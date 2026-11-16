@@ -26,6 +26,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { menuItemClasses } from "@/lib/overlay/shared/menuItem";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useJumpToDestinations } from "./useJumpToDestinations";
+import { useJumpToObjects } from "./useJumpToObjects";
 import {
   areaForPath,
   rankDestinations,
@@ -42,25 +43,34 @@ const route = useRoute();
 const destinations = useJumpToDestinations();
 
 const query = ref("");
-const activeIndex = ref(0);
+// Null follows the first row; a row the user picked stays picked while results arrive.
+const chosenKey = ref<string | null>(null);
 const visits = ref(readAreaVisits());
 const listRef = ref<HTMLElement | null>(null);
 const baseId = useId();
+const { groups: objectGroups, searchable } = useJumpToObjects(query, open, destinations);
 
-const groups = computed(() => rankDestinations(destinations.value, query.value, visits.value));
+const groups = computed(() => [
+  ...rankDestinations(destinations.value, query.value, visits.value, t("menu.jumpToPages")),
+  ...objectGroups.value,
+]);
 const results = computed(() => groups.value.flatMap((group) => group.items));
-const activeKey = computed(() => results.value[activeIndex.value]?.key);
+const activeKey = computed(() =>
+  results.value.some((item) => item.key === chosenKey.value)
+    ? chosenKey.value
+    : results.value[0]?.key,
+);
 
 const listId = `${baseId}-list`;
 const optionId = (key: string) => `${baseId}-${key.replace(/[^\w-]/g, "_")}`;
 const activeOptionId = computed(() => (activeKey.value ? optionId(activeKey.value) : undefined));
 const rowClasses = menuItemClasses("default", false, false);
 
-watch(query, () => (activeIndex.value = 0));
+watch(query, () => (chosenKey.value = null));
 watch(open, (isOpen) => {
   if (!isOpen) return;
   query.value = "";
-  activeIndex.value = 0;
+  chosenKey.value = null;
 });
 
 const resolvePath = (to: RouteLocationRaw): string | null => {
@@ -92,15 +102,16 @@ function revealActive() {
 // Captured before the field sees it, so Escape closes even with text in the field.
 function onKeydown(event: KeyboardEvent) {
   const count = results.value.length;
+  const index = results.value.findIndex((item) => item.key === activeKey.value);
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     if (!count) return;
     const step = event.key === "ArrowDown" ? 1 : -1;
-    activeIndex.value = (activeIndex.value + step + count) % count;
+    chosenKey.value = results.value[(index + step + count) % count].key;
     nextTick(revealActive);
   } else if (event.key === "Enter" && !event.isComposing) {
     event.preventDefault();
-    const target = results.value[activeIndex.value];
+    const target = results.value[index];
     if (target) go(target);
   } else if (event.key === "Escape") {
     event.preventDefault();
@@ -123,7 +134,7 @@ function onKeydown(event: KeyboardEvent) {
         v-model="query"
         width="full"
         :shortcut="false"
-        :placeholder="t('menu.jumpToPlaceholder')"
+        :placeholder="searchable ? t('menu.jumpToPlaceholder') : t('menu.jumpToPlaceholderPages')"
         :aria-controls="listId"
         :aria-activedescendant="activeOptionId"
         aria-autocomplete="list"
@@ -139,13 +150,15 @@ function onKeydown(event: KeyboardEvent) {
         data-test="jump-to-palette-list"
       >
         <div
-          v-for="group in groups"
+          v-for="(group, groupIndex) in groups"
           :key="group.areaKey"
           role="group"
-          :aria-labelledby="`${baseId}-area-${group.areaKey}`"
+          :aria-labelledby="group.area ? `${baseId}-area-${group.areaKey}` : undefined"
+          :class="!group.area && groupIndex > 0 && 'border-dropdown-separator mt-1 border-t pt-1'"
           :data-test="`jump-to-palette-group-${group.areaKey}`"
         >
           <div
+            v-if="group.area"
             :id="`${baseId}-area-${group.areaKey}`"
             role="presentation"
             class="text-text-muted text-2xs px-3 pt-2 pb-0.5 font-medium select-none"
@@ -161,16 +174,16 @@ function onKeydown(event: KeyboardEvent) {
             :data-highlighted="item.key === activeKey ? '' : undefined"
             :class="rowClasses"
             :data-test="`jump-to-palette-item-${item.key}`"
-            @mousemove="activeIndex = results.indexOf(item)"
+            @mousemove="chosenKey = item.key"
             @click="go(item)"
           >
             <OIcon :name="item.icon as IconName" size="sm" class="text-text-secondary shrink-0" />
             <OTruncatedText class="min-w-0 flex-1">{{ item.label }}</OTruncatedText>
-            <span
+            <OTruncatedText
               v-if="item.hint"
-              class="text-text-secondary shrink-0 text-xs"
+              class="text-text-secondary max-w-40 shrink-0 text-xs"
               :data-test="`jump-to-palette-hint-${item.key}`"
-              >{{ item.hint }}</span
+              >{{ item.hint }}</OTruncatedText
             >
           </div>
         </div>

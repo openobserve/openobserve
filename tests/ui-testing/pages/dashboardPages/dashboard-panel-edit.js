@@ -191,6 +191,7 @@ export default class DashboardPanel {
 
   //edit layout
   async editLayoutPanel(panelName, height) {
+    await this.page.locator('[data-test="dashboard-more-options-btn"]').click();
     await this.layoutEditBtn.waitFor({ state: "visible" });
     await this.layoutEditBtn.click();
     const dropdownBtn = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);

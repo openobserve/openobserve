@@ -25,27 +25,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <OPageLayout
       bleed
+      :title="isAnomalyMode ? t('alerts.newAnomalyTitle') : t('alerts.newAlertTitle')"
       :back="{ label: t('alerts.header'), to: alertListRoute, dataTest: 'add-alert-back-btn' }"
     >
-      <!-- The name is the title in both modes; edit mode renders it read-only. Anomaly and alert
-           names bind the same `name` field, which useAlertForm mirrors into anomalyConfig.name. -->
-      <template #title>
+      <!-- An existing name is the read-only title; a new one is a labelled field in the form body. -->
+      <template v-if="beingUpdated || anomalyEditMode" #title>
         <OFormInlineEdit
-          ref="step1Ref"
           size="lg"
           name="name"
-          :readonly="beingUpdated || anomalyEditMode"
+          readonly
           :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
-          :placeholder="
-            isAnomalyMode ? t('alerts.anomalyNamePlaceholder') : t('alerts.alertNamePlaceholder')
-          "
           :aria-label="isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName')"
-          :edit-hint="
-            alertAutoName.isAuto.value ? t('common.inlineEdit.autoHint') : t('alerts.renameHint')
-          "
-          @update:model-value="alertAutoName.markManual"
-          @commit="alertAutoName.onCommit"
-          @cancel="alertAutoName.onCommit"
         />
       </template>
 
@@ -170,6 +160,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
+            <div
+              v-if="!(beingUpdated || anomalyEditMode)"
+              class="border-border-default px-page-edge flex items-center gap-3 border-b py-2.5"
+            >
+              <span class="text-text-heading text-xs font-semibold whitespace-nowrap">
+                {{ isAnomalyMode ? t("alerts.anomalyName") : t("alerts.alertName") }}
+                <span class="text-text-body">*</span>
+              </span>
+              <OFormInlineEdit
+                ref="step1Ref"
+                field
+                name="name"
+                class="max-w-120"
+                :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
+                :placeholder="
+                  isAnomalyMode
+                    ? t('alerts.anomalyNamePlaceholder')
+                    : t('alerts.alertNamePlaceholder')
+                "
+                :aria-label="
+                  isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName')
+                "
+                :edit-hint="
+                  alertAutoName.isAuto.value
+                    ? t('common.inlineEdit.autoHint')
+                    : t('alerts.renameHint')
+                "
+                @update:model-value="alertAutoName.markManual"
+                @commit="alertAutoName.onCommit"
+                @cancel="alertAutoName.onCommit"
+              />
+            </div>
             <div class="border-border-default px-page-edge flex items-center gap-0 border-b py-2.5">
               <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
                 t("alerts.alertType")

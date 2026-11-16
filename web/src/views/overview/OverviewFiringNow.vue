@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @view-all="router.push(firingListRoute)"
   >
     <!-- every state keeps the four-row height, so the band never moves the page -->
-    <div class="flex min-h-37 flex-col" :data-test="`overview-firing-now-${state}`">
+    <div class="flex flex-col lg:min-h-37" :data-test="`overview-firing-now-${state}`">
       <ul v-if="state === 'loading'" class="divide-border-subtle flex flex-col divide-y">
         <li v-for="i in ROWS" :key="i" class="flex h-9 items-center gap-3">
           <OSkeleton shape="block" class="h-4 w-16 shrink-0" />
@@ -116,11 +116,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="flex shrink-0 items-center gap-2">
                   <OTag
                     v-if="row.last_outcome === 'notify_failed'"
-                    type="countChip"
-                    value="warning"
+                    tone="warn"
+                    icon="sync-problem"
+                    size="sm"
+                    :label="t('alerts.summaryDeliveryFailed')"
                     :data-test="`overview-firing-now-undelivered-${row.name}`"
-                    >{{ t("overview.firingNow.notifyFailed") }}</OTag
-                  >
+                  />
                   <span
                     v-if="row.firing_started_at"
                     class="text-text-secondary text-xs font-normal tabular-nums"

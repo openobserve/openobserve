@@ -947,8 +947,9 @@ describe("DetailTable Component", () => {
       expect(arg.query.span_id).toBeUndefined();
     });
 
-    it("shows a neutral, non-error state when correlation finds no service", async () => {
+    it("shows a neutral, non-error state when a log without a trace id matches no service", async () => {
       w = mountRow({
+        modelValue: { _timestamp: row._timestamp, message: "no ids" },
         initialTab: "correlated-traces",
         correlationError: i18n.global.t("logs.searchResult.noMatchingService"),
       });
@@ -959,6 +960,37 @@ describe("DetailTable Component", () => {
       expect(state.attributes("data-kind")).not.toBe("error");
       expect(state.text()).toContain("No trace linked to this log");
       expect(state.text()).toContain("Search traces around this time");
+      expect(w.find('[data-test="log-detail-linked-trace"]').exists()).toBe(false);
+    });
+
+    it("offers the log's own trace and span instead of 'No trace linked'", async () => {
+      w = mountRow({
+        initialTab: "correlated-traces",
+        correlationError: i18n.global.t("logs.searchResult.noMatchingService"),
+      });
+      await flushPromises();
+      const linked = w.find('[data-test="log-detail-linked-trace"]');
+      expect(linked.exists()).toBe(true);
+      expect(linked.text()).toContain("abc123");
+      expect(linked.text()).toContain("s1");
+      expect(w.text()).not.toContain("No trace linked to this log");
+    });
+
+    it("opens the linked trace focused on the log's span", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      w = mountRow({
+        initialTab: "correlated-traces",
+        correlationError: i18n.global.t("logs.searchResult.noMatchingService"),
+      });
+      await flushPromises();
+      w.vm.searchObj.meta.selectedTraceStream = "default";
+      await w.find('[data-test="log-detail-linked-trace-open-btn"]').trigger("click");
+      await flushPromises();
+      const arg: any = push.mock.calls[0][0];
+      push.mockRestore();
+      expect(arg.name).toBe("traceDetails");
+      expect(arg.query.trace_id).toBe("abc123");
+      expect(arg.query.span_id).toBe("s1");
     });
   });
 

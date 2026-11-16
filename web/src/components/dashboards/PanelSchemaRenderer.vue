@@ -2306,7 +2306,7 @@ export default defineComponent({
     );
 
     const noDataTitle = computed(() =>
-      customNoDataText.value ? raw(customNoDataText.value) : t("panel.noData"),
+      customNoDataText.value ? raw(customNoDataText.value) : t("panel.noDataInRange"),
     );
 
     // Determines what data to pass to ChartRenderer.

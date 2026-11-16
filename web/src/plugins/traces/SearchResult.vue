@@ -383,22 +383,6 @@ export default defineComponent({
       searchObj.meta.resultGrid.wrapCells = useLocalWrapTracesContent() === "true";
     });
 
-    // A failed run leaves the age where it was, so kept rows never read as fresh.
-    watch(
-      () => searchObj.loading,
-      (loading, wasLoading) => {
-        if (
-          wasLoading &&
-          !loading &&
-          searchObj.searchApplied &&
-          !searchObj.meta.refreshFailedAt &&
-          !searchObj.data.errorMsg?.trim()?.length
-        ) {
-          searchObj.meta.lastRunAt = Date.now();
-        }
-      },
-    );
-
     const traceTimeRange = (props: any) => {
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs

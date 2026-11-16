@@ -138,15 +138,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :help-text="
               rbacLocked
                 ? undefined
-                : isCloud
-                  ? filterdOption.length === 0
-                    ? t('user.noCustomRolesHint')
-                    : undefined
-                  : isExternalUser
-                    ? t('user.externalUserCustomRoleHint')
-                    : filterdOption.length === 0
+                : rbacOff
+                  ? t('user.customRolesNeedRbac')
+                  : isCloud
+                    ? filterdOption.length === 0
                       ? t('user.noCustomRolesHint')
                       : undefined
+                    : isExternalUser
+                      ? t('user.externalUserCustomRoleHint')
+                      : filterdOption.length === 0
+                        ? t('user.noCustomRolesHint')
+                        : undefined
             "
           >
             <template v-if="rbacLocked" #icon>
@@ -437,6 +439,8 @@ export default defineComponent({
     // Custom roles cannot be listed without the rbac license, so the picker would stay empty.
     const rbacState = computed(() => featureState(store.state.zoConfig?.features, "rbac"));
     const rbacLocked = computed(() => rbacState.value === "locked");
+    // Roles is locked in place when this is off, so the "create one in Roles" hint would point at a dead end.
+    const rbacOff = computed(() => store.state.zoConfig?.rbac_enabled === false);
     const { lockedReason: rbacLockedReason } = useLicenseLock("rbac");
 
     // Decide whether to send `custom_role`:
@@ -775,6 +779,7 @@ export default defineComponent({
       isExternalUser,
       rbacState,
       rbacLocked,
+      rbacOff,
       rbacLockedReason,
       changePassword,
       formEmail,

@@ -13,7 +13,9 @@
     "headerLocked": "已锁定：需要 {feature}",
     "availableInEnterprise": "{feature} 适用于 OpenObserve 企业版",
     "turnedOffTitle": "已为此组织关闭",
-    "enterpriseTitle": "Enterprise 版可用"
+    "enterpriseTitle": "Enterprise 版可用",
+    "readDocs": "阅读文档",
+    "rbacOff": "此组织已关闭 RBAC。管理员在服务器配置中将 {env} 设为 true 即可开启。"
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} 行 | {total} 行",
     "histogramTitleRows": "在 {took} 毫秒内显示 {total} 行。 | 在 {took} 毫秒内显示 {total} 行。",
     "histogramTitleRowsWithScan": "在 {took} 毫秒内显示 {total} 行。（{scanLabel}：{scanSize}） | 在 {took} 毫秒内显示 {total} 行。（{scanLabel}：{scanSize}）",
-    "pickStreamFirst": "请先选择一个流"
+    "pickStreamFirst": "请先选择一个流",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "告警校准",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "搜索或跳转到…",
     "jumpToTitle": "跳转到",
     "addData": "添加数据",
-    "jumpToPlaceholder": "搜索页面和操作",
+    "jumpToPlaceholder": "搜索页面、告警、仪表板和数据流",
+    "jumpToPlaceholderPages": "搜索页面和操作",
+    "jumpToPages": "页面",
+    "jumpToShowAll": "在{page}中查看全部",
+    "jumpToSearchLogs": "在日志中搜索“{text}”",
     "synthetic": "合成监控",
     "experience": "体验",
     "slos": "SLO",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "删除用户",
     "deleteUsersMsg": "您确定要删除 {count} 个用户吗？ | 您确定要删除 {count} 个用户吗？",
     "deleteUsersBlockNote": "其中 {count} 名用户通过您的已验证域名加入，将被阻止而不是删除。",
-    "roleHint": "Admin 管理组织，Editor 可更改数据和设置，Viewer 只能查看。"
+    "roleHint": "Admin 管理组织，Editor 可更改数据和设置，Viewer 只能查看。",
+    "customRolesNeedRbac": "自定义角色需要 RBAC，但此组织已关闭 RBAC。"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "GPU 导出器",
-    "rotationNote": "令牌不会原地轮换。要轮换，请创建新令牌，将数据源切换到新令牌，然后停用旧令牌。"
+    "rotationNote": "令牌不会原地轮换。要轮换，请创建新令牌，将数据源切换到新令牌，然后停用旧令牌。",
+    "rotateAction": "轮换…",
+    "rotateTitle": "轮换 {name}",
+    "rotateStep1": "创建新令牌。",
+    "rotateStep2": "将数据源切换到新令牌。",
+    "rotateStep3": "当不再有任何内容使用 {name} 时，从其行菜单中停用它。",
+    "rotateNever": "不会自动停用任何内容。旧令牌在你停用之前仍可使用。",
+    "rotateCreateNew": "创建新令牌",
+    "rotateNewName": "{name}-new",
+    "rotateDescription": "替换 {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "过去 7 天内停止写入",
       "criticalUnit": "{count} 个处于严重级别",
       "deliveryFailures": "告警投递失败",
+      "deliveryCount": "{count} 次告警送达失败 | {count} 次告警送达失败",
       "deliveryNote": "已触发但无法通知的告警",
       "oldestFiring": "最早触发已持续 {age}"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "无法读取您的数据流"
     },
     "start": {
-      "text": "过去 {range} 没有收到数据。发送数据、查看已有数据，或设置告警。",
+      "text": "尚未收到数据。发送数据、查看已有数据，或设置告警。",
       "addData": "添加数据",
       "createAlert": "创建告警"
     },
     "summary": {
       "loadError": "无法加载组织概要",
+      "loadErrorRest": "无法加载概要的其余部分",
       "denied": "无权访问组织概要。请联系组织管理员。"
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "阈值",
       "noIncident": "暂无事件",
       "conditionLabel": "告警条件",
-      "allRows": "所有行"
+      "allRows": "所有行",
+      "viewIncidents": "查看事件"
     },
     "summaryTrainingFailed": "训练失败",
     "startFromTemplate": "从模板开始",
@@ -12807,7 +12828,8 @@
       "condition": "条件",
       "result": "结果",
       "anomalies": "异常",
-      "forGroup": "对于 {group}"
+      "forGroup": "对于 {group}",
+      "errorFrom": "来自 {destination} 的 {status}"
     },
     "continue": "继续",
     "wouldTrigger": "会触发",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "此告警是一个安全检测。其查询由 Sigma 规则编译而来，因此规则、数据流和计划需在安全模块中编辑，以保持规则与查询一致。",
       "open": "在安全模块中编辑"
-    }
+    },
+    "newAlertTitle": "新建告警",
+    "newAnomalyTitle": "新建异常检测"
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -17120,7 +17144,13 @@
       "partial": "此追踪的部分 Span 无法读取。瀑布图可能不完整。",
       "truncated": "正在按开始时间顺序显示此追踪的第一个 Span。后续 Span 尚未加载。 | 正在按开始时间顺序显示此追踪的前 {count} 个 Span。后续 Span 尚未加载。",
       "loadMore": "加载下一个 Span | 加载接下来的 {size} 个 Span",
-      "loadMoreFailed": "无法加载此追踪的更多 Span"
+      "loadMoreFailed": "无法加载此追踪的更多 Span",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "点击展开",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "搜索此时间前后的追踪",
       "searchAroundTip": "加载紧邻此事件之前和之后记录的事件。",
       "noOfEventsTip": "围绕此事件加载的事件数量。",
-      "severityTip": "检测到的日志级别。选择即可查看检测方式。"
+      "severityTip": "检测到的日志级别。选择即可查看检测方式。",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "可视化不支持SELECT * 查询。",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "此模式无效或不受支持。不能使用先行断言、后行断言和反向引用。"
     },
     "queryTooltip": "以文本编辑筛选条件",
-    "builderTooltip": "使用构建器编辑筛选条件"
+    "builderTooltip": "使用构建器编辑筛选条件",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

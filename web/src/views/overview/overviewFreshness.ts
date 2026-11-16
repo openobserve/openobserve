@@ -87,3 +87,8 @@ export function freshnessRows(
 export function noDataInRange(rows: readonly FreshnessRow[]): boolean {
   return rows.some((r) => r.tone !== "none") && rows.every((r) => r.tone !== "fresh");
 }
+
+/** No stream of the org has ever received a record, or the org has no stream at all. */
+export function noDataEver(rows: readonly FreshnessRow[]): boolean {
+  return rows.length > 0 && rows.every((r) => r.lastSeenUs === null);
+}

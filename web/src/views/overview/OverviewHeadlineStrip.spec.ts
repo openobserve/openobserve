@@ -79,21 +79,14 @@ describe("OverviewHeadlineStrip", () => {
     expect(w.find('[data-test="overview-headline-firing"]').exists()).toBe(false);
   });
 
-  it("keeps a sixth cell for the strip's one load message", () => {
-    const w = mount(OverviewHeadlineStrip, {
-      props: {
-        overview: null,
-        pending: false,
-        failed: true,
-        incidentsState: "ok",
-        incidentsTotal: 0,
-      },
-      slots: { aside: '<p data-test="aside-probe">Could not load</p>' },
-      global: { plugins: [i18n, store] },
-    });
-    const aside = w.get('[data-test="overview-summary-aside"]');
-    expect(aside.find('[data-test="aside-probe"]').exists()).toBe(true);
-    expect(w.get('[data-test="overview-headline-strip"]').findAll(":scope > li")).toHaveLength(6);
+  it("says a failed summary once, inline, with Retry", async () => {
+    const w = mountStrip({ overview: null, failed: true, incidentsState: "locked" });
+    expect(w.get('[data-test="overview-summary-error"]').text()).toContain(
+      "Couldn't load the org summary",
+    );
+    await w.get('[data-test="overview-summary-retry"]').trigger("click");
+    expect(w.emitted("retry")).toHaveLength(1);
+    expect(w.get('[data-test="overview-headline-strip"]').attributes("aria-hidden")).toBe("true");
   });
 
   it("formats every count compactly, as the rest of Home does", () => {
@@ -300,12 +293,23 @@ describe("OverviewHeadlineStrip", () => {
     expect(w.text()).not.toContain("nope");
   });
 
-  it("shows a dash on every overview tile, with no note under each, when the whole request failed", () => {
-    const w = mountStrip({ overview: null, failed: true });
-    for (const key of OVERVIEW_TILES) {
-      expect(valueOf(w, key).text()).toBe("—");
-      expect(noteOf(w, key).exists()).toBe(false);
-    }
+  it("hides the tiles and keeps their box when the whole request failed", () => {
+    const w = mountStrip({ overview: null, failed: true, incidentsState: "locked" });
+    const grid = w.get('[data-test="overview-headline-strip"]');
+    expect(grid.classes()).toContain("invisible");
+    expect(grid.attributes("aria-hidden")).toBe("true");
+  });
+
+  it("keeps the delivery count the alert list gave when the summary failed", () => {
+    const w = mountStrip({
+      overview: null,
+      failed: true,
+      incidentsState: "locked",
+      deliveryFailures: 5,
+    });
+    expect(w.get('[data-test="overview-failed-delivery"]').text()).toBe(
+      "5 alert delivery failures",
+    );
   });
 
   it("shows the incidents tile as locked", () => {
@@ -321,12 +325,9 @@ describe("OverviewHeadlineStrip", () => {
     expect(w.emitted("select")).toBeUndefined();
   });
 
-  it("shows a note and is not clickable when incidents are unavailable", async () => {
+  it("leaves the incidents tile out when incidents are unavailable", () => {
     const w = mountStrip({ incidentsState: "unavailable" });
-    expect(noteOf(w, "incidents").text()).toBe("Not available");
-    expect(tile(w, "incidents").element.tagName).not.toBe("BUTTON");
-    await tile(w, "incidents").trigger("click");
-    expect(w.emitted("select")).toBeUndefined();
+    expect(w.find('[data-test="overview-tile-card-incidents"]').exists()).toBe(false);
   });
 
   it("keeps a value a link to its page unless the section is refused", async () => {

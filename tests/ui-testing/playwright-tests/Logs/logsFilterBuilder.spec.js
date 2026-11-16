@@ -10,7 +10,8 @@ const { EDITOR_HOSTS, seedEditor, editorText } = require('../utils/suggest-menu-
 
 const HOST = EDITOR_HOSTS.logs;
 const PREFIX = 'logs-search-bar-filter-builder';
-const TOGGLE = '[data-test="logs-search-bar-filter-builder-toggle"]';
+const TO_TEXT = '[data-test="logs-search-bar-filter-mode-text"]';
+const TO_BUILDER = '[data-test="logs-search-bar-filter-mode-builder"]';
 const FIELD = 'kubernetes_namespace_name';
 const UNPARSABLE_QUERY = `${FIELD} = upper(${FIELD})`;
 
@@ -64,15 +65,15 @@ test.describe('Logs filter builder', () => {
         await builder.addCondition(FIELD, '=', 'ziox');
         await builder.expectChipCount(1);
 
-        await page.locator(TOGGLE).click();
+        await page.locator(TO_TEXT).click();
         await expect(page.locator(HOST)).toBeVisible();
         await expect(builder.barInput).toBeHidden();
-        await expect(page.locator(TOGGLE)).toHaveAttribute('aria-pressed', 'false');
+        await expect(page.locator(TO_BUILDER)).toHaveAttribute('aria-pressed', 'false');
         await expect.poll(() => editorText(page, HOST)).toBe(`${FIELD} = 'ziox'`);
 
-        await page.locator(TOGGLE).click();
+        await page.locator(TO_BUILDER).click();
         await expect(builder.barInput).toBeVisible();
-        await expect(page.locator(TOGGLE)).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.locator(TO_BUILDER)).toHaveAttribute('aria-pressed', 'true');
         await builder.expectChipCount(1);
         await builder.expectChip(FIELD, 'ziox');
     });
@@ -82,9 +83,9 @@ test.describe('Logs filter builder', () => {
     }, async ({ page }) => {
         const banner = page.locator(`[data-test="${PREFIX}-unparsable"]`);
 
-        await page.locator(TOGGLE).click();
+        await page.locator(TO_TEXT).click();
         await seedEditor(page, HOST, UNPARSABLE_QUERY);
-        await page.locator(TOGGLE).click();
+        await page.locator(TO_BUILDER).click();
         await expect(banner).toBeVisible();
         await expect(builder.barInput).toBeHidden();
 
@@ -92,7 +93,7 @@ test.describe('Logs filter builder', () => {
         await expect(page.locator(HOST)).toBeVisible();
         await expect.poll(() => editorText(page, HOST)).toBe(UNPARSABLE_QUERY);
 
-        await page.locator(TOGGLE).click();
+        await page.locator(TO_BUILDER).click();
         await expect(banner).toBeVisible();
         await page.locator(`[data-test="${PREFIX}-clear-and-build"]`).click();
         await expect(banner).toBeHidden();

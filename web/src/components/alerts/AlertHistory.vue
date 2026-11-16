@@ -474,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   font-family: var(--font-mono);
                   font-size: var(--text-xs);
                 "
-                >{{ selectedRow.error }}</pre>
+                >{{ plainAlertError(selectedRow.error) }}</pre>
             </div>
           </div>
         </template>
@@ -553,6 +553,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue"
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { plainAlertError } from "@/utils/alerts/alertError";
 import analytics from "@/services/product_analytics";
 import { formatDate } from "@/utils/date";
 import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";

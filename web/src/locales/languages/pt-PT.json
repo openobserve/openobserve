@@ -13,7 +13,9 @@
     "headerLocked": "Bloqueado: requer {feature}",
     "availableInEnterprise": "Disponível no OpenObserve Enterprise: {feature}",
     "turnedOffTitle": "Desativado para esta organização",
-    "enterpriseTitle": "Disponível no Enterprise"
+    "enterpriseTitle": "Disponível no Enterprise",
+    "readDocs": "Ler a documentação",
+    "rbacOff": "O RBAC está desativado para esta organização. Um administrador ativa-o definindo {env} como true na configuração do servidor."
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} linha | {total} linhas",
     "histogramTitleRows": "A mostrar {total} linha em {took} ms. | A mostrar {total} linhas em {took} ms.",
     "histogramTitleRowsWithScan": "A mostrar {total} linha em {took} ms. ({scanLabel}: {scanSize}) | A mostrar {total} linhas em {took} ms. ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "Escolha primeiro um fluxo"
+    "pickStreamFirst": "Escolha primeiro um fluxo",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "Calibração de alertas",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "Pesquisar ou ir para…",
     "jumpToTitle": "Ir para",
     "addData": "Adicionar dados",
-    "jumpToPlaceholder": "Pesquisar páginas e ações",
+    "jumpToPlaceholder": "Pesquisar páginas, alertas, painéis e fluxos",
+    "jumpToPlaceholderPages": "Pesquisar páginas e ações",
+    "jumpToPages": "Páginas",
+    "jumpToShowAll": "Ver tudo em {page}",
+    "jumpToSearchLogs": "Pesquisar \"{text}\" nos registos",
     "synthetic": "Sintéticos",
     "experience": "Experiência",
     "slos": "SLOs",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "Eliminar utilizadores",
     "deleteUsersMsg": "Tem a certeza de que pretende eliminar {count} utilizador? | Tem a certeza de que pretende eliminar {count} utilizadores?",
     "deleteUsersBlockNote": "{count} deles entraram por meio do seu domínio verificado e serão bloqueados em vez de excluídos.",
-    "roleHint": "Admin gere a organização, Editor altera dados e definições, Viewer só pode ler."
+    "roleHint": "Admin gere a organização, Editor altera dados e definições, Viewer só pode ler.",
+    "customRolesNeedRbac": "As funções personalizadas requerem RBAC, que está desativado para esta organização."
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "Exportador de GPU",
-    "rotationNote": "Os tokens não são rodados no local. Para rodar, crie um novo token, mude as suas origens para ele e depois desative o antigo."
+    "rotationNote": "Os tokens não são rodados no local. Para rodar, crie um novo token, mude as suas origens para ele e depois desative o antigo.",
+    "rotateAction": "Rodar…",
+    "rotateTitle": "Rodar {name}",
+    "rotateStep1": "Crie um novo token.",
+    "rotateStep2": "Mude as suas origens para o novo token.",
+    "rotateStep3": "Quando nada usar {name}, desative-o a partir do menu da linha.",
+    "rotateNever": "Nada é desativado automaticamente. O token antigo continua a funcionar até o desativar.",
+    "rotateCreateNew": "Criar novo token",
+    "rotateNewName": "{name}-novo",
+    "rotateDescription": "Substitui {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "Deixou de escrever nos últimos 7 dias",
       "criticalUnit": "{count} em nível crítico",
       "deliveryFailures": "Falhas de entrega de alertas",
+      "deliveryCount": "{count} entrega de alerta falhada | {count} entregas de alertas falhadas",
       "deliveryNote": "Alertas que dispararam mas não conseguiram notificar",
       "oldestFiring": "Disparado há mais tempo: {age}"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "Não foi possível ler os seus streams"
     },
     "start": {
-      "text": "Não chegaram dados nas últimas {range}. Envie dados, veja o que tem ou configure um alerta.",
+      "text": "Ainda não chegaram dados. Envie dados, veja o que tem ou configure um alerta.",
       "addData": "Adicionar dados",
       "createAlert": "Criar alerta"
     },
     "summary": {
       "loadError": "Não foi possível carregar o resumo da organização",
+      "loadErrorRest": "Não foi possível carregar o resto do resumo",
       "denied": "Sem acesso ao resumo da organização. Peça a um administrador."
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "Limiar",
       "noIncident": "Ainda sem incidente",
       "conditionLabel": "Condição do alerta",
-      "allRows": "Todas as linhas"
+      "allRows": "Todas as linhas",
+      "viewIncidents": "Ver incidentes"
     },
     "summaryTrainingFailed": "Treino falhado",
     "startFromTemplate": "Começar a partir de um modelo",
@@ -12807,7 +12828,8 @@
       "condition": "Condição",
       "result": "Resultado",
       "anomalies": "Anomalias",
-      "forGroup": "para {group}"
+      "forGroup": "para {group}",
+      "errorFrom": "{status} de {destination}"
     },
     "continue": "Continuar",
     "wouldTrigger": "ACIONARIA",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "Este alerta é uma deteção de Segurança. A consulta é compilada a partir da regra Sigma, por isso a regra, o stream e o agendamento são editados em Segurança, que mantém a regra e a consulta alinhadas.",
       "open": "Editar em Segurança"
-    }
+    },
+    "newAlertTitle": "Novo alerta",
+    "newAnomalyTitle": "Nova deteção de anomalias"
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",
@@ -17120,7 +17144,13 @@
       "partial": "Alguns spans deste trace não puderam ser lidos. A cascata pode estar incompleta.",
       "truncated": "A mostrar o primeiro span deste trace, por ordem de hora de início. Spans posteriores ainda não foram carregados. | A mostrar os primeiros {count} spans deste trace, por ordem de hora de início. Spans posteriores ainda não foram carregados.",
       "loadMore": "Carregar o próximo span | Carregar os próximos {size} spans",
-      "loadMoreFailed": "Não foi possível carregar mais spans deste trace"
+      "loadMoreFailed": "Não foi possível carregar mais spans deste trace",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "Clique para expandir",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "Pesquisar rastreios em torno deste momento",
       "searchAroundTip": "Carrega os eventos registados imediatamente antes e depois deste.",
       "noOfEventsTip": "Quantos eventos carregar em torno deste.",
-      "severityTip": "Nível de registo detetado. Selecione para ver como foi detetado."
+      "severityTip": "Nível de registo detetado. Selecione para ver como foi detetado.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Consulta Select * não é suportada para visualização.",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "Este padrão é inválido ou não é suportado. Não é possível usar lookahead, lookbehind nem referências anteriores."
     },
     "queryTooltip": "Editar o filtro como texto",
-    "builderTooltip": "Editar o filtro com o construtor"
+    "builderTooltip": "Editar o filtro com o construtor",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

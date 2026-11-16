@@ -1421,6 +1421,18 @@ describe("OverviewTab", () => {
       expect(refreshLastRun()).not.toBeNull();
     });
 
+    it("should say one error for the group when every section failed but the band answered", async () => {
+      givenEnterprise(false);
+      givenEverySectionFails(serverError);
+      vi.mocked(alertsService.listByFolderId).mockResolvedValue({ data: { list: [] } } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-sections-load-error"]').exists()).toBe(true);
+      expect(wrapper.findAll(SECTION_ERROR)).toHaveLength(1);
+    });
+
     it("should keep loaded rows beside the failed section and retry every section from its button", async () => {
       givenEnterprise(false);
       givenRecentEvents();
@@ -2094,13 +2106,9 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="overview-time-range-group"]').exists()).toBe(true);
       // the detail panels sit last, so dropping them moves nothing on screen
       expect(wrapper.find('[data-test="overview-streams-card"]').exists()).toBe(false);
-      expect(wrapper.findAll('[data-test="overview-tile-value"]').map((v) => v.text())).toEqual([
-        "—",
-        "—",
-        "—",
-        "—",
-        "—",
-      ]);
+      expect(wrapper.get('[data-test="overview-headline-strip"]').attributes("aria-hidden")).toBe(
+        "true",
+      );
     });
 
     it("should force the read with refresh=true on the refresh button", async () => {
@@ -2166,13 +2174,9 @@ describe("OverviewTab", () => {
       for (const section of ["streams", "limit"]) {
         expect(wrapper.find(`[data-test="overview-${section}-error"]`).exists()).toBe(false);
       }
-      expect(wrapper.get(`${tile("failing")} [data-test="overview-tile-value"]`).text()).toBe("—");
-      // the failure is said once, beside the tiles, not under each of them
-      expect(
-        wrapper
-          .find('[data-test="overview-tile-card-failing"] [data-test="overview-tile-note"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.get('[data-test="overview-headline-strip"]').attributes("aria-hidden")).toBe(
+        "true",
+      );
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
 
@@ -2379,14 +2383,14 @@ describe("OverviewTab", () => {
       expect(wrapper.get(`${tile("failing")} [data-test="overview-tile-value"]`).text()).toBe("—");
     });
 
-    it("should show a dash on every tile, never a zero, when the overview request failed", async () => {
+    it("should hide the tiles and keep their box when the overview request failed", async () => {
       vi.mocked(overviewService.getOrgOverview).mockRejectedValue(new Error("boom"));
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      const values = wrapper.findAll('[data-test="overview-tile-value"]').map((v) => v.text());
-      expect(values).toHaveLength(5);
-      expect(values.every((v) => v === "—")).toBe(true);
+      expect(wrapper.get('[data-test="overview-headline-strip"]').attributes("aria-hidden")).toBe(
+        "true",
+      );
       expect(wrapper.get(SUMMARY_ERROR).text()).toContain("Couldn't load the org summary");
     });
 
@@ -2878,7 +2882,7 @@ describe("OverviewTab", () => {
       await mountWith(buildOverview());
 
       const failed = wrapper.get('[data-test="overview-firing-now-error"]');
-      expect(failed.classes()).toContain("min-h-37");
+      expect(failed.classes()).toContain("lg:min-h-37");
       expect(failed.text()).toContain("Couldn't load firing alerts");
       expect(wrapper.find('[data-test="overview-headline-strip"]').exists()).toBe(true);
 
@@ -2888,7 +2892,7 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="overview-firing-now-row-high_cpu"]').exists()).toBe(true);
     });
 
-    it("says no data in the range for a type that went quiet, and offers the first steps", async () => {
+    it("says no data in the range for a type that went quiet, without the first steps", async () => {
       givenLogsLastSeen(50 * HOUR_US);
       await mountWith(buildOverview());
 
@@ -2901,11 +2905,18 @@ describe("OverviewTab", () => {
       expect(wrapper.get('[data-test="overview-data-freshness-status-metrics"]').text()).toBe(
         "Not set up",
       );
+      expect(wrapper.find('[data-test="overview-getting-started"]').exists()).toBe(false);
+    });
+
+    it("offers the first steps only for an org that never received data", async () => {
+      givenStreams({ logs: [{ name: "app", stream_type: "logs" }] });
+      await mountWith(buildOverview());
+
       const start = wrapper.get('[data-test="overview-getting-started"]');
-      expect(start.text()).toContain("No data arrived in the last 24 hours");
+      expect(start.text()).toContain("No data has arrived yet");
       expect(
-        wrapper.get('[data-test="overview-getting-started-explore-logs"]').attributes("href"),
-      ).toContain("stream=app_logs");
+        wrapper.get('[data-test="overview-getting-started-create-alert"]').attributes("href"),
+      ).toContain("alerts/add");
     });
 
     it("shows the last data time and no first steps while data arrives", async () => {
@@ -2935,13 +2946,12 @@ describe("OverviewTab", () => {
       );
     });
 
-    it("holds the overview body until the stream lists answer, so the first steps never push it down", async () => {
+    it("keeps the first steps out until the stream lists answer", async () => {
       streamLists.lists = [undefined, undefined, undefined, undefined] as unknown[];
       await mountWith(buildOverview());
 
-      expect(wrapper.find('[data-test="overview-sections"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="overview-sections-pending"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="overview-firing-now-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-getting-started"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-data-freshness-loading"]').exists()).toBe(true);
     });
 
     it("hides the band and the time-range heading on the first-run hero", async () => {

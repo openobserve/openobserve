@@ -2606,7 +2606,7 @@ export default class DashboardVariablesScoped {
    * Open the dashboard refresh-options dropdown (the caret beside Refresh).
    */
   async openDashboardRefreshOptions() {
-    const trigger = this.page.locator('[data-test="dashboard-refresh-options-btn"]');
+    const trigger = this.page.locator('[data-test="dashboard-refresh-btn-auto-menu"]');
     await trigger.waitFor({ state: "visible", timeout: 15000 });
     // Disabled while any panel is loading.
     await expect(trigger).toBeEnabled({ timeout: 30000 });

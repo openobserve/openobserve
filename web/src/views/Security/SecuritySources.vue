@@ -451,7 +451,14 @@ onMounted(reload);
       class="mx-page-edge mt-2"
       data-test="security-sources-notices"
     />
+    <SecurityLoadError
+      v-if="loadFailed"
+      :what="t('siem.sources.whatSources')"
+      :hint="t('siem.sources.loadFailedHint')"
+      @retry="reload"
+    />
     <OTable
+      v-else
       :data="rows"
       :columns="columns"
       row-key="name"

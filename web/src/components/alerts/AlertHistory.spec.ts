@@ -504,9 +504,9 @@ describe("AlertHistory.vue", () => {
       expect(r.icon).toBe("error-outline");
     });
 
-    it("notify_failed → red error-soft (condition matched, delivery failed)", () => {
+    it("notify_failed → amber warning (the condition matched; only delivery failed, C9)", () => {
       const r = resolveBadge("alertState", "notify_failed");
-      expect(r.tone).toBe("err");
+      expect(r.tone).toBe("warn");
       expect(r.labelKey).toBe("components.badge.alertState.notifyfailed");
     });
   });

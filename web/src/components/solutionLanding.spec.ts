@@ -13,8 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
-import { MATCHING_PAGES, SOLUTION_HOME, solutionLanding } from "./solutionLanding";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  MATCHING_PAGES,
+  SOLUTION_HOME,
+  lastSolutionPage,
+  rememberSolutionPage,
+  solutionLanding,
+  solutionOfPath,
+} from "./solutionLanding";
 
 describe("solutionLanding", () => {
   it("lands Security pages on the Observability page that does the same job", () => {
@@ -59,5 +66,52 @@ describe("solutionLanding", () => {
       expect(pair.security.startsWith("/security/")).toBe(true);
       expect(pair.observability.startsWith("/security")).toBe(false);
     }
+  });
+
+  it("lands on the page the target solution last showed when nothing matches", () => {
+    const memory = { lastPage: "/security/mitre?tactic=TA0001" };
+    expect(solutionLanding("/metrics", "security", undefined, memory)).toBe(memory.lastPage);
+    expect(solutionLanding("/", "security", undefined, memory)).toBe(memory.lastPage);
+  });
+
+  it("prefers the matching page over the remembered one", () => {
+    const memory = { lastPage: "/security/mitre" };
+    expect(solutionLanding("/logs", "security", undefined, memory)).toBe("/security/events");
+  });
+
+  it("goes straight back to the page the user switched from when they have not moved", () => {
+    const memory = { lastPage: "/security/mitre", justSwitched: true };
+    expect(solutionLanding("/logs", "security", undefined, memory)).toBe("/security/mitre");
+  });
+
+  it("skips a remembered page this build no longer has", () => {
+    const exists = (path: string) => path !== "/security/mitre";
+    const memory = { lastPage: "/security/mitre", justSwitched: true };
+    expect(solutionLanding("/metrics", "security", exists, memory)).toBe(SOLUTION_HOME.security);
+  });
+});
+
+describe("remembered solution pages", () => {
+  beforeEach(() => window.localStorage.removeItem("o2.solutionSwitcher.lastPages"));
+
+  it("keeps the last page of each solution per org, and none for a page both share", () => {
+    rememberSolutionPage("acme", "/logs?stream=app");
+    rememberSolutionPage("acme", "/security/mitre");
+    rememberSolutionPage("acme", "/settings/general");
+    rememberSolutionPage("other", "/metrics");
+    expect(lastSolutionPage("acme", "observability")).toBe("/logs?stream=app");
+    expect(lastSolutionPage("acme", "security")).toBe("/security/mitre");
+    expect(lastSolutionPage("other", "security")).toBeNull();
+  });
+
+  it("names the solution of a page, or none for a shared one", () => {
+    expect(solutionOfPath("/security/cases")).toBe("security");
+    expect(solutionOfPath("/dashboards")).toBe("observability");
+    expect(solutionOfPath("/iam/users")).toBeNull();
+  });
+
+  it("reads nothing when storage holds nothing usable", () => {
+    window.localStorage.setItem("o2.solutionSwitcher.lastPages", "not json");
+    expect(lastSolutionPage("acme", "security")).toBeNull();
   });
 });

@@ -73,9 +73,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Destination Type and Name Display for Edit Mode -->
             <div v-if="isAlerts && destination && dtVal" class="w-full pb-3">
-              <div class="flex gap-3">
-                <!-- Destination Type (Read-only) -->
-                <div class="w-1/2">
+              <div class="flex w-1/2 flex-col gap-3">
+                <OFormInput
+                  data-test="add-destination-name-input"
+                  name="name"
+                  :label="t('alerts.name')"
+                  required
+                  readonly
+                  disabled
+                  tabindex="0"
+                />
+                <div>
                   <div class="mb-1 text-sm leading-tight font-medium">
                     {{ t("alert_destinations.destination_type") }}
                   </div>
@@ -89,18 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       t("alert_destinations.readonly")
                     }}</OTag>
                   </div>
-                </div>
-                <!-- Destination Name (Read-only) -->
-                <div class="w-1/2">
-                  <OFormInput
-                    data-test="add-destination-name-input"
-                    name="name"
-                    :label="t('alerts.name')"
-                    required
-                    readonly
-                    disabled
-                    tabindex="0"
-                  />
                 </div>
               </div>
             </div>

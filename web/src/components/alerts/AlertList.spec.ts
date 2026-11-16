@@ -595,7 +595,7 @@ describe("AlertList - data fetching and columns", () => {
     const texts = wrapper
       .findAll('[data-test="o2-table-cell-frequency"]')
       .map((c: any) => c.text());
-    expect(texts).toEqual(["15 Mins", "*/10 * * * *", "--"]);
+    expect(texts).toEqual(["15 min", "*/10 * * * *", "--"]);
   });
 
   it("states a zero firing count in the groups cell when no group fires", async () => {
@@ -2175,6 +2175,9 @@ describe("AlertList - row actions keep the view", () => {
     expect(wrapper.vm.filteredResults.find((r: any) => r.alert_id === "alert-6").enabled).toBe(
       false,
     );
+    // The scope lives in the URL; letting its write land here keeps it out of the next test.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await flushPromises();
   });
 
   it("holds the other bulk actions inactive while a bulk pause runs, so Resume can't overlap it", async () => {
@@ -2303,11 +2306,15 @@ describe("AlertList - filters from the Overview links", () => {
   });
 
   it("starts without the saved search when the link carries a state or level", async () => {
-    Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
+    const save = () =>
+      Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
+    save();
     const linked = await withQuery({ state: "firing" });
     expect(linked.vm.searchQuery).toBe("");
     expect(linked.vm.filterQuery).toBe("");
+    save();
     expect((await withQuery({ level: "critical" })).vm.searchQuery).toBe("");
+    save();
     expect((await withQuery({ state: "bogus" })).vm.searchQuery).toBe("saved");
   });
 
@@ -2396,9 +2403,16 @@ describe("AlertList - filters from the Overview links", () => {
     replace.mockRestore();
   });
 
-  it("restores the saved search on a later mount without the param", async () => {
+  it("drops the saved search for good once a link replaces it, so the URL never shows a search the box does not", async () => {
     Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
     await withQuery({ state: "firing" });
+    const again = await withQuery({});
+    expect(again.vm.searchQuery).toBe("");
+    expect(again.vm.filterQuery).toBe("");
+  });
+
+  it("restores the saved search on a later mount without a link", async () => {
+    Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
     const again = await withQuery({});
     expect(again.vm.searchQuery).toBe("saved");
     expect(again.vm.filterQuery).toBe("f=1");
@@ -2407,7 +2421,14 @@ describe("AlertList - filters from the Overview links", () => {
   it("starts a linked filter inside the current folder, not across folders", async () => {
     Object.assign(useListViewState("alerts", {}), { searchAcrossFolders: true });
     expect((await withQuery({ state: "firing" })).vm.searchAcrossFolders).toBe(false);
+    Object.assign(useListViewState("alerts", {}), { searchAcrossFolders: true });
     expect((await withQuery({})).vm.searchAcrossFolders).toBe(true);
+  });
+
+  it("reads a search across folders from the URL, as the Jump to Show all link writes it", async () => {
+    const wrapper = await withQuery({ "v.search": "cpu", "v.all": "true" });
+    expect(wrapper.vm.searchQuery).toBe("cpu");
+    expect(wrapper.vm.searchAcrossFolders).toBe(true);
   });
 
   it("says what pressing the level chip does", async () => {

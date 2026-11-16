@@ -13,7 +13,9 @@
     "headerLocked": "Vergrendeld: vereist {feature}",
     "availableInEnterprise": "{feature} is beschikbaar in OpenObserve Enterprise",
     "turnedOffTitle": "Uitgeschakeld voor deze organisatie",
-    "enterpriseTitle": "Beschikbaar in Enterprise"
+    "enterpriseTitle": "Beschikbaar in Enterprise",
+    "readDocs": "Documentatie lezen",
+    "rbacOff": "RBAC is uitgeschakeld voor deze organisatie. Een beheerder schakelt het in door {env} in de serverconfiguratie op true te zetten."
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} rij | {total} rijen",
     "histogramTitleRows": "{total} rij in {took} ms. | {total} rijen in {took} ms.",
     "histogramTitleRowsWithScan": "{total} rij in {took} ms. ({scanLabel}: {scanSize}) | {total} rijen in {took} ms. ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "Kies eerst een stream"
+    "pickStreamFirst": "Kies eerst een stream",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "Alarmkalibratie",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "Zoeken of ga naar…",
     "jumpToTitle": "Ga naar",
     "addData": "Gegevens toevoegen",
-    "jumpToPlaceholder": "Pagina's en acties zoeken",
+    "jumpToPlaceholder": "Zoek pagina's, waarschuwingen, dashboards en streams",
+    "jumpToPlaceholderPages": "Pagina's en acties zoeken",
+    "jumpToPages": "Pagina's",
+    "jumpToShowAll": "Alles tonen in {page}",
+    "jumpToSearchLogs": "Logs doorzoeken op \"{text}\"",
     "synthetic": "Synthetics",
     "experience": "Ervaring",
     "slos": "SLO's",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "Gebruikers verwijderen",
     "deleteUsersMsg": "Weet je zeker dat je {count} gebruiker wilt verwijderen? | Weet je zeker dat je {count} gebruikers wilt verwijderen?",
     "deleteUsersBlockNote": "{count} van hen is via je geverifieerde domein lid geworden en wordt geblokkeerd in plaats van verwijderd.",
-    "roleHint": "Admin beheert de organisatie, Editor wijzigt gegevens en instellingen, Viewer kan alleen lezen."
+    "roleHint": "Admin beheert de organisatie, Editor wijzigt gegevens en instellingen, Viewer kan alleen lezen.",
+    "customRolesNeedRbac": "Aangepaste rollen vereisen RBAC, dat is uitgeschakeld voor deze organisatie."
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "GPU-exporter",
-    "rotationNote": "Tokens worden niet ter plaatse geroteerd. Maak om te roteren een nieuw token, schakel uw bronnen erop over en schakel daarna het oude uit."
+    "rotationNote": "Tokens worden niet ter plaatse geroteerd. Maak om te roteren een nieuw token, schakel uw bronnen erop over en schakel daarna het oude uit.",
+    "rotateAction": "Roteren…",
+    "rotateTitle": "{name} roteren",
+    "rotateStep1": "Maak een nieuw token.",
+    "rotateStep2": "Schakel uw bronnen over naar het nieuwe token.",
+    "rotateStep3": "Schakel {name} uit via het rijmenu zodra niets het meer gebruikt.",
+    "rotateNever": "Er wordt niets automatisch uitgeschakeld. Het oude token blijft werken totdat u het uitschakelt.",
+    "rotateCreateNew": "Nieuw token maken",
+    "rotateNewName": "{name}-nieuw",
+    "rotateDescription": "Vervangt {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "Geen nieuwe data in de afgelopen 7 dagen",
       "criticalUnit": "{count} op kritiek niveau",
       "deliveryFailures": "Fouten bij alarmlevering",
+      "deliveryCount": "{count} alarmmelding niet bezorgd | {count} alarmmeldingen niet bezorgd",
       "deliveryNote": "Alarmen die afgingen maar geen melding konden versturen",
       "oldestFiring": "Langst afgaand: {age}"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "Je streams konden niet worden gelezen"
     },
     "start": {
-      "text": "Er zijn de afgelopen {range} geen gegevens binnengekomen. Stuur gegevens, bekijk wat je hebt of stel een alarm in.",
+      "text": "Er zijn nog geen gegevens binnengekomen. Stuur gegevens, bekijk wat je hebt of stel een alarm in.",
       "addData": "Gegevens toevoegen",
       "createAlert": "Alarm maken"
     },
     "summary": {
       "loadError": "Het organisatieoverzicht kon niet worden geladen",
+      "loadErrorRest": "De rest van het overzicht kon niet worden geladen",
       "denied": "Geen toegang tot het organisatieoverzicht. Vraag het een beheerder."
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "Drempel",
       "noIncident": "Nog geen incident",
       "conditionLabel": "Waarschuwingsvoorwaarde",
-      "allRows": "Elke rij"
+      "allRows": "Elke rij",
+      "viewIncidents": "Incidenten bekijken"
     },
     "summaryTrainingFailed": "Training mislukt",
     "startFromTemplate": "Begin met een sjabloon",
@@ -12807,7 +12828,8 @@
       "condition": "Voorwaarde",
       "result": "Resultaat",
       "anomalies": "Anomalieën",
-      "forGroup": "voor {group}"
+      "forGroup": "voor {group}",
+      "errorFrom": "{status} van {destination}"
     },
     "continue": "Ga verder",
     "wouldTrigger": "ZOU TRIGGEREN",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "Dit alarm is een Security-detectie. De query wordt gecompileerd uit de Sigma-regel, dus regel, stream en schema bewerk je in Security, zodat regel en query gelijk blijven.",
       "open": "Bewerken in Security"
-    }
+    },
+    "newAlertTitle": "Nieuwe waarschuwing",
+    "newAnomalyTitle": "Nieuwe anomaliedetectie"
   },
   "alert_dependencies": {
     "actionOpen": "Openen",
@@ -17120,7 +17144,13 @@
       "partial": "Sommige spans van deze trace konden niet worden gelezen. De waterval is mogelijk onvolledig.",
       "truncated": "Toont de eerste span van deze trace, in starttijdvolgorde. Latere spans zijn nog niet geladen. | Toont de eerste {count} spans van deze trace, in starttijdvolgorde. Latere spans zijn nog niet geladen.",
       "loadMore": "Laad de volgende span | Laad de volgende {size} spans",
-      "loadMoreFailed": "Kon niet meer spans van deze trace laden"
+      "loadMoreFailed": "Kon niet meer spans van deze trace laden",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "Klik om uit te vouwen",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "Traces rond dit tijdstip zoeken",
       "searchAroundTip": "Laad de gebeurtenissen die vlak voor en na deze zijn gelogd.",
       "noOfEventsTip": "Hoeveel gebeurtenissen rond deze worden geladen.",
-      "severityTip": "Gedetecteerd logniveau. Selecteer om te zien hoe het is bepaald."
+      "severityTip": "Gedetecteerd logniveau. Selecteer om te zien hoe het is bepaald.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select *-query wordt niet ondersteund voor visualisatie.",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "Dit patroon is ongeldig of wordt niet ondersteund. Lookahead, lookbehind en terugverwijzingen kunnen niet worden gebruikt."
     },
     "queryTooltip": "Filter als tekst bewerken",
-    "builderTooltip": "Filter bewerken met de builder"
+    "builderTooltip": "Filter bewerken met de builder",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

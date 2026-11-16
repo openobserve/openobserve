@@ -179,38 +179,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
-              <OButton
-                icon-only
-                icon="search"
-                :title="t('logStream.explore')"
-                data-test="log-stream-explore-btn"
-                data-row-action="view"
-                variant="ghost"
-                size="sm"
-                class="max-md:hidden"
-                @click="exploreStream({ row })"
-              />
-              <OButton
-                icon-only
-                icon="description"
-                :title="t('logStream.schemaHeader')"
-                data-test="log-stream-schema-btn"
-                data-row-action="view"
-                variant="ghost"
-                size="sm"
-                class="max-md:hidden"
-                @click="listSchema({ row })"
-              />
-              <OButton
-                icon-only
-                icon="delete"
-                :title="t('logStream.delete')"
-                data-test="log-stream-delete-btn"
+              <div
+                class="flex items-center opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 max-md:hidden pointer-coarse:opacity-100"
+              >
+                <OButton
+                  icon-only
+                  icon="search"
+                  :label="t('logStream.explore')"
+                  data-test="log-stream-explore-btn"
+                  data-row-action="view"
+                  variant="ghost"
+                  size="sm"
+                  @click="exploreStream({ row })"
+                />
+                <OButton
+                  icon-only
+                  icon="description"
+                  :label="t('logStream.schemaHeader')"
+                  data-test="log-stream-schema-btn"
+                  data-row-action="view"
+                  variant="ghost"
+                  size="sm"
+                  @click="listSchema({ row })"
+                />
+              </div>
+              <button
+                type="button"
                 data-row-action="delete"
-                variant="danger-ghost"
-                size="sm"
-                class="max-md:hidden"
-                @click="confirmDeleteAction({ row })"
+                class="hidden"
+                tabindex="-1"
+                aria-hidden="true"
+                @click.stop="confirmDeleteAction({ row })"
               />
               <ODropdown side="bottom" align="end">
                 <template #trigger>
@@ -220,7 +219,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon="more-vert"
                     variant="ghost"
                     size="sm"
-                    class="md:hidden"
                     data-test="log-stream-row-more-actions"
                     @click.stop
                   />
@@ -241,10 +239,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span>{{ t("logStream.schemaHeader") }}</span>
                 </ODropdownItem>
+                <ODropdownSeparator class="md:hidden" />
                 <ODropdownItem
                   icon="delete"
                   tone="danger"
-                  class="md:hidden"
                   data-test="log-stream-delete-btn-menu"
                   @select="confirmDeleteAction({ row })"
                 >
@@ -372,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       :title="t('logStream.confirmDeleteHead')"
       :secondary="{ label: t('logStream.cancel') }"
-      :primary="{ label: t('logStream.ok'), variant: 'danger' }"
+      :primary="{ label: t('logStream.delete'), variant: 'danger' }"
       @click:secondary="cancelDelete"
       @click:primary="
         () => {
@@ -464,6 +462,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -486,6 +485,7 @@ export default defineComponent({
     ODialog,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
     OIcon,
     OToggleGroup,
     OToggleGroupItem,

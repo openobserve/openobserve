@@ -46,6 +46,21 @@ describe("ORefreshButton", () => {
     expect(wrapper.text()).not.toContain("Not yet refreshed");
   });
 
+  it("shows a pending label in place of the age and turns primary", () => {
+    const wrapper = mountButton({ lastRunAt: now, pendingLabel: raw("Apply") });
+    expect(button(wrapper).text()).toContain("Apply");
+    expect(button(wrapper).attributes("aria-label")).toBe("Apply");
+  });
+
+  it("renders the menu slot under the intervals", () => {
+    const wrapper = mount(ORefreshButton, {
+      props: { autoRefresh: 0 },
+      slots: { menu: "<div data-test='extra'>More</div>" },
+      global,
+    });
+    expect(wrapper.find("[data-test='extra']").exists()).toBe(true);
+  });
+
   it("is one bordered md button labelled Refresh before the first load", () => {
     const wrapper = mountButton();
     expect(button(wrapper).attributes("data-o2-variant")).toBe("secondary");

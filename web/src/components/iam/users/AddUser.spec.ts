@@ -779,6 +779,20 @@ describe("AddUser", () => {
       store.state.zoConfig = saved;
     });
 
+    it("says custom roles need RBAC, not 'create one in Roles', when RBAC is off", async () => {
+      const saved = store.state.zoConfig;
+      store.state.zoConfig = { ...saved, rbac_enabled: false };
+      wrapper = mountComp({
+        modelValue: { email: "other@example.com", first_name: "Other", org_member_id: "2" },
+      });
+      await flushPromises();
+
+      const text = wrapper.find('[data-test="user-custom-role-field"]').text();
+      expect(text).toContain("Custom roles need RBAC");
+      expect(text).not.toContain("IAM → Roles");
+      store.state.zoConfig = saved;
+    });
+
     it("stages an unlock and sends it on save, after confirming", async () => {
       vi.mocked(userServiece.get).mockResolvedValue({
         data: { lockout: { locked: true, retry_after_secs: 240 } },

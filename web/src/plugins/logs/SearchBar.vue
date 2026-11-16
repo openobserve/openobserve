@@ -189,7 +189,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-only
             icon="bar-chart"
             variant="secondary"
-            :pressed="!!searchObj.meta.showHistogram"
+            :pressed="!histogramUnavailableReason && !!searchObj.meta.showHistogram"
+            :disabled="!!histogramUnavailableReason"
+            :disabled-reason="histogramUnavailableReason"
             :label="t('search.showHistogramLabel')"
             shortcut="logsToggleHistogram"
             data-test="logs-search-bar-histogram-btn"
@@ -406,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               :title="t('search.runQuery')"
               :disabled="buildRunBlocked"
-              class="hover:shadow-button-primary/70 rounded-s-default! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)] hover:opacity-90 hover:shadow-md"
+              class="hover:shadow-button-primary/70 rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)] hover:opacity-90 hover:shadow-md"
               :class="runButtonTone"
               @click="handleRunQueryFn()"
             >
@@ -465,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               :title="t('search.runQuery')"
               :disabled="buildRunBlocked || disable"
-              class="hover:shadow-button-primary/70 rounded-s-default! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)] hover:opacity-90 hover:shadow-md"
+              class="hover:shadow-button-primary/70 rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)] hover:opacity-90 hover:shadow-md"
               :class="runButtonTone"
               @click="handleRunQueryFn()"
             >
@@ -656,7 +658,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <ORefreshButton
-          v-if="!isVisualizeOrBuildMode"
+          v-if="isVisualizeOrBuildMode"
+          :last-run-at="visualizeLoadedAt"
+          :loading="visualizeSearchRequestTraceIds.length > 0"
+          :disabled="buildRunBlocked || visualizeSearchRequestTraceIds.length > 0"
+          :auto-refresh="Number(searchObj.meta.refreshInterval) || 0"
+          :auto-refresh-note="t('search.autoRefreshPausedInVisualize')"
+          data-test="logs-search-bar-data-age-refresh"
+          @click="handleRunQueryFn()"
+          @update:auto-refresh="onAutoRefreshPick"
+        />
+        <ORefreshButton
+          v-else
           :last-run-at="searchObj.meta.lastRunAt"
           :loading="!!(searchObj.loading || searchObj.loadingHistogram)"
           :disabled="
@@ -732,6 +745,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup :label="t('search.menuGroupViewOptions')">
             <ODropdownItem
               data-test="logs-search-bar-menu-histogram-btn"
+              :disabled="!!histogramUnavailableReason"
+              :disabled-reason="histogramUnavailableReason"
               @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
             >
               <template #icon>
@@ -745,8 +760,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #end>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
-                    v-model="searchObj.meta.showHistogram"
+                    :model-value="!histogramUnavailableReason && !!searchObj.meta.showHistogram"
+                    :disabled="!!histogramUnavailableReason"
                     data-test="logs-search-bar-show-histogram-toggle-btn"
+                    @update:model-value="searchObj.meta.showHistogram = $event"
                     @click.stop
                   />
                   <OButton
@@ -924,7 +941,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownSeparator />
 
           <!-- HISTORY -->
-          <ODropdownGroup :label="t('search.menuGroupHistory')">
+          <!-- Single-item groups carry no heading, so the menu fits a 900 px window (O10). -->
+          <ODropdownGroup>
             <ODropdownItem
               data-test="search-history-item-btn"
               shortcut="logsSearchHistory"
@@ -1082,7 +1100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                its search state through a pure adapter and CreateAlertAction owns
                the label, confirm dialog, and hand-off. Not enterprise-gated —
                alerts exist in OSS, unlike scheduled search above. -->
-          <ODropdownGroup :label="t('search.menuGroupAlerts')">
+          <ODropdownGroup>
             <CreateAlertAction
               variant="menu-item"
               :source="createAlertSource"
@@ -1111,7 +1129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <ODropdownSeparator />
-            <ODropdownGroup :label="t('search.menuGroupInspect')">
+            <ODropdownGroup>
               <ODropdownItem data-test="search-inspect-btn" @select="openSearchInspectDialog">
                 <template #icon>
                   <span
@@ -1126,7 +1144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <ODropdownSeparator v-if="searchObj.meta.sqlMode" />
-          <ODropdownGroup v-if="searchObj.meta.sqlMode" :label="t('search.menuGroupExplain')">
+          <ODropdownGroup v-if="searchObj.meta.sqlMode">
             <ODropdownItem
               data-test="logs-search-bar-explain-query-menu-btn"
               :disabled="
@@ -1195,33 +1213,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'fn-editor-open': showFunctionEditor,
               }"
             >
-              <OButton
+              <OToggleGroup
                 v-if="
                   !searchObj.meta.sqlMode &&
                   !searchObj.meta.nlpMode &&
                   searchObj.meta.logsVisualizeToggle === 'logs'
                 "
-                icon-only
-                :icon="filterBuilderOn ? 'code' : 'filter-list'"
-                :label="
-                  filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')
-                "
-                data-test="logs-search-bar-filter-builder-toggle"
-                :aria-pressed="filterBuilderOn"
-                variant="ghost"
-                @click="toggleFilterBuilder"
+                size="sm"
+                :model-value="filterBuilderOn ? 'builder' : 'text'"
+                :aria-label="t('filterBar.editorModeLabel')"
+                data-test="logs-search-bar-filter-editor-mode"
                 class="absolute! top-0.75 z-51"
                 :style="{ right: filterBuilderToggleRight }"
-              />
+                @update:model-value="setFilterEditorMode"
+              >
+                <OToggleGroupItem value="builder" data-test="logs-search-bar-filter-mode-builder">
+                  {{ t("filterBar.modeBuilder") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="text" data-test="logs-search-bar-filter-mode-text">
+                  {{ t("filterBar.modeText") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
               <div
                 v-if="showFilterBuilder"
                 class="h-full overflow-y-auto py-0.75 ps-1.5"
-                :class="aiButtonShown ? 'pe-26.5' : 'pe-18'"
+                :class="aiButtonShown ? 'pe-43.5' : 'pe-35'"
                 @pointerdown.self.prevent="activateFilterBuilder"
               >
                 <SqlFilterBuilder
                   ref="filterBuilderRef"
                   :query="searchObj.data.query"
+                  :free-text="freeTextAvailable"
                   :fields="filterBuilderFields"
                   :load-values="loadFilterBuilderValues"
                   :fields-loading="searchObj.loadingStream"
@@ -1785,6 +1807,7 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { extractWhereClause, isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
 import { applyDownloadRange, downloadRangeWindow, sqlLimitOf } from "@/utils/logs/downloadRange";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
+import { isNonTimeSeriesAggregate } from "@/utils/logs/sqlResultShape";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
 import { useFreeTextPreview } from "@/composables/useLogs/useFreeTextPreview";
@@ -2226,7 +2249,18 @@ export default defineComponent({
 
     const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
       useFilterBuilderPreference("o2.logs.queryInput");
+    // A tray, not an icon toggle, so the user can read which editor is on (F6).
+    const setFilterEditorMode = (mode: unknown) => {
+      if ((mode === "builder" || mode === "text") && (mode === "builder") !== filterBuilderOn.value)
+        toggleFilterBuilder();
+    };
     const filterBuilderRef = ref<InstanceType<typeof SqlFilterBuilder> | null>(null);
+    // "Search all text" is offered only where the server can run it: every stream has full-text keys.
+    const freeTextAvailable = computed(() => {
+      const ctx = buildFilterContext(searchObj, store.state.zoConfig, { ignoreFailures: true });
+      const streams: string[] = searchObj.data.stream.selectedStream ?? [];
+      return streams.every((stream) => ctx.targets[stream]?.mode !== "blocked");
+    });
     // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
     const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
     // The pane is taller than the bar, so a press on its blank part must still start a filter.
@@ -3639,6 +3673,17 @@ export default defineComponent({
       if (open) loadSavedView();
       else showDownloadSubmenu.value = false;
     };
+    // Parsed only while a histogram control is on screen; a SQL result with no time axis has no histogram (B9).
+    const histogramUnavailableReason = computed<I18nText | undefined>(() => {
+      if (!searchObj.meta.sqlMode) return undefined;
+      if (!utilitiesMenuOpen.value && !showPinnedHistogram.value) return undefined;
+      const timestamp = store.state.zoConfig.timestamp_column || "_timestamp";
+      if (isNonTimeSeriesAggregate(fnParsedSQL(), searchObj.data.query ?? "", timestamp))
+        return t("search.histogramNoTimeAxis");
+      if (searchObj.data.queryResults?.is_histogram_eligible === false)
+        return t("logs.index.histogramUnavailableCtesDistinctLimit");
+      return undefined;
+    });
 
     // Overwriting destroys the stored query, so it is confirmed first.
     const requestUpdateSavedView = (item: any) => {
@@ -4951,6 +4996,14 @@ export default defineComponent({
 
       return searchIds;
     });
+    // The chart's own age, set when its queries settle; the grid's run time would misdate it.
+    const visualizeLoadedAt = ref<number | null>(null);
+    watch(
+      () => visualizeSearchRequestTraceIds.value.length > 0,
+      (busy, wasBusy) => {
+        if (wasBusy && !busy) visualizeLoadedAt.value = Date.now();
+      },
+    );
     const editorWidthToggleFunction = computed(() => {
       if (!searchObj.data.transformType === "function" && isFocused.value) {
         return {
@@ -5332,6 +5385,8 @@ export default defineComponent({
       effectiveSuggestions,
       filterBuilderOn,
       toggleFilterBuilder,
+      setFilterEditorMode,
+      freeTextAvailable,
       showFilterBuilder,
       aiAccess,
       aiButtonShown,
@@ -5417,6 +5472,7 @@ export default defineComponent({
       confirmBuildModeChange,
       confirmBuildModeChangeOk,
       visualizeSearchRequestTraceIds,
+      visualizeLoadedAt,
       disable,
       cancelVisualizeQueries,
       isFocused,
@@ -5501,6 +5557,7 @@ export default defineComponent({
       togglePin,
       pinSyntaxGuideIconOnly,
       showPinnedHistogram,
+      histogramUnavailableReason,
       pinLabel,
       queryModeInMenu,
       noStreamReason,

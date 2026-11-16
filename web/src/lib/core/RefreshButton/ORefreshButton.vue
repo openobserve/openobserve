@@ -31,6 +31,7 @@ const props = withDefaults(defineProps<RefreshButtonProps>(), {
   intervals: () => AUTO_REFRESH_INTERVALS,
   minInterval: undefined,
   autoRefreshNote: undefined,
+  pendingLabel: undefined,
   size: "md",
   shortcut: undefined,
   dataTest: "refresh-button",
@@ -104,6 +105,7 @@ const failedText = computed<I18nText | null>(() => {
 const failedId = useId();
 
 const visibleLabel = computed<I18nText>(() => {
+  if (props.pendingLabel && !props.loading) return props.pendingLabel;
   if (autoInterval.value) {
     return t("refreshButton.autoOn", { interval: autoRefreshShortLabel(autoInterval.value, t) });
   }
@@ -113,6 +115,7 @@ const visibleLabel = computed<I18nText>(() => {
 // The age alone is the visible label, so the name leads with the action a screen reader announces.
 const buttonName = computed(() => {
   if (failedText.value) return t("common.retry");
+  if (props.pendingLabel) return props.pendingLabel;
   return props.lastRunAt
     ? t("refreshButton.refreshWithAge", { age: ageLabel.value })
     : t("refreshButton.refresh");
@@ -148,7 +151,7 @@ function handleClick(e: MouseEvent) {
   <OButtonGroup :size="size">
     <!-- A failed refresh restyles this same button rather than swapping it, so focus stays on it. -->
     <OButton
-      variant="secondary"
+      :variant="pendingLabel && !failedText ? 'primary' : 'secondary'"
       :disabled="disabled"
       :disabled-reason="disabled ? (disabledReason ?? undefined) : undefined"
       :aria-busy="loading || undefined"
@@ -187,6 +190,9 @@ function handleClick(e: MouseEvent) {
       >
         <span class="invisible col-start-1 row-start-1">{{ t("refreshButton.refreshing") }}</span>
         <span class="invisible col-start-1 row-start-1">{{ t("refreshButton.justNow") }}</span>
+        <span v-if="pendingLabel" class="invisible col-start-1 row-start-1">{{
+          pendingLabel
+        }}</span>
         <!-- No colour class: the age is the button's label, so it takes the button's ink. -->
         <span
           class="col-start-1 row-start-1 text-start tabular-nums"
@@ -231,6 +237,7 @@ function handleClick(e: MouseEvent) {
           </ODropdownItem>
         </ODropdownGroup>
       </template>
+      <slot name="menu" />
       <template v-if="hasDisabledInterval || autoRefreshNote">
         <ODropdownSeparator />
         <div

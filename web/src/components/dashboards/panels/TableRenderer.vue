@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             size="compact"
             icon="bar-chart"
-            :title="t('panel.noData')"
+            :title="t('panel.noDataInRange')"
             data-test="no-data"
             class="px-3"
           />

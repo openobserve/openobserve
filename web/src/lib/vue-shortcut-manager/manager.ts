@@ -13,12 +13,13 @@ const _KEY = "__vue_shortcut_manager__";
 interface ManagerState {
   instance: ShortcutManager | null;
   handler: ((e: KeyboardEvent) => void) | null;
+  captureHandler: ((e: KeyboardEvent) => void) | null;
 }
 
 function _state(): ManagerState {
-  if (typeof window === "undefined") return { instance: null, handler: null };
+  if (typeof window === "undefined") return { instance: null, handler: null, captureHandler: null };
   if (!(window as any)[_KEY]) {
-    (window as any)[_KEY] = { instance: null, handler: null } as ManagerState;
+    (window as any)[_KEY] = { instance: null, handler: null, captureHandler: null } as ManagerState;
   }
   return (window as any)[_KEY];
 }
@@ -29,7 +30,9 @@ export function getManager(options?: ShortcutManagerOptions): ShortcutManager | 
   if (!s.instance) {
     s.instance = new ShortcutManager(options);
     s.handler = (e) => _state().instance!.handleKeyDown(e);
+    s.captureHandler = (e) => _state().instance!.handleCaptureKeyDown(e);
     window.addEventListener("keydown", s.handler);
+    window.addEventListener("keydown", s.captureHandler, true);
   }
   return s.instance;
 }
@@ -41,6 +44,10 @@ export function resetManager(): void {
   if (s.handler) {
     window.removeEventListener("keydown", s.handler);
     s.handler = null;
+  }
+  if (s.captureHandler) {
+    window.removeEventListener("keydown", s.captureHandler, true);
+    s.captureHandler = null;
   }
   s.instance = null;
 }
@@ -214,10 +221,11 @@ export class ShortcutManager {
 
     const sequenceKey = this.sequenceBuffer.join(" ");
 
+    // A capture shortcut already had its turn before the key reached the page.
     const sequenceMatch = this.findMatch(sequenceKey);
     if (sequenceMatch) {
       this.sequenceBuffer = [];
-      this.triggerShortcut(sequenceMatch, e);
+      if (!sequenceMatch.capture) this.triggerShortcut(sequenceMatch, e);
       return;
     }
 
@@ -231,9 +239,17 @@ export class ShortcutManager {
     this.sequenceBuffer = [];
 
     const match = this.findMatch(key);
-    if (match) {
+    if (match && !match.capture) {
       this.triggerShortcut(match, e);
     }
+  }
+
+  /** Runs before the focused element sees the key, so an editor that binds the same combo cannot swallow it. */
+  handleCaptureKeyDown(e: KeyboardEvent): void {
+    const key = this.parseEvent(e);
+    if (!key) return;
+    const match = this.findMatch(key);
+    if (match?.capture && this.triggerShortcut(match, e)) e.stopPropagation();
   }
 
   private hasSequenceStartingWith(prefix: string): boolean {
@@ -265,9 +281,9 @@ export class ShortcutManager {
     return key.includes("ctrl+") || key.includes("meta+") || key.includes("alt+");
   }
 
-  private triggerShortcut(shortcut: RegisteredShortcut, e: KeyboardEvent): void {
+  private triggerShortcut(shortcut: RegisteredShortcut, e: KeyboardEvent): boolean {
     const target = e.composedPath?.()[0] ?? e.target;
-    if (shortcut.skipInInput && isInputFocused(target)) return;
+    if (shortcut.skipInInput && isInputFocused(target)) return false;
 
     // Guard: never intercept single-letter shortcuts while the user is typing
     // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,
@@ -280,7 +296,7 @@ export class ShortcutManager {
       !ShortcutManager.hasModifier(shortcut.key) &&
       isInputFocused(target)
     ) {
-      return;
+      return false;
     }
 
     // A plain key pressed inside a dialog belongs to it, not the page behind; Escape still closes things.
@@ -290,7 +306,7 @@ export class ShortcutManager {
       !ShortcutManager.hasModifier(shortcut.key) &&
       isInsideDialog(target)
     ) {
-      return;
+      return false;
     }
 
     if (shortcut.whenFocused !== undefined && shortcut.whenFocused !== null) {
@@ -304,11 +320,12 @@ export class ShortcutManager {
         ? (shortcut.whenFocused as { value: HTMLElement | null }).value
         : (shortcut.whenFocused as HTMLElement);
 
-      if (!el || document.activeElement !== el) return;
+      if (!el || document.activeElement !== el) return false;
     }
 
     if (this.options.preventDefault && e.key !== "Escape") e.preventDefault();
     if (this.options.stopPropagation) e.stopPropagation();
     shortcut.handler(e);
+    return true;
   }
 }

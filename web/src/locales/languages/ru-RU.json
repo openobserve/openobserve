@@ -13,7 +13,9 @@
     "headerLocked": "Заблокировано: требуется {feature}",
     "availableInEnterprise": "Доступно в OpenObserve Enterprise: {feature}",
     "turnedOffTitle": "Отключено для этой организации",
-    "enterpriseTitle": "Доступно в Enterprise"
+    "enterpriseTitle": "Доступно в Enterprise",
+    "readDocs": "Читать документацию",
+    "rbacOff": "RBAC отключён для этой организации. Администратор включает его, задав {env} значение true в конфигурации сервера."
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} строка | {total} строк",
     "histogramTitleRows": "{total} строка за {took} мс. | {total} строк за {took} мс.",
     "histogramTitleRowsWithScan": "{total} строка за {took} мс. ({scanLabel}: {scanSize}) | {total} строк за {took} мс. ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "Сначала выберите поток"
+    "pickStreamFirst": "Сначала выберите поток",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "Калибровка оповещений",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "Поиск или переход…",
     "jumpToTitle": "Перейти",
     "addData": "Добавить данные",
-    "jumpToPlaceholder": "Поиск страниц и действий",
+    "jumpToPlaceholder": "Поиск страниц, оповещений, дашбордов и потоков",
+    "jumpToPlaceholderPages": "Поиск страниц и действий",
+    "jumpToPages": "Страницы",
+    "jumpToShowAll": "Показать все: {page}",
+    "jumpToSearchLogs": "Искать «{text}» в логах",
     "synthetic": "Синтетика",
     "experience": "Опыт",
     "slos": "SLO",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "Удалить пользователей",
     "deleteUsersMsg": "Вы уверены, что хотите удалить {count} пользователя? | Вы уверены, что хотите удалить выбранных пользователей ({count})?",
     "deleteUsersBlockNote": "{count} из них вошли через ваш подтверждённый домен и будут заблокированы, а не удалены.",
-    "roleHint": "Admin управляет организацией, Editor изменяет данные и настройки, Viewer может только читать."
+    "roleHint": "Admin управляет организацией, Editor изменяет данные и настройки, Viewer может только читать.",
+    "customRolesNeedRbac": "Пользовательские роли требуют RBAC, который отключён для этой организации."
   },
   "invitation": {
     "pendingInvitations": "Ожидающие приглашения",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "Экспортёр GPU",
-    "rotationNote": "Токены не заменяются на месте. Чтобы выполнить ротацию, создайте новый токен, переключите на него источники, затем отключите старый."
+    "rotationNote": "Токены не заменяются на месте. Чтобы выполнить ротацию, создайте новый токен, переключите на него источники, затем отключите старый.",
+    "rotateAction": "Заменить…",
+    "rotateTitle": "Заменить {name}",
+    "rotateStep1": "Создайте новый токен.",
+    "rotateStep2": "Переключите свои источники на новый токен.",
+    "rotateStep3": "Когда {name} больше нигде не используется, отключите его в меню строки.",
+    "rotateNever": "Ничего не отключается автоматически. Старый токен работает, пока вы его не отключите.",
+    "rotateCreateNew": "Создать новый токен",
+    "rotateNewName": "{name}-новый",
+    "rotateDescription": "Заменяет {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "Данные не поступали последние 7 дней",
       "criticalUnit": "{count} на критическом уровне",
       "deliveryFailures": "Сбои доставки оповещений",
+      "deliveryCount": "{count} недоставленное оповещение | {count} недоставленных оповещений",
       "deliveryNote": "Сработавшие оповещения, которые не удалось доставить",
       "oldestFiring": "Самое давнее срабатывание: {age}"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "Не удалось прочитать ваши потоки"
     },
     "start": {
-      "text": "За последние {range} данные не поступали. Отправьте данные, посмотрите имеющиеся или настройте оповещение.",
+      "text": "Данные ещё не поступали. Отправьте данные, посмотрите имеющиеся или настройте оповещение.",
       "addData": "Добавить данные",
       "createAlert": "Создать оповещение"
     },
     "summary": {
       "loadError": "Не удалось загрузить сводку организации",
+      "loadErrorRest": "Не удалось загрузить остальную часть сводки",
       "denied": "Нет доступа к сводке организации. Обратитесь к администратору."
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "Порог",
       "noIncident": "Инцидента пока нет",
       "conditionLabel": "Условие оповещения",
-      "allRows": "Все строки"
+      "allRows": "Все строки",
+      "viewIncidents": "Показать инциденты"
     },
     "summaryTrainingFailed": "Сбой обучения",
     "startFromTemplate": "Начать с шаблона",
@@ -12807,7 +12828,8 @@
       "condition": "Условие",
       "result": "Результат",
       "anomalies": "Аномалии",
-      "forGroup": "для {group}"
+      "forGroup": "для {group}",
+      "errorFrom": "{status} от {destination}"
     },
     "continue": "Продолжить",
     "wouldTrigger": "БУДЕТ ЗАПУЩЕНО",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "Это оповещение является детекцией Безопасности. Его запрос компилируется из правила Sigma, поэтому правило, поток и расписание редактируются в разделе Безопасность, который поддерживает согласованность правила и запроса.",
       "open": "Изменить в Безопасности"
-    }
+    },
+    "newAlertTitle": "Новое оповещение",
+    "newAnomalyTitle": "Новое обнаружение аномалий"
   },
   "alert_dependencies": {
     "actionOpen": "Открыть",
@@ -17120,7 +17144,13 @@
       "partial": "Некоторые спаны этого трейса не удалось прочитать. Диаграмма водопада может быть неполной.",
       "truncated": "Показан первый спан этого трейса в порядке времени начала. Остальные спаны ещё не загружены. | Показаны первые спаны этого трейса ({count}) в порядке времени начала. Остальные спаны ещё не загружены.",
       "loadMore": "Загрузить следующий спан | Загрузить следующие спаны ({size})",
-      "loadMoreFailed": "Не удалось загрузить дополнительные спаны этого трейса"
+      "loadMoreFailed": "Не удалось загрузить дополнительные спаны этого трейса",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "Нажмите, чтобы развернуть",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "Искать трассировки в это время",
       "searchAroundTip": "Загрузить события, записанные непосредственно до и после этого.",
       "noOfEventsTip": "Сколько событий загрузить вокруг этого.",
-      "severityTip": "Определённый уровень лога. Выберите, чтобы узнать, как он определён."
+      "severityTip": "Определённый уровень лога. Выберите, чтобы узнать, как он определён.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Запрос SELECT * не поддерживается для визуализации.",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "Этот шаблон недопустим или не поддерживается. Нельзя использовать опережающие и ретроспективные проверки и обратные ссылки."
     },
     "queryTooltip": "Редактировать фильтр как текст",
-    "builderTooltip": "Редактировать фильтр в конструкторе"
+    "builderTooltip": "Редактировать фильтр в конструкторе",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

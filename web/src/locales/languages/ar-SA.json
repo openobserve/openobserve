@@ -13,7 +13,9 @@
     "headerLocked": "مقفل: يتطلب {feature}",
     "availableInEnterprise": "متاح في OpenObserve Enterprise: {feature}",
     "turnedOffTitle": "معطّل لهذه المؤسسة",
-    "enterpriseTitle": "متاح في Enterprise"
+    "enterpriseTitle": "متاح في Enterprise",
+    "readDocs": "اقرأ الوثائق",
+    "rbacOff": "RBAC معطّل لهذه المؤسسة. يقوم المسؤول بتفعيله عبر ضبط {env} على true في إعدادات الخادم."
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} صف | {total} صفوف",
     "histogramTitleRows": "عرض {total} صف في {took} مللي ثانية. | عرض {total} صفوف في {took} مللي ثانية.",
     "histogramTitleRowsWithScan": "عرض {total} صف في {took} مللي ثانية. ({scanLabel}: {scanSize}) | عرض {total} صفوف في {took} مللي ثانية. ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "اختر تدفقاً أولاً"
+    "pickStreamFirst": "اختر تدفقاً أولاً",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "معايرة التنبيهات",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "ابحث أو انتقل إلى…",
     "jumpToTitle": "انتقل إلى",
     "addData": "إضافة بيانات",
-    "jumpToPlaceholder": "ابحث في الصفحات والإجراءات",
+    "jumpToPlaceholder": "ابحث في الصفحات والتنبيهات ولوحات المعلومات والتدفقات",
+    "jumpToPlaceholderPages": "ابحث في الصفحات والإجراءات",
+    "jumpToPages": "الصفحات",
+    "jumpToShowAll": "عرض الكل في {page}",
+    "jumpToSearchLogs": "البحث في السجلات عن \"{text}\"",
     "synthetic": "المراقبة الاصطناعية",
     "experience": "الخبرة",
     "slos": "SLOs",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "حذف المستخدمين",
     "deleteUsersMsg": "هل أنت متأكد أنك تريد حذف {count} مستخدم؟ | هل أنت متأكد أنك تريد حذف {count} من المستخدمين؟",
     "deleteUsersBlockNote": "{count} منهم انضموا عبر نطاقك الموثّق وسيتم حظرهم بدلًا من حذفهم.",
-    "roleHint": "Admin يدير المؤسسة، وEditor يغيّر البيانات والإعدادات، وViewer يقرأ فقط."
+    "roleHint": "Admin يدير المؤسسة، وEditor يغيّر البيانات والإعدادات، وViewer يقرأ فقط.",
+    "customRolesNeedRbac": "تتطلب الأدوار المخصصة تفعيل RBAC، وهو معطّل لهذه المؤسسة."
   },
   "invitation": {
     "pendingInvitations": "الدعوات المعلقة",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "مصدِّر GPU",
-    "rotationNote": "لا يتم تدوير الرموز في مكانها. للتدوير، أنشئ رمزًا جديدًا، وحوّل مصادرك إليه، ثم عطّل الرمز القديم."
+    "rotationNote": "لا يتم تدوير الرموز في مكانها. للتدوير، أنشئ رمزًا جديدًا، وحوّل مصادرك إليه، ثم عطّل الرمز القديم.",
+    "rotateAction": "تدوير…",
+    "rotateTitle": "تدوير {name}",
+    "rotateStep1": "أنشئ رمزًا جديدًا.",
+    "rotateStep2": "حوّل مصادرك إلى الرمز الجديد.",
+    "rotateStep3": "عندما لا يستخدم أي شيء {name}، عطّله من قائمة صفّه.",
+    "rotateNever": "لا يتم تعطيل أي شيء تلقائيًا. يستمر الرمز القديم بالعمل حتى تعطّله.",
+    "rotateCreateNew": "إنشاء رمز جديد",
+    "rotateNewName": "{name}-جديد",
+    "rotateDescription": "يحل محل {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "توقفت عن الكتابة خلال آخر 7 أيام",
       "criticalUnit": "{count} في المستوى الحرج",
       "deliveryFailures": "إخفاقات تسليم التنبيهات",
+      "deliveryCount": "فشل تسليم {count} تنبيه | فشل تسليم {count} تنبيهات",
       "deliveryNote": "تنبيهات أُطلقت لكن تعذّر إشعارها",
       "oldestFiring": "أقدم تنبيه قيد الإطلاق منذ {age}"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "تعذرت قراءة تدفقاتك"
     },
     "start": {
-      "text": "لم تصل أي بيانات خلال آخر {range}. أرسل بيانات، أو راجع ما لديك، أو أعد تنبيهًا.",
+      "text": "لم تصل أي بيانات بعد. أرسل بيانات، أو راجع ما لديك، أو أعد تنبيهًا.",
       "addData": "إضافة بيانات",
       "createAlert": "إنشاء تنبيه"
     },
     "summary": {
       "loadError": "تعذر تحميل ملخص المؤسسة",
+      "loadErrorRest": "تعذر تحميل بقية الملخص",
       "denied": "لا يوجد وصول إلى ملخص المؤسسة. اطلب ذلك من مسؤول المؤسسة."
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "العتبة",
       "noIncident": "لا يوجد حادث بعد",
       "conditionLabel": "شرط التنبيه",
-      "allRows": "كل الصفوف"
+      "allRows": "كل الصفوف",
+      "viewIncidents": "عرض الحوادث"
     },
     "summaryTrainingFailed": "فشل التدريب",
     "startFromTemplate": "ابدأ من قالب",
@@ -12807,7 +12828,8 @@
       "condition": "الشرط",
       "result": "النتيجة",
       "anomalies": "الشذوذات",
-      "forGroup": "من أجل {group}"
+      "forGroup": "من أجل {group}",
+      "errorFrom": "{status} من {destination}"
     },
     "continue": "تابع",
     "wouldTrigger": "سيُطلَق",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "هذا التنبيه اكتشاف من Security. يُترجَم استعلامه من قاعدة Sigma الخاصة به، لذا تُحرَّر القاعدة والتدفق والجدولة في Security، مما يُبقي القاعدة والاستعلام متطابقين.",
       "open": "التحرير في Security"
-    }
+    },
+    "newAlertTitle": "تنبيه جديد",
+    "newAnomalyTitle": "اكتشاف شذوذ جديد"
   },
   "alert_dependencies": {
     "actionOpen": "فتح",
@@ -17120,7 +17144,13 @@
       "partial": "تعذّر قراءة بعض الـ Spans من هذا التتبع. قد يكون مخطط الشلال غير مكتمل.",
       "truncated": "يُعرض أول Span من هذا التتبع، حسب ترتيب وقت البدء. لم يتم تحميل الـ Spans اللاحقة بعد. | يُعرض أول {count} من الـ Spans لهذا التتبع، حسب ترتيب وقت البدء. لم يتم تحميل الـ Spans اللاحقة بعد.",
       "loadMore": "تحميل الـ Span التالي | تحميل {size} من الـ Spans التالية",
-      "loadMoreFailed": "تعذّر تحميل المزيد من الـ Spans لهذا التتبع"
+      "loadMoreFailed": "تعذّر تحميل المزيد من الـ Spans لهذا التتبع",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "انقر للتوسع",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "البحث عن التتبعات حول هذا الوقت",
       "searchAroundTip": "تحميل الأحداث المسجلة قبل هذا الحدث وبعده مباشرة.",
       "noOfEventsTip": "عدد الأحداث المراد تحميلها حول هذا الحدث.",
-      "severityTip": "مستوى السجل المكتشف. حدده لمعرفة كيف تم اكتشافه."
+      "severityTip": "مستوى السجل المكتشف. حدده لمعرفة كيف تم اكتشافه.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "اختيار * استعلام غير مدعوم للتصور.",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "هذا النمط غير صالح أو غير مدعوم. لا يمكن استخدام البحث الأمامي أو البحث الخلفي أو المراجع الخلفية."
     },
     "queryTooltip": "تحرير عامل التصفية كنص",
-    "builderTooltip": "تحرير عامل التصفية بالمنشئ"
+    "builderTooltip": "تحرير عامل التصفية بالمنشئ",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

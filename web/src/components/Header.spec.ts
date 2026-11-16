@@ -206,6 +206,7 @@ describe("Header Component", () => {
       plugins: [i18n],
       stubs: {
         ThemeSwitcher: true,
+        SolutionSwitcher: true,
       },
     };
 
@@ -1607,6 +1608,7 @@ describe("Header Component", () => {
           provide: { store },
           stubs: {
             ThemeSwitcher: true,
+            SolutionSwitcher: true,
             OrganizationSelector: true,
             EnterpriseUpgradeDialog: true,
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
@@ -1781,6 +1783,7 @@ describe("Header Component", () => {
           provide: { store },
           stubs: {
             ThemeSwitcher: true,
+            SolutionSwitcher: true,
             OrganizationSelector: true,
             EnterpriseUpgradeDialog: true,
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },

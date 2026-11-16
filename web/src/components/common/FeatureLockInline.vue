@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="
         access.ctaRelevant ? t('featureLock.enterpriseTitle') : t('featureLock.turnedOffTitle')
       "
-      :text="access.message"
+      :text="text"
     >
       <template v-if="access.ctaRelevant" #actions>
         <OButton
@@ -32,6 +32,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="router.push({ name: 'enterpriseFeatures', query: route.query })"
         >
           {{ t("enterpriseFeature.featuresPageTitle") }}
+        </OButton>
+      </template>
+      <template v-else #actions>
+        <OButton
+          :href="DOCS_URL"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-test="feature-lock-inline-docs"
+        >
+          {{ t("featureLock.readDocs") }}
         </OButton>
       </template>
     </OEmptyState>
@@ -45,12 +55,15 @@ import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import {
   buildFeatureGateContext,
   checkFeatureAccess,
   type FeatureKey,
 } from "@/utils/enterpriseFeatures";
+
+const DOCS_URL = "https://openobserve.ai/docs/";
+const RBAC_ENV = "O2_OPENFGA_ENABLED";
 
 const props = defineProps<{ featureKey: FeatureKey; name: I18nText }>();
 
@@ -61,5 +74,12 @@ const store = useStore();
 
 const access = computed(() =>
   checkFeatureAccess(props.featureKey, buildFeatureGateContext(store.state.zoConfig)),
+);
+
+// RBAC is the one gate the edition already supports, so the cause is a server setting, not an upgrade.
+const text = computed(() =>
+  access.value.ctaRelevant
+    ? access.value.message
+    : t("featureLock.rbacOff", { env: raw(RBAC_ENV) }),
 );
 </script>

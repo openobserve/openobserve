@@ -38,6 +38,8 @@ export interface InlineEditProps {
   tone?: InlineEditTone;
   maxlength?: number;
   disabled?: boolean;
+  /** Draws a bordered, full-width field at control height, for a form body rather than a header. */
+  field?: boolean;
   /** Renders the value as plain text with no edit affordance at all. */
   readonly?: boolean;
   /** Invalid state — red border while editing, red value in display mode. */

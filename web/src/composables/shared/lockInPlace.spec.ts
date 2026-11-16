@@ -45,6 +45,14 @@ describe("lockInPlace", () => {
     expect(wrapper.text()).toContain("Roles");
   });
 
+  it("names the cause, the setting and who changes it, with a docs link, when RBAC is off", async () => {
+    const wrapper = await mountGated(false);
+    await flushPromises();
+    expect(wrapper.text()).toContain("O2_OPENFGA_ENABLED");
+    expect(wrapper.text()).toContain("An admin turns it on");
+    expect(wrapper.find('[data-test="feature-lock-inline-docs"]').exists()).toBe(true);
+  });
+
   it("converts routes gated by withFeatureGate, children included, and keeps their own guard when allowed", () => {
     const guard = vi.fn();
     const routes = lockGatedRoutes([

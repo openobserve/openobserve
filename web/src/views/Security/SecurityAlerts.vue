@@ -1034,7 +1034,13 @@ onUnmounted(() => {
         data-test="security-alerts-first-run"
         @action="openDetection"
       />
-      <div v-if="!noDetections" class="border-border-default px-page-edge shrink-0 border-b py-3">
+      <SecurityLoadError
+        v-else-if="failed"
+        :what="t('siem.alerts.whatAlerts')"
+        :hint="t('siem.alerts.loadFailedHint')"
+        @retry="refresh"
+      />
+      <div v-else class="border-border-default px-page-edge shrink-0 border-b py-3">
         <div class="h-28">
           <SecuritySeverityChart
             :buckets="chartBuckets"
@@ -1049,7 +1055,7 @@ onUnmounted(() => {
       </div>
 
       <OTable
-        v-if="!noDetections"
+        v-if="!noDetections && !failed"
         ref="tableRef"
         :data="filtered"
         :columns="columns"

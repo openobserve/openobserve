@@ -66,7 +66,7 @@ describe("SearchBar — the query pane grows with the filter builder", () => {
     wrapper = mountSearchBar();
     await flushPromises();
     expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([54]);
-    await wrapper.find('[data-test="logs-search-bar-filter-builder-toggle"]').trigger("click");
+    await wrapper.find('[data-test="logs-search-bar-filter-mode-text"]').trigger("click");
     await flushPromises();
     expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
   });

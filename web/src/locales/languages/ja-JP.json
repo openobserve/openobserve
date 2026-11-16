@@ -13,7 +13,9 @@
     "headerLocked": "ロック中: {feature} が必要",
     "availableInEnterprise": "{feature} は OpenObserve Enterprise で利用できます",
     "turnedOffTitle": "この組織では無効です",
-    "enterpriseTitle": "Enterprise で利用できます"
+    "enterpriseTitle": "Enterprise で利用できます",
+    "readDocs": "ドキュメントを読む",
+    "rbacOff": "この組織では RBAC がオフです。管理者がサーバー設定で {env} を true に設定するとオンになります。"
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} 行 | {total} 行",
     "histogramTitleRows": "{total} 行を {took} ms で表示。 | {total} 行を {took} ms で表示。",
     "histogramTitleRowsWithScan": "{total} 行を {took} ms で表示。（{scanLabel}: {scanSize}） | {total} 行を {took} ms で表示。（{scanLabel}: {scanSize}）",
-    "pickStreamFirst": "先にストリームを選択してください"
+    "pickStreamFirst": "先にストリームを選択してください",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "アラートキャリブレーション",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "検索またはジャンプ…",
     "jumpToTitle": "ジャンプ",
     "addData": "データを追加",
-    "jumpToPlaceholder": "ページとアクションを検索",
+    "jumpToPlaceholder": "ページ、アラート、ダッシュボード、ストリームを検索",
+    "jumpToPlaceholderPages": "ページとアクションを検索",
+    "jumpToPages": "ページ",
+    "jumpToShowAll": "{page}ですべて表示",
+    "jumpToSearchLogs": "ログで「{text}」を検索",
     "synthetic": "合成モニタリング",
     "experience": "エクスペリエンス",
     "slos": "SLOs",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "ユーザーを削除する",
     "deleteUsersMsg": "{count}人のユーザーを削除してもよろしいですか？ | {count}人のユーザーを削除してもよろしいですか？",
     "deleteUsersBlockNote": "そのうち {count} 人は検証済みドメイン経由で参加したため、削除ではなくブロックされます。",
-    "roleHint": "Admin は組織を管理し、Editor はデータと設定を変更でき、Viewer は閲覧のみ可能です。"
+    "roleHint": "Admin は組織を管理し、Editor はデータと設定を変更でき、Viewer は閲覧のみ可能です。",
+    "customRolesNeedRbac": "カスタムロールには RBAC が必要ですが、この組織ではオフです。"
   },
   "invitation": {
     "pendingInvitations": "保留中の招待状",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "GPU エクスポーター",
-    "rotationNote": "トークンはその場でローテーションされません。ローテーションするには、新しいトークンを作成してソースを切り替え、古いトークンを無効にしてください。"
+    "rotationNote": "トークンはその場でローテーションされません。ローテーションするには、新しいトークンを作成してソースを切り替え、古いトークンを無効にしてください。",
+    "rotateAction": "ローテーション…",
+    "rotateTitle": "{name} をローテーション",
+    "rotateStep1": "新しいトークンを作成します。",
+    "rotateStep2": "ソースを新しいトークンに切り替えます。",
+    "rotateStep3": "{name} を使うものがなくなったら、行のメニューから無効にします。",
+    "rotateNever": "自動で無効になるものはありません。古いトークンは、無効にするまで使えます。",
+    "rotateCreateNew": "新しいトークンを作成",
+    "rotateNewName": "{name}-new",
+    "rotateDescription": "{name} を置き換えます"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "過去 7 日間に書き込みが停止",
       "criticalUnit": "クリティカルレベルが {count} 件",
       "deliveryFailures": "アラート配信の失敗",
+      "deliveryCount": "アラート配信の失敗 {count} 件 | アラート配信の失敗 {count} 件",
       "deliveryNote": "発火したが通知できなかったアラート",
       "oldestFiring": "最も古い発火から {age}"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "ストリームを読み込めませんでした"
     },
     "start": {
-      "text": "過去 {range} にデータが届いていません。データを送信するか、既存のデータを確認するか、アラートを設定してください。",
+      "text": "まだデータが届いていません。データを送信するか、既存のデータを確認するか、アラートを設定してください。",
       "addData": "データを追加",
       "createAlert": "アラートを作成"
     },
     "summary": {
       "loadError": "組織の概要を読み込めませんでした",
+      "loadErrorRest": "概要の残りを読み込めませんでした",
       "denied": "組織の概要へのアクセス権がありません。組織の管理者に依頼してください。"
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "しきい値",
       "noIncident": "インシデントはまだありません",
       "conditionLabel": "アラート条件",
-      "allRows": "すべての行"
+      "allRows": "すべての行",
+      "viewIncidents": "インシデントを表示"
     },
     "summaryTrainingFailed": "トレーニング失敗",
     "startFromTemplate": "テンプレートから開始",
@@ -12807,7 +12828,8 @@
       "condition": "条件",
       "result": "結果",
       "anomalies": "異常",
-      "forGroup": "{group} の"
+      "forGroup": "{group} の",
+      "errorFrom": "{destination} から {status}"
     },
     "continue": "続行",
     "wouldTrigger": "トリガーする",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "このアラートはセキュリティの検知です。クエリは Sigma ルールからコンパイルされるため、ルール、ストリーム、スケジュールはセキュリティで編集します。これによりルールとクエリが常に一致します。",
       "open": "セキュリティで編集"
-    }
+    },
+    "newAlertTitle": "新しいアラート",
+    "newAnomalyTitle": "新しい異常検知"
   },
   "alert_dependencies": {
     "actionOpen": "開く",
@@ -17120,7 +17144,13 @@
       "partial": "このトレースの一部のスパンを読み取れませんでした。ウォーターフォールが不完全な可能性があります。",
       "truncated": "このトレースの最初のスパンを開始時刻順に表示しています。以降のスパンはまだ読み込まれていません。 | このトレースの最初の {count} スパンを開始時刻順に表示しています。以降のスパンはまだ読み込まれていません。",
       "loadMore": "次のスパンを読み込む | 次の {size} スパンを読み込む",
-      "loadMoreFailed": "このトレースのスパンをこれ以上読み込めませんでした"
+      "loadMoreFailed": "このトレースのスパンをこれ以上読み込めませんでした",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "クリックして展開",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "この時刻前後のトレースを検索",
       "searchAroundTip": "このイベントの直前と直後に記録されたイベントを読み込みます。",
       "noOfEventsTip": "このイベントの前後に読み込むイベント数。",
-      "severityTip": "検出されたログレベル。選択すると検出方法を確認できます。"
+      "severityTip": "検出されたログレベル。選択すると検出方法を確認できます。",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT * クエリは可視化でサポートされていません。",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "このパターンは無効か、サポートされていません。先読み、後読み、後方参照は使用できません。"
     },
     "queryTooltip": "フィルターをテキストで編集",
-    "builderTooltip": "ビルダーでフィルターを編集"
+    "builderTooltip": "ビルダーでフィルターを編集",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

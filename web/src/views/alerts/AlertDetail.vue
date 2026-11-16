@@ -237,6 +237,7 @@
         <!-- An anomaly config has no query_condition for generate_sql to build from. -->
         <OContent v-if="showChart" class="shrink-0 py-3">
           <AlertGroupChart
+            v-model:range="detailRange"
             :alert="alert"
             :collapse-empty="chartMayCollapse"
             @settled="chartSettled = true"
@@ -393,7 +394,9 @@
                 <div class="min-h-0 flex-1">
                   <AlertEvaluationHistory
                     v-if="historyView === 'evaluations'"
+                    v-model:range="detailRange"
                     :alert-id="alertId"
+                    :shared-range="showChart"
                   />
                   <AlertGroupHistory
                     v-else
@@ -823,6 +826,7 @@ const firingFor = computed(() => {
 const showConditionLine = computed(() => !isSloAlertView.value && !isAnomalyAlert.value);
 const showChart = showConditionLine;
 
+const detailRange = ref("1h");
 const chartSettled = ref(false);
 const chartSlow = ref(false);
 // Shrinking once the history shows would move it, so a chart that settles late keeps its height.

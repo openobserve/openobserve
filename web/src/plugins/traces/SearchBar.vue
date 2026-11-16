@@ -619,26 +619,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="relative flex h-full w-full flex-col overflow-hidden"
         @keydown.capture="onRecentEditorKeydown"
       >
-        <OButton
+        <OToggleGroup
           v-if="!searchObj.meta.sqlMode && !nlpMode"
-          icon-only
-          :icon="filterBuilderOn ? 'code' : 'filter-list'"
-          data-test="traces-search-bar-filter-builder-toggle"
-          :aria-pressed="filterBuilderOn"
-          variant="ghost"
           size="sm"
+          :model-value="filterBuilderOn ? 'builder' : 'text'"
+          :aria-label="t('filterBar.editorModeLabel')"
+          data-test="traces-search-bar-filter-editor-mode"
           class="absolute! top-0.75 z-51"
           :style="{ right: filterBuilderToggleRight }"
-          @click="toggleFilterBuilder"
+          @update:model-value="setFilterEditorMode"
         >
-          <OTooltip
-            :content="filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')"
-          />
-        </OButton>
+          <OToggleGroupItem value="builder" data-test="traces-search-bar-filter-mode-builder">
+            {{ t("filterBar.modeBuilder") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="text" data-test="traces-search-bar-filter-mode-text">
+            {{ t("filterBar.modeText") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
         <div
           v-if="showFilterBuilder"
           class="h-full overflow-y-auto py-0.75 ps-1.5"
-          :class="isAiEnabled ? 'pe-18' : 'pe-10'"
+          :class="isAiEnabled ? 'pe-36' : 'pe-28'"
           @pointerdown.self.prevent="activateFilterBuilder"
         >
           <SqlFilterBuilder
@@ -1079,6 +1080,11 @@ export default defineComponent({
     );
     // The AI button holds the corner slot in both modes: QueryEditor's own, or the builder's copy.
     const filterBuilderToggleRight = computed(() => (isAiEnabled.value ? "2.375rem" : "0.25rem"));
+    // A tray, not an icon toggle, so the user can read which editor is on (F6).
+    const setFilterEditorMode = (mode: unknown) => {
+      if ((mode === "builder" || mode === "text") && (mode === "builder") !== filterBuilderOn.value)
+        toggleFilterBuilder();
+    };
     const { isDark } = useTheme();
     const aiIcon = computed(() =>
       getImageURL(
@@ -1814,6 +1820,7 @@ export default defineComponent({
       toggleFilterBuilder,
       showFilterBuilder,
       filterBuilderToggleRight,
+      setFilterEditorMode,
       aiIcon,
       openAiFromBuilder,
       filterBuilderFields,

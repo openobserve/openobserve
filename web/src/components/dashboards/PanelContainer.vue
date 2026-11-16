@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
           :isPanelLoading="isPanelLoading"
-          :lastTriggeredAt="lastTriggeredAt"
+          :lastTriggeredAt="panelIsEmpty ? null : lastTriggeredAt"
           :viewOnly="viewOnly"
           :exemplarError="exemplarErrorMessage"
           :canEdit="canEditFromNotice"
@@ -340,6 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :stale="variablesDataUpdated || isTimeRangeWaiting"
           variant="ghost"
           size="xs"
+          :class="restActionClass"
           @click="() => onRefreshPanel(false)"
           :aria-label="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
@@ -402,6 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               variant="ghost"
               size="xs"
+              :class="restActionClass"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
             >
               <OIcon name="more-vert" size="sm" />
@@ -1041,6 +1043,10 @@ export default defineComponent({
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
+    // An empty panel has no data to age, so it carries no freshness badge.
+    const panelIsEmpty = computed(
+      () => !!PanleSchemaRendererRef.value?.noData || !!PanleSchemaRendererRef.value?.statHasNoData,
+    );
     const handleLastTriggeredAtUpdate = (data: any) => {
       lastTriggeredAt.value = data;
     };
@@ -1139,6 +1145,19 @@ export default defineComponent({
       if (isCurrentlyHoveredPanel.value || isMobile.value) return narrowHide;
       return `invisible pointer-events-none ${narrowHide}`.trim();
     });
+
+    // Opacity, not visibility, so a keyboard user can still tab to them; errors, warnings and pending changes keep them shown.
+    const restActionClass = computed(() =>
+      isCurrentlyHoveredPanel.value ||
+      isMobile.value ||
+      hasNoticeChips.value ||
+      !!errorData.value ||
+      variablesDataUpdated.value ||
+      props.isTimeRangeWaiting ||
+      showDraftDot.value
+        ? ""
+        : "opacity-0 focus-visible:opacity-100 data-[state=open]:opacity-100",
+    );
 
     //for edit panel
     const onEditPanel = (data: any, focus?: PanelEditorFocusTarget) => {
@@ -1674,6 +1693,7 @@ export default defineComponent({
       isCurrentlyHoveredPanel,
       isLayoutEditing,
       hoverRevealClass,
+      restActionClass,
       previewView,
       showDataViewToggle,
       isDataView,
@@ -1719,6 +1739,7 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange,
       handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
       lastTriggeredAt,
+      panelIsEmpty,
       maxQueryRangeWarning,
       metaData,
       panelDiagnostics,

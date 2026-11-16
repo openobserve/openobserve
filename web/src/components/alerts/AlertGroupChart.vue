@@ -164,7 +164,7 @@ const store = useStore();
 const chartData = ref<any>(null);
 const chartError = ref<string | null>(null);
 const selectedTimeObj = ref<any>(null);
-const range = ref<string>("1h");
+const range = defineModel<string>("range", { default: "1h" });
 // A count, not a flag: an earlier build settling must not end a newer build's line.
 const buildsInFlight = ref(0);
 // The page mounts this before the alert GET lands, so a missing alert is still loading.
@@ -214,8 +214,9 @@ const aggregation = computed(() => queryCondition.value?.aggregation);
 const onRangeChange = (value: unknown) => {
   if (!value) return;
   range.value = String(value);
-  build();
 };
+
+watch(range, () => build());
 
 const build = async () => {
   buildsInFlight.value++;

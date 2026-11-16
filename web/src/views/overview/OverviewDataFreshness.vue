@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     view="ok"
     @view-all="router.push({ name: 'logstreams', query: { org_identifier: org } })"
   >
-    <div class="flex min-h-37 flex-col" :data-test="`overview-data-freshness-${state}`">
+    <div class="flex flex-col lg:min-h-37" :data-test="`overview-data-freshness-${state}`">
       <ul v-if="state === 'loading'" class="divide-border-subtle flex flex-col divide-y">
         <li v-for="i in 3" :key="i" class="flex h-9 items-center gap-2.5">
           <OSkeleton shape="circle" class="size-2 shrink-0" />

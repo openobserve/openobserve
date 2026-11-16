@@ -43,30 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </Teleport>
 
-    <!-- the first steps need the stream lists, so the body waits for them behind the band's skeleton -->
-    <div
-      v-if="showOverviewCards && pageShowsSections && !streamsSettled"
-      class="grid grid-cols-2 gap-x-8 gap-y-6 pt-2 pb-6 max-lg:grid-cols-1"
-      data-test="overview-sections-pending"
-    >
-      <OverviewFiringNow
-        state="loading"
-        :rows="[]"
-        :enabled-rules="0"
-        :total-rules="0"
-        :now="clock"
-      />
-      <OverviewDataFreshness
-        state="loading"
-        :rows="[]"
-        :range="timeRange"
-        :range-words="rangeWords"
-        :now="clock"
-      />
-    </div>
     <!-- every panel keeps its final height while it loads or fails, so nothing below it moves -->
     <div
-      v-else-if="showOverviewCards && pageShowsSections"
+      v-if="showOverviewCards && pageShowsSections"
       class="divide-border-default flex flex-col divide-y"
       data-test="overview-sections"
     >
@@ -98,7 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showGettingStarted"
         class="py-6"
         :rows="freshness"
-        :range-words="rangeWords"
         :logs-locked="logsLock.locked.value"
         :alerts-locked="alertsLocked"
       />
@@ -111,29 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :forbidden="overviewForbidden"
         :incidents-state="incidentsTile"
         :incidents-total="incidentsTotal"
+        :delivery-failures="deliveryFailures"
         @select="onHeadlineSelect"
+        @retry="() => loadOverview(true)"
         @ask-ai="onAskAi"
       >
         <template #aside>
           <OEmptyState
-            v-if="summaryState === 'error'"
-            size="compact"
-            kind="error"
-            :title="t('overview.summary.loadError')"
-            data-test="overview-summary-error"
-          >
-            <template #actions>
-              <OButton
-                size="sm"
-                data-test="overview-summary-retry"
-                @click="() => loadOverview(true)"
-              >
-                {{ t("emptyState.loadError.action") }}
-              </OButton>
-            </template>
-          </OEmptyState>
-          <OEmptyState
-            v-else-if="summaryState === 'denied'"
+            v-if="summaryState === 'denied'"
             size="compact"
             kind="denied"
             :title="t('overview.summary.denied')"
@@ -314,6 +277,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ rangeLabel }}</OText
             >
           </div>
+          <OEmptyState
+            v-if="groupFailed"
+            size="compact"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
+            data-test="overview-sections-load-error"
+          >
+            <template #actions>
+              <OButton
+                variant="secondary"
+                size="sm"
+                data-test="overview-sections-load-error-retry-btn"
+                @click="() => loadAll(true)"
+              >
+                {{ t("emptyState.loadError.action") }}
+              </OButton>
+            </template>
+          </OEmptyState>
           <!-- SERVICES (enterprise only — needs service graph data) -->
           <section
             v-if="incidentsAccess.allowed && services.length > 0"
@@ -709,11 +691,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="flex shrink-0 items-center gap-2">
                         <OTag
                           v-if="ev.notifyFailed"
-                          type="countChip"
-                          value="warning"
+                          tone="warn"
+                          icon="sync-problem"
+                          size="sm"
+                          :label="t('alerts.summaryDeliveryFailed')"
                           data-test="overview-recent-events-undelivered"
-                          >{{ t("overview.firingNow.notifyFailed") }}</OTag
-                        >
+                        />
                         <OTag
                           v-if="ev.count > 1"
                           type="countChip"
@@ -911,6 +894,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { formatCompactCount } from "@/utils/formatters";
 import { useOverviewTime } from "./overview/useOverviewTime";
+import { countStates } from "@/utils/alerts/firingAlerts";
 import { isFiringOutcome, isErrorOutcome, isNotifyFailedOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
@@ -945,7 +929,7 @@ import {
   type FiringLevel,
   type HomeAlertRow,
 } from "./overview/overviewFiring";
-import { freshnessRows, noDataInRange } from "./overview/overviewFreshness";
+import { freshnessRows, noDataEver } from "./overview/overviewFreshness";
 import OverviewTopStreamsCard from "./overview/OverviewTopStreamsCard.vue";
 import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
 import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
@@ -1254,8 +1238,16 @@ const legacySettled = computed(() =>
 );
 // an edition without the service graph refuses it with 403, which is no outage
 const isDenied = (key: SectionKey) => isForbidden(sectionFailure[key]);
+// when every section failed, one error for the group says it, not one per panel
+const groupFailed = computed(
+  () =>
+    pageShowsSections.value &&
+    attemptedSections.value.length > 1 &&
+    allFailed.value &&
+    attemptedSections.value.every((k) => !isDenied(k)),
+);
 const showSectionError = (key: SectionKey) =>
-  isFailed(key) && !isDenied(key) && pageShowsSections.value;
+  isFailed(key) && !isDenied(key) && pageShowsSections.value && !groupFailed.value;
 const showSectionForbidden = (key: SectionKey) =>
   isFailed(key) && isDenied(key) && pageShowsSections.value;
 const sectionApplies = (key: SectionKey) => {
@@ -1364,6 +1356,10 @@ const firingRead = useQuery(() => ({
 }));
 const alertRows = computed<HomeAlertRow[]>(() => firingRead.data.value?.list ?? []);
 const firingRows = computed(() => firingNow(alertRows.value));
+// the alert list already says what /overview would, so a failed summary can still show it
+const deliveryFailures = computed(() =>
+  firingState.value === "ok" ? countStates(alertRows.value).failed : null,
+);
 const enabledRules = computed(() => alertRows.value.filter((a) => a.enabled !== false).length);
 const firingState = computed<FiringNowState>(() => {
   if (alertsLocked.value) return "locked";
@@ -1392,8 +1388,10 @@ const { formatRangeWords } = useOverviewTime();
 const rangeWords = computed(() =>
   formatRangeWords((timeRange.value.endTime - timeRange.value.startTime) / 1e6),
 );
+// firing alerts prove the org is live, so first steps never sit beside them
 const showGettingStarted = computed(
-  () => freshnessState.value === "ok" && noDataInRange(freshness.value),
+  () =>
+    freshnessState.value === "ok" && noDataEver(freshness.value) && alertRows.value.length === 0,
 );
 // data health reads the app's cached stream lists, so only the firing read can make the whole page fail
 const bandFailed = computed(() => firingState.value !== "ok" && firingState.value !== "loading");

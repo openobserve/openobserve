@@ -553,6 +553,23 @@ let stopUrlSync = syncUrlViewState();
 const tracesRequestState: Record<string, { hasWritten: boolean; isPartial?: boolean }> = {};
 const searchCancelled = ref(false);
 
+// Here, not in the async SearchResult, so a run that settles before it mounts still dates its data;
+// a failed run leaves the age where it was, so kept rows never read as fresh.
+watch(
+  () => searchObj.loading,
+  (loading, wasLoading) => {
+    if (
+      wasLoading &&
+      !loading &&
+      searchObj.searchApplied &&
+      !searchObj.meta.refreshFailedAt &&
+      !searchObj.data.errorMsg?.trim()?.length
+    ) {
+      searchObj.meta.lastRunAt = Date.now();
+    }
+  },
+);
+
 const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
 
 const isLLMSpanPresent = ref(false);

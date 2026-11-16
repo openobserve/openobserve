@@ -1902,7 +1902,7 @@ describe("SearchBar", () => {
 
       // Three 1.875rem lines measure 84px; one line is the pane's own height.
       expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([54]);
-      await wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]').trigger("click");
+      await wrapper.find('[data-test="traces-search-bar-filter-mode-text"]').trigger("click");
       await flushPromises();
       expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
     });
@@ -1976,10 +1976,10 @@ describe("SearchBar", () => {
       try {
         wrapper = mountSearchBar();
         await flushPromises();
-        const toggle = () => wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]');
+        const toggle = () => wrapper.find('[data-test="traces-search-bar-filter-editor-mode"]');
         expect(toggle().attributes("style")).toContain("right: 2.375rem");
 
-        await toggle().trigger("click");
+        await wrapper.find('[data-test="traces-search-bar-filter-mode-builder"]').trigger("click");
         await flushPromises();
         expect(toggle().attributes("style")).toContain("right: 2.375rem");
         expect(wrapper.find('[data-test="traces-search-bar-filter-builder-ai-btn"]').exists()).toBe(

@@ -638,6 +638,12 @@ const AddDashboardFromGitHub = defineAsyncComponent(() => {
   return import("@/components/dashboards/AddDashboardFromGitHub.vue");
 });
 
+const NAME_COLUMN_MIN = 160;
+const NAME_COLUMN_MAX = 360;
+// The favorite star, its gap and the cell's padding beside the name.
+const NAME_CELL_CHROME = 64;
+const DESCRIPTION_COLUMN_MIN = 120;
+
 interface DashboardRow {
   "#": string | number;
   id: string;
@@ -916,6 +922,17 @@ export default defineComponent({
     });
 
     let currentSearchAbortController: AbortController | null = null;
+    // A name is what the reader scans, so it sizes to the longest one (to a cap) and the
+    // description takes what is left; 13 px text averages about 7 px a character.
+    const nameColumnWidth = computed(() => {
+      const longest = dashboards.value.reduce(
+        (max: number, row: any) => Math.max(max, String(row.name ?? "").length),
+        0,
+      );
+      return Math.round(
+        Math.min(NAME_COLUMN_MAX, Math.max(NAME_COLUMN_MIN, longest * 7.2 + NAME_CELL_CHROME)),
+      );
+    });
     const columns = computed(() => {
       const baseColumns: OTableColumnDef[] = [
         {
@@ -925,9 +942,9 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.name,
-          minSize: 160,
-          meta: { align: "left", flex: true },
+          size: nameColumnWidth.value,
+          minSize: NAME_COLUMN_MIN,
+          meta: { align: "left" },
         },
         // {
         //   id: "identifier",
@@ -946,7 +963,8 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: COL.description,
-          meta: { align: "left" },
+          minSize: DESCRIPTION_COLUMN_MIN,
+          meta: { align: "left", flex: true },
         },
         {
           id: "owner",
@@ -1692,8 +1710,10 @@ export default defineComponent({
       // presentation state, not a user action — letting it through would
       // clobber the favorites-first landing with "default".
       if (!landingDecided) return;
+      // The rail re-emitting the open folder is not a folder change, so the search stays.
+      if (folderId === activeFolderId.value) return;
       // A new folder the URL already names came from Back or Forward, and the URL restores its search too.
-      const fromUrl = folderId !== activeFolderId.value && folderId === route.query.folder;
+      const fromUrl = folderId === route.query.folder;
       activeFolderId.value = folderId;
       if (fromUrl) return;
       filterQuery.value = "";

@@ -48,9 +48,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTruncatedText>{{ incident.title || incident.id }}</OTruncatedText>
         </router-link>
-        <span v-else class="text-text-muted" data-test="alerts-alertdetail-no-incident">{{
-          t("alerts.detail.noIncident")
-        }}</span>
+        <span v-else class="flex items-baseline gap-2">
+          <span class="text-text-muted" data-test="alerts-alertdetail-no-incident">{{
+            t("alerts.detail.noIncident")
+          }}</span>
+          <router-link
+            :to="incidentsRoute"
+            class="text-accent shrink-0 hover:underline"
+            data-test="alerts-alertdetail-view-incidents"
+          >
+            {{ t("alerts.detail.viewIncidents") }}
+          </router-link>
+        </span>
       </dd>
     </div>
   </dl>
@@ -127,6 +136,11 @@ const items = computed<ConditionItem[]>(() => {
   );
   return list;
 });
+
+const incidentsRoute = computed(() => ({
+  name: "incidentList",
+  query: { org_identifier: props.org, status: "all", search: props.alert?.name ?? "" },
+}));
 
 const incidentRoute = computed(() => ({
   name: "incidentDetail",

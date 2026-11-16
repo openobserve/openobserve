@@ -13,7 +13,9 @@
     "headerLocked": "Locked: needs {feature}",
     "availableInEnterprise": "{feature} is available in OpenObserve Enterprise",
     "turnedOffTitle": "Turned off for this organization",
-    "enterpriseTitle": "Available in Enterprise"
+    "enterpriseTitle": "Available in Enterprise",
+    "readDocs": "Read the docs",
+    "rbacOff": "RBAC is off for this organization. An admin turns it on by setting {env} to true in the server configuration."
   },
   "emptyState": {
     "illustrations": {
@@ -1387,7 +1389,10 @@
       "isEmpty": "is blank or has no value",
       "isNotEmpty": "has a value that is not blank",
       "matchAll": "matches text"
-    }
+    },
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "flow": {
     "stepPicker": {
@@ -2084,7 +2089,9 @@
     "recordsChipRows": "{total} row | {total} rows",
     "histogramTitleRows": "Showing {total} row in {took} ms. | Showing {total} rows in {took} ms.",
     "histogramTitleRowsWithScan": "Showing {total} row in {took} ms. ({scanLabel}: {scanSize}) | Showing {total} rows in {took} ms. ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "Pick a stream first"
+    "pickStreamFirst": "Pick a stream first",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "Alert calibration",
@@ -2121,7 +2128,11 @@
     "searchOrJumpTo": "Search or jump to…",
     "jumpToTitle": "Jump to",
     "addData": "Add data",
-    "jumpToPlaceholder": "Search pages and actions",
+    "jumpToPlaceholder": "Search pages, alerts, dashboards and streams",
+    "jumpToPlaceholderPages": "Search pages and actions",
+    "jumpToPages": "Pages",
+    "jumpToShowAll": "Show all in {page}",
+    "jumpToSearchLogs": "Search logs for \"{text}\"",
     "synthetic": "Synthetics",
     "experience": "Experience",
     "slos": "SLOs",
@@ -4373,7 +4384,8 @@
     "deleteUsersTitle": "Delete users",
     "deleteUsersMsg": "Are you sure you want to delete {count} user? | Are you sure you want to delete {count} users?",
     "deleteUsersBlockNote": "{count} of them joined through your verified domain and will be blocked instead of deleted.",
-    "roleHint": "Admin manages the organization, Editor changes data and settings, Viewer can only read."
+    "roleHint": "Admin manages the organization, Editor changes data and settings, Viewer can only read.",
+    "customRolesNeedRbac": "Custom roles need RBAC, which is off for this organization."
   },
   "invitation": {
     "pendingInvitations": "Pending invitations",
@@ -6476,7 +6488,7 @@
     "confirmPauseBackfillJob": "Are you sure you want to pause the backfill job for \"{name}\"? You can resume it later.",
     "confirmResumeBackfillJob": "Are you sure you want to resume the backfill job for \"{name}\"?",
     "confirmDeleteBackfillJob": "Are you sure you want to delete the backfill job for the {name} pipeline? This will remove the job from the list but will not affect the backfilled data.",
-    "frequencyMins": "{count} Mins"
+    "frequencyMins": "{count} min"
   },
   "function": {
     "updateModeLabel": "Update mode",
@@ -7924,7 +7936,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "GPU exporter",
-    "rotationNote": "Tokens are not rotated in place. To rotate, create a new token, switch your sources to it, then disable the old one."
+    "rotationNote": "Tokens are not rotated in place. To rotate, create a new token, switch your sources to it, then disable the old one.",
+    "rotateAction": "Rotate…",
+    "rotateTitle": "Rotate {name}",
+    "rotateStep1": "Create a new token.",
+    "rotateStep2": "Switch your sources to the new token.",
+    "rotateStep3": "When nothing uses {name} any more, disable it from its row menu.",
+    "rotateNever": "Nothing is disabled for you. The old token keeps working until you disable it.",
+    "rotateCreateNew": "Create new token",
+    "rotateNewName": "{name}-new",
+    "rotateDescription": "Replaces {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10607,6 +10628,7 @@
       "quietNote": "Stopped writing in the last 7 days",
       "criticalUnit": "{count} at critical level",
       "deliveryFailures": "Alert delivery failures",
+      "deliveryCount": "{count} alert delivery failure | {count} alert delivery failures",
       "deliveryNote": "Alerts that fired but could not notify",
       "oldestFiring": "Oldest firing for {age}"
     },
@@ -10773,12 +10795,13 @@
       "loadError": "Couldn't read your streams"
     },
     "start": {
-      "text": "No data arrived in the last {range}. Send data, look at what you have, or set up an alert.",
+      "text": "No data has arrived yet. Send data, look at what you have, or set up an alert.",
       "addData": "Add data",
       "createAlert": "Create alert"
     },
     "summary": {
       "loadError": "Couldn't load the org summary",
+      "loadErrorRest": "Couldn't load the rest of the summary",
       "denied": "No access to the org summary. Ask an org admin."
     },
     "events": {
@@ -12084,7 +12107,8 @@
       "threshold": "Threshold",
       "noIncident": "No incident yet",
       "conditionLabel": "Alert condition",
-      "allRows": "Every row"
+      "allRows": "Every row",
+      "viewIncidents": "View incidents"
     },
     "summaryTrainingFailed": "Training failed",
     "startFromTemplate": "Start from a template",
@@ -13537,7 +13561,8 @@
       "condition": "Condition",
       "result": "Result",
       "anomalies": "Anomalies",
-      "forGroup": "for {group}"
+      "forGroup": "for {group}",
+      "errorFrom": "{status} from {destination}"
     },
     "continue": "Continue",
     "wouldTrigger": "Would trigger",
@@ -15085,7 +15110,9 @@
     "siemDetection": {
       "notice": "This alert is a Security detection. Its query is compiled from its Sigma rule, so the rule, stream and schedule are edited in Security, which keeps the rule and the query in step.",
       "open": "Edit in security"
-    }
+    },
+    "newAlertTitle": "New alert",
+    "newAnomalyTitle": "New anomaly detection"
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -17947,7 +17974,13 @@
       "partial": "Some spans of this trace could not be read. The waterfall may be incomplete.",
       "truncated": "Showing the first span of this trace, in start-time order. Later spans are not loaded yet. | Showing the first {count} spans of this trace, in start-time order. Later spans are not loaded yet.",
       "loadMore": "Load the next span | Load next {size} spans",
-      "loadMoreFailed": "Could not load more spans of this trace"
+      "loadMoreFailed": "Could not load more spans of this trace",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "Click to expand",
@@ -21607,7 +21640,9 @@
       "searchTracesAround": "Search traces around this time",
       "searchAroundTip": "Load the events logged just before and after this one.",
       "noOfEventsTip": "How many events to load around this one.",
-      "severityTip": "Detected log level. Select to see how it was found."
+      "severityTip": "Detected log level. Select to see how it was found.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select * query is not supported for visualization.",

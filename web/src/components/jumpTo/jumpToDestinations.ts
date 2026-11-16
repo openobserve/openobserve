@@ -21,6 +21,12 @@ const VISITS_KEY = "o2.jumpTo.areaVisits";
 /** The area of the palette's actions, which list only for a query. */
 export const ACTIONS_AREA_KEY = "actions";
 
+/** The one group that holds every matching page while a query is typed. */
+export const PAGES_AREA_KEY = "pages";
+
+/** Areas of the top-level rail links, which name the solution rather than a group of pages. */
+export const SOLUTION_AREA_KEYS = new Set(["observability", "security"]);
+
 /** One page the palette can open, with the rail area it belongs to. */
 export interface JumpDestination {
   key: string;
@@ -30,7 +36,7 @@ export interface JumpDestination {
   /** Stable, untranslated id of the area, used for the visit counts. */
   areaKey: string;
   to: RouteLocationRaw;
-  /** The page an action opens, shown beside it. */
+  /** Where it lives, shown beside it: the page an action opens, or an object's folder or explorer. */
   hint?: I18nText;
   /** Untranslated words that also find it, such as the last segment of its path. */
   keywords?: string[];
@@ -38,47 +44,80 @@ export interface JumpDestination {
 
 export interface JumpGroup {
   areaKey: string;
+  /** Empty for a group that needs no heading. */
   area: I18nText;
   items: JumpDestination[];
 }
 
+/** Named objects of one kind, such as alerts, that the palette finds by name. */
+export interface JumpObjectKind {
+  areaKey: string;
+  area: I18nText;
+  /** A tie in match keeps this order. */
+  items: JumpDestination[];
+  /** The row that ends the group and opens the kind's list, given the matches shown. */
+  showAll?: (matches: JumpDestination[]) => JumpDestination;
+}
+
 export type AreaVisits = Record<string, number>;
 
-/** 0 the label starts with the query, 1 a word of it does, 2 it holds it, 3 only the area, hint or a keyword does; null no match. */
-function matchScore(destination: JumpDestination, query: string): number | null {
-  const label = String(destination.label).toLowerCase();
+/** 0 the label starts with the query, 1 a word of it does, 2 it holds it; null no match. */
+function labelScore(label: string, query: string): number | null {
   if (label.startsWith(query)) return 0;
-  if (label.split(/[\s/_-]+/).some((word) => word.startsWith(query))) return 1;
-  if (label.includes(query)) return 2;
+  if (label.split(/[\s/_.-]+/).some((word) => word.startsWith(query))) return 1;
+  return label.includes(query) ? 2 : null;
+}
+
+/** As `labelScore`, with 3 when only the area, hint or a keyword holds the query. */
+function matchScore(destination: JumpDestination, query: string): number | null {
+  const score = labelScore(String(destination.label).toLowerCase(), query);
+  if (score !== null) return score;
   const extras = [destination.area, destination.hint ?? "", ...(destination.keywords ?? [])];
   return extras.some((text) => String(text).toLowerCase().includes(query)) ? 3 : null;
 }
 
-/** Groups by area. An empty query lists no actions and puts the most-visited areas first; a query puts the best matches first, actions winning a tie. */
+/** Under a query a page names its rail group beside it, unless that group is the solution or the page itself. */
+function withAreaHint(page: JumpDestination): JumpDestination {
+  if (page.hint || SOLUTION_AREA_KEYS.has(page.areaKey) || page.area === page.label) return page;
+  return { ...page, hint: page.area };
+}
+
+/**
+ * An empty query lists no actions and groups pages by area, the most-visited first. A query lists
+ * one Pages group and one Actions group, best match first, actions winning a tie.
+ */
 export function rankDestinations(
   destinations: JumpDestination[],
   query: string,
   visits: AreaVisits,
+  pagesLabel: I18nText,
 ): JumpGroup[] {
   const needle = query.trim().toLowerCase();
-  type Scored = { destination: JumpDestination; score: number };
+  type Scored = { destination: JumpDestination; score: number; order: number };
   const groups = new Map<
     string,
     { area: I18nText; scored: Scored[]; best: number; order: number }
   >();
   destinations.forEach((destination, order) => {
-    if (!needle && destination.areaKey === ACTIONS_AREA_KEY) return;
+    const isAction = destination.areaKey === ACTIONS_AREA_KEY;
+    if (!needle && isAction) return;
     const score = needle ? matchScore(destination, needle) : 0;
     if (score === null) return;
-    const group = groups.get(destination.areaKey) ?? {
-      area: destination.area,
+    const asPage = !!needle && !isAction;
+    const key = asPage ? PAGES_AREA_KEY : destination.areaKey;
+    const group = groups.get(key) ?? {
+      area: asPage ? pagesLabel : destination.area,
       scored: [],
       best: score,
       order,
     };
     group.best = Math.min(group.best, score);
-    group.scored.push({ destination, score });
-    groups.set(destination.areaKey, group);
+    group.scored.push({
+      destination: asPage ? withAreaHint(destination) : destination,
+      score,
+      order,
+    });
+    groups.set(key, group);
   });
   const visitsOf = (areaKey: string) => visits[areaKey] ?? 0;
   const isActions = (areaKey: string) => Number(areaKey === ACTIONS_AREA_KEY);
@@ -93,8 +132,36 @@ export function rankDestinations(
     .map(([areaKey, group]) => ({
       areaKey,
       area: group.area,
-      items: [...group.scored].sort((a, b) => a.score - b.score).map((s) => s.destination),
+      items: [...group.scored]
+        .sort(
+          (a, b) =>
+            a.score - b.score ||
+            visitsOf(b.destination.areaKey) - visitsOf(a.destination.areaKey) ||
+            a.order - b.order,
+        )
+        .map((s) => s.destination),
     }));
+}
+
+/** Each kind's objects whose name holds the query, best first and capped, then its "Show all" row; a kind with no match is left out. */
+export function rankObjects(kinds: JumpObjectKind[], query: string, cap: number): JumpGroup[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  return kinds.flatMap((kind) => {
+    const matches = kind.items
+      .map((item, order) => ({
+        item,
+        order,
+        score: labelScore(String(item.label).toLowerCase(), needle),
+      }))
+      .filter((m): m is { item: JumpDestination; order: number; score: number } => m.score !== null)
+      .sort((a, b) => a.score - b.score || a.order - b.order)
+      .slice(0, cap)
+      .map((m) => m.item);
+    if (!matches.length) return [];
+    const items = kind.showAll ? [...matches, kind.showAll(matches)] : matches;
+    return [{ areaKey: kind.areaKey, area: kind.area, items }];
+  });
 }
 
 /** The area holding `path`: the destination whose path is the longest prefix of it. */

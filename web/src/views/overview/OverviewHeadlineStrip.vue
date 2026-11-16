@@ -13,85 +13,119 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <ul
-    class="grid grid-cols-6 gap-x-6 gap-y-4 max-xl:grid-cols-3 max-md:grid-cols-2"
-    data-test="overview-headline-strip"
-  >
-    <li
-      v-for="item in items"
-      :key="item.key"
-      class="relative flex min-w-0 flex-col"
-      :data-test="`overview-tile-card-${item.key}`"
+  <div class="grid">
+    <!-- the failed line overlays the hidden tiles, so a failure keeps the loading box and moves nothing -->
+    <div
+      v-if="failed"
+      class="col-start-1 row-start-1 flex flex-wrap items-start gap-x-4 gap-y-2"
+      data-test="overview-summary-failed"
     >
-      <!-- the value opens its page; a tile without a page behind it stays plain text -->
-      <component
-        :is="item.selectable ? OButton : 'div'"
-        v-bind="item.selectable ? { variant: 'ghost' } : {}"
-        :class="[
-          'min-w-0 self-start',
-          item.selectable
-            ? '-ms-3 max-w-[calc(100%+0.75rem)]'
-            : 'h-control-md flex items-center gap-x-1.5',
-        ]"
-        :aria-describedby="`${uid}-${item.key}`"
-        :data-test="`overview-headline-${item.key}`"
-        @click="item.selectable && emit('select', item.key)"
+      <OButton
+        v-if="deliveryFailures"
+        variant="ghost"
+        class="-ms-3"
+        data-test="overview-failed-delivery"
+        @click="emit('select', 'delivery')"
       >
-        <OSkeleton
-          v-if="item.loading"
-          shape="block"
-          class="h-5 w-12"
-          data-test="overview-tile-skeleton"
-        />
-        <template v-else>
-          <span
-            :class="['text-xl leading-7 font-semibold tabular-nums', item.tone]"
-            data-test="overview-tile-value"
-            >{{ item.value }}</span
-          >
-          <OTruncatedText
-            v-if="item.unit"
-            class="text-text-secondary min-w-0 text-xs font-normal"
-            data-test="overview-tile-unit"
-            >{{ item.unit }}</OTruncatedText
-          >
-        </template>
-      </component>
-      <span
-        :id="`${uid}-${item.key}`"
-        :class="['text-text-secondary text-xs leading-4', item.ask && askVisible ? 'pe-8' : '']"
-        data-test="overview-tile-label"
-        >{{ item.label }}</span
+        <span class="text-status-warning-text">{{
+          t("overview.cards.deliveryCount", { count: deliveryFailures }, deliveryFailures)
+        }}</span>
+      </OButton>
+      <div class="h-control-md flex min-w-0 items-center gap-2" data-test="overview-summary-error">
+        <OIcon name="warning-amber" size="sm" class="text-status-error-text shrink-0" />
+        <span class="text-compact">{{
+          t(deliveryFailures ? "overview.summary.loadErrorRest" : "overview.summary.loadError")
+        }}</span>
+        <OButton size="sm" data-test="overview-summary-retry" @click="emit('retry')">
+          {{ t("emptyState.loadError.action") }}
+        </OButton>
+      </div>
+    </div>
+    <ul
+      :class="[
+        'col-start-1 row-start-1 grid grid-cols-6 gap-x-6 gap-y-4 max-xl:grid-cols-3 max-md:grid-cols-2',
+        failed && 'invisible',
+      ]"
+      :aria-hidden="failed || undefined"
+      :inert="failed"
+      data-test="overview-headline-strip"
+    >
+      <li
+        v-for="item in items"
+        :key="item.key"
+        class="relative flex min-w-0 flex-col"
+        :data-test="`overview-tile-card-${item.key}`"
       >
-      <!-- the note keeps two lines even when empty, so the six values share one rhythm -->
-      <span class="mt-0.5 flex min-h-8 items-start gap-1 text-xs leading-4">
-        <OIcon
-          v-if="item.note && !item.loading && item.noteTone === 'positive'"
-          name="check-circle"
-          size="xs"
-          class="text-status-success-text mt-0.5 shrink-0"
-        />
-        <span
-          v-if="item.note && !item.loading"
-          :class="NOTE_TONE[item.noteTone] ?? item.tone"
-          data-test="overview-tile-note"
-          >{{ item.note }}</span
+        <!-- the value opens its page; a tile without a page behind it stays plain text -->
+        <component
+          :is="item.selectable ? OButton : 'div'"
+          v-bind="item.selectable ? { variant: 'ghost' } : {}"
+          :class="[
+            'min-w-0 self-start',
+            item.selectable
+              ? '-ms-3 max-w-[calc(100%+0.75rem)]'
+              : 'h-control-md flex items-center gap-x-1.5',
+          ]"
+          :aria-describedby="`${uid}-${item.key}`"
+          :data-test="`overview-headline-${item.key}`"
+          @click="item.selectable && emit('select', item.key)"
         >
-      </span>
-      <OverviewAskAiButton
-        v-if="item.ask"
-        kind="tile"
-        :item-key="item.key"
-        :label="item.label"
-        class="absolute end-0 top-0"
-        @ask="emit('askAi', item.ask)"
-      />
-    </li>
-    <!-- the sixth cell holds the strip's one load message; its height fits that message, so a failure never moves the page -->
-    <li class="flex min-h-23 min-w-0 flex-col" data-test="overview-summary-aside">
-      <slot name="aside" />
-    </li>
-  </ul>
+          <OSkeleton
+            v-if="item.loading"
+            shape="block"
+            class="h-5 w-12"
+            data-test="overview-tile-skeleton"
+          />
+          <template v-else>
+            <span
+              :class="['text-xl leading-7 font-semibold tabular-nums', item.tone]"
+              data-test="overview-tile-value"
+              >{{ item.value }}</span
+            >
+            <OTruncatedText
+              v-if="item.unit"
+              class="text-text-secondary min-w-0 text-xs font-normal"
+              data-test="overview-tile-unit"
+              >{{ item.unit }}</OTruncatedText
+            >
+          </template>
+        </component>
+        <span
+          :id="`${uid}-${item.key}`"
+          :class="['text-text-secondary text-xs leading-4', item.ask && askVisible ? 'pe-8' : '']"
+          data-test="overview-tile-label"
+          >{{ item.label }}</span
+        >
+        <!-- the note keeps two lines even when empty, so the six values share one rhythm -->
+        <span class="mt-0.5 flex min-h-8 items-start gap-1 text-xs leading-4">
+          <OIcon
+            v-if="item.note && !item.loading && item.noteTone === 'positive'"
+            name="check-circle"
+            size="xs"
+            class="text-status-success-text mt-0.5 shrink-0"
+          />
+          <span
+            v-if="item.note && !item.loading"
+            :class="NOTE_TONE[item.noteTone] ?? item.tone"
+            data-test="overview-tile-note"
+            >{{ item.note }}</span
+          >
+        </span>
+        <OverviewAskAiButton
+          v-if="item.ask"
+          kind="tile"
+          :item-key="item.key"
+          :label="item.label"
+          class="absolute end-0 top-0"
+          @ask="emit('askAi', item.ask)"
+        />
+      </li>
+      <!-- the sixth cell holds the strip's one load message; its height fits that message, so a failure never moves the page -->
+      <li class="flex min-h-23 min-w-0 flex-col" data-test="overview-summary-aside">
+        <slot name="aside" />
+      </li>
+    </ul>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -161,10 +195,13 @@ const props = defineProps<{
   forbidden?: boolean;
   incidentsState: IncidentsTile;
   incidentsTotal: number;
+  /** Delivery failures counted from the alert list; null when that list is unknown too. */
+  deliveryFailures?: number | null;
 }>();
 
 const emit = defineEmits<{
   select: [target: OverviewTarget];
+  retry: [];
   askAi: [target: OverviewAskAiTarget];
 }>();
 
@@ -311,7 +348,7 @@ const items = computed<TileItem[]>(() => {
     ask: hasProblem(data) ? { kind: "count", topic: key, count: Number(data.value) } : undefined,
   });
   // firing has its own band above the strip; red is kept for incidents and dropped data (R9)
-  return [
+  const all: TileItem[] = [
     tile("failing", t("overview.cards.failingRules"), failing, TONE.warning, !failing.blocked),
     tile(
       "incidents",
@@ -336,5 +373,6 @@ const items = computed<TileItem[]>(() => {
     ),
     tile("quiet", t("overview.cards.quietStreams"), quiet, TONE.warning, !quiet.blocked),
   ];
+  return all.filter((i) => !(i.key === "incidents" && props.incidentsState === "unavailable"));
 });
 </script>

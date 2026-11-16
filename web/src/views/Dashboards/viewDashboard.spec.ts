@@ -550,6 +550,11 @@ describe("ViewDashboard", () => {
                 template: '<div><slot name="actions" /></div>',
               },
               ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+              ORefreshButton: {
+                name: "ORefreshButton",
+                props: ["tooltip"],
+                template: '<div><slot name="menu" /></div>',
+              },
             },
           },
         });
@@ -575,7 +580,6 @@ describe("ViewDashboard", () => {
 
         const option = (dataTest: string) => wrapper.findComponent(`[data-test="${dataTest}"]`);
         expect(wrapper.vm.arePanelsLoading).toBe(true);
-        expect(option("dashboard-refresh-options-btn").props("disabled")).toBe(false);
         expect(option("dashboard-refresh-without-cache-btn").props("disabled")).toBe(true);
         expect(option("dashboard-auto-run-toggle-btn").props("disabled")).toBe(false);
       });
@@ -604,9 +608,12 @@ describe("ViewDashboard", () => {
         const toggle = wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
         expect(toggle.text()).toContain("dashboard.viewDashboard.autoRunDescription");
         expect(toggle.text()).not.toContain("search.liveModeTooltip");
-        const tooltips = wrapper
-          .findAllComponents({ name: "OTooltip" })
-          .map((tooltip: any) => tooltip.props("content"));
+        const tooltips = [
+          wrapper.findComponent({ name: "ORefreshButton" }).props("tooltip"),
+          ...wrapper
+            .findAllComponents({ name: "OTooltip" })
+            .map((tooltip: any) => tooltip.props("content")),
+        ];
         expect(tooltips).toContain("dashboard.viewDashboard.autoRunDescription");
         expect(tooltips).not.toContain("dashboard.viewDashboard.autoRunScope");
         expect(tooltips).not.toContain("search.autoRunEnabled");
@@ -1697,7 +1704,7 @@ describe("ViewDashboard", () => {
           plugins: [i18n, store],
           renderStubDefaultSlot: true,
           stubs: {
-            OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
+            OPageLayout: { template: '<div><slot name="actions" /></div>' },
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
           },
         },
@@ -1798,7 +1805,7 @@ describe("ViewDashboard", () => {
         plugins: [i18n, store],
         renderStubDefaultSlot: true,
         stubs: {
-          OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
+          OPageLayout: { template: '<div><slot name="actions" /></div>' },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
         },
       },
@@ -1823,7 +1830,7 @@ describe("ViewDashboard", () => {
     wrapper = createWrapper({
       global: {
         plugins: [i18n, store],
-        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+        stubs: { OPageLayout: { template: '<div><slot name="actions" /></div>' } },
       },
     });
     await flushPromises();

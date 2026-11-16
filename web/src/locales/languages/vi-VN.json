@@ -13,7 +13,9 @@
     "headerLocked": "Đã khóa: cần {feature}",
     "availableInEnterprise": "{feature} có trong OpenObserve Enterprise",
     "turnedOffTitle": "Đã tắt cho tổ chức này",
-    "enterpriseTitle": "Có trong Enterprise"
+    "enterpriseTitle": "Có trong Enterprise",
+    "readDocs": "Đọc tài liệu",
+    "rbacOff": "RBAC đang tắt cho tổ chức này. Quản trị viên bật nó bằng cách đặt {env} thành true trong cấu hình máy chủ."
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} hàng | {total} hàng",
     "histogramTitleRows": "Hiển thị {total} hàng trong {took} ms. | Hiển thị {total} hàng trong {took} ms.",
     "histogramTitleRowsWithScan": "Hiển thị {total} hàng trong {took} ms. ({scanLabel}: {scanSize}) | Hiển thị {total} hàng trong {took} ms. ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "Hãy chọn một luồng trước"
+    "pickStreamFirst": "Hãy chọn một luồng trước",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "Hiệu chỉnh cảnh báo",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "Tìm kiếm hoặc chuyển đến…",
     "jumpToTitle": "Chuyển đến",
     "addData": "Thêm dữ liệu",
-    "jumpToPlaceholder": "Tìm trang và hành động",
+    "jumpToPlaceholder": "Tìm trang, cảnh báo, bảng điều khiển và luồng",
+    "jumpToPlaceholderPages": "Tìm trang và hành động",
+    "jumpToPages": "Trang",
+    "jumpToShowAll": "Xem tất cả trong {page}",
+    "jumpToSearchLogs": "Tìm \"{text}\" trong nhật ký",
     "synthetic": "Synthetics",
     "experience": "Trải nghiệm",
     "slos": "SLO",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "Xóa người dùng",
     "deleteUsersMsg": "Bạn có chắc chắn muốn xóa {count} người dùng? | Bạn có chắc chắn muốn xóa {count} người dùng?",
     "deleteUsersBlockNote": "{count} trong số họ đã tham gia qua tên miền đã xác minh của bạn và sẽ bị chặn thay vì bị xóa.",
-    "roleHint": "Admin quản lý tổ chức, Editor thay đổi dữ liệu và cài đặt, Viewer chỉ có thể đọc."
+    "roleHint": "Admin quản lý tổ chức, Editor thay đổi dữ liệu và cài đặt, Viewer chỉ có thể đọc.",
+    "customRolesNeedRbac": "Vai trò tùy chỉnh cần RBAC, hiện đang tắt cho tổ chức này."
   },
   "invitation": {
     "pendingInvitations": "Lời mời đang chờ",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "GPU exporter",
-    "rotationNote": "Mã thông báo không được xoay vòng tại chỗ. Để xoay vòng, hãy tạo mã mới, chuyển các nguồn sang mã đó rồi vô hiệu hóa mã cũ."
+    "rotationNote": "Mã thông báo không được xoay vòng tại chỗ. Để xoay vòng, hãy tạo mã mới, chuyển các nguồn sang mã đó rồi vô hiệu hóa mã cũ.",
+    "rotateAction": "Xoay vòng…",
+    "rotateTitle": "Xoay vòng {name}",
+    "rotateStep1": "Tạo một mã thông báo mới.",
+    "rotateStep2": "Chuyển các nguồn của bạn sang mã thông báo mới.",
+    "rotateStep3": "Khi không còn gì dùng {name}, hãy vô hiệu hóa nó từ menu của dòng.",
+    "rotateNever": "Không có gì bị vô hiệu hóa tự động. Mã thông báo cũ vẫn hoạt động cho đến khi bạn vô hiệu hóa nó.",
+    "rotateCreateNew": "Tạo mã thông báo mới",
+    "rotateNewName": "{name}-moi",
+    "rotateDescription": "Thay thế {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "Ngừng ghi dữ liệu trong 7 ngày qua",
       "criticalUnit": "{count} ở mức nghiêm trọng",
       "deliveryFailures": "Lỗi gửi cảnh báo",
+      "deliveryCount": "{count} lần gửi cảnh báo thất bại | {count} lần gửi cảnh báo thất bại",
       "deliveryNote": "Cảnh báo đã kích hoạt nhưng không thể thông báo",
       "oldestFiring": "Kích hoạt lâu nhất trong {age}"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "Không đọc được các luồng của bạn"
     },
     "start": {
-      "text": "Không có dữ liệu nào đến trong {range} qua. Hãy gửi dữ liệu, xem những gì bạn có hoặc thiết lập cảnh báo.",
+      "text": "Chưa có dữ liệu nào đến. Hãy gửi dữ liệu, xem những gì bạn có hoặc thiết lập cảnh báo.",
       "addData": "Thêm dữ liệu",
       "createAlert": "Tạo cảnh báo"
     },
     "summary": {
       "loadError": "Không tải được tóm tắt tổ chức",
+      "loadErrorRest": "Không tải được phần còn lại của tóm tắt",
       "denied": "Không có quyền truy cập tóm tắt tổ chức. Hãy hỏi quản trị viên."
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "Ngưỡng",
       "noIncident": "Chưa có sự cố",
       "conditionLabel": "Điều kiện cảnh báo",
-      "allRows": "Mọi hàng"
+      "allRows": "Mọi hàng",
+      "viewIncidents": "Xem sự cố"
     },
     "summaryTrainingFailed": "Huấn luyện thất bại",
     "startFromTemplate": "Bắt đầu từ một mẫu",
@@ -12807,7 +12828,8 @@
       "condition": "Điều kiện",
       "result": "Kết quả",
       "anomalies": "Bất thường",
-      "forGroup": "cho {group}"
+      "forGroup": "cho {group}",
+      "errorFrom": "{status} từ {destination}"
     },
     "continue": "Tiếp tục",
     "wouldTrigger": "SẼ KÍCH HOẠT",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "Cảnh báo này là một phát hiện Security. Truy vấn của nó được biên dịch từ quy tắc Sigma, vì vậy quy tắc, stream và lịch chạy được chỉnh sửa trong Security để giữ quy tắc và truy vấn luôn khớp nhau.",
       "open": "Chỉnh sửa trong Security"
-    }
+    },
+    "newAlertTitle": "Cảnh báo mới",
+    "newAnomalyTitle": "Phát hiện bất thường mới"
   },
   "alert_dependencies": {
     "actionOpen": "Mở",
@@ -17120,7 +17144,13 @@
       "partial": "Một số span của trace này không thể đọc được. Biểu đồ thác nước có thể không đầy đủ.",
       "truncated": "Hiển thị span đầu tiên của trace này, theo thứ tự thời gian bắt đầu. Các span sau chưa được tải. | Hiển thị {count} span đầu tiên của trace này, theo thứ tự thời gian bắt đầu. Các span sau chưa được tải.",
       "loadMore": "Tải span tiếp theo | Tải {size} span tiếp theo",
-      "loadMoreFailed": "Không thể tải thêm span của trace này"
+      "loadMoreFailed": "Không thể tải thêm span của trace này",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "Nhấp để mở rộng",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "Tìm trace quanh thời điểm này",
       "searchAroundTip": "Tải các sự kiện được ghi ngay trước và sau sự kiện này.",
       "noOfEventsTip": "Số sự kiện cần tải quanh sự kiện này.",
-      "severityTip": "Mức nhật ký được phát hiện. Chọn để xem cách phát hiện."
+      "severityTip": "Mức nhật ký được phát hiện. Chọn để xem cách phát hiện.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Truy vấn Select * không được hỗ trợ cho trực quan hóa.",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "Mẫu này không hợp lệ hoặc không được hỗ trợ. Không thể dùng lookahead, lookbehind và tham chiếu ngược."
     },
     "queryTooltip": "Sửa bộ lọc dạng văn bản",
-    "builderTooltip": "Sửa bộ lọc bằng trình dựng"
+    "builderTooltip": "Sửa bộ lọc bằng trình dựng",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

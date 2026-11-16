@@ -650,10 +650,10 @@ const shapePipelines = (list: any[]) =>
         ? {
             stream_name: pipeline.source.stream_name,
             stream_type: pipeline.source.stream_type,
-            frequency: "--",
-            period: "--",
-            cron: "--",
-            sql_query: "--",
+            frequency: "—",
+            period: "—",
+            cron: "—",
+            sql_query: "—",
           }
         : {
             stream_type: pipeline.source.stream_type,
@@ -671,8 +671,8 @@ const shapePipelines = (list: any[]) =>
             }),
             cron:
               pipeline.source.trigger_condition.frequency_type == "minutes"
-                ? t("common.boolFalse")
-                : t("common.boolTrue"),
+                ? t("common.no")
+                : t("common.yes"),
             sql_query: pipeline.source.query_condition.sql,
           };
 
@@ -812,8 +812,7 @@ const stateLabel = (row: any): string => {
       : t("pipeline_list.stateActive");
 };
 
-// Full-row wash for the EXCEPTIONS only — errored gets a light red, paused a
-// muted grey, healthy rows stay clean (their state reads from the green rail).
+// The wash is for the exceptions only: errored red, paused grey; healthy rows read from the green rail.
 // Scheduled rows keep their click affordance for the SQL expansion.
 const pipelineRowClass = (row: any): string => {
   const s = pipelineState(row);
@@ -823,8 +822,7 @@ const pipelineRowClass = (row: any): string => {
   return [cursorClass, stateClass].filter(Boolean).join(" ");
 };
 
-// Extreme-left state rail — inset box-shadow so it paints regardless of
-// border-collapse; rem width + token colour keep it theme-aware.
+// Inset box-shadow so the rail paints regardless of border-collapse; the green live rail is Calm Signal's, as on Streams.
 const pipelineRowStyle = (row: any): Record<string, string> => {
   const s = pipelineState(row);
   const color =

@@ -886,6 +886,12 @@ watch(orgId, () => void refresh());
         data-test="security-detections-first-run"
         @action="openNew()"
       />
+      <SecurityLoadError
+        v-else-if="error && !rows.length"
+        :what="t('siem.detections.whatDetections')"
+        :hint="t('siem.detections.loadFailedHint')"
+        @retry="refresh"
+      />
       <OTable
         v-else
         ref="tableRef"

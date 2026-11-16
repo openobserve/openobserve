@@ -238,6 +238,9 @@ const cases = computed<CaseRow[]>(() => {
 });
 const total = computed(() => Number(list.data.value?.total ?? cases.value.length));
 const loading = computed(() => list.isFetching.value);
+const lastRunAt = computed(() => list.dataUpdatedAt.value || null);
+// A failed read is the button's failed state, never a fresh data age.
+const failedAt = computed(() => (list.isError.value ? list.errorUpdatedAt.value || null : null));
 // The tiles count under every active filter except status, which the tiles themselves pick.
 const tileFilters = computed<CaseSearchFilters>(() => {
   const { status: _status, ...rest } = filters.value;
@@ -401,7 +404,7 @@ function onEmptyAction() {
 
 const priorityFilterOptions = computed(() =>
   PRIORITIES.map((p) => ({
-    label: t("siem.cases.priorityOption", { p, level: t(toneLabelKey(toneOfPriority(p))) }),
+    label: t(toneLabelKey(toneOfPriority(p))),
     value: p,
   })),
 );
@@ -1139,7 +1142,7 @@ async function setAssignee(value: unknown) {
 
 const priorityOptions = computed(() =>
   PRIORITIES.map((p) => ({
-    label: t("siem.cases.priorityOption", { p, level: t(toneLabelKey(toneOfPriority(p))) }),
+    label: t(toneLabelKey(toneOfPriority(p))),
     value: p,
   })),
 );
@@ -1357,7 +1360,8 @@ onMounted(() => {
           >{{ t("siem.cases.activeSuppressions") }}</OButton
         >
         <ORefreshButton
-          :last-run-at="list.dataUpdatedAt.value || null"
+          :last-run-at="lastRunAt"
+          :failed-at="failedAt"
           :loading="loading"
           data-test="security-cases-refresh"
           @click="refresh"
@@ -1388,7 +1392,14 @@ onMounted(() => {
         data-test="security-cases-notices"
       />
 
+      <SecurityLoadError
+        v-if="tableError"
+        :what="t('siem.cases.whatCases')"
+        :hint="t('siem.cases.loadFailedHint')"
+        @retry="refetchCases"
+      />
       <OTable
+        v-else
         :data="cases"
         :columns="columns"
         row-key="id"

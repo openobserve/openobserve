@@ -344,18 +344,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <OEmptyState
             v-if="!loading"
-            :kind="!!searchQuery || statusFilter !== 'all' ? 'filtered' : 'first-run'"
+            :kind="isNarrowed ? 'filtered' : 'first-run'"
             :title="
-              !!searchQuery || statusFilter !== 'all'
+              isNarrowed
                 ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.incidents') })
                 : t('emptyState.noIncidents.title')
             "
             :text="
-              !!searchQuery || statusFilter !== 'all'
+              isNarrowed
                 ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.incidents') })
                 : t('emptyState.noIncidents.description')
             "
-            :icon="!!searchQuery || statusFilter !== 'all' ? undefined : 'task-alt'"
+            :icon="isNarrowed ? undefined : 'task-alt'"
             @action="clearFilters()"
           />
         </template>
@@ -509,15 +509,16 @@ export default defineComponent({
       notLoaded(id)
         ? t("alerts.downtimes.incident.notLoadedTooltip", { id })
         : t("alerts.downtimes.incident.mutedBy", { name: nameOf(id) });
-    const searchQuery = ref("");
+    const searchQuery = ref(typeof route.query.search === "string" ? route.query.search : "");
     // Active covers open and acknowledged; Open is open only, matching the Overview count.
     const validStatuses = ["all", "active", "open", "resolved"];
     // Default to "active"; a valid ?status= query wins over the saved state.
     const urlStatus = validStatuses.includes(route.query.status as string)
       ? (route.query.status as string)
       : null;
-    if (route.query.status !== undefined) {
-      const { status: _status, ...rest } = route.query;
+    const hasUrlSearch = searchQuery.value !== "";
+    if (route.query.status !== undefined || route.query.search !== undefined) {
+      const { status: _status, search: _search, ...rest } = route.query;
       router.replace({ query: rest });
     }
     const statusFilter = ref(urlStatus ?? "active");
@@ -652,6 +653,8 @@ export default defineComponent({
         )
           return true;
         if (incident.severity.toLowerCase().includes(searchLower)) return true;
+        if (incident.alert_groups?.some((g) => g.alert_name.toLowerCase().includes(searchLower)))
+          return true;
         if (incident.group_values) {
           const dimensionsStr = Object.entries(incident.group_values)
             .map(([k, v]) => `${k}=${v}`)
@@ -888,6 +891,11 @@ export default defineComponent({
       savePageState();
     };
 
+    const isNarrowed = computed(
+      () =>
+        !!searchQuery.value || severityFilters.value.length > 0 || statusFilter.value !== "active",
+    );
+
     const clearFilters = () => {
       searchQuery.value = "";
       severityFilters.value = [];
@@ -1082,7 +1090,7 @@ export default defineComponent({
         if (cachedData && cachedData.length > 0) {
           allIncidents.value = cachedData;
         }
-        if (savedState.searchQuery !== undefined && !urlStatus) {
+        if (savedState.searchQuery !== undefined && !urlStatus && !hasUrlSearch) {
           searchQuery.value = savedState.searchQuery;
         }
         if (savedState.statusFilter !== undefined && !urlStatus) {
@@ -1174,6 +1182,7 @@ export default defineComponent({
       statusFilter,
       filterByStatus,
       clearFilters,
+      isNarrowed,
       columns,
       pageSize,
       sortBy,

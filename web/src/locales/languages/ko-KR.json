@@ -13,7 +13,9 @@
     "headerLocked": "잠김: {feature} 필요",
     "availableInEnterprise": "{feature}은(는) OpenObserve 엔터프라이즈에서 사용할 수 있습니다",
     "turnedOffTitle": "이 조직에서는 꺼져 있음",
-    "enterpriseTitle": "Enterprise에서 사용 가능"
+    "enterpriseTitle": "Enterprise에서 사용 가능",
+    "readDocs": "문서 읽기",
+    "rbacOff": "이 조직에서는 RBAC가 꺼져 있습니다. 관리자가 서버 구성에서 {env}를 true로 설정하면 켜집니다."
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total}개 행 | {total}개 행",
     "histogramTitleRows": "{took}ms 동안 {total}개 행 표시. | {took}ms 동안 {total}개 행 표시.",
     "histogramTitleRowsWithScan": "{took}ms 동안 {total}개 행 표시. ({scanLabel}: {scanSize}) | {took}ms 동안 {total}개 행 표시. ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "먼저 스트림을 선택하세요"
+    "pickStreamFirst": "먼저 스트림을 선택하세요",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "알림 캘리브레이션",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "검색 또는 이동…",
     "jumpToTitle": "이동",
     "addData": "데이터 추가",
-    "jumpToPlaceholder": "페이지 및 액션 검색",
+    "jumpToPlaceholder": "페이지, 알림, 대시보드, 스트림 검색",
+    "jumpToPlaceholderPages": "페이지 및 액션 검색",
+    "jumpToPages": "페이지",
+    "jumpToShowAll": "{page}에서 모두 보기",
+    "jumpToSearchLogs": "로그에서 \"{text}\" 검색",
     "synthetic": "Synthetics",
     "experience": "경험",
     "slos": "SLO",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "사용자 삭제",
     "deleteUsersMsg": "{count} 사용자를 삭제하시겠습니까? | {count} 사용자를 삭제하시겠습니까?",
     "deleteUsersBlockNote": "이 중 {count}명은 확인된 도메인을 통해 참여했으며 삭제 대신 차단됩니다.",
-    "roleHint": "Admin은 조직을 관리하고, Editor는 데이터와 설정을 변경하며, Viewer는 읽기만 할 수 있습니다."
+    "roleHint": "Admin은 조직을 관리하고, Editor는 데이터와 설정을 변경하며, Viewer는 읽기만 할 수 있습니다.",
+    "customRolesNeedRbac": "사용자 지정 역할에는 RBAC가 필요하지만 이 조직에서는 꺼져 있습니다."
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "GPU 익스포터",
-    "rotationNote": "토큰은 제자리에서 교체되지 않습니다. 교체하려면 새 토큰을 만들고 소스를 새 토큰으로 전환한 다음 이전 토큰을 비활성화하세요."
+    "rotationNote": "토큰은 제자리에서 교체되지 않습니다. 교체하려면 새 토큰을 만들고 소스를 새 토큰으로 전환한 다음 이전 토큰을 비활성화하세요.",
+    "rotateAction": "교체…",
+    "rotateTitle": "{name} 교체",
+    "rotateStep1": "새 토큰을 만드세요.",
+    "rotateStep2": "소스를 새 토큰으로 전환하세요.",
+    "rotateStep3": "{name}을(를) 더 이상 사용하는 곳이 없으면 행 메뉴에서 비활성화하세요.",
+    "rotateNever": "자동으로 비활성화되는 항목은 없습니다. 이전 토큰은 비활성화할 때까지 계속 작동합니다.",
+    "rotateCreateNew": "새 토큰 만들기",
+    "rotateNewName": "{name}-new",
+    "rotateDescription": "{name}을(를) 대체합니다"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "지난 7일 동안 쓰기 중단",
       "criticalUnit": "심각 수준 {count}개",
       "deliveryFailures": "알림 전송 실패",
+      "deliveryCount": "알림 전송 실패 {count}건 | 알림 전송 실패 {count}건",
       "deliveryNote": "발생했지만 알림을 보내지 못한 알림",
       "oldestFiring": "{age} 동안 발생 중인 가장 오래된 알림"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "스트림을 읽지 못했습니다"
     },
     "start": {
-      "text": "지난 {range} 동안 들어온 데이터가 없습니다. 데이터를 보내거나, 있는 데이터를 살펴보거나, 알림을 설정하세요.",
+      "text": "아직 들어온 데이터가 없습니다. 데이터를 보내거나, 있는 데이터를 살펴보거나, 알림을 설정하세요.",
       "addData": "데이터 추가",
       "createAlert": "알림 만들기"
     },
     "summary": {
       "loadError": "조직 요약을 불러오지 못했습니다",
+      "loadErrorRest": "요약의 나머지를 불러오지 못했습니다",
       "denied": "조직 요약에 대한 접근 권한이 없습니다. 조직 관리자에게 요청하세요."
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "임계값",
       "noIncident": "아직 인시던트 없음",
       "conditionLabel": "알림 조건",
-      "allRows": "모든 행"
+      "allRows": "모든 행",
+      "viewIncidents": "인시던트 보기"
     },
     "summaryTrainingFailed": "학습 실패",
     "startFromTemplate": "템플릿에서 시작",
@@ -12807,7 +12828,8 @@
       "condition": "조건",
       "result": "결과",
       "anomalies": "이상",
-      "forGroup": "{group} 기준"
+      "forGroup": "{group} 기준",
+      "errorFrom": "{destination}에서 {status}"
     },
     "continue": "계속",
     "wouldTrigger": "트리거됨",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "이 알림은 보안 탐지입니다. 쿼리는 Sigma 규칙에서 컴파일되므로 규칙, 스트림, 일정은 보안에서 편집하며, 이를 통해 규칙과 쿼리가 항상 일치하도록 유지됩니다.",
       "open": "보안에서 편집"
-    }
+    },
+    "newAlertTitle": "새 알림",
+    "newAnomalyTitle": "새 이상 탐지"
   },
   "alert_dependencies": {
     "actionOpen": "열기",
@@ -17120,7 +17144,13 @@
       "partial": "이 트레이스의 일부 스팬을 읽을 수 없습니다. 워터폴이 불완전할 수 있습니다.",
       "truncated": "이 트레이스의 첫 번째 스팬을 시작 시간 순으로 표시합니다. 이후 스팬은 아직 로드되지 않았습니다. | 이 트레이스의 처음 {count}개 스팬을 시작 시간 순으로 표시합니다. 이후 스팬은 아직 로드되지 않았습니다.",
       "loadMore": "다음 스팬 로드 | 다음 {size}개 스팬 로드",
-      "loadMoreFailed": "이 트레이스의 스팬을 더 로드할 수 없습니다"
+      "loadMoreFailed": "이 트레이스의 스팬을 더 로드할 수 없습니다",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "클릭하여 펼치기",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "이 시간 전후의 트레이스 검색",
       "searchAroundTip": "이 이벤트 바로 전후에 기록된 이벤트를 불러옵니다.",
       "noOfEventsTip": "이 이벤트 주변에서 불러올 이벤트 수입니다.",
-      "severityTip": "감지된 로그 수준입니다. 선택하면 감지 방법을 볼 수 있습니다."
+      "severityTip": "감지된 로그 수준입니다. 선택하면 감지 방법을 볼 수 있습니다.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "시각화에 SELECT * 쿼리가 지원되지 않습니다.",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "이 패턴은 잘못되었거나 지원되지 않습니다. 전방 탐색, 후방 탐색, 역참조는 사용할 수 없습니다."
     },
     "queryTooltip": "필터를 텍스트로 편집",
-    "builderTooltip": "빌더로 필터 편집"
+    "builderTooltip": "빌더로 필터 편집",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

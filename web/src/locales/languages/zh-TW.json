@@ -13,7 +13,9 @@
     "headerLocked": "已鎖定：需要 {feature}",
     "availableInEnterprise": "{feature} 適用於 OpenObserve 企業版",
     "turnedOffTitle": "已為此組織關閉",
-    "enterpriseTitle": "Enterprise 版提供"
+    "enterpriseTitle": "Enterprise 版提供",
+    "readDocs": "閱讀文件",
+    "rbacOff": "此組織已關閉 RBAC。管理員在伺服器設定中將 {env} 設為 true 即可開啟。"
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} 列 | {total} 列",
     "histogramTitleRows": "在 {took} 毫秒內顯示 {total} 列。 | 在 {took} 毫秒內顯示 {total} 列。",
     "histogramTitleRowsWithScan": "在 {took} 毫秒內顯示 {total} 列。（{scanLabel}：{scanSize}） | 在 {took} 毫秒內顯示 {total} 列。（{scanLabel}：{scanSize}）",
-    "pickStreamFirst": "請先選擇一個串流"
+    "pickStreamFirst": "請先選擇一個串流",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "警示校準",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "搜尋或跳至…",
     "jumpToTitle": "跳至",
     "addData": "新增資料",
-    "jumpToPlaceholder": "搜尋頁面和操作",
+    "jumpToPlaceholder": "搜尋頁面、警示、儀表板和資料流",
+    "jumpToPlaceholderPages": "搜尋頁面和操作",
+    "jumpToPages": "頁面",
+    "jumpToShowAll": "在{page}中查看全部",
+    "jumpToSearchLogs": "在日誌中搜尋「{text}」",
     "synthetic": "合成監控",
     "experience": "體驗",
     "slos": "SLOs",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "刪除使用者",
     "deleteUsersMsg": "您確定要刪除 {count} 個使用者嗎？ | 您確定要刪除 {count} 個使用者嗎？",
     "deleteUsersBlockNote": "其中 {count} 位是透過您已驗證的網域加入的，將被封鎖而非刪除。",
-    "roleHint": "Admin 管理組織，Editor 可變更資料與設定，Viewer 只能檢視。"
+    "roleHint": "Admin 管理組織，Editor 可變更資料與設定，Viewer 只能檢視。",
+    "customRolesNeedRbac": "自訂角色需要 RBAC，但此組織已關閉 RBAC。"
   },
   "invitation": {
     "pendingInvitations": "待處理的邀請",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "GPU 匯出器",
-    "rotationNote": "權杖不會原地輪替。若要輪替，請建立新權杖，將來源切換到新權杖，再停用舊權杖。"
+    "rotationNote": "權杖不會原地輪替。若要輪替，請建立新權杖，將來源切換到新權杖，再停用舊權杖。",
+    "rotateAction": "輪替…",
+    "rotateTitle": "輪替 {name}",
+    "rotateStep1": "建立新權杖。",
+    "rotateStep2": "將來源切換到新權杖。",
+    "rotateStep3": "當不再有任何項目使用 {name} 時，從其列選單停用它。",
+    "rotateNever": "不會自動停用任何項目。舊權杖在您停用之前仍可使用。",
+    "rotateCreateNew": "建立新權杖",
+    "rotateNewName": "{name}-new",
+    "rotateDescription": "取代 {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10447,6 +10465,7 @@
       "quietNote": "過去 7 天已停止寫入",
       "criticalUnit": "{count} 個為嚴重等級",
       "deliveryFailures": "警示傳送失敗",
+      "deliveryCount": "{count} 次警示送達失敗 | {count} 次警示送達失敗",
       "deliveryNote": "已觸發但無法通知的警示",
       "oldestFiring": "最久觸發已持續 {age}"
     },
@@ -10613,12 +10632,13 @@
       "loadError": "無法讀取你的資料流"
     },
     "start": {
-      "text": "過去 {range} 沒有收到資料。傳送資料、查看現有資料，或設定警示。",
+      "text": "尚未收到資料。傳送資料、查看現有資料，或設定警示。",
       "addData": "新增資料",
       "createAlert": "建立警示"
     },
     "summary": {
       "loadError": "無法載入組織摘要",
+      "loadErrorRest": "無法載入摘要的其餘部分",
       "denied": "無權存取組織摘要。請聯絡組織管理員。"
     },
     "events": {
@@ -11598,6 +11618,8 @@
     }
   },
   "alerts": {
+    "newAlertTitle": "新增警示",
+    "newAnomalyTitle": "新增異常偵測",
     "detail": {
       "openInLogs": "在日誌中開啟",
       "openInTraces": "在追蹤中開啟",
@@ -11606,6 +11628,7 @@
       "evidenceWindowTip": "使用此警示的篩選條件開啟 {stream}，範圍為最近 {window}",
       "threshold": "閾值",
       "noIncident": "尚無事件",
+      "viewIncidents": "檢視事件",
       "conditionLabel": "警示條件",
       "allRows": "所有列"
     },
@@ -12794,6 +12817,7 @@
       "ifCondition": "如果 {condition}"
     },
     "historyTable": {
+      "errorFrom": "來自 {destination} 的 {status}",
       "timestamp": "時間戳記",
       "status": "狀態",
       "evaluationTime": "評估 (s)",
@@ -17115,7 +17139,13 @@
       "partial": "無法讀取此追蹤的部分 Span。瀑布圖可能不完整。",
       "truncated": "顯示此追蹤的第一個 Span，依開始時間排序。後續 Span 尚未載入。 | 顯示此追蹤的前 {count} 個 Span，依開始時間排序。後續 Span 尚未載入。",
       "loadMore": "載入下一個 Span | 載入接下來 {size} 個 Span",
-      "loadMoreFailed": "無法載入此追蹤的更多 Span"
+      "loadMoreFailed": "無法載入此追蹤的更多 Span",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "點擊展開",
@@ -20689,7 +20719,9 @@
       "searchTracesAround": "搜尋此時間前後的追蹤",
       "searchAroundTip": "載入緊鄰此事件之前與之後記錄的事件。",
       "noOfEventsTip": "圍繞此事件載入的事件數量。",
-      "severityTip": "偵測到的日誌層級。選取即可查看偵測方式。"
+      "severityTip": "偵測到的日誌層級。選取即可查看偵測方式。",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "不支援視覺化的 Select * 查詢。",
@@ -30464,7 +30496,10 @@
       "regexInvalid": "此模式無效或不受支援。不能使用先行斷言、後行斷言和反向參照。"
     },
     "queryTooltip": "以文字編輯篩選條件",
-    "builderTooltip": "使用建構器編輯篩選條件"
+    "builderTooltip": "使用建構器編輯篩選條件",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

@@ -217,7 +217,8 @@ describe("SecurityCases", () => {
       message: "Request failed with status code 404",
     });
     const w = await mountView();
-    expect(w.find('[data-test="o2-table-error"]').exists()).toBe(true);
+    expect(w.find('[data-test="security-cases-table"]').exists()).toBe(false);
+    expect(w.find('[data-test="security-cases-stats"]').exists()).toBe(false);
     expect(w.find('[data-test="security-load-error"]').text()).toContain("Couldn't load cases");
     expect(w.text()).not.toContain("No cases");
     expect(w.text()).not.toContain("Request failed with status code 404");

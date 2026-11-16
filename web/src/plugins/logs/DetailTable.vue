@@ -570,6 +570,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               preset="tableRows"
               data-test="logs-correlation-loading-indicator"
             />
+            <div
+              v-else-if="linkedTrace"
+              class="px-page-edge flex flex-col items-start gap-3 py-3"
+              data-test="log-detail-linked-trace"
+            >
+              <ODescriptionList :items="linkedTrace" class="w-full" />
+              <div class="flex flex-wrap items-center gap-2">
+                <OButton
+                  v-if="!tracesMenuHidden"
+                  size="sm"
+                  variant="primary"
+                  :disabled="tracesLocked"
+                  :disabled-reason="tracesLocked ? tracesLockedReason : undefined"
+                  data-test="log-detail-linked-trace-open-btn"
+                  @click="openLinkedTrace"
+                >
+                  {{ t("logs.detailTable.openTrace") }}
+                </OButton>
+                <OButton
+                  size="sm"
+                  variant="secondary"
+                  data-test="log-detail-search-traces-around-btn"
+                  @click="searchTracesAround"
+                >
+                  {{ t("logs.detailTable.searchTracesAround") }}
+                </OButton>
+              </div>
+            </div>
             <OEmptyState
               v-else-if="correlationError && correlationNoMatch"
               size="compact"
@@ -712,6 +740,8 @@ import { crossLinkQueryText } from "@/composables/useLogs/freeTextSearch";
 import useViewTraceAction, { traceDetailsLocation } from "@/composables/useLogs/useViewTraceAction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
+import type { DescriptionListItem } from "@/lib/lists/DescriptionList/ODescriptionList.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -776,6 +806,7 @@ export default defineComponent({
     OSwitch,
     OSpinner,
     OEmptyState,
+    ODescriptionList,
     OSkeleton,
     OShortcut,
     OTooltip,
@@ -1518,6 +1549,29 @@ export default defineComponent({
       router.push({ name, query: { ...query, ...spanQuery } });
     };
 
+    // The log's own trace and span ids, which the Traces tab offers before any service match.
+    const linkedTrace = computed<DescriptionListItem[] | null>(() => {
+      const log = props.modelValue ?? {};
+      const { trace, span } = traceFieldNames.value;
+      if (!log[trace]) return null;
+      const items: DescriptionListItem[] = [
+        { label: t("logs.detailTable.traceId"), value: String(log[trace]), mono: true, copy: true },
+      ];
+      if (log[span])
+        items.push({
+          label: t("logs.detailTable.spanId"),
+          value: String(log[span]),
+          mono: true,
+          copy: true,
+        });
+      return items;
+    });
+
+    const openLinkedTrace = () => {
+      const { trace, span } = traceFieldNames.value;
+      openTrace(props.modelValue?.[span] ? span : trace);
+    };
+
     const showCorrelation = () => {
       // Emit the original modelValue (not flattened rowData) as it has _timestamp
       emit("show-correlation", props.modelValue);
@@ -1608,6 +1662,9 @@ export default defineComponent({
       correlationNoMatch,
       isTraceLinkField,
       openTrace,
+      linkedTrace,
+      openLinkedTrace,
+      tracesMenuHidden,
       searchTracesAround,
       tableColumns,
       tableRows,

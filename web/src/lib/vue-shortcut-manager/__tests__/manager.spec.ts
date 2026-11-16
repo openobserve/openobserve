@@ -228,6 +228,64 @@ describe("ShortcutManager", () => {
     });
   });
 
+  describe("capture shortcuts", () => {
+    let editor: HTMLTextAreaElement;
+
+    beforeEach(() => {
+      editor = document.createElement("textarea");
+      document.body.appendChild(editor);
+    });
+
+    afterEach(() => editor.remove());
+
+    it("should fire before the focused editor sees the key, and keep it from the editor", () => {
+      const handler = vi.fn();
+      manager.register({ key: "ctrl+k", handler, description: "jump", capture: true });
+      const event = fakeEvent({ key: "k", ctrlKey: true, target: editor });
+
+      manager.handleCaptureKeyDown(event);
+
+      expect(handler).toHaveBeenCalledOnce();
+      expect(event.stopPropagation).toHaveBeenCalled();
+      expect(event.preventDefault).toHaveBeenCalled();
+    });
+
+    it("should not fire a capture shortcut a second time when the key bubbles", () => {
+      const handler = vi.fn();
+      manager.register({ key: "ctrl+k", handler, description: "jump", capture: true });
+
+      manager.handleKeyDown(fakeEvent({ key: "k", ctrlKey: true, target: editor }));
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("should leave other shortcuts to the bubbling handler", () => {
+      const handler = vi.fn();
+      manager.register({ key: "ctrl+b", handler, description: "chat" });
+      const event = fakeEvent({ key: "b", ctrlKey: true, target: editor });
+
+      manager.handleCaptureKeyDown(event);
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(event.stopPropagation).not.toHaveBeenCalled();
+    });
+
+    it("should let a page scope that binds the same key win over a global capture shortcut", () => {
+      const global = vi.fn();
+      const page = vi.fn();
+      manager.register({ key: "ctrl+k", handler: global, description: "jump", capture: true });
+      manager.register({ key: "ctrl+k", handler: page, description: "k8s", scope: "kubernetes" });
+      const token = manager.acquireScope("kubernetes");
+
+      manager.handleCaptureKeyDown(fakeEvent({ key: "k", ctrlKey: true, target: editor }));
+      manager.handleKeyDown(fakeEvent({ key: "k", ctrlKey: true, target: editor }));
+
+      expect(global).not.toHaveBeenCalled();
+      expect(page).toHaveBeenCalledOnce();
+      manager.releaseScope(token);
+    });
+  });
+
   // o2-enterprise#3127: `x` inside the Public links drawer exported the dashboard behind it.
   describe("dialog-focus guard", () => {
     let dialog: HTMLDivElement;
@@ -578,6 +636,12 @@ describe("shortcutRegistry", () => {
 
   it("should return undefined for an unknown id", () => {
     expect(getShortcutDef("nopeNotAnId")).toBeUndefined();
+  });
+
+  it("should take Ctrl K for Jump to ahead of any focused input or editor", () => {
+    const def = getShortcutDef("searchOrJumpTo")!;
+    expect(def.capture).toBe(true);
+    expect(def.skipInInput).toBeFalsy();
   });
 
   it("should let only row and span stepping work inside dialogs", () => {

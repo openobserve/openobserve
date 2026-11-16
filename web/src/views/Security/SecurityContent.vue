@@ -210,6 +210,19 @@ async function loadStreams() {
         .filter((row) => row.source_type)
         .map((row) => [row.name, row.source_type]),
     );
+    // One failed match means the endpoint is down; the other streams skip it instead of repeating the request.
+    let matchDown = false;
+    let firstMatch: Promise<unknown> | null = null;
+    const matchOnce = async (fields: string[]) => {
+      if (firstMatch) await firstMatch;
+      if (matchDown) return null;
+      const request = fetchSourceMatch(org, fields).catch(() => {
+        matchDown = true;
+        return null;
+      });
+      firstMatch ??= request;
+      return request;
+    };
     const list = await Promise.all(
       (res.data?.list ?? []).map(async (s: any) => {
         const fields: string[] = (s.schema ?? []).map((f: any) => String(f.name));
@@ -220,8 +233,7 @@ async function loadStreams() {
             .map((f: any) => [String(f.name), String(f.type)]),
         );
         const stored = storedType.get(String(s.name));
-        const match =
-          !stored && fields.length ? await fetchSourceMatch(org, fields).catch(() => null) : null;
+        const match = !stored && fields.length ? await matchOnce(fields) : null;
         return {
           name: String(s.name),
           fields,
@@ -986,7 +998,8 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
             <OIcon name="rule" size="sm" />{{ t("siem.content.tab.rules") }}
             <span
               class="bg-surface-subtle text-text-secondary text-2xs rounded-full px-1.5 font-semibold tabular-nums"
-              >{{ catalogFailed ? "—" : catalog.length }}</span
+              v-if="!catalogFailed"
+              >{{ catalog.length }}</span
             >
           </span>
         </OTab>
@@ -995,7 +1008,8 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
             <OIcon name="database" size="sm" />{{ t("siem.content.tab.sources") }}
             <span
               class="bg-surface-subtle text-text-secondary text-2xs rounded-full px-1.5 font-semibold tabular-nums"
-              >{{ catalogFailed ? "—" : sourceTypes.length }}</span
+              v-if="!catalogFailed"
+              >{{ sourceTypes.length }}</span
             >
           </span>
         </OTab>
@@ -1029,7 +1043,7 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
       </OBanner>
     </template>
 
-    <template v-if="tab === 'rules'" #sidebar>
+    <template v-if="tab === 'rules' && !catalogFailed" #sidebar>
       <nav
         class="flex min-h-0 flex-1 flex-col overflow-y-auto py-2"
         data-test="security-content-logsources"
@@ -1094,6 +1108,12 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
         :denials="accessDenials"
         :reason="raw(forbiddenReason(streamsRefusal))"
         data-test="security-content-access-lock"
+      />
+      <SecurityLoadError
+        v-else-if="catalogFailed"
+        :what="t('siem.content.whatRules')"
+        :hint="t('siem.content.loadFailedHint')"
+        @retry="refresh"
       />
       <OTable
         v-else-if="tab === 'rules'"

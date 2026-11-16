@@ -272,6 +272,10 @@ export default class DashboardSetting {
 
   //Full screen//
   async fullScreenSettings() {
+    // Full screen lives in the More menu; the exit button shows alone once in full screen.
+    if (!(await this.fullScreen.isVisible().catch(() => false))) {
+      await this.page.locator('[data-test="dashboard-more-options-btn"]').click();
+    }
     await this.fullScreen.waitFor({ state: "visible" });
     await this.fullScreen.click();
   }

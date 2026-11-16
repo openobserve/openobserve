@@ -890,11 +890,14 @@ export default defineComponent({
       emit("openShortcuts");
     };
 
-    // The trigger and Ctrl K open Jump to; a focus-mode route has no navigation to jump through.
+    // The trigger and Ctrl K open Jump to; a focus-mode route has no navigation to jump through,
+    // so there Ctrl K stays with the editors.
     const openJumpTo = () => {
       if (!focusMode.value) emit("openJumpTo");
     };
-    useShortcuts([{ id: "searchOrJumpTo", handler: openJumpTo }]);
+    useShortcuts([{ id: "searchOrJumpTo", handler: openJumpTo }], undefined, {
+      active: computed(() => !focusMode.value),
+    });
 
     const signout = () => {
       emit("signout");

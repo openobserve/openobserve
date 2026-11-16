@@ -20,6 +20,8 @@ export interface RefreshButtonProps {
   minInterval?: number;
   /** One line under the intervals, such as which time ranges auto-refresh applies to. */
   autoRefreshNote?: I18nText;
+  /** A change waiting to be applied, such as "Apply": replaces the age as the label and makes the button primary. */
+  pendingLabel?: I18nText;
   /** `md` in a toolbar, `sm` in a panel header. */
   size?: Extract<ButtonSize, "sm" | "md">;
   /** Shortcut registry id shown in the tooltip. */

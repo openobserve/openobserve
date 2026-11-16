@@ -13,7 +13,9 @@
     "headerLocked": "Gesperrt: {feature} erforderlich",
     "availableInEnterprise": "In OpenObserve Enterprise verfügbar: {feature}",
     "turnedOffTitle": "Für diese Organisation deaktiviert",
-    "enterpriseTitle": "In Enterprise verfügbar"
+    "enterpriseTitle": "In Enterprise verfügbar",
+    "readDocs": "Dokumentation lesen",
+    "rbacOff": "RBAC ist für diese Organisation deaktiviert. Ein Administrator aktiviert es, indem er {env} in der Serverkonfiguration auf true setzt."
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} Zeile | {total} Zeilen",
     "histogramTitleRows": "{total} Zeile in {took} ms. | {total} Zeilen in {took} ms.",
     "histogramTitleRowsWithScan": "{total} Zeile in {took} ms. ({scanLabel}: {scanSize}) | {total} Zeilen in {took} ms. ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "Zuerst einen Stream auswählen"
+    "pickStreamFirst": "Zuerst einen Stream auswählen",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "Alarmkalibrierung",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "Suchen oder springen zu…",
     "jumpToTitle": "Springen zu",
     "addData": "Daten hinzufügen",
-    "jumpToPlaceholder": "Seiten und Aktionen durchsuchen",
+    "jumpToPlaceholder": "Seiten, Alarme, Dashboards und Streams durchsuchen",
+    "jumpToPlaceholderPages": "Seiten und Aktionen durchsuchen",
+    "jumpToPages": "Seiten",
+    "jumpToShowAll": "Alle in {page} anzeigen",
+    "jumpToSearchLogs": "Logs nach \"{text}\" durchsuchen",
     "synthetic": "Synthetics",
     "experience": "Erfahrung",
     "slos": "SLOs",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "Benutzer löschen",
     "deleteUsersMsg": "Möchten Sie wirklich {count} Benutzer löschen? | Möchten Sie wirklich {count} Benutzer löschen?",
     "deleteUsersBlockNote": "{count} von ihnen sind über Ihre verifizierte Domain beigetreten und werden blockiert statt gelöscht.",
-    "roleHint": "Admin verwaltet die Organisation, Editor ändert Daten und Einstellungen, Viewer kann nur lesen."
+    "roleHint": "Admin verwaltet die Organisation, Editor ändert Daten und Einstellungen, Viewer kann nur lesen.",
+    "customRolesNeedRbac": "Benutzerdefinierte Rollen benötigen RBAC, das für diese Organisation deaktiviert ist."
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "GPU-Exporter",
-    "rotationNote": "Tokens werden nicht an Ort und Stelle rotiert. Zum Rotieren erstellen Sie ein neues Token, stellen Ihre Quellen darauf um und deaktivieren dann das alte."
+    "rotationNote": "Tokens werden nicht an Ort und Stelle rotiert. Zum Rotieren erstellen Sie ein neues Token, stellen Ihre Quellen darauf um und deaktivieren dann das alte.",
+    "rotateAction": "Rotieren…",
+    "rotateTitle": "{name} rotieren",
+    "rotateStep1": "Erstellen Sie ein neues Token.",
+    "rotateStep2": "Stellen Sie Ihre Quellen auf das neue Token um.",
+    "rotateStep3": "Sobald {name} nicht mehr verwendet wird, deaktivieren Sie es im Zeilenmenü.",
+    "rotateNever": "Es wird nichts automatisch deaktiviert. Das alte Token funktioniert weiter, bis Sie es deaktivieren.",
+    "rotateCreateNew": "Neues Token erstellen",
+    "rotateNewName": "{name}-neu",
+    "rotateDescription": "Ersetzt {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "Keine Schreibvorgänge in den letzten 7 Tagen",
       "criticalUnit": "{count} auf kritischer Stufe",
       "deliveryFailures": "Fehler bei der Alarmzustellung",
+      "deliveryCount": "{count} Alarm-Zustellung fehlgeschlagen | {count} Alarm-Zustellungen fehlgeschlagen",
       "deliveryNote": "Alarme, die ausgelöst wurden, aber nicht benachrichtigen konnten",
       "oldestFiring": "Ältester ausgelöst seit {age}"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "Ihre Streams konnten nicht gelesen werden"
     },
     "start": {
-      "text": "In den letzten {range} sind keine Daten eingegangen. Senden Sie Daten, sehen Sie sich vorhandene an oder richten Sie einen Alarm ein.",
+      "text": "Es sind noch keine Daten eingegangen. Senden Sie Daten, sehen Sie sich vorhandene an oder richten Sie einen Alarm ein.",
       "addData": "Daten hinzufügen",
       "createAlert": "Alarm erstellen"
     },
     "summary": {
       "loadError": "Die Org-Übersicht konnte nicht geladen werden",
+      "loadErrorRest": "Der Rest der Übersicht konnte nicht geladen werden",
       "denied": "Kein Zugriff auf die Org-Übersicht. Fragen Sie einen Org-Admin."
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "Schwellenwert",
       "noIncident": "Noch kein Vorfall",
       "conditionLabel": "Alarmbedingung",
-      "allRows": "Jede Zeile"
+      "allRows": "Jede Zeile",
+      "viewIncidents": "Vorfälle anzeigen"
     },
     "summaryTrainingFailed": "Training fehlgeschlagen",
     "startFromTemplate": "Mit einer Vorlage beginnen",
@@ -12807,7 +12828,8 @@
       "condition": "Bedingung",
       "result": "Ergebnis",
       "anomalies": "Anomalien",
-      "forGroup": "für {group}"
+      "forGroup": "für {group}",
+      "errorFrom": "{status} von {destination}"
     },
     "continue": "Weiter",
     "wouldTrigger": "WÜRDE AUSLÖSEN",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "Dieser Alert ist eine Security-Erkennung. Seine Abfrage wird aus der Sigma-Regel kompiliert, daher werden Regel, Stream und Zeitplan in Security bearbeitet, damit Regel und Abfrage übereinstimmen.",
       "open": "In Security bearbeiten"
-    }
+    },
+    "newAlertTitle": "Neuer Alarm",
+    "newAnomalyTitle": "Neue Anomalieerkennung"
   },
   "alert_dependencies": {
     "actionOpen": "Öffnen",
@@ -17120,7 +17144,13 @@
       "partial": "Einige Spans dieses Traces konnten nicht gelesen werden. Das Wasserfalldiagramm ist möglicherweise unvollständig.",
       "truncated": "Zeigt den ersten Span dieses Traces in Startzeit-Reihenfolge an. Spätere Spans sind noch nicht geladen. | Zeigt die ersten {count} Spans dieses Traces in Startzeit-Reihenfolge an. Spätere Spans sind noch nicht geladen.",
       "loadMore": "Nächsten Span laden | Nächste {size} Spans laden",
-      "loadMoreFailed": "Weitere Spans dieses Traces konnten nicht geladen werden"
+      "loadMoreFailed": "Weitere Spans dieses Traces konnten nicht geladen werden",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "Zum Erweitern klicken",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "Traces um diesen Zeitpunkt suchen",
       "searchAroundTip": "Die Ereignisse laden, die direkt vor und nach diesem protokolliert wurden.",
       "noOfEventsTip": "Wie viele Ereignisse um dieses herum geladen werden.",
-      "severityTip": "Erkannte Log-Ebene. Auswählen, um zu sehen, wie sie ermittelt wurde."
+      "severityTip": "Erkannte Log-Ebene. Auswählen, um zu sehen, wie sie ermittelt wurde.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT *-Abfrage wird für die Visualisierung nicht unterstützt.",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "Dieses Muster ist ungültig oder wird nicht unterstützt. Lookahead, Lookbehind und Rückverweise können nicht verwendet werden."
     },
     "queryTooltip": "Filter als Text bearbeiten",
-    "builderTooltip": "Filter im Builder bearbeiten"
+    "builderTooltip": "Filter im Builder bearbeiten",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

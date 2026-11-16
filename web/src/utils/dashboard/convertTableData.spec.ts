@@ -97,6 +97,17 @@ describe("convertTableData", () => {
     expect(result.columns).toHaveLength(2);
   });
 
+  it("headers an unlabelled generated alias with its source column", () => {
+    mockPanelSchema.queries[0].fields = {
+      x: [{ alias: "x_axis_1", column: "path" }],
+      y: [{ alias: "y_axis_1", column: "_timestamp", aggregationFunction: "count" }],
+    };
+    const data = [[{ x_axis_1: "/a", y_axis_1: 3 }]];
+    const { columns } = convertTableData(mockPanelSchema, data, mockStore);
+
+    expect(columns.map((c: any) => c.label)).toEqual(["path", "count(_timestamp)"]);
+  });
+
   // Test 2: Empty or invalid data scenarios
   it("should return empty arrays for non-array searchQueryData", () => {
     const result = convertTableData(mockPanelSchema, null, mockStore);

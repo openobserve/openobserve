@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { getDataValue } from "./aliasUtils";
-import { getFieldLabel } from "./fieldLabel";
+import { getFieldLabel, getFieldSourceName } from "./fieldLabel";
 import {
   buildValueMappingCache,
   lookupValueMapping,
@@ -117,8 +117,11 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
 
   const isTransposeEnabled = panelSchema.config.table_transpose;
   const transposeColumn = columnData[0]?.alias || "";
-  const labelOf = (field: any) =>
-    getFieldLabel(field, panelSchema.config, panelSchema.queries?.[0]?.customQuery);
+  const labelOf = (field: any) => {
+    const customQuery = panelSchema.queries?.[0]?.customQuery;
+    const label = getFieldLabel(field, panelSchema.config, customQuery);
+    return label || (customQuery ? "" : getFieldSourceName(field));
+  };
   const transposeColumnLabel = labelOf(columnData[0]) || "";
   let columns;
 
@@ -427,7 +430,8 @@ export const convertMultiQueryTableData = (
     }
     if (!knownAliases.has(f.alias)) {
       knownAliases.set(f.alias, f);
-      knownLabels.set(f.alias, getFieldLabel(f, panelSchema.config, customQuery));
+      const label = getFieldLabel(f, panelSchema.config, customQuery);
+      knownLabels.set(f.alias, label || (customQuery ? "" : getFieldSourceName(f)));
     }
   };
 

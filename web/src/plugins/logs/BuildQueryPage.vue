@@ -191,7 +191,10 @@ const retryingParser = ref(false);
 const needsFilterInit = () =>
   !props.isSqlMode && (!!props.whereClause?.trim() || props.freeTextFilter);
 const filterInitPending = ref(needsFilterInit());
-const holdGeneratedQuery = ref(!props.isSqlMode && props.freeTextFilter);
+// Held while a user's SQL is being parsed, so a half-built builder query never overwrites it.
+const holdsUserQuery = () =>
+  (!props.isSqlMode && props.freeTextFilter) || (props.isSqlMode && !!props.searchQuery?.trim());
+const holdGeneratedQuery = ref(holdsUserQuery());
 
 // Get dashboard panel data for build page
 const {
@@ -209,6 +212,10 @@ const runBlocked = computed(
     (freeTextNotice.value && !dashboardPanelData.data.queries[0]?.customQuery),
 );
 let initSeq = 0;
+// The builder's rewrite of the user's own SQL shows as written (count(*), no added ORDER BY); a builder edit replaces it.
+let translatedUserQuery: { generated: string; original: string } | null = null;
+const shownQuery = (generated: string) =>
+  translatedUserQuery?.generated === generated ? translatedUserQuery.original : generated;
 
 const { showErrorNotification } = useNotifications();
 const { searchObj } = searchState();
@@ -276,10 +283,12 @@ const preferWholeNumbers = (savedConfig?: { decimals?: unknown }) => {
 
 const initializeFromQuery = async () => {
   const seq = ++initSeq;
+  const userQuery = props.searchQuery;
+  translatedUserQuery = null;
   freeTextNotice.value = false;
   parserLoadFailed.value = false;
   filterInitPending.value = needsFilterInit();
-  holdGeneratedQuery.value = !props.isSqlMode && props.freeTextFilter;
+  holdGeneratedQuery.value = holdsUserQuery();
   // Reset panel data first
   resetDashboardPanelData();
 
@@ -437,6 +446,7 @@ const initializeFromQuery = async () => {
     dashboardPanelData.data.queries[0].fields.x = [DEFAULT_X_AXIS_FIELD()];
     dashboardPanelData.data.queries[0].fields.y = [DEFAULT_Y_AXIS_FIELD()];
 
+    holdGeneratedQuery.value = false;
     preferWholeNumbers(urlConfig.config);
     emit("initialized");
     const generatedQuery = await makeAutoSQLQuery();
@@ -518,6 +528,9 @@ const initializeFromQuery = async () => {
         if (streamName) {
           await updateGroupedFields();
         }
+        const generated = await makeAutoSQLQuery();
+        if (seq !== initSeq) return;
+        if (generated) translatedUserQuery = { generated, original: userQuery };
       }
     } catch (error) {
       console.error("Error parsing query:", error);
@@ -538,6 +551,7 @@ const initializeFromQuery = async () => {
 
   // Notify parent that initialization is complete
   // This marks the end of first toggle, so subsequent tab switches will auto-select chart type
+  holdGeneratedQuery.value = false;
   preferWholeNumbers(urlConfig.config);
   emit("initialized");
 
@@ -616,7 +630,7 @@ const onQueryGenerated = (query: string) => {
   if (holdGeneratedQuery.value || filterInitPending.value || freeTextNotice.value) return;
   if (parserLoadFailed.value) return;
   // Forward the generated query to parent (Index.vue -> SearchBar)
-  emit("queryGenerated", query);
+  emit("queryGenerated", shownQuery(query));
 };
 
 const onCustomQueryModeChanged = (isCustomMode: boolean) => {
@@ -674,7 +688,7 @@ const runQuery = async (withoutCache?: boolean, generationId?: number): Promise<
     const generatedQuery = await makeAutoSQLQuery();
     if (runBlocked.value) return abandon();
     if (generatedQuery !== undefined) {
-      emit("queryGenerated", generatedQuery);
+      emit("queryGenerated", shownQuery(generatedQuery));
     }
   }
 

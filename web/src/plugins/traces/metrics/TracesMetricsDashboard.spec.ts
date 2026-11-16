@@ -404,12 +404,12 @@ describe("TracesMetricsDashboard", () => {
       expect(config.override_config ?? []).toEqual([]);
     });
 
-    it("should prepend WHERE span_status = 'ERROR' to the Errors panel query", async () => {
+    it("counts errors with a FILTER over every span, so an error-free window plots zeros", async () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
       const query = getPanelQuery(wrapper, "Errors");
-      expect(query).toContain("WHERE");
-      expect(query).toContain("span_status = 'ERROR'");
+      expect(query).toMatch(/filter \(where span_status = 'ERROR'\) AS error_rate/i);
+      expect(query).not.toMatch(/WHERE span_status = 'ERROR'/);
     });
   });
 

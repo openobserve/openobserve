@@ -13,7 +13,9 @@
     "headerLocked": "Kilitli: {feature} gerekiyor",
     "availableInEnterprise": "{feature}, OpenObserve Enterprise'da kullanılabilir",
     "turnedOffTitle": "Bu kuruluş için kapalı",
-    "enterpriseTitle": "Enterprise'ta kullanılabilir"
+    "enterpriseTitle": "Enterprise'ta kullanılabilir",
+    "readDocs": "Belgeleri oku",
+    "rbacOff": "RBAC bu kuruluş için kapalı. Bir yönetici, sunucu yapılandırmasında {env} değerini true yaparak açar."
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} satır | {total} satır",
     "histogramTitleRows": "{took} ms içinde {total} satır gösteriliyor. | {took} ms içinde {total} satır gösteriliyor.",
     "histogramTitleRowsWithScan": "{took} ms içinde {total} satır gösteriliyor. ({scanLabel}: {scanSize}) | {took} ms içinde {total} satır gösteriliyor. ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "Önce bir akış seçin"
+    "pickStreamFirst": "Önce bir akış seçin",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "Uyarı Kalibrasyonu",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "Ara veya şuraya git…",
     "jumpToTitle": "Git",
     "addData": "Veri ekle",
-    "jumpToPlaceholder": "Sayfalarda ve eylemlerde ara",
+    "jumpToPlaceholder": "Sayfa, uyarı, pano ve akış ara",
+    "jumpToPlaceholderPages": "Sayfalarda ve eylemlerde ara",
+    "jumpToPages": "Sayfalar",
+    "jumpToShowAll": "Tümünü göster: {page}",
+    "jumpToSearchLogs": "Günlüklerde \"{text}\" ara",
     "synthetic": "Sentetikler",
     "experience": "Deneyim",
     "slos": "SLO'lar",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "Kullanıcıları Sil",
     "deleteUsersMsg": "Bu {count} kullanıcıyı silmek istediğinize emin misiniz? | Bu {count} kullanıcıyı silmek istediğinize emin misiniz?",
     "deleteUsersBlockNote": "Bunlardan {count} tanesi doğrulanmış alan adınız üzerinden katıldı ve silinmek yerine engellenecek.",
-    "roleHint": "Admin kuruluşu yönetir, Editor verileri ve ayarları değiştirir, Viewer yalnızca okuyabilir."
+    "roleHint": "Admin kuruluşu yönetir, Editor verileri ve ayarları değiştirir, Viewer yalnızca okuyabilir.",
+    "customRolesNeedRbac": "Özel roller, bu kuruluş için kapalı olan RBAC'ı gerektirir."
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "GPU dışa aktarıcı",
-    "rotationNote": "Belirteçler yerinde yenilenmez. Yenilemek için yeni bir belirteç oluşturun, kaynaklarınızı ona geçirin, ardından eskisini devre dışı bırakın."
+    "rotationNote": "Belirteçler yerinde yenilenmez. Yenilemek için yeni bir belirteç oluşturun, kaynaklarınızı ona geçirin, ardından eskisini devre dışı bırakın.",
+    "rotateAction": "Yenile…",
+    "rotateTitle": "{name} belirtecini yenile",
+    "rotateStep1": "Yeni bir belirteç oluşturun.",
+    "rotateStep2": "Kaynaklarınızı yeni belirtece geçirin.",
+    "rotateStep3": "Artık hiçbir şey {name} belirtecini kullanmadığında, satır menüsünden devre dışı bırakın.",
+    "rotateNever": "Hiçbir şey otomatik olarak devre dışı bırakılmaz. Eski belirteç, siz devre dışı bırakana kadar çalışmaya devam eder.",
+    "rotateCreateNew": "Yeni belirteç oluştur",
+    "rotateNewName": "{name}-yeni",
+    "rotateDescription": "{name} belirtecinin yerine geçer"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "Son 7 gündür yazmıyor",
       "criticalUnit": "{count} tanesi kritik seviyede",
       "deliveryFailures": "Uyarı gönderim hataları",
+      "deliveryCount": "{count} uyarı teslimi başarısız | {count} uyarı teslimi başarısız",
       "deliveryNote": "Tetiklenen ancak bildirimi iletilemeyen uyarılar",
       "oldestFiring": "En eski tetiklenme: {age}"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "Akışlarınız okunamadı"
     },
     "start": {
-      "text": "Son {range} içinde veri gelmedi. Veri gönderin, elinizdekine bakın veya bir uyarı kurun.",
+      "text": "Henüz veri gelmedi. Veri gönderin, elinizdekine bakın veya bir uyarı kurun.",
       "addData": "Veri ekle",
       "createAlert": "Uyarı oluştur"
     },
     "summary": {
       "loadError": "Kuruluş özeti yüklenemedi",
+      "loadErrorRest": "Özetin geri kalanı yüklenemedi",
       "denied": "Kuruluş özetine erişiminiz yok. Bir yöneticiye başvurun."
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "Eşik",
       "noIncident": "Henüz olay yok",
       "conditionLabel": "Uyarı koşulu",
-      "allRows": "Her satır"
+      "allRows": "Her satır",
+      "viewIncidents": "Olayları görüntüle"
     },
     "summaryTrainingFailed": "Eğitim başarısız",
     "startFromTemplate": "Bir şablondan başla",
@@ -12807,7 +12828,8 @@
       "condition": "Koşul",
       "result": "Sonuç",
       "anomalies": "Anomaliler",
-      "forGroup": "{group} için"
+      "forGroup": "{group} için",
+      "errorFrom": "{destination} kaynağından {status}"
     },
     "continue": "Devam et",
     "wouldTrigger": "TETİKLEYECEKTİ",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "Bu uyarı bir Security algılamasıdır. Sorgusu Sigma kuralından derlenir; bu nedenle kural, akış ve zamanlama, kuralı ve sorguyu uyumlu tutan Security bölümünde düzenlenir.",
       "open": "Security'de düzenle"
-    }
+    },
+    "newAlertTitle": "Yeni uyarı",
+    "newAnomalyTitle": "Yeni anomali tespiti"
   },
   "alert_dependencies": {
     "actionOpen": "Aç",
@@ -17120,7 +17144,13 @@
       "partial": "Bu izin bazı span'ları okunamadı. Şelale eksik olabilir.",
       "truncated": "Bu izin ilk span'ı başlangıç zamanına göre sıralanmış olarak gösteriliyor. Sonraki span'lar henüz yüklenmedi. | Bu izin ilk {count} span'ı başlangıç zamanına göre sıralanmış olarak gösteriliyor. Sonraki span'lar henüz yüklenmedi.",
       "loadMore": "Sonraki span'ı yükle | Sonraki {size} span'ı yükle",
-      "loadMoreFailed": "Bu izin daha fazla span'ı yüklenemedi"
+      "loadMoreFailed": "Bu izin daha fazla span'ı yüklenemedi",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "Genişletmek için tıklayın",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "Bu zaman civarındaki izleri ara",
       "searchAroundTip": "Bu olaydan hemen önce ve sonra kaydedilen olayları yükler.",
       "noOfEventsTip": "Bu olayın çevresinde kaç olay yükleneceği.",
-      "severityTip": "Algılanan günlük düzeyi. Nasıl algılandığını görmek için seçin."
+      "severityTip": "Algılanan günlük düzeyi. Nasıl algılandığını görmek için seçin.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT * sorgusu görselleştirme için desteklenmiyor.",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "Bu desen geçersiz veya desteklenmiyor. İleriye bakma, geriye bakma ve geri başvurular kullanılamaz."
     },
     "queryTooltip": "Filtreyi metin olarak düzenle",
-    "builderTooltip": "Filtreyi oluşturucuyla düzenle"
+    "builderTooltip": "Filtreyi oluşturucuyla düzenle",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

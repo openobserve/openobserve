@@ -101,11 +101,16 @@ export const alertDependenciesQuery = (org: string) =>
   });
 
 /** One read of every folder: the views, counts and sort all run on these rows in the page. */
-export const firingAlertsQuery = (org: string) =>
+export const firingAlertsQuery = (org: string, options?: { silentForbidden?: boolean }) =>
   queryOptions({
     queryKey: alertKeys.firing(org),
-    queryFn: async (): Promise<FiringPage> =>
-      (await alerts.listByFolderId(1, 0, "name", false, "", org)).data,
+    queryFn: async (): Promise<FiringPage> => {
+      const args = [1, 0, "name", false, "", org] as const;
+      const res = await (options
+        ? alerts.listByFolderId(...args, undefined, undefined, undefined, undefined, options)
+        : alerts.listByFolderId(...args));
+      return res.data;
+    },
     staleTime: LIVE_STALE_TIME,
   });
 

@@ -15,7 +15,7 @@
 
 import { gt } from "@/types/i18n";
 import { getDataValue } from "./aliasUtils";
-import { getFieldLabel } from "./fieldLabel";
+import { getFieldLabel, getFieldSourceName } from "./fieldLabel";
 import {
   PIVOT_TABLE_MAX_COLUMNS,
   PIVOT_TABLE_SEPARATOR,
@@ -225,7 +225,9 @@ export const convertPivotTableData = (
   const valueMappingCache = buildValueMappingCache(config.mappings);
   const withLabel = (field: any) => ({
     ...field,
-    label: getFieldLabel(field, panelSchema.config, query.customQuery),
+    label:
+      getFieldLabel(field, panelSchema.config, query.customQuery) ||
+      (query.customQuery ? "" : getFieldSourceName(field)),
   });
   const xFields = (query.fields?.x || []).map(withLabel);
   const yFields = (query.fields?.y || []).map(withLabel);

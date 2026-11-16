@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="row.status"
                         data-test="alert-history-status-chip"
                       />
-                      <OTooltip v-if="row.error" :content="row.error" />
+                      <OTooltip v-if="row.error" :content="raw(plainAlertError(row.error))" />
                     </span>
                   </template>
 
@@ -221,7 +221,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template #cell-error="{ row }">
-                    <span class="text-compact">{{ row.error || "—" }}</span>
+                    <span class="text-compact">
+                      {{ summarizeAlertError(row.error, t) }}
+                      <OTooltip v-if="row.error" :content="raw(plainAlertError(row.error))" />
+                    </span>
                   </template>
                 </OTable>
               </div>
@@ -344,6 +347,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { plainAlertError, summarizeAlertError } from "@/utils/alerts/alertError";
 import { conditionSummary, isFiringOutcome, isOkOutcome } from "@/utils/alerts/runOutcome";
 import { formatTimestamp } from "@/utils/date";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";

@@ -111,7 +111,8 @@ export class SanityPage {
         // Stream search input on Streams page; OInput auto-generates `-field` variant.
         this.searchStreamInputField = page.locator('[data-test="streams-search-stream-input-field"]');
         // Stream delete button per row (data-test added in LogStream.vue this pass).
-        this.streamDeleteFirstRowBtn = page.locator('[data-test="log-stream-delete-btn"]').first();
+        this.streamRowMoreBtn = page.locator('[data-test="log-stream-row-more-actions"]').first();
+        this.streamDeleteFirstRowBtn = page.locator('[data-test="log-stream-delete-btn-menu"]').first();
         // Stream delete confirmation dialog primary button.
         this.streamDeleteDialogPrimary = page.locator('[data-test="log-stream-delete-dialog"] [data-test="o-dialog-primary-btn"]');
 
@@ -676,7 +677,8 @@ export class SanityPage {
         // register clicks immediately after the list re-renders from the search filter.
         await this.page.waitForTimeout(1500);
 
-        // Click the per-row delete button.
+        // Delete lives in the row's more menu.
+        await this.streamRowMoreBtn.click();
         await this.streamDeleteFirstRowBtn.click();
 
         // Confirm via any visible primary dialog button (ODialog teleports content to body,

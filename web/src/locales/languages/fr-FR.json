@@ -13,7 +13,9 @@
     "headerLocked": "Verrouillé : nécessite {feature}",
     "availableInEnterprise": "Disponible dans OpenObserve Enterprise : {feature}",
     "turnedOffTitle": "Désactivé pour cette organisation",
-    "enterpriseTitle": "Disponible dans Enterprise"
+    "enterpriseTitle": "Disponible dans Enterprise",
+    "readDocs": "Lire la documentation",
+    "rbacOff": "RBAC est désactivé pour cette organisation. Un administrateur l'active en définissant {env} sur true dans la configuration du serveur."
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} ligne | {total} lignes",
     "histogramTitleRows": "{total} ligne affichée en {took} ms. | {total} lignes affichées en {took} ms.",
     "histogramTitleRowsWithScan": "{total} ligne affichée en {took} ms. ({scanLabel} : {scanSize}) | {total} lignes affichées en {took} ms. ({scanLabel} : {scanSize})",
-    "pickStreamFirst": "Choisissez d’abord un flux"
+    "pickStreamFirst": "Choisissez d’abord un flux",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "Calibration des alertes",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "Rechercher ou aller à…",
     "jumpToTitle": "Aller à",
     "addData": "Ajouter des données",
-    "jumpToPlaceholder": "Rechercher des pages et des actions",
+    "jumpToPlaceholder": "Rechercher des pages, alertes, tableaux de bord et flux",
+    "jumpToPlaceholderPages": "Rechercher des pages et des actions",
+    "jumpToPages": "Pages",
+    "jumpToShowAll": "Tout afficher dans {page}",
+    "jumpToSearchLogs": "Rechercher \"{text}\" dans les journaux",
     "synthetic": "Synthétiques",
     "experience": "Expérience",
     "slos": "SLO",
@@ -4226,7 +4234,8 @@
     "deleteUsersTitle": "Supprimer des utilisateurs",
     "deleteUsersMsg": "Êtes-vous sûr de vouloir supprimer {count} utilisateur ? | Êtes-vous sûr de vouloir supprimer {count} utilisateurs ?",
     "deleteUsersBlockNote": "{count} d'entre eux ont rejoint via votre domaine vérifié et seront bloqués au lieu d'être supprimés.",
-    "roleHint": "Admin gère l'organisation, Editor modifie les données et les paramètres, Viewer peut seulement lire."
+    "roleHint": "Admin gère l'organisation, Editor modifie les données et les paramètres, Viewer peut seulement lire.",
+    "customRolesNeedRbac": "Les rôles personnalisés nécessitent RBAC, qui est désactivé pour cette organisation."
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -7773,7 +7782,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "Exportateur GPU",
-    "rotationNote": "Les jetons ne sont pas renouvelés sur place. Pour en renouveler un, créez un nouveau jeton, basculez vos sources dessus, puis désactivez l'ancien."
+    "rotationNote": "Les jetons ne sont pas renouvelés sur place. Pour en renouveler un, créez un nouveau jeton, basculez vos sources dessus, puis désactivez l'ancien.",
+    "rotateAction": "Renouveler…",
+    "rotateTitle": "Renouveler {name}",
+    "rotateStep1": "Créez un nouveau jeton.",
+    "rotateStep2": "Basculez vos sources vers le nouveau jeton.",
+    "rotateStep3": "Quand plus rien n'utilise {name}, désactivez-le depuis le menu de sa ligne.",
+    "rotateNever": "Rien n'est désactivé automatiquement. L'ancien jeton continue de fonctionner jusqu'à ce que vous le désactiviez.",
+    "rotateCreateNew": "Créer un nouveau jeton",
+    "rotateNewName": "{name}-nouveau",
+    "rotateDescription": "Remplace {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10452,6 +10470,7 @@
       "quietNote": "A cessé d'écrire ces 7 derniers jours",
       "criticalUnit": "{count} au niveau critique",
       "deliveryFailures": "Échecs de livraison des alertes",
+      "deliveryCount": "{count} livraison d'alerte échouée | {count} livraisons d'alertes échouées",
       "deliveryNote": "Alertes déclenchées mais non notifiées",
       "oldestFiring": "Plus ancienne déclenchée depuis {age}"
     },
@@ -10618,12 +10637,13 @@
       "loadError": "Impossible de lire vos flux"
     },
     "start": {
-      "text": "Aucune donnée n'est arrivée ces dernières {range}. Envoyez des données, consultez celles que vous avez ou configurez une alerte.",
+      "text": "Aucune donnée n'est encore arrivée. Envoyez des données, consultez celles que vous avez ou configurez une alerte.",
       "addData": "Ajouter des données",
       "createAlert": "Créer une alerte"
     },
     "summary": {
       "loadError": "Impossible de charger le résumé de l'organisation",
+      "loadErrorRest": "Impossible de charger le reste du résumé",
       "denied": "Aucun accès au résumé de l'organisation. Demandez à un administrateur."
     },
     "events": {
@@ -11612,7 +11632,8 @@
       "threshold": "Seuil",
       "noIncident": "Aucun incident pour l'instant",
       "conditionLabel": "Condition de l'alerte",
-      "allRows": "Toutes les lignes"
+      "allRows": "Toutes les lignes",
+      "viewIncidents": "Voir les incidents"
     },
     "summaryTrainingFailed": "Échec de l'entraînement",
     "startFromTemplate": "Partir d'un modèle",
@@ -12807,7 +12828,8 @@
       "condition": "Condition",
       "result": "Résultat",
       "anomalies": "Anomalies",
-      "forGroup": "pour {group}"
+      "forGroup": "pour {group}",
+      "errorFrom": "{status} depuis {destination}"
     },
     "continue": "Continuer",
     "wouldTrigger": "DÉCLENCHERAIT",
@@ -14291,7 +14313,9 @@
     "siemDetection": {
       "notice": "Cette alerte est une détection Sécurité. Sa requête est compilée à partir de sa règle Sigma : la règle, le flux et la planification se modifient donc dans Sécurité, qui maintient la règle et la requête synchronisées.",
       "open": "Modifier dans Sécurité"
-    }
+    },
+    "newAlertTitle": "Nouvelle alerte",
+    "newAnomalyTitle": "Nouvelle détection d'anomalies"
   },
   "alert_dependencies": {
     "actionOpen": "Ouvrir",
@@ -17120,7 +17144,13 @@
       "partial": "Certains spans de cette trace n'ont pas pu être lus. La cascade peut être incomplète.",
       "truncated": "Affichage du premier span de cette trace, dans l'ordre de l'heure de début. Les spans suivants ne sont pas encore chargés. | Affichage des {count} premiers spans de cette trace, dans l'ordre de l'heure de début. Les spans suivants ne sont pas encore chargés.",
       "loadMore": "Charger le span suivant | Charger les {size} spans suivants",
-      "loadMoreFailed": "Impossible de charger plus de spans pour cette trace"
+      "loadMoreFailed": "Impossible de charger plus de spans pour cette trace",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "Cliquer pour développer",
@@ -20694,7 +20724,9 @@
       "searchTracesAround": "Rechercher des traces autour de ce moment",
       "searchAroundTip": "Charge les événements consignés juste avant et après celui-ci.",
       "noOfEventsTip": "Nombre d'événements à charger autour de celui-ci.",
-      "severityTip": "Niveau de journal détecté. Sélectionnez-le pour voir comment il a été détecté."
+      "severityTip": "Niveau de journal détecté. Sélectionnez-le pour voir comment il a été détecté.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La requête SELECT * n'est pas prise en charge pour la visualisation.",
@@ -30469,7 +30501,10 @@
       "regexInvalid": "Ce motif est invalide ou non pris en charge. Les assertions avant, les assertions arrière et les références arrière ne peuvent pas être utilisées."
     },
     "queryTooltip": "Modifier le filtre en texte",
-    "builderTooltip": "Modifier le filtre avec le générateur"
+    "builderTooltip": "Modifier le filtre avec le générateur",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "autoobserveLive": {
     "paging": {

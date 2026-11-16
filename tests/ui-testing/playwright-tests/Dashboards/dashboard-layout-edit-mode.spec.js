@@ -47,7 +47,7 @@ test.describe("Dashboard layout edit mode testcases", () => {
   }, async () => {
     const actions = pm.dashboardPanelActions;
 
-    await expect(actions.layoutEditBtn).toBeVisible();
+    await expect(actions.page.locator(`[data-test="dashboard-more-options-btn"]`)).toBeVisible();
     await expect(actions.layoutEditBadge).toHaveCount(0);
     await expect(actions.layoutEditSaveBtn).toHaveCount(0);
     await expect(actions.panelDragGrip).toHaveCount(0);
@@ -96,7 +96,7 @@ test.describe("Dashboard layout edit mode testcases", () => {
 
     await actions.requestLayoutDiscard();
     await expect(actions.layoutDiscardDialog).toHaveCount(0);
-    await expect(actions.layoutEditBtn).toBeVisible();
+    await expect(actions.page.locator(`[data-test="dashboard-more-options-btn"]`)).toBeVisible();
     await expect(actions.layoutEditBadge).toHaveCount(0);
     await expect(actions.editingGrid).toHaveCount(0);
     await expect(actions.panelDragGrip).toHaveCount(0);
@@ -128,7 +128,7 @@ test.describe("Dashboard layout edit mode testcases", () => {
     await actions.saveLayoutEdit();
     expect((await putResponse).ok()).toBe(true);
     expect(puts.count).toBe(1);
-    await expect(actions.layoutEditBtn).toBeVisible();
+    await expect(actions.page.locator(`[data-test="dashboard-more-options-btn"]`)).toBeVisible();
 
     const saved = await getSavedLayouts(dashboardId);
     expect(saved[panelIds[0]]).toEqual(draftA);
@@ -202,7 +202,7 @@ test.describe("Dashboard layout edit mode testcases", () => {
 
     await actions.requestLayoutDiscard();
     await actions.confirmLayoutDiscard();
-    await expect(actions.layoutEditBtn).toBeVisible();
+    await expect(actions.page.locator(`[data-test="dashboard-more-options-btn"]`)).toBeVisible();
     await expect(actions.layoutEditBadge).toHaveCount(0);
     await expect.poll(async () => (await onScreenBox(panelIds[0])).h).toBe(PANEL_A.layout.h);
 
@@ -267,7 +267,7 @@ test.describe("Dashboard layout edit mode testcases", () => {
     );
     await actions.pressLayoutShortcut("ControlOrMeta+s");
     expect((await putResponse).ok()).toBe(true);
-    await expect(actions.layoutEditBtn).toBeVisible();
+    await expect(actions.page.locator(`[data-test="dashboard-more-options-btn"]`)).toBeVisible();
     expect((await getSavedLayouts(dashboardId))[panelIds[0]].h).toBe(14);
 
     testLogger.info("Keyboard shortcuts drove the layout draft and saved it");

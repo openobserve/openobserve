@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { freshnessRows, noDataInRange } from "./overviewFreshness";
+import { freshnessRows, noDataEver, noDataInRange } from "./overviewFreshness";
 
 const START = 1_000_000;
 const stream = (name: string, at?: number, type = "logs") => ({
@@ -70,5 +70,14 @@ describe("noDataInRange", () => {
     expect(noDataInRange(freshnessRows([[stream("a", START - 1)]], START))).toBe(true);
     expect(noDataInRange(freshnessRows([[stream("a", START)]], START))).toBe(false);
     expect(noDataInRange(freshnessRows([[], [], []], START))).toBe(false);
+  });
+});
+
+describe("noDataEver", () => {
+  it("is true only when no stream ever got a record", () => {
+    expect(noDataEver(freshnessRows([[stream("a", 0)]], START))).toBe(true);
+    expect(noDataEver(freshnessRows([[], [], []], START))).toBe(true);
+    expect(noDataEver(freshnessRows([[stream("a", START - 1)]], START))).toBe(false);
+    expect(noDataEver([])).toBe(false);
   });
 });

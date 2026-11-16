@@ -13,7 +13,9 @@
     "headerLocked": "ล็อกอยู่: ต้องมี {feature}",
     "availableInEnterprise": "{feature} ใช้งานได้ใน OpenObserve Enterprise",
     "turnedOffTitle": "ปิดใช้งานสำหรับองค์กรนี้",
-    "enterpriseTitle": "มีให้ใช้ใน Enterprise"
+    "enterpriseTitle": "มีให้ใช้ใน Enterprise",
+    "readDocs": "อ่านเอกสาร",
+    "rbacOff": "RBAC ปิดอยู่สำหรับองค์กรนี้ ผู้ดูแลระบบเปิดได้โดยตั้งค่า {env} เป็น true ในการกำหนดค่าเซิร์ฟเวอร์"
   },
   "emptyState": {
     "illustrations": {
@@ -1939,7 +1941,9 @@
     "recordsChipRows": "{total} แถว | {total} แถว",
     "histogramTitleRows": "แสดง {total} แถวใน {took} ms | แสดง {total} แถวใน {took} ms",
     "histogramTitleRowsWithScan": "แสดง {total} แถวใน {took} ms ({scanLabel}: {scanSize}) | แสดง {total} แถวใน {took} ms ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "เลือกสตรีมก่อน"
+    "pickStreamFirst": "เลือกสตรีมก่อน",
+    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
+    "histogramNoTimeAxis": "Grouped results have no time axis"
   },
   "menu": {
     "alertCalibration": "การปรับเทียบการแจ้งเตือน",
@@ -1976,7 +1980,11 @@
     "searchOrJumpTo": "ค้นหาหรือไปที่…",
     "jumpToTitle": "ไปที่",
     "addData": "เพิ่มข้อมูล",
-    "jumpToPlaceholder": "ค้นหาหน้าและการดำเนินการ",
+    "jumpToPlaceholder": "ค้นหาหน้า การแจ้งเตือน แดชบอร์ด และสตรีม",
+    "jumpToPlaceholderPages": "ค้นหาหน้าและการดำเนินการ",
+    "jumpToPages": "หน้า",
+    "jumpToShowAll": "แสดงทั้งหมดใน {page}",
+    "jumpToSearchLogs": "ค้นหา \"{text}\" ในบันทึก",
     "synthetic": "การตรวจสอบสังเคราะห์ (Synthetics)",
     "experience": "ประสบการณ์ใช้งาน (Experience)",
     "slos": "SLOs",
@@ -4225,7 +4233,8 @@
     "deleteUsersTitle": "Delete Users",
     "deleteUsersMsg": "Are you sure you want to delete {count} user? | Are you sure you want to delete {count} users?",
     "deleteUsersBlockNote": "{count} รายในจำนวนนี้เข้าร่วมผ่านโดเมนที่ยืนยันแล้วของคุณ และจะถูกบล็อกแทนการลบ",
-    "roleHint": "Admin จัดการองค์กร Editor เปลี่ยนข้อมูลและการตั้งค่า Viewer อ่านได้อย่างเดียว"
+    "roleHint": "Admin จัดการองค์กร Editor เปลี่ยนข้อมูลและการตั้งค่า Viewer อ่านได้อย่างเดียว",
+    "customRolesNeedRbac": "บทบาทแบบกำหนดเองต้องใช้ RBAC ซึ่งปิดอยู่สำหรับองค์กรนี้"
   },
   "invitation": {
     "pendingInvitations": "Pending Invitations",
@@ -6326,7 +6335,7 @@
     "confirmPauseBackfillJob": "Are you sure you want to pause the backfill job for \"{name}\"? You can resume it later.",
     "confirmResumeBackfillJob": "Are you sure you want to resume the backfill job for \"{name}\"?",
     "confirmDeleteBackfillJob": "Are you sure you want to delete the backfill job for the {name} pipeline? This will remove the job from the list but will not affect the backfilled data.",
-    "frequencyMins": "{count} Mins"
+    "frequencyMins": "{count} นาที"
   },
   "function": {
     "updateModeLabel": "Update Mode",
@@ -7772,7 +7781,16 @@
     },
     "gpu": "GPU",
     "gpuExporter": "GPU exporter",
-    "rotationNote": "โทเค็นไม่ได้หมุนเวียนในที่เดิม หากต้องการหมุนเวียน ให้สร้างโทเค็นใหม่ สลับแหล่งข้อมูลไปใช้ แล้วปิดใช้งานโทเค็นเก่า"
+    "rotationNote": "โทเค็นไม่ได้หมุนเวียนในที่เดิม หากต้องการหมุนเวียน ให้สร้างโทเค็นใหม่ สลับแหล่งข้อมูลไปใช้ แล้วปิดใช้งานโทเค็นเก่า",
+    "rotateAction": "หมุนเวียน…",
+    "rotateTitle": "หมุนเวียน {name}",
+    "rotateStep1": "สร้างโทเค็นใหม่",
+    "rotateStep2": "สลับแหล่งข้อมูลของคุณไปใช้โทเค็นใหม่",
+    "rotateStep3": "เมื่อไม่มีสิ่งใดใช้ {name} แล้ว ให้ปิดใช้งานจากเมนูของแถว",
+    "rotateNever": "ระบบจะไม่ปิดใช้งานให้อัตโนมัติ โทเค็นเก่าจะยังใช้งานได้จนกว่าคุณจะปิดใช้งาน",
+    "rotateCreateNew": "สร้างโทเค็นใหม่",
+    "rotateNewName": "{name}-ใหม่",
+    "rotateDescription": "แทนที่ {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -10449,6 +10467,7 @@
       "quietNote": "หยุดเขียนข้อมูลใน 7 วันที่ผ่านมา",
       "criticalUnit": "{count} รายการที่ระดับวิกฤต",
       "deliveryFailures": "ความล้มเหลวในการส่งการแจ้งเตือน",
+      "deliveryCount": "การส่งการแจ้งเตือนล้มเหลว {count} รายการ | การส่งการแจ้งเตือนล้มเหลว {count} รายการ",
       "deliveryNote": "การแจ้งเตือนที่ถูกทริกเกอร์แล้วแต่ไม่สามารถส่งการแจ้งเตือนได้",
       "oldestFiring": "รายการที่กำลังแจ้งเตือนนานที่สุดเป็นเวลา {age}"
     },
@@ -10615,12 +10634,13 @@
       "loadError": "อ่านสตรีมของคุณไม่ได้"
     },
     "start": {
-      "text": "ไม่มีข้อมูลเข้ามาใน {range} ที่ผ่านมา ส่งข้อมูล ดูข้อมูลที่มี หรือตั้งค่าการแจ้งเตือน",
+      "text": "ยังไม่มีข้อมูลเข้ามา ส่งข้อมูล ดูข้อมูลที่มี หรือตั้งค่าการแจ้งเตือน",
       "addData": "เพิ่มข้อมูล",
       "createAlert": "สร้างการแจ้งเตือน"
     },
     "summary": {
       "loadError": "โหลดสรุปขององค์กรไม่ได้",
+      "loadErrorRest": "โหลดส่วนที่เหลือของสรุปไม่ได้",
       "denied": "ไม่มีสิทธิ์เข้าถึงสรุปขององค์กร ติดต่อผู้ดูแลองค์กร"
     },
     "events": {
@@ -11609,7 +11629,8 @@
       "threshold": "เกณฑ์",
       "noIncident": "ยังไม่มีเหตุการณ์",
       "conditionLabel": "เงื่อนไขการแจ้งเตือน",
-      "allRows": "ทุกแถว"
+      "allRows": "ทุกแถว",
+      "viewIncidents": "ดูเหตุการณ์"
     },
     "summaryTrainingFailed": "การฝึกล้มเหลว",
     "startFromTemplate": "เริ่มจากเทมเพลต",
@@ -12804,7 +12825,8 @@
       "condition": "Condition",
       "result": "Result",
       "anomalies": "Anomalies",
-      "forGroup": "for {group}"
+      "forGroup": "for {group}",
+      "errorFrom": "{status} จาก {destination}"
     },
     "continue": "Continue",
     "wouldTrigger": "WOULD TRIGGER",
@@ -14288,7 +14310,9 @@
     "siemDetection": {
       "notice": "การแจ้งเตือนนี้เป็นการตรวจจับของ Security คิวรีของการแจ้งเตือนถูกคอมไพล์จากกฎ Sigma ดังนั้นกฎ สตรีม และกำหนดเวลาจะต้องแก้ไขใน Security ซึ่งช่วยให้กฎและคิวรีสอดคล้องกันเสมอ",
       "open": "แก้ไขใน Security"
-    }
+    },
+    "newAlertTitle": "การแจ้งเตือนใหม่",
+    "newAnomalyTitle": "การตรวจจับความผิดปกติใหม่"
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -17117,7 +17141,13 @@
       "partial": "Some spans of this trace could not be read. The waterfall may be incomplete.",
       "truncated": "Showing the first span of this trace, in start-time order. Later spans are not loaded yet. | Showing the first {count} spans of this trace, in start-time order. Later spans are not loaded yet.",
       "loadMore": "Load the next span | Load next {size} spans",
-      "loadMoreFailed": "Could not load more spans of this trace"
+      "loadMoreFailed": "Could not load more spans of this trace",
+      "notFoundTitle": "No trace with this ID between {from} and {to}",
+      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
+      "searchWiderRange": "Search a wider range",
+      "searchSpansInRange": "Search spans in this range",
+      "loadFailedTitle": "Couldn't load this trace",
+      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
     },
     "traceTree": {
       "clickToExpand": "Click to expand",
@@ -20691,7 +20721,9 @@
       "searchTracesAround": "ค้นหาเทรซรอบช่วงเวลานี้",
       "searchAroundTip": "โหลดเหตุการณ์ที่บันทึกก่อนและหลังเหตุการณ์นี้",
       "noOfEventsTip": "จำนวนเหตุการณ์ที่จะโหลดรอบเหตุการณ์นี้",
-      "severityTip": "ระดับบันทึกที่ตรวจพบ เลือกเพื่อดูว่าตรวจพบอย่างไร"
+      "severityTip": "ระดับบันทึกที่ตรวจพบ เลือกเพื่อดูว่าตรวจพบอย่างไร",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select * query is not supported for visualization.",
@@ -30554,6 +30586,9 @@
   },
   "filterBar": {
     "queryTooltip": "แก้ไขตัวกรองเป็นข้อความ",
-    "builderTooltip": "แก้ไขตัวกรองด้วยตัวสร้าง"
+    "builderTooltip": "แก้ไขตัวกรองด้วยตัวสร้าง",
+    "editorModeLabel": "Filter editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   }
 }

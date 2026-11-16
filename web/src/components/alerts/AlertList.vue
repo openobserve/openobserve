@@ -1317,7 +1317,7 @@ import { downtimeLink } from "@/utils/downtimes/link";
 import type { MuteActionResult } from "@/utils/downtimes/muteResult";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { useListViewState } from "@/composables/useListViewState";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -1484,16 +1484,26 @@ export default defineComponent({
     // Flag to skip clearing search state on the first folder emission after mount.
     // When returning from add/edit screens, the FolderList emits the active folder
     // which would normally clear restored search filters. This flag prevents that.
-    const savedAlertListFilters = useListViewState("alerts", {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-      stateFilter: [] as AlertStateKey[],
-      sortBy: "",
-      sortOrder: "asc" as "asc" | "desc",
-      perPage: 20,
-      currentPage: 1,
-    });
+    const savedAlertListFilters = useListViewState(
+      "alerts",
+      {
+        searchQuery: "",
+        filterQuery: "",
+        searchAcrossFolders: false,
+        stateFilter: [] as AlertStateKey[],
+        sortBy: "",
+        sortOrder: "asc" as "asc" | "desc",
+        perPage: 20,
+        currentPage: 1,
+      },
+      {
+        url: {
+          filterQuery: LIST_URL_PARAMS.filterQuery,
+          searchQuery: "search",
+          searchAcrossFolders: "all",
+        },
+      },
+    );
     const isRestoringState = ref(
       !!savedAlertListFilters.searchQuery ||
         !!savedAlertListFilters.filterQuery ||
@@ -2410,6 +2420,28 @@ export default defineComponent({
     const filterQuery = ref<any>(linkedFilter ? "" : savedAlertListFilters.filterQuery || "");
     const searchAcrossFolders = ref<any>(
       !linkedFilter && (savedAlertListFilters.searchAcrossFolders || false),
+    );
+    // The saved search lives in the URL too, so a link that drops it must clear it there as well.
+    if (linkedFilter) {
+      Object.assign(savedAlertListFilters, {
+        searchQuery: "",
+        filterQuery: "",
+        searchAcrossFolders: false,
+      });
+    }
+    // Back and Forward write the URL's search into the saved view; the search box follows it.
+    watch(
+      () =>
+        [
+          savedAlertListFilters.searchQuery,
+          savedAlertListFilters.filterQuery,
+          savedAlertListFilters.searchAcrossFolders,
+        ] as const,
+      ([search, filter, across]) => {
+        if ((searchQuery.value || "") !== search) searchQuery.value = search;
+        if ((filterQuery.value || "") !== filter) filterQuery.value = filter;
+        if (!!searchAcrossFolders.value !== across) searchAcrossFolders.value = across;
+      },
     );
     // The link filters apply once; leaving them in the URL would override the saved search on Back or reload.
     if (urlQuery.state !== undefined || urlQuery.level !== undefined) {

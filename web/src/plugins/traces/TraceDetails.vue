@@ -1014,6 +1014,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </FeatureLockExempt>
       <LicenseDeniedState :features="['traces']" />
     </div>
+    <div v-else-if="traceMissing" class="flex min-h-0 flex-1 flex-col">
+      <OPageHeader
+        :title="t('routeTitles.traceDetails')"
+        :back="
+          showBackButton
+            ? {
+                label: t('menu.traces'),
+                to: tracesListRoute(),
+                onClick: handleBackOrClose,
+                dataTest: 'trace-details-back-btn',
+              }
+            : undefined
+        "
+      />
+      <TraceMissingState
+        :kind="traceMissing.kind"
+        :trace-id="effectiveTraceId"
+        :stream="traceMissing.stream"
+        :from="traceMissing.from"
+        :to="traceMissing.to"
+        :can-widen="!!widerTraceRange"
+        @widen="searchWiderTraceRange"
+        @search-range="searchSpansInTraceRange"
+        @retry="openTraceLink"
+      />
+    </div>
 
     <!-- Filters Sidebar -->
     <ODrawer
@@ -1124,7 +1150,13 @@ import {
   filterTraceTree,
 } from "@/utils/traces/traceServiceGraph";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
-import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
+import {
+  resolveReplaySpan,
+  resolveSessionId,
+  resolveUrlTimeRange,
+  widerTraceWindow,
+} from "./traceDetails.utils";
+import TraceMissingState from "./TraceMissingState.vue";
 import {
   buildFilterTerm,
   applyFilterTerm,
@@ -1421,6 +1453,7 @@ export default defineComponent({
   },
   components: {
     ShareButton,
+    TraceMissingState,
     OPageHeader,
     FeatureLockExempt,
     LicenseDeniedState,
@@ -2412,8 +2445,17 @@ export default defineComponent({
       }, 300);
     };
 
+    // Standalone only: the page states a missing or unloadable trace in place of the waterfall.
+    const traceMissing = ref<{
+      kind: "not-found" | "error";
+      stream: string;
+      from: number;
+      to: number;
+    } | null>(null);
+
     const resetTraceDetails = () => {
       resetPaging();
+      traceMissing.value = null;
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";
       // Selection is being cleared — cancel any live scroll targeting it.
@@ -2790,7 +2832,7 @@ export default defineComponent({
         if ((error as { response?: { status?: number } })?.response?.status !== 401) {
           console.error("Error fetching trace details:", error);
         }
-        showTraceDetailsError();
+        showTraceDetailsError("error");
       } finally {
         if (generation === loadGeneration) {
           searchObj.data.traceDetails.isLoadingTraceDetails = false;
@@ -2850,7 +2892,7 @@ export default defineComponent({
       });
     };
 
-    const showTraceDetailsError = () => {
+    const showTraceDetailsError = (kind: "not-found" | "error" = "not-found") => {
       if (props.mode === "embedded") {
         // The host page stays put; the notice is enough.
         showErrorNotification(
@@ -2858,20 +2900,13 @@ export default defineComponent({
         );
         return;
       }
-      showErrorNotification(
-        t("traces.traceDetails.traceNotFound", {
-          traceId: router.currentRoute.value.query.trace_id,
-        }),
-      );
-      const query = cloneDeep(router.currentRoute.value.query);
-      delete query.trace_id;
-      router.push({
-        name: "traces",
-        query: {
-          ...query,
-        },
-      });
-      return;
+      const range = effectiveTimeRange.value;
+      traceMissing.value = {
+        kind,
+        stream: effectiveStreamName.value,
+        from: pagedTrace?.from ?? range.from,
+        to: pagedTrace?.to ?? range.to,
+      };
     };
 
     function generateNewColor() {
@@ -3649,6 +3684,35 @@ export default defineComponent({
       await setupTraceDetails();
     };
 
+    const widerTraceRange = computed(() =>
+      traceMissing.value?.kind === "not-found"
+        ? widerTraceWindow(traceMissing.value.from, traceMissing.value.to, Date.now() * 1000)
+        : null,
+    );
+
+    const searchWiderTraceRange = async () => {
+      const range = widerTraceRange.value;
+      if (!range) return;
+      await router.replace({
+        query: { ...router.currentRoute.value.query, from: range.from, to: range.to },
+      });
+      await openTraceLink();
+    };
+
+    const searchSpansInTraceRange = () => {
+      const missing = traceMissing.value;
+      if (!missing) return;
+      router.push({
+        name: "traces",
+        query: {
+          stream: missing.stream,
+          from: missing.from,
+          to: missing.to,
+          org_identifier: effectiveOrgIdentifier.value,
+        },
+      });
+    };
+
     // ── Keyboard shortcuts — span navigation ─────────────────────────────
     const spanNavAnnouncement = ref("");
     const announceSpanNav = (message: string) => announceInto(spanNavAnnouncement, message);
@@ -3697,6 +3761,10 @@ export default defineComponent({
       router,
       t,
       raw,
+      traceMissing,
+      widerTraceRange,
+      searchWiderTraceRange,
+      searchSpansInTraceRange,
       showCriticalPath,
       setShowCriticalPath,
       aiIconSrc,

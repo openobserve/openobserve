@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-if="!alertsLocked"
-        :to="{ name: 'alertLibrary', query: { org_identifier: org } }"
+        :to="{ name: 'addAlert', query: { org_identifier: org } }"
         data-test="overview-getting-started-create-alert"
       >
         {{ t("overview.start.createAlert") }}
@@ -45,14 +45,12 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { rangeRoute, recordRange } from "@/composables/firstEvent/confirmQuery";
 import type { FreshnessRow } from "./overviewFreshness";
 
 const props = defineProps<{
   rows: FreshnessRow[];
-  /** The selected range spoken as words, e.g. "24 hours". */
-  rangeWords: I18nText;
   logsLocked?: boolean;
   alertsLocked?: boolean;
 }>();
@@ -62,7 +60,7 @@ const store = useStore();
 
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-const text = computed(() => t("overview.start.text", { range: props.rangeWords }));
+const text = computed(() => t("overview.start.text"));
 
 // Explore logs lands on the newest log records, so a quiet org opens on data instead of an empty range
 const logsRoute = computed(() => {

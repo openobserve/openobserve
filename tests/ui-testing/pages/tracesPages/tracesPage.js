@@ -310,7 +310,7 @@ export class TracesPage {
 
   async validateTracesPage() {
 
-    await expect(this.page.locator('[data-test="traces-search-bar-filter-builder-toggle"]')).toBeDefined();
+    await expect(this.page.locator('[data-test="traces-search-bar-filter-editor-mode"]')).toBeDefined();
     await expect(this.page.locator('[data-test="logs-search-bar"]')).toBeDefined();
 
   }

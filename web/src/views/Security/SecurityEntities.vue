@@ -817,9 +817,9 @@ const noSources = computed(
             <OIcon :name="KIND_ICON[k]" size="sm" />
             {{ t(`siem.entities.kinds.${k}`) }}
             <span
+              v-if="!failed"
               class="bg-surface-subtle text-text-secondary text-2xs rounded-full px-1.5 font-semibold tabular-nums"
-              >{{ failed ? "—" : rowsByKind[k].length
-              }}{{ !failed && cappedKinds.has(k) ? "+" : "" }}</span
+              >{{ rowsByKind[k].length }}{{ cappedKinds.has(k) ? "+" : "" }}</span
             >
           </span>
         </OTab>
