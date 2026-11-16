@@ -1,13 +1,14 @@
-"""GROUP BY + ORDER BY + LIMIT under streaming aggregation returns exactly LIMIT rows (ENT#826).
+"""GROUP BY aggregates over `_search_stream` under streaming aggregation (ENT#826, ENT#571).
 
-With streaming aggregation on, `_search_stream` truncated each partition to the LIMIT before the
-cumulative merge (fixed in openobserve#8713), so the merged rows differed from `_search`. The planner
-only splits an aggregate into partitions when its estimated runtime exceeds
-`ZO_AGGS_MIN_NUM_PARTITIONS_SECS` (default 3s), which test-sized data never does. The estimate is
-read from the file list, so rows still in the WAL estimate 0s and never partition even at 0. The
-`streaming_aggs_limit` shard sets the threshold to 0 and pushes files out of the WAL within seconds;
-the fixture waits until `_search_partition` sees every row, and the test fails if the stream was
-not aggregated.
+ENT#826: `_search_stream` truncated each partition to the LIMIT before the cumulative merge (fixed
+in openobserve#8713), so the merged rows differed from `_search`. ENT#571: a trailing `;` and a
+single-quoted stream name made the merge duplicate groups, misreport the total and leak the
+internal `zo_sql_num` column. Both need more than one partition. The planner only splits an
+aggregate when its estimated runtime exceeds `ZO_AGGS_MIN_NUM_PARTITIONS_SECS` (default 3s), which
+test-sized data never does, and the estimate is read from the file list, so rows still in the WAL
+never partition even at 0. The `streaming_aggs_limit` shard sets the threshold to 0 and pushes files
+out of the WAL within seconds; the fixture waits until `_search_partition` sees every row, and each
+test fails if the query was not split and aggregated in streaming mode.
 """
 
 from __future__ import annotations
@@ -86,6 +87,41 @@ def ns_stream(create_session, base_url):
     create_session.delete(f"{base_url}api/{ORG_ID}/streams/{stream}?type=logs", timeout=30)
 
 
+def _partition_count(session, base_url, sql: str, now: int) -> int:
+    start, end = _window(now)
+    resp = session.post(
+        f"{base_url}api/{ORG_ID}/_search_partition?type=logs",
+        json={"sql": sql, "start_time": start, "end_time": end, "streaming_output": True},
+        timeout=60,
+    )
+    assert resp.status_code == 200, f"_search_partition failed: {resp.status_code} {resp.text[:300]}"
+    return len(resp.json().get("partitions") or [])
+
+
+def _stream_frames(session, base_url, sql: str, now: int) -> tuple[list[dict], list[list[dict]]]:
+    """Metadata frames and per-frame hit lists of one `_search_stream` run."""
+    start, end = _window(now)
+    resp = session.post(
+        f"{base_url}api/{ORG_ID}/_search_stream?type=logs&search_type=UI&use_cache=false",
+        json={"query": {"sql": sql, "start_time": start, "end_time": end, "from": 0, "size": -1}},
+        headers={"Accept": "text/event-stream"},
+        stream=True,
+        timeout=120,
+    )
+    assert resp.status_code == 200, f"streaming search failed: {resp.status_code} {resp.text[:300]}"
+    frames = read_sse_frames(resp)
+    errors = [d for e, d in frames if e in ("error", "search_error")]
+    assert not errors, f"streaming search emitted an error frame: {errors}"
+    metas = [d for e, d in frames if e == "search_response_metadata"]
+    hit_frames = [d.get("hits") or [] for e, d in frames if e == "search_response_hits"]
+    assert any(m.get("streaming_aggs") for m in metas), (
+        "streaming aggregation did not engage, so this run cannot test the merge; "
+        "the server needs ZO_AGGS_MIN_NUM_PARTITIONS_SECS=0"
+    )
+    assert hit_frames, f"no hits frames: {frames}"
+    return metas, hit_frames
+
+
 @pytest.mark.parametrize("limit", [3, 11])
 def test_group_by_order_by_limit_is_honoured_under_streaming_aggs(create_session, base_url, ns_stream, limit):
     stream, now = ns_stream
@@ -99,22 +135,7 @@ def test_group_by_order_by_limit_is_honoured_under_streaming_aggs(create_session
         for i in range(limit)
     ]
 
-    resp = create_session.post(
-        f"{base_url}api/{ORG_ID}/_search_stream?type=logs&search_type=UI&use_cache=false",
-        json={"query": {"sql": sql, "start_time": start, "end_time": end, "from": 0, "size": -1}},
-        headers={"Accept": "text/event-stream"},
-        stream=True,
-        timeout=120,
-    )
-    assert resp.status_code == 200, f"streaming search failed: {resp.status_code} {resp.text[:300]}"
-    frames = read_sse_frames(resp)
-    metas = [d for e, d in frames if e == "search_response_metadata"]
-    hit_frames = [d.get("hits") or [] for e, d in frames if e == "search_response_hits"]
-    assert any(m.get("streaming_aggs") for m in metas), (
-        "streaming aggregation did not engage, so this run cannot test ENT#826; "
-        "the server needs ZO_AGGS_MIN_NUM_PARTITIONS_SECS=0"
-    )
-    assert hit_frames, f"no hits frames: {frames}"
+    _, hit_frames = _stream_frames(create_session, base_url, sql, now)
     # Streaming-aggs frames are cumulative, so the last frame is the answer.
     assert hit_frames[-1] == expected, f"streaming LIMIT {limit} returned {hit_frames[-1]}"
 
@@ -125,3 +146,19 @@ def test_group_by_order_by_limit_is_honoured_under_streaming_aggs(create_session
     )
     assert plain.status_code == 200, plain.text[:300]
     assert plain.json()["hits"] == expected, f"non-streaming LIMIT {limit} returned {plain.json()['hits']}"
+
+
+def test_semicolon_and_single_quoted_stream_group_by_merges_partitions(create_session, base_url, ns_stream):
+    """Trailing `;` + `'stream'` over several partitions: 4 groups of 75, no duplicates, no `zo_sql_num` (ENT#571)."""
+    stream, now = ns_stream
+    sql = f"SELECT container, count(*) AS cnt FROM '{stream}' GROUP BY container;"
+    partitions = _partition_count(create_session, base_url, sql, now)
+    assert partitions > 1, f"the query ran as {partitions} partition(s), so no cross-partition merge was tested"
+
+    metas, hit_frames = _stream_frames(create_session, base_url, sql, now)
+    hits = hit_frames[-1]
+    containers = [h["container"] for h in hits]
+    assert sorted(containers) == [f"c{i}" for i in range(CONTAINERS)], f"groups wrong or duplicated: {containers}"
+    assert all(h["cnt"] == ROW_COUNT // CONTAINERS for h in hits), f"group counts wrong: {hits}"
+    assert all("zo_sql_num" not in h for h in hits), f"internal zo_sql_num column leaked: {hits[0]}"
+    assert metas[-1]["results"]["total"] == CONTAINERS, f"reported total is not {CONTAINERS}: {metas[-1]['results'].get('total')}"

@@ -50,12 +50,14 @@ test.describe('Logs live mode survives an org switch and back (ENT#730)', () => 
     await refresh.closePopover();
     await refresh.expectTriggerLabel(/1\s*m|60/i);
 
+    // Live mode skips the histogram, so a carried-over interval is what left the returning org without one.
     await refresh.switchOrg(otherOrg);
     testLogger.info(`Refresh trigger in the other org: ${await refresh.getTriggerLabel()}`);
 
     const searches = refresh.trackStreamSearches(STREAM);
     await refresh.switchOrg(orgId());
-    testLogger.info(`Refresh trigger back in the first org: ${await refresh.getTriggerLabel()}`);
+    await refresh.expectTriggerLabel(/off/i);
+    // The org switch clears the selected stream by design, so nothing can search until one is picked and run.
     await pm.logsPage.selectStream(STREAM, 3, 0, true);
     await pm.logsPage.applyQueryAndWaitForSearchResponse();
 
