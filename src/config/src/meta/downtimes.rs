@@ -585,6 +585,7 @@ pub struct ListDowntimesQuery {
     pub status: Option<String>,
     /// `none` (or `once`), `daily`, `weekly`, or `recurring` for both. Any other value is a 400.
     pub repeat: Option<String>,
+    /// Case-insensitive substring of the name, reason or creator.
     pub search: Option<String>,
     /// Rows whose alerts target names this alert, or whose condition matches its dimensions.
     pub alert_id: Option<String>,
