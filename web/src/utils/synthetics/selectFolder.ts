@@ -4,11 +4,8 @@ export function selectSyntheticsFolder(
   folders: readonly { folderId: string }[],
   urlFolder?: string,
 ): string | undefined {
-  return (
-    urlFolder ??
-    folders.find((folder) => folder.folderId === "default")?.folderId ??
-    folders[0]?.folderId
-  );
+  if (urlFolder?.trim()) return urlFolder;
+  return folders.find((folder) => folder.folderId === "default")?.folderId ?? folders[0]?.folderId;
 }
 
 /** The listed folders plus a saved check's own folder, which a direct grant can reach unlisted. */

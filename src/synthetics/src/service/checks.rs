@@ -8,7 +8,7 @@ use super::{composition, composition_lock, *};
 struct ChildFacts {
     counts: HashMap<String, usize>,
     nested: HashSet<String>,
-    /// Children in folders the caller cannot list: their steps and nesting stay unshown.
+    /// Children in folders the caller cannot list: their step counts stay unshown.
     hidden: HashSet<String>,
 }
 
@@ -869,10 +869,8 @@ fn composition_fields(
     let reference_state = (!held.is_empty()).then(|| {
         if held.iter().any(|c| !children.counts.contains_key(c)) {
             ReferenceState::Missing
-        } else if held
-            .iter()
-            .any(|c| children.nested.contains(c) && !children.hidden.contains(c))
-        {
+        } else if held.iter().any(|c| children.nested.contains(c)) {
+            // Shown even for a hidden child: expansion rejects the parent either way.
             ReferenceState::Nested
         } else {
             ReferenceState::Ok
@@ -1045,13 +1043,16 @@ mod tests {
         assert_eq!(row_of("n", true).3, Some(ReferenceState::Nested));
         assert_eq!(row_of("b", true).3, Some(ReferenceState::Missing));
 
-        // A child in a folder the caller cannot list shows neither its steps nor its nesting.
+        // A hidden child hides its steps, but its nesting still blocks the parent from running.
         children.hidden = HashSet::from(["a".to_string(), "elsewhere".to_string()]);
         assert_eq!(
             row("p", true, &children),
             (None, 0, Some(1), Some(ReferenceState::Ok))
         );
-        assert_eq!(row("n", true, &children).3, Some(ReferenceState::Ok));
+        assert_eq!(
+            row("n", true, &children),
+            (None, 0, Some(1), Some(ReferenceState::Nested))
+        );
         assert_eq!(row("b", true, &children).3, Some(ReferenceState::Missing));
     }
 

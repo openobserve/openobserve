@@ -312,8 +312,9 @@ export default defineComponent({
     onMounted(async () => {
       // A folder-list 403 must not strand the folder selection below.
       await getFoldersListByType(store, props.type).catch(() => null);
-      if (router.currentRoute.value.query.folder) {
-        activeFolderId.value = router.currentRoute.value.query.folder as string;
+      const urlFolder = router.currentRoute.value.query.folder as string | undefined;
+      if (urlFolder) {
+        activeFolderId.value = fallbackFolder(urlFolder);
       } else if (!props.showFavorites) {
         activeFolderId.value = fallbackFolder();
       }
