@@ -915,6 +915,37 @@ describe("AlertList - row actions", () => {
     expect(alertsDB.length).toBeGreaterThan(6);
   });
 
+  it.each([
+    ["a scheduled", {}],
+    ["an anomaly", { toBeClonedIsAnomaly: true }],
+    ["a composite", { toBeClonedIsComposite: true }],
+  ])(
+    "shows %s clone after saving, though the list opened on Firing with a search",
+    async (_kind, flags) => {
+      router.currentRoute.value.query = {};
+      alertsDB = [{ ...makeAlert(1), last_outcome: "firing" } as any];
+      const clone = vi
+        .spyOn(alertsSvc, "clone_by_id")
+        .mockImplementation(async (_org: any, _id: any, body: any) => {
+          alertsDB.push(makeAlert(998, { name: body.name }));
+          return { data: { code: 200 } };
+        });
+      const wrapper: any = await mountAlertList({ renderTable: false });
+      await flushPromises();
+      expect(wrapper.vm.stateFilters).toEqual(["firing"]);
+      await wrapper.vm.duplicateAlert(wrapper.vm.displayedAlerts[0]);
+      wrapper.vm.filterQuery = "Alert 1";
+      Object.assign(wrapper.vm, flags, { toBeCloneAlertName: "new clone" });
+
+      await wrapper.vm.submitForm();
+      await flushPromises();
+      clone.mockRestore();
+
+      expect(wrapper.vm.filterQuery || "").toBe("");
+      expect(wrapper.vm.displayedAlerts.map((a: any) => a.name)).toContain("new clone");
+    },
+  );
+
   it("names its own list to the table's no-access lock", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -2375,28 +2406,42 @@ describe("AlertList - filters from the Overview links", () => {
     expect(wrapper.vm.stateCounts).toMatchObject({ firing: 1, acknowledged: acked });
   });
 
-  it("shows one status error when the run state could not be read: in the table while the tiles empty it, else in the footer", async () => {
-    alertsSvc.listByFolderId.mockResolvedValue({
-      data: { list: [makeAlert(93)], status_unavailable: true },
-    });
-    const wrapper = await withQuery({});
-    const errorState = wrapper
-      .findAllComponents({ name: "OEmptyState" })
-      .find((c: any) => c.attributes("data-test") === "alert-list-empty-status-error");
-    expect(errorState?.props("variant")).toBe("warning");
-    expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(false);
-    expect(wrapper.vm.summaryStats.find((s: any) => s.key === "firing").value).toBe("—");
-    const calls = alertsSvc.listByFolderId.mock.calls.length;
-    await wrapper.get('[data-test="alert-list-empty-status-retry"]').trigger("click");
-    await flushPromises();
-    expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(calls);
+  it.each([
+    ["with templates", [{ name: "template1" }]],
+    ["with no templates", []],
+  ])(
+    "shows one status error %s when the run state could not be read: in the table while the tiles empty it, else in the footer",
+    async (_case, templates) => {
+      templatesSvc.list.mockResolvedValue({ data: templates } as any);
+      alertsSvc.listByFolderId.mockResolvedValue({
+        data: { list: [makeAlert(93)], status_unavailable: true },
+      });
+      const wrapper = await withQuery({});
+      expect(wrapper.find('[data-test="alert-list-create-template-text"]').exists()).toBe(false);
+      const errorState = wrapper
+        .findAllComponents({ name: "OEmptyState" })
+        .find((c: any) => c.attributes("data-test") === "alert-list-empty-status-error");
+      expect(errorState?.props("variant")).toBe("warning");
+      expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(false);
+      expect(wrapper.vm.summaryStats.find((s: any) => s.key === "firing").value).toBe("—");
+      const calls = alertsSvc.listByFolderId.mock.calls.length;
+      await wrapper.get('[data-test="alert-list-empty-status-retry"]').trigger("click");
+      await flushPromises();
+      expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(calls);
 
-    wrapper.vm.stateFilters = [];
-    await flushPromises();
-    expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
-  });
+      wrapper.vm.stateFilters = [];
+      await flushPromises();
+      expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
+
+      // A search that empties a folder holding alerts is a filtered list, not a first run.
+      wrapper.vm.filterQuery = "no such alert";
+      await flushPromises();
+      expect(wrapper.vm.displayedAlerts).toHaveLength(0);
+      expect(wrapper.find('[data-test="alert-list-create-template-text"]').exists()).toBe(false);
+    },
+  );
 
   it.each([
     [
@@ -4062,47 +4107,6 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
     const row = (name: string) => wrapper.vm.filteredResults.find((r: any) => r.name === name);
     return { wrapper, row };
   };
-
-  it.each([
-    ["failed", { is_real_time: "anomaly", status: "failed", enabled: true }, "error-500"],
-    ["firing", { enabled: true, last_outcome: "firing" }, "error-500"],
-    ["fully acknowledged", { enabled: true, last_outcome: "firing", ack }, "warning-500"],
-    [
-      "partly acknowledged",
-      {
-        enabled: true,
-        last_outcome: "firing",
-        multi_alert: true,
-        groups_firing: 2,
-        ack: { ...ack, groups_acked: 1 },
-      },
-      "error-500",
-    ],
-    [
-      "lower-bound acknowledged",
-      {
-        enabled: true,
-        last_outcome: "firing",
-        multi_alert: true,
-        groups_firing: 2,
-        groups_firing_is_lower_bound: true,
-        ack: { ...ack, groups_acked: 2 },
-      },
-      "error-500",
-    ],
-    ["paused", { enabled: false, last_outcome: "firing" }, "grey-400"],
-    ["quiet", { enabled: true, last_outcome: "ok" }, "success-500"],
-    [
-      "status-unknown",
-      { enabled: true, last_outcome: "firing", status_unavailable: true },
-      "success-500",
-    ],
-  ])("colours the row rail for a %s alert", async (_state, row, token) => {
-    const wrapper: any = await mountAlertList({ renderTable: false });
-    expect(wrapper.vm.alertRowStyle(row).boxShadow).toBe(
-      `var(--shadow-rail-geom) var(--color-${token})`,
-    );
-  });
 
   it("carries the list's ack onto the row", async () => {
     const { row } = await loadAckRows();

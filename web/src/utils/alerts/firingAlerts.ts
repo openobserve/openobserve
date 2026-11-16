@@ -15,6 +15,7 @@
 
 import type { ActiveDowntime } from "@/services/downtimes";
 import type { AlertListAck } from "@/ts/interfaces/alert";
+import { isFiringOutcome, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 
 export interface FiringRow {
   alert_id: string;
@@ -79,6 +80,17 @@ export interface AckSignals {
   ack?: Pick<AlertListAck, "groups_acked"> | null;
 }
 
+/** The fields the list row's operational state and state rail read. */
+export interface RailSignals extends FiringSignals, AckSignals {
+  is_real_time?: boolean | string;
+  status?: unknown;
+  status_unavailable?: boolean;
+}
+
+export type AlertOperationalState = "active" | "paused" | "failed";
+
+export type AlertRailState = "failed" | "firing" | "acknowledged" | "paused" | "active";
+
 export interface FiringPage {
   list: FiringRow[];
   /** The run state could not be read, so every row's live fields are blank. */
@@ -103,4 +115,24 @@ export const ackCanChange = (row: AckSignals): boolean => {
   if (!row.ack) return true;
   if (!row.multi_alert || row.groups_firing == null) return false;
   return !!row.groups_firing_is_lower_bound || (row.ack.groups_acked ?? 0) < row.groups_firing;
+};
+
+/** Failed is an anomaly whose model training failed; otherwise enabled is active and disabled paused. */
+export const alertOperationalState = (row: RailSignals): AlertOperationalState => {
+  if (row?.is_real_time === "anomaly" && String(row?.status).toLowerCase() === "failed")
+    return "failed";
+  return row?.enabled ? "active" : "paused";
+};
+
+/** Counts muted firings too, and an open firing whose latest evaluation errored before any recovery. */
+export const isFiringListRow = (row: FiringSignals): boolean =>
+  (shouldShowRunOutcome(row?.enabled, row?.last_outcome) && isFiringOutcome(row?.last_outcome)) ||
+  (!!row?.enabled && isFiringNow(row));
+
+/** An unknown run state shows no firing, so a stale firing never reads as live. */
+export const alertRailState = (row: RailSignals, statusUnavailable: boolean): AlertRailState => {
+  const state = alertOperationalState(row);
+  if (state !== "active") return state;
+  if (statusUnavailable || row.status_unavailable || !isFiringListRow(row)) return "active";
+  return row.ack && !ackCanChange(row) ? "acknowledged" : "firing";
 };

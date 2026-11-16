@@ -956,15 +956,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #empty>
                 <OEmptyState
-                  v-if="!templates.length"
-                  size="hero"
-                  preset="no-alert-templates"
-                  :description="t('alerts.noTemplatesMsg')"
-                  data-test="alert-list-create-template-text"
-                  @action="routeTo('alertTemplates')"
-                />
-                <OEmptyState
-                  v-else-if="statusErrorEmpty"
+                  v-if="statusErrorEmpty"
                   size="inline"
                   variant="warning"
                   icon="warning"
@@ -996,6 +988,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                 </OEmptyState>
+                <OEmptyState
+                  v-else-if="noTemplatesEmpty"
+                  size="hero"
+                  preset="no-alert-templates"
+                  :description="t('alerts.noTemplatesMsg')"
+                  data-test="alert-list-create-template-text"
+                  @action="routeTo('alertTemplates')"
+                />
                 <OEmptyState
                   v-else-if="noFiringTitle"
                   size="block"
@@ -1393,7 +1393,13 @@ import {
   outcomeLabel,
   shouldShowRunOutcome,
 } from "@/utils/alerts/runOutcome";
-import { ackCanChange, isFiringNow } from "@/utils/alerts/firingAlerts";
+import {
+  ackCanChange,
+  alertOperationalState,
+  alertRailState,
+  isFiringListRow,
+  type AlertRailState,
+} from "@/utils/alerts/firingAlerts";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import { oncallTeamsQuery } from "@/services/oncall.queries";
@@ -1919,16 +1925,6 @@ export default defineComponent({
       router.push(sloDetailRoute(row.slo_id, store.state.selectedOrganization?.identifier));
     };
 
-    // ── Alert operational state (single source of truth) ────────────────────
-    // failed  → an anomaly whose model training failed (needs attention)
-    // active  → enabled and running
-    // paused  → disabled
-    const alertState = (row: any): "active" | "paused" | "failed" => {
-      if (row?.is_real_time === "anomaly" && String(row?.status).toLowerCase() === "failed")
-        return "failed";
-      return row?.enabled ? "active" : "paused";
-    };
-
     // ── Last run outcome (Part IV) ─────────────────────────────────────────
     // A disabled alert freezes its last outcome, so the badge is suppressed
     // unless the alert is actually running — otherwise a paused alert would
@@ -1940,13 +1936,8 @@ export default defineComponent({
     const isMutedFiring = (row: { active_downtime?: unknown; last_outcome?: unknown }): boolean =>
       !!row.active_downtime && isFiringOutcome(row.last_outcome);
 
-    // Counts muted firings too, and an open firing whose latest evaluation errored before any recovery.
-    const isFiringRow = (row: any): boolean =>
-      (showRunOutcome(row) && isFiringOutcome(row?.last_outcome)) ||
-      (!!row?.enabled && isFiringNow(row));
-
     // The list's ack exists only while it is in force, so it needs no firing check of its own.
-    const isAckedFiring = (row: any): boolean => isFiringRow(row) && !!row?.ack;
+    const isAckedFiring = (row: any): boolean => isFiringListRow(row) && !!row?.ack;
 
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
@@ -1969,30 +1960,23 @@ export default defineComponent({
     // what's off, not what's fine: failed=light red, paused=muted grey, active
     // stays clean (its state still reads from the green left rail).
     const alertRowClass = (row: any): string => {
-      const s = alertState(row);
+      const s = alertOperationalState(row);
       return s === "failed" ? "!bg-status-error-bg" : s === "paused" ? "!bg-surface-panel" : "";
     };
 
     // Extreme-left state rail — a full-height colour bar at the very start of the
     // row (inset box-shadow so it paints regardless of border-collapse). rem width
     // + token colour keep it theme-aware and hardcode-free.
-    const alertRowStyle = (row: any): Record<string, string> => {
-      const s = alertState(row);
-      // Unknown run state shows no firing colour: a stale firing must not read as live.
-      const live = s === "active" && !statusUnavailable.value && !row?.status_unavailable;
-      const firing = live && isFiringRow(row);
-      const color =
-        s === "failed"
-          ? "var(--color-error-500)"
-          : s === "paused"
-            ? "var(--color-grey-400)"
-            : firing && isAckedFiring(row) && !ackCanChange(row)
-              ? "var(--color-warning-500)"
-              : firing
-                ? "var(--color-error-500)"
-                : "var(--color-success-500)";
-      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
+    const railColor: Record<AlertRailState, string> = {
+      failed: "var(--color-error-500)",
+      firing: "var(--color-error-500)",
+      acknowledged: "var(--color-warning-500)",
+      paused: "var(--color-grey-400)",
+      active: "var(--color-success-500)",
     };
+    const alertRowStyle = (row: any): Record<string, string> => ({
+      boxShadow: `var(--shadow-rail-geom) ${railColor[alertRailState(row, statusUnavailable.value)]}`,
+    });
 
     // Type chip (the "left chip"): glyph + colour by alert type.
     const typeIconName = (row: any): IconName =>
@@ -2039,7 +2023,7 @@ export default defineComponent({
         else paused += 1;
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
           failed += 1;
-        if (isFiringRow(r)) firing += 1;
+        if (isFiringListRow(r)) firing += 1;
         if (isAckedFiring(r)) acknowledged += 1;
         if (recencyLevel(r.last_satisfied_at_raw) === "hot") recent += 1;
         if (showRunOutcome(r) && isErrorOutcome(r.last_outcome)) error += 1;
@@ -2170,7 +2154,7 @@ export default defineComponent({
       parseQueryChoice(urlQuery.level, ALERT_LEVEL_FILTERS),
     );
     const matchesStateFilter = (r: any, f: AlertStateKey): boolean => {
-      if (f === "firing") return isFiringRow(r);
+      if (f === "firing") return isFiringListRow(r);
       if (f === "error") return showRunOutcome(r) && isErrorOutcome(r.last_outcome);
       if (f === "notify_failed") return showRunOutcome(r) && isNotifyFailedOutcome(r.last_outcome);
       if (f === "acknowledged") return isAckedFiring(r);
@@ -2548,6 +2532,8 @@ export default defineComponent({
     });
     const allSelectedAlerts = ref(false);
     const allAlerts: Ref<any[]> = ref([]);
+    // Template onboarding is a first run: a folder holding alerts that a tile or search emptied keeps its own state.
+    const noTemplatesEmpty = computed(() => !templates.value.length && !allAlerts.value.length);
 
     // Watched rather than called from `getAlertsFn`: a folder revisit is served
     // from `allAlertsListByFolderId` by `getAlertsByFolderId`, which never
@@ -3152,7 +3138,7 @@ export default defineComponent({
 
     // A multi-alert is offered Acknowledge while any firing group is still un-acked.
     const canAcknowledgeRow = (row: any): boolean =>
-      isAlertScopedMute(row) && isFiringRow(row) && ackCanChange(row);
+      isAlertScopedMute(row) && isFiringListRow(row) && ackCanChange(row);
 
     const refreshAfter = async (ok: boolean) => {
       if (ok) await refreshAlerts();
@@ -3564,6 +3550,16 @@ export default defineComponent({
         }
       }
     };
+    // Unfiltered like an editor save: a tile or search left set would hide the new, never-evaluated alert.
+    const showSavedAlert = async (folderId: string) => {
+      await getAlertsFn(store, folderId, "", true, "", true);
+      activeFolderId.value = folderId;
+      stateFilters.value = [];
+      levelFilter.value = null;
+      filterQuery.value = "";
+      searchAcrossFolders.value = false;
+      searchQuery.value = "";
+    };
     const submitForm = async () => {
       // #14627: neither clone endpoint rejects a blank name, and an unnamed
       // alert is a row that cannot be searched, toggled or deleted by name. The
@@ -3615,8 +3611,7 @@ export default defineComponent({
             message: t("toastMessages.alerts.anomalyDetectionClonedSuccessfully"),
           });
           showForm.value = false;
-          await getAlertsFn(store, folderIdToBeCloned.value, "", true, "", true);
-          activeFolderId.value = folderIdToBeCloned.value;
+          await showSavedAlert(folderIdToBeCloned.value);
         } catch (e: any) {
           dismiss();
           if (e?.response?.status === 403) {
@@ -3662,8 +3657,7 @@ export default defineComponent({
           // force (#14626): the list this refetches is the one the clone was
           // just added to, and an unforced fetchQuery answers from cache —
           // leaving the new row invisible until the user refreshes by hand.
-          await getAlertsFn(store, folderIdToBeCloned.value, "", true, "", true);
-          activeFolderId.value = folderIdToBeCloned.value;
+          await showSavedAlert(folderIdToBeCloned.value);
         } catch (e: any) {
           dismiss();
           if (e?.response?.status === 403) {
@@ -3738,8 +3732,7 @@ export default defineComponent({
                 message: t("toastMessages.alerts.alertClonedSuccessfully"),
               });
               showForm.value = false;
-              await getAlertsFn(store, folderIdToBeCloned.value, "", true, "", true);
-              activeFolderId.value = folderIdToBeCloned.value;
+              await showSavedAlert(folderIdToBeCloned.value);
             } else {
               toast({
                 variant: "error",
@@ -4960,6 +4953,7 @@ export default defineComponent({
       stateFilterEmptied,
       listFiltered,
       statusErrorEmpty,
+      noTemplatesEmpty,
       noFiringTitle,
       statusUnavailable,
       levelFilter,
