@@ -1480,6 +1480,10 @@ describe("CreateBrowserTest", () => {
       expect((dialog.props("range") as BrowserStep[]).map((s) => s.id)).toEqual(["s2", "s3"]);
       expect(dialog.props("parentName")).toBe("Checkout");
       expect(dialog.props("defaultFolder")).toBe("folder-1");
+      // A parent kept in a folder the user cannot list (direct grant) defaults the child to a listed one.
+      (wrapper.vm as any).folders = [{ folderId: "folder-2", name: "Shared" }];
+      await flushPromises();
+      expect(dialog.props("defaultFolder")).toBe("folder-2");
       expect(dialog.props("needsSchedule")).toBe(false);
       expect(dialog.props("parentLocations")).toEqual(["us-east"]);
       expect(dialog.props("authoredCount")).toBe(5);

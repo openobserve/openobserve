@@ -830,6 +830,16 @@ async function loadFolders() {
   }
 }
 
+// A delete that leaves no listable folder empties the list, which the server answers with a 403.
+watch(
+  () => (store.state as any).organizationData?.foldersByType?.synthetics,
+  (folders) => {
+    if (!foldersLoaded.value || folders?.length !== 0) return;
+    foldersFailed.value = true;
+    foldersForbidden.value = true;
+  },
+);
+
 // The sidebar refetches on remount, so its success must lift a denial this page saw earlier.
 function clearFolderFailure() {
   foldersFailed.value = false;

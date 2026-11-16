@@ -1279,6 +1279,12 @@ const extractAnchor = computed(() =>
   extractEligibilityResult.value.ok ? extractEligibilityResult.value.anchor : 0,
 );
 const extractVariables = computed(() => splitVariablesForChild(check.value, extractRange.value));
+// A direct grant can open a parent in an unlisted folder, which the picker cannot offer.
+const extractDefaultFolder = computed(() => {
+  const folder = check.value.folder;
+  if (folder && folders.value.some((f) => f.folderId === folder)) return folder;
+  return selectSyntheticsFolder(folders.value) ?? "";
+});
 
 function openExtractDialog() {
   if (extractEligibilityResult.value.ok) showExtractDialog.value = true;
@@ -2506,7 +2512,7 @@ function onClearResults() {
           :executed-count="executedStepCount"
           :parent-name="check.name"
           :parent-starting-url="check.url"
-          :default-folder="check.folder || selectSyntheticsFolder(folders) || ''"
+          :default-folder="extractDefaultFolder"
           :folders="folders"
           :needs-schedule="check.locations.length === 0"
           :parent-locations="check.locations"

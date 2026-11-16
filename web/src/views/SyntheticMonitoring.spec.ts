@@ -439,6 +439,21 @@ describe("SyntheticMonitoring", () => {
       expect(mockServiceList).toHaveBeenCalledWith("default", "team");
     });
 
+    it("shows the denial once a deleted folder leaves none listable", async () => {
+      const byType = store.state.organizationData.foldersByType;
+      byType.synthetics = [{ folderId: "team", name: "Team" }];
+      wrapper = mountPage(withFolderList);
+      await flushPromises();
+      const table = () =>
+        wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+      expect(table().props("forbidden")).toBe(false);
+
+      byType.synthetics = [];
+      await flushPromises();
+      expect(table().props("forbidden")).toBe(true);
+      delete byType.synthetics;
+    });
+
     it.each([
       { status: 403, forbidden: true, error: null },
       { status: 500, forbidden: false, error: "synthetics.checkDetails.foldersUnavailable" },
