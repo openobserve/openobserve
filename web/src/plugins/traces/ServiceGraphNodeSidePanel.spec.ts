@@ -1812,6 +1812,25 @@ describe("ServiceGraphNodeSidePanel", () => {
       await flushPromises();
       expect(placeOnly().text()).toBe("This service's spans don't report env, where or version");
       wrapper.unmount();
+      // Unversioned spans that name an env and place show those, not the nothing-reported sentence.
+      panelVersions.splice(0, panelVersions.length, {
+        version_key: "",
+        version: "",
+        active: true,
+        first_seen: 1,
+        where_key: "k8s:c1/web",
+        where: { kind: "k8s", k8s_cluster: "c1", k8s_namespace: "web" },
+        env: "prod",
+        env_source: "attribute",
+        signals: {},
+        deploys: [],
+      });
+      wrapper = mountPanel({ selectedNode: { ...baseNode, where_key: "k8s:c1/web" } });
+      await flushPromises();
+      expect(placeOnly().text()).not.toContain("don't report");
+      expect(placeOnly().text()).toContain("c1 · web");
+      expect(placeOnly().text()).toContain("No version");
+      wrapper.unmount();
       Object.assign(routeQuery, { panel: "operations", panelSvc: "frontend", panelWhere: "" });
       panelVersions.splice(0, panelVersions.length, {
         version_key: "2.0",
@@ -2215,6 +2234,16 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(sqls().find((sql) => sql.includes("GROUP BY operation_name"))).toContain(predicate);
       expect(sqls().find((sql) => sql.includes("o2_service_version as"))).toContain(predicate);
       expect(sqls().join("\n")).not.toContain("k8s:c1/");
+
+      // A refresh that folds another spelling into the same row reads the open resource tab again.
+      vi.mocked(streamTraceRows).mockClear();
+      await wrapper.setProps({
+        selectedNode: { ...rowAt(WHERE_B), service_names: ["frontend", "Frontend.service"] },
+      });
+      await flushPromises();
+      expect(sqls().find((sql) => sql.includes("o2_service_version as"))).toContain(
+        "Frontend.service",
+      );
     });
 
     // An empty answer is kept; a failed read shows the red error and reads again when reopened.

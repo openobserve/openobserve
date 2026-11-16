@@ -618,9 +618,14 @@ async fn update_locked<C: ConnectionTrait + TransactionTrait>(
     if accept {
         row.allow_collisions = request.allow_collisions;
     }
-    if accept && !request.allow_collisions {
+    if accept {
         let committed = committed(conn, org).await?;
-        reject_collisions(std::slice::from_ref(&row), &committed)?;
+        if row.kind == "rename" {
+            reject_traced_rename(&row.alias, &committed.summaries)?;
+        }
+        if !request.allow_collisions {
+            reject_collisions(std::slice::from_ref(&row), &committed)?;
+        }
     }
     written(conn, org, row).await
 }
@@ -657,10 +662,19 @@ async fn bulk_locked<C: ConnectionTrait + TransactionTrait>(
             next
         })
         .collect();
-    let collisions = if accept && !request.allow_collisions {
-        collisions_of(&next, &committed(conn, org).await?)
+    let committed = if accept {
+        Some(committed(conn, org).await?)
     } else {
-        Vec::new()
+        None
+    };
+    if let Some(committed) = &committed {
+        for row in next.iter().filter(|row| row.kind == "rename") {
+            reject_traced_rename(&row.alias, &committed.summaries)?;
+        }
+    }
+    let collisions = match &committed {
+        Some(committed) if !request.allow_collisions => collisions_of(&next, committed),
+        _ => Vec::new(),
     };
     let colliding: BTreeSet<&str> = collisions.iter().map(|c| c.alias_key.as_str()).collect();
     next.retain(|row| !colliding.contains(row.alias_key.as_str()));
@@ -1425,14 +1439,34 @@ mod tests {
                 (learned.kind.as_str(), learned.scope.as_str()),
                 ("rename", "shop")
             );
-            let edit = |canonical: &str| AliasUpdate {
-                status: "active".into(),
+            let edit = |status: &str, canonical: &str| AliasUpdate {
+                status: status.into(),
                 canonical: Some(canonical.into()),
                 allow_collisions: false,
             };
-            let row = update_with(&conn, org, "a", &learned.alias_key, edit("Warehouse"), 20)
-                .await
-                .unwrap();
+            // Its traces report stock-svc, so an accepted rename of it could never show.
+            let traced = update_with(&conn, org, "a", &learned.alias_key, edit("active", "W"), 19);
+            let (status, body) = status_and_body(traced.await.unwrap_err()).await;
+            assert_eq!(status, StatusCode::CONFLICT);
+            assert!(body["error"].as_str().unwrap().contains("service.name"));
+            let bulk = AliasBulk {
+                action: "accept".into(),
+                alias_keys: Some(vec![learned.alias_key.clone()]),
+                filter: None,
+                allow_collisions: true,
+            };
+            let error = bulk_with(&conn, org, "a", bulk, 19).await.unwrap_err();
+            assert_eq!(status_and_body(error).await.0, StatusCode::CONFLICT);
+            let row = update_with(
+                &conn,
+                org,
+                "a",
+                &learned.alias_key,
+                edit("rejected", "Warehouse"),
+                20,
+            )
+            .await
+            .unwrap();
             assert_eq!(
                 (
                     row.kind.as_str(),
@@ -1441,7 +1475,7 @@ mod tests {
                 ),
                 ("rename", "shop", "Warehouse")
             );
-            let error = update_with(&conn, org, "a", &learned.alias_key, edit(" "), 21)
+            let error = update_with(&conn, org, "a", &learned.alias_key, edit("active", " "), 21)
                 .await
                 .unwrap_err();
             assert_eq!(status_and_body(error).await.0, StatusCode::BAD_REQUEST);

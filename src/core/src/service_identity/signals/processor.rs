@@ -801,7 +801,7 @@ fn plan_org(
     }
 }
 
-/// An org without a cursor starts at the current window, or resumes at `shared` once tracked.
+/// Only an untracked org with no cursor backfills, so only it reads its first span's window.
 async fn plan_for(org: &str, shared: i64, horizon: i64, interval: i64) -> anyhow::Result<OrgPlan> {
     let own = db::service_signals::get_org_offset(org).await?;
     let tracked = own.is_none() && super::deploys::has_epoch(org).await?;

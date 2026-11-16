@@ -845,6 +845,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import {
+  isOutsideK8s,
   versionImageLabel,
   versionPlaces,
   whereSentence,
@@ -1340,7 +1341,7 @@ export default defineComponent({
           (row) => row.version && row.where_key === countWhere.value,
         ).length,
     );
-    const headerIdentity = computed(
+    const versionedIdentity = computed(
       () =>
         [...scopedVersions.value]
           .filter((row) => row.version && !row.restricted)
@@ -1350,15 +1351,28 @@ export default defineComponent({
               (b.deploys?.[0]?.at || b.first_seen) - (a.deploys?.[0]?.at || a.first_seen),
           )[0],
     );
+    // Unversioned spans can still name an env or place, so the header shows those; only spans with neither say none is reported.
+    const unversionedIdentity = computed(() =>
+      (panelVersions.data.value?.versions || []).find(
+        (row) =>
+          !row.version &&
+          !row.restricted &&
+          row.where_key === countWhere.value &&
+          ((Boolean(row.env) && !row.no_env) || !isOutsideK8s(row.where_key, row.where)),
+      ),
+    );
+    const headerIdentity = computed(
+      () => versionedIdentity.value ?? (versionCount.value ? undefined : unversionedIdentity.value),
+    );
     const headerVersion = computed(() =>
-      headerIdentity.value
+      versionedIdentity.value
         ? versionImageLabel(
-            headerIdentity.value.version,
-            headerIdentity.value.image,
-            headerIdentity.value.version_images,
+            versionedIdentity.value.version,
+            versionedIdentity.value.image,
+            versionedIdentity.value.version_images,
             t,
           )
-        : "",
+        : t("serviceVersions.catalog.noVersion"),
     );
 
     // A place the user picked in Versions scopes the whole panel, so the header shows it with a way back.
@@ -1377,7 +1391,11 @@ export default defineComponent({
     );
     // A place whose spans carry no version once loaded says so, as the badge-less Versions tab does.
     const identityAbsent = computed(
-      () => !pickedPlace.value && panelVersions.isSuccess.value && versionCount.value === 0,
+      () =>
+        !pickedPlace.value &&
+        panelVersions.isSuccess.value &&
+        versionCount.value === 0 &&
+        !unversionedIdentity.value,
     );
     const clearPickedPlace = () =>
       versionPanel.update(props.selectedNode?.where_key || "", activeTab.value);
@@ -2858,9 +2876,11 @@ export default defineComponent({
           activeTab.value,
           panelWhereKey.value,
           activeResourceTabConfigs.value.map((c) => c.id).join(),
+          // A refreshed row of the same node can add a spelling, which changes what the cached rows counted.
+          serviceFilter(),
         ] as const,
       (next, prev) => {
-        if (prev && next[4] !== prev[4]) {
+        if (prev && (next[4] !== prev[4] || next[6] !== prev[6])) {
           resourceTabData.value = {};
           resourceTabLoading.value = {};
           resourceTabError.value = {};
