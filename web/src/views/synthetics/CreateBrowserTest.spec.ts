@@ -232,6 +232,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { syntheticsKeys } from "@/services/synthetics.querykeys";
 import { onBeforeRouteLeave } from "vue-router";
 import {
+  deleteEditorDraft,
   hashDraftValue,
   readEditorDraft,
   writeEditorDraft,
@@ -1729,13 +1730,13 @@ describe("CreateBrowserTest", () => {
       expect(await leaveAsks(wrapper)).toBe(false);
     });
 
-    it("no unsaved dot after the folder fallback", async () => {
+    it("keeps the check's own folder, unedited, when the caller may not list it", async () => {
       mockGetFoldersListByType.mockResolvedValue([{ folderId: "folder-1", name: "Checkout" }]);
       mockServiceGet.mockResolvedValue({
         data: {
           name: "Checkout",
           url: "https://shop.test",
-          folder: "gone",
+          folder: "direct-grant-folder",
           environments: [],
           journey: saved.map((step) => ({ ...step })),
         },
@@ -1743,6 +1744,12 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
+      expect((wrapper.vm as any).check.folder).toBe("direct-grant-folder");
+      expect((wrapper.vm as any).validationErrors.folder).toBeUndefined();
+      expect((wrapper.vm as any).pickerFolders).toEqual([
+        { folderId: "folder-1", name: "Checkout" },
+        { folderId: "direct-grant-folder", name: "Current Folder" },
+      ]);
       expect(wrapper.find(DOT).exists()).toBe(false);
       expect(await leaveAsks(wrapper)).toBe(false);
     });
@@ -3735,20 +3742,35 @@ describe("CreateBrowserTest", () => {
     });
 
     it("drops a draft holding only the gate fields the setup reload carries in the query", async () => {
-      mockGetFoldersListByType.mockResolvedValue([{ folderId: "default", name: "Default" }]);
-      writeEditorDraft(newScope, {
-        data: {
-          check: { ...defaultDraftCheck(), name: "Shop", url: "https://shop.test", journey: [] },
-          currentStep: 1,
-          journeyStepDone: false,
-        },
-      });
-      mockRoute.query = { url: "https://shop.test", name: "Shop", setup: "1" };
-      wrapper = mountPage();
-      await flushPromises();
+      // Folders still loading; a draft in a folder the query does not carry is real work.
+      mockGetFoldersListByType.mockReturnValue(new Promise(() => {}));
+      for (const [folder, dropped] of [
+        ["default", true],
+        ["team", false],
+      ] as const) {
+        writeEditorDraft(newScope, {
+          data: {
+            check: {
+              ...defaultDraftCheck(),
+              folder,
+              name: "Shop",
+              url: "https://shop.test",
+              journey: [],
+            },
+            currentStep: 1,
+            journeyStepDone: false,
+          },
+        });
+        mockRoute.query = { url: "https://shop.test", name: "Shop", setup: "1" };
+        wrapper = mountPage();
+        await flushPromises();
 
-      expect(wrapper.find('[data-test="editor-draft-restore-dialog"]').exists()).toBe(false);
-      expect(readEditorDraft(newScope)).toBeNull();
+        const restore = wrapper.find('[data-test="editor-draft-restore-dialog"]');
+        expect(restore.exists(), folder).toBe(!dropped);
+        expect(readEditorDraft(newScope) === null, folder).toBe(dropped);
+        wrapper.unmount();
+        deleteEditorDraft(newScope);
+      }
     });
 
     it("save from the leave dialog persists without navigating", async () => {

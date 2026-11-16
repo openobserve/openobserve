@@ -93,7 +93,7 @@ import {
 } from "@/components/synthetics/CreateBrowserTest.schema";
 import { CHROME_UI_LABELS, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
-import { selectSyntheticsFolder } from "@/utils/synthetics/selectFolder";
+import { selectSyntheticsFolder, withCheckFolder } from "@/utils/synthetics/selectFolder";
 import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -602,6 +602,13 @@ const autoRecord = ref(false);
 
 /** The check as last loaded or saved, which is what server-side moves act on. */
 const savedCheck = ref<BrowserCheck | null>(null);
+const pickerFolders = computed(() =>
+  withCheckFolder(
+    folders.value,
+    props.editId ? savedCheck.value?.folder : undefined,
+    t("dashboard.currentFolderLabel"),
+  ),
+);
 /** The check as the server returned it, kept unmodified so its draft hash is stable. */
 let serverCheck: BrowserCheck | null = null;
 
@@ -703,20 +710,16 @@ watch(
   { immediate: true },
 );
 
-// Unlisted folders cannot be used as save destinations, including the default folder.
+// Only new checks fall back; a direct grant can reach a saved check in an unlisted folder.
 watch(
   [folders, foldersLoaded, () => check.value.folder],
   () => {
-    if (!foldersLoaded.value) return;
+    if (!foldersLoaded.value || props.editId) return;
     const folderId = check.value.folder;
     if (folders.value.some((f) => f.folderId === folderId)) return;
     const folder = selectSyntheticsFolder(folders.value) ?? "";
     if (folder === folderId) return;
     check.value = { ...check.value, folder };
-    // The unreachable folder could never be saved back, so the fallback is the baseline, not an edit.
-    if (savedCheck.value && savedCheck.value.folder === folderId) {
-      savedCheck.value = { ...savedCheck.value, folder };
-    }
     if (folderId) {
       validationErrors.value = {
         ...validationErrors.value,
@@ -905,10 +908,10 @@ function dropDraftCarriedByQuery() {
   const comparable = (value: BrowserCheck) =>
     stableStringify({ ...value, url: (value.url ?? "").trim(), name: (value.name ?? "").trim() });
   // The draft is stored redacted, so the reloaded check is compared in the same form.
-  // Protection must not wait for the folder list, so a still-unpicked folder is the one the draft holds.
+  // Before the list lands no folder is picked, so only an unpicked or "default" draft folder is carried.
   const reloaded = redactCheckDraftSecrets({
     ...check.value,
-    folder: check.value.folder || stored.folder,
+    folder: check.value.folder || (stored.folder === "default" ? stored.folder : ""),
     url: startUrl.value,
     name: checkName.value,
   }).data;
@@ -2313,7 +2316,7 @@ function onClearResults() {
               :browsers="browsers"
               :devices="devices"
               :destinations="destinations"
-              :folders="folders"
+              :folders="pickerFolders"
               :folders-loading="foldersLoading"
               :validation-errors="{ ...validationErrors, ...reentryErrors }"
               :variable-suggestions="variableSuggestions"

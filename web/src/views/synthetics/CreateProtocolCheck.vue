@@ -42,7 +42,7 @@ import {
   mapResponseToProtocolCheck,
 } from "@/utils/synthetics/buildPayload";
 import { getFoldersListByType } from "@/utils/commons";
-import { selectSyntheticsFolder } from "@/utils/synthetics/selectFolder";
+import { selectSyntheticsFolder, withCheckFolder } from "@/utils/synthetics/selectFolder";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -147,6 +147,10 @@ const destinations = ref<string[]>([]);
 const folders = ref<SyntheticsFolder[]>([]);
 const foldersLoading = ref(false);
 const foldersLoaded = ref(false);
+const loadedFolder = ref<string>();
+const pickerFolders = computed(() =>
+  withCheckFolder(folders.value, loadedFolder.value, t("dashboard.currentFolderLabel")),
+);
 /** Only ever carries `folder` today — the folder select is the one field this
  *  view can invalidate on its own. */
 const validationErrors = ref<Record<string, string>>({});
@@ -206,11 +210,11 @@ async function fetchFolders() {
   }
 }
 
-// Unlisted folders cannot be used as save destinations, including the default folder.
+// Only new checks fall back; a direct grant can reach a saved check in an unlisted folder.
 watch(
   [folders, foldersLoaded, () => check.value.folder],
   () => {
-    if (!foldersLoaded.value) return;
+    if (!foldersLoaded.value || props.editId) return;
     const folderId = check.value.folder;
     if (folders.value.some((f) => f.folderId === folderId)) return;
     const folder = selectSyntheticsFolder(folders.value) ?? "";
@@ -329,6 +333,7 @@ async function loadForEdit(id: string): Promise<boolean> {
     const res = await syntheticsService.get(org, id, String(route.query.folder ?? ""));
     check.value = mapResponseToProtocolCheck(res.data as Record<string, unknown>);
     serverCheck = JSON.parse(JSON.stringify(check.value)) as ProtocolCheck;
+    loadedFolder.value = check.value.folder;
     return true;
   } catch (err: any) {
     // If the check doesn't exist in this org (e.g. user switched orgs while editing),
@@ -513,7 +518,7 @@ async function saveCheck() {
             :locations="locations"
             :loading-locations="locationsLoading"
             :destinations="destinations"
-            :folders="folders"
+            :folders="pickerFolders"
             :folders-loading="foldersLoading"
             :validation-errors="{ ...validationErrors, ...reentryErrors }"
             :allow-private-locations="privateLocationsEnabled"
