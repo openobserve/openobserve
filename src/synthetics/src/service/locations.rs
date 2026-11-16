@@ -103,20 +103,24 @@ fn merge_agent_capabilities(
     }
 }
 
-/// Locations visible to an org (all public rows + the org's private rows) with
-/// per-type availability computed from live agents' capabilities.
-pub async fn list_locations_for_org(org_id: &str) -> anyhow::Result<SyntheticsCapabilitiesV2> {
+/// Check counts cover only `listable_folder_ids` (`None` is every folder).
+pub async fn list_locations_for_org(
+    org_id: &str,
+    listable_folder_ids: Option<Vec<String>>,
+) -> anyhow::Result<SyntheticsCapabilitiesV2> {
     let rows = synthetics_locations::list_visible(org_id).await?;
 
     // One org-wide checks fetch, bucketed per location below — avoids a
     // JSON-contains query per row (locations arrays are filtered in Rust).
-    let checks = synthetics_checks::list(
-        get_orm_client_rw().await,
-        org_id,
-        &ListSyntheticsParams::default(),
-    )
-    .await
-    .unwrap_or_default();
+    let conn = get_orm_client_rw().await;
+    let params = ListSyntheticsParams {
+        listable_folder_ids,
+        ..Default::default()
+    };
+    let params = super::checks::with_folder_pks(conn, org_id, &params).await?;
+    let checks = synthetics_checks::list(conn, org_id, &params)
+        .await
+        .unwrap_or_default();
 
     // One agents query for every location, not one per location. The checks
     // fetch above was already hoisted out of this loop for the same reason.
