@@ -67,12 +67,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
           tone="title"
           :readonly="!chatActions"
-          :aria-label="t('assistant.thread.renameLabel')"
+          :aria-label="titleEditing ? t('assistant.thread.renameLabel') : undefined"
           :edit-hint="t('assistant.thread.renameHint')"
           :maxlength="MAX_TITLE"
           :aria-busy="renamePending ? 'true' : undefined"
           data-test="assistant-thread-heading-edit"
-          @commit="saveTitle"
+          @edit-start="titleEditing = true"
+          @commit="onTitleCommit"
+          @cancel="titleEditing = false"
         />
       </div>
       <div v-if="toolbar" class="flex shrink-0 items-center gap-1">
@@ -417,6 +419,8 @@ const titleCut = ref(false);
 const deleteOpen = ref(false);
 const widthRem = ref(Number.POSITIVE_INFINITY);
 const headingTitleId = `assistant-thread-${useId()}-title`;
+// The title button is named by the title it shows; only the edit field needs the "Chat title" label.
+const titleEditing = ref(false);
 const saveTagId = `assistant-thread-${useId()}-save`;
 let sizes: ResizeObserver | null = null;
 
@@ -553,6 +557,11 @@ function focusTitle(): void {
 
 // A rename typed while one is saving waits for it, then saves.
 let queuedTitle = "";
+
+function onTitleCommit(value: string): void {
+  titleEditing.value = false;
+  saveTitle(value);
+}
 
 function saveTitle(value: string): void {
   const next = value.trim().slice(0, MAX_TITLE);

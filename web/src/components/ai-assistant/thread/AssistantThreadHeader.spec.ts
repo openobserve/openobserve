@@ -457,6 +457,15 @@ describe("AssistantThreadHeader", () => {
       expect(label.text()).toBe("Checkout 5xx spike");
     });
 
+    it("names the title button by the title it shows and labels only the edit field", async () => {
+      const { wrapper } = await setup(toolbar);
+      const edit = '[data-test="assistant-thread-heading-edit';
+      expect(wrapper.get(`${edit}-trigger"]`).attributes("aria-label")).toBeUndefined();
+      await wrapper.get(`${edit}-trigger"]`).trigger("click");
+      await flushPromises();
+      expect(wrapper.get(`${edit}-input"]`).attributes("aria-label")).toBe("Chat title");
+    });
+
     it("gives an empty inline edit the accessible name from its aria-label (C-05)", async () => {
       const { default: OInlineEdit } = await import("@/lib/forms/InlineEdit/OInlineEdit.vue");
       const w = mount(OInlineEdit, {
