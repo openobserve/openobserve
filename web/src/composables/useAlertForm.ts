@@ -69,6 +69,7 @@ import {
   saveAlertJson as saveAlertJsonUtil,
   type ValidationContext,
   type JsonValidationContext,
+  type SqlCheckResult,
 } from "@/utils/alerts/alertValidation";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
@@ -832,7 +833,6 @@ export function useAlertForm(
   // Drives the QueryConfig warning that it runs before the Multi Alert's own
   // "Alert if [column]" condition.
   const sqlQueryHasHaving = ref(false);
-  const validateSqlQueryPromise = ref<Promise<unknown>>();
   const addAlertFormRef = ref(null);
   const viewSqlEditorDialog = ref(false);
   const plotChart: any = ref(null);
@@ -1460,7 +1460,6 @@ export function useAlertForm(
     const validationContext: ValidationContext = {
       store,
       t,
-      validateSqlQueryPromise,
       sqlQueryErrorMsg,
       vrlFunctionError,
       buildQueryPayload,
@@ -1469,11 +1468,10 @@ export function useAlertForm(
     return validateInputsUtil(input, validationContext, notify);
   };
 
-  const validateSqlQuery = async () => {
+  const validateSqlQuery = async (): Promise<SqlCheckResult> => {
     const validationContext: ValidationContext = {
       store,
       t,
-      validateSqlQueryPromise,
       sqlQueryErrorMsg,
       sqlErrorRanges,
       vrlFunctionError,
@@ -1779,7 +1777,6 @@ export function useAlertForm(
 
   const updateFunctionVisibility = () => {
     if (!showVrlFunction.value && vrlFunctionError.value) {
-      validateSqlQueryPromise.value = Promise.resolve("");
       vrlFunctionError.value = "";
     }
   };
@@ -2430,7 +2427,7 @@ export function useAlertForm(
         });
         return false;
       }
-      if (sqlQueryErrorMsg.value && sqlQueryErrorMsg.value.trim() !== "") {
+      if (sqlQueryErrorMsg.value?.trim() && !sqlUnchangedSinceLoad()) {
         activeTab.value = "condition";
         hooks.showSection?.("condition");
         toast({
@@ -2461,6 +2458,35 @@ export function useAlertForm(
     return true;
   };
 
+  // The SQL the edited alert was loaded with; null when creating.
+  let loadedSql: string | null = null;
+  const sqlUnchangedSinceLoad = () =>
+    loadedSql !== null && String(formData.value.query_condition?.sql ?? "") === loadedSql;
+
+  // Save must judge the SQL being saved, not the verdict of the last blur-triggered check.
+  const validateSqlBeforeSave = async (): Promise<boolean> => {
+    const qc = formData.value.query_condition;
+    if (formData.value.is_real_time !== "false" || qc?.type !== "sql") return true;
+    if (!String(qc.sql ?? "").trim()) return true;
+    const blockOnQuery = (message?: string) => {
+      activeTab.value = "condition";
+      hooks.showSection?.("condition");
+      if (message) toast({ variant: "error", message });
+      return false;
+    };
+    if (!getParser(qc.sql)) return blockOnQuery(t("alerts.messages.selectAllColumnsNotAllowed"));
+    // An edit that kept the stored SQL must not be blocked by a check that cannot change it.
+    if (sqlUnchangedSinceLoad()) return true;
+    const verdict = await validateSqlQuery();
+    if (verdict === "sql_error") return blockOnQuery(t("alerts.messages.fixSqlErrorBeforeSaving"));
+    // The validator already toasted the VRL error.
+    if (verdict === "function_error") return blockOnQuery();
+    if (verdict === "request_failed") {
+      toast({ variant: "warning", message: t("alerts.messages.sqlCheckUnavailable") });
+    }
+    return true;
+  };
+
   let callAlert: Promise<{ data: any }>;
 
   // Advisories that ride along with a 200 — an alert that can only ever page
@@ -2480,22 +2506,8 @@ export function useAlertForm(
   // reactive read-view and can lag by a tick after a just-written setF).
   const onSubmit = async () => {
     const target = saveTargetNow();
+    if (!(await validateSqlBeforeSave())) return false;
     if (!runImperativeQueryChecks()) return false;
-
-    if (
-      formData.value.is_real_time == "false" &&
-      formData.value.query_condition.type == "sql" &&
-      !getParser(formData.value.query_condition.sql)
-    ) {
-      activeTab.value = "condition";
-      hooks.showSection?.("condition");
-      toast({
-        variant: "error",
-        message: t("alerts.messages.selectAllColumnsNotAllowed"),
-        timeout: 1500,
-      });
-      return false;
-    }
 
     if (
       formData.value.is_real_time == "false" &&
@@ -2574,21 +2586,6 @@ export function useAlertForm(
       message: t("common.pleaseWait"),
       timeout: 0,
     });
-
-    if (formData.value.is_real_time == "false" && formData.value.query_condition.type == "sql") {
-      try {
-        await validateSqlQueryPromise.value;
-      } catch (error) {
-        dismiss();
-        toast({
-          variant: "error",
-          message: t("alerts.messages.sqlValidationRequestFailed"),
-          timeout: 1500,
-        });
-        console.error("Error while validating sql query", error);
-        return false;
-      }
-    }
 
     if (formData.value.is_real_time !== "composite") {
       // VERSION HANDLING - wrap conditions with version field for backend
@@ -2846,6 +2843,7 @@ export function useAlertForm(
 
     // Seed the ONE form (single source of truth) with the fully-transformed obj.
     resetForm(data);
+    loadedSql = props.isUpdated ? String(form.state.values.query_condition?.sql ?? "") : null;
 
     // Resolve the timezone from the stored offset (edit prefill) after the reset.
     if (pendingTimezoneOffset != null) {
@@ -3395,7 +3393,6 @@ export function useAlertForm(
     sqlErrorRanges,
     sqlAggColumnOptions,
     sqlQueryHasHaving,
-    validateSqlQueryPromise,
     addAlertFormRef,
     viewSqlEditorDialog,
     plotChart,

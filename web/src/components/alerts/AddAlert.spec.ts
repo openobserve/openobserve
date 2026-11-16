@@ -24,6 +24,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import alertsService from "@/services/alerts";
+import searchService from "@/services/search";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import store from "@/test/unit/helpers/store";
@@ -33,10 +34,11 @@ import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
 
 // Shared so the SQL → stream-name sync tests can parse a FROM clause and fail a
 // stream lookup; the defaults match the old per-call mocks.
-const { getStreamMock, getStreamsMock, sqlParseMock } = vi.hoisted(() => ({
+const { getStreamMock, getStreamsMock, sqlParseMock, sqlAstifyMock } = vi.hoisted(() => ({
   getStreamMock: vi.fn(),
   getStreamsMock: vi.fn(),
   sqlParseMock: vi.fn(),
+  sqlAstifyMock: vi.fn(() => ({ columns: [] as { expr: { column: string } }[] })),
 }));
 const STREAM_SCHEMA = {
   schema: [
@@ -75,7 +77,7 @@ vi.mock("@/services/search", async (importOriginal) => {
 vi.mock("@/composables/useParser", () => ({
   default: () => ({
     sqlParser: async () => ({
-      astify: vi.fn(() => ({ columns: [] })),
+      astify: sqlAstifyMock,
       parse: sqlParseMock,
       sqlify: vi.fn(),
     }),
@@ -260,6 +262,8 @@ describe("AddAlert (OForm owner)", () => {
 
   beforeEach(() => {
     unstubScrolling = stubScrolling();
+    vi.mocked(searchService.search).mockResolvedValue({ data: {} } as never);
+    sqlAstifyMock.mockReturnValue({ columns: [] });
   });
 
   afterEach(() => {
@@ -382,14 +386,16 @@ describe("AddAlert (OForm owner)", () => {
       expect(condition.state).toBe("error");
     });
 
-    it("blocks a SQL save while a SQL validation error is present", async () => {
+    it("blocks a SQL save when the SQL check reports an error", async () => {
+      vi.mocked(searchService.search).mockRejectedValueOnce({
+        response: { status: 400, data: { message: "Invalid syntax" } },
+      });
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "sql");
       form.setFieldValue("query_condition.sql", "SELECT * FROM logs");
-      wrapper.vm.sqlQueryErrorMsg = "Invalid syntax";
       const scrollToSection = vi.fn();
       wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
 
@@ -408,6 +414,194 @@ describe("AddAlert (OForm owner)", () => {
         (item: { id: string }) => item.id === "condition",
       );
       expect(condition.state).toBe("error");
+    });
+
+    // The blur-triggered check has not run yet when Save is clicked straight from the editor.
+    describe("SQL validated at Save", () => {
+      type SeedableForm = { setFieldValue: (path: string, value: unknown) => void };
+      const seedSql = (form: SeedableForm, sql: string) => {
+        seedValidScheduled(form);
+        form.setFieldValue("is_real_time", "false");
+        form.setFieldValue("query_condition.type", "sql");
+        form.setFieldValue("query_condition.sql", sql);
+      };
+
+      it("blocks an immediate save of invalid SQL and makes no save request", async () => {
+        vi.mocked(searchService.search).mockRejectedValueOnce({
+          response: { status: 400, data: { message: "SQL error: syntax error at FROM" } },
+        });
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, "SELECT FROM WHERE oops");
+        const scrollToSection = vi.fn();
+        wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+
+        await wrapper.vm.form.handleSubmit();
+        await vi.waitFor(() => expect(scrollToSection).toHaveBeenCalledWith("condition"), {
+          timeout: 2000,
+        });
+        await flushPromises();
+
+        expect(searchService.search).toHaveBeenCalledWith(
+          expect.objectContaining({ validate: true }),
+        );
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe("SQL error: syntax error at FROM");
+        expect(toast).toHaveBeenCalledWith(
+          expect.objectContaining({ message: "Please fix the SQL error before saving." }),
+        );
+        expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      });
+
+      it("saves valid SQL after the check passes", async () => {
+        vi.mocked(searchService.search).mockResolvedValueOnce({ data: {} } as never);
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+
+        await wrapper.vm.form.handleSubmit();
+        await vi.waitFor(() => expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1), {
+          timeout: 2000,
+        });
+
+        expect(searchService.search).toHaveBeenCalledWith(
+          expect.objectContaining({ validate: true }),
+        );
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe("");
+      });
+
+      it("saves once the fresh check clears an error left from an earlier query", async () => {
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+        wrapper.vm.sqlQueryErrorMsg = "Search stream not found: where";
+
+        await wrapper.vm.form.handleSubmit();
+        await vi.waitFor(() => expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1), {
+          timeout: 2000,
+        });
+      });
+
+      const saveSettled = async () => {
+        await wrapper.vm.form.handleSubmit();
+        await flushPromises();
+      };
+
+      it("blocks the save without a SQL error when the VRL function fails", async () => {
+        vi.mocked(searchService.search).mockResolvedValueOnce({
+          data: { function_error: "vrl failed" },
+        } as never);
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+        const scrollToSection = vi.fn();
+        wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+
+        await saveSettled();
+
+        expect(scrollToSection).toHaveBeenCalledWith("condition");
+        expect(wrapper.vm.vrlFunctionError).toBe("vrl failed");
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe("");
+        expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ["a 500", { response: { status: 500, data: { message: "upstream down" } } }],
+        ["a network error", new Error("Network Error")],
+      ])("saves with a warning, not a SQL error, when the check hits %s", async (_, failure) => {
+        vi.mocked(searchService.search).mockRejectedValueOnce(failure);
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+
+        await saveSettled();
+
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe("");
+        expect(toast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "warning",
+            message: i18n.global.t("alerts.messages.sqlCheckUnavailable"),
+          }),
+        );
+        expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      });
+
+      it("shows the select-all message for a SELECT * query", async () => {
+        sqlAstifyMock.mockReturnValue({ columns: [{ expr: { column: "*" } }] });
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT * FROM "_rundata"');
+
+        await saveSettled();
+
+        expect(toast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: i18n.global.t("alerts.messages.selectAllColumnsNotAllowed"),
+          }),
+        );
+        expect(searchService.search).not.toHaveBeenCalled();
+        expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      });
+
+      it("skips the check when an edit keeps the stored SQL", async () => {
+        const sql = 'SELECT count(*) AS total FROM "app_logs"';
+        wrapper = mountAlert({
+          isUpdated: true,
+          modelValue: savedAlert({
+            query_condition: { ...savedAlert().query_condition, type: "sql", sql },
+          }),
+          destinations: [{ name: "email" }],
+        });
+        await flushPromises();
+        wrapper.vm.sqlQueryErrorMsg = "Search stream not found: app_logs";
+
+        await saveSettled();
+
+        expect(searchService.search).not.toHaveBeenCalled();
+        expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
+      });
+
+      it("checks the SQL when an edit changes it", async () => {
+        wrapper = mountAlert({
+          isUpdated: true,
+          modelValue: savedAlert({
+            query_condition: {
+              ...savedAlert().query_condition,
+              type: "sql",
+              sql: 'SELECT count(*) AS total FROM "app_logs"',
+            },
+          }),
+          destinations: [{ name: "email" }],
+        });
+        await flushPromises();
+        wrapper.vm.form.setFieldValue("query_condition.sql", 'SELECT count(*) FROM "app_logs"');
+
+        await saveSettled();
+
+        expect(searchService.search).toHaveBeenCalledWith(
+          expect.objectContaining({ validate: true }),
+        );
+        expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
+      });
+
+      it("does not run the SQL check for a PromQL save", async () => {
+        wrapper = mountAlert();
+        await flushPromises();
+        const form = wrapper.vm.form;
+        seedValidScheduled(form);
+        form.setFieldValue("query_condition.type", "promql");
+        form.setFieldValue("query_condition.promql", "up");
+        form.setFieldValue("query_condition.promql_condition", {
+          column: "value",
+          operator: ">=",
+          value: 1,
+        });
+
+        await form.handleSubmit();
+        await flushPromises();
+
+        expect(searchService.search).not.toHaveBeenCalled();
+        expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      });
     });
 
     it("blocks a PromQL save when the PromQL query is empty", async () => {

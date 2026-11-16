@@ -14171,6 +14171,7 @@
       "anomalyConfigSaveFailed": "Failed to save anomaly config.",
       "sqlQueryEmpty": "SQL query cannot be empty.",
       "fixSqlErrorBeforeSaving": "Please fix the SQL error before saving.",
+      "sqlCheckUnavailable": "Couldn't check the SQL query right now, so it is saved without that check.",
       "promqlQueryEmpty": "PromQL query cannot be empty.",
       "selectAllColumnsNotAllowed": "Selecting all Columns in SQL query is not allowed.",
       "udsFieldNotAvailable": "Field \"{field}\" is not available. Please use only the available fields in your conditions.",
