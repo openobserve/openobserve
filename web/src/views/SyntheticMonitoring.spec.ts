@@ -173,8 +173,9 @@ const baseStubs = {
       "sortOrder",
       "draftSavedAt",
       "forbidden",
+      "error",
     ],
-    emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder"],
+    emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder", "retry"],
   },
   CheckTypePicker: {
     template: '<div data-test="check-type-picker-stub"><slot /></div>',
@@ -438,15 +439,26 @@ describe("SyntheticMonitoring", () => {
       expect(mockServiceList).toHaveBeenCalledWith("default", "team");
     });
 
-    it("shows the access-denied state when the caller may list no synthetics folder", async () => {
-      vi.mocked(getFoldersListByType).mockRejectedValue({ response: { status: 403, data: {} } });
-      wrapper = mountPage(withFolderList);
-      await flushPromises();
-      const mt = wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
-      expect(mt.props("forbidden")).toBe(true);
-      expect(mt.props("loading")).toBe(false);
-      expect(mockServiceList).not.toHaveBeenCalled();
-    });
+    it.each([
+      { status: 403, forbidden: true, error: null },
+      { status: 500, forbidden: false, error: "synthetics.checkDetails.foldersUnavailable" },
+    ])(
+      "shows a $status folder-list failure, not an empty list, and Retry reloads it",
+      async ({ status, forbidden, error }) => {
+        vi.mocked(getFoldersListByType).mockRejectedValue({ response: { status, data: {} } });
+        wrapper = mountPage(withFolderList);
+        await flushPromises();
+        const mt = wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+        expect(mt.props("forbidden")).toBe(forbidden);
+        expect(mt.props("error") ?? null).toBe(error);
+        expect(mt.props("loading")).toBe(false);
+        expect(mockServiceList).not.toHaveBeenCalled();
+        const calls = vi.mocked(getFoldersListByType).mock.calls.length;
+        mt.vm.$emit("retry");
+        await flushPromises();
+        expect(getFoldersListByType).toHaveBeenCalledTimes(calls + 1);
+      },
+    );
   });
 
   describe("MonitorTable has-filters prop", () => {

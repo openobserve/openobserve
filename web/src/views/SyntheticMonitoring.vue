@@ -148,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="filteredMonitors"
           :loading="loading"
           :forbidden="forbidden"
+          :error="foldersError"
           :timezone="store.state.timezone"
           :empty-message="emptyMessage"
           :selected-ids="selectedMonitorIds"
@@ -160,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :bulk-action-loading="bulkActionLoading"
           :has-filters="hasActiveFilters"
           @row-click="openDetail"
+          @retry="refreshMonitors"
           @edit="openEdit"
           @toggle-enabled="toggleEnabled"
           @duplicate="duplicateMonitor"
@@ -769,6 +771,12 @@ const forbidden = computed(() => {
   const e: any = monitorsList.error.value;
   return foldersForbidden.value || forbiddenState(e) || e?.status === 403;
 });
+// With no folder to read, no checks request runs, so an empty table would hide the failure.
+const foldersError = computed(() =>
+  foldersFailed.value && !foldersForbidden.value && !folderResolved.value
+    ? t("synthetics.checkDetails.foldersUnavailable")
+    : null,
+);
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
 const fetching = monitorsList.isFetching;

@@ -360,6 +360,26 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     Ok(out)
 }
 
+/// Location ids any synthetic in the org runs from, across every folder.
+pub async fn location_ids_in_use<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<std::collections::HashSet<String>, errors::Error> {
+    let rows: Vec<serde_json::Value> = Entity::find()
+        .select_only()
+        .column(Column::Locations)
+        .filter(Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    Ok(rows
+        .iter()
+        .filter_map(|locs| locs.as_array())
+        .flatten()
+        .filter_map(|v| v.as_str().map(String::from))
+        .collect())
+}
+
 /// Every synthetic in an org, fully decoded; fails closed on a bad row, unlike `list`.
 pub async fn list_fully_decoded<C: ConnectionTrait>(
     conn: &C,
@@ -2533,6 +2553,7 @@ pub(crate) mod tests {
                 id: format!("in-{pk}"),
                 name: format!("Check {pk}"),
                 folder_id: pk.into(),
+                locations: serde_json::json!([format!("loc-{pk}")]),
                 ..make_model()
             };
             ActiveModel::from(check)
@@ -2584,6 +2605,22 @@ pub(crate) mod tests {
             };
             assert_eq!(visible, visible_want, "{slugs:?}");
         }
+        // Delete guards read this, so it must not shrink to the caller's folders.
+        let mut in_use: Vec<_> = location_ids_in_use(&db, "org1")
+            .await
+            .unwrap()
+            .into_iter()
+            .collect();
+        in_use.sort();
+        let in_use_want = [
+            "aws-us-east-1",
+            "loc-alert-pk",
+            "loc-folder-1",
+            "loc-folder-2",
+            "loc-folder-3",
+            "loc-other-pk",
+        ];
+        assert_eq!(in_use, in_use_want);
     }
 
     /// The gap state is what makes each gap send one notice pair across restarts and nodes, so

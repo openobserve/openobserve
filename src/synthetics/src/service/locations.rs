@@ -70,6 +70,7 @@ pub struct LocationEntry {
     pub checks_count: usize,
     /// Σ 60/interval_secs over the enabled synthetics above.
     pub checks_per_min: f64,
+    pub in_use: bool,
 }
 
 /// Capabilities response sourced from the location registry.
@@ -121,6 +122,10 @@ pub async fn list_locations_for_org(
     let checks = synthetics_checks::list(conn, org_id, &params)
         .await
         .unwrap_or_default();
+    // Unlike the counts, ignores folder access: the delete guard refuses on any reference.
+    let in_use = synthetics_checks::location_ids_in_use(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     // One agents query for every location, not one per location. The checks
     // fetch above was already hoisted out of this loop for the same reason.
@@ -132,7 +137,8 @@ pub async fn list_locations_for_org(
     let mut locations = Vec::with_capacity(rows.len());
     for row in rows {
         let agents = agents_by_location.get(&row.id).cloned().unwrap_or_default();
-        locations.push(location_entry(row, &agents, &checks));
+        let used = in_use.contains(&row.id);
+        locations.push(location_entry(row, &agents, &checks, used));
     }
 
     let caps = config::meta::synthetics::list_capabilities();
@@ -231,6 +237,7 @@ pub(crate) fn location_entry(
     row: synthetics_locations::SyntheticsLocationRecord,
     agents: &[synthetics_agents::SyntheticsAgentRecord],
     org_checks: &[Synthetic],
+    in_use: bool,
 ) -> LocationEntry {
     let now = config::utils::time::now_micros();
     let window = agent_liveness_window_us();
@@ -297,6 +304,7 @@ pub(crate) fn location_entry(
         last_seen_at: newest.map(|a| a.last_seen_at),
         checks_count: referencing.len(),
         checks_per_min: (checks_per_min * 100.0).round() / 100.0,
+        in_use,
     }
 }
 
@@ -590,7 +598,7 @@ pub async fn location_detail(org_id: &str, id: &str) -> anyhow::Result<LocationD
 
     let (_, install) = private_location_install(org_id, &row).await;
     Ok(LocationDetail {
-        location: location_entry(row, &agents, &checks),
+        location: location_entry(row, &agents, &checks, !checks.is_empty()),
         agents: agent_infos,
         checks: check_summaries,
         install,
@@ -868,6 +876,7 @@ mod tests {
             last_seen_at: None,
             checks_count: 0,
             checks_per_min: 0.0,
+            in_use: false,
         };
 
         let known = serde_json::to_value(entry(LiveStatus {
