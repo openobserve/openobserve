@@ -609,20 +609,25 @@ pub const RCA_RUNS_MAX_LIMIT: u64 = 100;
 
 /// Query parameters for listing an incident's analysis runs
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
 pub struct ListRcaRunsQuery {
     /// Page size (default 25, max 100)
     #[serde(default)]
+    #[param(nullable)]
     pub limit: Option<u64>,
     /// Return runs older than this run id (the last run of the previous page)
     #[serde(default)]
+    #[param(nullable)]
     pub before: Option<String>,
 }
 
 /// Query parameters for reading an analysis run's investigation thread
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
 pub struct RcaThreadQuery {
     /// The `state_version` of the caller's copy; an equal version returns `not_modified`
     #[serde(default)]
+    #[param(nullable)]
     pub known_version: Option<String>,
 }
 
@@ -1821,9 +1826,11 @@ pub async fn get_incident_rca_summary(
 
 /// Query of `GET …/rca/live_stream`.
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
 pub struct RcaLiveStreamQuery {
     /// The run whose thread, summary and steering to send; without it, only the incident's state.
     #[serde(default)]
+    #[param(nullable)]
     pub run_id: Option<String>,
 }
 
@@ -2103,7 +2110,6 @@ pub async fn post_incident_comment(
 pub async fn post_incident_comment(
     _path: Path<(String, String)>,
     _headers: Headers<UserEmail>,
-    _body: Json<CommentRequest>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -2275,10 +2281,7 @@ pub async fn get_incident_stats(_path: Path<String>) -> Response {
         ("x-o2-mcp" = json!({"description": "Update an incident's title, severity, or status", "category": "alerts"}))
     )
 )]
-pub async fn update_incident(
-    _path: Path<(String, String)>,
-    _body: Json<UpdatePayload>,
-) -> Response {
+pub async fn update_incident(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -2334,10 +2337,7 @@ pub async fn cancel_incident_rca(
         ("x-o2-mcp" = json!({"enabled": true, "description": "List past incident RCA runs", "category": "alerts"}))
     )
 )]
-pub async fn list_incident_rca_runs(
-    _path: Path<(String, String)>,
-    _query: Query<ListRcaRunsQuery>,
-) -> Response {
+pub async fn list_incident_rca_runs(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -2392,10 +2392,7 @@ pub async fn get_incident_rca_run(_path: Path<(String, String, String)>) -> Resp
         ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
-pub async fn get_incident_rca_thread(
-    _path: Path<(String, String, String)>,
-    _query: Query<RcaThreadQuery>,
-) -> Response {
+pub async fn get_incident_rca_thread(_path: Path<(String, String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -2423,10 +2420,7 @@ pub async fn get_incident_rca_thread(
         ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
-pub async fn get_incident_rca_summary(
-    _path: Path<(String, String, String)>,
-    _query: Query<RcaThreadQuery>,
-) -> Response {
+pub async fn get_incident_rca_summary(_path: Path<(String, String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -2516,7 +2510,6 @@ pub async fn get_incident_rca_steering(
 )]
 pub async fn get_incident_rca_live_stream(
     _path: Path<(String, String)>,
-    _query: Query<RcaLiveStreamQuery>,
     _headers: Headers<UserEmail>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
@@ -5412,7 +5405,6 @@ mod tests {
     async fn test_the_oss_live_stream_is_403() {
         let response = get_incident_rca_live_stream(
             Path(("default".to_string(), "inc_1".to_string())),
-            Query(RcaLiveStreamQuery { run_id: None }),
             Headers(UserEmail {
                 user_id: "a.rao@acme.io".to_string(),
             }),
