@@ -248,8 +248,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let (org_id, kv_key) = (parts[0], parts[1]);
 
-                // Fetch actual value from kv_store table (primary storage)
-                let item_value = match infra::table::kv_store::get(org_id, kv_key).await {
+                // The notice follows a commit a lagging replica may not have yet.
+                let item_value = match infra::table::kv_store::get_primary(org_id, kv_key).await {
                     Ok(Some(model)) => Bytes::from(model.value),
                     Ok(None) => {
                         log::error!("KV key not found in table: {}", item_key);
