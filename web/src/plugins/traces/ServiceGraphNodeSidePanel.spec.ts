@@ -2177,19 +2177,41 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(sqls().join("\n")).not.toContain("k8s:c1/");
     });
 
-    it("reads an empty version breakdown once, also when its tab is opened again", async () => {
+    // An empty answer is kept; a failed read shows the red error and reads again when reopened.
+    it.each([
+      ["an empty version breakdown once", false, 1, []],
+      ["a failed version breakdown again", true, 2, ["v2"]],
+    ])("reads %s when its tab is opened again", async (_case, failed, reads, names) => {
       givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
       openAt(WHERE_A);
       wrapper = mountAt();
       await flushPromises();
       await flushPromises();
-      const tabId = (wrapper.vm as any).activeResourceTabConfigs[0].id;
-      for (const tab of [tabId, "operations", tabId]) {
-        (wrapper.vm as any).onTabChange(tab);
+      const { id: tabId, colId } = (wrapper.vm as any).activeResourceTabConfigs[0];
+      let versionReads = 0;
+      vi.mocked(streamTraceRows).mockImplementation(async (request) => {
+        if (!request.sql.includes("o2_service_version as")) return [];
+        versionReads += 1;
+        if (versionReads > 1) return [{ [`${colId}_name`]: "v2", request_count: 42 }];
+        if (failed) throw new Error("temporary 503");
+        return [];
+      });
+      try {
+        (wrapper.vm as any).onTabChange(tabId);
         await flushPromises();
+        const error = wrapper.find(`[data-test="service-graph-side-panel-${tabId}-error"]`);
+        expect(error.exists()).toBe(failed);
+        for (const tab of ["operations", tabId]) {
+          (wrapper.vm as any).onTabChange(tab);
+          await flushPromises();
+        }
+        expect(versionReads).toBe(reads);
+        expect((wrapper.vm as any).resourceTabData[tabId].map((row: any) => row.name)).toEqual(
+          names,
+        );
+      } finally {
+        vi.mocked(streamTraceRows).mockReset().mockResolvedValue([]);
       }
-      expect(sqls().filter((sql) => sql.includes("o2_service_version as"))).toHaveLength(1);
-      expect((wrapper.vm as any).resourceTabData[tabId]).toEqual([]);
     });
 
     it.each([

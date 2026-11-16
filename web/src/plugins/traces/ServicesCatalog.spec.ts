@@ -3626,7 +3626,7 @@ describe("ServicesCatalog Env and Deploy verdict filters", () => {
   const sqlOf = (req: any) =>
     atob(req.queryReq.query.sql.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "="));
   // A null where key serves a period with no spans at all; claude_code's spans never carry one.
-  const serve = (whereKey: string | null) =>
+  const serve = (whereKey: string | null, pgWhereKey = whereKey) =>
     mockFetchQueryDataWithHttpStream.mockImplementation((req: any, callbacks: any) => {
       const stamped = !sqlOf(req).includes("claude_code");
       const key = stamped ? whereKey : "";
@@ -3636,7 +3636,7 @@ describe("ServicesCatalog Env and Deploy verdict filters", () => {
           : [
               { where_key: key, service_name: "checkout", _is_real_service: 1 },
               {
-                where_key: key,
+                where_key: stamped ? pgWhereKey : "",
                 service_name: "pg",
                 _infer_service_name: "pg",
                 _infer_service_type: "database",
@@ -3681,6 +3681,13 @@ describe("ServicesCatalog Env and Deploy verdict filters", () => {
     { spans: "carry no env stamp", whereKey: "", schema: true, disabled: "true" },
     { spans: "carry env stamps", whereKey: "k8s:c1/prod", schema: true, disabled: "false" },
     {
+      spans: "mix stamped and unstamped services",
+      whereKey: "k8s:c1/prod",
+      pgWhereKey: "",
+      schema: true,
+      disabled: "false",
+    },
+    {
       spans: "come from a stream without the env field",
       whereKey: null,
       schema: false,
@@ -3688,7 +3695,7 @@ describe("ServicesCatalog Env and Deploy verdict filters", () => {
     },
   ])("disables the filters when spans $spans", async (c) => {
     if (!c.schema) mockStreamSchema.mockResolvedValue({ data: { schema: [] } });
-    serve(c.whereKey);
+    serve(c.whereKey, "pgWhereKey" in c ? c.pgWhereKey : c.whereKey);
     view = mountServicesCatalog({ stubs });
     await flushPromises();
     expect(view.get('[data-test="controls"]').attributes("data-no-env-stamps")).toBe(c.disabled);

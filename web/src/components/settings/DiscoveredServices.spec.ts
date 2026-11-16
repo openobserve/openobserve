@@ -441,25 +441,42 @@ describe("DiscoveredServices", () => {
       expect(wrapper.vm.totalInstances).toBe(3);
     });
 
-    it("gives the tile, the tab and the footer one service count, by display name", async () => {
-      const renamed = multiInstanceResponse.map((row) =>
-        row.service_name === "worker"
-          ? { ...row, service_name: "worker-v2", display_name: "api-server" }
-          : { ...row, display_name: "api-server", display_source: "trace" },
-      );
-      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
-        data: renamed,
-      } as any);
-      wrapper = mountComponent();
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      const discovered = vm.tiles.find((tile: any) => tile.id === "discovered");
-      expect(vm.filteredGroupCount).toBe(1);
-      expect(vm.serviceCount).toBe(1);
-      expect(Number(discovered.value)).toBe(1);
-      expect(wrapper.findComponent(OTable).props("totalCount")).toBe(1);
-      expect(vm.totalInstances).toBe(3);
-    });
+    // A collision kept on purpose shows each key with its own qualifier, so they stay two services.
+    it.each([
+      ["one display name", undefined, 1],
+      ["the same name under two qualifiers", "staging", 2],
+    ])(
+      "gives the tile, the tab and the footer one service count: %s",
+      async (_case, workerQualifier, count) => {
+        const renamed = multiInstanceResponse.map((row) =>
+          row.service_name === "worker"
+            ? {
+                ...row,
+                service_name: "worker-v2",
+                display_name: "api-server",
+                display_qualifier: workerQualifier,
+              }
+            : {
+                ...row,
+                display_name: "api-server",
+                display_source: "trace",
+                display_qualifier: workerQualifier && "prod",
+              },
+        );
+        vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+          data: renamed,
+        } as any);
+        wrapper = mountComponent();
+        await flushPromises();
+        const vm = wrapper.vm as any;
+        const discovered = vm.tiles.find((tile: any) => tile.id === "discovered");
+        expect(vm.filteredGroupCount).toBe(count);
+        expect(vm.serviceCount).toBe(count);
+        expect(Number(discovered.value)).toBe(count);
+        expect(wrapper.findComponent(OTable).props("totalCount")).toBe(count);
+        expect(vm.totalInstances).toBe(3);
+      },
+    );
   });
 
   describe("column widths at 1600 px", () => {

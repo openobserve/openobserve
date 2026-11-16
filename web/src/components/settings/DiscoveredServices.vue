@@ -754,7 +754,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import { dimensionLabel } from "@/utils/dimensionLabels";
-import { serviceNameCount } from "@/utils/serviceCount";
+import { serviceIdentityOf, serviceNameCount } from "@/utils/serviceCount";
 import { shortList } from "@/utils/shortList";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -1075,7 +1075,7 @@ function handleRowClick(row: any) {
 const serviceGroups = computed((): ServiceGroup[] => {
   const groupMap: Record<string, ServiceRecord[]> = {};
   for (const s of services.value) {
-    const name = displayOf(s);
+    const name = serviceIdentityOf(s);
     if (!groupMap[name]) groupMap[name] = [];
     groupMap[name].push(s);
   }

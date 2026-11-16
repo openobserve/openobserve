@@ -17767,6 +17767,7 @@
       "spansTooltip": "Every span of this service in this time range, not only incoming requests, so it can exceed the catalog's Requests.",
       "metricsLoadFailed": "Couldn't load this service's correlated metrics. {reason}",
       "noResourceRecorded": "This service's spans in this time range don't record {resource}.",
+      "resourceLoadFailed": "Couldn't load {resource} for this service. {reason}",
       "noVersionTraffic": "This service's spans in this stream don't record a version, so there is no traffic to split by version."
     },
     "traceErrorTab": {

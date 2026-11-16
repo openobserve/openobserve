@@ -618,7 +618,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`service-graph-side-panel-${cfg.id}`"
           >
             <div
-              v-if="!resourceTabData[cfg.id]?.length && !resourceTabPending(cfg.id)"
+              v-if="resourceTabError[cfg.id]"
+              role="alert"
+              class="text-status-error-text flex flex-col items-center gap-3 py-6 text-center text-sm"
+              :data-test="`service-graph-side-panel-${cfg.id}-error`"
+            >
+              <span>{{ resourceTabError[cfg.id] }}</span>
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                :data-test="`service-graph-side-panel-${cfg.id}-retry-btn`"
+                @click="fetchResourceData(cfg)"
+                >{{ t("traces.serviceGraphNodeSidePanel.retry") }}</OButton
+              >
+            </div>
+            <div
+              v-else-if="!resourceTabData[cfg.id]?.length && !resourceTabPending(cfg.id)"
               class="text-text-secondary flex flex-col items-center justify-center py-16 text-center text-sm"
             >
               {{ resourceEmptyText(cfg) }}
@@ -2053,6 +2068,7 @@ export default defineComponent({
     // Dynamic resource tabs state
     const resourceTabData = ref<Record<string, ResourceRow[]>>({});
     const resourceTabLoading = ref<Record<string, boolean>>({});
+    const resourceTabError = ref<Record<string, string>>({});
     // Resource groups from getDimensionAnalytics that match the current stream schema
     // (after platform-priority filtering — see resolveWorkloadFields)
     const availableResourceTabConfigs = ref<ResourceTabConfig[]>([]);
@@ -2712,6 +2728,7 @@ export default defineComponent({
         [config.id]: true,
       };
       resourceTabData.value = { ...resourceTabData.value, [config.id]: [] };
+      resourceTabError.value = { ...resourceTabError.value, [config.id]: "" };
       const scope = serviceFilter();
 
       try {
@@ -2749,10 +2766,19 @@ export default defineComponent({
             p99Latency: row.p99_latency || 0,
           })),
         };
-      } catch (error) {
-        console.error(`Failed to fetch ${config.label} data:`, error);
-        if (scope === serviceFilter())
-          resourceTabData.value = { ...resourceTabData.value, [config.id]: [] };
+      } catch (error: any) {
+        if (scope !== serviceFilter()) return;
+        // No data entry, so reopening the tab reads again instead of showing a failure as empty.
+        const data = { ...resourceTabData.value };
+        delete data[config.id];
+        resourceTabData.value = data;
+        resourceTabError.value = {
+          ...resourceTabError.value,
+          [config.id]: t("traces.serviceGraphNodeSidePanel.resourceLoadFailed", {
+            resource: config.label.toLowerCase(),
+            reason: error?.response?.data?.message || error?.message || "",
+          }),
+        };
       } finally {
         if (scope === serviceFilter())
           resourceTabLoading.value = {
@@ -2873,7 +2899,8 @@ export default defineComponent({
 
     // A tab whose read has not started yet is loading, never empty.
     const resourceTabPending = (id: string) =>
-      Boolean(resourceTabLoading.value[id]) || resourceTabData.value[id] === undefined;
+      Boolean(resourceTabLoading.value[id]) ||
+      (resourceTabData.value[id] === undefined && !resourceTabError.value[id]);
 
     // Build table rows for any resource tab config
     const buildResourceTableRows = (config: ResourceTabConfig) =>
@@ -2902,6 +2929,7 @@ export default defineComponent({
         if (prev && next[4] !== prev[4]) {
           resourceTabData.value = {};
           resourceTabLoading.value = {};
+          resourceTabError.value = {};
           metricsCorrelationLoaded.value = false;
         }
         if (
@@ -2930,6 +2958,7 @@ export default defineComponent({
       () => {
         resourceTabData.value = {};
         resourceTabLoading.value = {};
+        resourceTabError.value = {};
         availableResourceTabConfigs.value = [];
         resolvedWorkloadFields.value = [];
         selectedWorkloadFields.value = [];
@@ -3267,6 +3296,8 @@ export default defineComponent({
       detectedEnvironments,
       resourceTabData,
       resourceTabLoading,
+      resourceTabError,
+      fetchResourceData,
       resourceTabPending,
       panelVersions,
       buildEntityTableColumns,

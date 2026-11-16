@@ -13,23 +13,32 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { qualifiedName } from "@/types/serviceRef";
+
 const SIGNAL_ORDER = ["logs", "metrics", "traces"];
 
-/** Services as a reader counts them in the discovered list: one per display name, so two detected keys of one trace service count once. */
-export function serviceNameCount(
-  records: readonly { service_name: string; display_name?: string | null }[],
-) {
-  return new Set(records.map((record) => record.display_name || record.service_name)).size;
+interface NamedRecord {
+  service_name: string;
+  display_name?: string | null;
+  display_qualifier?: string | null;
+}
+
+/** The service a discovered record belongs to: its display name, kept apart from a same-named one by its qualifier. */
+export function serviceIdentityOf(record: NamedRecord) {
+  return qualifiedName(record.display_name || record.service_name, record.display_qualifier);
+}
+
+/** Services as a reader counts them in the discovered list: two detected keys of one qualified trace service count once. */
+export function serviceNameCount(records: readonly NamedRecord[]) {
+  return new Set(records.map(serviceIdentityOf)).size;
 }
 
 /** Services of the discovered list that carry one dimension value, counted like serviceNameCount so it never exceeds that count. */
 export function serviceValueCount(
-  records: readonly {
-    service_name: string;
-    display_name?: string | null;
+  records: readonly (NamedRecord & {
     all_dimensions?: Record<string, string> | null;
     disambiguation?: Record<string, string> | null;
-  }[],
+  })[],
   dimension: string,
   value: string,
 ) {
