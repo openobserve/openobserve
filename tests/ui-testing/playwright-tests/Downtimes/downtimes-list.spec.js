@@ -312,10 +312,13 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
     await pm.downtimesPage.expectNotFound('Downtime not found');
   });
 
-  test('DT-D-04 "Mute now for 1 h" on the detail page creates a child downtime', { tag: ['@P2'] }, async ({ page }) => {
+  test('DT-D-04 "Mute now for 1 h" shows only on a finished row and creates a child downtime', { tag: ['@P2'] }, async ({ page }) => {
     const f = await fx.newDowntimeFolder(page, reg);
-    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id, 'parent');
+    const active = await fx.activeDowntime(page, reg, f, shared.alertX.id, 'active');
+    await pm.downtimesPage.gotoDetail(active.id, f);
+    await pm.downtimesPage.expectNoMuteForHour();
 
+    const a = await fx.cancelledDowntime(page, reg, f, shared.alertX.id, 'parent');
     await pm.downtimesPage.gotoDetail(a.id, f);
     await pm.downtimesPage.muteForHourFromDetail();
     await pm.downtimesPage.expectToast('Downtime created');

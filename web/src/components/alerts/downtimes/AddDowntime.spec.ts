@@ -108,6 +108,18 @@ const seeSchedule = async (wrapper: ReturnType<typeof mount>) => {
   await flushPromises();
 };
 
+const draftOptions = vi.hoisted(() => ({ last: null as any }));
+vi.mock("@/composables/useEditorDraft", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useEditorDraft: (options: any) => {
+      draftOptions.last = options;
+      return actual.useEditorDraft(options);
+    },
+  };
+});
+
 describe("AddDowntime", () => {
   beforeEach(() => {
     // An earlier test's unsaved form leaves a draft, whose restore dialog would cover the next page.
@@ -586,5 +598,151 @@ describe("AddDowntime", () => {
     expect(downtimes.update).toHaveBeenCalledTimes(2);
     expect(vi.mocked(downtimes.update).mock.calls[1][2].version).toBe(4);
     wrapper.unmount();
+  });
+  describe("group scope of a loaded mute", () => {
+    const scopedRow = () => ({
+      id: "d1",
+      org: "default",
+      folder_id: "default",
+      name: "Quick mute · payments-latency",
+      reason: "flaky",
+      targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1"] }],
+      schedule: {
+        repeat: "none",
+        starts_at: (Date.now() - 600_000) * 1000,
+        ends_at: (Date.now() + 3_000_000) * 1000,
+        timezone: "UTC",
+        duration_secs: 3600,
+        weekdays: [],
+      },
+      alert_groups: [{ alert_id: "a1", group_key: "k1", group_labels: { region: "pune" } }],
+      end_on_clear: { alert_id: "a1", group_key: "k1" },
+      show_banner: false,
+      created_by: "lin",
+      created_at: 1,
+      updated_by: "lin",
+      updated_at: 1,
+      version: 2,
+      status: "active",
+      current_window: null,
+      next_window: null,
+      matched_alerts: 1,
+      matched_anomalies: 0,
+      matched_synthetics: 0,
+      matched_slos: 0,
+      affected: { alerts: [], anomalies: [], synthetics: [], slos: [] },
+    });
+
+    const mountEdit = async (row = scopedRow()) => {
+      vi.mocked(downtimes.get).mockResolvedValue({ data: row } as any);
+      vi.mocked(downtimes.update).mockReset();
+      vi.mocked(downtimes.update).mockResolvedValue({ data: {} } as any);
+      const router = makeRouter();
+      await router.push({
+        name: "editDowntime",
+        params: { id: "d1" },
+        query: { org_identifier: "default", folder: "default" },
+      });
+      await router.isReady();
+      const wrapper = mount(AddDowntime, {
+        global: { plugins: [store, router] },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("shows the scope note and keeps the groups and the end on save", async () => {
+      const wrapper = await mountEdit();
+      const note = wrapper.get('[data-test="downtime-form-group-scope"]');
+      expect(note.text()).toContain("Mutes only 1 group");
+      expect(note.text()).toContain("region=pune");
+      expect(note.text()).toContain("Ends when this group stops firing.");
+      await save(wrapper);
+      expect(downtimes.update).toHaveBeenCalledTimes(1);
+      const body = vi.mocked(downtimes.update).mock.calls[0][2];
+      expect(body.alert_groups).toEqual(scopedRow().alert_groups);
+      expect(body.end_on_clear).toEqual(scopedRow().end_on_clear);
+      wrapper.unmount();
+    });
+
+    it("clears both fields with Mute all groups and saves explicit nulls", async () => {
+      const wrapper = await mountEdit();
+      await wrapper.get('[data-test="downtime-form-group-scope-clear"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="downtime-form-group-scope"]').exists()).toBe(false);
+      await save(wrapper);
+      expect(downtimes.update).toHaveBeenCalledTimes(1);
+      const body = vi.mocked(downtimes.update).mock.calls[0][2];
+      expect(body.alert_groups).toBeNull();
+      expect(body.end_on_clear).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("shows the group-limit error in the note when the items block is closed", async () => {
+      const wrapper = await mountEdit();
+      expect(wrapper.find('[data-test="downtime-form-group-scope-error"]').exists()).toBe(false);
+      await wrapper.get('[data-test="downtime-target-alerts-ids-remove"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="downtime-target-alerts-ids-block"]').exists()).toBe(false);
+      const error = wrapper.get('[data-test="downtime-form-group-scope-error"]');
+      expect(error.text()).toContain("Mute all groups");
+      expect(wrapper.find('[data-test="downtime-form-group-scope-clear"]').exists()).toBe(true);
+      await save(wrapper);
+      expect(downtimes.update).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
+    it("describes only the scope that Save sends, one line per alert", async () => {
+      const row = {
+        ...scopedRow(),
+        targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1", "a2"] }],
+        alert_groups: [
+          { alert_id: "a1", group_key: "k1", group_labels: { region: "pune" } },
+          { alert_id: "a2", group_key: "k2", group_labels: { region: "oslo" } },
+        ],
+        // The end names an alert that is not a target, so Save drops it.
+        end_on_clear: { alert_id: "a3", group_key: "k3" },
+      };
+      const wrapper = await mountEdit(row as any);
+      const note = wrapper.get('[data-test="downtime-form-group-scope"]');
+      expect(note.text().match(/Mutes only 1 group of/g)).toHaveLength(2);
+      expect(note.text()).toContain("region=pune");
+      expect(note.text()).toContain("region=oslo");
+      expect(note.text()).not.toContain("stops firing");
+      await save(wrapper);
+      const body = vi.mocked(downtimes.update).mock.calls[0][2];
+      expect(body.alert_groups).toEqual(row.alert_groups);
+      expect(body.end_on_clear).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("keeps the loaded scope when a restored draft has no scope keys", async () => {
+      const wrapper = await mountEdit();
+      const drafted = { ...draftOptions.last.snapshot(), reason: "from an old draft" };
+      delete drafted.alert_groups;
+      delete drafted.end_on_clear;
+      await draftOptions.last.apply(drafted, { notKeptPaths: [] });
+      await flushPromises();
+      await save(wrapper);
+      expect(downtimes.update).toHaveBeenCalledTimes(1);
+      const body = vi.mocked(downtimes.update).mock.calls[0][2];
+      expect(body.reason).toBe("from an old draft");
+      expect(body.alert_groups).toEqual(scopedRow().alert_groups);
+      expect(body.end_on_clear).toEqual(scopedRow().end_on_clear);
+      wrapper.unmount();
+    });
+
+    it("lets a restored draft clear the scope with explicit nulls", async () => {
+      const wrapper = await mountEdit();
+      const drafted = { ...draftOptions.last.snapshot(), alert_groups: null, end_on_clear: null };
+      await draftOptions.last.apply(drafted, { notKeptPaths: [] });
+      await flushPromises();
+      await save(wrapper);
+      const body = vi.mocked(downtimes.update).mock.calls[0][2];
+      expect(body.alert_groups).toBeNull();
+      expect(body.end_on_clear).toBeNull();
+      wrapper.unmount();
+    });
   });
 });
