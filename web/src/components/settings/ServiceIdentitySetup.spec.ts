@@ -247,6 +247,7 @@ describe("ServiceIdentitySetup", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+    queryClient.clear();
   });
 
   describe("initial render", () => {
@@ -260,6 +261,13 @@ describe("ServiceIdentitySetup", () => {
       await flushPromises();
       expect(serviceStreamsService.getDimensionAnalytics).toHaveBeenCalledWith("test-org");
       expect(serviceStreamsService.getIdentityConfig).toHaveBeenCalledWith("test-org");
+    });
+
+    it("reads analytics once when the page's semantic groups land during the first load", async () => {
+      wrapper = mountComponent();
+      await wrapper.setProps({ semanticGroups: [] });
+      await flushPromises();
+      expect(serviceStreamsService.getDimensionAnalytics).toHaveBeenCalledTimes(1);
     });
   });
 
