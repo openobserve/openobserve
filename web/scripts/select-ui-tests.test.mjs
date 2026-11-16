@@ -45,6 +45,7 @@ write({
   "web/src/locales/index.ts": `const sec = import.meta.glob("./languages/security/*.json");`,
   "web/src/locales/languages/security/ko-KR.json": JSON.stringify({ siem: { nav: "Alerts" } }),
   "web/src/router.spec.ts": `import i18n from "@/locales";\nsetLocale("ko");`,
+  "web/src/plain.spec.ts": `import i18n from "@/locales";`,
   "web/src/catalog.ts": `export const all = import.meta.glob("./catalog/*.json");`,
   "web/src/catalog/one.json": "{}",
   "web/src/catalog.spec.ts": `import { all } from "./catalog";`,

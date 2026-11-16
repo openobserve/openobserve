@@ -30,6 +30,7 @@ const SRC_TYPES =
   /\.(ts|tsx|js|jsx|mjs|cjs|vue|json|css|scss|svg|png|jpe?g|gif|webp|ico|woff2?|ttf|txt|md|snap)$/;
 // Code that reads source through fs or ?raw, so the import graph cannot see what it covers.
 const READS_FS = /readFileSync|readdirSync|readFile\(|fs\.promises/;
+const LOCALE_SWITCH = /setLocale\(|loadLocaleMessages\(|\blocale(?:\.value)?\s*=[^=]|global\.locale/;
 const READS_SOURCE = new RegExp(`${READS_FS.source}|\\?raw\\b`);
 const LOCALE = /(?:^|\/)([a-z]{2}-[A-Z]{2})\.json$/;
 const FULL = [
@@ -346,12 +347,15 @@ export function select({ repo, base, head }) {
     };
   }
   const idx = new TextIndex(texts, specs);
+  let switchers;
+  const localeSwitchers = () =>
+    (switchers ??= new Set([...specSet].filter((s) => LOCALE_SWITCH.test(texts.get(s) ?? ""))));
 
   const reasons = [];
   const picked = new Set();
-  const take = (file, starts, direct = [], stop) => {
+  const take = (file, starts, direct = [], stop, keep = specSet) => {
     const got = new Set(direct);
-    for (const n of reach(rev, starts, stop, specSet)) if (specSet.has(n)) got.add(n);
+    for (const n of reach(rev, starts, stop, keep)) if (specSet.has(n)) got.add(n);
     for (const s of got) picked.add(s);
     reasons.push({ file, specs: got.size });
   };
@@ -368,10 +372,10 @@ export function select({ repo, base, head }) {
     if (loc && f.startsWith("src/")) {
       const direct = (rev.get(f) ?? []).filter((x) => specSet.has(x));
       if (loc[1] !== "en-US") {
-        // Specs load these by app code ("ko"); past setup-loaded loaders, keep only direct spec importers.
+        // Specs run in English: past setup-loaded loaders, only specs that switch language can see this file.
         const out = new Set(direct);
         idx.specsContaining(loc[1], out);
-        take(repoPath, [f, ...owners], out, (n) => setup.has(n) && !LOCALE.test(n));
+        take(repoPath, [f, ...owners], out, (n) => setup.has(n) && !LOCALE.test(n), localeSwitchers());
         continue;
       }
       let keys;
