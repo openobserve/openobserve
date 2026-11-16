@@ -408,7 +408,6 @@ export interface ValidationContext {
   store: any;
   /** vue-i18n `t`, injected by the composable (this module has no Vue context). */
   t: Translator;
-  validateSqlQueryPromise: any;
   sqlQueryErrorMsg: any;
   /** Ref<SqlErrorRange[]> — editor squiggle ranges (optional). */
   sqlErrorRanges?: any;
@@ -564,14 +563,21 @@ export const validateInputs = (
   return true;
 };
 
+/** Outcome of one SQL check; `request_failed` means the check itself could not run. */
+export type SqlCheckResult =
+  "valid" | "skipped" | "sql_error" | "function_error" | "request_failed";
+
+interface SqlCheckError {
+  response?: { status?: number; data?: { message?: string; code?: number; error_detail?: string } };
+}
+
 export const validateSqlQuery = async (
   formData: AlertFormData,
   context: ValidationContext,
-): Promise<void> => {
+): Promise<SqlCheckResult> => {
   const {
     store,
     t,
-    validateSqlQueryPromise,
     sqlQueryErrorMsg,
     sqlErrorRanges,
     vrlFunctionError,
@@ -589,11 +595,11 @@ export const validateSqlQuery = async (
   if (!formData.query_condition.sql || formData.query_condition.sql.trim() === "") {
     sqlQueryErrorMsg.value = "";
     clearRanges();
-    return;
+    return "skipped";
   }
 
   if (!getParser(formData.query_condition.sql)) {
-    return;
+    return "skipped";
   }
 
   const query = buildQueryPayload(
@@ -614,56 +620,50 @@ export const validateSqlQuery = async (
   if (formData.query_condition.vrl_function)
     query.query.query_fn = b64EncodeUnicode(formData.query_condition.vrl_function);
 
-  validateSqlQueryPromise.value = new Promise((resolve, reject) => {
-    searchService
-      .search({
-        org_identifier: store.state.selectedOrganization.identifier,
-        query,
-        page_type: formData.stream_type,
-        validate: true,
-      })
-      .then((res: any) => {
-        sqlQueryErrorMsg.value = "";
-        clearRanges();
-
-        if (res.data?.function_error) {
-          vrlFunctionError.value = res.data.function_error;
-          toast({
-            variant: "error",
-            message: t("alerts.validation.invalidVrlFunction"),
-          });
-          reject("function_error");
-        } else vrlFunctionError.value = "";
-
-        resolve("");
-      })
-      .catch((err: any) => {
-        sqlQueryErrorMsg.value = err.response?.data?.message
-          ? err.response?.data?.message
-          : t("alerts.validation.invalidSqlQuery");
-
-        // Error message is displayed inline below the editor
-        // No need for toast notification as it's redundant
-
-        // Locate the offending token in the SQL and squiggle it in the editor.
-        if (sqlErrorRanges) {
-          rangesFromServerError({
-            code: err.response?.data?.code,
-            message: err.response?.data?.message,
-            errorDetail: err.response?.data?.error_detail,
-            sqlMode: true,
-            query: formData.query_condition.sql,
-            streamName: formData.stream_name,
-          }).then((ranges) => {
-            sqlErrorRanges.value = ranges;
-          });
-        }
-
-        reject("sql_error");
+  try {
+    const res = await searchService.search({
+      org_identifier: store.state.selectedOrganization.identifier,
+      query,
+      page_type: formData.stream_type,
+      validate: true,
+    });
+    sqlQueryErrorMsg.value = "";
+    clearRanges();
+    if (res.data?.function_error) {
+      vrlFunctionError.value = res.data.function_error;
+      toast({
+        variant: "error",
+        message: t("alerts.validation.invalidVrlFunction"),
       });
-  });
-  // Save awaits this later; until then a rejection would be reported as unhandled.
-  validateSqlQueryPromise.value.catch(() => {});
+      return "function_error";
+    }
+    vrlFunctionError.value = "";
+    return "valid";
+  } catch (caught: unknown) {
+    const response = (caught as SqlCheckError)?.response;
+    const message = response?.data?.message;
+    // The backend answers a bad query with 400 + message; anything else is the check failing, not the SQL.
+    if (response?.status !== 400 || !message) {
+      sqlQueryErrorMsg.value = "";
+      clearRanges();
+      return "request_failed";
+    }
+    sqlQueryErrorMsg.value = message;
+
+    if (sqlErrorRanges) {
+      rangesFromServerError({
+        code: response.data?.code,
+        message,
+        errorDetail: response.data?.error_detail,
+        sqlMode: true,
+        query: formData.query_condition.sql,
+        streamName: formData.stream_name,
+      }).then((ranges) => {
+        sqlErrorRanges.value = ranges;
+      });
+    }
+    return "sql_error";
+  }
 };
 
 export const saveAlertJson = async (

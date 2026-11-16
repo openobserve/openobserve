@@ -33,14 +33,13 @@ const formData = {
 const makeContext = (): ValidationContext => ({
   store: { state: { selectedOrganization: { identifier: "default" } } },
   t: ((key: string) => key) as ValidationContext["t"],
-  validateSqlQueryPromise: { value: undefined as Promise<unknown> | undefined },
   sqlQueryErrorMsg: { value: "" },
   vrlFunctionError: { value: "" },
   buildQueryPayload: () => ({ query: { start_time: 0, sql: "" }, aggs: {} }),
   getParser: () => true,
 });
 
-describe("validateSqlQuery rejection handling", () => {
+describe("validateSqlQuery verdicts", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
@@ -48,34 +47,45 @@ describe("validateSqlQuery rejection handling", () => {
 
   const runValidation = async (search: () => Promise<unknown>) => {
     vi.useFakeTimers();
-    vi.mocked(searchService.search).mockImplementation(search as any);
-    const unhandled = vi.fn();
-    process.on("unhandledRejection", unhandled);
+    vi.mocked(searchService.search).mockImplementation(search as typeof searchService.search);
     const context = makeContext();
     const done = validateSqlQuery(formData, context);
     await vi.advanceTimersByTimeAsync(300);
-    await done;
-    vi.useRealTimers();
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    process.off("unhandledRejection", unhandled);
-    return { context, unhandled };
+    return { context, verdict: await done };
   };
 
-  it("does not leave a rejected sql_error unhandled before save awaits it", async () => {
-    const { context, unhandled } = await runValidation(() =>
-      Promise.reject({ response: { data: { message: "bad sql" } } }),
+  it("reports a 400 with a message as a SQL error and shows it", async () => {
+    const { context, verdict } = await runValidation(() =>
+      Promise.reject({ response: { status: 400, data: { message: "bad sql" } } }),
     );
 
-    expect(unhandled).not.toHaveBeenCalled();
-    await expect(context.validateSqlQueryPromise.value).rejects.toBe("sql_error");
+    expect(verdict).toBe("sql_error");
+    expect(context.sqlQueryErrorMsg.value).toBe("bad sql");
   });
 
-  it("does not leave a rejected function_error unhandled before save awaits it", async () => {
-    const { context, unhandled } = await runValidation(() =>
+  it("reports a VRL failure as a function error", async () => {
+    const { context, verdict } = await runValidation(() =>
       Promise.resolve({ data: { function_error: "vrl failed" } }),
     );
 
-    expect(unhandled).not.toHaveBeenCalled();
-    await expect(context.validateSqlQueryPromise.value).rejects.toBe("function_error");
+    expect(verdict).toBe("function_error");
+    expect(context.vrlFunctionError.value).toBe("vrl failed");
+  });
+
+  it.each([
+    ["a 403", { response: { status: 403, data: { message: "Unauthorized Access" } } }],
+    ["a 500 without a message", { response: { status: 500, data: {} } }],
+    ["a network error", new Error("Network Error")],
+  ])("treats %s as a failed check, not a SQL error", async (_, failure) => {
+    const { context, verdict } = await runValidation(() => Promise.reject(failure));
+
+    expect(verdict).toBe("request_failed");
+    expect(context.sqlQueryErrorMsg.value).toBe("");
+  });
+
+  it("reports a passing query as valid", async () => {
+    const { verdict } = await runValidation(() => Promise.resolve({ data: {} }));
+
+    expect(verdict).toBe("valid");
   });
 });

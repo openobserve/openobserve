@@ -1549,6 +1549,8 @@ watch(
   ],
   (next, prev) => {
     if (next[0] !== prev?.[0]) {
+      // A query that fails to run emits no new result, so the old verdict would linger.
+      evaluationStatus.value = null;
       debouncedRefreshFromProps();
       return;
     }
