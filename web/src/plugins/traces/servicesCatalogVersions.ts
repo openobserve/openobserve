@@ -1,7 +1,7 @@
 import type { Scope, ServicesResponse, Tracking, Verdict } from "@/services/service_versions";
 import type { I18nKey, TranslateFn } from "@/types/i18n";
 import type { LocationQuery } from "vue-router";
-import { inEnv, NO_ENV } from "@/services/service_versions.envs";
+import { envEntries, inEnv, NO_ENV } from "@/services/service_versions.envs";
 import { verdictCode } from "@/enterprise/components/ServiceVersions/verdictText";
 import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
 import {
@@ -25,8 +25,9 @@ export const catalogExtraVerdictOptions = [
   "pre_existing",
   "capped",
   "restricted",
+  "pre_tracking",
 ] as const;
-export type CatalogVerdictFilter = Verdict | "no_version";
+export type CatalogVerdictFilter = Verdict | "no_version" | "pre_tracking";
 
 // Labels in catalogVerdictRank order, highest first, from the same keys the verdict chips use.
 const SORTED_VERDICT_LABELS: I18nKey[] = [
@@ -43,41 +44,20 @@ const SORTED_VERDICT_LABELS: I18nKey[] = [
 ];
 
 export const CATALOG_COLUMN_SIZES = {
-  service_name: 132,
-  version_env: 130,
-  version_where: 134,
+  version_env: 100,
+  version_where: 104,
   version_verdict: 169,
   service_versions: 179,
-  status: 98,
-  version_deployed: 80,
-  total_requests: 90,
-  error_count: 72,
-  error_rate: 92,
-  p95_latency_ns: 72,
-  p99_latency_ns: 72,
+  version_deployed: 100,
 } as const;
 const CATALOG_ENV_PICKED_SIZE = 157;
-export const CATALOG_SERVICE_MIN_SIZE = 112;
 export const CATALOG_ROW_HEIGHT = 54;
-const CATALOG_DEFAULT_HIDDEN = [
-  "p50_latency_ns",
-  "p99_latency_ns",
-  "avg_duration_ns",
-  "max_duration_ns",
-  "version_deployed",
-];
 
 /** The Env column header names the dimension under All envs, so its chips drop their env word. */
 export function catalogEnvColumn(env: string) {
   return env
     ? { size: CATALOG_ENV_PICKED_SIZE, hideKey: false }
     : { size: CATALOG_COLUMN_SIZES.version_env, hideKey: true };
-}
-
-/** Default column visibility; a choice saved from the column picker wins. */
-export function catalogColumnVisibility(versionsEnabled: boolean, saved: Record<string, boolean>) {
-  if (!versionsEnabled) return saved;
-  return { ...Object.fromEntries(CATALOG_DEFAULT_HIDDEN.map((id) => [id, false])), ...saved };
 }
 
 export interface CatalogPlace {
@@ -121,22 +101,62 @@ export function mergeCatalogVersions<
     };
   });
 }
-const literal = (value: string) => `'${value.replace(/'/g, "''")}'`;
-export function environmentPredicate(response: ServicesResponse, env: string) {
-  if (!env) return { sql: "", postfilter: false };
-  const keys =
-    response.envs.find((item) => (env === NO_ENV ? item.no_env : item.env === env && !item.no_env))
-      ?.where_keys || [];
-  // No env has no label to match in SQL, so a long key list leaves the narrowing to the registry rows.
-  if (env === NO_ENV && keys.length > 200) return { sql: "", postfilter: true };
-  return keys.length <= 200
-    ? {
-        sql: keys.length ? `o2_service_where IN (${keys.map(literal).join(",")})` : "1=0",
-        postfilter: false,
-      }
-    : { sql: `o2_service_env = ${literal(env)}`, postfilter: true };
+/** The row a panel route highlights; a place with no row in the window falls back to one of the service's rows. */
+export function catalogPanelRow<
+  T extends {
+    service_name: string;
+    where_key?: string;
+    infer_service_name?: string;
+    infer_service_type?: string;
+    infer_service_system?: string;
+  },
+>(rows: T[], service: string, where: string, kind = "", system?: string) {
+  // A kind names a dependency row, which can share its name with an instrumented service.
+  const own = rows.filter(
+    (row) =>
+      row.service_name === service &&
+      (kind
+        ? row.infer_service_name &&
+          row.infer_service_type === kind &&
+          (system === undefined || (row.infer_service_system || "") === system)
+        : !row.infer_service_name),
+  );
+  return (
+    own.find((row) => (row.where_key || "") === where) ??
+    own.find((row) => !row.where_key) ??
+    own[0]
+  );
 }
 
+/** Why a version cell of a row with no registry scope is empty; null for an inferred row, which never has versions. */
+export function catalogCellGap(row: {
+  where_key?: string;
+  infer_service_name?: string;
+}): I18nKey | null {
+  if (row.infer_service_name) return null;
+  return row.where_key
+    ? "serviceVersions.catalog.notTracked"
+    : "serviceVersions.catalog.notReported";
+}
+
+/** The gap every scopeless row of the view shares, said once in the column header; null when rows differ. */
+export function sharedCellGap(
+  rows: { where_key?: string; infer_service_name?: string; versionScope?: Scope }[],
+): I18nKey | null {
+  const gaps = new Set(rows.filter((row) => !row.versionScope).map(catalogCellGap));
+  gaps.delete(null);
+  return gaps.size === 1 ? [...gaps][0] : null;
+}
+
+/** The reason an empty version cell names itself; empty when the header already says it, or no reason fits. */
+export function catalogCellReason(
+  row: { where_key?: string; infer_service_name?: string; versionScope?: Scope },
+  shared: I18nKey | null,
+  t: TranslateFn,
+): string {
+  const gap = row.versionScope ? null : catalogCellGap(row);
+  return gap && gap !== shared ? t(gap) : "";
+}
 export function hasVersion(scope?: Scope) {
   return Boolean(scope?.newest_version);
 }
@@ -202,7 +222,8 @@ export function catalogVerdictValue(scope?: Scope): CatalogVerdictFilter | undef
   const summary = scope.newest_verdict;
   if (!summary) {
     if (deployUnjudged(scope)) return "insufficient";
-    return isFirstVersion(scope) ? "first_version" : undefined;
+    if (isFirstVersion(scope)) return "first_version";
+    return preTracking(scope) ? "pre_tracking" : undefined;
   }
   if (summary.restricted) return "restricted";
   if (summary.state === "pre_existing") return "pre_existing";
@@ -220,10 +241,88 @@ export function catalogMatches(
 ) {
   if (state !== "ready") return true;
   const scope = row.versionScope;
-  if (env && (!scope || !inEnv(scope, env))) return false;
+  // A row with no registry scope has no env of its own, so No env is where the filter reaches it.
+  if (env && !(scope ? inEnv(scope, env) : env === NO_ENV)) return false;
   if (!verdict || unavailable) return true;
   if (row.infer_service_name || !scope) return false;
   return catalogVerdictValue(scope) === verdict;
+}
+
+/** A Deploy verdict option's label, for the menu and for any sentence that names the pick. */
+export function catalogVerdictLabel(value: string, t: TranslateFn) {
+  if (value === "no_version") return t("serviceVersions.catalog.noVersion");
+  if (value === "not_serving") return t("serviceVersions.verdict.notServing");
+  if (value === "first_version") return t("serviceVersions.verdict.firstVersion");
+  if (value === "pre_existing") return t("serviceVersions.verdict.preExisting");
+  if (value === "pre_tracking") return t("serviceVersions.catalog.verdictPreTracking");
+  return t(`serviceVersions.verdict.${value}`);
+}
+
+/** Rows per env, NO_ENV for No env and for rows with no scope; counted by the same membership catalogMatches filters on. */
+export function catalogEnvCounts(rows: { versionScope?: Scope }[]) {
+  const counts = new Map<string, number>();
+  for (const { versionScope } of rows)
+    for (const env of versionScope ? envEntries(versionScope) : [null]) {
+      const key = env ?? NO_ENV;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  return counts;
+}
+
+/** Why the filters matched no row, naming each active filter by its control's label. */
+export function catalogFilterEmptyText(
+  view: { env: string; verdict: string; search?: string; locale: string },
+  t: TranslateFn,
+) {
+  const filters: string[] = [];
+  const search = view.search?.trim();
+  if (view.env)
+    filters.push(
+      t("serviceVersions.catalog.filterEmpty.filter", {
+        label: t("serviceVersions.catalog.env"),
+        value: view.env === NO_ENV ? t("serviceVersions.env.noEnv") : view.env,
+      }),
+    );
+  if (view.verdict)
+    filters.push(
+      t("serviceVersions.catalog.filterEmpty.filter", {
+        label: t("serviceVersions.catalog.deployVerdict"),
+        value: catalogVerdictLabel(view.verdict, t),
+      }),
+    );
+  if (search)
+    filters.push(
+      t("serviceVersions.catalog.filterEmpty.filter", {
+        label: t("serviceVersions.catalog.filterEmpty.search"),
+        value: t("serviceVersions.catalog.filterEmpty.quoted", { text: search }),
+      }),
+    );
+  const list = new Intl.ListFormat(view.locale || "en", { type: "conjunction" }).format(filters);
+  return t(
+    view.env || view.verdict
+      ? "serviceVersions.catalog.filterEmpty.noMatch"
+      : "serviceVersions.catalog.filterEmpty.noMatchSearch",
+    { filters: list },
+  );
+}
+
+/** An error rate as the catalog prints it; a few errors among many requests never read as 0.00%. */
+export function errorRateLabel(rate: number, errors: number) {
+  return errors > 0 && rate < 0.005 ? "<0.01%" : `${rate.toFixed(2)}%`;
+}
+
+/** When the deploy behind the shown verdict happened, in µs; 0 when no deploy is recorded. */
+export function deployedAtUs(scope?: Scope) {
+  const verdict = scope?.newest_verdict;
+  return verdict?.state === "pre_existing" ? 0 : verdict?.deploy?.at || 0;
+}
+
+/** Sort keys for the version columns, so Version and Deployed order like Deploy verdict does. */
+export function catalogVersionSort(field: string, scope?: Scope): number | string | null {
+  if (field === "version_verdict") return catalogVerdictRank(scope);
+  if (field === "version_deployed") return deployedAtUs(scope);
+  if (field === "service_versions") return shownVersion(scope);
+  return null;
 }
 
 /** True when a row has no Health to show: no requests, or a shown version that is not serving. */
@@ -492,6 +591,37 @@ export function catalogRangeQuery(
   else if (datetime.startTime && datetime.endTime) {
     next.from = String(datetime.startTime);
     next.to = String(datetime.endTime);
+  }
+  return next;
+}
+
+const CATALOG_FILTER_KEYS = { env: "catalogEnv", verdict: "catalogVerdict", type: "catalogType" };
+
+/** The catalog filters a URL names; absent keys read as the defaults. */
+export function catalogFiltersFromQuery(query: LocationQuery) {
+  const text = (key: string) => {
+    const value = query[key];
+    return typeof value === "string" ? value : "";
+  };
+  return {
+    env: text(CATALOG_FILTER_KEYS.env),
+    verdict: text(CATALOG_FILTER_KEYS.verdict),
+    type: text(CATALOG_FILTER_KEYS.type),
+  };
+}
+
+/** The route query with the catalog filters in it, holding only non-default values. */
+export function catalogFilterQuery(
+  query: LocationQuery,
+  filters: { env: string; verdict: string; type: string },
+  defaultType: string,
+) {
+  const next: LocationQuery = { ...query };
+  const values = { ...filters, type: filters.type === defaultType ? "" : filters.type };
+  for (const [field, key] of Object.entries(CATALOG_FILTER_KEYS)) {
+    const value = values[field as keyof typeof values];
+    if (value) next[key] = value;
+    else delete next[key];
   }
   return next;
 }

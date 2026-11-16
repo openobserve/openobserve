@@ -49,9 +49,10 @@ function version(index: number, extra = {}) {
     ...extra,
   };
 }
-function render(overrides: Record<string, unknown> = {}) {
+const tipStub = { props: ["content"], template: '<i data-test="tip">{{ content }}</i>' };
+function render(overrides: Record<string, unknown> = {}, props: Record<string, unknown> = {}) {
   return mount(Tab, {
-    props: { service: "svc" },
+    props: { service: "svc", ...props },
     global: {
       stubs: {
         OButton: {
@@ -88,6 +89,11 @@ function render(overrides: Record<string, unknown> = {}) {
     },
   });
 }
+// Stopped versions start hidden, so tests about older rows turn them on first.
+async function showStopped(wrapper: ReturnType<typeof render>) {
+  await wrapper.find('[data-test="svcver-include-inactive"]').setValue(true);
+  await flushPromises();
+}
 beforeEach(() => {
   vi.clearAllMocks();
   config.isEnterprise = "true";
@@ -111,6 +117,11 @@ it("shows loading, empty, error retry, and 403 distinctly", async () => {
   mocks.query.isPending.value = true;
   await flushPromises();
   expect(wrapper.find('[data-test="svcver-panel-loading"]').exists()).toBe(true);
+  expect(wrapper.find('[data-test="svcver-where-loading"]').exists()).toBe(true);
+  // The toolbar sits above everything that loads, so rows and card landing later never move it.
+  const toolbar = wrapper.get('[data-test="svcver-versions-toolbar"]').element;
+  const loading = wrapper.get('[data-test="svcver-panel-loading"]').element;
+  expect(toolbar.compareDocumentPosition(loading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   mocks.query.isPending.value = false;
   mocks.query.data.value = { versions: [], total: 0 };
   await flushPromises();
@@ -125,7 +136,7 @@ it("shows loading, empty, error retry, and 403 distinctly", async () => {
   expect(wrapper.find('[data-test="svcver-compare"]').exists()).toBe(false);
 });
 it("says there is only one version instead of asking for two", async () => {
-  const wrapper = render();
+  const wrapper = render({ OTooltip: tipStub });
   await flushPromises();
   expect(wrapper.get('[data-test="svcver-compare-hint"]').text()).toBe(
     "serviceVersions.panel.selectTwo",
@@ -142,7 +153,7 @@ it("locks OSS without controls", () => {
   expect(wrapper.find('[data-test="svcver-panel-denied"]').exists()).toBe(true);
   expect(wrapper.find('[data-test="svcver-include-inactive"]').exists()).toBe(false);
 });
-it("pages history newest first, shows stopped versions by default and searches them", async () => {
+it("pages history newest first, hides stopped versions until asked, and says what emptied the table", async () => {
   mocks.query.data.value.versions = Array.from({ length: 25 }, (_, i) => version(i));
   mocks.query.data.value.versions.push(version(99, { active: false, first_seen: 1 }));
   const wrapper = render();
@@ -152,10 +163,33 @@ it("pages history newest first, shows stopped versions by default and searches t
   const search = wrapper.find('[data-test="svcver-version-search"]');
   expect(search.element.closest("[data-no-autofocus]")).not.toBeNull();
   await wrapper.find('[data-test="svcver-version-search"]').setValue("v99");
+  expect(wrapper.find('[data-test="svcver-version-key-99"]').exists()).toBe(false);
+  await showStopped(wrapper);
   expect(wrapper.find('[data-test="svcver-version-key-99"]').exists()).toBe(true);
   expect(wrapper.find('[data-test="svcver-version-key-24"]').exists()).toBe(false);
-  await wrapper.find('[data-test="svcver-include-inactive"]').setValue(false);
-  expect(wrapper.find('[data-test="svcver-version-key-99"]').exists()).toBe(false);
+  await wrapper.find('[data-test="svcver-version-search"]').setValue("zzz");
+  expect(wrapper.get('[data-test="svcver-panel-empty"]').text()).toBe(
+    "serviceVersions.panel.emptySearch",
+  );
+});
+it("lists stopped versions when none is running, and unselects the ones a running version hides again", async () => {
+  mocks.query.data.value.versions = [version(1, { active: false }), version(2, { active: false })];
+  const wrapper = render({ OTooltip: tipStub });
+  await flushPromises();
+  expect(wrapper.find('[data-test="svcver-version-key-1"]').exists()).toBe(true);
+  expect(wrapper.find('[data-test="svcver-panel-empty"]').exists()).toBe(false);
+  const toggle = wrapper.get('[data-test="svcver-include-inactive"]');
+  expect((toggle.element as HTMLInputElement).checked).toBe(true);
+  expect(toggle.attributes("disabled")).toBeDefined();
+  expect(wrapper.get('[data-test="svcver-none-running"]').text()).toBe(
+    "serviceVersions.panel.noneRunning",
+  );
+  await wrapper.find('[data-test="svcver-select-key-1"]').setValue(true);
+  await wrapper.find('[data-test="svcver-select-key-2"]').setValue(true);
+  mocks.query.data.value.versions = [version(1), version(2, { active: false })];
+  await flushPromises();
+  expect(wrapper.find('[data-test="svcver-version-key-2"]').exists()).toBe(false);
+  expect(wrapper.get('[data-test="svcver-compare"]').attributes("disabled")).toBeDefined();
 });
 it("labels the live current row, the baseline, and compares older rows against current", async () => {
   mocks.query.data.value.versions = [
@@ -164,6 +198,7 @@ it("labels the live current row, the baseline, and compares older rows against c
     version(1, { active: false }),
   ];
   const wrapper = render();
+  await showStopped(wrapper);
   wrapper
     .findComponent({ name: "ServicePanelVerdictCard" })
     .vm.$emit("baseline", { version: "v2", image: null, source: "automatic" });
@@ -252,7 +287,7 @@ it("counts only versioned rows when saying there is one version", async () => {
     versions: [version(1), version(2, { version: "" })],
     total: 2,
   };
-  const wrapper = render();
+  const wrapper = render({ OTooltip: tipStub });
   await flushPromises();
   expect(wrapper.get('[data-test="svcver-compare-hint"]').text()).toBe(
     "serviceVersions.panel.onlyOneVersion",
@@ -269,14 +304,54 @@ it("preserves registry rows on verdict failure and retries both reads", async ()
   expect(mocks.verdicts.refetch).toHaveBeenCalled();
   expect(mocks.transitions.refetch).toHaveBeenCalled();
 });
-it("chooses a stable initial where for a graph node without a location", () => {
+it("picks a stable where for a panel without one, locally, a named place over the no-cluster one", async () => {
   mocks.state.value.where = "";
   mocks.discovery.data.value.versions = [
     version(1, { where_key: "env:z" }),
+    version(3, { where_key: "default", where: { kind: "default" } }),
     version(2, { where_key: "env:a" }),
   ];
-  render();
-  expect(mocks.update).toHaveBeenCalledWith("env:a", "versions");
+  const wrapper = render();
+  await flushPromises();
+  expect(mocks.update).not.toHaveBeenCalled();
+  expect(wrapper.findComponent({ name: "ServicePanelVerdictCard" }).props("where")).toBe("env:a");
+});
+it.each([
+  { opened: "the same service", service: "svc" },
+  { opened: "another service at the same place", service: "b" },
+])(
+  "keeps its picked place for $opened when discovery adds places, also when the panel remounts it",
+  async ({ service }) => {
+    mocks.state.value.where = "";
+    mocks.discovery.data.value.versions = [version(1, { where_key: "env:z" })];
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.setProps({ service });
+    mocks.discovery.data.value.versions = [
+      version(1, { where_key: "env:z" }),
+      version(2, { where_key: "env:a" }),
+    ];
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "ServicePanelVerdictCard" }).props("where")).toBe("env:z");
+    const autoPick = wrapper.emitted("update:autoPick")?.at(-1)?.[0];
+    wrapper.unmount();
+    const remounted = render({}, { service, autoPick });
+    await flushPromises();
+    expect(remounted.findComponent({ name: "ServicePanelVerdictCard" }).props("where")).toBe(
+      "env:z",
+    );
+    expect(mocks.update).not.toHaveBeenCalled();
+  },
+);
+it("announces its place for each service it shows, even when the place stays the same", async () => {
+  mocks.state.value.where = "";
+  mocks.discovery.data.value.versions = [version(1, { where_key: "env:z" })];
+  const wrapper = render();
+  for (const service of ["b", "svc"]) await wrapper.setProps({ service });
+  await flushPromises();
+  expect(wrapper.emitted("scope")).toEqual(
+    ["svc", "b", "svc"].map((service) => [{ service, where: "env:z" }]),
+  );
 });
 it("reads a recorded deploy that has no verdict yet as Not enough data, as the catalog does", async () => {
   mocks.query.data.value.versions = [
@@ -292,6 +367,13 @@ it("reads a recorded deploy that has no verdict yet as Not enough data, as the c
   mocks.verdicts.isError.value = true;
   await flushPromises();
   expect(wrapper.find('[data-test="svcver-verdict-key-2"]').exists()).toBe(false);
+});
+it("marks a version running before tracking started with the catalog's no-verdict mark", async () => {
+  mocks.query.data.value.versions = [version(2, { tracking_started: false })];
+  const wrapper = render();
+  await flushPromises();
+  const cell = wrapper.get('[data-test="svcver-verdict-key-2-pre-tracking"]');
+  expect(cell.find('[data-test="svcver-not-compared"]').exists()).toBe(true);
 });
 it("hands the card a pre-existing latest version and the tracking epoch", () => {
   mocks.query.data.value.tracking = structuredClone(producer.versions_tracking);
@@ -345,6 +427,8 @@ describe("Versions tab at 1600 px", () => {
       size: number;
     }[];
     expect(columns.reduce((sum, column) => sum + column.size, 0)).toBe(COLUMNS_WIDTH_AT_1600);
+    // A narrower panel scrolls the table; a pinned column would sit over the ones before it.
+    expect(columns.some((column: any) => column.isAction || column.pinned)).toBe(false);
     for (const [id, need] of Object.entries(NEEDS))
       expect(columns.find((column) => column.id === id)!.size).toBeGreaterThanOrEqual(need);
   });
@@ -390,6 +474,7 @@ describe("the baseline row", () => {
       }),
     ];
     const wrapper = render();
+    await showStopped(wrapper);
     wrapper
       .findComponent({ name: "ServicePanelVerdictCard" })
       .vm.$emit("baseline", { version: "v2", source: "automatic" });
@@ -411,6 +496,7 @@ describe("the baseline row", () => {
       build(4, "8ebf1f7", 1500),
     ];
     const wrapper = render();
+    await showStopped(wrapper);
     wrapper
       .findComponent({ name: "ServicePanelVerdictCard" })
       .vm.$emit("baseline", { version: "v2", image: "1f08369", source: "last_good" });

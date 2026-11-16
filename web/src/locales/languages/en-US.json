@@ -16349,8 +16349,7 @@
       "resetServices": "Reset services",
       "resetServicesTooltip": "Delete all discovered services. They will be re-discovered automatically as new data arrives.",
       "resetServicesConfirmTitle": "Reset all discovered services?",
-      "resetServicesConfirmMessage": "This will delete all discovered services for this organization. Services will be automatically re-discovered as new telemetry data is ingested. This action cannot be undone.",
-      "resetServicesConfirmWarning": "Services will be automatically re-discovered as new telemetry data is ingested. This action cannot be undone.",
+      "resetServicesConfirmBody": "This deletes every discovered service in this organization and can't be undone. Services are discovered again as new telemetry arrives.",
       "resetServicesSuccess": "Successfully deleted {count} discovered service. | Successfully deleted {count} discovered services.",
       "resetServicesFailed": "Failed to reset services",
       "workload": "Workload",
@@ -16361,8 +16360,6 @@
       "selectFieldFirst": "Select a field first",
       "instanceSingular": "instance",
       "instancePlural": "instances",
-      "serviceCountSingular": "{count} service | {count} services",
-      "instancesCount": "({count} instance) | ({count} instances)",
       "noDimensions": "no dimensions",
       "defaultSetWarningTitle": "Correlation may be unreliable.",
       "defaultSetWarningBody": "This instance has no disambiguation — it was discovered without any workload matching (no cluster, namespace, or environment context). Logs and traces may come from different deployments of the same service name.",
@@ -17570,6 +17567,7 @@
       "noStreamsDetected": "No streams detected",
       "tabLabel": "Service Catalog",
       "filterPlaceholder": "Filter by service name...",
+      "rowsCapped": "Showing the first {count} entities; narrow the time range to see the rest.",
       "columns": {
         "serviceName": "Service",
         "status": "Status",
@@ -17609,7 +17607,9 @@
           "errors": "error ratio",
           "p95": "p95 latency"
         },
-        "scoreAbove": "+{percent}% score above threshold",
+        "scoreAboveThreshold": "{signal} anomaly score {percent}% above its alert threshold",
+        "count": "{count} insight | {count} insights",
+        "countHint": "{count} service anomaly in this time range | {count} service anomalies in this time range",
         "viewTraces": "Traces",
         "viewCharts": "Charts"
       }
@@ -17736,7 +17736,6 @@
       "metrics": "Metrics",
       "noOperationsFound": "No operations found",
       "viewInTraces": "View in Traces",
-      "noResourceDataFound": "No {resource} data found",
       "retry": "Retry",
       "noMetricsAvailable": "No metrics available for this service.",
       "unknown": "Unknown",
@@ -17748,8 +17747,6 @@
       "noCorrelatedStreams": "No correlated streams found.",
       "enterpriseFeature": "Service Discovery is an enterprise feature.",
       "failedToLoadStreams": "Failed to load service streams.",
-      "failedToLoadMetrics": "Failed to load metrics.",
-      "requests": "Requests",
       "errors": "Errors",
       "p99": "P99",
       "p95": "P95",
@@ -17772,7 +17769,13 @@
       "envContainer": "Container",
       "envServerless": "Serverless",
       "envRuntime": "Runtime",
-      "envCloud": "Cloud"
+      "envCloud": "Cloud",
+      "spans": "Spans",
+      "spansTooltip": "Every span of this service in this time range, not only incoming requests, so it can exceed the catalog's Requests.",
+      "metricsLoadFailed": "Couldn't load this service's correlated metrics. {reason}",
+      "noResourceRecorded": "This service's spans in this time range don't record {resource}.",
+      "resourceLoadFailed": "Couldn't load {resource} for this service. {reason}",
+      "noVersionTraffic": "This service's spans in this stream don't record a version, so there is no traffic to split by version."
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP Status Code",
@@ -33541,6 +33544,7 @@
       "close": "Close",
       "resize": "Resize comparison",
       "shareWaiting": "Share is available once the compare loads.",
+      "shareFailed": "Share is unavailable: the compare couldn't load.",
       "incidentNoVerdict": "Only a deploy's own verdict can open an incident. This compare has none.",
       "incidentRestricted": "You can't open an incident from a restricted result."
     },
@@ -33554,7 +33558,6 @@
       "empty": "No services in the version registry",
       "severityCount": "{count} {verdict}",
       "deployedLabel": "Deployed",
-      "health": "Health",
       "version": "Version",
       "any": "Any",
       "allEnvs": "All envs",
@@ -33568,6 +33571,9 @@
       "versionsUnavailableTitle": "Versions and deploy verdicts are unavailable",
       "verdictsUnavailable": "{title}: trace metrics below are current. The Deploy verdict filter is disabled until it recovers.",
       "verdictsUnavailableTitle": "Deploy verdicts are unavailable",
+      "verdictsUnavailableShort": "Verdicts unavailable",
+      "versionsUnavailableShort": "Versions unavailable",
+      "deniedShort": "No access to versions",
       "vsBaseline": "vs {version}",
       "vsBaselineIn": "vs {version} in {where}",
       "vsBaselineOutside": "vs {version} outside Kubernetes",
@@ -33586,7 +33592,22 @@
       "healthNoTraffic": "No traffic in the window",
       "moreChips": "+{count} more | +{count} more",
       "warmingUpNoEpoch": "Deploy tracking is warming up. Deploy verdicts start with your next deploy.",
-      "noDeployRecorded": "No deploy recorded"
+      "noDeployRecorded": "No deploy recorded",
+      "notReported": "Not reported by this service's spans",
+      "notTracked": "No version recorded for this place",
+      "noEnvStamps": "Spans in this stream don't record an environment yet, so filtering by env or deploy verdict would hide every service.",
+      "filterEmpty": {
+        "title": "No services match the filters",
+        "filter": "{label}: {value}",
+        "noMatch": "Filtered by {filters}. Try another env or deploy verdict, or clear the filters.",
+        "noMatchSearch": "Filtered by {filters}. Try another search, or clear it.",
+        "search": "Search",
+        "quoted": "\"{text}\""
+      },
+      "verdictPreTracking": "Before tracking",
+      "noSpansInRange": "No spans in this stream in the selected time range.",
+      "healthNoRequests": "No incoming requests in the window, so there is no health to rate",
+      "dashMeans": "— in this column: {reason}"
     },
     "panel": {
       "versions": "Versions",
@@ -33610,7 +33631,8 @@
       },
       "compareTo": "Compare {from} → {to}",
       "showStopped": "Show stopped versions",
-      "showStoppedHint": "from the service registry, all time",
+      "noneRunning": "No version was seen in the last 15 minutes, so stopped versions are shown",
+      "identityNotReported": "This service's spans don't report env, where or version",
       "transitionsIn": "Deploy transitions in {where}",
       "transitionsOutside": "Deploy transitions outside Kubernetes",
       "transition": {
@@ -33627,8 +33649,16 @@
       "durationP95": "Duration p95",
       "whereUnscoped": "Charts and tables are not scoped to {where}: the stream schema could not be read.",
       "whereUnscopedOutside": "Charts and tables are not scoped to the instances outside Kubernetes: the stream schema could not be read.",
-      "byVersion": "By version",
-      "onlyOneVersion": "Only one version so far"
+      "byVersion": "Version traffic",
+      "onlyOneVersion": "Only one version so far",
+      "historyScope": "All-time versions from the service registry, for every stream of this service",
+      "clearPlace": "Show this row's own place again",
+      "deploysInRange": "Deploys in this time range:",
+      "noDeploysInRange": "No deploys in this time range",
+      "placeNoSpans": "No spans in this stream and time range come from {where}",
+      "placeNoSpansOutside": "No spans in this stream and time range come from outside Kubernetes",
+      "emptyNone": "No versions recorded for this place",
+      "emptySearch": "No versions match \"{search}\""
     },
     "compare": {
       "baseline": "Compare with",
@@ -34137,7 +34167,7 @@
       "byPodLogCluster": "This log's own cluster field reads {cluster}."
     },
     "discovered": {
-      "banner": "Service = name from traces. \"detected as\" = the name correlation matches on (kept, shown muted). Kubernetes workload = the deployment or statefulset the pods belong to.",
+      "banner": "Service = name from traces. \"detected as\" = the name correlation matches on (kept, shown muted). K8s workload = the deployment or statefulset the pods belong to.",
       "tiles": {
         "discovered": "Discovered (all signals)",
         "discoveredSub": "{n} of these send traces",
@@ -34146,8 +34176,9 @@
         "view": "View →",
         "names": "Names to review",
         "review": "Review →",
-        "versions": "Versions",
-        "versionsStripped": "{count} git hash stripped | {count} git hashes stripped"
+        "versionsStripped": "{count} git hash stripped | {count} git hashes stripped",
+        "versioned": "Services with a version",
+        "more": "{count} more"
       },
       "view": {
         "label": "Discovered Services view",
@@ -34155,18 +34186,16 @@
         "nameReview": "Name review"
       },
       "cols": {
-        "service": "Service",
-        "workload": "Kubernetes workload",
-        "identity": "Instance identity",
-        "telemetry": "Telemetry coverage",
+        "workload": "K8s workload",
         "env": "Env",
-        "version": "Version",
-        "lastSeen": "Last seen"
+        "version": "Version"
       },
-      "noVersion": "no version",
       "noWorkload": "No Kubernetes workload",
+      "noTraces": "This service sends no traces, so no env or version is known",
+      "noTracePlace": "No traced service matches this name and place",
       "search": "Search service or detected name",
-      "proposedWorkload": "proposed: {workloads}"
+      "proposedWorkload": "proposed: {workloads}",
+      "footerInstances": "{count} instance | {count} instances"
     },
     "nameReview": {
       "banner": "Accepting changes only the display: every screen shows the trace name, with the detected name as a muted label. Correlation matching does not change.",
@@ -34211,15 +34240,17 @@
       },
       "unresolved": {
         "title": "Unresolved",
-        "sub": "Detected names with no trace service to display them as",
         "cols": {
           "name": "Detected name",
           "seenIn": "Seen in",
           "why": "Why it has no trace name"
         },
         "ambiguous": "One detected name covers pods of {n} trace services ({names})",
-        "noTrace": "No trace service runs on these pods; the detected name is shown as is",
-        "displayAs": "Display as…"
+        "displayAs": "Display as…",
+        "intro": "These detected names match no trace service name, so each shows as detected until you choose a display name.",
+        "introPods": "No trace service runs on these pods, so each detected name shows as is until you choose a display name.",
+        "reasonPods": "No trace service runs on these pods",
+        "reasonName": "No trace service has this name"
       },
       "snack": {
         "accepted": "Accepted {n} display names: {names} | Accepted {n} display name: {names} | Accepted {n} display names: {names}",
