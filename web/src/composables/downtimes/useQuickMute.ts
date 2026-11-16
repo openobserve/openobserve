@@ -21,8 +21,10 @@ import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDown
 import { quickMuteMutation } from "@/services/downtimes.queries";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
+  MAX_QUICK_MUTE_IDS,
   buildQuickMuteRequest,
   endTimeText,
+  overIdCap,
   selectionCount,
   type QuickMuteSelection,
 } from "@/utils/downtimes/quickMute";
@@ -46,6 +48,14 @@ export function useQuickMute() {
     reason?: string,
     folder?: string,
   ): Promise<string | null> => {
+    // The server refuses more ids per module, so a preset mute stops here as the dialog does.
+    if (overIdCap(selection)) {
+      toast({
+        variant: "error",
+        message: t("alerts.downtimes.mute.tooMany", { max: MAX_QUICK_MUTE_IDS }),
+      });
+      return null;
+    }
     // The toast's link names the org of the mute, even if the user switches org before the click.
     const org = orgId.value;
     const folderId = folder || (await defaultFolder.resolve());

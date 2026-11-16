@@ -68,6 +68,22 @@ describe("useQuickMute", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it("stops a preset mute of more than 200 ids per module before the request", async () => {
+    const { api, wrapper } = await run();
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => `a${i}`);
+    expect(await api.muteFor([{ module: "alerts", ids: ids(201) }], 3600)).toBeNull();
+    expect(downtimes.create).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "error",
+        message: "Select at most 200 items per module.",
+      }),
+    );
+    await api.muteFor([{ module: "alerts", ids: ids(200) }], 3600);
+    expect(vi.mocked(downtimes.create).mock.calls[0][1].targets[0].ids).toHaveLength(200);
+    wrapper.unmount();
+  });
+
   it("starts at the server time, so a fast client clock does not shorten the mute", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(SERVER_NOW + 3 * 60_000);

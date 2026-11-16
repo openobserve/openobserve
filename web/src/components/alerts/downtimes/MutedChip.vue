@@ -71,7 +71,7 @@ const router = app?.$router as Router | undefined;
 const store = app?.$store as Store<any> | undefined;
 
 // An older node sends no folder; then the chip links only when the lookup knows the row, else it stays plain.
-const lookup = useDowntimeLookup(true);
+const lookup = useDowntimeLookup(() => !props.downtime.folder_id);
 const link = computed(() => {
   if (!router) return null;
   const to = props.downtime.folder_id

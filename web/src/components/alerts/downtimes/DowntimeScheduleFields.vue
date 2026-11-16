@@ -182,8 +182,7 @@ const repeat = computed(() => schedule.value?.repeat);
 
 const REPEATS: readonly Repeat[] = ["none", "daily", "weekly"];
 
-// A start the user moves moves the end by the same amount, so the window keeps its length.
-// It runs from the start controls, not a watcher, so a loaded row or a reset moves nothing.
+// A start the user moves moves the end by the same amount; a loaded row or a reset moves nothing.
 // The control calls this before the form stores the new start, so `schedule` still holds the old one.
 const onStartChange = (part: "start_date" | "start_time", value: unknown) => {
   const s = schedule.value;
