@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { qualifiedName } from "@/types/serviceRef";
+import { sqlIn, sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 const SIGNAL_ORDER = ["logs", "metrics", "traces"];
 const SERVICE_UNITS = ["service", "socket", "target", "slice"];
@@ -40,6 +41,14 @@ export function serviceKey(name: string) {
 /** serviceKey as a SQL expression over a span column, so a search groups every spelling of a service together. */
 export function serviceKeySql(column: string) {
   return `regexp_replace(lower(${column}), '${SERVICE_KEY_PATTERN}', '\\1\\2')`;
+}
+
+/** A span filter on every raw spelling of one service, so a folded catalog row reads all of its spans. */
+export function serviceNamesSql(column: string, names: readonly string[]) {
+  const spellings = [...new Set(names)];
+  return spellings.length === 1
+    ? `${column} = ${sqlLiteral(spellings[0])}`
+    : sqlIn(column, spellings);
 }
 
 /** Services as a reader counts them in the discovered list: two detected keys of one qualified trace service count once. */

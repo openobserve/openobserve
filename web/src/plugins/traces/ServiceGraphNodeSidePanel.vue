@@ -891,6 +891,7 @@ import {
   buildChipDimensionsFromFilters,
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
+import { serviceNamesSql } from "@/utils/serviceCount";
 import {
   escapeSingleQuotes,
   deepCopy,
@@ -1465,6 +1466,12 @@ export default defineComponent({
       const name = props.selectedNode.name || props.selectedNode.label || props.selectedNode.id;
       return escapeSingleQuotes(name);
     };
+    // A catalog row folds a service's spellings, so its span reads match each one the row carries.
+    const spanServiceNames = (): string[] => {
+      const node = props.selectedNode;
+      const spellings = node?.service_type ? undefined : node?.service_names;
+      return spellings?.length ? spellings : [node?.name || node?.label || node?.id || ""];
+    };
 
     // Shared cache of stream schema field names — populated by resolveStreamSchema,
     // consumed by serviceNameField (model column resolution), resolveWorkloadFields
@@ -1605,8 +1612,7 @@ export default defineComponent({
     );
 
     const serviceFilter = (alias = ""): string => {
-      const serviceName = buildServiceName();
-      let filter = `${identityField(alias)} = '${serviceName}'`;
+      let filter = serviceNamesSql(identityField(alias), spanServiceNames());
       if (panelWhereKey.value)
         filter += ` AND ${alias}o2_service_where = '${escapeSingleQuotes(panelWhereKey.value)}'`;
       if (!hasCatalogServiceIdentity.value) return filter;
@@ -2960,6 +2966,9 @@ export default defineComponent({
         serviceName:
           props.selectedNode?.name || props.selectedNode?.label || props.selectedNode?.id,
         serviceType: props.selectedNode?.service_type,
+        ...(props.selectedNode?.service_names?.length && !props.selectedNode?.service_type
+          ? { serviceNames: spanServiceNames() }
+          : {}),
         ...(hasCatalogServiceIdentity.value
           ? { serviceSystem: props.selectedNode?.service_system }
           : {}),

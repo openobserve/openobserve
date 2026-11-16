@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { serviceKey } from "@/utils/serviceCount";
 import {
   queryText,
   withoutKeys,
@@ -30,7 +31,13 @@ export function useServicePanelRoute() {
     node?: { name?: string; label?: string; id?: string; service_type?: string } | null,
   ) {
     if (!state.value.open || !node || (node.service_type || "") !== state.value.kind) return false;
-    return [node.name, node.label, node.id].includes(state.value.service);
+    const names = [node.name, node.label, node.id];
+    if (names.includes(state.value.service)) return true;
+    // The catalog folds an instrumented service's spellings into one row, so a link may name any of them.
+    const key = serviceKey(state.value.service);
+    return (
+      !state.value.kind && names.some((name) => name !== undefined && serviceKey(name) === key)
+    );
   }
   function open(service: string, where: string, tab = "operations", kind = "", system?: string) {
     return router.push({

@@ -130,6 +130,21 @@ export function catalogPanelRow<
   );
 }
 
+/** Every raw span spelling of an instrumented service across the catalog's rows, places included. */
+export function catalogSpellings(
+  rows: { service_name: string; infer_service_name?: string; service_names?: string[] }[],
+  service: string,
+) {
+  const key = serviceKey(service);
+  return [
+    ...new Set(
+      rows
+        .filter((row) => !row.infer_service_name && serviceKey(row.service_name) === key)
+        .flatMap((row) => row.service_names ?? [row.service_name]),
+    ),
+  ];
+}
+
 /** Why a version cell of a row with no registry scope is empty; null for an inferred row, which never has versions. */
 export function catalogCellGap(row: {
   where_key?: string;
@@ -355,7 +370,12 @@ export function servingIdle(
   const version = scope?.current_version;
   if (!complete || !version || !scope?.signals?.includes("traces")) return false;
   return !traffic.get(
-    versionTrafficKey(row.service_name, row.where_key || "", version, scope.current_image),
+    versionTrafficKey(
+      serviceKey(row.service_name),
+      row.where_key || "",
+      version,
+      scope.current_image,
+    ),
   )?.requests;
 }
 
@@ -378,14 +398,30 @@ WHERE o2_service_version IS NOT NULL AND o2_service_version <> ''${own}
 GROUP BY o2_service_where, ${service}, o2_service_version${image ? `, ${image}` : ""}`;
 }
 
-/** One build's traffic key; an empty image is the imageless build, as the backend reads it. */
+/** One build's traffic key over a folded service key; an empty image is the imageless build, as the backend reads it. */
 export function versionTrafficKey(
-  service: string,
+  key: string,
   whereKey: string,
   version: string,
   image?: string | null,
 ) {
-  return JSON.stringify([serviceKey(service), whereKey, version, image || null]);
+  return JSON.stringify([key, whereKey, version, image || null]);
+}
+
+/** The serving-health read's rows by build; the read already folds service_name, and a key folds again into another service. */
+export function versionTrafficFrom(hits: Record<string, unknown>[]) {
+  const traffic = new Map<string, VersionTraffic>();
+  for (const hit of hits)
+    traffic.set(
+      versionTrafficKey(
+        String(hit.service_name ?? ""),
+        String(hit.where_key ?? ""),
+        String(hit.version ?? ""),
+        hit.image == null ? null : String(hit.image),
+      ),
+      { requests: Number(hit.total_requests ?? 0), errors: Number(hit.error_count ?? 0) },
+    );
+  return traffic;
 }
 
 /** Health of the version serving now, so a recovered rollback reads Healthy; else the row's whole-range health. */
@@ -402,7 +438,7 @@ export function servingStatus(
   if (!version) return row.status;
   const bucket = traffic.get(
     versionTrafficKey(
-      row.service_name,
+      serviceKey(row.service_name),
       row.where_key || "",
       version,
       row.versionScope?.current_image,

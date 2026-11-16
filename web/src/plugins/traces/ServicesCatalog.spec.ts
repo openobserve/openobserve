@@ -1860,6 +1860,43 @@ describe("ServicesCatalog", () => {
         expect(decodedSql).toContain('FROM "production-stream"');
       });
 
+      it("hands the panel every spelling the service's rows folded, across places", async () => {
+        mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: {
+              results: {
+                hits: [
+                  {
+                    where_key: "east",
+                    service_name: "Checkout",
+                    service_names: ["Checkout", "checkout.service"],
+                    total_requests: 2,
+                  },
+                  {
+                    where_key: "west",
+                    service_name: "CHECKOUT",
+                    service_names: ["CHECKOUT"],
+                    total_requests: 1,
+                  },
+                ],
+              },
+            },
+          });
+          callbacks.complete(null, {});
+        });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+        expect(wrapper.vm.selectedServiceNode.service_names).toEqual([
+          "Checkout",
+          "checkout.service",
+          "CHECKOUT",
+        ]);
+      });
+
       it("keeps inferred dependencies with the same name but different identities separate", async () => {
         mockStreamSchema.mockResolvedValueOnce({
           data: {

@@ -21,6 +21,7 @@ import {
   servingIdle,
   servingHealthSql,
   versionTrafficKey,
+  versionTrafficFrom,
   CATALOG_COLUMN_SIZES,
   catalogEnvColumn,
   catalogPanelRow,
@@ -505,6 +506,13 @@ describe("Health when the shown version sent nothing in the window", () => {
     expect(servingIdle(row("1.0"), traffic, true)).toBe(false);
     expect(servingIdle(row("3.0"), traffic, false)).toBe(false);
   });
+  it("joins a row to the read's already folded name without folding it again", () => {
+    const doubled = { ...row("1.0"), service_name: "a.service.service" };
+    const read = versionTrafficFrom([
+      { where_key: "east", service_name: "a.service", version: "1.0", total_requests: 5 },
+    ]);
+    expect(servingIdle(doubled, read, true)).toBe(false);
+  });
   it("keeps Health for a version known only from browser data", () => {
     const rum = row("3.0");
     rum.versionScope.signals = ["rum"];
@@ -554,7 +562,7 @@ describe("Health of one build beside another build of the same version text", ()
     expect(plain).toContain("CAST(NULL AS VARCHAR) AS image");
     expect(plain).not.toContain("o2_service_image");
     expect(versionTrafficKey("orders", "east", "2.4.0", "")).toBe(
-      versionTrafficKey("Orders.service", "east", "2.4.0", null),
+      versionTrafficKey("orders", "east", "2.4.0", null),
     );
   });
 });

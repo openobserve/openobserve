@@ -772,9 +772,10 @@ import {
   servingHealthSql,
   servingStatus,
   servingIdle,
-  versionTrafficKey,
+  versionTrafficFrom,
   catalogEnvColumn,
   catalogPanelRow,
+  catalogSpellings,
   catalogCellReason,
   sharedCellGap,
   catalogVersionSort,
@@ -948,6 +949,8 @@ interface ServiceRow {
   place?: CatalogPlace;
   id: string;
   service_name: string;
+  /** The raw span spellings an instrumented row folded into one. */
+  service_names?: string[];
   status: ServiceHealthStatus;
   total_requests: number;
   error_count: number;
@@ -1247,6 +1250,9 @@ const selectedServiceNode = computed(() => {
     (selected.where_key || "") !== panelRoute.state.value.where;
   return {
     ...node,
+    ...(selected.infer_service_name
+      ? {}
+      : { service_names: catalogSpellings(services.value, selected.service_name) }),
     service_system: selected.infer_service_system,
     error_rate: selected.error_rate,
     health_status: current?.status ?? selected.status,
@@ -1922,6 +1928,7 @@ function catalogSql(streamName: string, flags: StreamSchemaFlags): string {
   if (!flags.hasInferColumns) {
     return `SELECT
   MIN(service_name) AS service_name,
+  array_agg(DISTINCT service_name) AS service_names,
 ${redAggregates(requestPred)}
 FROM "${streamName}"
 GROUP BY
@@ -1943,6 +1950,7 @@ ORDER BY total_requests DESC`;
   ].filter((expr): expr is string => expr !== null);
   return `SELECT
   MIN(service_name) AS service_name,
+  array_agg(DISTINCT service_name) FILTER (WHERE NULLIF(infer_service_name, '') IS NULL) AS service_names,
   NULLIF(infer_service_name, '') AS _infer_service_name,
   ${systemExpr ?? "NULL"} AS _infer_service_system,
   ${typeExpr ?? "NULL"} AS _infer_service_type,
@@ -2127,18 +2135,7 @@ async function loadVersionTraffic(
       size: VERSION_TRAFFIC_ROWS,
     });
     if (load !== catalogLoad) return;
-    const traffic = new Map<string, VersionTraffic>();
-    for (const hit of hits)
-      traffic.set(
-        versionTrafficKey(
-          String(hit.service_name ?? ""),
-          String(hit.where_key ?? ""),
-          String(hit.version ?? ""),
-          hit.image == null ? null : String(hit.image),
-        ),
-        { requests: Number(hit.total_requests ?? 0), errors: Number(hit.error_count ?? 0) },
-      );
-    versionTraffic.value = traffic;
+    versionTraffic.value = versionTrafficFrom(hits);
     versionTrafficComplete.value = hits.length < VERSION_TRAFFIC_ROWS;
   } catch {
     if (load !== catalogLoad) return;
@@ -2278,6 +2275,10 @@ async function loadServicesCatalog() {
               where_key: hit.where_key || "",
               id,
               service_name: name,
+              service_names:
+                !inferredName && Array.isArray(hit.service_names)
+                  ? hit.service_names.map(String)
+                  : undefined,
               total_requests: hit.total_requests ?? 0,
               error_count: hit.error_count ?? 0,
               error_rate: hit.error_rate ?? 0,

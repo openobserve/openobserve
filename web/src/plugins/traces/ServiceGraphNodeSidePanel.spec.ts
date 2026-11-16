@@ -706,6 +706,22 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(sql).not.toContain("LEFT JOIN");
     });
 
+    it("matches every spelling a folded catalog row carries, in its spans and in View traces", async () => {
+      vi.mocked(streamTraceRows).mockClear();
+      vi.mocked(streamTraceRows).mockResolvedValue([]);
+      const service_names = ["Checkout", "checkout.service"];
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, name: "checkout.service", service_names },
+      });
+      await flushPromises();
+      const sql = vi.mocked(streamTraceRows).mock.calls[0][0].sql;
+      expect(sql).toContain("service_name IN ('Checkout','checkout.service')");
+      await wrapper.vm.viewRelatedTraces();
+      expect(wrapper.emitted("view-traces")?.[0]?.[0]).toMatchObject({
+        serviceNames: service_names,
+      });
+    });
+
     it("filters catalog-origin inferred dependencies by type and system", async () => {
       vi.mocked(streamTraceRows).mockClear();
       vi.mocked(streamTraceRows).mockResolvedValue([]);
@@ -1696,6 +1712,13 @@ describe("ServiceGraphNodeSidePanel", () => {
   describe("versions tab placement and identity header", () => {
     it.each([
       { scope: "route's", panel: "operations", where: "k8s:c1/web", spans: "k8s:c1/web" },
+      {
+        scope: "route's, linked in another spelling,",
+        panel: "operations",
+        where: "k8s:c1/web",
+        spans: "k8s:c1/web",
+        service: "Frontend.service",
+      },
       { scope: "Versions tab's own", panel: "versions", where: "", spans: "" },
       // The count does not wait for the tab: it takes the place the tab will open on.
       { scope: "first", panel: "operations", where: "", spans: "", countOnly: true },
@@ -1711,7 +1734,11 @@ describe("ServiceGraphNodeSidePanel", () => {
         vi.mocked(streamTraceRows).mockResolvedValue([
           { operation_name: "GET /", request_count: 1 },
         ]);
-        Object.assign(routeQuery, { panel: c.panel, panelSvc: "frontend", panelWhere: c.where });
+        Object.assign(routeQuery, {
+          panel: c.panel,
+          panelSvc: c.service ?? "frontend",
+          panelWhere: c.where,
+        });
         panelVersions.splice(
           0,
           panelVersions.length,
