@@ -536,6 +536,76 @@ describe("removeSampleData", () => {
     expect(await done).toBe(down);
   });
 
+  describe("stream deletes", () => {
+    const limited = () => ({ response: { status: 429 } });
+    beforeEach(() => {
+      mocks.streamDelete.mockReset();
+      vi.useFakeTimers();
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("deletes one stream at a time", async () => {
+      const resolvers: (() => void)[] = [];
+      let inFlight = 0;
+      let maxInFlight = 0;
+      mocks.streamDelete.mockImplementation(() => {
+        maxInFlight = Math.max(maxInFlight, ++inFlight);
+        return new Promise<void>((resolve) =>
+          resolvers.push(() => {
+            inFlight--;
+            resolve();
+          }),
+        );
+      });
+      const done = removeSampleData("acme");
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mocks.streamDelete).toHaveBeenCalledTimes(1);
+      // each release lets exactly the next delete start
+      while (resolvers.length) {
+        resolvers.shift()!();
+        await vi.advanceTimersByTimeAsync(0);
+      }
+      await done;
+      expect(maxInFlight).toBe(1);
+      expect(mocks.streamDelete.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    it("retries a stream delete that gets a 429 and still reports the step done", async () => {
+      mocks.streamDelete.mockRejectedValueOnce(limited());
+      const events: [string, string][] = [];
+      const done = removeSampleData("acme", ((id: string, st: string) =>
+        events.push([id, st])) as any);
+      await vi.advanceTimersByTimeAsync(999);
+      expect(mocks.streamDelete).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(done).resolves.toEqual([]);
+      expect(mocks.streamDelete.mock.calls[1]).toEqual(mocks.streamDelete.mock.calls[0]);
+      expect(events).toContainEqual(["streams", "done"]);
+      expect(events).not.toContainEqual(["streams", "failed"]);
+    });
+
+    it("gives up on a stream after four 429 retries, throws it, and still tries the other streams", async () => {
+      const rate = limited();
+      for (let i = 0; i < 5; i++) mocks.streamDelete.mockRejectedValueOnce(rate);
+      const done = removeSampleData("acme").catch((e) => e);
+      await vi.advanceTimersByTimeAsync(1000 + 2000 + 4000 + 8000);
+      expect(await done).toBe(rate);
+      const first = mocks.streamDelete.mock.calls[0];
+      const sameStream = mocks.streamDelete.mock.calls.filter(
+        (c) => c[1] === first[1] && c[2] === first[2],
+      );
+      expect(sameStream).toHaveLength(5);
+      expect(mocks.streamDelete.mock.calls.length).toBeGreaterThan(5);
+    });
+
+    it("treats a 404 on a stream as already deleted without retrying", async () => {
+      mocks.streamDelete.mockRejectedValueOnce({ response: { status: 404 } });
+      await expect(removeSampleData("acme")).resolves.toEqual([]);
+      const first = mocks.streamDelete.mock.calls[0];
+      expect(mocks.streamDelete.mock.calls.filter((c) => c[1] === first[1])).toHaveLength(1);
+    });
+  });
+
   it("keeps a sample destination and template that something still uses, and still removes the rest", async () => {
     vi.mocked(commonService.list_Folders).mockResolvedValue({
       data: { list: [{ name: SAMPLE_FOLDER_NAME, folderId: "sf" }] },
