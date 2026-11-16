@@ -10410,31 +10410,12 @@
     "hoursAgo": "{count}h atrás",
     "daysAgo": "{count}d atrás",
     "cards": {
-      "firingAlerts": "Alertas disparados",
-      "failingRules": "Regras com falhas",
-      "openIncidents": "Incidentes abertos",
-      "pipelineErrors": "Erros de pipeline",
-      "pipelinesOf": "de {enabled} ativos",
-      "quietStreams": "Streams sem atividade",
-      "firingNone": "Nenhum disparado",
-      "noAlertRules": "Sem regras de alerta",
-      "noEnabledRules": "Sem regras ativadas",
-      "failingNone": "Nenhuma com falhas",
-      "failingNote": "A última avaliação deu erro",
-      "incidentsNone": "Nenhum aberto",
-      "noPipelines": "Sem pipelines",
-      "noStreams": "Sem streams",
-      "quietNote": "Deixou de escrever nos últimos 7 dias",
-      "criticalUnit": "{count} em nível crítico",
-      "deliveryFailures": "Falhas de entrega de alertas",
-      "deliveryNote": "Alertas que dispararam mas não conseguiram notificar",
-      "oldestFiring": "Disparado há mais tempo: {age}"
+      "openIncidents": "Incidentes abertos"
     },
     "state": {
       "tileForbidden": "Sem acesso",
       "tileLocked": "Bloqueado",
       "tileError": "Não foi possível carregar",
-      "tileUnavailable": "Não disponível",
       "sectionLocked": "Disponível com uma licença enterprise",
       "sectionForbidden": "A sua função não permite ver estes dados. Peça acesso a um administrador da organização."
     },
@@ -10556,20 +10537,6 @@
       "retry": "Tentar novamente"
     },
     "dataAsOf": "Dados de {time}",
-    "status": {
-      "attention": "Requer atenção",
-      "checking": "A verificar…",
-      "partial": "Não foi possível carregar algumas verificações",
-      "clear": "Nada requer atenção",
-      "items": {
-        "firing": "{count} alerta disparado | {count} alertas disparados",
-        "failing": "{count} regra com falha | {count} regras com falha",
-        "incidents": "{count} incidente em aberto | {count} incidentes em aberto",
-        "pipelines": "{count} pipeline com erros | {count} pipelines com erros",
-        "quiet": "{count} stream sem atividade | {count} streams sem atividade"
-      },
-      "unmonitored": "Ainda não há nada a ser monitorizado"
-    },
     "timeRange": {
       "heading": "No intervalo de tempo selecionado"
     }

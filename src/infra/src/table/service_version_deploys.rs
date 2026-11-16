@@ -81,13 +81,14 @@ pub async fn put_batch<C: ConnectionTrait + TransactionTrait>(
     Ok(())
 }
 
+/// Returns the rows as stored; a row its version's later delete refuses is left out.
 pub async fn put_fenced_batch<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     region: &str,
     token: i64,
     rows: Vec<Model>,
-) -> Result<(), errors::Error> {
+) -> Result<Vec<Model>, errors::Error> {
     let txn = conn.begin().await?;
     // Reusing the alias fence serializes every regional writer, including absent deploy keys.
     let statement = sea_orm::Statement::from_sql_and_values(
@@ -100,16 +101,19 @@ pub async fn put_fenced_batch<C: ConnectionTrait + TransactionTrait>(
             "service deploy ownership changed".into(),
         ));
     }
+    let mut stored = Vec::with_capacity(rows.len());
     for row in rows {
         if row.org_id != org_id || row.cluster != region {
             return Err(errors::Error::Message(
                 "service deploy writer scope mismatch".into(),
             ));
         }
+        let key = row.deploy_key.clone();
         put(&txn, row).await?;
+        stored.extend(get(&txn, org_id, &key).await?);
     }
     txn.commit().await?;
-    Ok(())
+    Ok(stored)
 }
 
 pub async fn get<C: ConnectionTrait>(

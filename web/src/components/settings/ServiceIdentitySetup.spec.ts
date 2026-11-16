@@ -247,6 +247,7 @@ describe("ServiceIdentitySetup", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+    queryClient.clear();
   });
 
   describe("initial render", () => {
@@ -260,6 +261,31 @@ describe("ServiceIdentitySetup", () => {
       await flushPromises();
       expect(serviceStreamsService.getDimensionAnalytics).toHaveBeenCalledWith("test-org");
       expect(serviceStreamsService.getIdentityConfig).toHaveBeenCalledWith("test-org");
+    });
+
+    it("reads analytics once when the page's semantic groups land during the first load", async () => {
+      wrapper = mountComponent();
+      await wrapper.setProps({ semanticGroups: [] });
+      await flushPromises();
+      expect(serviceStreamsService.getDimensionAnalytics).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads analytics again when a mapping is saved while the first read is in flight", async () => {
+      const summary = { dimensions: [], available_groups: [], service_field_sources: [] };
+      const saved = { group_id: "new-field", display_name: "New field", dimensions: [] };
+      let finishFirst: (value: unknown) => void = () => {};
+      vi.mocked(serviceStreamsService.getDimensionAnalytics)
+        .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)) as never)
+        .mockResolvedValueOnce({ data: { ...summary, available_groups: [saved] } } as never);
+      wrapper = mountComponent();
+      await flushPromises();
+      void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all("test-org") });
+      await wrapper.setProps({ semanticGroups: [saved] });
+      finishFirst({ data: summary });
+      await flushPromises();
+      expect((wrapper.vm as any).availableGroups.map((g: any) => g.group_id)).toEqual([
+        "new-field",
+      ]);
     });
   });
 
@@ -540,7 +566,7 @@ describe("ServiceIdentitySetup", () => {
       ]);
     });
 
-    it("counts the service card out of the discovered services, by display name", async () => {
+    it("counts the service card out of the discovered services, by display name and qualifier", async () => {
       queryClient.clear();
       const response = analytics();
       Object.assign(response.data.dimensions[0], {
@@ -553,14 +579,15 @@ describe("ServiceIdentitySetup", () => {
           { service_name: row.service_name, display_name: row.display_name },
           { service_name: "legacy-key", display_name: row.display_name },
           { service_name: "nats" },
+          { service_name: "nats-eu", display_name: "nats", display_qualifier: "eu" },
         ],
       } as any);
       wrapper = mountComponent();
       await flushPromises();
       (wrapper.vm as any).openInsightDialog(row.service_name, "primary");
       await flushPromises();
-      expect((wrapper.vm as any).insightData.total).toBe(2);
-      expect((wrapper.vm as any).insightData.coverage).toBe(50);
+      expect((wrapper.vm as any).insightData.total).toBe(3);
+      expect((wrapper.vm as any).insightData.coverage).toBe(33);
       queryClient.clear();
     });
 

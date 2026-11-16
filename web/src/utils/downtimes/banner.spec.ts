@@ -13,11 +13,14 @@ describe("downtime banner", () => {
     expect(countdownText(59, gt)).toBe("ends in less than a minute");
   });
 
-  it("counts whole minutes under an hour, singular and plural", () => {
+  it("rounds the minutes under an hour to the nearest, as the list does", () => {
     expect(countdownText(60, gt)).toBe("ends in 1 minute");
-    expect(countdownText(119, gt)).toBe("ends in 1 minute");
-    expect(countdownText(5 * 60 + 40, gt)).toBe("ends in 5 minutes");
-    expect(countdownText(59 * 60 + 59, gt)).toBe("ends in 59 minutes");
+    expect(countdownText(89, gt)).toBe("ends in 1 minute");
+    expect(countdownText(90, gt)).toBe("ends in 2 minutes");
+    expect(countdownText(4 * 60 + 40, gt)).toBe("ends in 5 minutes");
+    expect(countdownText(59 * 60 + 40, gt)).toBe("ends in 60 minutes");
+    expect(countdownText(3 * 60 + 30, gt)).toBe("ends in 4 minutes");
+    expect(countdownText(3 * 60 + 29, gt)).toBe("ends in 3 minutes");
   });
 
   it("switches to hours and minutes from an hour on", () => {
@@ -25,9 +28,12 @@ describe("downtime banner", () => {
     expect(countdownText(2 * 3600 + 15 * 60 + 30, gt)).toBe("ends in 2 h 15 min");
   });
 
-  it("wakes at the next minute boundary, and at the end in the last minute", () => {
-    expect(msUntilCountdownChanges(5 * 60_000 + 1_500)).toBe(1_500);
-    expect(msUntilCountdownChanges(5 * 60_000)).toBe(60_000);
+  it("wakes where the text changes: each minute above an hour, each half minute below, then 60 s and 0", () => {
+    expect(msUntilCountdownChanges(2 * 3_600_000 + 1_500)).toBe(1_500);
+    expect(msUntilCountdownChanges(3_600_000 + 20_000)).toBe(20_000);
+    expect(msUntilCountdownChanges(5 * 60_000)).toBe(30_000);
+    expect(msUntilCountdownChanges(3 * 60_000 + 40_000)).toBe(10_000);
+    expect(msUntilCountdownChanges(75_000)).toBe(15_000);
     expect(msUntilCountdownChanges(42_000)).toBe(42_000);
     expect(msUntilCountdownChanges(0)).toBeNull();
     expect(msUntilCountdownChanges(-5)).toBeNull();

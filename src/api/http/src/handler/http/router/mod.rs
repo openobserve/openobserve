@@ -102,7 +102,7 @@ use crate::{
         },
         router::middlewares::{
             blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
-            password_policy_middleware, root_only_middleware,
+            memory_breaker_middleware, password_policy_middleware, root_only_middleware,
         },
     },
 };
@@ -2410,6 +2410,9 @@ fn with_service_layers(router: Router) -> Router {
 
     // Snappy preprocessing sits outside RequestDecompressionLayer, which rejects snappy with 415.
     router
+        // Innermost, so auth and the org block answer first; both decoders are lazy, so no body
+        // has been read yet when a tripped breaker refuses the write.
+        .layer(middleware::from_fn(memory_breaker_middleware))
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
         // Between auth and audit: it needs the email authentication resolves, and a request it
@@ -3091,6 +3094,10 @@ pub fn splunk_collector_routes() -> Router {
         .layer(middleware::from_fn(
             hec_collector::wire_body_limit_middleware,
         ))
+        // Outside the wire cap, which reads the whole body, so a tripped node never reads it.
+        .layer(middleware::from_fn(
+            hec_collector::memory_breaker_middleware,
+        ))
         .layer(middleware::from_fn(ingest_rejections_middleware))
 }
 
@@ -3485,6 +3492,120 @@ mod tests {
             let json: Value = serde_json::from_slice(&bytes).unwrap();
             assert_eq!(json["message"], "Not Supported", "{what}");
         }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn enterprise_stubs_refuse_before_reading_the_request_in_the_oss_build() {
+        #[rustfmt::skip]
+        const ENTERPRISE_STUBS: &[(&str, &str, u16, &str)] = &[
+            ("GET", "/api/v2/default/downtimes", 403, "Not Supported"),
+            ("POST", "/api/v2/default/downtimes", 403, "Not Supported"),
+            ("POST", "/api/v2/default/downtimes/preview", 403, "Not Supported"),
+            ("POST", "/api/v2/default/downtimes/resources", 403, "Not Supported"),
+            ("POST", "/api/v2/default/downtimes/values", 403, "Not Supported"),
+            ("PUT", "/api/v2/default/downtimes/d1", 403, "Not Supported"),
+            ("POST", "/api/v2/default/downtimes/d1/cancel", 403, "Not Supported"),
+            ("POST", "/api/v2/default/downtimes/d1/extend", 403, "Not Supported"),
+            ("POST", "/api/v2/default/downtimes/d1/test", 403, "Not Supported"),
+            ("PATCH", "/api/v2/default/downtimes/move", 403, "Not Supported"),
+            ("POST", "/api/default/organizations/assume_service_account", 501, "only available in the enterprise version"),
+            ("POST", "/api/default/service_streams/_correlate", 403, "Service Discovery is an enterprise-only feature"),
+            ("POST", "/api/v2/default/incidents/events", 403, "Not Supported"),
+            ("POST", "/api/v2/default/incidents/events/t1", 403, "Not Supported"),
+            ("POST", "/api/v2/default/alerts/a1/mute", 403, "Not Supported"),
+            ("POST", "/api/v2/default/alerts/a1/mute/d1/extend", 403, "Not Supported"),
+            ("POST", "/api/v2/default/alerts/a1/mute/d1/cancel", 403, "Not Supported"),
+            ("POST", "/api/default/alerts/deduplication/semantic-groups/preview-diff", 403, "Enterprise feature not available"),
+            ("PUT", "/api/default/alerts/deduplication/semantic-groups", 403, "Enterprise feature not available"),
+            ("POST", "/api/v2/default/alerts/incidents/i1/events/comment", 403, "Not Supported"),
+            ("PATCH", "/api/v2/default/alerts/incidents/i1/update", 403, "Not Supported"),
+            ("GET", "/api/v2/default/alerts/incidents/i1/rca/runs", 403, "Not Supported"),
+            ("GET", "/api/v2/default/alerts/incidents/i1/rca/runs/r1/thread", 403, "Not Supported"),
+            ("GET", "/api/v2/default/alerts/incidents/i1/rca/runs/r1/summary", 403, "Not Supported"),
+            ("GET", "/api/v2/default/alerts/incidents/i1/rca/live_stream", 403, "Not Supported"),
+            ("POST", "/api/v2/default/incidents/integrations", 403, "Not Supported"),
+            ("PATCH", "/api/v2/default/incidents/integrations/n1/enable", 403, "Not Supported"),
+            ("PATCH", "/api/v2/default/incidents/integrations/n1", 403, "Not Supported"),
+            ("POST", "/api/default/roles", 403, "Not Supported"),
+            ("DELETE", "/api/default/roles/bulk", 403, "Not Supported"),
+            ("PUT", "/api/default/roles/r1", 403, "Not Supported"),
+            ("POST", "/api/default/groups", 403, "Not Supported"),
+            ("PUT", "/api/default/groups/g1", 403, "Not Supported"),
+            ("DELETE", "/api/default/groups/bulk", 403, "Not Supported"),
+            ("POST", "/api/default/pipelines/p1/backfill", 403, "Not Supported"),
+            ("PUT", "/api/default/pipelines/p1/backfill/j1", 403, "Not Supported"),
+            ("POST", "/api/default/status_pages/s1/notices", 403, "require an enterprise license"),
+            ("PUT", "/api/default/status_pages/notices/n1", 403, "require an enterprise license"),
+            ("POST", "/api/default/status_pages/notices/n1/updates", 403, "require an enterprise license"),
+            ("POST", "/api/default/status_pages/notices/n1/mark_false_positive", 403, "require an enterprise license"),
+            ("POST", "/api/default/status_pages/s1/domains", 403, "require an enterprise license"),
+            ("POST", "/api/default/llm/models", 403, "Not supported in the open source version"),
+            ("PUT", "/api/default/llm/models/m1", 403, "Not supported in the open source version"),
+            ("POST", "/api/v2/default/alerts/incidents", 403, "Service incidents require the enterprise build"),
+            ("PUT", "/api/default/service_identity/overrides", 403, "Service versions require the enterprise build"),
+            ("POST", "/api/default/service_identity/aliases", 403, "Service versions require the enterprise build"),
+            ("PUT", "/api/default/service_identity/aliases/k1", 403, "Service versions require the enterprise build"),
+            ("POST", "/api/default/service_identity/aliases/_bulk", 403, "Service versions require the enterprise build"),
+            ("POST", "/api/default/service_identity/aliases/_undo", 403, "Service versions require the enterprise build"),
+        ];
+        const BAD_QUERY: &str = "page=zz&page_size=zz&limit=zz&offset=zz&version=zz&start_time=zz&end_time=zz&status=zz&after_seq=zz&run_id=zz";
+        const REPEATED_QUERY: &str = "known_version=a&known_version=b&run_id=a&run_id=b&start_time=1&start_time=2&folder=a&folder=b";
+        let probes: [(&str, &str, Option<&str>, &'static str); 5] = [
+            ("empty object", "", Some("application/json"), "{}"),
+            ("bad json", "", Some("application/json"), "{not json"),
+            ("no content type", "", None, ""),
+            ("bad query", BAD_QUERY, Some("application/json"), "{}"),
+            (
+                "repeated query",
+                REPEATED_QUERY,
+                Some("application/json"),
+                "{}",
+            ),
+        ];
+        let app = Router::new()
+            .nest("/api", service_route_table())
+            .merge(basic_routes())
+            .nest("/config", config_routes());
+        assert!(
+            get_config().synthetics.enabled,
+            "the status page routes mount only with ZO_SYNTHETICS_ENABLED on"
+        );
+        let mut wrong = Vec::new();
+        for (method, path, status, message) in ENTERPRISE_STUBS {
+            for (label, query, content_type, body) in &probes {
+                let uri = if query.is_empty() {
+                    path.to_string()
+                } else {
+                    format!("{path}?{query}")
+                };
+                let mut req = Request::builder()
+                    .method(Method::from_bytes(method.as_bytes()).unwrap())
+                    .uri(uri)
+                    .header("user_id", "root@example.com");
+                if let Some(content_type) = content_type {
+                    req = req.header(header::CONTENT_TYPE, *content_type);
+                }
+                let response = app
+                    .clone()
+                    .oneshot(req.body(Body::from(*body)).unwrap())
+                    .await
+                    .unwrap();
+                let got = response.status().as_u16();
+                let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                let text = String::from_utf8_lossy(&bytes);
+                if got != *status || !text.contains(message) {
+                    wrong.push(format!("{method} {path} ({label}): {got} {text}"));
+                }
+            }
+        }
+        assert!(
+            wrong.is_empty(),
+            "stubs read the request before refusing:\n{}",
+            wrong.join("\n")
+        );
     }
 
     #[cfg(not(feature = "enterprise"))]

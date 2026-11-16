@@ -276,9 +276,13 @@ pub fn incident_display(
 }
 
 /// One scope per distinct (service, env, namespace) of the trace summary rows, for every env seen.
+/// A placeholder name is no trace name, so a rename of it can be shown.
 pub fn trace_scopes(rows: &[WhereSummaryRecord]) -> Vec<DisplayScope> {
     let mut scopes: BTreeMap<(String, String, String), i64> = BTreeMap::new();
-    for row in rows.iter().filter(|row| row.signal == SIGNAL_TRACES) {
+    for row in rows.iter().filter(|row| {
+        row.signal == SIGNAL_TRACES
+            && !config::meta::service_identity::is_placeholder_service(&row.service_name)
+    }) {
         for env in std::iter::once(&row.env).chain(&row.envs) {
             let seen = scopes
                 .entry((
@@ -666,6 +670,36 @@ pub(crate) mod tests {
         rows[0].envs = vec!["prod".into(), "staging".into()];
         let envs: Vec<_> = trace_scopes(&rows).into_iter().map(|s| s.env).collect();
         assert_eq!(envs, ["prod", "staging"]);
+    }
+
+    #[test]
+    fn a_rename_of_a_placeholder_trace_name_is_shown() {
+        let org = "display_feed_placeholder_rename";
+        let rows = summaries(
+            org,
+            &json!({"trace_scopes": [
+                {"service": "unknown_service:node", "env": "default", "k8s_namespace": ""},
+                {"service": "inventory", "env": "prod", "k8s_namespace": ""}
+            ]}),
+            SIGNAL_TRACES,
+        );
+        let rename = |alias: &str| AliasRow {
+            kind: "rename".into(),
+            alias: alias.into(),
+            canonical: format!("{alias} app"),
+            status: "active".into(),
+            ..Default::default()
+        };
+        rebuild_from(
+            org,
+            &rows,
+            &[rename("unknown_service:node"), rename("inventory")],
+        );
+        assert_eq!(
+            label(org, "unknown_service:node"),
+            "unknown_service:node app"
+        );
+        assert_eq!(label(org, "inventory"), "inventory");
     }
 
     #[test]

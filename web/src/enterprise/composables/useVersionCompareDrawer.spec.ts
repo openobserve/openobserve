@@ -85,6 +85,26 @@ describe("drawer URL ownership", () => {
     });
     wrapper.unmount();
   });
+  it("drops a dependency panel's whole identity when Compare opens over it", async () => {
+    window.history.replaceState({}, "");
+    const { router, drawer, wrapper } = await location({
+      tab: "services-catalog",
+      panel: "operations",
+      panelSvc: "orders",
+      panelWhere: "",
+      panelKind: "database",
+      panelSystem: "mysql",
+    });
+    await drawer.open({ service: "checkout", where: "k8s:c1/prod", a: "v2", b: "v1" });
+    await drawer.openService();
+    expect(router.currentRoute.value.query).toEqual({
+      tab: "services-catalog",
+      panel: "versions",
+      panelSvc: "checkout",
+      panelWhere: "k8s:c1/prod",
+    });
+    wrapper.unmount();
+  });
   it("replaces back-to-service after refresh instead of trusting stale history flags", async () => {
     window.history.replaceState({ o2CmpOpened: true, o2CmpFromPanel: true }, "");
     const { router, drawer, wrapper } = await location({

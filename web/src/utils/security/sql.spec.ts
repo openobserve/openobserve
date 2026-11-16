@@ -17,5 +17,12 @@ describe("quoteString", () => {
     expect(quoteString("[\\'\"]")).toBe("('[' || chr(92) || '''\"]')");
     expect(quoteString("a\\\\")).toBe("('a' || repeat(chr(92), 2))");
     expect(quoteString("\\")).toBe("(chr(92))");
+    expect(quoteString("x\\' OR 1=1 --")).toBe("('x' || chr(92) || ''' OR 1=1 --')");
+  });
+
+  it("splits before a quote that follows another, as the server does", () => {
+    expect(quoteString("")).toBe("''");
+    expect(quoteString("a''b")).toBe("('a''' || '''b')");
+    expect(quoteString("'''")).toBe("('''' || '''' || '''')");
   });
 });

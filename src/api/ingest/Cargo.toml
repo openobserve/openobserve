@@ -49,3 +49,6 @@ snap.workspace = true
 tokio.workspace = true
 tower.workspace = true
 utoipa.workspace = true
+
+[dev-dependencies]
+futures.workspace = true

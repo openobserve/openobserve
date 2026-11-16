@@ -4415,7 +4415,17 @@ pub async fn retrain_alert(
     Path((org_id, alert_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, alert_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
     #[cfg(feature = "enterprise")]
+    retrain_anomaly_alert(&org_id, alert_id, &user_email.user_id).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn retrain_anomaly_alert(org_id: &str, alert_id: String, user_id: &str) -> Response {
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -4425,7 +4435,7 @@ pub async fn retrain_alert(
     };
     let client = get_orm_client_ro().await;
     // Check if this is a regular alert — if so, return 400
-    match alert::get_by_id(client, &org_id, alert_id).await {
+    match alert::get_by_id(client, org_id, alert_id).await {
         Ok(_) => {
             return MetaHttpResponse::bad_request(
                 "retrain is only supported for anomaly detection alerts",
@@ -4436,26 +4446,19 @@ pub async fn retrain_alert(
         }
         Err(e) => return e.into(),
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        MetaHttpResponse::bad_request("retrain is only supported for anomaly detection alerts")
-    }
-    #[cfg(feature = "enterprise")]
     if let Some(resp) = crate::request::anomaly_detection::disabled_response() {
         return resp;
     }
-    #[cfg(feature = "enterprise")]
     if let Err(resp) = openobserve_core::background_access::guard_loaded(
-        &org_id,
-        &user_email.user_id,
-        openobserve_core::background_access::runnable_anomaly_sources(&org_id, &alert_id_str),
+        org_id,
+        user_id,
+        openobserve_core::background_access::runnable_anomaly_sources(org_id, &alert_id_str),
     )
     .await
     {
         return resp;
     }
-    #[cfg(feature = "enterprise")]
-    match openobserve_core::anomaly_detection::train_model(&org_id, &alert_id_str).await {
+    match openobserve_core::anomaly_detection::train_model(org_id, &alert_id_str).await {
         Ok(_) => MetaHttpResponse::ok("Retraining triggered"),
         Err(e) => {
             let msg = e.to_string().to_lowercase();
@@ -4865,6 +4868,13 @@ mod tests {
         known_target_names, locked_target_ids, locked_target_warnings, resolve_generate_sql,
         save_warnings, visible_alert,
     };
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn oss_retrain_alert_answers_403_before_parsing_the_id() {
+        let resp = super::retrain_alert(Path(("o".to_string(), "not-an-id".to_string()))).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
 
     fn row(name: &str, extra: serde_json::Value) -> ListAlertsResponseBodyItem {
         let mut value = serde_json::json!({

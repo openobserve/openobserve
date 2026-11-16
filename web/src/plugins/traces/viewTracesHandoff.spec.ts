@@ -26,6 +26,15 @@ describe("buildViewTracesFilter", () => {
     expect(buildViewTracesFilter({ serviceName: "svc" })).toBe("service_name = 'svc'");
   });
 
+  it("matches every spelling of a folded catalog service", () => {
+    expect(
+      buildViewTracesFilter({
+        serviceName: "checkout.service",
+        serviceNames: ["Checkout", "checkout.service"],
+      }),
+    ).toBe("service_name IN ('Checkout','checkout.service')");
+  });
+
   it("uses infer_service_name when a serviceType is present", () => {
     expect(buildViewTracesFilter({ serviceName: "db", serviceType: "database" })).toBe(
       "infer_service_name = 'db'",

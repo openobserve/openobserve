@@ -10410,31 +10410,12 @@
     "hoursAgo": "{count}h her",
     "daysAgo": "{count}d her",
     "cards": {
-      "firingAlerts": "Ausgelöste Alarme",
-      "failingRules": "Fehlerhafte Regeln",
-      "openIncidents": "Offene Vorfälle",
-      "pipelineErrors": "Pipeline-Fehler",
-      "pipelinesOf": "von {enabled} aktiviert",
-      "quietStreams": "Inaktive Streams",
-      "firingNone": "Keine ausgelöst",
-      "noAlertRules": "Keine Alarmregeln",
-      "noEnabledRules": "Keine aktivierten Regeln",
-      "failingNone": "Keine fehlerhaft",
-      "failingNote": "Letzte Auswertung fehlgeschlagen",
-      "incidentsNone": "Keine offen",
-      "noPipelines": "Keine Pipelines",
-      "noStreams": "Keine Streams",
-      "quietNote": "Keine Schreibvorgänge in den letzten 7 Tagen",
-      "criticalUnit": "{count} auf kritischer Stufe",
-      "deliveryFailures": "Fehler bei der Alarmzustellung",
-      "deliveryNote": "Alarme, die ausgelöst wurden, aber nicht benachrichtigen konnten",
-      "oldestFiring": "Ältester ausgelöst seit {age}"
+      "openIncidents": "Offene Vorfälle"
     },
     "state": {
       "tileForbidden": "Kein Zugriff",
       "tileLocked": "Gesperrt",
       "tileError": "Laden fehlgeschlagen",
-      "tileUnavailable": "Nicht verfügbar",
       "sectionLocked": "Verfügbar mit einer Enterprise-Lizenz",
       "sectionForbidden": "Ihre Rolle kann diese Daten nicht sehen. Bitten Sie einen Organisations-Administrator um Zugriff."
     },
@@ -10556,20 +10537,6 @@
       "retry": "Wiederholen"
     },
     "dataAsOf": "Datenstand: {time}",
-    "status": {
-      "attention": "Erfordert Aufmerksamkeit",
-      "checking": "Wird geprüft…",
-      "partial": "Einige Prüfungen konnten nicht geladen werden",
-      "clear": "Nichts erfordert Aufmerksamkeit",
-      "items": {
-        "firing": "{count} Alarm ausgelöst | {count} Alarme ausgelöst",
-        "failing": "{count} Regel schlägt fehl | {count} Regeln schlagen fehl",
-        "incidents": "{count} offener Vorfall | {count} offene Vorfälle",
-        "pipelines": "{count} Pipeline mit Fehlern | {count} Pipelines mit Fehlern",
-        "quiet": "{count} inaktiver Stream | {count} inaktive Streams"
-      },
-      "unmonitored": "Es wird noch nichts überwacht"
-    },
     "timeRange": {
       "heading": "Im ausgewählten Zeitraum"
     }

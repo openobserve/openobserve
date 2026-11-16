@@ -25,13 +25,12 @@ use crate::{
 
 /// Gets a KV value by org_id and key
 pub async fn get(org_id: &str, key: &str) -> Result<Option<Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
-    let kv_entry = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Key.eq(key))
-        .one(client)
-        .await?;
-    Ok(kv_entry)
+    get_in(get_orm_client_ro().await, org_id, key).await
+}
+
+/// [`get`] from the primary, for a read that must see a write a lagging replica may not have yet.
+pub async fn get_primary(org_id: &str, key: &str) -> Result<Option<Model>, errors::Error> {
+    get_in(get_orm_client_rw().await, org_id, key).await
 }
 
 /// Sets a KV value (upsert: insert or update)
@@ -189,6 +188,19 @@ pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
     let client = get_orm_client_rw().await;
     let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
     Ok(super::delete_returning(client, delete, &[Column::Key]).await?)
+}
+
+async fn get_in<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    key: &str,
+) -> Result<Option<Model>, errors::Error> {
+    let kv_entry = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Key.eq(key))
+        .one(client)
+        .await?;
+    Ok(kv_entry)
 }
 
 #[cfg(test)]

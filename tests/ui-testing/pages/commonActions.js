@@ -5,6 +5,7 @@ import { expect } from '@playwright/test';
 import { getAuthHeaders, getOrgIdentifier } from '../playwright-tests/utils/cloud-auth.js';
 import testLogger from '../playwright-tests/utils/test-logger.js';
 import { ingestBase } from '../playwright-tests/utils/ingest-url.js';
+import { gotoWithAlpha1Reauth } from '../playwright-tests/utils/reauth-alpha1.js';
 
 // Left-nav group flyouts.
 // Several former top-level menu items (pipeline, functions, enrichment tables,
@@ -148,10 +149,12 @@ export async function gotoMetricsVisualize(page) {
         // about:blank and friends have no query string — keep the fallback.
     }
 
-    await page.goto(
-        `${process.env.ZO_BASE_URL}/web/metrics?org_identifier=${orgIdentifier}&mode=visualize`
+    await gotoWithAlpha1Reauth(
+        page,
+        `${process.env.ZO_BASE_URL}/web/metrics?org_identifier=${orgIdentifier}&mode=visualize`,
+        page.locator('[data-test="metrics-explorer-visualize"]'),
+        { timeout: 30000 }
     );
-    await page.locator('[data-test="metrics-explorer-visualize"]').waitFor({ state: 'visible', timeout: 30000 });
 }
 
 // Common Locator exports

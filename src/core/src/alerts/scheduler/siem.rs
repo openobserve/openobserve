@@ -106,7 +106,13 @@ impl SiemRun {
         let settings =
             db::organization::read_org_setting(&alert.org_id, |s| s.security_tuning.shared())
                 .await
-                .unwrap_or_default();
+                .unwrap_or_else(|e| {
+                    log::warn!(
+                        "[SECURITY] security tuning of org {} unreadable, using defaults: {e}",
+                        alert.org_id
+                    );
+                    Default::default()
+                });
         let now = chrono::Utc::now().timestamp_micros();
         let alert_id = alert.get_unique_key();
         let exceptions = settings.active_exceptions(&alert_id, now);

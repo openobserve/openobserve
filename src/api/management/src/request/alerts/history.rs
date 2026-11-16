@@ -21,14 +21,13 @@ use axum::{
     response::Response,
 };
 use chrono::{Duration, Utc};
-use common::utils::sql::escape_like;
 use config::{
     meta::{
         search::{Query as SearchQuery, Request as SearchRequest},
         self_reporting::usage::{TRIGGERS_STREAM, TriggerDataType, normalize_outcome},
         stream::StreamType,
     },
-    utils::time::now_micros,
+    utils::{sql::quote_like_pattern, time::now_micros},
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
@@ -369,9 +368,9 @@ pub async fn get_alert_history(
             }
         }
 
-        let escaped_id = escape_like(anomaly_id);
+        let pattern = quote_like_pattern("%/", anomaly_id, "");
         let where_clause = format!(
-            "module = 'anomaly_detection' AND key LIKE '%/{escaped_id}' \
+            "module = 'anomaly_detection' AND key LIKE {pattern} \
              AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
         );
 
@@ -775,10 +774,7 @@ pub async fn get_alert_history(
 
         let alert_filter = permitted_ids
             .iter()
-            .map(|id| {
-                // escape_like already doubles single quotes.
-                format!("key LIKE '%{}%'", escape_like(id))
-            })
+            .map(|id| format!("key LIKE {}", quote_like_pattern("%", id, "%")))
             .collect::<Vec<_>>()
             .join(" OR ");
         where_clause.push_str(&format!(" AND ({alert_filter})"));
@@ -1823,103 +1819,6 @@ mod tests {
             status: None,
         };
         assert_eq!(query_desc.sort_order, Some("desc".to_string()));
-    }
-
-    #[test]
-    fn test_escape_like_basic() {
-        // Test with normal string (no SQL special characters except underscore)
-        assert_eq!(escape_like("normalstring"), "normalstring");
-        assert_eq!(escape_like("alert123"), "alert123");
-        assert_eq!(escape_like(""), "");
-        assert_eq!(escape_like("simple-text"), "simple-text");
-    }
-
-    #[test]
-    fn test_escape_like_backslash() {
-        // Test escaping backslash
-        assert_eq!(escape_like("path\\to\\file"), r"path\\to\\file");
-        assert_eq!(escape_like("\\"), r"\\");
-        assert_eq!(escape_like("\\\\"), r"\\\\");
-    }
-
-    #[test]
-    fn test_escape_like_percent() {
-        // Test escaping percent sign (SQL wildcard)
-        assert_eq!(escape_like("50%"), r"50\%");
-        assert_eq!(escape_like("%wildcard%"), r"\%wildcard\%");
-        assert_eq!(escape_like("100% success"), r"100\% success");
-    }
-
-    #[test]
-    fn test_escape_like_underscore() {
-        // Test escaping underscore (SQL wildcard)
-        assert_eq!(escape_like("alert_name"), r"alert\_name");
-        assert_eq!(escape_like("_prefix"), r"\_prefix");
-        assert_eq!(escape_like("suffix_"), r"suffix\_");
-    }
-
-    #[test]
-    fn test_escape_like_single_quote() {
-        // Test escaping single quote (SQL string delimiter)
-        assert_eq!(escape_like("it's"), "it''s");
-        assert_eq!(escape_like("'quoted'"), "''quoted''");
-        assert_eq!(escape_like("O'Brien"), "O''Brien");
-    }
-
-    #[test]
-    fn test_escape_like_multiple_special_chars() {
-        // Test multiple special characters in one string
-        assert_eq!(escape_like("100%_test"), r"100\%\_test");
-        assert_eq!(escape_like("path\\with_50%"), r"path\\with\_50\%");
-        assert_eq!(escape_like("It's 100%!"), r"It''s 100\%!");
-    }
-
-    #[test]
-    fn test_escape_like_all_special_chars() {
-        // Test all special characters together
-        assert_eq!(escape_like(r"\%_'combined"), r"\\\%\_''combined");
-    }
-
-    #[test]
-    fn test_escape_like_unicode() {
-        // Test with unicode characters (should pass through unchanged)
-        assert_eq!(escape_like("alert_テスト"), r"alert\_テスト");
-        assert_eq!(escape_like("🔔_notification"), r"🔔\_notification");
-        assert_eq!(escape_like("алерт_name"), r"алерт\_name");
-    }
-
-    #[test]
-    fn test_escape_like_sql_injection_patterns() {
-        // Test common SQL injection patterns
-        assert_eq!(escape_like("' OR '1'='1"), "'' OR ''1''=''1");
-        assert_eq!(escape_like("admin'--"), "admin''--");
-        assert_eq!(escape_like("'; DROP TABLE--"), "''; DROP TABLE--");
-    }
-
-    #[test]
-    fn test_escape_like_consecutive_special_chars() {
-        // Test consecutive special characters
-        assert_eq!(escape_like("%%"), r"\%\%");
-        assert_eq!(escape_like("__"), r"\_\_");
-        assert_eq!(escape_like("''"), "''''");
-        assert_eq!(escape_like(r"\\"), r"\\\\");
-    }
-
-    #[test]
-    fn test_escape_like_whitespace() {
-        // Test that whitespace is preserved
-        assert_eq!(escape_like("alert name"), "alert name");
-        assert_eq!(escape_like("  spaces  "), "  spaces  ");
-        assert_eq!(escape_like("new\nline"), "new\nline");
-        assert_eq!(escape_like("tab\there"), "tab\there");
-    }
-
-    #[test]
-    fn test_escape_like_real_world_alert_names() {
-        // Test with realistic alert name patterns
-        assert_eq!(escape_like("cpu_usage_>_80%"), r"cpu\_usage\_>\_80\%");
-        assert_eq!(escape_like("disk_full_/var/log"), r"disk\_full\_/var/log");
-        assert_eq!(escape_like("error_rate_'high'"), r"error\_rate\_''high''");
     }
 
     #[test]

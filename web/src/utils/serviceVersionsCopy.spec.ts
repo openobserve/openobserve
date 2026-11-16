@@ -150,6 +150,7 @@ describe("warm-up end time", () => {
     const ended = { epoch: now - 2 * hour, warmup_ends_at: now - hour };
     expect(noVerdictText(ended, t, now, true)).toContain("Running before deploy tracking");
   });
+  // The org epoch says nothing about this scope's versions, so a scope not tracked yet never reads as pre-existing.
   it("names the warm-up end only while it is ahead; a passed end on a scope not tracked yet reads time-less", () => {
     const ended = { epoch: now - 2 * hour, warmup_ends_at: now - hour };
     expect(noVerdictText(ended, t, now, false)).toBe(
@@ -167,6 +168,13 @@ describe("warm-up end time", () => {
     );
     expect(noVerdictRule({ epoch: now - 2 * hour, warmup_ends_at: now - hour }, t, now, true)).toBe(
       "running before deploy tracking started",
+    );
+    const ended = { epoch: now - 2 * hour, warmup_ends_at: now - hour };
+    expect(noVerdictRule(ended, t, now, false, true)).toBe(
+      "version metrics have not reached this window",
+    );
+    expect(noVerdictRule(ended, t, now - 2 * hour, false, true)).toBe(
+      "deploy tracking is warming up",
     );
   });
 });

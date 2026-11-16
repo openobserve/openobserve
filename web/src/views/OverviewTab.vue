@@ -20,10 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="pageState !== 'forbidden' && !errorIsForbidden"
-      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+      class="flex flex-wrap items-center justify-end gap-2"
     >
-      <OverviewStatusLine v-if="showStatusLine" :status="status" />
-      <div class="ms-auto flex items-center gap-2">
+      <div class="flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading || overviewState.loading"
@@ -65,18 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </OBanner>
-
-    <OverviewHeadlineStrip
-      v-if="showOverviewCards"
-      :overview="overview"
-      :pending="overviewPending"
-      :failed="overviewFailed"
-      :forbidden="overviewForbidden"
-      :incidents-state="incidentsTile"
-      :incidents-total="incidentsTotal"
-      @select="onHeadlineSelect"
-      @ask-ai="onAskAi"
-    />
 
     <div
       v-if="showOverviewCards"
@@ -841,32 +828,21 @@ import OverviewSectionError from "./OverviewSectionError.vue";
 import OverviewSectionEmpty from "./OverviewSectionEmpty.vue";
 import HomeNoDataState from "./HomeNoDataState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OverviewHeadlineStrip, {
-  type OverviewTarget,
-  type IncidentsTile,
-} from "./overview/OverviewHeadlineStrip.vue";
 import OverviewAlertsCard, { type AlertsBoxTarget } from "./overview/OverviewAlertsCard.vue";
 import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
 import OverviewTopStreamsCard from "./overview/OverviewTopStreamsCard.vue";
 import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
 import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
 import OverviewAskAiButton from "./overview/OverviewAskAiButton.vue";
-import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
 import { buildOverviewAskAi, type OverviewAskAiTarget } from "./overview/overviewAskAi";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
 import { resolveBrowserTimezone } from "@/utils/timezone";
-import {
-  overviewChecks,
-  overviewStatus,
-  type AttentionCheck,
-  type OverviewDestination,
-  type OverviewSignal,
-} from "./overview/overviewFormat";
+import { type OverviewDestination, type OverviewSignal } from "./overview/overviewFormat";
 import { overviewKeys } from "@/services/overview.querykeys";
-import type { OrgOverview } from "@/ts/interfaces/overview";
+import type { IncidentsTile, OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
@@ -1314,30 +1290,6 @@ const incidentsTile = computed<IncidentsTile>(() => {
   if (isFailed("incidents")) return "error";
   return "ok";
 });
-
-// a source not loaded yet is still being checked; one this deployment lacks is left out
-const incidentsCheck = computed<Omit<AttentionCheck, "key" | "monitors"> | undefined>(() => {
-  if (!isIncidentsEnabled.value) return undefined;
-  if (!sectionState.incidents.loaded) return { state: "loading", count: 0 };
-  if (isFailed("incidents")) return { state: "unavailable", count: 0 };
-  return { state: "ok", count: incidentsTotal.value };
-});
-const status = computed(() =>
-  overviewStatus(
-    overviewChecks({
-      overview: overview.value,
-      pending: overviewPending.value,
-      failed: overviewFailed.value,
-      forbidden: overviewForbidden.value,
-      incidents: incidentsCheck.value,
-    }),
-  ),
-);
-// The cards already show every count and problem, so the line speaks only when none can.
-const showStatusLine = computed(
-  () =>
-    showOverviewCards.value && status.value.kind !== "danger" && status.value.kind !== "warning",
-);
 
 // only the flag-on page can tell that nothing is watched
 const loadAlertCount = async (force = false) => {
@@ -1929,20 +1881,9 @@ const onSignalOpen = (signal: OverviewSignal) => {
 };
 
 const onAlertsSelect = (target: AlertsBoxTarget) => {
-  if (target === "critical" || target === "warning") openAlertList(ALERT_LIST_FILTERS[target]);
-  else onHeadlineSelect(target);
-};
-
-const onHeadlineSelect = (target: OverviewTarget) => {
   if (target in ALERT_LIST_FILTERS)
     openAlertList(ALERT_LIST_FILTERS[target as keyof typeof ALERT_LIST_FILTERS]);
-  else if (target === "pipelines") goToPipelines("errored");
-  else if (target === "quiet") goToStreams();
-  else if (incidentsLicenseLocked.value) return;
-  else if (incidentsTile.value === "locked") openUpgradeDialog();
-  else if (incidentsTile.value !== "unavailable" && incidentsTile.value !== "forbidden") {
-    goToIncidentList();
-  }
+  else goToIncidentList();
 };
 
 const onAskAi = (target: OverviewAskAiTarget) => {
