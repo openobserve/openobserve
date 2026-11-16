@@ -332,8 +332,10 @@ pub(crate) mod tests {
             v2["metadata"] = state["metadata"].clone();
         }
         let time = &state["time"];
+        // A 1.x part may lack a callID; the projection then names the call by the part id.
+        let call = part.get("callID").unwrap_or(&part["id"]);
         json!({
-            "type": "tool", "id": part["callID"], "name": part["tool"], "state": v2,
+            "type": "tool", "id": call, "name": part["tool"], "state": v2,
             "time": {"created": time["start"], "completed": time["end"]},
         })
     }
