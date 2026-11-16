@@ -50,6 +50,7 @@ vi.mock("@/composables/useTraces", () => ({
 }));
 
 import TracesNoEventsState from "./TracesNoEventsState.vue";
+import { TRACES_APPLY_RANGE } from "./tracesSearchBar.utils";
 
 // ---------------------------------------------------------------------------
 // Stubs
@@ -153,12 +154,41 @@ describe("TracesNoEventsState", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("names a calendar period in the no-events message, never as a NaN count", async () => {
-      wrapper.unmount();
-      mockSearchObj.data.datetime.relativeTimePeriod = "calendar:month:-1";
-      wrapper = mountComponent();
-      expect(wrapper.text()).toContain("Previous month");
-      expect(wrapper.text()).not.toContain("NaN");
+    it("dates a calendar period in the no-events message, never as a NaN count (R6)", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-16T03:00:00Z"));
+      try {
+        wrapper.unmount();
+        mockSearchObj.data.datetime.relativeTimePeriod = "calendar:month:-1";
+        wrapper = mountComponentWithStore();
+        expect(wrapper.text()).toContain("No traces in Oct 1 – 31");
+        expect(wrapper.text()).not.toContain("NaN");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("offers the next longer quick range through the page's apply (R6, O4)", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-16T03:19:00Z"));
+      try {
+        wrapper.unmount();
+        const applyRange = vi.fn();
+        wrapper = mount(TracesNoEventsState, {
+          global: {
+            plugins: [i18n, store],
+            provide: { [TRACES_APPLY_RANGE as symbol]: applyRange },
+            stubs: { OEmptyState: OEmptyStateStub, EmptyStateActionCard: EmptyStateActionCardStub },
+          },
+        });
+        expect(wrapper.text()).toContain("No traces in Nov 16, 03:04 – 03:19");
+        const btn = wrapper.find('[data-test="traces-no-events-try-range-btn"]');
+        expect(btn.text()).toBe("Try Last 1 hour");
+        await btn.trigger("click");
+        expect(applyRange).toHaveBeenCalledWith("1h");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("should NOT render any expand range card (feature removed)", () => {

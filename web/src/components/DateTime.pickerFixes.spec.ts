@@ -101,7 +101,11 @@ describe("DateTime picker fixes (run 1)", () => {
       await openCalendar();
       const before = emits();
 
-      wrapper!.vm.onStartTimeEdit("10:00:00");
+      const start = document.querySelector<HTMLInputElement>(
+        '[data-test="datetime-start-time"] input',
+      )!;
+      start.value = "10:00:00";
+      start.dispatchEvent(new Event("change", { bubbles: true }));
       await flushPromises();
       expect(emits()).toBe(before);
       expect(wrapper!.vm.triggerLabel).toBe(applied);
@@ -259,7 +263,7 @@ describe("DateTime picker fixes (run 1)", () => {
     expect(lastEmit()).toMatchObject({ relativeTimePeriod: "1h" });
   });
 
-  it("V12 flags a time no typing can complete as it is typed, and only that", async () => {
+  it("V12 flags unreadable text when the field takes it, never while it is typed", async () => {
     createWrapper({ ...absoluteProps });
     await flushPromises();
     await openCalendar();
@@ -273,14 +277,16 @@ describe("DateTime picker fixes (run 1)", () => {
       await flushPromises();
     };
 
-    for (const bad of ["25:99", "ab", "12:60"]) {
-      await typeInto(bad);
-      expect((el("date-time-apply-btn") as HTMLButtonElement).disabled).toBe(true);
-      expect(el("date-time-input-error")?.textContent).toContain("Enter a time as HH:MM");
-    }
-    for (const partial of ["1", "12:", "12:3", "12:30:0"]) {
+    for (const partial of ["1", "12:", "Nov 1", "25:99"]) {
       await typeInto(partial);
       expect((el("date-time-apply-btn") as HTMLButtonElement).disabled).toBe(false);
+    }
+    for (const bad of ["25:99", "ab", "12:60"]) {
+      await typeInto(bad);
+      field.dispatchEvent(new Event("change", { bubbles: true }));
+      await flushPromises();
+      expect((el("date-time-apply-btn") as HTMLButtonElement).disabled).toBe(true);
+      expect(el("date-time-input-error")?.textContent).toContain("Didn’t catch that");
     }
   });
 

@@ -154,22 +154,6 @@ export default function useTimeRangeZone(pickerTimezone: () => string) {
     return `${dayLabel(date)} ${time.slice(0, 5)}`;
   };
 
-  // "Nov 12, 21:13:49.948", the instant a pasted time was read as.
-  const formatExactInstant = (micros: number) => {
-    const { date, time } = convertUnixTime(micros);
-    const ms = String(Math.floor((((micros % 1e6) + 1e6) % 1e6) / 1000)).padStart(3, "0");
-    return `${dayLabel(date)} ${time}.${ms}`;
-  };
-
-  // "21:08:49.948 – 21:18:49.948" for an anchor row, the day added only when the ends differ.
-  const formatClockSpan = (startUs: number, endUs: number) => {
-    const clock = (us: number) => formatExactInstant(us).split(" ").pop() ?? "";
-    const sameDay = convertUnixTime(startUs).date === convertUnixTime(endUs).date;
-    return sameDay
-      ? `${clock(startUs)} – ${clock(endUs)}`
-      : `${formatExactInstant(startUs)} – ${formatExactInstant(endUs)}`;
-  };
-
   return {
     pickerZone,
     zone,
@@ -188,8 +172,6 @@ export default function useTimeRangeZone(pickerTimezone: () => string) {
     resolveRelativePeriod,
     calendarTooltip,
     formatShownInstant,
-    formatExactInstant,
-    formatClockSpan,
   };
 }
 

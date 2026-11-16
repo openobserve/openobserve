@@ -335,7 +335,7 @@ import analytics from "@/services/product_analytics";
 import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import { placeCaret } from "@/test/unit/helpers/monacoCaret";
-import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
+import { tracesRangeLink, tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
 
 // ---------------------------------------------------------------------------
 // DOM anchor node required by attachTo
@@ -769,7 +769,7 @@ describe("SearchBar", () => {
         await flushPromises();
 
         const picker = wrapper.findComponent(`[data-test="${mode}-date-time-picker"]`);
-        expect(picker.props("preset")).toBe("explorer-manual");
+        expect(picker.props("preset")).toBe("explorer-auto");
         expect(picker.props("capabilities")?.kinds ?? ["calendar"]).toContain("calendar");
       },
     );
@@ -2139,6 +2139,101 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("searchdata")).toHaveLength(1);
     });
 
+    it("runs a user's range apply with live mode off, once (decision a)", async () => {
+      store.state.zoConfig = { auto_query_enabled: true };
+      searchObjInstance.meta.liveMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.datetime.relativeTimePeriod = "15m";
+      searchObjInstance.meta.lastRunSignature = tracesSearchRunSignature(searchObjInstance);
+
+      await (wrapper.vm as any).updateDateTime({
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+        userChangedValue: true,
+      });
+
+      expect(wrapper.emitted("searchdata")).toHaveLength(1);
+    });
+
+    it("holds a user's range apply while the query text has unrun edits (decision a)", async () => {
+      searchObjInstance.meta.liveMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.datetime.relativeTimePeriod = "15m";
+      searchObjInstance.meta.lastRunSignature = tracesSearchRunSignature(searchObjInstance);
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+
+      await (wrapper.vm as any).updateDateTime({
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+        userChangedValue: true,
+      });
+
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+
+    it("keeps a refused over-limit link unclamped; a user's apply clears the refusal (R2, O1)", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.stream.selectedStream = { label: "default", value: "default" };
+      searchObjInstance.data.datetime.queryRangeRestrictionInHour = 24;
+      tracesRangeLink.fromLink = true;
+      tracesRangeLink.refusal = {
+        asked: { startUs: 0, endUs: 1 },
+        period: "7d",
+        allowed: "1d",
+        allowedPeriod: "24h",
+        stream: "default",
+      };
+      const end = Date.parse("2026-10-06T10:00:00Z") * 1000;
+      const start = end - 7 * 24 * 3_600_000_000;
+      try {
+        await (wrapper.vm as any).updateDateTime({
+          startTime: start,
+          endTime: end,
+          valueType: "absolute",
+          selectedDate: { from: "2026/09/29", to: "2026/10/06" },
+          selectedTime: { startTime: "10:00", endTime: "10:00" },
+          userChangedValue: false,
+        });
+        expect(searchObjInstance.data.datetime.startTime).toBe(start);
+
+        await (wrapper.vm as any).updateDateTime({
+          startTime: 0,
+          endTime: 0,
+          relativeTimePeriod: "24h",
+          valueType: "relative",
+          userChangedValue: true,
+        });
+        expect(tracesRangeLink.refusal).toBeNull();
+        expect(tracesRangeLink.fromLink).toBe(false);
+      } finally {
+        tracesRangeLink.refusal = null;
+        tracesRangeLink.fromLink = false;
+      }
+    });
+
+    it("runs a user's absolute apply at once, without a typing debounce (decision a)", async () => {
+      searchObjInstance.meta.liveMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await (wrapper.vm as any).updateDateTime({
+        startTime: 1_000,
+        endTime: 2_000,
+        relativeTimePeriod: null,
+        valueType: "absolute",
+        userChangedValue: true,
+      });
+
+      expect(wrapper.emitted("searchdata")).toHaveLength(1);
+    });
+
     it("should NOT emit searchdata for a programmatic date change (userChangedValue false) in live mode", async () => {
       store.state.zoConfig = { auto_query_enabled: true };
       searchObjInstance.meta.liveMode = true;
@@ -2180,7 +2275,7 @@ describe("SearchBar", () => {
       expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     });
 
-    it("tracks a debounced user absolute change in live mode as traces_time_range_changed", async () => {
+    it("tracks a user absolute change in live mode as traces_time_range_changed", async () => {
       store.state.zoConfig = { auto_query_enabled: true };
       searchObjInstance.meta.liveMode = true;
       wrapper = mountSearchBar();

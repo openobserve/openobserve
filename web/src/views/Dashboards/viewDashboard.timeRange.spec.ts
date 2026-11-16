@@ -19,6 +19,10 @@ import { inject, reactive } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 import { AUTO_RUN_STORAGE_KEY, useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
+import { HEADER_TIME_ROW_QUERY } from "@/composables/dashboard/useHeaderTitleRoom";
+import { buildCalendarToken } from "@/utils/dashboard/calendarPeriods";
+import { dashboardTimeUs } from "@/utils/shareTimeRange";
+import { formatRangeCopyText } from "@/utils/timeRangeLabel";
 
 const MINUTE = 60 * 1_000_000;
 
@@ -140,6 +144,7 @@ const PickerStub = {
     preset: String,
     zoneBadge: String,
     shortcuts: Boolean,
+    panelTimeMark: Boolean,
   },
   emits: ["update:modelValue", "show", "hide", "timezone-change"],
   data: () => ({ zoomed: null as any }),
@@ -198,7 +203,8 @@ describe("ViewDashboard time range gate", () => {
             setup() {
               freshOnOpen = inject(DASHBOARD_FRESH_ON_OPEN, null);
             },
-            template: '<div><slot name="actions" /><slot name="subnav" /><slot /></div>',
+            template:
+              '<div><slot name="actions" /><slot name="actions-overflow" /><slot name="subnav" /><slot /></div>',
           },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
           DateTimePickerDashboard: PickerStub,
@@ -307,6 +313,74 @@ describe("ViewDashboard time range gate", () => {
     expect(pickerCalls.mounted).toBe(1);
     expect(picker().vm).toBe(first);
     expect(mockState.timezone).toBe("Asia/Kolkata");
+  });
+
+  describe("header (V1, R4, R9)", () => {
+    let realMatchMedia: typeof window.matchMedia;
+    // The 1280px query alone decides where the trigger sits; the title's room no longer does.
+    const viewportWide = (wide: boolean) => {
+      window.matchMedia = ((query: string) => ({
+        matches: query === HEADER_TIME_ROW_QUERY ? wide : /min-width/.test(query),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+    };
+    const share = () => wrapper.findComponent({ name: "ShareButton" });
+
+    beforeEach(() => {
+      realMatchMedia = window.matchMedia;
+    });
+    afterEach(() => {
+      window.matchMedia = realMatchMedia;
+      dashboard.tabs[0].panels[0].config = {};
+    });
+
+    it("keeps the trigger in the header row from 1280px", async () => {
+      viewportWide(true);
+      await mountDashboard();
+      expect(pickerCalls.mountedIn).toBe("dashboard-header-time");
+      expect(wrapper.vm.hasTimeRow).toBe(false);
+    });
+
+    it("gives the trigger its own row below 1280px", async () => {
+      viewportWide(false);
+      await mountDashboard();
+      expect(pickerCalls.mountedIn).toBe("dashboard-time-row");
+      expect(wrapper.find('[data-test="dashboard-time-row"]').isVisible()).toBe(true);
+    });
+
+    it("marks the global trigger while any panel runs on its own time", async () => {
+      await mountDashboard();
+      expect(picker().props("panelTimeMark")).toBe(false);
+      wrapper.unmount();
+
+      (dashboard.tabs[1].panels[0] as any).config = { panel_time_enabled: true };
+      await mountDashboard();
+      expect(picker().props("panelTimeMark")).toBe(true);
+      (dashboard.tabs[1].panels[0] as any).config = {};
+    });
+
+    it("shares a rolling range live and a finished calendar period as fixed dates", async () => {
+      await mountDashboard();
+      expect(share().props("defaultKind")).toBe("live");
+      wrapper.unmount();
+
+      route.query = { ...route.query, period: buildCalendarToken("day", -1) };
+      await mountDashboard();
+      expect(share().props("defaultKind")).toBe("fixed");
+    });
+
+    it("copies the exact window with its zone offset in the range line", async () => {
+      await mountDashboard();
+      const bounds = dashboardTimeUs(wrapper.vm.currentTimeObj)!;
+      expect(share().props("fixedCopyLabel")).toBe(
+        formatRangeCopyText(bounds, { timezone: mockState.timezone }),
+      );
+      expect(share().props("fixedCopyLabel")).toMatch(/ UTC$/);
+    });
   });
 
   it("does not run a correction the picker makes by itself until Refresh", async () => {

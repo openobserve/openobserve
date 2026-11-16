@@ -181,12 +181,14 @@ describe("DateTime v2", () => {
       await flushPromises();
       expect(el("date-time-trigger-narrowed")).not.toBeNull();
       await openMenu();
-      expect(el("date-time-chips-note-narrowed")?.textContent).toContain("narrowed by query");
+      expect(el("date-time-panel-narrowed")?.textContent?.trim()).toBe(
+        "Query keeps 21:15:00 – 21:20:00 (5m)",
+      );
     });
   });
 
   describe("strip notes", () => {
-    it("shows the limit note and the short narrowed note together", async () => {
+    it("shows the limit note beside the chips and the narrowed window on its own line", async () => {
       createWrapper({
         queryRangeRestrictionInHour: 24,
         narrowedByQuery: {
@@ -196,7 +198,8 @@ describe("DateTime v2", () => {
       });
       await openMenu();
       expect(el("date-time-chips-note-limit")?.textContent).toContain("Max 1d");
-      expect(el("date-time-chips-note-narrowed")?.textContent?.trim()).toBe("narrowed");
+      expect(el("date-time-chips-note-narrowed")).toBeNull();
+      expect(el("date-time-panel-narrowed")).not.toBeNull();
     });
   });
 
@@ -233,9 +236,7 @@ describe("DateTime v2", () => {
         "date-time-list-anchor-to-now",
       ]);
       expect(rows()[0].getAttribute("aria-selected")).toBe("true");
-      expect(el("date-time-resolved-name")?.textContent).toBe(
-        "± 5 min around Nov 12, 21:13:49.948",
-      );
+      expect(el("date-time-resolved-name")?.textContent).toBe("± 5 min");
       expect(el("date-time-preview-note")?.textContent).toBe("read as epoch µs");
 
       await pressInBar("ArrowDown");
@@ -292,7 +293,7 @@ describe("DateTime v2", () => {
 
       await typeInBar("checkout");
       expect(el("date-time-list")!.getAttribute("aria-label")).toBe("No match yet. You can type:");
-      expect(el("date-time-list-heading")!.getAttribute("aria-hidden")).toBe("true");
+      expect(el("date-time-list-heading")!.closest('[aria-hidden="true"]')).not.toBeNull();
     });
 
     it("says why unreadable text failed on Enter and counts it without the text", async () => {
@@ -357,7 +358,7 @@ describe("DateTime v2", () => {
       await flushPromises();
       expect(wrapper!.vm.applyDisabled).toBe(false);
       expect(el("date-time-resolved-name")?.textContent).toBe("Nov 4");
-      expect(el("date-time-preview-note")?.textContent).toBe("pick the end date");
+      expect(el("date-time-preview-note")).toBeNull();
 
       wrapper!.vm.calendarPreviewDay = "2026/11/09";
       await flushPromises();
@@ -421,6 +422,12 @@ describe("DateTime v2", () => {
   });
 
   describe("Start and End fields", () => {
+    const commit = async (dataTest: string, value: string) => {
+      const input = document.querySelector<HTMLInputElement>(`[data-test="${dataTest}"] input`)!;
+      input.value = value;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await flushPromises();
+    };
     const openFixedCalendar = async () => {
       createWrapper({
         defaultType: "absolute",
@@ -438,25 +445,21 @@ describe("DateTime v2", () => {
     it("keeps Apply off while either field is unreadable, whatever the other field does", async () => {
       await openFixedCalendar();
 
-      wrapper!.vm.onTimeFieldInvalid("start", true);
-      wrapper!.vm.onEndTimeEdit("12:00:00");
-      await flushPromises();
+      await commit("datetime-start-time", "noon-ish");
+      await commit("datetime-end-time", "12:00:00");
       expect(wrapper!.vm.applyDisabled).toBe(true);
 
-      wrapper!.vm.onTimeFieldInvalid("end", true);
-      wrapper!.vm.onTimeFieldInvalid("end", false);
-      await flushPromises();
+      await commit("datetime-end-time", "not a time");
+      await commit("datetime-end-time", "13:00:00");
       expect(wrapper!.vm.applyDisabled).toBe(true);
 
-      wrapper!.vm.onTimeFieldInvalid("start", false);
-      await flushPromises();
+      await commit("datetime-start-time", "11:00");
       expect(wrapper!.vm.applyDisabled).toBe(false);
     });
 
     it("drops an unreadable-field error when the calendar closes", async () => {
       await openFixedCalendar();
-      wrapper!.vm.onTimeFieldInvalid("start", true);
-      await flushPromises();
+      await commit("datetime-start-time", "noon-ish");
       expect(wrapper!.vm.applyDisabled).toBe(true);
 
       wrapper!.vm.closeCalendar();

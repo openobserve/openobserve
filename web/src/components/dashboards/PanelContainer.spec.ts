@@ -208,12 +208,13 @@ describe("PanelContainer", () => {
     }
   });
 
-  const createWrapper = (props = {}, extraStubs = {}, provide = {}) => {
+  const createWrapper = (props = {}, extraStubs = {}, provide = {}, slots = {}) => {
     return mount(PanelContainer, {
       props: {
         ...defaultProps,
         ...props,
       },
+      slots,
       global: {
         plugins: [i18n, store, router],
         provide,
@@ -1781,6 +1782,46 @@ describe("PanelContainer", () => {
         await wrapper.vm.$nextTick();
 
         expect(wrapper.vm.confirmDeletePanelDialog).toBe(opens);
+      });
+
+      it("leaves keys to an open picker: handled ones and any typed inside its panel", async () => {
+        wrapper = createWrapper({ layoutMode: "view" });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+        const panel = document.createElement("div");
+        panel.setAttribute("role", "dialog");
+        const row = document.createElement("div");
+        row.tabIndex = 0;
+        panel.appendChild(row);
+        document.body.appendChild(panel);
+        const handled = document.createElement("div");
+        handled.addEventListener("keydown", (e) => e.preventDefault());
+        document.body.appendChild(handled);
+
+        handled.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Delete", bubbles: true, cancelable: true }),
+        );
+        for (const key of ["Backspace", "e", "d", "v", "i"]) {
+          row.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+        }
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.confirmDeletePanelDialog).toBe(false);
+        expect(wrapper.vm.showViewPanel).toBe(false);
+        expect(wrapper.emitted("onViewPanel")).toBeUndefined();
+        panel.remove();
+        handled.remove();
+      });
+
+      it("puts the panel-time slot in the panel's header bar", () => {
+        wrapper = createWrapper(
+          { layoutMode: "view" },
+          {},
+          {},
+          { "panel-time": '<button data-test="panel-time-slot">15m</button>' },
+        );
+        expect(
+          wrapper.find('[data-test="dashboard-panel-bar"] [data-test="panel-time-slot"]').exists(),
+        ).toBe(true);
       });
 
       it.each([["kiosk"], ["viewOnly"]])("ignores every hover shortcut in %s", async (prop) => {

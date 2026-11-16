@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { parseRollingPeriod } from "@/utils/dateTimeRangeParse";
 import {
   isRelativeHistoryEntry,
   sameHistoryEntry,
@@ -21,6 +22,13 @@ import {
 
 const MICROS_PER_DAY = 86_400_000_000;
 const MICROS_PER_HOUR = 3_600_000_000;
+const CLOCK_UNIT_MICROS: Readonly<Record<string, number>> = {
+  s: 1_000_000,
+  m: 60_000_000,
+  h: MICROS_PER_HOUR,
+};
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const DST_ALLOWANCE_US = MICROS_PER_HOUR;
 
 /** The rolling periods offered as chips, in the order shown. */
 export const TIME_RANGE_CHIPS = ["15m", "1h", "4h", "24h", "7d", "30d"] as const;
@@ -80,6 +88,19 @@ export const TIME_INPUT_EXAMPLES = [
 /** A page limit in its largest whole unit, as chips write ranges: 168 hours is `7d`. */
 export const formatLimitShorthand = (hours: number): string =>
   hours >= 24 && hours % 24 === 0 ? `${hours / 24}d` : `${hours}h`;
+
+/** The shortest chip strictly longer than the span (O4), for `Try {range}`; null when none is. */
+export const nextLongerChip = (
+  spanUs: number,
+  chips: readonly TimeRangeChip[],
+): TimeRangeChip | null => {
+  let best: { chip: TimeRangeChip; span: number } | null = null;
+  for (const chip of chips) {
+    const span = shortestChipMicros(chip.value);
+    if (span !== null && span > spanUs && (!best || span < best.span)) best = { chip, span };
+  }
+  return best?.chip ?? null;
+};
 
 export type ScrollCue = "top" | "bottom" | "both" | null;
 
@@ -253,4 +274,27 @@ export const stepListCursor = (
     if (!rows[index].disabled) return index;
   }
   return -1;
+};
+
+// Day-based chips lose up to an hour across DST, and a month chip counts its shortest run of months.
+const shortestChipMicros = (value: string): number | null => {
+  const rolling = parseRollingPeriod(value);
+  if (!rolling) return null;
+  if (rolling.unit in CLOCK_UNIT_MICROS) return rolling.value * CLOCK_UNIT_MICROS[rolling.unit];
+  const days =
+    rolling.unit === "M"
+      ? fewestDaysInMonths(rolling.value)
+      : rolling.value * (rolling.unit === "w" ? 7 : 1);
+  return days * MICROS_PER_DAY - DST_ALLOWANCE_US;
+};
+
+const fewestDaysInMonths = (months: number): number => {
+  const rest = months % 12;
+  let fewest = rest ? Infinity : 0;
+  for (let first = 0; rest && first < 12; first++) {
+    let days = 0;
+    for (let i = 0; i < rest; i++) days += MONTH_DAYS[(first + i) % 12];
+    fewest = Math.min(fewest, days);
+  }
+  return Math.floor(months / 12) * 365 + fewest;
 };

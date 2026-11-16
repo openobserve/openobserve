@@ -16,6 +16,7 @@
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
 const HALF_HOUR_MS = 1_800_000;
+const SECOND_MS = 1_000;
 // Zone offsets move by at most this much at a DST change, so the true instant lies within it of the first guess.
 const CANDIDATE_STEPS = [0, -2, 2, -1, 1];
 
@@ -28,4 +29,21 @@ export const instantFromShiftedMs = (shiftedMs: number, shiftZone: string): numb
     (candidate) => toZonedTime(candidate, shiftZone).getTime() === shiftedMs,
   );
   return (exact ?? guess) * 1000;
+};
+
+/** A drag-zoom window widened to whole buckets: the bucket of the bar under each edge (`originMs` is any bucket start). */
+export const snapZoomToBuckets = (
+  startMs: number,
+  endMs: number,
+  intervalMs: number,
+  originMs = 0,
+): { start: number; end: number } => {
+  if (!(intervalMs >= SECOND_MS)) {
+    const start = Math.floor(startMs / SECOND_MS) * SECOND_MS;
+    return { start, end: Math.max(Math.ceil(endMs / SECOND_MS) * SECOND_MS, start + SECOND_MS) };
+  }
+  // ECharts centres a time-axis bar on its bucket start, so the bar under a point is the nearest start.
+  const first = Math.round((startMs - originMs) / intervalMs);
+  const last = Math.max(Math.round((endMs - originMs) / intervalMs), first);
+  return { start: originMs + first * intervalMs, end: originMs + (last + 1) * intervalMs };
 };

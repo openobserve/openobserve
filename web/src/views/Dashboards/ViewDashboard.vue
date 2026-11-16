@@ -112,8 +112,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Kiosk keeps this mounted on every width: it owns the refresh value and its URL sync. -->
           <AutoRefreshInterval
             v-if="!isMobile || kioskMode"
+            ref="autoActionRef"
             v-model="refreshInterval"
             trigger
+            :is-compact="headerIconOnly.auto"
+            data-test="dashboard-auto-refresh"
+            :data-icon-only="String(headerIconOnly.auto)"
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
             :range-end-us="refreshRangeEndUs"
             :range-start-us="refreshRangeStartUs"
@@ -216,14 +220,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
+            ref="editActionRef"
             variant="outline"
-            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+            :size="isMobile || headerIconOnly.edit ? 'icon-toolbar' : 'sm-toolbar'"
             icon-left="edit"
             :aria-label="t('dashboard.layoutEdit.enter')"
             data-test="dashboard-edit-btn"
+            :data-icon-only="String(isMobile || headerIconOnly.edit)"
             @click="enterLayoutEdit"
           >
-            <template v-if="!isMobile">{{ t("dashboard.layoutEdit.edit") }}</template>
+            <template v-if="!isMobile && !headerIconOnly.edit">{{
+              t("dashboard.layoutEdit.edit")
+            }}</template>
             <OTooltip :content="t('dashboard.layoutEdit.enter')" />
           </OButton>
           <template v-if="isEditingLayout">
@@ -318,17 +326,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="!isEditingLayout">
             <OButtonGroup v-if="!isFullscreen" v-show="store.state.printMode !== true">
               <ShareButton
+                ref="shareActionRef"
                 :url="dashboardShareURL"
                 :live-url="dashboardRollingURL"
-                default-kind="live"
+                :default-kind="dashboardShareDefaultKind"
                 :fixed-label="dashboardFixedLabel"
+                :fixed-copy-label="dashboardFixedCopyLabel"
                 :live-label="dashboardRollingLabel"
                 :range-context="dashboardShareContext"
                 @copy:success="onDashboardShared"
                 variant="outline"
-                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-                :show-label="!isMobile"
+                :size="isMobile || headerIconOnly.share ? 'icon-toolbar' : 'sm-toolbar'"
+                :show-label="!isMobile && !headerIconOnly.share"
                 data-test="dashboard-share-btn"
+                :data-icon-only="String(isMobile || headerIconOnly.share)"
               >
                 <template v-if="store.state.zoConfig?.public_dashboards_enabled" #menu-extra>
                   <ODropdownItem
@@ -538,6 +549,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :shortcuts="!kioskMode && store.state.printMode !== true"
             class="dashboard-icons"
             :class="{ 'min-w-0 flex-1': hasTimeRow && isMobile }"
+            :style="pickerSlotStyle"
+            :panel-time-mark="anyPanelOwnTime"
             size="sm"
             :modelValue="timeGate.picked.value ?? selectedDate"
             :initialTimezone="initialTimezone"
@@ -739,6 +752,7 @@ import {
   onUnmounted,
   onBeforeMount,
   computed,
+  type Ref,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
@@ -756,7 +770,12 @@ import { heldGuard } from "@/composables/usePageTimeRange";
 import useTimeRangeContext from "@/composables/useTimeRangeContext";
 import { formatTimeRange } from "@/utils/timeRangeFormat";
 import { rangeFromLegacy } from "@/utils/timeRangeModel";
-import { useHeaderTitleRoom } from "@/composables/dashboard/useHeaderTitleRoom";
+import {
+  useHeaderActionsRoom,
+  useHeaderTimeInRow,
+} from "@/composables/dashboard/useHeaderTitleRoom";
+import { dashboardShareKind } from "@/utils/dashboard/dashboardTimeLabels";
+import { formatRangeCopyText } from "@/utils/timeRangeLabel";
 import {
   onBeforeRouteLeave,
   onBeforeRouteUpdate,
@@ -942,14 +961,57 @@ export default defineComponent({
     const kioskMode = computed(() => store.state.kioskMode === true);
     const dashboardTitleEl = ref<HTMLElement | null>(null);
     const dateTimePicker = ref(null); // holds a reference to the date time picker
-    const { crowded: titleCrowded } = useHeaderTitleRoom(dashboardTitleEl, {
-      movedEl: computed(() => (dateTimePicker.value as { $el?: HTMLElement } | null)?.$el ?? null),
-    });
+    const timeInHeaderRow = useHeaderTimeInRow();
+    // One place per breakpoint, by viewport width only, so the trigger never jumps rows while the header fits itself.
     const hasTimeRow = computed(
       () =>
-        (isMobile.value || titleCrowded.value) &&
+        (isMobile.value || !timeInHeaderRow.value) &&
         !kioskMode.value &&
         store.state.printMode !== true,
+    );
+    const shareActionRef = ref<{ $el?: HTMLElement } | null>(null);
+    const editActionRef = ref<{ $el?: HTMLElement } | null>(null);
+    const autoActionRef = ref<{ $el?: HTMLElement } | null>(null);
+    const elOf = (target: Ref<{ $el?: HTMLElement } | null>) =>
+      computed(() => target.value?.$el ?? null);
+    type PickerApi = { shortestFormWidth?: () => number };
+    // The picker measures only its trigger button; the steppers around it keep their width.
+    const shortestPickerWidth = (): number | null => {
+      const picker = dateTimePicker.value as {
+        $el?: HTMLElement;
+        dateTimePicker?: PickerApi;
+      } | null;
+      const button = picker?.$el?.querySelector?.<HTMLElement>('[data-cy="date-time-button"]');
+      const shortest = picker?.dateTimePicker?.shortestFormWidth?.() ?? 0;
+      if (!picker?.$el || !button || !(shortest > 0)) return null;
+      const width = (el: HTMLElement) => el.getBoundingClientRect().width;
+      return width(picker.$el) - width(button) + shortest;
+    };
+    const { iconOnly: headerIconOnly, triggerMaxWidth: headerTriggerMaxWidth } =
+      useHeaderActionsRoom(
+        dashboardTitleEl,
+        {
+          trigger: elOf(dateTimePicker as Ref<{ $el?: HTMLElement } | null>),
+          share: elOf(shareActionRef),
+          edit: elOf(editActionRef),
+          auto: elOf(autoActionRef),
+        },
+        {
+          shortestTriggerWidth: shortestPickerWidth,
+          enabled: computed(
+            () => !isMobile.value && !kioskMode.value && store.state.printMode !== true,
+          ),
+        },
+      );
+    const pickerSlotStyle = computed(() => {
+      if (headerTriggerMaxWidth.value === null || hasTimeRow.value) return undefined;
+      const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      return { maxWidth: `${headerTriggerMaxWidth.value / rootPx}rem` };
+    });
+    const anyPanelOwnTime = computed(() =>
+      (currentDashboardData.data?.tabs ?? []).some((tab: any) =>
+        (tab?.panels ?? []).some((panel: any) => hasPanelTime(panel)),
+      ),
     );
     const kioskFit = computed(() => isFitEnabled(route.query.fit));
     const { active: kioskPointerActive } = useIdleReveal(kioskMode);
@@ -2640,6 +2702,14 @@ export default defineComponent({
         ? String(formatPeriodLabel(dashboardPeriod.value, store.state.timezone, t))
         : "",
     );
+    const dashboardShareDefaultKind = computed(() => dashboardShareKind(dashboardPeriod.value));
+    // The range line spells the exact window with its offset, so a reader can paste it back into the bar.
+    const dashboardFixedCopyLabel = computed(() => {
+      const bounds = dashboardTimeUs(
+        currentTimeObj.value as { start_time?: Date; end_time?: Date },
+      );
+      return bounds ? formatRangeCopyText(bounds, { timezone: store.state.timezone }) : "";
+    });
     const dashboardFixedLabel = computed(() => {
       const bounds = dashboardTimeUs(
         currentTimeObj.value as { start_time?: Date; end_time?: Date },
@@ -3088,6 +3158,14 @@ export default defineComponent({
       isMobile,
       hasTimeRow,
       dashboardTitleEl,
+      shareActionRef,
+      editActionRef,
+      autoActionRef,
+      headerIconOnly,
+      pickerSlotStyle,
+      anyPanelOwnTime,
+      dashboardShareDefaultKind,
+      dashboardFixedCopyLabel,
       currentDashboardData,
       dashboardRemountKey,
       toggleFullscreen,

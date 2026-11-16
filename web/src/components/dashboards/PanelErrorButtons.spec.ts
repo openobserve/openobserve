@@ -19,6 +19,7 @@ import { mount } from "@vue/test-utils";
 import PanelErrorButtons from "./PanelErrorButtons.vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
+import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 
 // Create a mock Vuex store with timezone state
 const mockStore = createStore({
@@ -681,6 +682,42 @@ describe("PanelErrorButtons", () => {
         wrapper.find('[data-test="panel-notice-chip-collapsed"]').attributes("aria-label"),
       ).toBe("1 issue");
       wrapper.unmount();
+    });
+  });
+  describe("stream range limit (R2)", () => {
+    // The server's own clamp text, through the notices composable the panel hosts use.
+    const clampWarning = (hours: number) => {
+      const notices = usePanelNotices(() => "UTC");
+      notices.handleResultMetadataUpdate([
+        [
+          {
+            function_error: [
+              `Query duration is modified due to query range restriction of ${hours} hours`,
+            ],
+          },
+        ],
+      ]);
+      return notices.maxQueryRangeWarning.value;
+    };
+
+    it("shows a lock chip with the stream's limit instead of the warning button", () => {
+      const wrapper = mountComponent({ props: { maxQueryRangeWarning: clampWarning(24) } });
+      const chip = wrapper.find('[data-test="panel-max-duration-chip"]');
+      expect(chip.exists()).toBe(true);
+      expect(chip.text()).toBe("Max 1d");
+      expect(chip.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
+    });
+
+    it("spells a limit under a day in hours", () => {
+      const wrapper = mountComponent({ props: { maxQueryRangeWarning: clampWarning(6) } });
+      expect(wrapper.find('[data-test="panel-max-duration-chip"]').text()).toBe("Max 6h");
+    });
+
+    it("keeps the warning button for a function error that names no limit", () => {
+      const wrapper = mountComponent({ props: { maxQueryRangeWarning: "error[E203]: syntax" } });
+      expect(wrapper.find('[data-test="panel-max-duration-chip"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(true);
     });
   });
 });

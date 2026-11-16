@@ -188,6 +188,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @pick-stream="onPickStream"
                       />
                     </div>
+                    <RangeLimitStrip
+                      v-else-if="searchObj.meta.rangeLimitRefusal"
+                      :refusal="searchObj.meta.rangeLimitRefusal"
+                      :timezone="store.state.timezone"
+                      data-test="logs-range-limit-strip"
+                      nothing-run-test="logs-nothing-run"
+                      @show="onTryRange"
+                      @pick="() => searchBarRef?.dateTimeRef?.openMenu?.()"
+                    />
                     <div
                       v-else-if="searchObj.data.filterErrMsg !== '' && searchObj.loading == false"
                       data-test="logs-search-filter-error-message"
@@ -354,6 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query-window-us="queryWindowUs"
                         :timezone="store.state.timezone"
                         @jump-to-stream-data="onJumpToStreamData"
+                        @apply-range="onTryRange"
                         @open-history="openSearchHistory"
                         @ask-ai="onAskAiFixQuery"
                       />
@@ -645,6 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :query-window-us="queryWindowUs"
                 :timezone="store.state.timezone"
                 @jump-to-stream-data="onJumpToStreamData"
+                @apply-range="onTryRange"
                 @open-history="openSearchHistory"
                 @ask-ai="onAskAiFixQuery"
               />
@@ -836,6 +847,7 @@ import {
 } from "@/utils/searchAroundWindow";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
+import RangeLimitStrip from "./RangeLimitStrip.vue";
 import { liveTimeSelection, staleQueriedRange } from "@/utils/logsStaleRange";
 import { formatRangeLabel } from "@/utils/timeRangeLabel";
 import { formatPeriodLabel } from "@/utils/timeRangeRail";
@@ -909,6 +921,7 @@ export default defineComponent({
     LogsAutoRunGuard,
     OBadge,
     StaleRangeStrip,
+    RangeLimitStrip,
   },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
@@ -1377,6 +1390,7 @@ export default defineComponent({
           searchObj.meta.searchApplied = false;
           resetStreamData();
           await restoreUrlQueryParams(dashboardPanelData);
+          markRangeFromLink();
           await loadLogsData("url");
         }
       },
@@ -1705,6 +1719,7 @@ export default defineComponent({
               else endLogsArrival();
             } else {
               searchObj.loading = true;
+              markRangeFromLink();
               loadLogsData("landing", { origin: currentInitOrigin() ?? undefined });
             }
           } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
@@ -1851,6 +1866,7 @@ export default defineComponent({
       resetSearchObj();
       resetStreamData();
       await restoreUrlQueryParams(dashboardPanelData);
+      markRangeFromLink();
       loadLogsData("url");
     }
 
@@ -1877,6 +1893,7 @@ export default defineComponent({
       resetSearchObj();
       resetStreamData();
       await restoreUrlQueryParams(dashboardPanelData);
+      markRangeFromLink();
       loadLogsData("url");
     }
 
@@ -2271,6 +2288,15 @@ export default defineComponent({
       }
       return undefined;
     });
+
+    // O1: a range named by the URL is a link's, so its stream limit refuses it instead of clamping it.
+    function markRangeFromLink() {
+      const query = router.currentRoute.value.query;
+      searchObj.meta.rangeFromLink = !!(query.period || query.from || query.to);
+    }
+
+    // Applied as a chip pick, so it runs, takes an undo step and lands in Recent like one.
+    const onTryRange = (period: string) => searchBarRef.value?.dateTimeRef?.pickChip?.(period);
 
     const onJumpToStreamData = (fromUs: number, toUs: number) => {
       // We fire the search directly via runQuery below. setAbsoluteTime is only
@@ -4092,8 +4118,9 @@ export default defineComponent({
       }
       (searchBarRef.value as { handleRunQueryFn?: () => void } | null)?.handleRunQueryFn?.();
     };
+    // A range applied over unrun query edits waits for Run, so say which range the shown results are for.
     const staleRangeText = computed(() => {
-      if (isAutoRunOn.value || searchObj.loading) return null;
+      if (isAutoRunOn.value || searchObj.loading || !searchObj.meta.editorDirty) return null;
       if (contextViewText.value) return null;
       if (searchObj.meta.logsVisualizeToggle !== "logs") return null;
       const queried = staleQueriedRange(
@@ -4452,6 +4479,7 @@ export default defineComponent({
       onAskAiFixQuery,
       streamDocTimeRange,
       queryWindowUs,
+      onTryRange,
       onJumpToStreamData,
       onFixQuery,
       onConfigureStream,

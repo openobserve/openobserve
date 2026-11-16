@@ -96,3 +96,40 @@ describe("searchTimeZones [fresh#6]", () => {
     expect(searchTimeZones(options, "india", (option) => option.zone, AT)).toEqual([options[0]]);
   });
 });
+
+describe("browser zone aliases [R12]", () => {
+  const BROWSER_ROW = { label: "Browser time · Asia/Kolkata", value: "browser", zone: KOLKATA };
+  const OPTIONS = [
+    BROWSER_ROW,
+    { label: "UTC", value: "UTC", zone: "UTC" },
+    ...ZONES.filter((zone) => zone !== "UTC").map((zone) => ({ label: zone, value: zone, zone })),
+  ];
+  const find = (query: string) =>
+    searchTimeZones(
+      OPTIONS,
+      query,
+      (option) => option.zone,
+      AT,
+      (option) => option === BROWSER_ROW,
+    );
+
+  it.each(["browser", "Browser", "local", "LOCAL", "brow", "loc"])(
+    "%s finds the browser row alone",
+    (query) => {
+      expect(find(query)).toEqual([BROWSER_ROW]);
+    },
+  );
+
+  it("still finds the browser row by its zone, beside the zone's own row", () => {
+    const found = find("kolkata").map((option) => option.value);
+    expect(found).toContain("browser");
+    expect(found).toContain(KOLKATA);
+  });
+
+  it("matches the browser's own zone when no browser row is marked", () => {
+    const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    expect(searchTimeZones(ZONES, "local", undefined, AT)).toEqual(
+      ZONES.filter((zone) => zone === browserZone),
+    );
+  });
+});

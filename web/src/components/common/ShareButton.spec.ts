@@ -26,6 +26,7 @@ vi.mock("@/utils/clipboard", () => ({
 }));
 
 import { copyToClipboard } from "@/utils/clipboard";
+import { formatRangeCopyText } from "@/utils/timeRangeLabel";
 
 // Mock short URL service
 vi.mock("@/services/short_url", () => ({
@@ -659,6 +660,29 @@ describe("ShareButton", () => {
       });
       expect(wrapper.get('[data-test="share-button-copy-with-range"]').text()).toContain(
         "Adds “Logs · default · Nov 11, 06:57 – 07:12 UTC · fixed”",
+      );
+    });
+
+    it("adds exactly the line its hint shows: the exact window with its offset, then the kind (R4)", async () => {
+      const window = formatRangeCopyText(
+        {
+          startUs: Date.UTC(2026, 10, 15, 14, 32, 10) * 1000,
+          endUs: Date.UTC(2026, 10, 15, 14, 32, 12) * 1000,
+        },
+        { timezone: "Asia/Kolkata" },
+      );
+      const wrapper = mountKinds({
+        liveUrl: LIVE,
+        rangeContext: "Dashboard · Checkout",
+        fixedCopyLabel: window,
+      });
+      expect(window).toBe("2026-11-15 20:02:10 – 20:02:12 UTC+05:30");
+      await wrapper.get('[data-test="share-button-copy-with-range"]').trigger("click");
+      await flushPromises();
+      const line = lastCopy()[0].split("\n")[1];
+      expect(line).toBe(`Dashboard · Checkout · ${window} · fixed`);
+      expect(wrapper.get('[data-test="share-button-copy-with-range"]').text()).toContain(
+        `Adds “${line}”`,
       );
     });
 

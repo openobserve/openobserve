@@ -17,14 +17,16 @@ import { computed, nextTick, ref, type Ref } from "vue";
 import { formatTypedTime, parseTypedTime } from "@/lib/forms/Time/parseTypedTime";
 import { convertToUtcTimestamp } from "@/utils/zincutils";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { parseTimeInput } from "@/utils/dateTimeRangeParse";
+import { readingAnchorMicros } from "@/utils/timeRangeAnchor";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { MICROS_PER_SECOND, type TimeRangeZone } from "@/composables/useTimeRangeZone";
 import type { TimeRangeLimits } from "@/composables/useTimeRangeLimits";
 
 type TimeField = "start" | "end";
 
-// Endings that complete a partly typed time (`1` → `100`, `12:` → `12:00`), milliseconds included.
-const TIME_COMPLETIONS = ["", "0", "00", ":00", "0:00", ":00:00", "0:00:00"];
+// A clock time alone, with an optional fraction: it keeps the day the field already shows.
+const CLOCK_ONLY_RE = /^([\d:]+?)(?:\.(\d{1,6}))?$/;
 
 interface ShownEnd {
   date: string;
@@ -50,11 +52,11 @@ export interface TimeRangeFieldsDeps {
   readPastedStamp: (text: string) => { start: number; end: number } | null;
 }
 
-const canBecomeTime = (text: string): boolean =>
-  TIME_COMPLETIONS.some((ending) => {
-    const full = `${text}${ending}`.replace(/\.\d{0,3}$/, "");
-    return parseTypedTime(full) !== null;
-  });
+const fractionMicros = (digits: string | undefined): number =>
+  digits ? Math.round(Number(`0.${digits}`) * MICROS_PER_SECOND) : 0;
+
+const msOf = (micros: number) =>
+  Math.floor((((micros % MICROS_PER_SECOND) + MICROS_PER_SECOND) % MICROS_PER_SECOND) / 1000);
 
 /** The Start/End fields: the civil dates and times they hold, the instants they stand for, and their edit rules. */
 export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
@@ -84,10 +86,12 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
   const timeFieldFocused = ref(false);
   // The Start or End field whose last edit was refused, and why.
   const timeFieldError = ref<{ field: TimeField; message: I18nText } | null>(null);
-  // Set only by each field's own @invalid, so an edit to the other field cannot unblock Apply.
+  // Set only by each field's own commit, so an edit to the other field cannot unblock Apply.
   const unreadableFields = ref({ start: false, end: false });
-  // A readable time still being typed in Start or End, previewed in the summary before the field commits it.
-  const typedFieldTime = ref<{ field: TimeField; time: string; ms: boolean } | null>(null);
+  // A readable instant still being typed in Start or End, previewed in the summary before the field commits it.
+  const typedFieldTime = ref<{ field: TimeField; micros: number } | null>(null);
+  // Text typed into a field and not yet taken; a refused edit drops it so the field shows the kept value.
+  const fieldDrafts = ref<Record<TimeField, string | null>>({ start: null, end: null });
 
   const isSeeding = () => isSeedingAbsolute;
 
@@ -243,6 +247,7 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
   const clearTimeFieldErrors = () => {
     timeFieldError.value = null;
     unreadableFields.value = { start: false, end: false };
+    fieldDrafts.value = { start: null, end: null };
   };
 
   // An edit in Start/End makes the selection absolute; the shown values were the relative one's.
@@ -326,91 +331,127 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
     return true;
   };
 
-  // Whether the fields would read End at or before Start, on the pending day when one is clicked.
-  const timesReversed = (startTime: string, endTime: string) => {
-    const pending = menuOpen.value ? pendingDay.value : null;
-    return timesReversedOn(
-      pending ?? selectedDate.value.from,
-      pending ?? selectedDate.value.to,
-      startTime,
-      endTime,
-    );
+  const pendingShown = () => (menuOpen.value ? pendingDay.value : null);
+
+  // The day each field stands on; mid-pick, End is the day under the pointer: the end a second pick would make.
+  const fieldDate = (field: TimeField): string => {
+    const pending = pendingShown();
+    if (field === "start") return pending ?? selectedDate.value.from;
+    return pending ? (calendarPreviewDay.value ?? pending) : selectedDate.value.to;
   };
 
-  // A Start typed at or past End moves the range: End follows at the same duration, stopped at now; null when that leaves End not after Start.
-  const shiftedEnd = (startTime: string): ShownEnd | null => {
-    const pending = menuOpen.value ? pendingDay.value : null;
-    const from = pending ?? selectedDate.value.from;
-    const to = pending ?? selectedDate.value.to;
-    const oldStart = convertToUtcTimestamp(`${from} ${selectedTime.value.startTime}`, zone.value);
-    const oldEnd = convertToUtcTimestamp(`${to} ${selectedTime.value.endTime}`, zone.value);
-    const start = convertToUtcTimestamp(`${from} ${startTime}`, zone.value);
-    const end = Math.min(start + Math.max(0, oldEnd - oldStart), selectionCeilingMicros());
-    return end > start ? convertUnixTime(end) : null;
+  // The instants the fields hold, on the pending day when one is clicked.
+  const fieldInstants = (): { start: number; end: number } => {
+    const pending = pendingShown();
+    if (pending === null) {
+      const { startUTC, endUTC } = getUTCTimeStamp();
+      return { start: startUTC, end: endUTC };
+    }
+    return {
+      start: absoluteToMicros(pending, selectedTime.value.startTime),
+      end: endFieldToMicros(pending, selectedTime.value.endTime),
+    };
   };
 
-  // A refused edit leaves the model alone, so the field shows the kept value again.
-  const onStartTimeEdit = (value: string) => {
+  // Text that reads back to the same instant: seconds and milliseconds only when present.
+  const formatFieldStamp = (date: string, time: string, ms: number): string => {
+    const clockText = ms
+      ? `${time}.${String(ms).padStart(3, "0")}`
+      : time.endsWith(":00")
+        ? time.slice(0, 5)
+        : time;
+    return `${dayLabel(date)} ${clockText}`;
+  };
+
+  const fieldText = (field: TimeField): string => {
+    const time = field === "start" ? selectedTime.value.startTime : selectedTime.value.endTime;
+    if (pendingShown() !== null) return formatFieldStamp(fieldDate(field), time, 0);
+    const { start, end } = fieldInstants();
+    const at = field === "start" ? start : shownEndMicros(start, end);
+    const civil = convertUnixTime(at);
+    return formatFieldStamp(civil.date, civil.time, msOf(at));
+  };
+
+  const startFieldText = computed(() => fieldDrafts.value.start ?? fieldText("start"));
+  const endFieldText = computed(() => fieldDrafts.value.end ?? fieldText("end"));
+
+  // A shown 23:59:59 in End is the whole last second, as the fields write an exclusive midnight.
+  const throughLastSecond = (field: TimeField, micros: number): number =>
+    field === "end" &&
+    micros % MICROS_PER_SECOND === 0 &&
+    convertUnixTime(micros).time === "23:59:59"
+      ? micros + MICROS_PER_SECOND
+      : micros;
+
+  // A clock time alone keeps the field's day; other text goes through the bar's point parser in the picker zone.
+  const readFieldText = (field: TimeField, text: string): number | null => {
+    const typed = text.trim();
+    if (!typed) return null;
+    const clockOnly = CLOCK_ONLY_RE.exec(typed);
+    const clockTime = clockOnly ? parseTypedTime(clockOnly[1]) : null;
+    if (clockOnly && clockTime) {
+      const at = absoluteToMicros(fieldDate(field), formatTypedTime(clockTime));
+      return throughLastSecond(field, at + fractionMicros(clockOnly[2]));
+    }
+    const reading = parseTimeInput(typed, { now: new Date(), timeZone: zone.value });
+    const anchor = reading ? readingAnchorMicros(reading, zone.value) : null;
+    if (anchor !== null) return throughLastSecond(field, Math.round(anchor));
+    const stamp = deps.readPastedStamp(typed);
+    if (!stamp) return null;
+    return field === "start" ? stamp.start : stamp.end;
+  };
+
+  const onFieldInput = (field: TimeField, value: string | number) => {
+    const text = String(value);
+    fieldDrafts.value[field] = text;
+    const at = text.trim() === fieldText(field) ? null : readFieldText(field, text);
+    if (at !== null) unreadableFields.value[field] = false;
+    typedFieldTime.value = at === null ? null : { field, micros: at };
+  };
+
+  const refuseField = (field: TimeField, message: I18nText) => {
+    timeFieldError.value = { field, message };
+    fieldDrafts.value[field] = null;
+  };
+
+  // A Start typed at or past End moves the range: End follows at the same duration, stopped at the ceiling.
+  const rangeAfterEdit = (field: TimeField, at: number): { start: number; end: number } | null => {
+    const current = fieldInstants();
+    if (field === "end") return at > current.start ? { start: current.start, end: at } : null;
+    if (at < current.end) return { start: at, end: current.end };
+    const moved = Math.min(at + Math.max(0, current.end - current.start), selectionCeilingMicros());
+    return moved > at ? { start: at, end: moved } : null;
+  };
+
+  // A refused edit leaves the model alone; unreadable text stays in the field, marked, and blocks Apply.
+  const commitFieldText = (field: TimeField, text: string) => {
     typedFieldTime.value = null;
-    const pending = menuOpen.value ? pendingDay.value : null;
-    const from = pending ?? selectedDate.value.from;
-    const bound = startBoundError(convertToUtcTimestamp(`${from} ${value}`, zone.value));
-    if (bound !== null) {
-      timeFieldError.value = { field: "start", message: bound };
+    if (text.trim() === fieldText(field)) {
+      fieldDrafts.value[field] = null;
+      unreadableFields.value[field] = false;
       return;
     }
-    if (timesReversed(value, selectedTime.value.endTime)) {
-      const end = shiftedEnd(value);
-      if (!end) {
-        timeFieldError.value = { field: "start", message: t("common.timeRangeEndBeforeStart") };
-        return;
-      }
-      // A moved End makes the clicked day a range of its own, committed like a settled one.
-      pendingDay.value = null;
-      selectedDate.value.from = from;
-      selectedDate.value.to = end.date;
-      selectedTime.value.endTime = end.time;
-      seededEnd = null;
+    const at = readFieldText(field, text);
+    if (at === null) {
+      fieldDrafts.value[field] = text;
+      unreadableFields.value[field] = true;
+      return;
     }
+    unreadableFields.value[field] = false;
+    const bound = field === "start" ? startBoundError(at) : null;
+    if (bound !== null) return refuseField(field, bound);
+    const range = rangeAfterEdit(field, at);
+    if (!range) return refuseField(field, t("common.timeRangeEndBeforeStart"));
     timeFieldError.value = null;
-    unreadableFields.value.start = false;
+    fieldDrafts.value[field] = null;
     endBeforeCut = null;
+    // A clicked day stays a whole-day pick while the edit keeps the range on it.
+    const pending = pendingShown();
+    const shownEnd = shownEndMicros(range.start, range.end);
+    const onPending = [range.start, shownEnd].every((us) => convertUnixTime(us).date === pending);
+    if (!onPending) pendingDay.value = null;
     markAbsoluteEdit();
-    selectedTime.value.startTime = value;
-  };
-
-  const onEndTimeEdit = (value: string) => {
-    typedFieldTime.value = null;
-    if (timesReversed(selectedTime.value.startTime, value)) {
-      timeFieldError.value = { field: "end", message: t("common.timeRangeEndBeforeStart") };
-      return;
-    }
-    timeFieldError.value = null;
-    unreadableFields.value.end = false;
-    endBeforeCut = null;
-    markAbsoluteEdit();
-    selectedTime.value.endTime = value;
-  };
-
-  // The field refuses milliseconds, so the preview says where they can be typed.
-  // Text no further typing can make readable is flagged at once, not only when the field commits.
-  const onTimeFieldTyping = (field: TimeField, event: Event) => {
-    const text = (event.target as HTMLInputElement | null)?.value.trim() ?? "";
-    unreadableFields.value[field] = text !== "" && !canBecomeTime(text);
-    const ms = /\.\d{1,3}$/.test(text);
-    const parsed = parseTypedTime(ms ? text.replace(/\.\d{1,3}$/, "") : text);
-    if (!parsed) {
-      typedFieldTime.value = null;
-      return;
-    }
-    const time = formatTypedTime(parsed);
-    const current = field === "start" ? selectedTime.value.startTime : selectedTime.value.endTime;
-    typedFieldTime.value = time === current && !ms ? null : { field, time, ms };
-  };
-
-  const onTimeFieldInvalid = (field: TimeField, invalid: boolean) => {
-    if (invalid) typedFieldTime.value = null;
-    unreadableFields.value[field] = invalid;
+    writeInstants(range.start, range.end);
   };
 
   const onTimeFieldBlur = () => {
@@ -426,6 +467,9 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
       return false;
     }
     const text = event.clipboardData?.getData("text")?.trim() ?? "";
+    // A lone instant is one field's value, so it pastes as text; a range fills both fields.
+    const reading = text ? parseTimeInput(text, { now: new Date(), timeZone: zone.value }) : null;
+    if (reading && readingAnchorMicros(reading, zone.value) !== null) return false;
     const stamp = text ? deps.readPastedStamp(text) : null;
     if (!stamp) return false;
     event.preventDefault();
@@ -437,17 +481,6 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
     );
     return true;
   };
-
-  const startDayLabel = computed(() =>
-    raw(dayLabel((menuOpen.value ? pendingDay.value : null) ?? selectedDate.value.from)),
-  );
-
-  // Mid-pick, End names the day under the pointer: the end a second pick would make.
-  const endDayLabel = computed(() => {
-    const pending = menuOpen.value ? pendingDay.value : null;
-    const end = pending ? (calendarPreviewDay.value ?? pending) : selectedDate.value.to;
-    return raw(dayLabel(end));
-  });
 
   return {
     selectedTime,
@@ -478,14 +511,14 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
     onCalendarEndDate,
     onCalendarPendingDay,
     commitPendingDay,
-    onStartTimeEdit,
-    onEndTimeEdit,
-    onTimeFieldTyping,
-    onTimeFieldInvalid,
+    fieldInstants,
+    startFieldText,
+    endFieldText,
+    readFieldText,
+    onFieldInput,
+    commitFieldText,
     onTimeFieldBlur,
     pasteIntoTimeFields,
-    startDayLabel,
-    endDayLabel,
   };
 }
 

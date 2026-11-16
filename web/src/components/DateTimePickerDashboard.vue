@@ -33,6 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :preset="preset"
     :capabilities="capabilities"
     :host-name="hostName"
+    :panel-time-mark="panelTimeMark"
+    :limit-refused="limitRefused"
     @apply="onApply"
     @hide="onHide"
     @show="onShow"
@@ -86,7 +88,7 @@ export default defineComponent({
     },
     menuAlign: {
       required: false,
-      default: "end",
+      default: "start",
       type: String as PropType<"center" | "start" | "end">,
     },
     variant: {
@@ -108,6 +110,18 @@ export default defineComponent({
       required: false,
       default: "",
       type: String,
+    },
+    /** A panel on the dashboard keeps its own time; the trigger marks it. */
+    panelTimeMark: {
+      required: false,
+      default: false,
+      type: Boolean,
+    },
+    /** The page refused this range as over its limit; the trigger keeps it with a lock. */
+    limitRefused: {
+      required: false,
+      default: false,
+      type: Boolean,
     },
   },
   emits: ["update:modelValue", "hide", "show", "timezone-change", "apply"],

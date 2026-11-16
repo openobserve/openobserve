@@ -67,7 +67,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:bg-button-primary-hover",
     "enabled:active:bg-button-primary-active",
     "focus-visible:ring-3 focus-visible:ring-button-primary-hover",
-    "disabled:bg-button-primary-disabled disabled:text-button-primary-foreground",
+    "disabled:bg-button-primary-disabled disabled:text-button-primary-disabled-foreground",
   ].join(" "),
   secondary: [
     "bg-button-secondary text-button-secondary-foreground",
@@ -211,7 +211,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:bg-button-primary-hover",
     "enabled:active:bg-button-primary-active",
     "focus-visible:ring-3 focus-visible:ring-button-primary-hover",
-    "disabled:bg-button-primary-disabled disabled:text-button-primary-foreground",
+    "disabled:bg-button-primary-disabled disabled:text-button-primary-disabled-foreground",
   ].join(" "),
   // Sidebar toggle: bg-surface border shadow — for persistent panel collapse/expand buttons
   "sidebar-toggle": [
@@ -396,7 +396,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 
 const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "section-chip": "opacity-60",
-  primary: "bg-button-primary-disabled text-button-primary-foreground",
+  primary: "bg-button-primary-disabled text-button-primary-disabled-foreground",
   secondary: "bg-button-secondary-disabled text-text-disabled",
   outline: "opacity-50",
   ghost: "text-text-disabled",
@@ -414,7 +414,7 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "outline-destructive": "opacity-50",
   "cancel-query": "opacity-60",
   "panel-collapse": "opacity-50",
-  "sidebar-button": "bg-button-primary-disabled text-button-primary-foreground",
+  "sidebar-button": "bg-button-primary-disabled text-button-primary-disabled-foreground",
   "sidebar-toggle": "opacity-50",
   "ai-gradient": "opacity-40",
   "on-dark-primary": "opacity-50",

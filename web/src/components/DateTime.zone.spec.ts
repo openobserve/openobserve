@@ -138,4 +138,55 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
     expect(inMenu("date-time-copy-btn")).not.toBeNull();
     expect(inMenu("date-time-paste-btn")).not.toBeNull();
   });
+
+  describe("zone menu (R12, O3)", () => {
+    const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tr = (key: string, params: Record<string, unknown> = {}) =>
+      String((i18n.global.t as unknown as (k: string, p: object) => string)(key, params));
+
+    it("pins UTC and the browser zone above a divider", async () => {
+      createWrapper();
+      await flushPromises();
+      const [utc, browser, divider] = wrapper!.vm.timezoneSelectOptions;
+      expect(utc.value).toBe("UTC");
+      expect(browser.label).toBe(tr("dateTime.browserTimeZone", { zone: browserZone }));
+      expect(browser.testId).toBe("datetime-timezone-browser");
+      expect(divider).toMatchObject({ divider: true, testId: "datetime-timezone-divider" });
+    });
+
+    it.each(["browser", "local"])("finds the browser row by %s", async (term) => {
+      createWrapper();
+      await flushPromises();
+      wrapper!.vm.zoneQuery = term;
+      await flushPromises();
+      expect(wrapper!.vm.timezoneSelectOptions[0].testId).toBe("datetime-timezone-browser");
+    });
+
+    it("offers the as-UTC reading in the zone menu, not in the summary", async () => {
+      store.state.timezone = "Asia/Calcutta";
+      createWrapper({ capabilities: {}, defaultOpen: true });
+      await flushPromises();
+      const field = document.querySelector<HTMLInputElement>(
+        "[data-test='date-time-input-field']",
+      )!;
+      field.value = "2026-11-04 09:00";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      await flushPromises();
+      expect(wrapper!.vm.asUtcLabel).not.toBeNull();
+      const summary = inMenu("date-time-resolved")!;
+      expect(summary.querySelector("[data-test='date-time-as-utc-toggle']")).toBeNull();
+
+      document
+        .querySelector<HTMLElement>("[data-test='datetime-timezone-select-trigger']")!
+        .click();
+      await flushPromises();
+      const toggle = document.querySelector<HTMLElement>("[data-test='date-time-as-utc-toggle']")!;
+      expect(toggle.textContent?.trim()).toBe(String(wrapper!.vm.asUtcLabel!.full));
+      toggle.click();
+      await flushPromises();
+      expect(wrapper!.vm.inputAsUtc).toBe(true);
+    });
+  });
 });

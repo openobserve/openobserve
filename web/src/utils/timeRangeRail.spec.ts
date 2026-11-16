@@ -24,9 +24,10 @@ import {
   formatDurationMicros,
   formatKnownPeriod,
   formatZoneAbbreviation,
+  formatZoneBadge,
 } from "./timeRangeRail";
 import type { TranslateFn } from "@/types/i18n";
-import { formatRangeDates } from "./timeRangeLabel";
+import { formatRangeDates, formatZoneOffset } from "./timeRangeLabel";
 import { parseCalendarToken } from "./dashboard/calendarPeriods";
 
 const us = (iso: string) => Date.parse(iso) * 1000;
@@ -229,5 +230,28 @@ describe("timeRangeRail", () => {
       ["calendar:year:0", "common.thisYear"],
       ["calendar:year:-1", "dateTime.previousYear"],
     ]);
+  });
+});
+
+describe("formatZoneBadge [R4]", () => {
+  const WINTER = Date.parse("2026-01-15T12:00:00Z");
+  const SUMMER = Date.parse("2026-07-15T12:00:00Z");
+
+  it.each([
+    ["Asia/Kolkata", WINTER, "UTC+05:30"],
+    ["America/New_York", WINTER, "UTC-05:00"],
+    ["America/New_York", SUMMER, "UTC-04:00"],
+    ["Europe/Berlin", SUMMER, "UTC+02:00"],
+    ["Asia/Kathmandu", WINTER, "UTC+05:45"],
+    ["Europe/London", WINTER, "UTC"],
+    ["UTC", WINTER, "UTC"],
+  ])("spells %s as the offset", (zone, at, badge) => {
+    expect(formatZoneBadge(zone, at)).toBe(badge);
+  });
+
+  it("spells the zone exactly as the copied range does", () => {
+    for (const zone of ["Asia/Kolkata", "America/New_York", "Australia/Lord_Howe"]) {
+      expect(formatZoneBadge(zone, SUMMER)).toBe(formatZoneOffset(zone, SUMMER));
+    }
   });
 });

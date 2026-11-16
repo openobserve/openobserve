@@ -55,6 +55,8 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import type { FieldAlias } from "@/services/service_streams";
 import { isGuardActive } from "@/composables/useLogs/useAutoRun";
+import { formatZoneOffset } from "@/utils/timeRangeLabel";
+import { linkRangeRefusal } from "@/utils/logs/rangeLimitRefusal";
 import { pickLatestStream, type StreamStatsEntry } from "@/utils/logs/estimateScanMb";
 import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
 import { sqlSources } from "@/utils/logs/sqlSources";
@@ -323,6 +325,7 @@ export const useStreamFields = () => {
         };
 
         const interestingFieldsMap: { [key: string]: boolean } = {};
+        let limitStream = "";
 
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
@@ -381,6 +384,7 @@ export const useStreamFields = () => {
                 stream.settings.max_query_range > 0
                   ? stream.settings.max_query_range
                   : store.state.zoConfig.max_query_range;
+              limitStream = stream.name;
 
               searchObj.data.datetime.queryRangeRestrictionMsg = t(
                 "search.queryRangeRestrictionMsg",
@@ -837,6 +841,14 @@ export const useStreamFields = () => {
             searchObj.data.stream.userDefinedSchema = userDefineSchemaSettings || [];
           }
         }
+        // O1: a linked range over the stream limit runs nothing; the page shows the guard strip instead.
+        searchObj.meta.rangeLimitRefusal = searchObj.meta.rangeFromLink
+          ? linkRangeRefusal(
+              searchObj.data.datetime,
+              searchObj.data.datetime.queryRangeRestrictionInHour,
+              limitStream,
+            )
+          : null;
         searchObj.data.stream.interestingFieldList = Object.keys(interestingFieldsMap).filter(
           (field: any) => interestingFieldsMap[field],
         );
@@ -1268,8 +1280,12 @@ export const useStreamFields = () => {
                 store.state.timezone,
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
-            label: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
-            header: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
+            label: t("search.timestampWithTimezone", {
+              timezone: formatZoneOffset(store.state.timezone),
+            }),
+            header: t("search.timestampWithTimezone", {
+              timezone: formatZoneOffset(store.state.timezone),
+            }),
             align: "left",
             sortable: true,
             enableResizing: false,
@@ -1334,8 +1350,12 @@ export const useStreamFields = () => {
                 store.state.timezone,
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
-            label: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
-            header: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
+            label: t("search.timestampWithTimezone", {
+              timezone: formatZoneOffset(store.state.timezone),
+            }),
+            header: t("search.timestampWithTimezone", {
+              timezone: formatZoneOffset(store.state.timezone),
+            }),
             align: "left",
             sortable: true,
             enableResizing: false,

@@ -106,19 +106,19 @@ export default class DashboardPanelTime {
   // FACTORY HELPERS — runtime-dynamic locators
   // =========================================
 
-  /** Returns the time picker wrapper for a panel in view mode */
+  /** The panel header's time wrapper: the visible chip plus the hidden picker, whose text holds the full label. */
   panelTimePicker(panelId) {
-    return this.page.locator(`[data-test="panel-time-picker-${panelId}"]`);
+    return this.page.locator(`[data-test="dashboard-panel-${panelId}-time-picker"]`);
   }
 
-  /** Returns the date-time-btn inside a panel time picker in view mode */
+  /** The panel header chip (e.g. "1h"); the picker's own trigger is hidden, so the chip opens it. */
   panelTimePickerBtn(panelId) {
-    return this.page.locator(`[data-test="panel-time-picker-${panelId}"] [data-test="date-time-btn"]`);
+    return this.page.locator(`[data-test="dashboard-panel-${panelId}-time-chip"]`);
   }
 
-  /** Returns the display button showing current time text for a panel */
+  /** Text showing the panel's time: the chip's short form and the hidden trigger's full label. */
   panelTimePickerDisplayBtn(panelId) {
-    return this.page.locator(`[data-test="panel-time-picker-${panelId}-btn"]`);
+    return this.panelTimePicker(panelId);
   }
 
   /** Returns the panel loading indicator */
@@ -453,7 +453,7 @@ export default class DashboardPanelTime {
    * @param {string} panelId - Panel ID
    */
   async getPanelTimeDisplayText(panelId) {
-    return await this.panelTimePickerBtn(panelId).textContent();
+    return await this.panelTimePickerDisplayBtn(panelId).textContent();
   }
 
   /**

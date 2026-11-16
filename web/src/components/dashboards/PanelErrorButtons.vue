@@ -164,9 +164,29 @@
         </template>
       </OTooltip>
     </OButton>
+    <!-- Dashboards run wide ranges, so only the panel its stream limits says so, quietly. -->
+    <OTag
+      v-if="rangeLimitText"
+      variant="default-soft"
+      size="sm"
+      icon="lock"
+      clickable
+      class="me-1 shrink-0"
+      :aria-label="maxQueryRangeWarning"
+      data-test="panel-max-duration-chip"
+    >
+      {{ rangeLimitText }}
+      <OTooltip side="bottom" align="end" max-width="26.25rem">
+        <template #content
+          ><div class="whitespace-pre-wrap" data-test="panel-max-duration-warning-content">
+            {{ maxQueryRangeWarning }}
+          </div></template
+        >
+      </OTooltip>
+    </OTag>
     <OButton
       :aria-label="t('dashboard.panelWarning')"
-      v-if="maxQueryRangeWarning"
+      v-else-if="maxQueryRangeWarning"
       variant="ghost-warning"
       size="icon"
       icon-left="warning"
@@ -259,6 +279,7 @@ import PanelNoticeContent from "@/components/dashboards/PanelNoticeContent.vue";
 import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
+import { formatLimitShorthand } from "@/utils/timeRangeList";
 import {
   buildPanelNotices,
   seriesTotalBoundOf,
@@ -283,6 +304,9 @@ const COLLAPSE_CLASSES = {
     collapsed: "hidden @max-[36rem]/panelbar:inline-flex",
   },
 };
+
+// The server's clamp notice names the stream's limit; any other function error keeps the warning button.
+const RANGE_LIMIT_HOURS = /query range restriction of (\d+) hours/i;
 
 export default defineComponent({
   name: "PanelErrorButtons",
@@ -407,6 +431,11 @@ export default defineComponent({
       ),
     );
 
+    const rangeLimitText = computed(() => {
+      const hours = Number(RANGE_LIMIT_HOURS.exec(props.maxQueryRangeWarning)?.[1]);
+      return hours > 0 ? t("dateTime.maxLimit", { limit: raw(formatLimitShorthand(hours)) }) : "";
+    });
+
     const collapsedTone = computed(() =>
       notices.value.some((notice) => notice.tone === "error") ? "error" : "warning",
     );
@@ -453,6 +482,7 @@ export default defineComponent({
       raw,
       t,
       notices,
+      rangeLimitText,
       collapsedTone,
       collapsedLabel,
       collapseClasses,

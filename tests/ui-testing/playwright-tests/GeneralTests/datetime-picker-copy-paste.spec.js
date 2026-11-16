@@ -81,7 +81,7 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
 
       await pm.dateTimePickerPage.selectRelativePeriod('15-m');
       await pm.dateTimePickerPage.clickCopy();
-      await pm.dateTimePickerPage.expectCopySuccessToast();
+      await pm.dateTimePickerPage.expectCopyConfirmed();
 
       // Copy resolves a relative selection to a concrete absolute window, so the
       // payload must be a pair of epoch-microsecond numbers spanning ~15 minutes.

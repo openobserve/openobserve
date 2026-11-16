@@ -48,6 +48,7 @@ export type RunReason =
   | "page-size"
   | "sort"
   | "zoom"
+  | "range"
   | "compare"
   | "explicit";
 
@@ -175,6 +176,8 @@ export interface AutoRunMeta {
   autoRunBlocked?: AutoRunBlocked | null;
   consentedScope?: ConsentScope | null;
   runPending?: boolean;
+  /** Set while a linked range over the stream limit waits for the user; nothing runs until it clears. */
+  rangeLimitRefusal?: unknown;
   runOutcome?: Partial<Record<PersistSurface, RunOutcome>>;
   runCancelled?: Partial<Record<PersistSurface, boolean>>;
 }
@@ -331,6 +334,7 @@ export const REASON_KIND: Record<RunReason, RunKind> = {
   "page-size": "explicit",
   sort: "explicit",
   zoom: "explicit",
+  range: "explicit",
   compare: "explicit",
   explicit: "explicit",
 };
@@ -357,6 +361,7 @@ export const REASON_DEBOUNCE_MS: Record<RunReason, number> = {
   "page-size": 0,
   sort: 0,
   zoom: 0,
+  range: 0,
   compare: 0,
   explicit: 0,
 };
@@ -1043,7 +1048,8 @@ export function createAutoRun(deps: AutoRunDeps) {
     options: RequestRunOptions,
   ): RequestRunResult {
     if (reason === "run-anyway") return runAnyway(options);
-    if (reason === "zoom" && meta.editorDirty) {
+    // A range change must not run the editor's unrun text with it.
+    if ((reason === "zoom" || reason === "range") && meta.editorDirty) {
       meta.runPending = true;
       return "pending-dirty";
     }
@@ -1064,6 +1070,7 @@ export function createAutoRun(deps: AutoRunDeps) {
   }
 
   function requestRun(reason: RunReason, options: RequestRunOptions = {}): RequestRunResult {
+    if (meta.rangeLimitRefusal) return "skipped-ineligible";
     const kind = REASON_KIND[reason];
     if (options.origin === "editor" && kind !== "explicit") return "skipped-editor-origin";
     if (reason === "refresh") return requestRefresh(options);

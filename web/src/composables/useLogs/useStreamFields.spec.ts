@@ -35,6 +35,7 @@ const i18n = createI18n({
       search: {
         queryRangeRestrictionMsg: "Query range restricted to {range}",
         streamNotExist: "The following [STREAM_NAME] streams were not found.",
+        timestampWithTimezone: "timestamp ({timezone})",
       },
     },
   },
@@ -352,6 +353,18 @@ describe("useStreamFields Composable", () => {
       wrapper.vm.updateGridColumns();
 
       expect(columnIds()).toEqual(["_timestamp", "_stream_name", "message"]);
+    });
+
+    it("spells the zone in the timestamp header as its offset (R4)", () => {
+      const zone = store.state.timezone;
+      store.state.timezone = "Asia/Kolkata";
+      try {
+        wrapper.vm.updateGridColumns();
+        const ts = searchObj.data.resultGrid.columns.find((c: any) => c.id === "_timestamp");
+        expect(ts.header).toBe("timestamp (UTC+05:30)");
+      } finally {
+        store.state.timezone = zone;
+      }
     });
 
     it("leaves a single-stream result unchanged", () => {

@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        → "relax your filters" message (no action card; Ask AI available)
 
     3. No stream stats available (fallback)
-       → generic message (no action card; Ask AI available)
+       → dated message + "Try {range}" with the next longer quick range
 -->
 <template>
   <OEmptyState illustration="trace" size="hero" :hide-action="true">
@@ -64,6 +64,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #extra>
       <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
+          v-if="tryChip && applyRange && !jumpTarget"
+          variant="outline"
+          size="sm"
+          data-test="traces-no-events-try-range-btn"
+          @click="applyRange(tryChip.value)"
+        >
+          {{ t("dateTime.tryRange", { range: tryChipLabel }) }}
+        </OButton>
+        <OButton
           v-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
           size="sm"
@@ -81,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { DateTime } from "luxon";
@@ -93,6 +102,10 @@ import useWidenRange from "@/composables/useWidenRange";
 import { useAiIcon } from "@/composables/useAiIcon";
 import { getConsumableRelativeTime } from "@/utils/date";
 import DOMPurify from "dompurify";
+import { formatRangeLabel } from "@/utils/timeRangeLabel";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
+import { nextLongerChip, TIME_RANGE_CHIP_SETS } from "@/utils/timeRangeList";
+import { TRACES_APPLY_RANGE } from "./tracesSearchBar.utils";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 const END_NUDGE_US = 1_000_000;
@@ -209,14 +222,31 @@ const jumpTargetSublabel = computed(() => {
 
 // --- time-range helpers (via shared composable) -----------------------------
 
-// `currentPeriodLabel` feeds the "descNoFilters" message; the widen-range
-// action card was removed because widening never surfaces more data here.
-const { currentPeriodLabel } = useWidenRange(
+const applyRange = inject(TRACES_APPLY_RANGE, null);
+
+const { currentPeriodLabel: periodLabel } = useWidenRange(
   () => searchObj.data?.datetime?.type ?? "",
   () => searchObj.data?.datetime?.relativeTimePeriod ?? "",
   {
     absoluteRangeLabel: t("traces.noEvents.selectedRange"),
     absoluteExpandDesc: t("traces.noEvents.expandRangeDescAbsolute"),
   },
+);
+
+const currentPeriodLabel = computed(() => {
+  const w = queryWindowUs.value;
+  if (!w) return periodLabel.value;
+  return formatRangeLabel(
+    { startUs: w.start, endUs: w.end },
+    { timezone: store?.state?.timezone, surface: "summary" },
+  );
+});
+
+const tryChip = computed(() => {
+  const w = queryWindowUs.value;
+  return w ? nextLongerChip(w.end - w.start, TIME_RANGE_CHIP_SETS.ops) : null;
+});
+const tryChipLabel = computed(() =>
+  tryChip.value ? formatPeriodLabel(tryChip.value.value, store?.state?.timezone, t) : "",
 );
 </script>

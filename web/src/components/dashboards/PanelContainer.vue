@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </OTooltip>
         </OButton>
+        <slot name="panel-time" />
         <span
           v-if="titleMeta"
           class="text-2xs text-text-secondary me-5 shrink-0 font-normal whitespace-nowrap"
@@ -1566,6 +1567,8 @@ export default defineComponent({
       if (props.viewOnly || props.kiosk) return;
       if (!isCurrentlyHoveredPanel.value) return;
       if (isInputFocused()) return;
+      // A key the open picker acted on, or pressed inside its panel, belongs to the picker.
+      if (e.defaultPrevented || (e.target as Element | null)?.closest?.('[role="dialog"]')) return;
       if (isLayoutEditing.value && !["v", "V", "i", "I"].includes(e.key)) return;
       // These are single-letter shortcuts — never fire while a modifier is held.
       // Otherwise combos like Alt+Left (panel-editor "Discard & go back") leaking

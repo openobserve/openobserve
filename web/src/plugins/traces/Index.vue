@@ -220,12 +220,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @action="() => searchData()"
                       />
                     </div>
+                    <RangeLimitStrip
+                      v-else-if="tracesRangeLink.refusal"
+                      :refusal="tracesRangeLink.refusal"
+                      :timezone="store.state.timezone"
+                      data-test="traces-range-limit-strip"
+                      nothing-run-test="traces-nothing-run"
+                      @show="(period: string) => searchBarRef?.dateTimeRef?.pickChip?.(period)"
+                      @pick="() => searchBarRef?.dateTimeRef?.openMenu?.()"
+                    />
                     <div v-else data-test="logs-search-search-result" class="flex h-full! flex-col">
                       <StaleRangeStrip
                         v-if="staleRangeText"
                         :text="staleRangeText"
                         data-test="traces-search-bar-stale-range-strip"
                         @run="() => searchData()"
+                      />
+                      <TracesArrivalStrip
+                        v-if="arrivalRangeText"
+                        :range="arrivalRangeText"
+                        :page="t('menu.search')"
+                        @apply="applyArrival"
+                        @close="arrivalDismissed = true"
                       />
                       <StaleRangeStrip
                         v-if="tracesContextText"
@@ -341,11 +357,22 @@ import {
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
 import {
+  TRACES_APPLY_RANGE,
+  tracesRangeLink,
   tracesRunIsStaged,
   tracesRunTimeSelection,
+  tracesQueryEdited,
   tracesSearchRunSignature,
 } from "./tracesSearchBar.utils";
 import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
+import TracesArrivalStrip from "./TracesArrivalStrip.vue";
+import RangeLimitStrip from "@/plugins/logs/RangeLimitStrip.vue";
+import { linkRangeRefusal } from "@/utils/logs/rangeLimitRefusal";
+import useTimeRangeHistory, {
+  arrivalFromPage,
+  isRelativeHistoryEntry,
+  type TimeRangeHistoryEntry,
+} from "@/composables/useTimeRangeHistory";
 import { liveTimeSelection, staleQueriedRange } from "@/utils/logsStaleRange";
 import { formatRangeLabel } from "@/utils/timeRangeLabel";
 import { formatPeriodLabel } from "@/utils/timeRangeRail";
@@ -359,7 +386,7 @@ import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep } from "lodash-es";
-import { computed } from "vue";
+import { computed, provide } from "vue";
 import useStreams from "@/composables/useStreams";
 import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
 import {
@@ -1454,6 +1481,14 @@ async function extractFields() {
               : searchObj.data.datetime.queryRangeRestrictionInHour + " hour",
         });
       }
+      // O1: a linked range over the stream limit runs nothing; the page shows the guard strip instead.
+      tracesRangeLink.refusal = tracesRangeLink.fromLink
+        ? linkRangeRefusal(
+            searchObj.data.datetime,
+            searchObj.data.datetime.queryRangeRestrictionInHour,
+            stream.name,
+          )
+        : null;
       schema.push(...stream.schema);
       ftsKeys = new Set([...stream.settings.full_text_search_keys]);
 
@@ -1798,6 +1833,9 @@ onUnmounted(() => {
 
 onActivated(async () => {
   pageActive.value = true;
+  arrivedWithoutRange.value = !urlHasRange();
+  arrivalDismissed.value = false;
+  tracesRangeLink.fromLink = urlHasRange();
   setupContextProvider();
 
   const savedAutoRun = localStorage.getItem("oo_toggle_auto_run");
@@ -1882,6 +1920,7 @@ onActivated(async () => {
 
 /** Runs the search; `record` is false for runs no user asked for, such as a page landing. */
 const runQueryFn = (record = true) => {
+  if (tracesRangeLink.refusal) return;
   searchObj.data.resultGrid.currentPage = pendingUrlPage ?? 0;
   pendingUrlPage = null;
   searchObj.runQuery = false;
@@ -2134,11 +2173,11 @@ const backFromTracesContext = async () => {
   searchData();
 };
 
-// With Auto Run off a picked range sits over the old results until Run, so say which range they are.
+// A range applied over unrun query edits waits for Run, so say which range the shown results are for.
 const staleRangeText = computed(() => {
   if (searchObj.loading) return null;
   if (tracesContextOn.value) return null;
-  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) return null;
+  if (!tracesQueryEdited(searchObj.meta.lastRunSignature, searchObj)) return null;
   const queried = staleQueriedRange(
     tracesRunTimeSelection(searchObj.meta.lastRunSignature),
     liveTimeSelection(searchObj.data.datetime ?? {}),
@@ -2154,6 +2193,63 @@ const staleRangeText = computed(() => {
   return t("search.resultsAreForRange", { range });
 });
 
+// O2: Traces opened without a range in its URL offers the range Logs applied last.
+const rangeHistory = useTimeRangeHistory();
+const urlHasRange = () => {
+  const query = router.currentRoute.value.query;
+  return !!(query.period || query.from || query.to);
+};
+const arrivedWithoutRange = ref(!urlHasRange());
+tracesRangeLink.fromLink = urlHasRange();
+const arrivalDismissed = ref(false);
+const arrival = computed<TimeRangeHistoryEntry | null>(() => {
+  if (!arrivedWithoutRange.value || arrivalDismissed.value) return null;
+  const dt = searchObj.data.datetime ?? {};
+  const current: TimeRangeHistoryEntry | null =
+    dt.type === "absolute"
+      ? { startUs: Number(dt.startTime), endUs: Number(dt.endTime) }
+      : dt.relativeTimePeriod
+        ? { relative: dt.relativeTimePeriod }
+        : null;
+  return arrivalFromPage(rangeHistory.entries.value, String(t("menu.search")), current);
+});
+const arrivalRangeText = computed(() => {
+  const entry = arrival.value;
+  if (!entry) return null;
+  if (isRelativeHistoryEntry(entry))
+    return formatPeriodLabel(entry.relative, store.state.timezone, t);
+  return raw(
+    formatRangeLabel(
+      { startUs: entry.startUs, endUs: entry.endUs },
+      { timezone: store.state.timezone, surface: "summary" },
+    ),
+  );
+});
+// Programmatic picker sync, so the one run below is the only search.
+const applyArrival = () => {
+  const entry = arrival.value;
+  arrivalDismissed.value = true;
+  if (!entry) return;
+  tracesRangeLink.fromLink = false;
+  tracesRangeLink.refusal = null;
+  const picker = searchBarRef.value?.dateTimeRef;
+  if (isRelativeHistoryEntry(entry)) {
+    const resolved = getConsumableRelativeTime(entry.relative);
+    if (!resolved) return;
+    picker?.setRelativeTime(entry.relative);
+    searchObj.data.datetime.startTime = resolved.startTime;
+    searchObj.data.datetime.endTime = resolved.endTime;
+    searchObj.data.datetime.relativeTimePeriod = entry.relative;
+    searchObj.data.datetime.type = "relative";
+  } else {
+    picker?.setAbsoluteTime(entry.startUs, entry.endUs);
+    searchObj.data.datetime.startTime = entry.startUs;
+    searchObj.data.datetime.endTime = entry.endUs;
+    searchObj.data.datetime.type = "absolute";
+  }
+  runQueryFn();
+};
+
 const isStreamSelected = computed(() => {
   return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
 });
@@ -2163,6 +2259,11 @@ const onRemoveTracesFilter = () => {
   searchBarRef.value?.updateQuery?.();
   searchObj.runQuery = true;
 };
+
+// Applied as a chip pick, so it runs, takes an undo step and lands in Recent like one.
+provide(TRACES_APPLY_RANGE, (period: string) =>
+  searchBarRef.value?.dateTimeRef?.pickChip?.(period),
+);
 
 const onJumpToTracesStreamData = (fromUs: number, toUs: number) => {
   searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);

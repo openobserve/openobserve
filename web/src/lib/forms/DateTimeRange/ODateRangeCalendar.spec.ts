@@ -249,6 +249,22 @@ describe("ODateRangeCalendar", () => {
       expect(cell("2026-11-11").classes().join(" ")).not.toContain("border-datepicker-day-today");
     });
 
+    it("opens on the month of a range applied in an earlier month and selects its days", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-11T12:00:00Z"));
+      wrapper = mount(ODateRangeCalendar, {
+        props: { bandRange: true, fill: true, startDate: "2026/09/03", endDate: "2026/09/10" },
+        attachTo: document.body,
+      });
+
+      expect(wrapper.find('[data-test="daterangecalendar-heading"]').text()).toContain(
+        "September 2026",
+      );
+      expect(cell("2026-09-03").attributes("data-selected")).toBeDefined();
+      expect(cell("2026-09-10").attributes("data-selected")).toBeDefined();
+      expect(cell("2026-11-11").exists()).toBe(false);
+    });
+
     it("leaves a range another control produced unpainted and keeps today a dot", () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date("2026-11-11T12:00:00Z"));

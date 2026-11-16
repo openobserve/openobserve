@@ -60,39 +60,22 @@ test.describe('On-call pickers and deleted team (o2-enterprise#2749)', {
     await context.close();
   });
 
-  test('Mark away: every number on the When end-time clock can be clicked', {
+  test('Mark away: the When end time takes a typed clock time on its own day', {
     tag: ['@bug-ent2749', '@P2'],
   }, async () => {
+    // The clock popup this bug clipped is gone: End is a text field, so check typing reaches it instead.
     const detail = pm.oncallTeamDetailPage;
     await detail.goto(orgId(), made.team.id, 'members');
     await detail.openMembersTab();
     await detail.openMarkAwayDialog();
     await detail.openAwayWindow();
-    await detail.openAwayEndTimePicker();
 
-    // The end time starts at the current time, so pick an hour and minute it cannot already show.
-    const [nowHour, nowMinute] = (await detail.getAwayEndTimeInput().inputValue()).split(':').map(Number);
-    const hour = nowHour % 12 === 9 ? 3 : 9;
-    const minute = nowMinute === 30 ? 15 : 30;
-    const hours = `(${String(hour).padStart(2, '0')}|${hour + 12})`;
-    const blocked = async () => (await detail.readHitTargets(detail.locators.timeClockNumber))
-      .filter((n) => !n.hit || !n.onScreen).map((n) => n.label);
-
-    await expect.poll(async () => {
-      const numbers = await detail.readHitTargets(detail.locators.timeClockNumber);
-      return { count: numbers.length, blocked: numbers.filter((n) => !n.hit || !n.onScreen).map((n) => n.label) };
-    }, { message: 'all 12 hours are on screen and on top of the dialog', timeout: 10000 }).toEqual({ count: 12, blocked: [] });
-    await detail.clickClockNumber(hour);
-    await expect(detail.getAwayEndTimeInput()).toHaveValue(new RegExp(`^${hours}:`));
-
-    await expect.poll(blocked, { message: 'all the minutes are on top of the dialog too', timeout: 10000 }).toEqual([]);
-    await detail.clickClockNumber(minute);
-    await expect(detail.getAwayEndTimeInput()).toHaveValue(new RegExp(`^${hours}:${minute}:`));
-
-    await expect.poll(blocked, { message: 'and the seconds', timeout: 10000 }).toEqual([]);
-    await detail.clickClockNumber('00');
-    await expect(detail.getAwayEndTimeInput()).toHaveValue(new RegExp(`^${hours}:${minute}:00$`));
-    await expect(detail.getTimePopup()).toHaveCount(0);
+    const end = detail.getAwayEndTimeInput();
+    await expect(end).toBeVisible({ timeout: 10000 });
+    await end.fill('23:59');
+    await end.press('Tab');
+    await expect(end).toHaveValue(/(^|\s)23:59$/);
+    await expect(end).not.toHaveAttribute('aria-invalid', 'true');
   });
 
   test('First handover date: a half-typed year is not committed and the typed date keeps its weekday', {

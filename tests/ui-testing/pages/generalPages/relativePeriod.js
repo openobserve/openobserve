@@ -31,7 +31,10 @@ export async function openDateFields(page, timeout = 10000) {
     await waitForDateTimePanel(page, timeout);
     const pickDates = page.locator(`${DATE_TIME_PANEL} [data-test="date-time-pick-dates-btn"]`).first();
     // A picker with relative ranges disabled opens straight on the calendar, without the button.
-    if (await pickDates.isVisible().catch(() => false)) await pickDates.click();
+    // The calendar icon toggles, so a second click on an open calendar would close it.
+    if (await pickDates.isVisible().catch(() => false)) {
+        if ((await pickDates.getAttribute('aria-pressed')) !== 'true') await pickDates.click();
+    }
     await page.locator('[data-test="datetime-start-time"]').first().waitFor({ state: 'visible', timeout });
 }
 

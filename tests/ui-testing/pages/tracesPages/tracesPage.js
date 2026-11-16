@@ -238,6 +238,14 @@ export class TracesPage {
     // Trace details — datetime absolute tab Start/End time fields (OInput convention)
     this.datetimeStartTime = '[data-test="datetime-start-time"] input';
 
+    // Arriving from Logs with no range in the URL offers the Logs range; Apply runs one search.
+    this.arrivalStrip = '[data-test="traces-arrival-strip"]';
+    this.arrivalApplyBtn = '[data-test="traces-arrival-apply-btn"]';
+    this.arrivalCloseBtn = '[data-test="traces-arrival-close-btn"]';
+    this.rangeLimitStrip = '[data-test="traces-range-limit-strip"]';
+    this.nothingRunText = '[data-test="traces-nothing-run"]';
+    this.noEventsTryRangeBtn = '[data-test="traces-no-events-try-range-btn"]';
+
     // Field list header expansion (Field rows include data-test=`log-search-expand-{name}-field-btn`)
     this.fieldExpandPrefix = '[data-test^="log-search-expand-"]';
 

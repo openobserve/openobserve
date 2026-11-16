@@ -84,7 +84,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @blur="onTriggerHover(false)"
         >
           <template #icon-left>
-            <OIcon name="schedule" size="sm" :class="{ 'max-md:hidden': !fieldAppearance }" />
+            <OIcon
+              v-if="narrowedByQuery"
+              name="filter-alt"
+              size="sm"
+              class="text-text-secondary shrink-0"
+              data-test="date-time-trigger-narrowed"
+            />
+            <OIcon
+              v-else-if="triggerIconShown"
+              name="schedule"
+              size="sm"
+              data-test="date-time-trigger-icon"
+              :class="{ 'max-md:hidden': !fieldAppearance }"
+            />
           </template>
           <!-- Clipped, never ellipsised: the label steps down to a whole form that fits (§6). -->
           <span
@@ -112,19 +125,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               triggerEnds
             }}</OBadge
           >
-          <OIcon
-            v-if="narrowedByQuery"
-            name="filter-alt"
-            size="sm"
-            class="text-text-secondary shrink-0"
-            data-test="date-time-trigger-narrowed"
-          />
+          <span
+            v-if="limitRefused"
+            role="img"
+            :aria-label="t('dateTime.nothingWasRun')"
+            class="inline-flex shrink-0"
+            data-test="date-time-trigger-lock"
+            ><OIcon name="lock" size="sm" class="text-status-warning-text" aria-hidden="true"
+          /></span>
+          <span
+            v-if="panelTimeMark"
+            role="img"
+            :aria-label="t('dashboard.panelTimeEnabled')"
+            class="inline-flex shrink-0"
+            data-test="date-time-panel-time-mark"
+            ><OIcon
+              name="timer"
+              size="sm"
+              class="text-text-secondary"
+              aria-hidden="true" /><OTooltip
+              :content="t('dashboard.panelTimeEnabled')"
+              side="bottom"
+          /></span>
           <span
             v-if="zoneBadgeText && triggerParts.zoneDot"
             data-test="date-time-zone-dot"
+            role="img"
+            :aria-label="zoneBadgeText"
             class="bg-text-secondary size-1.5 shrink-0 rounded-full forced-colors:bg-[color:CanvasText]"
-            aria-hidden="true"
-          />
+            ><OTooltip :content="raw(zoneBadgeText)" side="bottom"
+          /></span>
           <OBadge
             v-else-if="zoneBadgeText"
             data-test="date-time-zone-badge"
@@ -145,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         id="date-time-menu"
         ref="menuEl"
-        class="date-time-dialog z-10001 flex h-82 max-h-(--reka-popover-content-available-height) w-110 max-w-[min(27.5rem,calc(100vw-1.5rem))] flex-col"
+        class="date-time-dialog time-picker-scope z-10001 flex h-82 max-h-(--reka-popover-content-available-height) w-128 max-w-[min(32rem,calc(100vw-1.5rem))] flex-col"
         @keydown.capture="onPickerKeydown"
         @paste="onPickerPaste"
       >
@@ -167,9 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-expanded="shownRows.length > 0"
                 :aria-controls="shownRows.length > 0 ? listId : undefined"
                 :aria-activedescendant="cursorRow >= 0 ? `${listId}-${cursorRow}` : undefined"
-                :placeholder="
-                  isMobile ? t('dateTime.placeholderShort') : t('common.timeRangeInputPlaceholder')
-                "
+                :placeholder="barPlaceholder"
+                :data-placeholder="shortPlaceholder ? 'short' : undefined"
                 :aria-label="t('common.timeRangeInputLabel')"
                 :error="inputError"
                 :aria-describedby="inputError ? inputErrorId : undefined"
@@ -199,6 +228,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OInput>
             </div>
             <div v-else class="flex-1" />
+            <OTooltip
+              v-if="!fixedOnly"
+              :content="t('dateTime.pickDates')"
+              side="bottom"
+              align="end"
+            >
+              <OButton
+                data-test="date-time-pick-dates-btn"
+                variant="outline"
+                size="icon-sm"
+                icon-left="calendar-month"
+                :class="{ 'bg-surface-accent-active!': calendarMode }"
+                :aria-label="t('dateTime.pickDates')"
+                :aria-pressed="calendarMode"
+                @click="toggleCalendar"
+              />
+            </OTooltip>
             <OSelect
               v-if="!hideRelativeTimezone"
               data-test="datetime-timezone-select"
@@ -224,6 +270,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="datetime-timezone-short"
                   >{{ zoneShortLabel }}</span
                 >
+              </template>
+              <template v-if="asUtcLabel" #before-options>
+                <div class="border-border-subtle border-b p-1">
+                  <OButton
+                    data-test="date-time-as-utc-toggle"
+                    variant="ghost"
+                    size="sm"
+                    class="text-text-link! w-full justify-start!"
+                    @click="toggleAsUtc"
+                    >{{ asUtcLabel.full }}</OButton
+                  >
+                </div>
               </template>
             </OSelect>
           </div>
@@ -343,16 +401,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="date-time-preview-note"
                 >{{ shownLine.note }}</span
               >
-              <OButton
-                v-if="asUtcLabel"
-                data-test="date-time-as-utc-toggle"
-                variant="outline"
-                size="chip"
-                class="text-text-link! shrink-0 rounded-full!"
-                @click="toggleAsUtc"
-                >{{ asUtcLabel.short
-                }}<OTooltip :content="asUtcLabel.full" side="bottom" align="end"
-              /></OButton>
             </div>
             <div class="flex shrink-0 items-center gap-1">
               <!-- Copy takes the selection, not a preview, so it steps aside and the preview's note shows in full. -->
@@ -374,10 +422,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 align="end"
               >
                 <OButton
-                  data-test="date-time-copy-btn"
+                  :data-test="copied ? 'date-time-copy-btn-done' : 'date-time-copy-btn'"
                   variant="ghost"
                   size="icon-xs-sq"
-                  icon-left="content-copy"
+                  :icon-left="copied ? 'check' : 'content-copy'"
                   class="enabled:text-text-secondary! disabled:text-text-disabled! max-md:hidden pointer-coarse:size-9!"
                   :aria-label="t('common.copyRange')"
                   :disabled="copyDisabled"
@@ -457,7 +505,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :calendar-label="t('dateTime.dateRangeGrid')"
               :prev-label="t('dateTime.calendarPrevMonth')"
               :next-label="t('dateTime.calendarNextMonth')"
-              :hide-selection="selectedType === 'relative'"
               :start-date="selectedDate.from"
               :end-date="selectedDate.to"
               :min-date="calendarMinDate"
@@ -473,6 +520,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div v-else class="flex h-full flex-col">
+            <div
+              v-if="narrowedText && !typing"
+              class="border-border-subtle text-text-secondary flex h-8 shrink-0 items-center gap-1.5 border-b px-3 text-xs tabular-nums"
+              data-test="date-time-panel-narrowed"
+            >
+              <OIcon name="filter-alt" size="xs" class="shrink-0" aria-hidden="true" />{{
+                narrowedText
+              }}
+            </div>
             <div
               v-if="showChips && !typing"
               class="border-border-subtle flex h-9 shrink-0 items-center gap-2 border-b px-3 pointer-coarse:h-11"
@@ -492,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   focusable-unavailable
                   :tooltip="chip.reason ? raw(chip.reason) : undefined"
                   :aria-label="chip.title"
-                  class="o-time-chip data-[state=on]:bg-accent! data-[state=on]:text-text-inverse! data-disabled:border-border-default h-6! tabular-nums data-disabled:border data-disabled:bg-transparent! forced-colors:data-disabled:text-[color:GrayText]! forced-colors:data-[state=on]:bg-[color:Highlight]! forced-colors:data-[state=on]:text-[color:HighlightText]! forced-colors:data-[state=on]:forced-color-adjust-none pointer-coarse:h-8! pointer-coarse:min-w-10"
+                  class="o-time-chip data-[state=on]:bg-accent! data-[state=on]:text-text-inverse! data-disabled:border-border-default data-disabled:bg-surface-base! h-6! tabular-nums data-disabled:border forced-colors:data-disabled:text-[color:GrayText]! forced-colors:data-[state=on]:bg-[color:Highlight]! forced-colors:data-[state=on]:text-[color:HighlightText]! forced-colors:data-[state=on]:forced-color-adjust-none pointer-coarse:h-8! pointer-coarse:min-w-10"
                   :data-test="`date-time-chip-${chip.label}`"
                   >{{ raw(chip.label) }}<OTooltip v-if="!chip.disabled" :content="chip.title"
                 /></OToggleGroupItem>
@@ -521,6 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :active="cursorRow"
                 :editing-id="editingPinRowId"
                 :heading="emptyExamples.length > 0 ? t('dateTime.noMatchYet') : listHeading"
+                :head-note="headNote"
                 @pick="pickBodyRow"
                 @cursor="setCursorRow"
                 @pin="pinRecentRow"
@@ -537,69 +594,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="date-time-footer"
         >
           <template v-if="calendarMode">
-            <OTooltip v-if="!fixedOnly" :content="t('dateTime.backToList')">
-              <OButton
-                data-test="date-time-calendar-back-btn"
-                variant="ghost"
-                size="icon-xs-sq"
-                icon-left="arrow-back"
-                class="text-text-secondary! shrink-0 pointer-coarse:size-9!"
-                :aria-label="t('dateTime.backToList')"
-                @click="closeCalendar"
-              />
-            </OTooltip>
             <div
               v-if="!wholeDaysOnly"
-              class="startEndTime grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_1rem_minmax(0,1fr)] items-center gap-0.5 max-md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+              class="startEndTime grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 ps-1"
               data-test="date-time-start-end"
               @keydown.enter="onTimeFieldEnter"
             >
-              <OTime
-                class="min-w-0 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight]"
+              <OInput
+                class="min-w-0 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight] [&>div:first-of-type]:h-7!"
                 size="sm"
+                autocomplete="off"
                 :aria-label="t('common.timeRangeStart')"
-                :prefix="fieldsBlank ? undefined : startDayLabel"
                 :placeholder="t('common.timeRangeStart')"
-                hide-icon
-                format24
-                revert-refused
                 :error="unreadableFields.start || timeFieldError?.field === 'start'"
-                hide-message
-                :model-value="fieldsBlank ? '' : selectedTime.startTime"
-                with-seconds
-                optional-seconds
+                :model-value="fieldsBlank ? '' : startFieldText"
                 data-test="datetime-start-time"
-                @input="onTimeFieldTyping('start', $event)"
-                @invalid="onTimeFieldInvalid('start', $event)"
-                @update:model-value="onStartTimeEdit"
+                @update:model-value="onFieldInput('start', $event)"
+                @change="onFieldChange('start', $event)"
                 @focus="timeFieldFocused = true"
                 @blur="onTimeFieldBlur"
               />
-              <OIcon
-                name="arrow-forward"
-                size="xs"
-                class="text-text-label self-center justify-self-center max-md:hidden"
+              <span
+                class="text-text-label text-compact"
                 aria-hidden="true"
-              />
-              <OTime
-                class="min-w-0 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight]"
-                :class="{ '[&_input]:text-text-label': calendarPreviewDay && pendingDay }"
+                data-test="date-time-start-end-dash"
+                >{{ raw("–") }}</span
+              >
+              <OInput
+                class="min-w-0 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight] [&>div:first-of-type]:h-7!"
                 size="sm"
+                autocomplete="off"
                 :aria-label="t('common.timeRangeEnd')"
-                :prefix="fieldsBlank ? undefined : endDayLabel"
                 :placeholder="t('common.timeRangeEnd')"
-                hide-icon
-                format24
-                revert-refused
                 :error="unreadableFields.end || timeFieldError?.field === 'end'"
-                hide-message
-                :model-value="fieldsBlank ? '' : endFieldShown"
-                with-seconds
-                optional-seconds
+                :model-value="fieldsBlank ? '' : endFieldText"
                 data-test="datetime-end-time"
-                @input="onTimeFieldTyping('end', $event)"
-                @invalid="onTimeFieldInvalid('end', $event)"
-                @update:model-value="onEndTimeEdit"
+                @update:model-value="onFieldInput('end', $event)"
+                @change="onFieldChange('end', $event)"
                 @focus="timeFieldFocused = true"
                 @blur="onTimeFieldBlur"
               />
@@ -619,17 +650,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTooltip>
           </template>
           <template v-else>
-            <OButton
-              data-test="date-time-pick-dates-btn"
-              variant="ghost"
-              size="xs"
-              icon-left="calendar-month"
-              class="text-text-heading! pointer-coarse:h-9!"
-              @click="openCalendar"
-              >{{ t("dateTime.pickDates") }}</OButton
-            >
             <div class="flex-1" />
-            <template v-if="!hideRangeShift">
+            <template v-if="!hideRangeShift && !isDraft">
               <OTooltip shortcut-id="timeRangePrevious">
                 <template #content>
                   <span class="flex flex-col">
@@ -694,7 +716,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
         <div class="sr-only" aria-live="polite" data-test="date-time-live-region">
-          {{ panelSpeech }}
+          {{ copiedSpeech || panelSpeech }}
         </div>
       </div>
     </OPopover>
@@ -703,10 +725,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :anchor="triggerElement"
       :open="triggerTooltipOpen && !menuOpen"
       side="bottom"
+      :align="triggerTooltipAlign"
     >
       <template #content>
         <span class="flex flex-col tabular-nums" data-test="date-time-trigger-tooltip">
           <span>{{ triggerTooltip.stamps }}</span>
+          <span v-if="triggerTooltip.utc" data-test="date-time-trigger-tooltip-utc">{{
+            triggerTooltip.utc
+          }}</span>
           <span
             v-if="triggerTooltip.progress"
             class="text-text-secondary text-xs"
@@ -714,6 +740,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ triggerTooltip.progress }}</span
           >
           <span class="text-text-secondary text-xs">{{ triggerTooltip.detail }}</span>
+          <span
+            v-if="narrowedText"
+            class="flex items-center gap-1 text-xs"
+            data-test="date-time-trigger-tooltip-narrowed"
+            ><OIcon name="filter-alt" size="xs" aria-hidden="true" />{{ narrowedText }}</span
+          >
         </span>
       </template>
     </OTooltip>
@@ -779,7 +811,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import DateTimeRangeList from "@/components/DateTimeRangeList.vue";
@@ -900,7 +931,6 @@ export default defineComponent({
     OTooltip,
     OInput,
     OSelect,
-    OTime,
     ODateRangeCalendar,
     OPopover,
     DateTimeRangeList,
@@ -1042,6 +1072,16 @@ export default defineComponent({
     narrowedByQuery: {
       type: Object as PropType<{ startUs: number; endUs: number } | null>,
       default: null,
+    },
+    /** The page refused to run this range as over its limit: the trigger keeps it, with a lock, and the picker never clamps it. */
+    limitRefused: {
+      type: Boolean,
+      default: false,
+    },
+    /** A panel on the page keeps its own time, marked on the trigger. */
+    panelTimeMark: {
+      type: Boolean,
+      default: false,
     },
   },
 
@@ -1234,6 +1274,7 @@ export default defineComponent({
       chipItems,
       litChip,
       chipsNotes,
+      narrowedText,
       recordEntry,
       removeRecentRange,
       pinRecentRow,
@@ -1359,19 +1400,13 @@ export default defineComponent({
       onCalendarEndDate,
       onCalendarPendingDay,
       commitPendingDay,
-      onStartTimeEdit,
-      onEndTimeEdit,
-      onTimeFieldTyping,
-      onTimeFieldInvalid,
+      startFieldText,
+      endFieldText,
+      readFieldText,
+      onFieldInput,
+      commitFieldText,
       onTimeFieldBlur,
-      startDayLabel,
-      endDayLabel,
     } = fields;
-
-    // A 23:59:59 end stands for the exclusive midnight, which the label shows as 23:59.
-    const endFieldShown = computed(() =>
-      selectedTime.value.endTime === "23:59:59" ? "23:59" : selectedTime.value.endTime,
-    );
 
     // The pending selection as microseconds, including a clicked day still waiting for its end.
     const pendingRange = computed<{ startTime: number; endTime: number } | null>(() => {
@@ -1389,9 +1424,8 @@ export default defineComponent({
       };
     });
 
-    const { zoneRedrawn, kindText, resolvedLine, previewLine, shownLine } = useTimeRangeSummary(
-      typingView,
-      {
+    const { zoneRedrawn, kindText, resolvedLine, previewLine, shownLine, headNote } =
+      useTimeRangeSummary(typingView, {
         clock,
         fields,
         typing: typingBar,
@@ -1402,8 +1436,7 @@ export default defineComponent({
         menuOpen,
         pendingRange,
         currentRelativePeriod,
-      },
-    );
+      });
 
     const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const timezone = ref(props.pickerTimezone || currentTimezone);
@@ -1411,8 +1444,10 @@ export default defineComponent({
       return tz;
     });
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // The browser row's value is a sentinel other zone selects share, never a zone id.
     const browserTime = raw("Browser Time (" + browserTz + ")");
 
+    timezoneOptions = timezoneOptions.filter((tz) => tz !== "UTC");
     timezoneOptions.unshift("UTC");
     timezoneOptions.unshift(browserTime);
     if (props.pickerTimezone && !timezoneOptions.includes(props.pickerTimezone)) {
@@ -1461,29 +1496,46 @@ export default defineComponent({
     const filteredTimezone: any = ref(timezoneOptions);
     const isTimezoneSelectOpen = ref(false);
 
-    // OSelect filters by substring, so the matched zones carry the query itself and arrive in rank order.
+    // UTC and the browser zone stay pinned above a divider; OSelect filters by substring, so matches carry the query.
     const zoneQuery = ref("");
+    const zoneOption = (tz: string) => {
+      const isBrowser = tz === browserTime;
+      const offset = zoneOffset(isBrowser ? browserTz : tz, tooltipNow.value);
+      const suffix = offset ? raw(`UTC${offset}`) : undefined;
+      if (isBrowser) {
+        const label = t("dateTime.browserTimeZone", { zone: browserTz });
+        return { label, suffix, value: tz, testId: "datetime-timezone-browser" };
+      }
+      if (tz === "UTC") return { label: raw(tz), suffix, value: tz };
+      // The label is the name alone, so `utc` matches zone names, not every `UTC+…` offset.
+      return { label: raw(tz), suffix, value: tz, searchText: offset };
+    };
+    const allTimezoneOptions = computed(() => timezoneOptions.map(zoneOption));
     const timezoneSelectOptions = computed(() => {
+      const options = allTimezoneOptions.value;
       const term = zoneQuery.value.trim().toLowerCase();
-      if (!term) return allTimezoneOptions.value;
-      return searchTimeZones(allTimezoneOptions.value, term, (option) =>
-        option.value === browserTime ? browserTz : option.value,
-      ).map((option) => ({ ...option, searchText: term }));
+      if (term) {
+        return searchTimeZones(
+          options,
+          term,
+          (option) => (option.value === browserTime ? browserTz : option.value),
+          tooltipNow.value,
+          (option) => option.value === browserTime,
+        ).map((option) => ({ ...option, searchText: term }));
+      }
+      const pinned = ["UTC", browserTime].flatMap((value) =>
+        options.filter((option) => option.value === value),
+      );
+      const rest = options.filter((option) => !pinned.includes(option));
+      const divider = {
+        divider: true,
+        label: raw(""),
+        value: "__zone-divider__",
+        dataTest: "datetime-timezone-divider",
+        testId: "datetime-timezone-divider",
+      };
+      return [...pinned, divider, ...rest];
     });
-    const allTimezoneOptions = computed(() =>
-      timezoneOptions.map((tz: string) => {
-        const isBrowser = tz === browserTime;
-        const zone = isBrowser ? browserTz : tz;
-        const offset = zoneOffset(zone, tooltipNow.value);
-        const suffix = offset ? raw(`UTC${offset}`) : undefined;
-        if (isBrowser) {
-          return { label: t("common.browserTimeWithZone", { zone: browserTz }), suffix, value: tz };
-        }
-        if (tz === "UTC") return { label: raw(tz), suffix, value: tz };
-        // The label is the name alone, so `utc` matches zone names, not every `UTC+…` offset.
-        return { label: raw(tz), suffix, value: tz, searchText: offset };
-      }),
-    );
 
     const datetimeBtn = ref<unknown>(null);
 
@@ -2021,6 +2073,41 @@ export default defineComponent({
 
     const { isMobile } = useBreakpoint();
 
+    // Width of text in an element's font; 0 where no canvas can measure it.
+    const textWidth = (text: string, el: HTMLElement): number => {
+      try {
+        const context = document.createElement("canvas").getContext("2d");
+        if (!context) return 0;
+        context.font = getComputedStyle(el).font;
+        return context.measureText(text).width;
+      } catch {
+        return 0;
+      }
+    };
+
+    // Per-page examples (§9); the short one only where the long one would be cut.
+    const shortPlaceholder = ref(false);
+    const longPlaceholder = computed<I18nText>(() =>
+      props.preset === "dashboard" || props.preset === "form"
+        ? t("common.timeRangeInputPlaceholder")
+        : t("dateTime.placeholderOps"),
+    );
+    const barPlaceholder = computed<I18nText>(() =>
+      isMobile.value || shortPlaceholder.value
+        ? t("dateTime.placeholderShort")
+        : longPlaceholder.value,
+    );
+    const fitPlaceholder = () => {
+      shortPlaceholder.value = false;
+      nextTick(() => {
+        const box = menuEl.value?.querySelector<HTMLInputElement>(
+          "[data-test='date-time-input-field']",
+        );
+        if (!box || box.value) return;
+        shortPlaceholder.value = box.scrollWidth > box.clientWidth + 1;
+      });
+    };
+
     const labelSurface = computed(() => (props.preset === "dashboard" ? "dashboard" : "toolbar"));
     const datesShown = computed(() => props.preset === "dashboard");
 
@@ -2128,6 +2215,8 @@ export default defineComponent({
       });
     });
     const triggerFormIndex = ref(0);
+    // The clock icon is the first thing to go when the label does not fit (§6).
+    const triggerIconShown = ref(true);
     const triggerParts = computed<TriggerLabelForm>(() => {
       const forms = triggerForms.value;
       return forms[Math.min(triggerFormIndex.value, forms.length - 1)];
@@ -2140,12 +2229,18 @@ export default defineComponent({
       const label = triggerLabelEl.value;
       if (!label) return;
       const run = ++fitRun;
+      const overflows = () => label.scrollWidth > label.clientWidth + 1;
       triggerFormIndex.value = 0;
+      triggerIconShown.value = true;
       await nextTick();
+      if (run === fitRun && overflows() && !props.narrowedByQuery) {
+        triggerIconShown.value = false;
+        await nextTick();
+      }
       while (
         run === fitRun &&
         triggerFormIndex.value < triggerForms.value.length - 1 &&
-        label.scrollWidth > label.clientWidth + 1
+        overflows()
       ) {
         triggerFormIndex.value += 1;
         await nextTick();
@@ -2171,6 +2266,20 @@ export default defineComponent({
     });
     onBeforeUnmount(() => slotObserver?.disconnect());
 
+    // The trigger's width at its narrowest form, so a toolbar can budget for it before dropping its own labels.
+    const shortestFormWidth = (): number => {
+      const button = triggerElement.value;
+      const label = triggerLabelEl.value;
+      if (!button || !label) return 0;
+      const forms = triggerForms.value;
+      const last = forms[forms.length - 1];
+      const text =
+        last.name && last.dates ? `${last.name} · ${last.dates}` : last.name || last.dates;
+      const icon = button.querySelector<HTMLElement>("[data-test='date-time-trigger-icon']");
+      const chrome = button.offsetWidth - label.offsetWidth - (icon?.offsetWidth ?? 0);
+      return Math.max(0, Math.ceil(chrome + textWidth(text, label)));
+    };
+
     // A fixed range still filling says when it ends, on the trigger and in its tooltip.
     const appliedEndText = computed(() => {
       const applied = appliedModel();
@@ -2194,8 +2303,13 @@ export default defineComponent({
       ].join(" · ");
       const end = appliedEndText.value;
       const progress = end ? String(t("dateTime.inProgressRefresh", { end })) : "";
-      return { stamps: formatRangeStamps(range, labelOptions()), detail, progress };
+      const inUtc = formatZoneOffset(zone.value, range.startUs / 1000) === "UTC";
+      const utc = inUtc
+        ? ""
+        : `UTC ${formatRangeStamps(range, { ...labelOptions(), timezone: "UTC" })}`;
+      return { stamps: formatRangeStamps(range, labelOptions()), utc, detail, progress };
     });
+    const triggerTooltipAlign = computed(() => (props.preset === "dashboard" ? "center" : "start"));
 
     const triggerAriaLabel = computed(() =>
       t("dateTime.triggerLabel", {
@@ -2327,13 +2441,26 @@ export default defineComponent({
     const copyShortcut = isMacOS() ? "ctrl+shift+c" : "alt+shift+c";
 
     // Readable text the bar reads back; it names the zone, so it means the same in every timezone.
-    const copyRange = () => {
+    const copied = ref(false);
+    const copiedSpeech = ref("");
+    let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+    // The icon confirms the copy in place, so no toast covers the range it copied.
+    const copyRange = async () => {
       const range = selectionRange.value;
       if (!range) return;
-      copyToClipboard(formatRangeCopyText(range, labelOptions()), t, {
-        successMessage: t("common.dateRangeCopied"),
+      const done = await copyToClipboard(formatRangeCopyText(range, labelOptions()), t, {
+        silent: true,
       });
+      if (!done) return;
+      copied.value = true;
+      copiedSpeech.value = String(t("common.dateRangeCopied"));
+      if (copiedTimer !== null) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => {
+        copied.value = false;
+        copiedSpeech.value = "";
+      }, 1500);
     };
+    onBeforeUnmount(() => copiedTimer !== null && clearTimeout(copiedTimer));
 
     const applyAbsoluteRange = (
       startMicros: number,
@@ -2508,6 +2635,7 @@ export default defineComponent({
     const computeRelativePeriod = () => {
       markProgrammaticDateChange();
       computeRelativeMaxima();
+      if (props.limitRefused) return;
       const periodBefore = currentRelativePeriod();
       if (selectedType.value === "relative") {
         if (calendarExceedsRestriction(calendarToken.value)) {
@@ -2635,6 +2763,7 @@ export default defineComponent({
         entryAtOpen = appliedHistoryEntry();
         onBeforeShow();
         onShow();
+        nextTick(fitPlaceholder);
       } else {
         pendingDay.value = null;
         clearInput();
@@ -2690,6 +2819,8 @@ export default defineComponent({
       listCursor.value = -1;
       editingPinRowId.value = null;
     };
+
+    const toggleCalendar = () => (calendarMode.value ? closeCalendar() : openCalendar());
 
     // Leaving the calendar keeps whatever it applied; a half-picked day is dropped.
     const closeCalendar = () => {
@@ -2922,13 +3053,25 @@ export default defineComponent({
       else applyAndClose();
     };
 
-    // The native change fires after keydown, so blurring commits the typed text before Apply reads it.
+    const fieldOf = (target: EventTarget | null): "start" | "end" | null => {
+      if (!(target instanceof HTMLElement)) return null;
+      if (target.closest("[data-test='datetime-start-time']")) return "start";
+      return target.closest("[data-test='datetime-end-time']") ? "end" : null;
+    };
+
+    const onFieldChange = (field: "start" | "end", event: Event) => {
+      const input = event.target;
+      if (input instanceof HTMLInputElement) commitFieldText(field, input.value);
+    };
+
+    // Enter takes the field's text first, then applies when it read.
     const onTimeFieldEnter = (event: KeyboardEvent) => {
-      const field = event.target as HTMLInputElement | null;
-      field?.blur();
+      const input = event.target instanceof HTMLInputElement ? event.target : null;
+      const field = fieldOf(input);
+      if (input && field) commitFieldText(field, input.value);
       nextTick(() => {
         if (timeFieldError.value === null && !applyDisabled.value) applyAndClose();
-        else field?.focus();
+        else input?.focus();
       });
     };
 
@@ -2941,10 +3084,7 @@ export default defineComponent({
       }
       if (timeFieldError.value) return { message: timeFieldError.value.message };
       if (unreadableFields.value.start || unreadableFields.value.end) {
-        return {
-          message: t("components.time.invalid", { format: raw("HH:MM") }),
-          examples: t("common.timeFieldExamples"),
-        };
+        return { message: t("common.timeRangeInputError") };
       }
       const limit = calendarLimit.value.preview ?? calendarLimit.value.selection;
       return limit ? { message: raw(limit) } : null;
@@ -3139,17 +3279,16 @@ export default defineComponent({
       suggestionRows,
       activeSuggestion,
       applySuggestion,
-      startDayLabel,
-      endDayLabel,
-      endFieldShown,
+      startFieldText,
+      endFieldText,
+      readFieldText,
+      onFieldInput,
+      onFieldChange,
       inputErrorId,
       onCalendarStartDate,
       onCalendarEndDate,
       onCalendarPendingDay,
-      onStartTimeEdit,
-      onEndTimeEdit,
       onTimeFieldBlur,
-      onTimeFieldTyping,
       typedFieldTime,
       groupEl,
       timeFieldFocused,
@@ -3219,7 +3358,6 @@ export default defineComponent({
       fieldsBlank,
       zoomOutBlocked,
       menuEl,
-      onTimeFieldInvalid,
       onTimeFieldEnter,
       onApplyClick,
       summaryError,
@@ -3251,6 +3389,16 @@ export default defineComponent({
       triggerLabelEl,
       fitTriggerLabel,
       triggerFormIndex,
+      triggerIconShown,
+      shortestFormWidth,
+      triggerTooltipAlign,
+      narrowedText,
+      headNote,
+      copied,
+      copiedSpeech,
+      toggleCalendar,
+      barPlaceholder,
+      shortPlaceholder,
     };
   },
   computed: {

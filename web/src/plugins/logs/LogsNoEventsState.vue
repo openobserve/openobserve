@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        → "relax your filters" message (no action card; Ask AI / history below)
 
     3. No stream stats available (fallback)
-       → generic message (no action card; Ask AI / history below)
+       → dated message + "Try {range}" with the next longer quick range
 
   Emits action IDs to the parent rather than mutating state directly.
   The "Ask AI" ghost button is only shown when aiEnabled is true.
@@ -67,6 +67,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #extra>
       <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
+          v-if="tryChip && !jumpTarget"
+          variant="outline"
+          size="sm"
+          data-test="logs-no-events-try-range-btn"
+          @click="emit('apply-range', tryChip.value)"
+        >
+          {{ t("dateTime.tryRange", { range: tryChipLabel }) }}
+        </OButton>
+        <OButton
           variant="ghost"
           size="sm"
           icon-left="history"
@@ -102,6 +111,9 @@ import { useAiIcon } from "@/composables/useAiIcon";
 import { DateTime } from "luxon";
 import { periodToLabel } from "@/composables/useWidenRange";
 import DOMPurify from "dompurify";
+import { formatRangeLabel } from "@/utils/timeRangeLabel";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
+import { nextLongerChip, TIME_RANGE_CHIP_SETS } from "@/utils/timeRangeList";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 // Backend uses exclusive end boundary, so nudge end by 1s to include the record at doc_time_max.
@@ -126,6 +138,7 @@ const emit = defineEmits<{
   "jump-to-stream-data": [fromUs: number, toUs: number];
   "open-history": [];
   "ask-ai": [];
+  "apply-range": [period: string];
 }>();
 
 const { t } = useI18nTyped();
@@ -190,10 +203,25 @@ const jumpTargetSublabel = computed(() => {
 
 // --- time-range helpers ------------------------------------------------------
 
-// `currentPeriodLabel` feeds the "descNoFilters" message. The widen-range
-// action card was removed because widening never surfaces more data here.
+// A widen action was once removed as unhelpful; the approved polish design brings "Try {range}" back.
 const isRelative = computed(() => props.dateType === "relative" && !!props.relativeTimePeriod);
-const currentPeriodLabel = computed(() =>
-  isRelative.value ? periodToLabel(props.relativeTimePeriod) : t("logs.noEvents.selectedRange"),
+const currentPeriodLabel = computed(() => {
+  const w = props.queryWindowUs;
+  if (w)
+    return formatRangeLabel(
+      { startUs: w.start, endUs: w.end },
+      { timezone: props.timezone, surface: "summary" },
+    );
+  return isRelative.value
+    ? periodToLabel(props.relativeTimePeriod)
+    : t("logs.noEvents.selectedRange");
+});
+
+const tryChip = computed(() => {
+  const w = props.queryWindowUs;
+  return w ? nextLongerChip(w.end - w.start, TIME_RANGE_CHIP_SETS.ops) : null;
+});
+const tryChipLabel = computed(() =>
+  tryChip.value ? formatPeriodLabel(tryChip.value.value, props.timezone, t) : "",
 );
 </script>

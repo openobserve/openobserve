@@ -288,19 +288,28 @@ export default function useTimeRangeRail(props: TimeRangeRailProps, deps: TimeRa
         testId: "date-time-chips-note-limit",
       });
     }
-    const narrowed = props.narrowedByQuery;
-    if (!narrowed || !(narrowed.endUs > narrowed.startUs)) return notes;
-    const range = formatRangeLabel(
-      { startUs: narrowed.startUs, endUs: narrowed.endUs },
-      { ...labelOptions(), surface: "row" },
-    );
-    notes.push({
-      icon: "filter-alt",
-      text: String(t(notes.length > 0 ? "dateTime.narrowed" : "dateTime.narrowedByQuery")),
-      tooltip: t("dateTime.queryKeeps", { range }),
-      testId: "date-time-chips-note-narrowed",
-    });
     return notes;
+  });
+
+  // Milliseconds only when the instant has them.
+  const clockText = (us: number): string => {
+    const ms = Math.floor((((us % 1_000_000) + 1_000_000) % 1_000_000) / 1000);
+    const { time } = convertUnixTime(us);
+    return ms ? `${time}.${String(ms).padStart(3, "0")}` : time;
+  };
+
+  // `Query keeps {window} ({duration})`, said in the panel and the trigger tooltip; "" when the query keeps it all.
+  const narrowedText = computed<string>(() => {
+    const narrowed = props.narrowedByQuery;
+    if (!narrowed || !(narrowed.endUs > narrowed.startUs)) return "";
+    const { startUs, endUs } = narrowed;
+    // Inside the picked range its day is already shown, so a one-day window reads as clock times.
+    const sameDay = convertUnixTime(startUs).date === convertUnixTime(endUs).date;
+    const range = sameDay
+      ? `${clockText(startUs)} – ${clockText(endUs)}`
+      : formatRangeLabel({ startUs, endUs }, { ...labelOptions(), surface: "row" });
+    const duration = formatRangeDuration(startUs, endUs);
+    return String(t("dateTime.queryKeeps", { range, duration }));
   });
 
   // Recent never shows what a pin, chip or calendar row offers, so storing it would only push out ranges it does show.
@@ -379,6 +388,7 @@ export default function useTimeRangeRail(props: TimeRangeRailProps, deps: TimeRa
     chipItems,
     litChip,
     chipsNotes,
+    narrowedText,
     recordEntry,
     recentEntry,
     removeRecentRange,

@@ -212,7 +212,7 @@ describe("DateTime layout", () => {
 
       const menu = document.getElementById("date-time-menu")!;
       expect(menu.className).toContain("h-82");
-      expect(menu.className).toContain("w-110");
+      expect(menu.className).toContain("w-128");
       expect(el("date-time-body")!.className).toContain("flex-1");
       expect(el("date-time-chips")).not.toBeNull();
       expect(el("date-time-relative-15-m-btn")).toBeNull();

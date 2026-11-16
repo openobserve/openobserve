@@ -531,7 +531,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(wrapper!.vm.showRunQueryPending).toBe(true);
     });
 
-    it("runs a relative time change with Auto Run on, and not with it off (D1)", async () => {
+    it("runs a user's range change whether Auto Run is on or off (decision a)", async () => {
       const { logs } = await setup({ liveMode: false });
       vi.useFakeTimers();
       await wrapper!.vm.updateDateTime({
@@ -542,7 +542,8 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         userChangedValue: true,
       });
       await vi.advanceTimersByTimeAsync(10);
-      expect(logs).not.toHaveBeenCalled();
+      expect(logs).toHaveBeenCalledTimes(1);
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "range", kind: "explicit" });
 
       wrapper!.vm.searchObj.meta.liveMode = true;
       await wrapper!.vm.updateDateTime({
@@ -553,8 +554,63 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         userChangedValue: true,
       });
       await vi.advanceTimersByTimeAsync(10);
+      expect(logs).toHaveBeenCalledTimes(2);
+      expect(logs.mock.calls[1][0]).toMatchObject({ reason: "range" });
+    });
+
+    it("a chip click on the real picker runs, and undo runs the restored range (decision a, Bug 3)", async () => {
+      const { logs } = await setup({ liveMode: false });
+      const picker = wrapper!.vm.dateTimeRef;
+      const chip = async (value: string) => {
+        picker.onMenuOpenChange(true);
+        picker.menuOpen = true;
+        await flushPromises();
+        const node = Array.from(document.querySelectorAll<HTMLElement>("[data-test]")).find(
+          (n) => n.getAttribute("data-test") === `date-time-chip-${value}`,
+        );
+        node!.click();
+        await flushPromises();
+      };
+      await chip("1h");
       expect(logs).toHaveBeenCalledTimes(1);
-      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "time" });
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "range", kind: "explicit" });
+      await chip("4h");
+      expect(logs).toHaveBeenCalledTimes(2);
+      expect(picker.undo()).toBe(true);
+      await flushPromises();
+      expect(logs).toHaveBeenCalledTimes(3);
+      expect(wrapper!.vm.searchObj.data.datetime.relativeTimePeriod).toBe("1h");
+    });
+
+    it("holds a user's range change behind unrun query edits (decision a)", async () => {
+      const { logs, searchObj } = await setup({ liveMode: false });
+      vi.useFakeTimers();
+      wrapper!.vm.onEditorUserEdit();
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "1h",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: true,
+      });
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(logs).not.toHaveBeenCalled();
+      expect(searchObj.meta.runPending).toBe(true);
+      expect(searchObj.meta.editorDirty).toBe(true);
+    });
+
+    it("a programmatic range change keeps the auto-run rules", async () => {
+      const { logs } = await setup({ liveMode: false });
+      vi.useFakeTimers();
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "1h",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: false,
+      });
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(logs).not.toHaveBeenCalled();
     });
 
     it("going live from an ended range with refresh on runs even with Auto Run off (V4)", async () => {
@@ -572,10 +628,10 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       });
       await vi.advanceTimersByTimeAsync(10);
       expect(logs).toHaveBeenCalledTimes(1);
-      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "run" });
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "range" });
     });
 
-    it("a live range from an ended one stays manual while refresh is off (V4)", async () => {
+    it("a live range from an ended one runs while refresh is off too (decision a)", async () => {
       const { logs, searchObj } = await setup({ liveMode: false });
       vi.useFakeTimers();
       searchObj.data.datetime = { type: "absolute", startTime: 1, endTime: 2 };
@@ -589,7 +645,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         userChangedValue: true,
       });
       await vi.advanceTimersByTimeAsync(10);
-      expect(logs).not.toHaveBeenCalled();
+      expect(logs).toHaveBeenCalledTimes(1);
     });
 
     it("clamps an over-limit pick without a second toast; the picker names the limit (V7)", async () => {
@@ -611,6 +667,41 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       searchObj.data.datetime.queryRangeRestrictionInHour = 24;
       await wrapper!.vm.updateDateTime(overLimit(false));
       expect(toastMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("a refused over-limit link is not clamped, toasted or run; a user's pick clears it and runs (R2)", async () => {
+      const { searchObj, logs } = await setup({ liveMode: false });
+      vi.useFakeTimers();
+      const end = Date.parse("2026-10-06T10:00:00") * 1000;
+      searchObj.data.datetime = { type: "absolute", queryRangeRestrictionInHour: 24 };
+      searchObj.meta.rangeFromLink = true;
+      searchObj.meta.rangeLimitRefusal = { allowed: "1d", allowedPeriod: "24h" };
+      const linked = {
+        valueType: "absolute",
+        startTime: end - 7 * 24 * 3600 * 1_000_000,
+        endTime: end,
+        selectedDate: { from: "2026/09/29", to: "2026/10/06" },
+        selectedTime: { startTime: "10:00", endTime: "10:00" },
+        userChangedValue: false,
+      };
+      await wrapper!.vm.updateDateTime(linked);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(Number(searchObj.data.datetime.startTime)).toBe(linked.startTime);
+      expect(toastMock).not.toHaveBeenCalled();
+      expect(logs).not.toHaveBeenCalled();
+      expect(wrapper!.vm.dateTimeRef.$props.limitRefused).toBe(true);
+
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "24h",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: true,
+      });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(searchObj.meta.rangeLimitRefusal).toBeNull();
+      expect(searchObj.meta.rangeFromLink).toBe(false);
+      expect(logs).toHaveBeenCalledTimes(1);
     });
 
     it("tracks a user time change as logs_time_range_changed without the raw value", async () => {
@@ -650,7 +741,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         rerun: true,
       });
       expect(logs).toHaveBeenCalledTimes(1);
-      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "zoom", kind: "explicit" });
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "range", kind: "explicit" });
     });
 
     it("a zoom to the unchanged range does not turn the next relative pick into a zoom (M3)", async () => {
@@ -666,10 +757,10 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       });
       await vi.advanceTimersByTimeAsync(3000);
       expect(logs).toHaveBeenCalledTimes(1);
-      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "time", kind: "refinement" });
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "range", kind: "explicit" });
     });
 
-    it("a relative pick after an unemitted zoom does not run with Auto Run off (M3)", async () => {
+    it("a relative pick after an unemitted zoom runs as a range change, not a zoom (M3)", async () => {
       const { logs } = await setup({ liveMode: false });
       vi.useFakeTimers();
       wrapper!.vm.markZoom(ZOOM);
@@ -681,7 +772,8 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         userChangedValue: true,
       });
       await vi.advanceTimersByTimeAsync(1000);
-      expect(logs).not.toHaveBeenCalled();
+      expect(logs).toHaveBeenCalledTimes(1);
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "range" });
     });
 
     it("a zoom expires on the tick after it is marked (M3)", async () => {

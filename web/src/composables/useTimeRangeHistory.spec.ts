@@ -19,6 +19,7 @@ import { mount } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 import useTimeRangeHistory, {
   TIME_RANGE_HISTORY_LIMIT,
+  arrivalFromPage,
   readTimeRangeHistory,
   timeRangeHistoryKey,
 } from "./useTimeRangeHistory";
@@ -206,5 +207,25 @@ describe("useTimeRangeHistory", () => {
   it("drops a source that is not text when reading", () => {
     localStorage.setItem(KEY, JSON.stringify([{ ...range(1), source: 42 }]));
     expect(readTimeRangeHistory(KEY)).toEqual([range(1)]);
+  });
+
+  describe("arrivalFromPage", () => {
+    it("offers the newest range another page applied when it differs from this page's", () => {
+      const { api } = setup();
+      api.add(range(1).startUs, range(1).endUs, "Logs");
+      expect(arrivalFromPage(api.entries.value, "Logs", { relative: "15m" })).toEqual({
+        ...range(1),
+        source: "Logs",
+      });
+    });
+
+    it("offers nothing when the newest entry came from another page or is already in force", () => {
+      const { api } = setup();
+      api.add(range(1).startUs, range(1).endUs, "Logs");
+      expect(arrivalFromPage(api.entries.value, "Logs", range(1))).toBeNull();
+      api.addRelative("6h", "Traces");
+      expect(arrivalFromPage(api.entries.value, "Logs", null)).toBeNull();
+      expect(arrivalFromPage([], "Logs", null)).toBeNull();
+    });
   });
 });

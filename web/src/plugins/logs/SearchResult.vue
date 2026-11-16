@@ -938,6 +938,7 @@ import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtil
 import {
   convertLogData,
   convertStackedLogData,
+  histogramZoomWindow,
   formatDate,
   formatCount,
 } from "@/utils/logs/convertLogData";
@@ -1223,8 +1224,19 @@ export default defineComponent({
       this.searchObj.organizationIdentifier = this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
     },
-    onChartUpdate({ start, end }: { start: any; end: any }) {
+    onChartUpdate(range: { start: any; end: any }) {
       this.searchObj.meta.showDetailTab = false;
+      const snapped =
+        range.start && range.end
+          ? histogramZoomWindow(
+              Number(range.start),
+              Number(range.end),
+              this.plotChart,
+              Number(this.searchObj.data.histogramInterval),
+            )
+          : null;
+      const start = snapped?.start ?? range.start;
+      const end = snapped?.end ?? range.end;
 
       // Store the original time range BEFORE updating datetime (for volume analysis baseline)
       if (start && end && !this.originalTimeRangeBeforeSelection) {

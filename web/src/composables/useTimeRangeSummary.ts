@@ -22,8 +22,8 @@ import {
 } from "@/utils/dashboard/calendarPeriods";
 import { formatDurationMicros } from "@/utils/timeRangeRail";
 import { formatRangeDates, formatRangeDuration } from "@/utils/timeRangeLabel";
-import { anchorWindowLabel, dropZeroMilliseconds } from "@/utils/timeRangeAnchor";
-import { formatReadingNote, readingNote } from "@/utils/timeRangeNotes";
+import { anchorWindowLabel } from "@/utils/timeRangeAnchor";
+import { formatReadingNote, readingNote, type ReadingNote } from "@/utils/timeRangeNotes";
 import type { ParsedTimeInput, TimeTextAnswer } from "@/utils/dateTimeRangeParse";
 import {
   timeRangeChangeText,
@@ -223,11 +223,27 @@ export default function useTimeRangeSummary(
     return zoneRedrawn.value ? { ...line, note: String(t("dateTime.sameWindow")) } : line;
   });
 
+  const noteOf = (reading: ParsedTimeInput | null, asUtc: boolean): ReadingNote | null =>
+    asUtc ? { kind: "utc" } : reading ? readingNote(reading, zone.value) : null;
+
+  // The zone a text was typed in heads the list; the summary keeps its room for the range.
+  const isZoneNote = (note: ReadingNote | null) =>
+    note?.kind === "utc" || note?.kind === "typedZone";
+
   const noteFor = (reading: ParsedTimeInput | null, asUtc: boolean): string => {
-    if (asUtc) return String(formatReadingNote({ kind: "utc" }, t, intlLocale.value, zone.value));
-    const note = reading ? readingNote(reading, zone.value) : null;
-    return note ? String(formatReadingNote(note, t, intlLocale.value, zone.value)) : "";
+    const note = noteOf(reading, asUtc);
+    if (!note || isZoneNote(note)) return "";
+    return String(formatReadingNote(note, t, intlLocale.value, zone.value));
   };
+
+  const headNote = computed<string>(() => {
+    if (!inputText.value.trim() || typing.inputError.value) return "";
+    const tag = typing.shownTag.value;
+    const note = noteOf(tag ? inputReading.value : shownReading.value, inputAsUtc.value);
+    return isZoneNote(note)
+      ? String(formatReadingNote(note!, t, intlLocale.value, zone.value))
+      : "";
+  });
 
   const rollingLine = (period: string, startTime: number): SummaryLine => ({
     ...liveLine(period, startTime, tooltipNow.value * 1000),
@@ -246,14 +262,8 @@ export default function useTimeRangeSummary(
     const line = name ? namedLine(start, end, name) : fixedLine(start, end);
     const tag = shownTag.value;
     if (tag && "anchor" in tag && tag.anchor !== "to-now" && reading?.type === "timestamp") {
-      const centre = reading.centreMicros ?? (start + end) / 2;
-      line.name = String(
-        t("dateTime.aroundInstant", {
-          window: String(anchorWindowLabel(tag.anchor, t)),
-          instant: dropZeroMilliseconds(clock.formatExactInstant(centre)),
-        }),
-      );
-      line.range = "";
+      line.name = String(anchorWindowLabel(tag.anchor, t));
+      line.range = formatRangeDates({ startUs: start, endUs: end }, labelOptions());
       line.duration = "";
     }
     const first = inputReading.value;
@@ -302,7 +312,7 @@ export default function useTimeRangeSummary(
     const [first, last] = other < day ? [other, day] : [day, other];
     const start = clock.civilDayStart(first);
     const end = clock.civilDayStart(addCivilDays(last, 1));
-    return { ...fixedLine(start, end), note: String(t("dateTime.pickEndDate")) };
+    return fixedLine(start, end);
   });
 
   // The range the fields would make with the time being typed, before the field commits it.
@@ -310,15 +320,9 @@ export default function useTimeRangeSummary(
     const typed = menuOpen.value && deps.calendarMode.value ? fields.typedFieldTime.value : null;
     const range = pendingRange.value;
     if (!typed || !range) return null;
-    const day =
-      pendingDay.value ?? fields.selectedDate.value[typed.field === "start" ? "from" : "to"];
-    const start =
-      typed.field === "start" ? clock.absoluteToMicros(day, typed.time) : range.startTime;
-    const end = typed.field === "end" ? clock.endFieldToMicros(day, typed.time) : range.endTime;
-    if (!(end > start)) return null;
-    const line = fixedLine(start, end);
-    // The duration tag gives way to this long note, as it is the first part of the row to go.
-    return typed.ms ? { ...line, duration: "", note: String(t("dateTime.secondsOnlyHere")) } : line;
+    const start = typed.field === "start" ? typed.micros : range.startTime;
+    const end = typed.field === "end" ? typed.micros : range.endTime;
+    return end > start ? fixedLine(start, end) : null;
   });
 
   const reversedLine = (): SummaryLine | null =>
@@ -385,5 +389,6 @@ export default function useTimeRangeSummary(
     resolvedLine,
     previewLine,
     shownLine,
+    headNote,
   };
 }

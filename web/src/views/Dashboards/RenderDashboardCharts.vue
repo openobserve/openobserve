@@ -267,32 +267,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @exploreCreateAlert="$emit('exploreCreateAlert', $event)"
                   @exploreAddToDashboard="$emit('exploreAddToDashboard', $event)"
                 >
+                  <template v-if="hasPanelTime(item) && panelTimeValues[item.id]" #panel-time>
+                    <!-- The chip stands in for the picker's trigger; the hidden picker under it anchors its panel there. -->
+                    <span
+                      class="relative inline-flex shrink-0"
+                      :data-test="`dashboard-panel-${item.id}-time-picker`"
+                    >
+                      <OTag
+                        variant="primary-soft"
+                        size="sm"
+                        icon="timer"
+                        clickable
+                        :aria-label="t('dashboard.panelTimeEnabled')"
+                        :data-test="`dashboard-panel-${item.id}-time-chip`"
+                        :ref="(chip) => setPanelTimeChip(item.id, chip)"
+                        @click="openPanelTimePicker(item.id)"
+                        >{{ panelTimeChipText(item.id)
+                        }}<OTooltip :content="t('dashboard.panelTimeEnabled')" side="bottom"
+                      /></OTag>
+                      <DateTimePickerDashboard
+                        preset="dashboard"
+                        :modelValue="getPanelPickedTime(item.id) ?? panelTimeValues[item.id]"
+                        size="sm"
+                        menu-align="start"
+                        class="panel-time-picker-widget invisible absolute start-0 top-0"
+                        @update:modelValue="(val) => getPanelTimeGate(item.id).onPick(val)"
+                        @show="getPanelTimeGate(item.id).onShow()"
+                        @hide="onPanelTimePickerHide(item.id)"
+                        @timezone-change="getPanelTimeGate(item.id).flush()"
+                        :data-test="`panel-time-picker-${item.id}`"
+                        :ref="(picker) => setPanelTimePicker(item.id, picker)"
+                      />
+                    </span>
+                  </template>
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
                   <template #panel-variables>
                     <div
                       class="panel-variables-container px-1"
                       :data-test="`dashboard-panel-${item.id}-variables`"
                     >
-                      <!-- Panel Time Picker (NEW) -->
-                      <div
-                        v-if="hasPanelTime(item) && panelTimeValues[item.id]"
-                        class="panel-time-picker-wrapper mt-1 mb-2"
-                        :data-test="`dashboard-panel-${item.id}-time-picker`"
-                      >
-                        <DateTimePickerDashboard
-                          preset="dashboard"
-                          :modelValue="getPanelPickedTime(item.id) ?? panelTimeValues[item.id]"
-                          size="sm"
-                          class="panel-time-picker-widget"
-                          @update:modelValue="(val) => getPanelTimeGate(item.id).onPick(val)"
-                          @show="getPanelTimeGate(item.id).onShow()"
-                          @hide="getPanelTimeGate(item.id).onHide()"
-                          @timezone-change="getPanelTimeGate(item.id).flush()"
-                          :data-test="`panel-time-picker-${item.id}`"
-                          :ref="(picker) => setPanelTimePicker(item.id, picker)"
-                        />
-                      </div>
-
                       <VariablesValueSelector
                         v-if="variablesManager && getPanelVariables(item.id).length > 0"
                         :scope="'panels'"
@@ -380,6 +393,9 @@ import { getPanelDisplayTitle } from "@/utils/dashboard/panelTitle";
 import { useRouter } from "vue-router";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { panelTimeChipLabel } from "@/utils/dashboard/dashboardTimeLabels";
 import { useRoute } from "vue-router";
 import { updateDashboard } from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
@@ -542,6 +558,8 @@ export default defineComponent({
     TabList,
     ODialog,
     OTruncatedText,
+    OTag,
+    OTooltip,
   },
   setup(props: any, { emit }) {
     const { t } = useI18nTyped();
@@ -1801,6 +1819,31 @@ export default defineComponent({
 
     const getPanelPickedTime = (panelId: string) => getPanelTimeGate(panelId).picked.value;
 
+    const panelTimeChips = new Map<string, { $el?: HTMLElement }>();
+    const setPanelTimeChip = (panelId: string, chip: any) => {
+      if (chip) panelTimeChips.set(panelId, chip);
+      else panelTimeChips.delete(panelId);
+    };
+    const panelTimeChipText = (panelId: string): I18nText =>
+      panelTimeChipLabel(
+        getPanelPickedTime(panelId) ?? panelTimeValues.value[panelId],
+        store.state.timezone,
+        t,
+      );
+    const openPanelTimePicker = (panelId: string) => {
+      panelTimePickers.get(panelId)?.dateTimePicker?.openMenu?.();
+    };
+    // The picker's own trigger is hidden, so focus returns to the chip that opened it.
+    const onPanelTimePickerHide = (panelId: string) => {
+      getPanelTimeGate(panelId).onHide();
+      nextTick(() => {
+        const active = document.activeElement;
+        const picker = panelTimePickers.get(panelId)?.$el as HTMLElement | undefined;
+        if (active && active !== document.body && !picker?.contains(active)) return;
+        panelTimeChips.get(panelId)?.$el?.focus();
+      });
+    };
+
     // panelDownloadRegistry is a module-level singleton (see utils/panelDownloadRegistry.ts).
     // PanelContainer instances register themselves on mount; no provide/inject needed.
 
@@ -2043,6 +2086,10 @@ export default defineComponent({
       getPanelPickedTime,
       isPanelTimeWaiting,
       setPanelTimePicker,
+      setPanelTimeChip,
+      panelTimeChipText,
+      openPanelTimePicker,
+      onPanelTimePickerHide,
       viewPanelSelectedDate,
     };
   },

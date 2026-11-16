@@ -778,7 +778,8 @@ describe("RenderDashboardCharts", () => {
       name: "PanelContainer",
       props: ["data", "isTimeRangeWaiting"],
       emits: ["refreshPanelRequest"],
-      template: '<div data-test="panel-container-stub"><slot name="panel-variables" /></div>',
+      template:
+        '<div data-test="panel-container-stub"><div data-test="panel-bar-stub"><slot name="panel-time" /></div><slot name="panel-variables" /></div>',
     };
 
     const RELATIVE_HOUR = { type: "relative", relativeTimePeriod: "1h" };
@@ -816,6 +817,8 @@ describe("RenderDashboardCharts", () => {
             PanelContainer: PanelContainerStub,
             DateTimePickerDashboard: false,
             DateTime: false,
+            OTag: false,
+            OBadge: false,
           },
         },
       });
@@ -974,6 +977,38 @@ describe("RenderDashboardCharts", () => {
       expect(panel().props("isTimeRangeWaiting")).toBe(false);
       expect(panelRefreshRequests()).toHaveLength(0);
       expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("puts the panel's own time in its header as one timer chip, not a toolbar (R9)", async () => {
+      await mountWithPanelPicker();
+      const bar = wrapper.get('[data-test="panel-bar-stub"]');
+      const chip = bar.get('[data-test="dashboard-panel-P1-time-chip"]');
+      expect(chip.text()).toBe("1h");
+      expect(chip.attributes("aria-label")).toBe("Panel-Specific Time Range");
+      expect(chip.findComponent({ name: "OIcon" }).props("name")).toBe("timer");
+      expect(bar.find('[data-test="dashboard-panel-P1-time-picker"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="dashboard-panel-P1-variables"] [data-test="panel-time-picker-P1"]')
+          .exists(),
+      ).toBe(false);
+    });
+
+    it("opens that panel's picker from its chip", async () => {
+      await mountWithPanelPicker();
+      const realPicker = dateTime().findComponent(DateTime);
+      expect(realPicker.vm.menuOpen).toBe(false);
+
+      await wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').trigger("click");
+      await flushPromises();
+
+      expect(realPicker.vm.menuOpen).toBe(true);
+    });
+
+    it("names a waiting pick on the chip", async () => {
+      await mountWithPanelPicker();
+      await pickPreset("h", 6);
+      expect(wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').text()).toBe("6h");
     });
 
     it("does not reload the panel when its picker reports its starting range", async () => {

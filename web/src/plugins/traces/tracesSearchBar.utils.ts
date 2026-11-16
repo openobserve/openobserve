@@ -19,8 +19,20 @@
  * mounting the full SFC (which pulls in monaco / vuex).
  */
 
+import { reactive, type InjectionKey } from "vue";
+import type { RangeLimitRefusal } from "@/utils/logs/rangeLimitRefusal";
 import type { TimeSelection } from "@/composables/useLogs/useAutoRun";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
+
+/** Applies a quick range on the Traces picker as a chip pick; the empty state sits below components that do not forward events. */
+export const TRACES_APPLY_RANGE: InjectionKey<(period: string) => void> =
+  Symbol("tracesApplyRange");
+
+/** Shared by Index and SearchBar: whether the range in force came from a link, and its refusal over the stream limit. */
+export const tracesRangeLink = reactive({
+  fromLink: false,
+  refusal: null as RangeLimitRefusal | null,
+});
 
 /** Subset of `searchObj.data.datetime` that the comparison cares about. */
 export interface DatetimeSnapshot {
@@ -138,6 +150,21 @@ export function tracesRunTimeSelection(signature: string | null | undefined): Ti
     return { type: "absolute", startUs: Number(first), endUs: Number(second) };
   } catch {
     return null;
+  }
+}
+
+/** True when the query part of the search (text, stream, SQL mode) differs from the last Run; the range is ignored. */
+export function tracesQueryEdited(
+  lastRunSignature: string | null | undefined,
+  searchObj: Parameters<typeof tracesSearchRunSignature>[0],
+): boolean {
+  if (!lastRunSignature) return false;
+  try {
+    const ran = JSON.parse(lastRunSignature) as unknown[];
+    const now = JSON.parse(tracesSearchRunSignature(searchObj)) as unknown[];
+    return now.slice(0, 3).some((part, i) => part !== ran[i]);
+  } catch {
+    return false;
   }
 }
 

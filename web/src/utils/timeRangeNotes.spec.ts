@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
+import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 import { parseTimeInput, suggestTimeInput, type TimeInputOptions } from "./dateTimeRangeParse";
 import { formatReadingNote, readingNote } from "./timeRangeNotes";
@@ -68,11 +69,28 @@ describe("readingNote", () => {
   });
 });
 
+describe("formatReadingNote head line [V2]", () => {
+  const t = i18n.global.t as unknown as TranslateFn;
+  const headOf = (text: string, timezone: string) =>
+    String(formatReadingNote(noteOf(text, timezone)!, t, "en-US", timezone));
+
+  it("words a pasted UTC stamp as the zone it was typed in", () => {
+    expect(headOf("2026-11-15T14:32:10.250Z", "Asia/Calcutta")).toBe("Typed in UTC");
+  });
+
+  it("words a typed zone the same way", () => {
+    expect(headOf("yesterday 9-17 UTC", "Asia/Calcutta")).toBe("Typed in UTC");
+    expect(String(formatReadingNote({ kind: "typedZone", zone: "Europe/Berlin" }, t))).toBe(
+      "Typed in Europe/Berlin",
+    );
+  });
+});
+
 describe("formatReadingNote", () => {
   it.each([
     [{ kind: "epoch", unit: "µs" } as const, 'dateTime.readAsEpoch {"unit":"µs"}'],
-    [{ kind: "utc" } as const, "dateTime.readAsUtc {}"],
-    [{ kind: "typedZone", zone: "UTC" } as const, 'dateTime.typedInZone {"zone":"UTC"}'],
+    [{ kind: "utc" } as const, 'dateTime.typedInZoneHead {"zone":"UTC"}'],
+    [{ kind: "typedZone", zone: "UTC" } as const, 'dateTime.typedInZoneHead {"zone":"UTC"}'],
     [{ kind: "future" } as const, "dateTime.inTheFuture {}"],
     [{ kind: "dayOrder", order: "dayMonth" } as const, "dateTime.readAsDayMonth {}"],
     [{ kind: "dayOrder", order: "monthDay" } as const, "dateTime.readAsMonthDay {}"],

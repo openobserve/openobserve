@@ -14,7 +14,7 @@ import testLogger from '../../utils/test-logger.js';
 export async function assertPanelTimePickerVisible(page, panelId) {
   testLogger.info('Asserting panel time picker is visible', { panelId });
 
-  const picker = page.locator(`[data-test="panel-time-picker-${panelId}"]`);
+  const picker = page.locator(`[data-test="dashboard-panel-${panelId}-time-picker"]`);
   await expect(picker).toBeVisible({ timeout: 10000 });
 
   testLogger.info('Panel time picker is visible', { panelId });
@@ -28,7 +28,7 @@ export async function assertPanelTimePickerVisible(page, panelId) {
 export async function assertPanelTimePickerNotVisible(page, panelId) {
   testLogger.info('Asserting panel time picker is NOT visible', { panelId });
 
-  const picker = page.locator(`[data-test="panel-time-picker-${panelId}"]`);
+  const picker = page.locator(`[data-test="dashboard-panel-${panelId}-time-picker"]`);
   await expect(picker).not.toBeVisible();
 
   testLogger.info('Panel time picker is not visible', { panelId });
@@ -43,7 +43,7 @@ export async function assertPanelTimePickerNotVisible(page, panelId) {
 export async function assertPanelTimeDisplay(page, panelId, expectedText) {
   testLogger.info('Asserting panel time display', { panelId, expectedText });
 
-  const pickerBtn = page.locator(`[data-test="panel-time-picker-${panelId}-btn"]`);
+  const pickerBtn = page.locator(`[data-test="dashboard-panel-${panelId}-time-picker"]`);
   await expect(pickerBtn).toContainText(expectedText, { timeout: 10000 });
 
   testLogger.info('Panel time display verified', { panelId, expectedText });
@@ -300,7 +300,7 @@ export async function assertPanelTimePickerInFullScreen(page, panelId) {
   testLogger.info('Asserting panel time picker in full screen', { panelId });
 
   // Full screen is just the regular dashboard view
-  const picker = page.locator(`[data-test="panel-time-picker-${panelId}"]`);
+  const picker = page.locator(`[data-test="dashboard-panel-${panelId}-time-picker"]`);
   await expect(picker).toBeVisible({ timeout: 10000 });
 
   testLogger.info('Panel time picker in full screen verified', { panelId });

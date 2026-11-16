@@ -107,6 +107,17 @@ export const sameHistoryEntry = (a: TimeRangeHistoryEntry, b: TimeRangeHistoryEn
   return a.startUs === b.startUs && a.endUs === b.endUs;
 };
 
+/** The newest Recent entry when another page applied it and it is not the range in force here, else null. */
+export const arrivalFromPage = (
+  entries: readonly TimeRangeHistoryEntry[],
+  pageName: string,
+  currentRange: TimeRangeHistoryEntry | null,
+): TimeRangeHistoryEntry | null => {
+  const newest = entries[0];
+  if (!newest || !pageName || newest.source !== pageName) return null;
+  return currentRange && sameHistoryEntry(newest, currentRange) ? null : newest;
+};
+
 let watchingOtherTabs = false;
 
 // Another tab's write reaches this one only as a storage event, which the version bump turns into a re-read.

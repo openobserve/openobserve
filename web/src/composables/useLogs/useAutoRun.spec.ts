@@ -308,6 +308,7 @@ describe("AC4.6 kind table", () => {
     "page-size",
     "sort",
     "zoom",
+    "range",
     "compare",
     "explicit",
   ];
@@ -395,6 +396,7 @@ describe("J4 debounce and coalescing", () => {
       time: 0,
       "time-typed": 2500,
       zoom: 0,
+      range: 0,
       sort: 0,
       function: 300,
       tab: 0,
@@ -901,6 +903,41 @@ describe("explicit zoom", () => {
     expect(h.requests).toHaveLength(0);
     expect(h.store.meta.runPending).toBe(true);
     expect(h.store.meta.editorDirty).toBe(true);
+  });
+});
+
+describe("explicit range change", () => {
+  it("runs once with Auto Run off and the editor clean", () => {
+    const h = makeHarness({ liveMode: false, estimateMb: 1e9 });
+    expect(h.engine.requestRun("range")).toBe("dispatched");
+    vi.runAllTimers();
+    expect(h.hits()).toHaveLength(1);
+    expect(h.hits()[0].ctx.reasons).toEqual(["range"]);
+  });
+
+  it("waits behind unrun editor edits and keeps them unrun", () => {
+    const h = makeHarness({ liveMode: false });
+    h.engine.markEditorDirty();
+    expect(h.engine.requestRun("range")).toBe("pending-dirty");
+    vi.runAllTimers();
+    expect(h.requests).toHaveLength(0);
+    expect(h.store.meta.runPending).toBe(true);
+    expect(h.store.meta.editorDirty).toBe(true);
+  });
+});
+
+describe("refused over-limit link (R2)", () => {
+  it("runs nothing, not even an explicit run, until the refusal clears", () => {
+    const h = makeHarness();
+    h.store.meta.rangeLimitRefusal = { allowed: "1d" };
+    expect(h.engine.requestRun("url")).toBe("skipped-ineligible");
+    expect(h.engine.requestRun("run")).toBe("skipped-ineligible");
+    vi.runAllTimers();
+    expect(h.requests).toHaveLength(0);
+    h.store.meta.rangeLimitRefusal = null;
+    h.engine.requestRun("range");
+    vi.runAllTimers();
+    expect(h.hits()).toHaveLength(1);
   });
 });
 

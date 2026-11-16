@@ -512,8 +512,15 @@ export class LogsPage {
         this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
         this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
         this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
+        // "No events in {dates}" offers the next longer range; applying it runs the query.
+        this.noEventsTryRangeBtn = '[data-test="logs-no-events-try-range-btn"]';
+        // A linked range over the stream's limit runs nothing until the user picks a range.
+        this.rangeLimitStrip = '[data-test="logs-range-limit-strip"]';
+        this.rangeLimitShowBtn = '[data-test="logs-range-limit-strip-show-btn"]';
+        this.rangeLimitPickBtn = '[data-test="logs-range-limit-strip-pick-btn"]';
+        this.nothingRunText = '[data-test="logs-nothing-run"]';
         // States that only render once a search has run (or the auto-run guard held it); the pre-search "apply search" hero is excluded on purpose.
-        this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"]`;
+        this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"], [data-test="logs-nothing-run"]`;
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
         this.queryPlanView = `${this.queryPlanDialog} [data-test="query-plan-view"]`;

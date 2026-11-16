@@ -659,4 +659,24 @@ describe("DateTimePickerDashboard", () => {
       panel.unmount();
     });
   });
+
+  describe("polish props", () => {
+    const mountReal = (props = {}) =>
+      mount(DateTimePickerDashboard, {
+        props: { ...defaultProps, ...props },
+        global: { plugins: [i18n, store] },
+      });
+
+    it("opens the panel at the trigger's start by default", () => {
+      wrapper = mountReal();
+      expect(wrapper.findComponent(DateTime).props("menuAlign")).toBe("start");
+    });
+
+    it("passes the panel-time mark and the refused-limit lock to the picker", () => {
+      wrapper = mountReal({ panelTimeMark: true, limitRefused: true });
+      const picker = wrapper.findComponent(DateTime);
+      expect(picker.props("panelTimeMark")).toBe(true);
+      expect(picker.props("limitRefused")).toBe(true);
+    });
+  });
 });

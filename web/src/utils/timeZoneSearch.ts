@@ -86,6 +86,9 @@ const ZONE_ALIASES: Record<string, readonly string[]> = {
   brazil: ["America/Sao_Paulo"],
 };
 
+// Words for the browser's own zone; they match the option the caller marks as the browser row.
+const BROWSER_ALIASES = ["browser", "local"] as const;
+
 // Shorter prefixes of a city or country name would match too many aliases to help.
 const MIN_ALIAS_PREFIX = 3;
 
@@ -125,13 +128,23 @@ const aliasPrefixMatches = (term: string, zone: string): boolean =>
   );
 
 /** How well a zone matches typed text: 0 alias, 1 name word start or alias prefix, 2 name substring, 3 offset; null for none. */
-export const zoneSearchRank = (zone: string, query: string, atMs = Date.now()): number | null => {
+export const zoneSearchRank = (
+  zone: string,
+  query: string,
+  atMs = Date.now(),
+  isBrowser = false,
+): number | null => {
   // `_`, `/` and space are one separator, so `New_York`, `america/new york` and `new york` match alike.
   const term = query
     .trim()
     .toLowerCase()
     .replace(/[\s_/]+/g, " ");
   if (!term) return 0;
+  if (isBrowser) {
+    if (BROWSER_ALIASES.some((alias) => alias === term)) return 0;
+    const prefix = term.length >= MIN_ALIAS_PREFIX;
+    if (prefix && BROWSER_ALIASES.some((alias) => alias.startsWith(term))) return 1;
+  }
   if (ZONE_ALIASES[term]?.includes(zone)) return 0;
   // An offset is read only as one: `Etc/GMT+5` is UTC-05:00, so its name must not match `+5`.
   if (OFFSET_QUERY_RE.test(term.replace(/\s+/g, ""))) {
@@ -145,16 +158,23 @@ export const zoneSearchRank = (zone: string, query: string, atMs = Date.now()): 
   return name.includes(term) ? 2 : null;
 };
 
-/** The options matching typed text, aliases and names before offsets; `zoneOf` maps an option to its IANA zone. */
+/** The options matching typed text, aliases and names before offsets; `browser` and `local` find the option `isBrowser` marks. */
 export const searchTimeZones = <T>(
   options: readonly T[],
   query: string,
   zoneOf: (option: T) => string = (option) => String(option),
   atMs = Date.now(),
+  isBrowser?: (option: T) => boolean,
 ): T[] => {
   if (!query.trim()) return [...options];
+  const browser = isBrowser ? null : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const marked = isBrowser ?? ((option: T) => zoneOf(option) === browser);
   return options
-    .map((option, index) => ({ option, index, rank: zoneSearchRank(zoneOf(option), query, atMs) }))
+    .map((option, index) => ({
+      option,
+      index,
+      rank: zoneSearchRank(zoneOf(option), query, atMs, marked(option)),
+    }))
     .filter((entry): entry is { option: T; index: number; rank: number } => entry.rank !== null)
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map((entry) => entry.option);

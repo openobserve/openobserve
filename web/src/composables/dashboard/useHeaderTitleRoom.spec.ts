@@ -13,133 +13,214 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { effectScope, nextTick, ref } from "vue";
-import { nextTitleRoom, TITLE_MIN_PX, useHeaderTitleRoom } from "./useHeaderTitleRoom";
+import {
+  HEADER_TIME_ROW_QUERY,
+  headerCollapse,
+  useHeaderActionsRoom,
+  useHeaderTimeInRow,
+} from "./useHeaderTitleRoom";
 
-const fresh = { crowded: false, roomAt: 0, movedWidth: null };
+const savings = { share: 70, edit: 30, auto: 50 };
+const none = { share: false, edit: false, auto: false };
 
-describe("nextTitleRoom", () => {
-  it("leaves a title with room alone", () => {
-    expect(nextTitleRoom(fresh, { headerWidth: 1400, titleWidth: 300, titleRoom: 200 })).toEqual(
-      fresh,
-    );
-  });
-
-  it("leaves a short title alone even when its box is small", () => {
-    expect(nextTitleRoom(fresh, { headerWidth: 1280, titleWidth: 40, titleRoom: 40 })).toEqual(
-      fresh,
-    );
-  });
-
-  it("flags a title squeezed to 21px at 1280 and records the width it needs (V25)", () => {
-    const next = nextTitleRoom(fresh, { headerWidth: 1190, titleWidth: 144, titleRoom: 21 });
-    expect(next).toEqual({ crowded: true, roomAt: 1190 + 144 - 21, movedWidth: null });
-  });
-
-  it("asks for at most the minimum width for a long title", () => {
-    const next = nextTitleRoom(fresh, { headerWidth: 1190, titleWidth: 600, titleRoom: 21 });
-    expect(next.roomAt).toBe(1190 + TITLE_MIN_PX - 21);
-  });
-
-  it("stays crowded while the title box is wide but the header is still short of room", () => {
-    const crowded = { crowded: true, roomAt: 1313, movedWidth: null };
-    expect(nextTitleRoom(crowded, { headerWidth: 1300, titleWidth: 144, titleRoom: 900 })).toBe(
-      crowded,
-    );
-  });
-
-  it("clears once the header reaches the recorded width", () => {
-    const crowded = { crowded: true, roomAt: 1313, movedWidth: null };
-    expect(nextTitleRoom(crowded, { headerWidth: 1313, titleWidth: 144, titleRoom: 900 })).toEqual(
-      fresh,
-    );
-  });
-  it("records the moved control's width only once it has moved, since the header may squeeze it", () => {
-    const next = nextTitleRoom(fresh, {
-      headerWidth: 1190,
-      titleWidth: 144,
-      titleRoom: 21,
-      movedWidth: 180,
+describe("headerCollapse", () => {
+  it("keeps every label while the header fits", () => {
+    expect(headerCollapse({ deficit: 0, triggerSave: 100, savings })).toEqual({
+      triggerSqueeze: 0,
+      iconOnly: none,
     });
-    expect(next).toEqual({ crowded: true, roomAt: 1190 + 144 - 21, movedWidth: null });
-    const moved = nextTitleRoom(next, {
-      headerWidth: 1190,
-      titleWidth: 144,
-      titleRoom: 900,
-      movedWidth: 260,
+  });
+
+  it("takes room from the trigger's own forms before any action loses its label", () => {
+    expect(headerCollapse({ deficit: 40, triggerSave: 100, savings })).toEqual({
+      triggerSqueeze: 40,
+      iconOnly: none,
     });
-    expect(moved).toEqual({ ...next, movedWidth: 260 });
   });
 
-  it("clears at the same header width once the moved control has narrowed enough (P9)", () => {
-    const crowded = { crowded: true, roomAt: 1313, movedWidth: 260 };
-    const sizes = { headerWidth: 1190, titleWidth: 144, titleRoom: 900 };
-    expect(nextTitleRoom(crowded, { ...sizes, movedWidth: 200 })).toBe(crowded);
-    expect(nextTitleRoom(crowded, { ...sizes, movedWidth: 137 })).toEqual(fresh);
+  it("then drops Share, Edit and Auto labels one at a time, in that order", () => {
+    const stage = (deficit: number) =>
+      headerCollapse({ deficit, triggerSave: 100, savings }).iconOnly;
+    expect(stage(150)).toEqual({ share: true, edit: false, auto: false });
+    expect(stage(171)).toEqual({ share: true, edit: true, auto: false });
+    expect(stage(201)).toEqual({ share: true, edit: true, auto: true });
+    expect(stage(170)).toEqual({ share: true, edit: false, auto: false });
+    expect(stage(-10)).toEqual(none);
   });
 
-  it("asks for more header once the moved control has widened", () => {
-    const crowded = { crowded: true, roomAt: 1313, movedWidth: 120 };
-    const sizes = { headerWidth: 1313, titleWidth: 144, titleRoom: 900 };
-    expect(nextTitleRoom(crowded, { ...sizes, movedWidth: 200 })).toBe(crowded);
+  it("goes straight to the actions when the trigger cannot narrow", () => {
+    expect(headerCollapse({ deficit: 20, triggerSave: 0, savings })).toEqual({
+      triggerSqueeze: 0,
+      iconOnly: { share: true, edit: false, auto: false },
+    });
   });
 });
 
-describe("useHeaderTitleRoom", () => {
-  const sized = (el: HTMLElement, width: number) => {
-    Object.defineProperty(el, "clientWidth", { configurable: true, value: width });
-    el.getBoundingClientRect = () => ({ width }) as DOMRect;
+describe("useHeaderActionsRoom", () => {
+  type Rect = { width: number; height?: number; right?: number };
+  const rect = (el: HTMLElement, box: Rect) => {
+    el.getBoundingClientRect = () =>
+      ({ width: box.width, height: box.height ?? 32, right: box.right ?? 0 }) as DOMRect;
   };
 
-  it("hands the row back to the header when the moved picker narrows (P9)", async () => {
-    let onResize: () => void = () => {};
-    const observed: Element[] = [];
+  // header > row > block(flex-1) > column > h1 > title; the actions sit beside the block.
+  const buildHeader = () => {
+    const header = document.createElement("header");
+    const row = document.createElement("div");
+    const block = document.createElement("div");
+    block.className = "flex min-w-0 flex-1";
+    const column = document.createElement("div");
+    const h1 = document.createElement("h1");
+    const title = document.createElement("span");
+    title.textContent = "Checkout health";
+    h1.appendChild(title);
+    column.appendChild(h1);
+    block.appendChild(column);
+    const actions = document.createElement("div");
+    const button = (label: string) => {
+      const el = document.createElement("button");
+      el.textContent = label;
+      actions.appendChild(el);
+      return el;
+    };
+    const trigger = document.createElement("div");
+    actions.appendChild(trigger);
+    const auto = button("Auto: Off");
+    const edit = button("Edit");
+    const share = button("Share Link");
+    row.append(block, actions);
+    header.appendChild(row);
+    document.body.appendChild(header);
+    return { header, block, column, h1, title, trigger, share, edit, auto };
+  };
+
+  let onResize: () => void = () => {};
+  const stubObservers = () => {
     vi.stubGlobal(
       "ResizeObserver",
       class {
         constructor(cb: () => void) {
           onResize = cb;
         }
-        observe(el: Element) {
-          observed.push(el);
-        }
+        observe() {}
         disconnect() {}
       },
     );
-    const header = document.createElement("header");
-    const box = document.createElement("div");
-    const title = document.createElement("span");
-    const picker = document.createElement("div");
-    box.appendChild(title);
-    header.appendChild(box);
-    document.body.append(header, picker);
-    sized(header, 1190);
-    sized(box, 21);
-    sized(title, 144);
-    sized(picker, 260);
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.innerHTML = "";
+  });
+
+  it("narrows the trigger, then drops Share's label, and hands both back when the header widens", async () => {
+    stubObservers();
+    const dom = buildHeader();
+    const sizes = { trigger: 300, share: 110, edit: 70, auto: 100 };
+    const lay = (titleRoom: number, freeAfter: number) => {
+      Object.defineProperty(dom.h1, "clientWidth", { configurable: true, value: titleRoom });
+      rect(dom.title, { width: 144 });
+      rect(dom.column, { width: titleRoom, right: 400 });
+      rect(dom.block, { width: titleRoom + freeAfter, right: 400 + freeAfter });
+      rect(dom.trigger, { width: sizes.trigger });
+      rect(dom.share, { width: sizes.share });
+      rect(dom.edit, { width: sizes.edit });
+      rect(dom.auto, { width: sizes.auto });
+    };
 
     const scope = effectScope();
     const titleEl = ref<HTMLElement | null>(null);
-    const movedEl = ref<HTMLElement | null>(null);
-    const { crowded } = scope.run(() => useHeaderTitleRoom(titleEl, { movedEl }))!;
-    titleEl.value = title;
-    movedEl.value = picker;
-    await nextTick();
-    onResize();
-    expect(crowded.value).toBe(true);
-    expect(observed).toContain(picker);
+    const els = {
+      trigger: ref<HTMLElement | null>(dom.trigger),
+      share: ref<HTMLElement | null>(dom.share),
+      edit: ref<HTMLElement | null>(dom.edit),
+      auto: ref<HTMLElement | null>(dom.auto),
+    };
+    const { iconOnly, triggerMaxWidth } = scope.run(() =>
+      useHeaderActionsRoom(titleEl, els, { shortestTriggerWidth: () => 240 }),
+    )!;
 
-    sized(box, 900);
+    lay(144, 20);
+    titleEl.value = dom.title;
+    await nextTick();
+    expect(iconOnly.value).toEqual(none);
+    expect(triggerMaxWidth.value).toBeNull();
+
+    // 104px short: the trigger gives its 60px first, Share's label the rest.
+    lay(40, 0);
     onResize();
-    expect(crowded.value).toBe(true);
-    sized(picker, 120);
+    expect(triggerMaxWidth.value).toBe(240);
+    expect(iconOnly.value).toEqual({ share: true, edit: false, auto: false });
+
+    // The new layout is measured again and gives the same plan, so it never flips back and forth.
+    sizes.trigger = 240;
+    sizes.share = 32;
+    lay(144, 14);
     onResize();
-    expect(crowded.value).toBe(false);
+    expect(triggerMaxWidth.value).toBe(240);
+    expect(iconOnly.value).toEqual({ share: true, edit: false, auto: false });
+
+    // Wider header: room for every label again.
+    lay(144, 200);
+    onResize();
+    expect(iconOnly.value).toEqual(none);
+    expect(triggerMaxWidth.value).toBeNull();
 
     scope.stop();
-    header.remove();
-    picker.remove();
-    vi.unstubAllGlobals();
+  });
+
+  it("keeps every label while disabled", async () => {
+    stubObservers();
+    const dom = buildHeader();
+    Object.defineProperty(dom.h1, "clientWidth", { configurable: true, value: 10 });
+    rect(dom.title, { width: 300 });
+    rect(dom.column, { width: 10, right: 100 });
+    rect(dom.block, { width: 10, right: 100 });
+    for (const el of [dom.trigger, dom.share, dom.edit, dom.auto]) rect(el, { width: 100 });
+    const scope = effectScope();
+    const enabled = ref(false);
+    const titleEl = ref<HTMLElement | null>(dom.title);
+    const els = {
+      trigger: ref<HTMLElement | null>(dom.trigger),
+      share: ref<HTMLElement | null>(dom.share),
+      edit: ref<HTMLElement | null>(dom.edit),
+      auto: ref<HTMLElement | null>(dom.auto),
+    };
+    const { iconOnly } = scope.run(() => useHeaderActionsRoom(titleEl, els, { enabled }))!;
+    await nextTick();
+    onResize();
+    expect(iconOnly.value).toEqual(none);
+
+    enabled.value = true;
+    await nextTick();
+    expect(iconOnly.value).toEqual({ share: true, edit: true, auto: true });
+    scope.stop();
+  });
+});
+
+describe("useHeaderTimeInRow", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("follows the 1280px viewport query", () => {
+    let listener: (event: { matches: boolean }) => void = () => {};
+    const spy = vi.fn(
+      (query: string) =>
+        ({
+          matches: false,
+          media: query,
+          addEventListener: (_: string, cb: any) => (listener = cb),
+          removeEventListener: vi.fn(),
+        }) as any,
+    );
+    vi.stubGlobal("matchMedia", spy);
+    const scope = effectScope();
+    const inRow = scope.run(() => useHeaderTimeInRow())!;
+    expect(spy).toHaveBeenCalledWith(HEADER_TIME_ROW_QUERY);
+    expect(inRow.value).toBe(false);
+    listener({ matches: true });
+    expect(inRow.value).toBe(true);
+    scope.stop();
   });
 });

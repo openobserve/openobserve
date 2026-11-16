@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OPageHeaderStatus />
           <DateTime
-            preset="explorer-manual"
+            preset="explorer-auto"
             :host-name="t('menu.traces')"
             ref="dateTimeRef"
             menu-align="end"
@@ -330,6 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             :retention-days="tracesStreamLimits.retentionDays"
+            :limit-refused="!!tracesRangeLink.refusal"
             class="h-8.5! max-lg:me-auto"
             @on:date-change="updateDateTime"
             @apply="onRangeApply"
@@ -545,7 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
             <OPageHeaderStatus />
             <DateTime
-              preset="explorer-manual"
+              preset="explorer-auto"
               :host-name="t('menu.traces')"
               ref="dateTimeRef"
               :default-type="searchObj.data.datetime.type"
@@ -599,7 +600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center gap-2">
             <OPageHeaderStatus />
             <DateTime
-              preset="explorer-manual"
+              preset="explorer-auto"
               :host-name="t('menu.traces')"
               ref="dateTimeRef"
               menu-align="end"
@@ -824,7 +825,6 @@ import SavedViewsMenu from "@/components/savedViews/SavedViewsMenu.vue";
 import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 
-import { debounce } from "lodash-es";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
@@ -839,6 +839,8 @@ import {
 } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
+  tracesQueryEdited,
+  tracesRangeLink,
   tracesRunIsStaged,
   tracesToolbarLayout,
   TRACES_TOOLBAR_WIDTHS,
@@ -1254,22 +1256,6 @@ export default defineComponent({
       }
     };
 
-    // Debounced query trigger for absolute time when auto-run is enabled.
-    // Gives the user 2.5s to finish typing start/end time before firing.
-    const triggerAbsoluteQueryDebounced = debounce((value: object) => {
-      if (value.userChangedValue) {
-        analytics.track("traces_time_range_changed", {
-          stream_name: searchObj.data.stream.selectedStream.value,
-          value_type: value.valueType,
-          relative_period: value.relativeTimePeriod,
-        });
-      }
-
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
-        emit("searchdata");
-      }
-    }, 2500);
-
     // The context view runs its own window moves at once; Back to results runs the restored range.
     let runAfterDate: (() => void) | null = null;
     let contextMoves = 0;
@@ -1297,7 +1283,12 @@ export default defineComponent({
 
     const updateDateTime = async (value: object) => {
       if (router.currentRoute.value.name !== "traces") return;
+      if (value.userChangedValue === true) {
+        tracesRangeLink.fromLink = false;
+        tracesRangeLink.refusal = null;
+      }
       if (
+        !tracesRangeLink.refusal &&
         value.valueType == "absolute" &&
         searchObj.data.stream.selectedStream.length > 0 &&
         searchObj.data.datetime.queryRangeRestrictionInHour > 0 &&
@@ -1358,29 +1349,11 @@ export default defineComponent({
         return;
       }
 
+      // A user's range apply runs whatever Auto Run says, unless it would also run unrun query edits.
       if (
-        value.valueType === "absolute" &&
-        searchObj.meta.liveMode &&
-        store.state.zoConfig?.auto_query_enabled &&
         value.userChangedValue === true &&
-        datetimeChanged
-      ) {
-        // Debounce query trigger so user can finish typing the full time value
-        triggerAbsoluteQueryDebounced(value);
-        return;
-      }
-
-      // Live mode: auto-trigger search ONLY on a genuine user-driven time-range
-      // change. `userChangedValue` (stamped by DateTime.vue) is the authoritative
-      // signal — programmatic sets (redirect, metrics brush, mount replay) emit
-      // `false` and must never auto-run, since they are owned by an explicit
-      // trigger elsewhere. `datetimeChanged` additionally filters a user toggling
-      // the type tab without actually changing the range.
-      if (
-        store.state.zoConfig?.auto_query_enabled &&
-        searchObj.meta.liveMode &&
-        value.userChangedValue === true &&
-        datetimeChanged
+        (datetimeChanged || value.rerun === true) &&
+        !tracesQueryEdited(searchObj.meta.lastRunSignature, searchObj)
       ) {
         emit("searchdata");
       }
@@ -1883,6 +1856,7 @@ export default defineComponent({
       emit,
       updateQueryValue,
       updateDateTime,
+      tracesRangeLink,
       downloadLogs,
       createAlertDisabledReason,
       createAlertNote,

@@ -42,6 +42,14 @@ const CLOCK_SKEW_MICROS = 24 * 60 * 60 * 1_000_000;
 // Dec 30, 9999 UTC, so the year stays 9999 or less in every zone.
 export const LATEST_INSTANT_US = Date.UTC(9999, 11, 30) * 1000;
 
+export interface OverLimitLink {
+  asked: { startUs: number; endUs: number };
+  /** The stream's limit as chips write it (`1d`), for the strip's copy. */
+  allowed: string;
+  /** The longest period the page may run instead (`24h`). */
+  period: string;
+}
+
 export interface TimeRangeLimitProps {
   disableRelative: boolean;
   minDate: string;
@@ -51,6 +59,15 @@ export interface TimeRangeLimitProps {
   retentionDays: number | null;
   futureAllowed?: boolean;
 }
+
+/** A linked range longer than the page's limit, with what the page allows instead; null when it fits or there is no limit. */
+export const linkOverLimit = (
+  asked: { startUs: number; endUs: number },
+  limitHours: number,
+): OverLimitLink | null => {
+  if (!(limitHours > 0) || asked.endUs - asked.startUs <= limitHours * MICROS_PER_HOUR) return null;
+  return { asked, allowed: formatLimitShorthand(limitHours), period: `${limitHours}h` };
+};
 
 /** The bounds a picked range must stay within: the calendar's first and last day, retention and the page's range limit. */
 export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: TimeRangeZone) {

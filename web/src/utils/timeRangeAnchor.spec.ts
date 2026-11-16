@@ -21,8 +21,10 @@ import {
   DEFAULT_ANCHOR_WINDOW,
   anchorRows,
   anchorWindowLabel,
+  formatAnchorSpan,
   readingAnchorMicros,
 } from "./timeRangeAnchor";
+import i18n from "@/locales";
 
 const NOW = new Date(Date.UTC(2026, 10, 12, 15, 54, 10));
 const OPTS: TimeInputOptions = { now: NOW, locale: "en-US", timeZone: "UTC" };
@@ -76,5 +78,34 @@ describe("anchorWindowLabel", () => {
     ["to-now", "dateTime.fromHereToNow {}"],
   ] as const)("%s → %s", (id, expected) => {
     expect(anchorWindowLabel(id, echo)).toBe(expected);
+  });
+});
+
+describe("formatAnchorSpan [R8, V2]", () => {
+  const t = i18n.global.t as unknown as TranslateFn;
+  const IST = { timezone: "Asia/Calcutta" };
+  const centre = us("2026-11-15T14:32:10.250Z");
+  const rows = anchorRows(centre, us("2026-11-16T03:30:00Z"));
+  const span = (id: string, opts = IST) =>
+    formatAnchorSpan(
+      rows.find((row) => row.id === id)!,
+      t,
+      opts,
+    );
+
+  it("writes From here's moving end as now", () => {
+    expect(span("to-now")).toBe("20:02:10 – now");
+    expect(span("to-now", { ...IST, withDay: true })).toBe("Nov 15, 20:02:10 – now");
+  });
+
+  it("prints seconds for spans of a minute or more and ms under one", () => {
+    expect(span("5m")).toBe("19:57:10 – 20:07:10");
+    expect(span("1m")).toBe("20:01:10 – 20:03:10");
+    expect(span("5s")).toBe("20:02:05.250 – 20:02:15.250");
+  });
+
+  it("drops a whole second's .000", () => {
+    const whole = anchorRows(us("2026-11-15T14:32:10Z"), us("2026-11-16T03:30:00Z"));
+    expect(formatAnchorSpan(whole[3], t, IST)).toBe("20:02:05 – 20:02:15");
   });
 });

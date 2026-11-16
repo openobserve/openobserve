@@ -17,7 +17,7 @@ import { toZonedTime } from "date-fns-tz";
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { formatCalendarLabel, safeTimezone } from "@/utils/dashboard/calendarPeriods";
-import { formatRangeDuration } from "@/utils/timeRangeLabel";
+import { formatRangeDuration, formatZoneOffset } from "@/utils/timeRangeLabel";
 
 const MICROS_PER_SECOND = 1_000_000;
 
@@ -194,9 +194,6 @@ export const formatPeriodLabel = (
   nowMs: number = Date.now(),
 ): I18nText => formatKnownPeriod(period, timezone, t, locale, nowMs) ?? raw(period);
 
-/** The trigger's zone badge: the zone's own abbreviation, else `UTC±hh:mm`. */
-export const formatZoneBadge = (timezone: string | null | undefined, atMs: number = Date.now()) => {
-  const short = formatZoneAbbreviation(timezone, atMs, "en-US");
-  const offset = short.match(/^GMT([+-])(\d{1,2})(?::(\d{2}))?$/);
-  return offset ? `UTC${offset[1]}${offset[2].padStart(2, "0")}:${offset[3] ?? "00"}` : short;
-};
+/** The trigger's zone badge, spelt as the offset (`UTC+05:30`, `UTC`) like every other surface. */
+export const formatZoneBadge = (timezone: string | null | undefined, atMs: number = Date.now()) =>
+  formatZoneOffset(timezone, atMs);

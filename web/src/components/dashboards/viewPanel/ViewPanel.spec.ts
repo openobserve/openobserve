@@ -228,7 +228,7 @@ describe("ViewPanel", () => {
           DateTimePickerDashboard: {
             name: "DateTimePickerDashboard",
             template: '<div data-test="date-time-picker-dashboard"><slot /></div>',
-            props: ["modelValue", "preset", "disable"],
+            props: ["modelValue", "preset", "disable", "panelTimeMark"],
             emits: ["update:modelValue", "show", "hide", "timezone-change"],
             methods: {
               refresh: vi.fn(),
@@ -745,6 +745,29 @@ describe("ViewPanel", () => {
       wrapper.vm.refreshData();
 
       expect(wrapper.vm.selectedDate).toBe(appliedBefore);
+    });
+  });
+
+  describe("panel with its own time (R9)", () => {
+    afterEach(() => {
+      delete (mockDashboardPanelData.data as any).config;
+    });
+
+    it("marks the picker while the panel runs on its own time", async () => {
+      (mockDashboardPanelData.data as any).config = { panel_time_enabled: true };
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(
+        wrapper.findComponent({ name: "DateTimePickerDashboard" }).props("panelTimeMark"),
+      ).toBe(true);
+    });
+
+    it("leaves the picker unmarked for a panel on the dashboard's time", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(
+        wrapper.findComponent({ name: "DateTimePickerDashboard" }).props("panelTimeMark"),
+      ).toBe(false);
     });
   });
 

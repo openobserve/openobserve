@@ -29,8 +29,10 @@ import {
   stepListCursor,
   visibleRecentEntries,
   isOfferedElsewhere,
+  nextLongerChip,
   type TimeRangeListRow,
 } from "./timeRangeList";
+import { resolveRange, type TimeRange } from "./timeRangeModel";
 
 const DAY_US = 86_400_000_000;
 const HOUR_US = 3_600_000_000;
@@ -212,5 +214,62 @@ describe("limit shorthand and scroll cue", () => {
     expect(scrollCue({ scrollTop: 0, scrollHeight: 300, clientHeight: 100 })).toBe("bottom");
     expect(scrollCue({ scrollTop: 100, scrollHeight: 300, clientHeight: 100 })).toBe("both");
     expect(scrollCue({ scrollTop: 200, scrollHeight: 300, clientHeight: 100 })).toBe("top");
+  });
+});
+
+describe("nextLongerChip [R6, R7, O4]", () => {
+  const OPS = TIME_RANGE_CHIP_SETS.ops;
+  const NY_ZONE = "America/New_York";
+  const DASHBOARD = TIME_RANGE_CHIP_SETS.dashboard;
+  const spanOf = (range: TimeRange, nowMs = NOW_MS, zone = "Asia/Kolkata") => {
+    const { startUs, endUs } = resolveRange(range, {
+      nowUs: nowMs * 1000,
+      zone,
+      weekStart: 1,
+      locale: "en-US",
+      fiscalYearStartMonth: null,
+    });
+    return endUs - startUs;
+  };
+
+  it("offers 1h for a 15-minute fixed range", () => {
+    const fixed = { kind: "fixed" as const, startUs: NOW_US - 15 * 60_000_000, endUs: NOW_US };
+    expect(nextLongerChip(spanOf(fixed), OPS)).toEqual({ value: "1h", label: "1h" });
+  });
+
+  it("offers a chip strictly longer, never the range's own length", () => {
+    expect(nextLongerChip(spanOf({ kind: "rolling", span: "1h" }), OPS)?.value).toBe("4h");
+    expect(nextLongerChip(spanOf({ kind: "rolling", span: "24h" }), OPS)?.value).toBe("7d");
+  });
+
+  it("offers nothing past the longest chip: Previous month on Logs has no longer chip", () => {
+    const previousMonth = spanOf({ kind: "calendar", unit: "month", offset: -1 });
+    expect(previousMonth).toBe(31 * DAY_US);
+    expect(nextLongerChip(previousMonth, OPS)).toBeNull();
+    expect(nextLongerChip(previousMonth, DASHBOARD)?.value).toBe("90d");
+  });
+
+  it("never offers Last 6 months for a 6-month range, whichever months it spans", () => {
+    for (let month = 0; month < 12; month++) {
+      const nowMs = Date.UTC(2026, month, 15, 12);
+      const span = spanOf({ kind: "rolling", span: "6M" }, nowMs, "UTC");
+      expect(nextLongerChip(span, DASHBOARD)?.value).toBe("12M");
+    }
+  });
+
+  it("never offers Last 7 days for a 7-day range an hour short across DST", () => {
+    const originalTz = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      const span = spanOf({ kind: "rolling", span: "7d" }, Date.UTC(2026, 2, 10, 12), NY_ZONE);
+      expect(span).toBe(7 * DAY_US - HOUR_US);
+      expect(nextLongerChip(span, OPS)?.value).toBe("30d");
+    } finally {
+      process.env.TZ = originalTz;
+    }
+  });
+
+  it("picks the shortest longer chip whatever the chip order", () => {
+    expect(nextLongerChip(2 * HOUR_US, [...OPS].reverse())?.value).toBe("4h");
   });
 });

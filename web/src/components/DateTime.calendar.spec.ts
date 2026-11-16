@@ -390,7 +390,7 @@ describe("DateTime calendar", () => {
       expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/10/03", to: "2026/10/05" });
     });
 
-    it("shows Start/End as HH:MM and previews a time while it is typed, before the field commits it", async () => {
+    it("shows Start/End with their day and previews a time while it is typed, before the field commits it", async () => {
       createWrapper({
         defaultType: "absolute",
         defaultAbsoluteTime: {
@@ -401,7 +401,7 @@ describe("DateTime calendar", () => {
       await flushPromises();
       await openMenu();
       const startField = el("datetime-start-time")!.querySelector("input")!;
-      expect(startField.value).toBe("09:00");
+      expect(startField.value).toBe("Oct 7, 09:00");
       const emits = (wrapper!.emitted("on:date-change") ?? []).length;
       // Vue drops an event stamped no later than its listener was attached, and Date is frozen here.
       const typeInto = async (text: string) => {
@@ -420,9 +420,7 @@ describe("DateTime calendar", () => {
       expect(el("date-time-resolved-name")?.textContent).toBe("Oct 7, 10:30 – 12:00");
 
       await typeInto("10:15:30.250");
-      expect(el("date-time-preview-note")?.textContent).toBe(
-        "Seconds only here; type ms in the bar",
-      );
+      expect(el("date-time-preview-note")).toBeNull();
 
       vi.setSystemTime(Date.now() + 1000);
       startField.dispatchEvent(new FocusEvent("blur"));
@@ -548,7 +546,7 @@ describe("DateTime calendar", () => {
       const end = document.querySelector<HTMLInputElement>(
         '[data-test="datetime-end-time"] input',
       )!;
-      expect(end.value).toBe("23:59");
+      expect(end.value).toBe("Oct 3, 23:59:59");
       wrapper!.vm.applyAndClose();
       await flushPromises();
       expect(lastEmit()).toMatchObject({ endTime: micros("2026-10-03T18:30:00Z") });
@@ -690,12 +688,8 @@ describe("DateTime calendar", () => {
         startTime: "12:30:00",
         endTime: "14:30:00",
       });
-      expect(timeField("datetime-end-time").value).toBe("14:30");
-      expect(
-        document
-          .querySelector('[data-test="datetime-end-time"][role="group"]')
-          ?.getAttribute("aria-invalid"),
-      ).toBe("true");
+      expect(timeField("datetime-end-time").value).toBe("Oct 6, 14:30");
+      expect(timeField("datetime-end-time").getAttribute("aria-invalid")).toBe("true");
       expect(document.body.textContent).toContain("End must be after start.");
 
       await commit("datetime-end-time", "15:00:00");
@@ -763,7 +757,7 @@ describe("DateTime calendar", () => {
 
       expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
       expect(wrapper!.vm.selectedTime.startTime).toBe("06:00:00");
-      expect(timeField("datetime-start-time").value).toBe("06:00");
+      expect(timeField("datetime-start-time").value).toBe("Oct 8, 06:00");
       expect(document.body.textContent).toContain("That is in the future. Latest is now.");
       expect(document.body.textContent).not.toContain("End must be after start.");
     });
@@ -807,7 +801,7 @@ describe("DateTime calendar", () => {
       });
     });
 
-    it("blocks Apply and Enter on unreadable Start text and says how to type a time", async () => {
+    it("blocks Apply and Enter on unreadable Start text and says so", async () => {
       createWrapper(absoluteProps(false));
       await flushPromises();
       await openMenu();
@@ -816,8 +810,8 @@ describe("DateTime calendar", () => {
       await commit("datetime-start-time", "noon-ish");
 
       expect(el("date-time-apply-btn")!.disabled).toBe(true);
-      expect(document.body.textContent).toContain("Enter a time as HH:MM.");
-      expect(el("date-time-input-examples")?.textContent).toBe("for example 09:30 or 09:30:15");
+      expect(document.body.textContent).toContain("Didn’t catch that");
+      expect(el("date-time-input-examples")).toBeNull();
       expect(
         document.querySelectorAll('[data-test="datetime-start-time"] [role="alert"]'),
       ).toHaveLength(0);
@@ -830,7 +824,7 @@ describe("DateTime calendar", () => {
 
       await commit("datetime-start-time", "08:00");
       expect(el("date-time-apply-btn")!.disabled).toBe(false);
-      expect(document.body.textContent).not.toContain("Enter a time as HH:MM.");
+      expect(document.body.textContent).not.toContain("Didn’t catch that");
     });
 
     it("keeps the fields on the resolved range when the clock moves on", async () => {
@@ -855,6 +849,13 @@ describe("DateTime calendar", () => {
   });
 
   describe("one selection", () => {
+    const commit = async (dataTest: string, value: string) => {
+      const input = document.querySelector<HTMLInputElement>(`[data-test="${dataTest}"] input`)!;
+      input.value = value;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await flushPromises();
+    };
+
     it("shows the applied calendar range in the Absolute column on open and applies nothing", async () => {
       createWrapper({ defaultRelativeTime: "calendar:day:0" });
       await flushPromises();
@@ -878,8 +879,8 @@ describe("DateTime calendar", () => {
       await flushPromises();
       await openMenu();
 
-      wrapper!.vm.onStartTimeEdit("06:00:00");
-      wrapper!.vm.onEndTimeEdit("07:00:00");
+      await commit("datetime-start-time", "06:00:00");
+      await commit("datetime-end-time", "07:00:00");
       await flushPromises();
       vi.setSystemTime(new Date("2026-10-08T03:05:00Z"));
       wrapper!.vm.refreshTooltipNow();
@@ -908,8 +909,8 @@ describe("DateTime calendar", () => {
       expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "23:59:59" });
 
       const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
-      wrapper!.vm.onStartTimeEdit("06:00:00");
-      wrapper!.vm.onEndTimeEdit("23:00:00");
+      await commit("datetime-start-time", "06:00:00");
+      await commit("datetime-end-time", "23:00:00");
       await flushPromises();
       expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
 
@@ -1121,6 +1122,43 @@ describe("DateTime calendar", () => {
         startTime: micros("2026-10-05T18:30:00Z"),
         endTime: micros("2026-10-08T03:00:00Z"),
       });
+    });
+  });
+
+  describe("applied range and Escape (V3)", () => {
+    const calendar = () => wrapper!.findComponent({ name: "ODateRangeCalendar" });
+
+    it("opens on a live range drawn as a band over its days", async () => {
+      createWrapper({ defaultRelativeTime: "7d" });
+      await flushPromises();
+      await openMenu();
+      expect(calendar().props("hideSelection")).toBe(false);
+      expect(calendar().props("startDate")).toBe("2026/10/01");
+      expect(calendar().props("endDate")).toBe("2026/10/08");
+      expect(el("date-time-calendar-back-btn")).toBeNull();
+    });
+
+    it("clears a half pick, then returns to the list, then closes", async () => {
+      createWrapper({});
+      await flushPromises();
+      await openMenu();
+      const cell = el("daterangecalendar-cell-2026-10-03")!;
+      cell.click();
+      await flushPromises();
+      const escape = async () => {
+        document
+          .querySelector<HTMLElement>("#date-time-menu")!
+          .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        await flushPromises();
+      };
+      await escape();
+      expect(wrapper!.vm.pendingDay).toBeNull();
+      expect(wrapper!.vm.calendarMode).toBe(true);
+      await escape();
+      expect(wrapper!.vm.calendarMode).toBe(false);
+      expect(wrapper!.vm.menuOpen).toBe(true);
+      await escape();
+      expect(wrapper!.vm.menuOpen).toBe(false);
     });
   });
 });

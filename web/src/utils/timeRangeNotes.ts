@@ -48,7 +48,7 @@ export const readingNote = (
   return dstGapNote(reading, safeTimezone(timezone));
 };
 
-/** The summary text for a note. */
+/** The text for a note; a typed zone is the list head line (`Typed in UTC`). */
 export const formatReadingNote = (
   note: ReadingNote,
   t: TranslateFn,
@@ -56,8 +56,8 @@ export const formatReadingNote = (
   timezone?: string | null,
 ): I18nText => {
   if (note.kind === "epoch") return t("dateTime.readAsEpoch", { unit: note.unit });
-  if (note.kind === "utc") return t("dateTime.readAsUtc");
-  if (note.kind === "typedZone") return t("dateTime.typedInZone", { zone: note.zone });
+  if (note.kind === "utc") return t("dateTime.typedInZoneHead", { zone: raw("UTC") });
+  if (note.kind === "typedZone") return t("dateTime.typedInZoneHead", { zone: note.zone });
   if (note.kind === "dayOrder") {
     return t(note.order === "monthDay" ? "dateTime.readAsMonthDay" : "dateTime.readAsDayMonth");
   }

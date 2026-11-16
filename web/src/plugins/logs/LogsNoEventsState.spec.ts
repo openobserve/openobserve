@@ -19,13 +19,33 @@ import { defineComponent, h } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import LogsNoEventsState from "./LogsNoEventsState.vue";
+import { getConsumableRelativeTime } from "@/utils/date";
 
 const OEmptyStateStub = defineComponent({
   name: "OEmptyState",
   setup(_, { slots }) {
-    return () => h("div", { "data-test": "o-empty-state" }, [slots.description?.()]);
+    return () =>
+      h("div", { "data-test": "o-empty-state" }, [slots.description?.(), slots.extra?.()]);
   },
 });
+
+// The window Index passes, resolved from the period the way Index.vue's queryWindowUs does.
+const mountWithWindow = (relativeTimePeriod: string) => {
+  const r = getConsumableRelativeTime(relativeTimePeriod, "UTC")!;
+  return mount(LogsNoEventsState, {
+    props: {
+      sqlMode: false,
+      query: "",
+      editorValue: "",
+      relativeTimePeriod,
+      dateType: "relative",
+      aiEnabled: false,
+      queryWindowUs: { start: r.startTime, end: r.endTime },
+      timezone: "UTC",
+    },
+    global: { plugins: [i18n, store], stubs: { OEmptyState: OEmptyStateStub } },
+  });
+};
 
 const mountState = (relativeTimePeriod: string) =>
   mount(LogsNoEventsState, {
@@ -55,5 +75,30 @@ describe("LogsNoEventsState", () => {
 
   it("keeps the rolling wording for a rolling period", () => {
     expect(mountState("15m").text()).toContain("Last 15 minutes");
+  });
+
+  it("dates the empty range from the query window (R7)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T03:00:00Z"));
+    const text = mountWithWindow("calendar:month:-1").text();
+    expect(text).toContain("No events in Oct 1 – 31");
+  });
+
+  it("offers the next longer quick range and emits its period (R7, O4)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T03:19:00Z"));
+    const wrapper = mountWithWindow("15m");
+    expect(wrapper.text()).toContain("No events in Nov 16, 03:04 – 03:19");
+    const btn = wrapper.find('[data-test="logs-no-events-try-range-btn"]');
+    expect(btn.text()).toBe("Try Last 1 hour");
+    await btn.trigger("click");
+    expect(wrapper.emitted("apply-range")).toEqual([["1h"]]);
+  });
+
+  it("offers no longer range when no quick range is longer than the window (O4)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T03:00:00Z"));
+    const wrapper = mountWithWindow("calendar:month:-1");
+    expect(wrapper.find('[data-test="logs-no-events-try-range-btn"]').exists()).toBe(false);
   });
 });

@@ -115,7 +115,7 @@ export const formatRangeDuration = (startUs: number, endUs: number): string => {
     .join(" ");
 };
 
-/** Full stamps for the tooltip: "Nov 12, 2026 21:08:49.948 – 21:18:49.948"; an end the label shows as the day before shows its last millisecond. */
+/** Full stamps for the tooltip: "Nov 12, 2026 21:08:49.948 – 21:18:49"; ms only on a fixed bound that has them. */
 export const formatRangeStamps = (range: RangeLabelInput, opts: RangeLabelOptions = {}): string => {
   const base = shapeOf(range, opts);
   const stored = civilOf(range.endUs, base.zone);
@@ -127,12 +127,19 @@ export const formatRangeStamps = (range: RangeLabelInput, opts: RangeLabelOption
     : range.endUs;
   const end = civilOf(endUs, base.zone);
   const day = new Intl.DateTimeFormat(base.locale, dayOptions(true));
-  const clock = new Intl.DateTimeFormat(base.locale, { ...clockOptions("ms"), timeZone: "UTC" });
-  const stamp = (civil: Civil, withDay: boolean) =>
-    clean(
-      `${withDay ? `${day.format(utcDateOf(civil, false))} ` : ""}${clock.format(utcDateOf(civil, true))}`,
-    );
-  return `${stamp(base.start, true)}${DASH}${stamp(end, end.date !== base.start.date)}`;
+  const clock = (exact: boolean) =>
+    new Intl.DateTimeFormat(base.locale, {
+      ...clockOptions(exact ? "ms" : "second"),
+      timeZone: "UTC",
+    });
+  // A live bound is now and a .000 says nothing, so only a fixed bound's own ms are shown.
+  const stamp = (civil: Civil, withDay: boolean, fixedBound: boolean) => {
+    const time = clock(fixedBound && civil.ms > 0).format(utcDateOf(civil, true));
+    return clean(withDay ? `${day.format(utcDateOf(civil, false))} ${time}` : time);
+  };
+  const fixed = !range.live;
+  const endText = stamp(end, end.date !== base.start.date, fixed && !shownAsDayBefore);
+  return `${stamp(base.start, true, fixed)}${DASH}${endText}`;
 };
 
 /** The zone's offset at an instant as "UTC+05:30", or "UTC". */

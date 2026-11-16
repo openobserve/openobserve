@@ -24,6 +24,8 @@ import {
 } from "./timeRangeLabel";
 import { parseTimeInput } from "./dateTimeRangeParse";
 import { formatKnownPeriod } from "./timeRangeRail";
+import { anchorRows } from "./timeRangeAnchor";
+import { resolveRange } from "./timeRangeModel";
 import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -209,9 +211,7 @@ describe("formatRangeLabel", () => {
       period: true,
     };
     expect(formatRangeLabel(h2, OPTS)).toBe("H2 2026 · Jul 1 – Nov 12, 21:24");
-    expect(formatRangeStamps(h2, OPTS)).toBe(
-      "Jul 1, 2026 00:00:00.000 – Nov 12, 2026 21:24:10.500",
-    );
+    expect(formatRangeStamps(h2, OPTS)).toBe("Jul 1, 2026 00:00:00 – Nov 12, 2026 21:24:10.500");
   });
 
   it("names no period for a range that ends inside an earlier, smaller one [V6]", () => {
@@ -264,26 +264,73 @@ describe("formatRangeStamps [#6]", () => {
     expect(formatRangeStamps(range, OPTS)).toBe("Nov 12, 2026 21:08:49.948 – 21:18:49.948");
   });
 
-  it("shows a whole-day end as its last millisecond", () => {
+  it("shows a whole-day end as its last second", () => {
     const range = { startUs: ist("2026-11-04T00:00:00"), endUs: ist("2026-11-07T00:00:00") };
-    expect(formatRangeStamps(range, OPTS)).toBe(
-      "Nov 4, 2026 00:00:00.000 – Nov 6, 2026 23:59:59.999",
-    );
+    expect(formatRangeStamps(range, OPTS)).toBe("Nov 4, 2026 00:00:00 – Nov 6, 2026 23:59:59");
   });
 
   it("shows a timed range's exclusive midnight end as the day before, like its label [fresh#9]", () => {
     const range = { startUs: ist("2026-11-05T09:30:00"), endUs: ist("2026-11-08T00:00:00") };
     expect(formatRangeLabel(range, OPTS)).toBe("Nov 5, 09:30 – Nov 7, 23:59");
-    expect(formatRangeStamps(range, OPTS)).toBe(
-      "Nov 5, 2026 09:30:00.000 – Nov 7, 2026 23:59:59.999",
-    );
+    expect(formatRangeStamps(range, OPTS)).toBe("Nov 5, 2026 09:30:00 – Nov 7, 2026 23:59:59");
   });
 
   it("keeps a sub-minute midnight end as stored, like its label", () => {
     const range = { startUs: ist("2026-11-07T23:59:30"), endUs: ist("2026-11-08T00:00:00") };
-    expect(formatRangeStamps(range, OPTS)).toBe(
-      "Nov 7, 2026 23:59:30.000 – Nov 8, 2026 00:00:00.000",
-    );
+    expect(formatRangeStamps(range, OPTS)).toBe("Nov 7, 2026 23:59:30 – Nov 8, 2026 00:00:00");
+  });
+});
+
+describe("formatRangeStamps milliseconds [R5]", () => {
+  const ctx = {
+    nowUs: NOW_MS * 1000 + 100_000,
+    zone: IST,
+    weekStart: 1 as const,
+    locale: "en-US",
+    fiscalYearStartMonth: null,
+  };
+
+  it("prints a live range's bounds to the second, never the clock's .100", () => {
+    const week = resolveRange({ kind: "rolling", span: "7d" }, ctx);
+    const stamps = formatRangeStamps({ ...week, name: "Last 7 days", live: true }, OPTS);
+    expect(stamps).toBe("Nov 5, 2026 21:24:10 – Nov 12, 2026 21:24:10");
+    expect(stamps).not.toMatch(/\.\d/);
+  });
+
+  it("prints a running calendar period to the second", () => {
+    const today = resolveRange({ kind: "calendar", unit: "day", offset: 0 }, ctx);
+    const stamps = formatRangeStamps({ ...today, live: true, calendar: true }, OPTS);
+    expect(stamps).toBe("Nov 12, 2026 00:00:00 – 21:24:10");
+  });
+
+  it("prints a fixed bound's non-zero milliseconds exactly, the label only to the second", () => {
+    const range = {
+      startUs: ist("2026-11-12T02:00:00.123"),
+      endUs: ist("2026-11-12T02:05:00.500"),
+    };
+    expect(formatRangeStamps(range, OPTS)).toBe("Nov 12, 2026 02:00:00.123 – 02:05:00.500");
+    expect(formatRangeLabel(range, OPTS)).toBe("Nov 12, 02:00:00 – 02:05:00");
+  });
+
+  it("never prints .000 on a whole-second bound", () => {
+    const range = { startUs: ist("2026-11-12T02:00:00.123"), endUs: ist("2026-11-12T02:05:10") };
+    expect(formatRangeStamps(range, OPTS)).toBe("Nov 12, 2026 02:00:00.123 – 02:05:10");
+    const whole = { startUs: ist("2026-11-12T02:00:10"), endUs: ist("2026-11-12T02:05:10") };
+    expect(formatRangeStamps(whole, OPTS)).not.toContain(".000");
+  });
+});
+
+describe("anchor window labels [V2]", () => {
+  const centre = ist("2026-11-15T20:02:10.250");
+  const rows = anchorRows(centre, ist("2026-11-16T09:00:00"));
+  const window = (id: string) => rows.find((row) => row.id === id)!;
+
+  it("prints seconds, no ms, for ± 5 min", () => {
+    expect(formatRangeLabel(window("5m"), OPTS)).toBe("Nov 15, 19:57:10 – 20:07:10");
+  });
+
+  it("prints ms for ± 5 s, a span under a minute", () => {
+    expect(formatRangeLabel(window("5s"), OPTS)).toBe("Nov 15, 20:02:05.250 – 20:02:15.250");
   });
 });
 

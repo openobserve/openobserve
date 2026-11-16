@@ -427,14 +427,16 @@ describe("Logs Index", async () => {
       wrapper.vm.searchObj.meta.executed = {
         signature: { time: { type: "relative", period: "15m" } },
       };
+      wrapper.vm.searchObj.meta.editorDirty = true;
       await flushPromises();
     };
 
     afterEach(() => {
       wrapper.vm.searchObj.meta.executed = null;
+      wrapper.vm.searchObj.meta.editorDirty = false;
     });
 
-    it("names the range the shown results came from once the picker moves off it", async () => {
+    it("names the range the shown results came from while it waits behind query edits", async () => {
       await showStaleRange();
       expect(wrapper.vm.staleRangeText).toContain("15");
       const strip = wrapper.find('[data-test="logs-search-bar-stale-range-strip"]');
@@ -472,6 +474,43 @@ describe("Logs Index", async () => {
       wrapper.vm.searchObj.meta.logsVisualizeToggle = "patterns";
       expect(wrapper.vm.staleRangeText).toBeNull();
       wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+    });
+
+    it("shows the over-limit guard strip and Nothing was run for a refused link (R2)", async () => {
+      await showStaleRange();
+      const pickChip = vi.fn();
+      const openMenu = vi.fn();
+      wrapper.vm.searchBarRef = { dateTimeRef: { pickChip, openMenu } } as any;
+      const end = Date.parse("2026-11-16T00:00:00Z") * 1000;
+      wrapper.vm.searchObj.meta.rangeLimitRefusal = {
+        asked: { startUs: end - 7 * 86_400_000_000, endUs: end },
+        period: "7d",
+        allowed: "1d",
+        allowedPeriod: "24h",
+        stream: "default",
+      };
+      await flushPromises();
+      try {
+        const strip = wrapper.find('[data-test="logs-range-limit-strip"]');
+        expect(strip.text()).toContain(
+          "This link asks for Last 7 days. Stream “default” allows 1d.",
+        );
+        expect(wrapper.find('[data-test="logs-nothing-run"]').text()).toBe("Nothing was run");
+        const show = wrapper.find('[data-test="logs-range-limit-strip-show-btn"]');
+        expect(show.text()).toBe("Show Last 24 hours");
+        await show.trigger("click");
+        expect(pickChip).toHaveBeenCalledWith("24h");
+        await wrapper.find('[data-test="logs-range-limit-strip-pick-btn"]').trigger("click");
+        expect(openMenu).toHaveBeenCalled();
+      } finally {
+        wrapper.vm.searchObj.meta.rangeLimitRefusal = null;
+      }
+    });
+
+    it("hides for a range change alone, which runs (decision a)", async () => {
+      await showStaleRange();
+      wrapper.vm.searchObj.meta.editorDirty = false;
+      expect(wrapper.vm.staleRangeText).toBeNull();
     });
   });
 

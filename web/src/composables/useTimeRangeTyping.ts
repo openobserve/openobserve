@@ -39,7 +39,7 @@ import {
   anchorRows,
   anchorSearchAroundChoice,
   anchorWindowLabel,
-  dropZeroMilliseconds,
+  formatAnchorSpan,
   readingAnchorMicros,
   type AnchorRow,
 } from "@/utils/timeRangeAnchor";
@@ -188,7 +188,6 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     rollingRange,
     absoluteToMicros,
     convertUnixTime,
-    formatClockSpan,
   } = clock;
   const {
     startBoundError,
@@ -727,13 +726,12 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
       return { key, label: rowRangeLabel(start, end, reading), hint: "", relative: false };
     }
     if (tag && "anchor" in tag && plan.kind === "absolute") {
-      const span =
-        tag.anchor === "to-now"
-          ? formatRangeLabel(
-              { startUs: plan.start, endUs: plan.end },
-              { ...labelOptions(), surface: "row" },
-            )
-          : dropZeroMilliseconds(formatClockSpan(plan.start, plan.end));
+      const sameDay = convertUnixTime(plan.start).date === convertUnixTime(plan.end).date;
+      const span = formatAnchorSpan({ id: tag.anchor, startUs: plan.start, endUs: plan.end }, t, {
+        timezone: zone.value,
+        locale: intlLocale.value,
+        withDay: tag.anchor !== "to-now" && !sameDay,
+      });
       return {
         key,
         label: String(anchorWindowLabel(tag.anchor, t)),
@@ -863,11 +861,12 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     return null;
   });
 
-  const listRows = computed(() =>
-    typing.value
-      ? filterTimeRangeList(defaultRows.value, inputText.value, readPeriod.value)
-      : defaultRows.value,
-  );
+  // Text that reads as fixed dates has its own rows, so rows matched by name would only compete with them.
+  const listRows = computed(() => {
+    if (!typing.value) return defaultRows.value;
+    if (inputPlan.value?.kind === "absolute") return [];
+    return filterTimeRangeList(defaultRows.value, inputText.value, readPeriod.value);
+  });
 
   // What an example reads as on this host; "" when the host could not apply it.
   const exampleMeta = (text: string): string => {

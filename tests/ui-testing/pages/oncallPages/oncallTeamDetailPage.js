@@ -172,9 +172,6 @@ export class OnCallTeamDetailPage {
       membersAwayWindowButton: '[data-test="oncall-members-away-window"] [data-test="date-time-btn"]',
       // The window's popup is portalled out of the dialog, so its parts are not scoped under the window.
       awayEndTimeInput: '[data-test="datetime-end-time"] input',
-      awayEndTimeButton: '[data-test="datetime-end-time"] button',
-      timePopup: '[data-test="otime-popup"]',
-      timeClockNumber: '[data-test="otime-clock-face"] g[role="button"]',
       rangeCalendar: '[data-test="daterangecalendar-root"]',
 
       // Setup checklist / Quick start banner.
@@ -811,45 +808,11 @@ export class OnCallTeamDetailPage {
   }
 
   getAwayEndTimeInput() { return this.page.locator(this.locators.awayEndTimeInput).first(); }
-  getTimePopup() { return this.page.locator(this.locators.timePopup); }
   getRangeCalendar() { return this.page.locator(this.locators.rangeCalendar); }
 
   async openAwayWindow() {
     await this.page.locator(this.locators.membersAwayWindowButton).click();
     await expect(this.getRangeCalendar()).toBeVisible({ timeout: 10000 });
-  }
-
-  async openAwayEndTimePicker() {
-    await this.page.locator(this.locators.awayEndTimeButton).first().click();
-    await expect(this.getTimePopup()).toBeVisible({ timeout: 10000 });
-  }
-
-  /** Each element's centre and whether a click there would really land on it, which is what a clipped or covered popup breaks. */
-  async readHitTargets(selector) {
-    return this.page.locator(selector).evaluateAll((elements) => elements.map((el) => {
-      const box = el.getBoundingClientRect();
-      const x = box.left + box.width / 2;
-      const y = box.top + box.height / 2;
-      const top = document.elementFromPoint(x, y);
-      return {
-        label: el.getAttribute('aria-label') || el.textContent.trim(),
-        date: el.getAttribute('data-value'),
-        x,
-        y,
-        hit: Boolean(top) && (el === top || el.contains(top)),
-        onScreen: box.top >= 0 && box.left >= 0 && box.bottom <= window.innerHeight && box.right <= window.innerWidth,
-      };
-    }));
-  }
-
-  /** A real mouse click at the point, because the original bug left these targets in the DOM where a scripted click still worked. */
-  async clickAtHitTarget(target) {
-    await this.page.mouse.click(target.x, target.y);
-  }
-
-  async clickClockNumber(value) {
-    const numbers = await this.readHitTargets(this.locators.timeClockNumber);
-    await this.clickAtHitTarget(numbers.find((n) => new RegExp(`\\b${value}\\b`).test(n.label)));
   }
 
   // ------------------------------------------------------- enterprise gating

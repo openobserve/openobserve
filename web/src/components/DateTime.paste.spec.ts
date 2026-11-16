@@ -392,7 +392,7 @@ describe("DateTime paste", () => {
       createWrapper();
       await openMenu();
 
-      expect(field().getAttribute("placeholder")).toBe("Try 2h, yesterday, Q3, Nov 4 – 6");
+      expect(field().getAttribute("placeholder")).toBe("Try 2h or Nov 10 2pm-4pm");
       expect(field().value).toBe("");
       expect(inMenu("date-time-resolved-name")?.textContent).toBe("Last 15 minutes");
       expect(inMenu("date-time-resolved")?.textContent).toContain("Nov 9, 03:18 – 03:33");
@@ -572,7 +572,7 @@ describe("DateTime paste", () => {
         await typeInto("2026-03-08 01:58:00");
 
         tick();
-        inMenu("date-time-as-utc-toggle")!.click();
+        wrapper!.vm.toggleAsUtc();
         await flushPromises();
         await pressEnter();
 
@@ -588,10 +588,10 @@ describe("DateTime paste", () => {
         await typeInto("2026-03-08 01:58:00");
 
         tick();
-        inMenu("date-time-as-utc-toggle")!.click();
+        wrapper!.vm.toggleAsUtc();
         await flushPromises();
         tick();
-        inMenu("date-time-as-utc-toggle")!.click();
+        wrapper!.vm.toggleAsUtc();
         await flushPromises();
         await pressEnter();
 
@@ -644,7 +644,7 @@ describe("DateTime paste", () => {
       createWrapper();
       await openMenu();
       await typeInto("2026-11-06 14:02:11 to 15:10:43");
-      expect(inMenu("date-time-as-utc-toggle")).not.toBeNull();
+      expect(wrapper!.vm.asUtcLabel).not.toBeNull();
       wrapper!.vm.openCalendar();
       await flushPromises();
 
@@ -654,7 +654,7 @@ describe("DateTime paste", () => {
       await flushPromises();
 
       expect(field().value).toBe("");
-      expect(inMenu("date-time-as-utc-toggle")).toBeNull();
+      expect(wrapper!.vm.asUtcLabel).toBeNull();
       expect(wrapper!.vm.pendingDay).toBe("2026/11/04");
     });
 
@@ -670,7 +670,7 @@ describe("DateTime paste", () => {
         startTime: micros("2026-11-09T03:10:00Z"),
         endTime: micros("2026-11-09T03:25:00Z"),
       });
-      expect(inMenu("date-time-as-utc-toggle")).toBeNull();
+      expect(wrapper!.vm.asUtcLabel).toBeNull();
     });
 
     it("offers no as-UTC reading that would start after the picker's last day", async () => {
@@ -682,7 +682,7 @@ describe("DateTime paste", () => {
       await pressEnter();
 
       expect(lastEmit()).toMatchObject({ startTime: micros("2026-11-20T17:30:00Z") });
-      expect(inMenu("date-time-as-utc-toggle")).toBeNull();
+      expect(wrapper!.vm.asUtcLabel).toBeNull();
     });
 
     it("stores no period on a date-only picker", async () => {
@@ -706,16 +706,15 @@ describe("DateTime paste", () => {
       const before = emitCount();
       await typeInto("2026-11-06 14:02:11 to 15:10:43");
       expect(inMenu("date-time-resolved-name")?.textContent).toBe("Nov 6, 14:02:11 – 15:10:43");
-      const toggle = inMenu("date-time-as-utc-toggle")!;
-      expect(toggle.textContent?.trim()).toBe("as UTC");
+      expect(String(wrapper!.vm.asUtcLabel?.short)).toBe("as UTC");
       expect(wrapper!.vm.asUtcLabel?.full).toBe("as UTC: 19:32 – 20:40");
 
       tick();
-      toggle.click();
+      wrapper!.vm.toggleAsUtc();
       await flushPromises();
       expect(emitCount()).toBe(before);
       expect(inMenu("date-time-resolved")?.textContent).toContain("Nov 6, 19:32:11 – 20:40:43");
-      expect(inMenu("date-time-as-utc-toggle")?.textContent?.trim()).toBe("as GMT+5:30");
+      expect(String(wrapper!.vm.asUtcLabel?.short)).toBe("as GMT+5:30");
       expect(wrapper!.vm.asUtcLabel?.full).toBe("as GMT+5:30: 14:02 – 15:10");
       expect(field().value).toBe("2026-11-06 14:02:11 to 15:10:43");
 
@@ -738,7 +737,7 @@ describe("DateTime paste", () => {
         startTime: micros("2026-11-08T03:30:00Z"),
         endTime: micros("2026-11-08T05:30:00Z"),
       });
-      expect(inMenu("date-time-as-utc-toggle")).toBeNull();
+      expect(wrapper!.vm.asUtcLabel).toBeNull();
     });
 
     it("does not apply text left in the bar when the panel closes", async () => {
@@ -955,7 +954,7 @@ describe("DateTime paste", () => {
 
       await typeInto("2026-11-06 14:02:11 to 15:10:43");
       tick();
-      inMenu("date-time-as-utc-toggle")!.click();
+      wrapper!.vm.toggleAsUtc();
       await flushPromises();
       await pressEnter();
 
@@ -975,7 +974,7 @@ describe("DateTime paste", () => {
 
       await typeInto("2026-11-06 14:02:11 to 15:10:43");
       tick();
-      inMenu("date-time-as-utc-toggle")!.click();
+      wrapper!.vm.toggleAsUtc();
       await flushPromises();
       await pressEnter();
 
@@ -999,7 +998,7 @@ describe("DateTime paste", () => {
 
       await typeInto("2026-11-06 14:02:11 to 15:10:43");
       tick();
-      inMenu("date-time-as-utc-toggle")!.click();
+      wrapper!.vm.toggleAsUtc();
       await flushPromises();
       await pressEnter();
 
@@ -1007,14 +1006,14 @@ describe("DateTime paste", () => {
       expect(JSON.parse(localStorage.getItem(key) ?? "[]")).toEqual(shared);
     });
 
-    it("clears the bar when a button below picks another selection", async () => {
+    it("clears the bar when a step picks another selection", async () => {
       createWrapper({});
       await openMenu();
       await typeInto("2h");
       expect(field().value).toBe("2h");
 
       tick();
-      inMenu("date-time-prev-btn-footer")!.click();
+      wrapper!.vm.shiftTimeRange("prev");
       await flushPromises();
 
       expect(wrapper!.vm.inputText).toBe("");
@@ -1308,7 +1307,7 @@ describe("DateTime paste", () => {
         await flushPromises();
 
         expect(emitCount()).toBe(before);
-        expect(inMenu("date-time-as-utc-toggle")?.textContent?.trim()).toBe("as UTC");
+        expect(String(wrapper!.vm.asUtcLabel?.short)).toBe("as UTC");
         expect(wrapper!.vm.asUtcLabel?.full).toBe("as UTC: 19:32 – 20:40");
         await pressEnter();
         expect(lastEmit()).toMatchObject({ startTime: micros("2026-11-06T08:32:11Z") });
@@ -1514,7 +1513,7 @@ describe("DateTime paste", () => {
       firePaste(document.querySelector("#date-time-menu")!, "2026-11-08T03:30:00+05:30");
       await flushPromises();
 
-      expect(inMenu("date-time-preview-note")?.textContent).toBe("typed in UTC+05:30");
+      expect(wrapper!.vm.headNote).toBe("Typed in UTC+05:30");
     });
 
     it("offers the as-UTC reading only for a zoneless machine stamp", async () => {
@@ -1523,14 +1522,14 @@ describe("DateTime paste", () => {
       await openMenu();
 
       await typeInto("Nov 6 14:02");
-      expect(inMenu("date-time-resolved-name")?.textContent).toBe("± 5 min around Nov 6, 14:02:00");
-      expect(inMenu("date-time-as-utc-toggle")).toBeNull();
+      expect(inMenu("date-time-resolved-name")?.textContent).toBe("± 5 min");
+      expect(wrapper!.vm.asUtcLabel).toBeNull();
 
       await typeInto("Nov 6 2026 14:02");
-      expect(inMenu("date-time-as-utc-toggle")).toBeNull();
+      expect(wrapper!.vm.asUtcLabel).toBeNull();
 
       await typeInto("2026-11-06 14:02");
-      expect(inMenu("date-time-as-utc-toggle")).not.toBeNull();
+      expect(wrapper!.vm.asUtcLabel).not.toBeNull();
     });
 
     it("refuses a typed range before a date-only picker's minDate", async () => {
@@ -1621,7 +1620,7 @@ describe("DateTime paste", () => {
         expect(line).toContain("Nov 5 – 7");
         expect(line).toContain("3d");
         expect(line).not.toMatch(/\d{2}:\d{2}/);
-        expect(inMenu("date-time-as-utc-toggle")).toBeNull();
+        expect(wrapper!.vm.asUtcLabel).toBeNull();
       });
 
       it("drops the zone and the as-UTC chip when the picker hides its zone", async () => {
@@ -1633,7 +1632,7 @@ describe("DateTime paste", () => {
 
         expect(inMenu("date-time-resolved")?.textContent).toContain("Nov 6, 14:02:11 – 15:10:43");
         expect(inMenu("date-time-resolved")?.textContent).not.toContain("GMT");
-        expect(inMenu("date-time-as-utc-toggle")).toBeNull();
+        expect(wrapper!.vm.asUtcLabel).toBeNull();
       });
     });
   });

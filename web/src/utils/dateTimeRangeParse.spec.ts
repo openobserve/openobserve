@@ -865,3 +865,30 @@ describe("calendar words", () => {
     expect(parseTimeInput(text)).toEqual({ type: "relative", period });
   });
 });
+
+describe("placeholder examples read as ranges [V4, R11]", () => {
+  const OPTS = { now: new Date(Date.UTC(2026, 10, 16, 10)), locale: "en-US", timeZone: "UTC" };
+
+  it("reads the business-hours example as Nov 10 14:00–16:00", () => {
+    expect(parseTimeInput("Nov 10 2pm-4pm", OPTS)).toMatchObject({
+      type: "absolute",
+      startDate: "2026/11/10",
+      startTime: "14:00:00",
+      endDate: "2026/11/10",
+      endTime: "16:00:00",
+    });
+  });
+
+  it.each([
+    ["2h", { type: "relative", period: "2h" }],
+    ["yesterday", { type: "relative", period: "calendar:day:-1" }],
+    ["last quarter", { type: "relative", period: "calendar:quarter:-1" }],
+    ["90d", { type: "relative", period: "90d" }],
+    ["Q3", { type: "absolute", startDate: "2026/07/01", endDate: "2026/10/01" }],
+    ["Q3 2025", { type: "absolute", startDate: "2025/07/01", endDate: "2025/10/01" }],
+    ["2025", { type: "absolute", startDate: "2025/01/01", endDate: "2026/01/01" }],
+    ["Nov 4 – 6", { type: "absolute", startDate: "2026/11/04", endDate: "2026/11/07" }],
+  ])("reads %s", (text, expected) => {
+    expect(parseTimeInput(text, OPTS)).toMatchObject(expected);
+  });
+});

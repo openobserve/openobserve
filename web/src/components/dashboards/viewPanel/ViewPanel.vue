@@ -48,6 +48,7 @@
           ref="dateTimePickerRef"
           class="hover:bg-interactive-hover-bg h-7.5 min-h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
+          :panel-time-mark="panelOwnTime"
           :disable="disable"
           @update:model-value="timeGate.onApply"
           @show="timeGate.onShow"
@@ -333,7 +334,11 @@ import {
   freshTimeFromAppliedRange,
 } from "@/composables/dashboard/dashboardFreshPanelTime";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
-import { pickerValueToTimeObj, toPickerSavedDate } from "@/utils/dashboard/panelTimeUtils";
+import {
+  hasPanelTime,
+  pickerValueToTimeObj,
+  toPickerSavedDate,
+} from "@/utils/dashboard/panelTimeUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -450,6 +455,7 @@ export default defineComponent({
     // The applied range the chart loads with; the picker's own value is `timeGate.picked`.
     const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);
+    const panelOwnTime = computed(() => hasPanelTime(dashboardPanelData.data));
     const errorData: any = reactive({
       errors: [],
     });
@@ -1097,6 +1103,7 @@ export default defineComponent({
       refreshTooltip,
       timeGate,
       pickedDate: timeGate.picked,
+      panelOwnTime,
       onTimePickerHide,
       isAutoRunAvailable,
       isAutoRunOn,

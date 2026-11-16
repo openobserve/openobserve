@@ -883,7 +883,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="order-1 min-w-0 max-md:me-auto max-md:shrink-0">
           <DateTime
-            preset="explorer-manual"
+            preset="explorer-auto"
             :host-name="t('menu.search')"
             ref="dateTimeRef"
             menu-align="end"
@@ -902,6 +902,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:timezone-change="updateTimezone"
             :retention-days="retentionDays"
             :narrowed-by-query="narrowedByQuery"
+            :limit-refused="!!searchObj.meta.rangeLimitRefusal"
             :disable="disable"
             class="h-8.5!"
           />
@@ -2656,7 +2657,19 @@ export default defineComponent({
     const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
 
     // Responsive toolbar — width tracking via shared composable
-    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
+    // V1: the picker trigger walks its own forms first, so the budget counts it at its shortest.
+    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive({
+      rightSlack: () => {
+        const picker = dateTimeRef.value as {
+          $el?: Element;
+          shortestFormWidth?: () => number;
+        } | null;
+        const shortest = picker?.shortestFormWidth?.() ?? 0;
+        const el = picker?.$el;
+        if (!shortest || !(el instanceof Element)) return 0;
+        return el.getBoundingClientRect().width - shortest;
+      },
+    });
 
     // ── Pinned toolbar items ──────────────────────────────────────────────
     // Items pinned out of the "More" menu render as fixed-position toolbar
@@ -3256,10 +3269,15 @@ export default defineComponent({
       return matches;
     };
 
-    const requestTimeRun = (valueType: string, isZoom: boolean) => {
-      let reason: "zoom" | "time-typed" | "time" = "time";
+    // Any range the user applies runs like a zoom; only non-picker callers keep the auto-run rules.
+    const requestTimeRun = (
+      value: { valueType?: string; userChangedValue?: boolean; rerun?: boolean },
+      isZoom: boolean,
+    ) => {
+      let reason: "zoom" | "range" | "time-typed" | "time" = "time";
       if (isZoom) reason = "zoom";
-      else if (valueType === "absolute") reason = "time-typed";
+      else if (value.userChangedValue === true || value.rerun === true) reason = "range";
+      else if (value.valueType === "absolute") reason = "time-typed";
       autoRun.request(reason);
     };
 
@@ -3317,15 +3335,14 @@ export default defineComponent({
     const updateDateTime = async (value: object) => {
       if (suppressUpdateDateTime) return;
       const isZoom = takeZoom(value);
-      // Refresh pauses while results are stale, so going live from an ended range must run once to resume it.
-      const resumesRefresh =
-        value.userChangedValue === true &&
-        !!value.relativeTimePeriod &&
-        searchObj.data.datetime?.type === "absolute" &&
-        Number(searchObj.meta.refreshInterval) > 0;
-      if (value.userChangedValue === true) noteUserScopeChange();
+      if (value.userChangedValue === true) {
+        noteUserScopeChange();
+        searchObj.meta.rangeFromLink = false;
+        searchObj.meta.rangeLimitRefusal = null;
+      }
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
       if (
+        !searchObj.meta.rangeLimitRefusal &&
         value.valueType == "absolute" &&
         searchObj.data.stream.selectedStream.length > 0 &&
         searchObj.data.datetime.queryRangeRestrictionInHour > 0 &&
@@ -3435,9 +3452,7 @@ export default defineComponent({
         ignoreAutoTrigger === false &&
         (isLogsResultsMode() || searchObj.meta.logsVisualizeToggle === "patterns")
       ) {
-        // "run" is explicit and would execute unsaved editor edits.
-        if (resumesRefresh && !searchObj.meta.editorDirty) autoRun.request("run");
-        else requestTimeRun(value.valueType, isZoom || value.rerun === true);
+        requestTimeRun(value, isZoom);
       }
     };
 
@@ -4241,6 +4256,7 @@ export default defineComponent({
                 searchObj.meta.refreshHistogram = true;
                 // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
                 searchObj.communicationMethod = "streaming";
+                searchObj.meta.rangeFromLink = true;
                 await extractFields();
                 autoRun.engine.requestRun("saved-view", { op: "full" });
                 store.dispatch("setSavedViewFlag", false);

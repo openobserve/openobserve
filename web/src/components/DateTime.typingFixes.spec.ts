@@ -200,25 +200,27 @@ describe("DateTime typed text", () => {
     await openMenu();
     await typeInBar("1794498229");
 
-    expect(el("date-time-resolved-name")?.textContent).toBe("± 5 min around Nov 12, 21:13:49");
+    expect(el("date-time-resolved-name")?.textContent).toBe("± 5 min");
+    expect(el("date-time-resolved-range")?.textContent).not.toContain(".000");
     expect(names()[0]).not.toContain(".000");
   });
 
-  it("says read as UTC for a stamp written in UTC (P2)", async () => {
+  it("says typed in UTC for a stamp written in UTC, in the list head line (P2)", async () => {
     createWrapper();
     await openMenu();
     await typeInBar("2026-11-12T10:00:00Z");
 
-    expect(el("date-time-preview-note")?.textContent).toBe("read as UTC");
+    expect(el("date-time-list-head-note")?.textContent?.trim()).toBe("Typed in UTC");
+    expect(el("date-time-preview-note")).toBeNull();
   });
 
   it("offers the as UTC toggle for machine stamps only (P2)", async () => {
     createWrapper();
     await openMenu();
     await typeInBar("Nov 6, 2026 14:02:11");
-    expect(el("date-time-as-utc-toggle")).toBeNull();
+    expect(wrapper!.vm.asUtcLabel).toBeNull();
 
     await typeInBar("2026-11-06 14:02:11");
-    expect(el("date-time-as-utc-toggle")).not.toBeNull();
+    expect(wrapper!.vm.asUtcLabel).not.toBeNull();
   });
 });

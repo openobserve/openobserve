@@ -34,10 +34,14 @@ export class DateTimePickerPage {
         this.textInput = page.locator('[data-test="date-time-input-field"]');
         this.inputError = page.locator('[data-test="date-time-input-error"]');
         this.resolvedLine = page.locator('[data-test="date-time-resolved"]');
+        // The as-UTC toggle sits at the top of the zone menu, so open the zone select first.
+        this.timezoneSelect = page.locator('[data-test="datetime-timezone-select"]');
+        this.timezoneDivider = page.locator('[data-test="datetime-timezone-divider"]');
         this.asUtcToggle = page.locator('[data-test="date-time-as-utc-toggle"]');
 
-        // Copy / paste controls — added by PR #13374.
-        this.copyBtn = page.locator('[data-test="date-time-copy-btn"]');
+        // Copy / paste controls. Copy swaps its id to -done (check icon, no toast) for 1.5 s.
+        this.copyBtn = page.locator('[data-test="date-time-copy-btn"], [data-test="date-time-copy-btn-done"]');
+        this.copyDoneBtn = page.locator('[data-test="date-time-copy-btn-done"]');
         this.pasteBtn = page.locator('[data-test="date-time-paste-btn"]');
 
         // Shift buttons — Previous / Next flank the trigger (rendered when
@@ -47,8 +51,7 @@ export class DateTimePickerPage {
         this.prevShiftBtn = page.locator('[data-test="date-time-prev-btn"]');
         this.nextShiftBtn = page.locator('[data-test="date-time-next-btn"]');
 
-        // Absolute panel fields. OTime renders the data-test on a role=group
-        // wrapper; the value lives on the descendant input[type=time].
+        // Calendar Start / End fields: OInput text fields (e.g. "Jul 23 10:00"); a bare clock time keeps the field's day.
         this.startTimeInput = page.locator('[data-test="datetime-start-time"] input');
         this.endTimeInput = page.locator('[data-test="datetime-end-time"] input');
 
@@ -61,9 +64,8 @@ export class DateTimePickerPage {
         this.tooltipContent = page.locator('[data-test="o-tooltip-content"]');
 
         // ==================== Expected toast messages ====================
-        // Values of common.dateRangeCopied / dateRangePasted / dateRangePasteError / dateRangePasteEmpty
+        // Values of common.dateRangePasted / dateRangePasteError / dateRangePasteEmpty
         // in web/src/locales/languages/en-US.json.
-        this.copiedToastMessage = 'Date range copied';
         this.pastedToastMessage = 'Date range pasted';
         this.pasteErrorToastMessage = 'Could not parse date range';
         this.pasteEmptyToastMessage = 'Clipboard is empty. Copy a date range first.';
@@ -229,8 +231,9 @@ export class DateTimePickerPage {
 
     // ==================== Toast assertions ====================
 
-    async expectCopySuccessToast() {
-        await expect(this.toastByMessage(this.copiedToastMessage)).toBeVisible();
+    /** Copy confirms in place: the button shows a check under date-time-copy-btn-done. */
+    async expectCopyConfirmed() {
+        await expect(this.copyDoneBtn).toBeVisible();
     }
 
     async expectPasteSuccessToast() {
@@ -256,9 +259,10 @@ export class DateTimePickerPage {
         return await this.endTimeInput.inputValue();
     }
 
+    /** Matches the clock part of each field; the field drops ":00" seconds and leads with the day. */
     async expectAbsoluteTimeFields(expectedStart, expectedEnd) {
-        await expect(this.startTimeInput).toHaveValue(expectedStart);
-        await expect(this.endTimeInput).toHaveValue(expectedEnd);
+        await expect(this.startTimeInput).toHaveValue(clockTail(expectedStart));
+        await expect(this.endTimeInput).toHaveValue(clockTail(expectedEnd));
     }
 
     async getTriggerLabel() {
@@ -324,6 +328,11 @@ export class DateTimePickerPage {
         await expect(this.applyBtn).toBeVisible();
         await this.applyBtn.click();
     }
+}
+
+function clockTail(time) {
+    const shown = String(time).replace(/^(\d{1,2}:\d{2}):00$/, '$1');
+    return new RegExp(`(^|\\s)${shown.replace(/[.]/g, '\\.')}$`);
 }
 
 export default DateTimePickerPage;

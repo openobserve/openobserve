@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="scroller"
     role="listbox"
     tabindex="-1"
-    :aria-label="heading || t('dateTime.timeRanges')"
+    :aria-label="[heading || t('dateTime.timeRanges'), headNote].filter(Boolean).join('. ')"
     data-test="date-time-list"
     class="h-full overflow-y-auto overscroll-contain py-1 outline-none"
     :class="CUE_CLASSES[cue ?? 'none']"
@@ -28,12 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- A listbox holds only options, so the heading reaches screen readers as the list's name. -->
     <div
-      v-if="heading"
+      v-if="heading || headNote"
       aria-hidden="true"
-      class="text-text-secondary px-3 pt-1 pb-1.5 text-xs"
-      data-test="date-time-list-heading"
+      class="text-text-secondary flex items-baseline gap-2 px-3 pt-1 pb-1.5 text-xs"
     >
-      {{ heading }}
+      <span v-if="heading" class="min-w-0 flex-1" data-test="date-time-list-heading">{{
+        heading
+      }}</span>
+      <span v-if="headNote" class="shrink-0" data-test="date-time-list-head-note">{{
+        headNote
+      }}</span>
     </div>
     <template v-for="(row, index) in rows" :key="row.id">
       <div
@@ -225,9 +229,9 @@ const ENTER_KINDS: readonly TimeRangeListKind[] = [
 
 const CUE_CLASSES: Record<NonNullable<ScrollCue> | "none", string> = {
   none: "",
-  top: "shadow-[var(--shadow-scroll-top)]",
-  bottom: "shadow-[var(--shadow-scroll-bottom)]",
-  both: "shadow-[var(--shadow-scroll-top),var(--shadow-scroll-bottom)]",
+  top: "shadow-scroll-top",
+  bottom: "shadow-scroll-bottom",
+  both: "shadow-scroll-both",
 };
 
 const props = defineProps<{
@@ -239,6 +243,8 @@ const props = defineProps<{
   editingId?: string | null;
   /** A line above the rows, such as the examples' lead-in. */
   heading?: string;
+  /** How the typed text was read (`Typed in UTC`), at the end of the head line. */
+  headNote?: string;
 }>();
 
 const emit = defineEmits<{

@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { rollingShortName, triggerLabelForms } from "./timeRangeForms";
+import { formatRangeDates } from "./timeRangeLabel";
 
 describe("triggerLabelForms (ui-spec §6, r2)", () => {
   it("steps a live dashboard range from name to short name to dates, never dropping the dates", () => {
@@ -109,6 +110,56 @@ describe("triggerLabelForms (ui-spec §6, r2)", () => {
     expect(
       triggerLabelForms({ kind: "fixed", dashboard: true, name: "", dates: "Nov 4 – 6, 2026" }),
     ).toEqual([{ name: "", dates: "Nov 4 – 6, 2026" }]);
+  });
+});
+
+describe("triggerLabelForms on dashboards [V1]", () => {
+  const live = {
+    kind: "live" as const,
+    dashboard: true,
+    name: "Last 6 hours",
+    shortName: rollingShortName("6h"),
+    dates: formatRangeDates(
+      {
+        startUs: Date.parse("2026-11-15T15:30:00Z") * 1000,
+        endUs: Date.parse("2026-11-15T21:30:00Z") * 1000,
+        live: true,
+      },
+      { timezone: "Asia/Kolkata", surface: "dashboard", nowMs: Date.parse("2026-11-16T00:00:00Z") },
+    ),
+  };
+
+  it("walks Last 6 hours · … → 6h · … → dates, never dropping the dates", () => {
+    expect(triggerLabelForms(live)).toEqual([
+      { name: "Last 6 hours", dates: live.dates },
+      { name: "6h", dates: live.dates },
+      { name: "", dates: live.dates },
+    ]);
+  });
+
+  it.each(["live", "calendar", "named", "fixed"] as const)(
+    "never swaps the %s dashboard zone label for a dot",
+    (kind) => {
+      const forms = triggerLabelForms({ ...live, kind });
+      expect(forms.some((form) => form.zoneDot)).toBe(false);
+      if (kind !== "named") expect(forms.every((form) => form.dates === live.dates)).toBe(true);
+    },
+  );
+
+  it("still gives an explorer fixed range the dot and start · duration forms", () => {
+    const forms = triggerLabelForms({
+      kind: "fixed",
+      dashboard: false,
+      name: "",
+      dates: "Nov 16, 00:03:59 – 00:54:43",
+      duration: "50m 44s",
+    });
+    expect(forms.at(-1)).toEqual({
+      name: "",
+      dates: "Nov 16, 00:03:59 · 50m 44s",
+      zoneDot: true,
+    });
+    expect(forms.some((form) => form.zoneDot)).toBe(true);
   });
 });
 
