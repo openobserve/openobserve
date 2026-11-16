@@ -10537,20 +10537,6 @@
       "retry": "다시 시도"
     },
     "dataAsOf": "{time} 기준 데이터",
-    "status": {
-      "attention": "주의 필요",
-      "checking": "확인 중…",
-      "partial": "일부 검사를 불러오지 못했습니다",
-      "clear": "주의가 필요한 항목이 없습니다",
-      "items": {
-        "firing": "{count}개 알림 발생 | {count}개 알림 발생",
-        "failing": "{count}개 규칙 실패 | {count}개 규칙 실패",
-        "incidents": "{count}개 미해결 인시던트 | {count}개 미해결 인시던트",
-        "pipelines": "{count}개 파이프라인에서 오류 발생 | {count}개 파이프라인에서 오류 발생",
-        "quiet": "{count}개 활동 없는 스트림 | {count}개 활동 없는 스트림"
-      },
-      "unmonitored": "아직 모니터링 중인 항목이 없습니다"
-    },
     "timeRange": {
       "heading": "선택한 시간 범위 내"
     }

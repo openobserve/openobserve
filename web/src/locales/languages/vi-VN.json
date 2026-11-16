@@ -10537,20 +10537,6 @@
       "retry": "Thử lại"
     },
     "dataAsOf": "Dữ liệu tính đến {time}",
-    "status": {
-      "attention": "Cần chú ý",
-      "checking": "Đang kiểm tra…",
-      "partial": "Không tải được một số kiểm tra",
-      "clear": "Không có gì cần chú ý",
-      "items": {
-        "firing": "{count} cảnh báo đang kích hoạt | {count} cảnh báo đang kích hoạt",
-        "failing": "{count} quy tắc bị lỗi | {count} quy tắc bị lỗi",
-        "incidents": "{count} sự cố đang mở | {count} sự cố đang mở",
-        "pipelines": "{count} pipeline có lỗi | {count} pipeline có lỗi",
-        "quiet": "{count} stream im lặng | {count} stream im lặng"
-      },
-      "unmonitored": "Chưa có gì được giám sát"
-    },
     "timeRange": {
       "heading": "Trong khoảng thời gian đã chọn"
     }

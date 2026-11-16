@@ -10537,20 +10537,6 @@
       "retry": "Wiederholen"
     },
     "dataAsOf": "Datenstand: {time}",
-    "status": {
-      "attention": "Erfordert Aufmerksamkeit",
-      "checking": "Wird geprüft…",
-      "partial": "Einige Prüfungen konnten nicht geladen werden",
-      "clear": "Nichts erfordert Aufmerksamkeit",
-      "items": {
-        "firing": "{count} Alarm ausgelöst | {count} Alarme ausgelöst",
-        "failing": "{count} Regel schlägt fehl | {count} Regeln schlagen fehl",
-        "incidents": "{count} offener Vorfall | {count} offene Vorfälle",
-        "pipelines": "{count} Pipeline mit Fehlern | {count} Pipelines mit Fehlern",
-        "quiet": "{count} inaktiver Stream | {count} inaktive Streams"
-      },
-      "unmonitored": "Es wird noch nichts überwacht"
-    },
     "timeRange": {
       "heading": "Im ausgewählten Zeitraum"
     }

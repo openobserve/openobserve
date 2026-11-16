@@ -10537,20 +10537,6 @@
       "retry": "Riprova"
     },
     "dataAsOf": "Dati aggiornati a {time}",
-    "status": {
-      "attention": "Richiede attenzione",
-      "checking": "Verifica in corso…",
-      "partial": "Impossibile caricare alcuni controlli",
-      "clear": "Niente richiede attenzione",
-      "items": {
-        "firing": "{count} avviso attivo | {count} avvisi attivi",
-        "failing": "{count} regola in errore | {count} regole in errore",
-        "incidents": "{count} incidente aperto | {count} incidenti aperti",
-        "pipelines": "{count} pipeline con errori | {count} pipeline con errori",
-        "quiet": "{count} stream inattivo | {count} stream inattivi"
-      },
-      "unmonitored": "Non è ancora monitorato nulla"
-    },
     "timeRange": {
       "heading": "Nell'intervallo di tempo selezionato"
     }

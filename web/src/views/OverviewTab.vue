@@ -20,10 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="pageState !== 'forbidden' && !errorIsForbidden"
-      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+      class="flex flex-wrap items-center justify-end gap-2"
     >
-      <OverviewStatusLine v-if="showOverviewCards" :status="status" />
-      <div class="ms-auto flex items-center gap-2">
+      <div class="flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading || overviewState.loading"
@@ -835,20 +834,13 @@ import OverviewTopStreamsCard from "./overview/OverviewTopStreamsCard.vue";
 import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
 import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
 import OverviewAskAiButton from "./overview/OverviewAskAiButton.vue";
-import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
 import { buildOverviewAskAi, type OverviewAskAiTarget } from "./overview/overviewAskAi";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
 import { resolveBrowserTimezone } from "@/utils/timezone";
-import {
-  overviewChecks,
-  overviewStatus,
-  type AttentionCheck,
-  type OverviewDestination,
-  type OverviewSignal,
-} from "./overview/overviewFormat";
+import { type OverviewDestination, type OverviewSignal } from "./overview/overviewFormat";
 import { overviewKeys } from "@/services/overview.querykeys";
 import type { IncidentsTile, OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -1298,25 +1290,6 @@ const incidentsTile = computed<IncidentsTile>(() => {
   if (isFailed("incidents")) return "error";
   return "ok";
 });
-
-// a source not loaded yet is still being checked; one this deployment lacks is left out
-const incidentsCheck = computed<Omit<AttentionCheck, "key" | "monitors"> | undefined>(() => {
-  if (!isIncidentsEnabled.value) return undefined;
-  if (!sectionState.incidents.loaded) return { state: "loading", count: 0 };
-  if (isFailed("incidents")) return { state: "unavailable", count: 0 };
-  return { state: "ok", count: incidentsTotal.value };
-});
-const status = computed(() =>
-  overviewStatus(
-    overviewChecks({
-      overview: overview.value,
-      pending: overviewPending.value,
-      failed: overviewFailed.value,
-      forbidden: overviewForbidden.value,
-      incidents: incidentsCheck.value,
-    }),
-  ),
-);
 
 // only the flag-on page can tell that nothing is watched
 const loadAlertCount = async (force = false) => {

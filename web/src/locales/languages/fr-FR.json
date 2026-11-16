@@ -10537,20 +10537,6 @@
       "retry": "Réessayer"
     },
     "dataAsOf": "Données en date du {time}",
-    "status": {
-      "attention": "Nécessite une attention",
-      "checking": "Vérification…",
-      "partial": "Certaines vérifications n'ont pas pu être chargées",
-      "clear": "Rien ne nécessite d'attention",
-      "items": {
-        "firing": "{count} alerte déclenchée | {count} alertes déclenchées",
-        "failing": "{count} règle en échec | {count} règles en échec",
-        "incidents": "{count} incident ouvert | {count} incidents ouverts",
-        "pipelines": "{count} pipeline en erreur | {count} pipelines en erreur",
-        "quiet": "{count} flux silencieux | {count} flux silencieux"
-      },
-      "unmonitored": "Rien n'est encore surveillé"
-    },
     "timeRange": {
       "heading": "Dans la plage de temps sélectionnée"
     }

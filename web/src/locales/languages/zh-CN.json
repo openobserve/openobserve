@@ -10537,20 +10537,6 @@
       "retry": "重试"
     },
     "dataAsOf": "数据截至 {time}",
-    "status": {
-      "attention": "需要关注",
-      "checking": "检查中…",
-      "partial": "部分检查无法加载",
-      "clear": "无需关注",
-      "items": {
-        "firing": "{count} 条告警触发中 | {count} 条告警触发中",
-        "failing": "{count} 条规则失败 | {count} 条规则失败",
-        "incidents": "{count} 个未解决事件 | {count} 个未解决事件",
-        "pipelines": "{count} 条流水线有错误 | {count} 条流水线有错误",
-        "quiet": "{count} 个静默数据流 | {count} 个静默数据流"
-      },
-      "unmonitored": "尚未监控任何内容"
-    },
     "timeRange": {
       "heading": "在所选时间范围内"
     }

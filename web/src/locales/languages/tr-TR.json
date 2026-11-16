@@ -10537,20 +10537,6 @@
       "retry": "Yeniden dene"
     },
     "dataAsOf": "Veriler {time} itibarıyla",
-    "status": {
-      "attention": "Dikkat gerekiyor",
-      "checking": "Kontrol ediliyor…",
-      "partial": "Bazı kontroller yüklenemedi",
-      "clear": "Dikkat gereken bir durum yok",
-      "items": {
-        "firing": "{count} uyarı tetiklenmiş | {count} uyarı tetiklenmiş",
-        "failing": "{count} kural başarısız | {count} kural başarısız",
-        "incidents": "{count} açık vaka | {count} açık vaka",
-        "pipelines": "{count} hatalı işlem hattı | {count} hatalı işlem hattı",
-        "quiet": "{count} sessiz akış | {count} sessiz akış"
-      },
-      "unmonitored": "Henüz hiçbir şey izlenmiyor"
-    },
     "timeRange": {
       "heading": "Seçilen zaman aralığında"
     }

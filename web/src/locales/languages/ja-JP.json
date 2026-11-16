@@ -10537,20 +10537,6 @@
       "retry": "再試行"
     },
     "dataAsOf": "{time} 時点のデータ",
-    "status": {
-      "attention": "対応が必要",
-      "checking": "確認中…",
-      "partial": "一部のチェックを読み込めませんでした",
-      "clear": "対応が必要な項目はありません",
-      "items": {
-        "firing": "{count} 件のアラートが発火中 | {count} 件のアラートが発火中",
-        "failing": "{count} 件のルールが失敗しています | {count} 件のルールが失敗しています",
-        "incidents": "{count} 件のオープンなインシデント | {count} 件のオープンなインシデント",
-        "pipelines": "{count} 件のエラーのあるパイプライン | {count} 件のエラーのあるパイプライン",
-        "quiet": "{count} 件のデータのないストリーム | {count} 件のデータのないストリーム"
-      },
-      "unmonitored": "まだ何も監視されていません"
-    },
     "timeRange": {
       "heading": "選択した時間範囲内"
     }

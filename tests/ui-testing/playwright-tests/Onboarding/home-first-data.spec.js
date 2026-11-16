@@ -427,11 +427,9 @@ const SCREENS = [
         async run({ page, orgId }) {
             await openHome(page, orgId, 'overview');
 
-            await expect(tid(page, 'overview-status-danger')).toBeVisible({ timeout: 30000 });
-            await expect(tid(page, 'overview-status-text')).toHaveText('Needs attention');
-            await expect(tid(page, 'overview-status-clear')).toHaveCount(0);
-
-            await expect(tid(page, 'overview-data-health-value-failing')).toHaveText('0');
+            await expect(tid(page, 'overview-data-health-value-failing')).toHaveText('0', {
+                timeout: 30000,
+            });
             await expect(tid(page, 'overview-data-health-value-delivery')).toHaveText('0');
 
             await expect(tid(page, `overview-alerts-firing-${FIRING_RULE}`)).toBeVisible();

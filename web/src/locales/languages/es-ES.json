@@ -10537,20 +10537,6 @@
       "retry": "Reintentar"
     },
     "dataAsOf": "Datos a fecha de {time}",
-    "status": {
-      "attention": "Requiere atención",
-      "checking": "Comprobando…",
-      "partial": "Algunas comprobaciones no se pudieron cargar",
-      "clear": "Nada requiere atención",
-      "items": {
-        "firing": "{count} alerta disparada | {count} alertas disparadas",
-        "failing": "{count} regla con errores | {count} reglas con errores",
-        "incidents": "{count} incidente abierto | {count} incidentes abiertos",
-        "pipelines": "{count} pipeline con errores | {count} pipelines con errores",
-        "quiet": "{count} stream inactivo | {count} streams inactivos"
-      },
-      "unmonitored": "Todavía no se está monitorizando nada"
-    },
     "timeRange": {
       "heading": "En el rango de tiempo seleccionado"
     }

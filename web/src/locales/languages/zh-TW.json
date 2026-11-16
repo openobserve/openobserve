@@ -10532,20 +10532,6 @@
       "retry": "重試"
     },
     "dataAsOf": "資料截至 {time}",
-    "status": {
-      "attention": "需要留意",
-      "checking": "檢查中…",
-      "partial": "部分檢查無法載入",
-      "clear": "沒有需要留意的事項",
-      "items": {
-        "firing": "{count} 個警示觸發中 | {count} 個警示觸發中",
-        "failing": "{count} 條規則失敗 | {count} 條規則失敗",
-        "incidents": "{count} 個未解決事件 | {count} 個未解決事件",
-        "pipelines": "{count} 條管線有錯誤 | {count} 條管線有錯誤",
-        "quiet": "{count} 個閒置串流 | {count} 個閒置串流"
-      },
-      "unmonitored": "尚未監控任何項目"
-    },
     "timeRange": {
       "heading": "所選時間範圍內"
     }

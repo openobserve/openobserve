@@ -10537,20 +10537,6 @@
       "retry": "Ponów"
     },
     "dataAsOf": "Dane na {time}",
-    "status": {
-      "attention": "Wymaga uwagi",
-      "checking": "Sprawdzanie…",
-      "partial": "Nie udało się wczytać niektórych kontroli",
-      "clear": "Nic nie wymaga uwagi",
-      "items": {
-        "firing": "{count} alert wyzwolony | {count} wyzwolonych alertów",
-        "failing": "{count} reguła z błędem | {count} reguł z błędem",
-        "incidents": "{count} otwarty incydent | {count} otwartych incydentów",
-        "pipelines": "{count} potok z błędami | {count} potoków z błędami",
-        "quiet": "{count} nieaktywny strumień | {count} nieaktywnych strumieni"
-      },
-      "unmonitored": "Nic nie jest jeszcze monitorowane"
-    },
     "timeRange": {
       "heading": "W wybranym zakresie czasu"
     }

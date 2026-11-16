@@ -2279,7 +2279,6 @@ describe("OverviewTab", () => {
         expect(wrapper.get(healthValue(key)).text()).toBe("0");
       }
       expect(wrapper.get(healthValue("quiet")).text()).toBe("3");
-      expect(wrapper.get('[data-test="overview-status-warning"]').text()).toBe("Needs attention");
     });
 
     it("should retry a single card with only the /overview request", async () => {
@@ -2581,14 +2580,7 @@ describe("OverviewTab", () => {
     );
   });
 
-  describe("page layout and status line", () => {
-    const quietFree = () => {
-      const base = buildHealthyOverview();
-      return {
-        ...base,
-        streams: { status: "ok", data: { ...base.streams.data!, quiet_count: 0 } },
-      } as typeof base;
-    };
+  describe("page layout", () => {
     const mountWith = async (overview: unknown) => {
       vi.mocked(overviewService.getOrgOverview).mockResolvedValue({ data: overview } as never);
       wrapper = mountOverviewTab();
@@ -2684,11 +2676,9 @@ describe("OverviewTab", () => {
       expect(pair().find(RECENT_EVENTS).exists()).toBe(true);
     });
 
-    it("shows the attention status line alongside the alerts card when something needs attention", async () => {
+    it("shows the alerts card when something needs attention", async () => {
       await mountWith(buildOverview());
 
-      expect(wrapper.get('[data-test="overview-status-danger"]').exists()).toBe(true);
-      expect(wrapper.get('[data-test="overview-status-text"]').text()).toBe("Needs attention");
       expect(wrapper.find('[data-test="overview-alerts-card"]').exists()).toBe(true);
     });
 
@@ -2747,59 +2737,13 @@ describe("OverviewTab", () => {
       push.mockRestore();
     });
 
-    it("shows the warning status line when only streams went quiet", async () => {
+    it("shows the quiet-streams count when only streams went quiet", async () => {
       await mountWith(buildHealthyOverview());
 
-      expect(wrapper.get('[data-test="overview-status-warning"]').text()).toBe("Needs attention");
       expect(wrapper.get('[data-test="overview-data-health-value-quiet"]').text()).toBe("3");
     });
 
-    it("says nothing needs attention, with an icon, when every check is clear", async () => {
-      await mountWith(quietFree());
-
-      const line = wrapper.get('[data-test="overview-status-clear"]');
-      expect(line.text()).toBe("Nothing needs attention");
-      expect(line.find("svg").exists()).toBe(true);
-    });
-
-    it("says nothing is monitored yet, not all clear, when nothing is set up", async () => {
-      const base = quietFree();
-      await mountWith({
-        ...base,
-        alerts: {
-          status: "ok",
-          data: { ...base.alerts.data!, total: 0, enabled: 0, disabled: 0, by_state: {} },
-        },
-        pipelines: { status: "ok", data: { total: 0, enabled: 0, disabled: 0, errored: 0 } },
-        streams: { status: "ok", data: { ...base.streams.data!, total_streams: 0, by_type: [] } },
-      });
-
-      expect(wrapper.get('[data-test="overview-status-unmonitored"]').text()).toBe(
-        "Nothing is being monitored yet",
-      );
-      expect(wrapper.find('[data-test="overview-status-clear"]').exists()).toBe(false);
-    });
-
-    it("never claims all clear when the overview could not load", async () => {
-      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(new Error("boom"));
-      wrapper = mountOverviewTab();
-      await flushPromises();
-
-      expect(wrapper.get('[data-test="overview-status-partial"]').text()).toBe(
-        "Some checks could not load",
-      );
-      expect(wrapper.find('[data-test="overview-status-clear"]').exists()).toBe(false);
-    });
-
-    it("says checking while the overview is in flight", async () => {
-      vi.mocked(overviewService.getOrgOverview).mockReturnValue(deferred().promise as never);
-      wrapper = mountOverviewTab();
-      await flushPromises();
-
-      expect(wrapper.get('[data-test="overview-status-checking"]').text()).toBe("Checking…");
-    });
-
-    it("hides the status line and the time-range heading on the first-run hero", async () => {
+    it("hides the time-range heading on the first-run hero", async () => {
       store.commit("setConfig", {
         ...store.state.zoConfig,
         restricted_routes_on_empty_data: false,
@@ -2809,7 +2753,6 @@ describe("OverviewTab", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="home-first-data-hero"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test^="overview-status-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="overview-time-range-heading"]').exists()).toBe(false);
     });
   });

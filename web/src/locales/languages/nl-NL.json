@@ -10537,20 +10537,6 @@
       "retry": "Opnieuw proberen"
     },
     "dataAsOf": "Gegevens per {time}",
-    "status": {
-      "attention": "Vraagt aandacht",
-      "checking": "Controleren…",
-      "partial": "Sommige controles konden niet worden geladen",
-      "clear": "Niets vraagt aandacht",
-      "items": {
-        "firing": "{count} alarm dat afgaat | {count} alarms die afgaan",
-        "failing": "{count} regel die faalt | {count} regels die falen",
-        "incidents": "{count} open incident | {count} open incidenten",
-        "pipelines": "{count} pipeline met fouten | {count} pipelines met fouten",
-        "quiet": "{count} stille stream | {count} stille streams"
-      },
-      "unmonitored": "Er wordt nog niets gemonitord"
-    },
     "timeRange": {
       "heading": "In het geselecteerde tijdsbereik"
     }

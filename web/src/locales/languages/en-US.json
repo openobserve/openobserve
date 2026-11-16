@@ -10697,20 +10697,6 @@
       "retry": "Retry"
     },
     "dataAsOf": "Data as of {time}",
-    "status": {
-      "attention": "Needs attention",
-      "checking": "Checking…",
-      "partial": "Some checks could not load",
-      "clear": "Nothing needs attention",
-      "items": {
-        "firing": "{count} alert firing | {count} alerts firing",
-        "failing": "{count} rule failing | {count} rules failing",
-        "incidents": "{count} open incident | {count} open incidents",
-        "pipelines": "{count} pipeline with errors | {count} pipelines with errors",
-        "quiet": "{count} quiet stream | {count} quiet streams"
-      },
-      "unmonitored": "Nothing is being monitored yet"
-    },
     "timeRange": {
       "heading": "In the selected time range"
     }
