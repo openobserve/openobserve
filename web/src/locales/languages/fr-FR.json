@@ -10410,31 +10410,12 @@
     "hoursAgo": "il y a {count}h",
     "daysAgo": "il y a {count}d",
     "cards": {
-      "firingAlerts": "Alertes déclenchées",
-      "failingRules": "Règles en échec",
-      "openIncidents": "Incidents ouverts",
-      "pipelineErrors": "Erreurs de pipeline",
-      "pipelinesOf": "sur {enabled} activés",
-      "quietStreams": "Flux silencieux",
-      "firingNone": "Aucune déclenchée",
-      "noAlertRules": "Aucune règle d'alerte",
-      "noEnabledRules": "Aucune règle activée",
-      "failingNone": "Aucune en échec",
-      "failingNote": "Dernière évaluation en erreur",
-      "incidentsNone": "Aucun ouvert",
-      "noPipelines": "Aucun pipeline",
-      "noStreams": "Aucun flux",
-      "quietNote": "A cessé d'écrire ces 7 derniers jours",
-      "criticalUnit": "{count} au niveau critique",
-      "deliveryFailures": "Échecs de livraison des alertes",
-      "deliveryNote": "Alertes déclenchées mais non notifiées",
-      "oldestFiring": "Plus ancienne déclenchée depuis {age}"
+      "openIncidents": "Incidents ouverts"
     },
     "state": {
       "tileForbidden": "Aucun accès",
       "tileLocked": "Verrouillé",
       "tileError": "Chargement impossible",
-      "tileUnavailable": "Non disponible",
       "sectionLocked": "Disponible avec une licence entreprise",
       "sectionForbidden": "Votre rôle ne permet pas de voir ces données. Demandez l'accès à un administrateur de l'organisation."
     },
@@ -10556,20 +10537,6 @@
       "retry": "Réessayer"
     },
     "dataAsOf": "Données en date du {time}",
-    "status": {
-      "attention": "Nécessite une attention",
-      "checking": "Vérification…",
-      "partial": "Certaines vérifications n'ont pas pu être chargées",
-      "clear": "Rien ne nécessite d'attention",
-      "items": {
-        "firing": "{count} alerte déclenchée | {count} alertes déclenchées",
-        "failing": "{count} règle en échec | {count} règles en échec",
-        "incidents": "{count} incident ouvert | {count} incidents ouverts",
-        "pipelines": "{count} pipeline en erreur | {count} pipelines en erreur",
-        "quiet": "{count} flux silencieux | {count} flux silencieux"
-      },
-      "unmonitored": "Rien n'est encore surveillé"
-    },
     "timeRange": {
       "heading": "Dans la plage de temps sélectionnée"
     }

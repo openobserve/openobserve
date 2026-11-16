@@ -10410,31 +10410,12 @@
     "hoursAgo": "Hace {count} h",
     "daysAgo": "Hace {count} d",
     "cards": {
-      "firingAlerts": "Alertas disparadas",
-      "failingRules": "Reglas con errores",
-      "openIncidents": "Incidentes abiertos",
-      "pipelineErrors": "Errores de pipeline",
-      "pipelinesOf": "de {enabled} habilitados",
-      "quietStreams": "Streams sin actividad",
-      "firingNone": "Ninguna disparada",
-      "noAlertRules": "Sin reglas de alerta",
-      "noEnabledRules": "Sin reglas habilitadas",
-      "failingNone": "Ninguna con errores",
-      "failingNote": "La última evaluación falló",
-      "incidentsNone": "Ninguno abierto",
-      "noPipelines": "Sin pipelines",
-      "noStreams": "Sin streams",
-      "quietNote": "Dejaron de recibir datos en los últimos 7 días",
-      "criticalUnit": "{count} en nivel crítico",
-      "deliveryFailures": "Fallos de entrega de alertas",
-      "deliveryNote": "Alertas que se dispararon pero no pudieron notificar",
-      "oldestFiring": "La más antigua disparada desde hace {age}"
+      "openIncidents": "Incidentes abiertos"
     },
     "state": {
       "tileForbidden": "Sin acceso",
       "tileLocked": "Bloqueado",
       "tileError": "No se pudo cargar",
-      "tileUnavailable": "No disponible",
       "sectionLocked": "Disponible con una licencia enterprise",
       "sectionForbidden": "Tu rol no puede ver estos datos. Solicita acceso a un administrador de la organización."
     },
@@ -10556,20 +10537,6 @@
       "retry": "Reintentar"
     },
     "dataAsOf": "Datos a fecha de {time}",
-    "status": {
-      "attention": "Requiere atención",
-      "checking": "Comprobando…",
-      "partial": "Algunas comprobaciones no se pudieron cargar",
-      "clear": "Nada requiere atención",
-      "items": {
-        "firing": "{count} alerta disparada | {count} alertas disparadas",
-        "failing": "{count} regla con errores | {count} reglas con errores",
-        "incidents": "{count} incidente abierto | {count} incidentes abiertos",
-        "pipelines": "{count} pipeline con errores | {count} pipelines con errores",
-        "quiet": "{count} stream inactivo | {count} streams inactivos"
-      },
-      "unmonitored": "Todavía no se está monitorizando nada"
-    },
     "timeRange": {
       "heading": "En el rango de tiempo seleccionado"
     }

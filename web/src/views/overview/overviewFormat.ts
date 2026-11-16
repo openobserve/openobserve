@@ -209,12 +209,6 @@ export function firingRows(alerts: OverviewAlertsData | undefined): OverviewFiri
   return alerts?.firing ?? [];
 }
 
-export function oldestKnownFiring(
-  alerts: OverviewAlertsData | undefined,
-): OverviewFiringAlert | undefined {
-  return firingRows(alerts).find((row) => hasKnownSince(row.since));
-}
-
 // firing_by_level counts every firing rule, so it is the total the capped list is cut from
 export function firingTotal(alerts: OverviewAlertsData | undefined): number {
   if (!alerts?.firing_by_level) return firingCount(alerts);
@@ -226,118 +220,6 @@ export function levelTone(level: OverviewAlertLevel): "error" | "warning" | "suc
   if (level === "warning") return "warning";
   if (level === "ok") return "success";
   return "neutral";
-}
-
-export type AttentionKey = "firing" | "failing" | "incidents" | "pipelines" | "quiet";
-
-// the headline tiles' order, so the status line reads in the same order as the strip below it
-export const ATTENTION_ORDER: AttentionKey[] = [
-  "firing",
-  "failing",
-  "incidents",
-  "pipelines",
-  "quiet",
-];
-
-// quiet streams are a warning, not an outage, so they alone never turn the line red
-export const DANGER_KEYS: AttentionKey[] = ["firing", "failing", "incidents", "pipelines"];
-
-export type CheckState = "ok" | "loading" | "unavailable";
-
-export interface AttentionCheck {
-  key: AttentionKey;
-  state: CheckState;
-  count: number;
-  // true once the source has something configured to watch, so zero problems can mean healthy
-  monitors: boolean;
-}
-
-export interface AttentionItem {
-  key: AttentionKey;
-  count: number;
-}
-
-export type OverviewStatusKind =
-  "danger" | "warning" | "checking" | "partial" | "unmonitored" | "clear";
-
-export interface OverviewStatus {
-  kind: OverviewStatusKind;
-  items: AttentionItem[];
-}
-
-export interface OverviewChecksInput {
-  overview: OrgOverview | null;
-  pending: boolean;
-  failed: boolean;
-  forbidden?: boolean;
-  // left out when the edition or deployment has no incidents, so it can neither alarm nor block all clear
-  incidents?: Omit<AttentionCheck, "key" | "monitors">;
-}
-
-export function checkState(view: OverviewView): CheckState {
-  if (view === "ok" || view === "empty") return "ok";
-  return view === "loading" ? "loading" : "unavailable";
-}
-
-// a source that is not set up reports zero problems and monitors nothing
-export function overviewChecks(input: OverviewChecksInput): AttentionCheck[] {
-  const opts = { pending: input.pending, failed: input.failed, forbidden: input.forbidden };
-  const fromSection = <T>(
-    key: AttentionKey,
-    section: OverviewSection<T> | undefined,
-    pick: (data: T) => number,
-    monitors: (data: T) => boolean,
-  ): AttentionCheck => {
-    const view = sectionView(section, opts);
-    const data = view === "ok" ? section?.data : undefined;
-    return {
-      key,
-      state: checkState(view),
-      count: data ? pick(data) : 0,
-      monitors: data ? monitors(data) : false,
-    };
-  };
-  const o = input.overview;
-  // a disabled rule watches nothing, matching the tiles' "No enabled rules" note
-  const hasRules = (d: OverviewAlertsData) => d.enabled > 0;
-  const firing = fromSection("firing", o?.alerts, (d) => firingCount(d), hasRules);
-  const checks = [
-    firing,
-    fromSection("failing", o?.alerts, (d) => d.failed_evaluation, hasRules),
-    fromSection(
-      "pipelines",
-      o?.pipelines,
-      (d) => d.errored,
-      (d) => d.total > 0,
-    ),
-    fromSection(
-      "quiet",
-      o?.streams,
-      (d) => d.quiet_count,
-      (d) => d.total_streams > 0,
-    ),
-  ];
-  // incidents are only raised by alert rules, so they monitor exactly when an enabled rule does
-  if (input.incidents) {
-    checks.push({ key: "incidents", ...input.incidents, monitors: firing.monitors });
-  }
-  return checks;
-}
-
-// a problem outranks a check still loading or one that failed, so a known outage is never held back
-export function overviewStatus(checks: AttentionCheck[]): OverviewStatus {
-  const items = ATTENTION_ORDER.flatMap((key) => {
-    const count = checks
-      .filter((c) => c.key === key && c.state === "ok")
-      .reduce((sum, c) => sum + Math.max(0, c.count), 0);
-    return count > 0 ? [{ key, count }] : [];
-  });
-  if (items.some((item) => DANGER_KEYS.includes(item.key))) return { kind: "danger", items };
-  if (items.length > 0) return { kind: "warning", items };
-  if (checks.some((c) => c.state === "loading")) return { kind: "checking", items: [] };
-  if (checks.some((c) => c.state === "unavailable")) return { kind: "partial", items: [] };
-  if (!checks.some((c) => c.monitors)) return { kind: "unmonitored", items: [] };
-  return { kind: "clear", items: [] };
 }
 
 export type HealthTone = "error" | "warning" | "info" | "neutral" | "success";

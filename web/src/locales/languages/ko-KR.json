@@ -10410,31 +10410,12 @@
     "hoursAgo": "{count}시간 전",
     "daysAgo": "{count}일 전",
     "cards": {
-      "firingAlerts": "발생 중인 알림",
-      "failingRules": "실패 중인 규칙",
-      "openIncidents": "미해결 인시던트",
-      "pipelineErrors": "파이프라인 오류",
-      "pipelinesOf": "{enabled}개 활성화됨",
-      "quietStreams": "조용한 스트림",
-      "firingNone": "발생 중인 알림 없음",
-      "noAlertRules": "알림 규칙 없음",
-      "noEnabledRules": "활성화된 규칙 없음",
-      "failingNone": "실패 중인 규칙 없음",
-      "failingNote": "마지막 평가 오류",
-      "incidentsNone": "미해결 인시던트 없음",
-      "noPipelines": "파이프라인 없음",
-      "noStreams": "스트림 없음",
-      "quietNote": "지난 7일 동안 쓰기 중단",
-      "criticalUnit": "심각 수준 {count}개",
-      "deliveryFailures": "알림 전송 실패",
-      "deliveryNote": "발생했지만 알림을 보내지 못한 알림",
-      "oldestFiring": "{age} 동안 발생 중인 가장 오래된 알림"
+      "openIncidents": "미해결 인시던트"
     },
     "state": {
       "tileForbidden": "접근 권한 없음",
       "tileLocked": "잠김",
       "tileError": "불러올 수 없음",
-      "tileUnavailable": "사용할 수 없음",
       "sectionLocked": "엔터프라이즈 라이선스에서 사용 가능",
       "sectionForbidden": "현재 역할로는 이 데이터를 볼 수 없습니다. 조직 관리자에게 접근 권한을 요청하세요."
     },
@@ -10556,20 +10537,6 @@
       "retry": "다시 시도"
     },
     "dataAsOf": "{time} 기준 데이터",
-    "status": {
-      "attention": "주의 필요",
-      "checking": "확인 중…",
-      "partial": "일부 검사를 불러오지 못했습니다",
-      "clear": "주의가 필요한 항목이 없습니다",
-      "items": {
-        "firing": "{count}개 알림 발생 | {count}개 알림 발생",
-        "failing": "{count}개 규칙 실패 | {count}개 규칙 실패",
-        "incidents": "{count}개 미해결 인시던트 | {count}개 미해결 인시던트",
-        "pipelines": "{count}개 파이프라인에서 오류 발생 | {count}개 파이프라인에서 오류 발생",
-        "quiet": "{count}개 활동 없는 스트림 | {count}개 활동 없는 스트림"
-      },
-      "unmonitored": "아직 모니터링 중인 항목이 없습니다"
-    },
     "timeRange": {
       "heading": "선택한 시간 범위 내"
     }

@@ -10405,31 +10405,12 @@
     "hoursAgo": "{count} 小時前",
     "daysAgo": "{count} 天前",
     "cards": {
-      "firingAlerts": "觸發中警示",
-      "failingRules": "失敗規則",
-      "openIncidents": "未解決事件",
-      "pipelineErrors": "管線錯誤",
-      "pipelinesOf": "已啟用 {enabled} 個",
-      "quietStreams": "沉寂串流",
-      "firingNone": "目前無觸發",
-      "noAlertRules": "無警示規則",
-      "noEnabledRules": "無已啟用規則",
-      "failingNone": "目前無失敗",
-      "failingNote": "上次評估發生錯誤",
-      "incidentsNone": "目前無未解決事件",
-      "noPipelines": "無管線",
-      "noStreams": "無串流",
-      "quietNote": "過去 7 天已停止寫入",
-      "criticalUnit": "{count} 個為嚴重等級",
-      "deliveryFailures": "警示傳送失敗",
-      "deliveryNote": "已觸發但無法通知的警示",
-      "oldestFiring": "最久觸發已持續 {age}"
+      "openIncidents": "未解決事件"
     },
     "state": {
       "tileForbidden": "無存取權",
       "tileLocked": "已鎖定",
       "tileError": "無法載入",
-      "tileUnavailable": "無法使用",
       "sectionLocked": "需企業授權才能使用",
       "sectionForbidden": "您的角色無法查看此數據。請聯絡組織管理員取得存取權。"
     },
@@ -10551,20 +10532,6 @@
       "retry": "重試"
     },
     "dataAsOf": "資料截至 {time}",
-    "status": {
-      "attention": "需要留意",
-      "checking": "檢查中…",
-      "partial": "部分檢查無法載入",
-      "clear": "沒有需要留意的事項",
-      "items": {
-        "firing": "{count} 個警示觸發中 | {count} 個警示觸發中",
-        "failing": "{count} 條規則失敗 | {count} 條規則失敗",
-        "incidents": "{count} 個未解決事件 | {count} 個未解決事件",
-        "pipelines": "{count} 條管線有錯誤 | {count} 條管線有錯誤",
-        "quiet": "{count} 個閒置串流 | {count} 個閒置串流"
-      },
-      "unmonitored": "尚未監控任何項目"
-    },
     "timeRange": {
       "heading": "所選時間範圍內"
     }
