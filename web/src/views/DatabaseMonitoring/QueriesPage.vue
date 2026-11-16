@@ -525,9 +525,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                the failure tile — which only traces can answer — is absent
                rather than claiming an all-clear. -->
           <template #subheader>
-            <DbmSubheaderBand data-test="dbm-server-queries-summary">
-              <OStatStrip :items="visibleSummaryStats" :loading="loading" />
-            </DbmSubheaderBand>
+            <OStatStrip
+              :items="visibleSummaryStats"
+              :loading="loading"
+              row
+              data-test="dbm-server-queries-summary"
+            />
           </template>
           <template #cell-query="{ row }">
             <DbmQueryCell
@@ -604,7 +607,6 @@ import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
-import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";

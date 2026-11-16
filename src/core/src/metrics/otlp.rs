@@ -213,7 +213,7 @@ pub async fn otlp_json(org_id: &str, body: Bytes, user: IngestUser) -> HttpRespo
 
 pub async fn handle_otlp_request(
     org_id: &str,
-    request: ExportMetricsServiceRequest,
+    mut request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
     user: IngestUser,
 ) -> Result<HttpResponse, anyhow::Error> {
@@ -250,6 +250,11 @@ pub async fn handle_otlp_request(
     let mut stream_trigger_map: HashMap<String, Option<ingest::StreamTriggers>> = HashMap::new();
 
     let mut partial_success = ExportMetricsPartialSuccess::default();
+    let (dropped, discard) = drop_out_of_window(&mut request, ingest::IngestWindow::now());
+    if let Some(discard) = discard {
+        partial_success.rejected_data_points += dropped as i64;
+        partial_success.error_message = discard.message();
+    }
 
     // records buffer
     let mut json_data_by_stream: RecordsByStream<()> = HashMap::new();
@@ -728,6 +733,83 @@ pub fn write_failure_response(req_type: OtlpRequestType, e: &anyhow::Error) -> H
         crate::ingestion::write_error_status,
     );
     otlp_rejection_response(req_type, status, e.to_string())
+}
+
+/// Removes data points and exemplars outside the ingest window; returns the data points removed
+/// and why the first point or exemplar was.
+fn drop_out_of_window(
+    request: &mut ExportMetricsServiceRequest,
+    window: ingest::IngestWindow,
+) -> (usize, Option<ingest::WindowDiscard>) {
+    let mut first = None;
+    let mut dropped = 0;
+    let metrics = request
+        .resource_metrics
+        .iter_mut()
+        .flat_map(|rm| rm.scope_metrics.iter_mut())
+        .flat_map(|sm| sm.metrics.iter_mut());
+    for metric in metrics {
+        let first = &mut first;
+        dropped += match &mut metric.data {
+            Some(Data::Gauge(gauge)) => {
+                retain_in_window(&mut gauge.data_points, window, first, |p| {
+                    (p.time_unix_nano, Some(&mut p.exemplars))
+                })
+            }
+            Some(Data::Sum(sum)) => retain_in_window(&mut sum.data_points, window, first, |p| {
+                (p.time_unix_nano, Some(&mut p.exemplars))
+            }),
+            Some(Data::Histogram(hist)) => {
+                retain_in_window(&mut hist.data_points, window, first, |p| {
+                    (p.time_unix_nano, Some(&mut p.exemplars))
+                })
+            }
+            Some(Data::ExponentialHistogram(hist)) => {
+                retain_in_window(&mut hist.data_points, window, first, |p| {
+                    (p.time_unix_nano, Some(&mut p.exemplars))
+                })
+            }
+            Some(Data::Summary(summary)) => {
+                retain_in_window(&mut summary.data_points, window, first, |p| {
+                    (p.time_unix_nano, None)
+                })
+            }
+            None => 0,
+        };
+    }
+    (dropped, first)
+}
+
+/// Keeps the in-window points and, of those, the in-window exemplars; returns the points removed.
+fn retain_in_window<P>(
+    points: &mut Vec<P>,
+    window: ingest::IngestWindow,
+    first: &mut Option<ingest::WindowDiscard>,
+    time_and_exemplars: impl Fn(&mut P) -> (u64, Option<&mut Vec<Exemplar>>),
+) -> usize {
+    let mut keep = |time_unix_nano: u64| {
+        // past i64 micros is far beyond any future bound
+        let timestamp = i64::try_from(time_unix_nano / 1000).unwrap_or(i64::MAX);
+        match window.discard(timestamp) {
+            Some(discard) => {
+                first.get_or_insert(discard);
+                false
+            }
+            None => true,
+        }
+    };
+    let before = points.len();
+    points.retain_mut(|point| {
+        let (time_unix_nano, exemplars) = time_and_exemplars(point);
+        if !keep(time_unix_nano) {
+            return false;
+        }
+        if let Some(exemplars) = exemplars {
+            exemplars.retain(|e| keep(e.time_unix_nano));
+        }
+        true
+    });
+    before - points.len()
 }
 
 /// Flattens a data-point record exactly as a full rebuild would, without always paying for one.
@@ -4297,6 +4379,221 @@ mod tests {
         assert_eq!(
             infra::schema::exists("test_org_id", StreamType::Metrics, &long_name).await,
             !bounded
+        );
+    }
+
+    /// Nanosecond timestamps now, just past the oldest allowed and just past the newest allowed.
+    fn window_edges_nanos() -> (u64, u64, u64) {
+        let limit = &config::get_config().limit;
+        let now = Utc::now().timestamp_micros();
+        let too_old = now - limit.ingest_allowed_upto_micro - 60_000_000;
+        let too_new = now + limit.ingest_allowed_in_future_micro + 60_000_000;
+        let nanos = |micros: i64| micros as u64 * 1000;
+        (nanos(now), nanos(too_old), nanos(too_new))
+    }
+
+    fn one_metric_request(name: &str, data: Data) -> ExportMetricsServiceRequest {
+        ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                scope_metrics: vec![ScopeMetrics {
+                    metrics: vec![Metric {
+                        name: name.to_string(),
+                        data: Some(data),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        }
+    }
+
+    fn timed_point(time_unix_nano: u64, exemplar_times: &[u64]) -> NumberDataPoint {
+        NumberDataPoint {
+            time_unix_nano,
+            value: Some(number_data_point::Value::AsDouble(1.0)),
+            exemplars: exemplar_times
+                .iter()
+                .map(|&time_unix_nano| Exemplar {
+                    time_unix_nano,
+                    value: Some(exemplar::Value::AsDouble(1.0)),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn only_metric(request: &ExportMetricsServiceRequest) -> &Data {
+        request.resource_metrics[0].scope_metrics[0].metrics[0]
+            .data
+            .as_ref()
+            .unwrap()
+    }
+
+    #[test]
+    fn otlp_in_window_points_are_kept() {
+        let (now, ..) = window_edges_nanos();
+        let mut request = one_metric_request(
+            "m",
+            Data::Gauge(Gauge {
+                data_points: vec![timed_point(now, &[now]), timed_point(now - 1, &[])],
+            }),
+        );
+        let before = request.clone();
+        let dropped = drop_out_of_window(&mut request, ingest::IngestWindow::now());
+        assert_eq!(dropped, (0, None));
+        assert_eq!(request, before);
+    }
+
+    #[test]
+    fn otlp_too_old_points_are_dropped_for_every_metric_type() {
+        let (_, old, _) = window_edges_nanos();
+        let datas = [
+            Data::Gauge(Gauge {
+                data_points: vec![timed_point(old, &[]), timed_point(0, &[])],
+            }),
+            Data::Sum(Sum {
+                data_points: vec![timed_point(old, &[]), timed_point(0, &[])],
+                ..Default::default()
+            }),
+            Data::Histogram(Histogram {
+                data_points: vec![
+                    HistogramDataPoint {
+                        time_unix_nano: old,
+                        ..Default::default()
+                    };
+                    2
+                ],
+                ..Default::default()
+            }),
+            Data::ExponentialHistogram(ExponentialHistogram {
+                data_points: vec![
+                    ExponentialHistogramDataPoint {
+                        time_unix_nano: old,
+                        ..Default::default()
+                    };
+                    2
+                ],
+                ..Default::default()
+            }),
+            Data::Summary(Summary {
+                data_points: vec![
+                    SummaryDataPoint {
+                        time_unix_nano: old,
+                        ..Default::default()
+                    };
+                    2
+                ],
+            }),
+        ];
+        for data in datas {
+            let mut request = one_metric_request("m", data);
+            let dropped = drop_out_of_window(&mut request, ingest::IngestWindow::now());
+            assert_eq!(dropped, (2, Some(ingest::WindowDiscard::TooOld)));
+            assert_eq!(
+                data_point_count(&request.resource_metrics[0].scope_metrics[0].metrics[0]),
+                0
+            );
+        }
+    }
+
+    #[test]
+    fn otlp_too_new_points_are_dropped() {
+        let (_, _, new) = window_edges_nanos();
+        let mut request = one_metric_request(
+            "m",
+            Data::Gauge(Gauge {
+                data_points: vec![timed_point(new, &[]), timed_point(u64::MAX, &[])],
+            }),
+        );
+        let dropped = drop_out_of_window(&mut request, ingest::IngestWindow::now());
+        assert_eq!(dropped, (2, Some(ingest::WindowDiscard::TooNew)));
+    }
+
+    #[test]
+    fn otlp_mixed_points_keep_only_the_in_window_points_and_exemplars() {
+        let (now, old, new) = window_edges_nanos();
+        let mut request = one_metric_request(
+            "m",
+            Data::Sum(Sum {
+                data_points: vec![
+                    timed_point(new, &[]),
+                    timed_point(now, &[now, old, new]),
+                    timed_point(old, &[now]),
+                ],
+                ..Default::default()
+            }),
+        );
+        let dropped = drop_out_of_window(&mut request, ingest::IngestWindow::now());
+        assert_eq!(dropped, (2, Some(ingest::WindowDiscard::TooNew)));
+        let Data::Sum(sum) = only_metric(&request) else {
+            unreachable!()
+        };
+        assert_eq!(sum.data_points.len(), 1);
+        assert_eq!(sum.data_points[0].time_unix_nano, now);
+        let exemplar_times: Vec<u64> = sum.data_points[0]
+            .exemplars
+            .iter()
+            .map(|e| e.time_unix_nano)
+            .collect();
+        assert_eq!(exemplar_times, [now]);
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_otlp_rejects_only_the_out_of_window_points_as_partial_success() {
+        let (now, old, new) = window_edges_nanos();
+        let mut request = one_metric_request(
+            "test_otlp_window_mixed",
+            Data::Gauge(Gauge {
+                data_points: vec![
+                    timed_point(old, &[]),
+                    timed_point(now, &[]),
+                    timed_point(new, &[]),
+                ],
+            }),
+        );
+        request.resource_metrics[0].scope_metrics[0]
+            .metrics
+            .push(Metric {
+                name: "test_otlp_window_all_old".to_string(),
+                data: Some(Data::Gauge(Gauge {
+                    data_points: vec![timed_point(old, &[])],
+                })),
+                ..Default::default()
+            });
+        let resp = otlp_proto(
+            "test_org_id",
+            request.encode_to_vec().into(),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let partial = ExportMetricsServiceResponse::decode(body)
+            .unwrap()
+            .partial_success
+            .unwrap();
+        assert_eq!(partial.rejected_data_points, 3);
+        assert_eq!(
+            partial.error_message,
+            schema::get_upto_discard_error().to_string()
+        );
+        assert!(
+            infra::schema::exists("test_org_id", StreamType::Metrics, "test_otlp_window_mixed")
+                .await
+        );
+        assert!(
+            !infra::schema::exists(
+                "test_org_id",
+                StreamType::Metrics,
+                "test_otlp_window_all_old"
+            )
+            .await
         );
     }
 

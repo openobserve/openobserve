@@ -270,12 +270,41 @@ describe("User Component", () => {
     resetListViewState();
   });
 
+  it("ORs two picked role chips", async () => {
+    wrapper.vm.rows = [
+      { email: "a@x.io", role: "admin" },
+      { email: "e@x.io", role: "editor" },
+      { email: "v@x.io", role: "viewer" },
+    ];
+    wrapper.vm.onStatSelect("admin");
+    wrapper.vm.onStatSelect("viewer");
+    await flushPromises();
+    expect(wrapper.vm.displayedRows.map((r: any) => r.email)).toEqual(["a@x.io", "v@x.io"]);
+    wrapper.vm.onStatSelect("total");
+    expect(wrapper.vm.roleFilters).toEqual([]);
+  });
+
   it("keeps the search text when the user comes back to the list", async () => {
     wrapper.vm.filterQuery = "alice";
     wrapper.unmount();
     wrapper = mountUser();
     await flushPromises();
     expect(wrapper.vm.filterQuery).toBe("alice");
+  });
+
+  it("counts the summary tiles over the searched rows, not the role facet", async () => {
+    wrapper.vm.rows = [
+      { email: "ann@example.com", role: "admin", roles: ["admin"] },
+      { email: "bob@example.com", role: "viewer", roles: ["viewer"] },
+    ];
+    const tile = (key: string) => wrapper.vm.summaryStats.find((s: any) => s.key === key)?.value;
+
+    wrapper.vm.filterQuery = "ann";
+    wrapper.vm.roleFilter = "viewer";
+    expect([tile("admin"), tile("viewer"), tile("total")]).toEqual([1, 0, 1]);
+
+    wrapper.vm.filterQuery = "zzqq";
+    expect([tile("admin"), tile("viewer"), tile("total")]).toEqual([0, 0, 0]);
   });
 
   // ---------------------------------------------------------------------
@@ -951,12 +980,12 @@ describe("User Component", () => {
     it("clears search and role filter from the custom Clear filters card", async () => {
       await mountAs("admin");
       wrapper.vm.filterQuery = "new@example.com";
-      wrapper.vm.roleFilter = "viewer";
+      wrapper.vm.roleFilters = ["viewer"];
       await settleTable();
 
       await wrapper.find('[data-test="user-list-clear-filters"]').trigger("click");
       expect(wrapper.vm.filterQuery).toBe("");
-      expect(wrapper.vm.roleFilter).toBe(null);
+      expect(wrapper.vm.roleFilters).toEqual([]);
     });
 
     it("refreshes the members list after an invite is sent", async () => {
@@ -1368,8 +1397,8 @@ describe("User Component", () => {
   describe("pa gap fixes: user list test ids (P8)", () => {
     it("P8-R4: the edit actions' test ids carry a row index, never the email", async () => {
       const OTableRows = {
-        props: ["data"],
-        template: `<div><div v-for="(row, i) in data" :key="i"><slot name="cell-actions" :row="row" :index="i" /></div></div>`,
+        props: ["data", "rowActions"],
+        template: `<div><div v-for="(row, i) in data" :key="i"><i v-for="action in rowActions" :key="action.id" :data-test="action.dataTest(row, i)" /></div></div>`,
       };
       const w = mount(User, {
         global: {

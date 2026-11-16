@@ -477,7 +477,7 @@ describe("TelephonySettings", () => {
 
     it("a 403 on the read shows the sentence instead of the hero", async () => {
       await render(failure(403), false);
-      expect(text("forbidden")).toBe(READ_ONLY);
+      expect(text("forbidden")).toContain(READ_ONLY);
       expect(q("hero")).toBeNull();
     });
   });

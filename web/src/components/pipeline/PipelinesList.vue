@@ -58,24 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           width="100%"
           class="h-full w-full"
         >
-          <!-- Summary strip: operational state counts for the current tab, doubling
-               as the state facet (the toggle group above facets by pipeline TYPE,
-               so the two never overlap). Always rendered so rows never shift. -->
-          <template #subheader>
-            <div data-test="pipeline-list-summary">
-              <OStatStrip
-                :items="summaryStats"
-                :loading="loading"
-                selectable
-                :selected-key="stateFilter"
-                default-key="total"
-                @select="onStatSelect"
-              />
-            </div>
-          </template>
-
           <template #toolbar>
-            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+            <div class="contents">
               <OToggleGroup
                 mobile-dropdown
                 :model-value="activeTab"
@@ -95,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("pipeline_list.tab_realtime") }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <div class="min-w-0 flex-1 max-md:min-w-40">
+              <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
                 <OInput
                   data-test="pipeline-list-search-input"
                   v-model="filterQuery"
@@ -107,6 +91,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OInput>
               </div>
+              <!-- Facets by state; the toggle group facets by type, so the two never overlap. -->
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :row="false"
+                multiple
+                :selected-keys="stateFilters"
+                default-key="total"
+                class="max-md:order-last"
+                data-test="pipeline-list-summary"
+                @update:selected-keys="stateFilters = $event as PipelineStateKey[]"
+              />
             </div>
           </template>
           <template #toolbar-trailing>
@@ -338,11 +335,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OEmptyState
               size="hero"
               preset="no-pipelines"
-              :filtered="!!(filterQuery || stateFilter)"
+              :filtered="!!(filterQuery || stateFilters.length)"
               @action="
                 (id) =>
                   id === 'clear-filters'
-                    ? ((filterQuery = ''), (stateFilter = null))
+                    ? ((filterQuery = ''), (stateFilters = []))
                     : id === 'import'
                       ? goToImportPipeline()
                       : goToCreatePipeline()
@@ -574,6 +571,12 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
+
+const PIPELINE_STATE_KEYS = ["errored", "paused", "active"] as const;
+type PipelineStateKey = (typeof PIPELINE_STATE_KEYS)[number];
+const isPipelineStateKey = (key: string): key is PipelineStateKey =>
+  (PIPELINE_STATE_KEYS as readonly string[]).includes(key);
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -587,12 +590,19 @@ interface PipelineRow {
 const viewState = useListViewState("pipelines", {
   filterQuery: "",
   tab: "all",
-  stateFilter: null as "errored" | "paused" | "active" | null,
+  stateFilter: [] as PipelineStateKey[],
   pageSize: 20,
   sortBy: "",
   sortOrder: "asc" as "asc" | "desc",
 });
-const filterQuery = ref(viewState.filterQuery);
+// A state link shows that state across every tab with no saved search, so its rows match the count behind it.
+const urlState = router.currentRoute.value.query.state;
+const urlPipelineStates = readFilterKeys(urlState, isPipelineStateKey);
+if (urlState !== undefined) {
+  const { state: _consumed, ...rest } = router.currentRoute.value.query;
+  router.replace({ query: rest });
+}
+const filterQuery = ref(urlPipelineStates.length ? "" : viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const sortBy = ref(viewState.sortBy);
 const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
@@ -723,7 +733,7 @@ const confirmDialogMeta: any = ref({
   data: null,
   onConfirm: () => {},
 });
-const activeTab = ref(viewState.tab);
+const activeTab = ref(urlPipelineStates.length ? "all" : viewState.tab);
 // Derived, not assigned: a copy written only by updateActiveTab() is empty on a cold mount.
 const filteredPipelines = computed<any[]>(() =>
   activeTab.value === "all"
@@ -766,13 +776,10 @@ const currentRouteName = computed(() => {
 
 const otableColumns = computed(() => columns.value);
 
-// ── Pipeline operational state (single source of truth) ─────────────────────
-// errored → last run reported an error (needs attention, whether or not it runs)
-// active  → enabled and running
-// paused  → disabled
+// errored needs enabled plus a last-run error, matching the backend count; paused wins over any error
 const pipelineState = (row: any): "errored" | "active" | "paused" => {
-  if (row?.last_error) return "errored";
-  return row?.enabled ? "active" : "paused";
+  if (!row?.enabled) return "paused";
+  return row.last_error ? "errored" : "active";
 };
 
 const stateVariant = (row: any): BadgeVariant => {
@@ -819,12 +826,16 @@ const pipelineRowStyle = (row: any): Record<string, string> => {
 // ── State facet + summary strip ─────────────────────────────────────────────
 // Counts run over the TYPE-filtered rows (not the state-filtered ones) so the
 // tiles keep their totals while a facet is active.
-const stateFilter = ref<"errored" | "paused" | "active" | null>(viewState.stateFilter);
-watch([filterQuery, activeTab, stateFilter, pageSize, sortBy, sortOrder], () => {
+const stateFilters = ref<PipelineStateKey[]>(
+  urlPipelineStates.length
+    ? urlPipelineStates
+    : readFilterKeys(viewState.stateFilter, isPipelineStateKey),
+);
+watch([filterQuery, activeTab, stateFilters, pageSize, sortBy, sortOrder], () => {
   Object.assign(viewState, {
     filterQuery: filterQuery.value,
     tab: activeTab.value,
-    stateFilter: stateFilter.value,
+    stateFilter: stateFilters.value,
     pageSize: pageSize.value,
     sortBy: sortBy.value,
     sortOrder: sortOrder.value,
@@ -833,18 +844,10 @@ watch([filterQuery, activeTab, stateFilter, pageSize, sortBy, sortOrder], () => 
 
 const displayedPipelines = computed(() => {
   const rows = filteredPipelines.value || [];
-  const f = stateFilter.value;
-  if (!f) return rows;
-  return rows.filter((row: any) => pipelineState(row) === f);
+  return rows.filter((row: any) =>
+    matchesAnyKey(stateFilters.value, row, (r, key) => pipelineState(r) === key),
+  );
 });
-
-const onStatSelect = (key: string) => {
-  if (key === "total") {
-    stateFilter.value = null;
-    return;
-  }
-  stateFilter.value = stateFilter.value === key ? null : (key as "errored" | "paused" | "active");
-};
 
 const stateCounts = computed(() => {
   const rows = filteredPipelines.value || [];
@@ -897,7 +900,7 @@ const summaryStats = computed<StatItem[]>(() => {
     },
     {
       key: "total",
-      label: t("pipeline_list.summaryTotal"),
+      label: t("common.allStates"),
       value: v(c.total),
       icon: "format-list-bulleted",
       tone: "primary",

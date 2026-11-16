@@ -21,6 +21,19 @@ export const FORM_CONTEXT_KEY: InjectionKey<FormContextValue> = Symbol("OFormCon
  */
 export const FORM_SUBMIT_STATE_KEY: InjectionKey<Ref<boolean>> = Symbol("OFormSubmitState");
 
+/** What an enclosing row tells the field wrappers inside it: which field's message the row prints, and that message's element id. */
+export interface SettingRowErrorContext {
+  readonly name: string | undefined;
+  readonly errorId?: string;
+}
+
+/** Provided by a row that prints a field's error itself, so the wrapper keeps its red state but prints no text. */
+export const SETTING_ROW_ERROR_KEY: InjectionKey<SettingRowErrorContext> =
+  Symbol("OSettingRowError");
+
+/** When a form first shows a field's error: on the first submit, or when the user leaves a field they changed. */
+export type FormValidateOn = "submit" | "leave";
+
 export interface OFormProps<T extends Record<string, unknown>> {
   /** Initial values for all fields in the form */
   defaultValues: T;
@@ -47,6 +60,10 @@ export interface OFormProps<T extends Record<string, unknown>> {
    * Written as `@submit="handler"` in templates (Vue maps it to this prop).
    */
   onSubmit?: (_values: T) => unknown | Promise<unknown>;
+  /** `"leave"` shows a changed field's error when the user leaves it; default `"submit"`. */
+  validateOn?: FormValidateOn;
+  /** Groups of field paths checked together in leave mode; the last member of a group prints the shared message. */
+  coupled?: string[][];
 }
 
 export interface OFormEmits {

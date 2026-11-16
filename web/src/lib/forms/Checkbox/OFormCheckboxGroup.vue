@@ -4,7 +4,7 @@
 import { inject } from "vue";
 import OCheckboxGroup from "./OCheckboxGroup.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { leaveOnFocusOut, useVisibleFieldError } from "../Form/fieldError";
 import type { FormCheckboxGroupProps } from "./OFormCheckboxGroup.types";
 
 defineOptions({ inheritAttrs: false });
@@ -12,6 +12,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormCheckboxGroupProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormCheckboxGroup] must be rendered inside <OForm>. No form context found.");
@@ -21,7 +22,7 @@ if (import.meta.env.DEV && !form) {
 <template>
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
-      <div class="flex flex-col gap-1">
+      <div class="flex flex-col gap-1" @focusout="leaveOnFocusOut(field, $event)">
         <OCheckboxGroup
           v-bind="$attrs"
           :disabled="props.disabled"
@@ -30,8 +31,8 @@ if (import.meta.env.DEV && !form) {
         >
           <slot />
         </OCheckboxGroup>
-        <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text text-xs">
-          {{ firstFieldError(field.state.meta.errors) }}
+        <div v-if="shown(field).message !== undefined" class="text-input-error-text text-xs">
+          {{ shown(field).message }}
         </div>
       </div>
     </template>

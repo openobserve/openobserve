@@ -10,14 +10,11 @@ export
         this.homeIcon = page.locator("[name ='home']");
         this.managementMenuItem = page.locator('[data-test="menu-link-/settings-item"]');
         this.submitButton = page.locator('[data-test="dashboard-add-submit"]');
-        this.editLogoTextButton = page.locator('[data-test="settings_ent_logo_custom_text_edit_btn"]');
         this.customLogoTextBox = page.locator('[data-test="settings_ent_logo_custom_text-field"]');
-        this.customLogoText = page.locator("[aria-label ='Custom Logo Text']");
-        this.saveButton = page.locator('[data-test="settings_ent_logo_custom_text_save_btn"]');
+        this.customLogoText = page.locator("[aria-label ='Custom logo text']");
         this.deleteLogoButton = page.locator('[data-test="setting_ent_custom_logo_img_delete_btn"]');
         this.confirmDeleteButton = page.locator('[data-test="general-delete-image-dialog"] [data-test="o-dialog-primary-btn"]');
         this.fileUploadInput = page.locator('[data-test="setting_ent_custom_logo_img_file_upload-field"]');
-        this.saveButtonLight = page.locator('[data-test="settings_ent_logo_custom_light_save_btn"]');
         this.enterpriseFeature = page.locator('#enterpriseFeature');
         this.organizationSearchInput = page.locator('[data-test="organization-search-input-field"]');
         this.organizationMenuList = page.locator('[data-test="organization-menu-list"]');
@@ -26,7 +23,6 @@ export
 
         // Dark mode logo locators
         this.fileUploadInputDark = page.locator('[data-test="setting_ent_custom_logo_dark_img_file_upload-field"]');
-        this.saveButtonDark = page.locator('[data-test="settings_ent_logo_custom_dark_save_btn"]');
         this.deleteLogoButtonDark = page.locator('[data-test="setting_ent_custom_logo_dark_img_delete_btn"]');
     }
 
@@ -115,37 +111,16 @@ export
     async updateCustomLogoText(text) {
     await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: /Unauthorized/i }).first()).not.toBeVisible(); // Check Unauthorized Access
 
-    // Step 1: Check if the text input is already visible (no existing data scenario)
-    try {
-        await this.customLogoTextBox.waitFor({ state: 'visible', timeout: 5000 });
-        // Input is visible, proceed directly
-        await this.customLogoTextBox.click();
-        await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: /Unauthorized/i }).first()).not.toBeVisible(); // Check Unauthorized Access
-        await this.customLogoTextBox.fill(text);
-        await this.saveButton.first().waitFor({ state: 'visible' });
-        await this.saveButton.first().click({ force: true });
-        return;
-    } catch (error) {
-        // Input not visible, continue to check for existing data
-    }
-
-    // Step 2: Check if there is existing data in #enterpriseFeature
-    const existingDataText = await this.enterpriseFeature.first().textContent();
-
-    if (existingDataText && existingDataText.trim().length > 0) {
-        // Step 3: There is existing data, click edit button
-        await this.editLogoTextButton.waitFor({ state: 'visible' });
-        await this.editLogoTextButton.click();
-        await this.page.waitForTimeout(2000);
-    }
-
-    // Step 4: Enter the text
+    // The logo text is a normal form field: the page Save stores it.
     await this.customLogoTextBox.waitFor({ state: 'visible', timeout: 30000 });
     await this.customLogoTextBox.click();
     await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: /Unauthorized/i }).first()).not.toBeVisible(); // Check Unauthorized Access
     await this.customLogoTextBox.fill(text);
-    await this.saveButton.first().waitFor({ state: 'visible' });
-    await this.saveButton.first().click({ force: true });
+    await this.submitButton.waitFor({ state: 'visible' });
+    await this.submitButton.click({ force: true });
+    // Save turns disabled again only once the save bar is clean, i.e. the text was stored.
+    await expect(this.submitButton).toBeDisabled({ timeout: 30000 });
+    await expect(this.customLogoTextBox).toHaveValue(text);
 }
 
     async uploadLogo(filePath) {
@@ -159,11 +134,9 @@ export
         await this.openMetaGeneralSettings();
         await this.fileUploadInput.waitFor({ state: 'attached' });
         await this.fileUploadInput.setInputFiles(filePath);
-        // wait for Vue reactivity to process the file change before clicking save
-        await this.page.waitForTimeout(500);
-        // Click the save button after logo upload (light mode)
-        await this.saveButtonLight.waitFor({ state: 'visible' });
-        await this.saveButtonLight.click({ force: true });
+        // A chosen logo is a normal form change: the page Save uploads it.
+        await expect(this.submitButton).toBeEnabled();
+        await this.submitButton.click();
         await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: /Logo updated successfully/i }).first()).toBeVisible({
             timeout: 30000,
         });
@@ -189,9 +162,9 @@ export
         await this.fileUploadInputDark.waitFor({ state: 'attached' });
         await this.fileUploadInputDark.setInputFiles(filePath);
 
-        // Click the save button for dark mode logo
-        await this.saveButtonDark.waitFor({ state: 'visible' });
-        await this.saveButtonDark.click({ force: true });
+        // A chosen logo is a normal form change: the page Save uploads it.
+        await expect(this.submitButton).toBeEnabled();
+        await this.submitButton.click();
 
         // Verify success message
         await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: /Dark mode logo updated/i }).first()).toBeVisible({

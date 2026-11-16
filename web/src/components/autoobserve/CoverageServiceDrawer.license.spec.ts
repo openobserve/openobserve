@@ -17,11 +17,19 @@ import { flushPromises, mount } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
-import { raw, type TranslateFn } from "@/types/i18n";
-import { coverageFor } from "./fixtures";
+import { raw } from "@/types/i18n";
+import { SIGNALS, type CoverageCell, type CoverageRow } from "./aoTypes";
 import CoverageServiceDrawer from "./CoverageServiceDrawer.vue";
 
-const t = ((key: string) => raw(key)) as unknown as TranslateFn;
+const watched: CoverageCell = { state: "watched" };
+const row: CoverageRow = {
+  service: "checkout",
+  stream: "default",
+  lastScanned: raw("1 min ago"),
+  scannedMinutes: 1,
+  cells: Object.fromEntries(SIGNALS.map((s) => [s, watched])) as CoverageRow["cells"],
+  status: { state: "watched", label: raw("Watched") },
+};
 const stubs = {
   ODrawer: { template: "<div><slot name='header' /><slot /></div>" },
   CoverageMetricChart: true,
@@ -29,14 +37,11 @@ const stubs = {
 };
 const original = { ...store.state.zoConfig };
 
-const mountDrawer = () => {
-  const row = coverageFor("demo", t)[0];
-  return mount(CoverageServiceDrawer, {
+const mountDrawer = () =>
+  mount(CoverageServiceDrawer, {
     props: {
       row,
       serviceStates: {},
-      scenario: "demo",
-      ledger: [],
       expanded: null,
       anchor: "",
       fix: null,
@@ -44,7 +49,6 @@ const mountDrawer = () => {
     },
     global: { plugins: [i18n, store, router], stubs },
   });
-};
 
 afterEach(() => {
   store.commit("setConfig", original);

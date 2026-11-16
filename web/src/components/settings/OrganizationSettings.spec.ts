@@ -41,13 +41,17 @@ vi.mock("@/services/organizations", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), {
     default: {
       post_organization_settings: vi.fn(),
+      get_organization_settings: vi.fn(),
     },
   });
 });
 
 import config from "@/aws-exports";
 import organizations from "@/services/organizations";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { confirmLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
 const mockPostOrganizationSettings = organizations.post_organization_settings as any;
+const mockGetOrganizationSettings = organizations.get_organization_settings as any;
 
 // Mock useStore to return our test store
 vi.mock("vuex", () => ({
@@ -86,16 +90,23 @@ const createWrapper = (props = {}, options = {}) => {
       // the real schema validation runs (per the migration playbook: at least
       // one path must mount the real <OForm>).
       stubs: {
+        teleport: true,
         OButton: {
           template: `<button
             data-test-stub='o-btn'
             :data-test='$attrs["data-test"]'
+            :type='type || "button"'
             @click='$emit("click", $event)'
           ><slot></slot></button>`,
           props: ["variant", "size", "type", "loading"],
           emits: ["click"],
         },
         OSeparator: { template: '<hr data-test-stub="o-separator" />' },
+        ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+        ODropdownItem: {
+          template: `<button type="button" @click="$emit('select', $event)"><slot /></button>`,
+          emits: ["select"],
+        },
         CrossLinkManager: {
           template: '<div data-test="cross-link-manager">CrossLinkManager</div>',
           props: ["modelValue", "title", "subtitle"],
@@ -124,6 +135,7 @@ describe("OrganizationSettings", () => {
       toggle_ingestion_logs: false,
     };
     mockPostOrganizationSettings.mockResolvedValue({ status: 200 });
+    mockGetOrganizationSettings.mockResolvedValue({ data: { data: {} } });
     mockStore.dispatch.mockResolvedValue({});
   });
 
@@ -135,12 +147,6 @@ describe("OrganizationSettings", () => {
     it("should mount successfully", () => {
       const wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should display the settings title", () => {
-      const wrapper = createWrapper();
-      const title = wrapper.get("div.text-base.font-bold");
-      expect(title.text()).toContain("Log Details");
     });
 
     it("should render trace and span ID field inputs (data-tests preserved)", () => {
@@ -157,11 +163,122 @@ describe("OrganizationSettings", () => {
       expect(wrapper.find('[data-test="add-toggle-usage-stream-btn"]').exists()).toBe(true);
     });
 
-    it("should render the save button and keep it enabled (R3)", () => {
+    it("shows no saved value and a loading bar until the settings exist", async () => {
+      mockStore.state.organizationData.organizationSettings = undefined;
       const wrapper = createWrapper();
-      const saveBtn = wrapper.find('[data-test="add-alert-submit-btn"]');
-      expect(saveBtn.exists()).toBe(true);
-      expect(saveBtn.attributes("disabled")).toBeFalsy();
+      // Looked up per read: the teleport stub re-creates its content when the page re-renders.
+      const bar = () => wrapper.get('[data-test="organization-settings-save-bar"]');
+
+      expect(wrapper.find('[data-test="settings-org-trace-id-input-field"]').exists()).toBe(false);
+      expect(bar().attributes("data-state")).toBe("loading");
+
+      mockStore.state.organizationData.organizationSettings = {
+        trace_id_field_name: "tid",
+        span_id_field_name: "sid",
+      };
+      await flushPromises();
+
+      const input = wrapper.get('[data-test="settings-org-trace-id-input-field"]');
+      expect((input.element as HTMLInputElement).value).toBe("tid");
+      expect(bar().attributes("data-state")).toBe("clean");
+    });
+
+    it("counts a field edit and a cross-link edit, and Discard restores both", async () => {
+      mockStore.state.zoConfig.enable_cross_linking = true;
+      const wrapper = createWrapper();
+      // Looked up per read: the teleport stub re-creates its content when the page re-renders.
+      const bar = () => wrapper.get('[data-test="organization-settings-save-bar"]');
+      const input = wrapper.get('[data-test="settings-org-trace-id-input-field"]');
+
+      await input.setValue("other_trace");
+      wrapper.vm.crossLinks = [{ name: "a" }];
+      await flushPromises();
+      expect(bar().attributes("data-state")).toBe("changed");
+      expect(wrapper.findComponent({ name: "OSaveBar" }).props("changeCount")).toBe(2);
+
+      await wrapper.get('[data-test="organization-settings-save-bar-discard"]').trigger("click");
+      await flushPromises();
+
+      expect((input.element as HTMLInputElement).value).toBe("trace_id");
+      expect(wrapper.vm.crossLinks).toEqual([]);
+      expect(bar().attributes("data-state")).toBe("clean");
+      mockStore.state.zoConfig.enable_cross_linking = undefined;
+    });
+
+    it("saves from the bar and returns to clean on the saved values", async () => {
+      const wrapper = createWrapper();
+      // Looked up per read: the teleport stub re-creates its content when the page re-renders.
+      const bar = () => wrapper.get('[data-test="organization-settings-save-bar"]');
+
+      await wrapper.get('[data-test="settings-org-trace-id-input-field"]').setValue("other_trace");
+      await wrapper.get('[data-test="add-alert-submit-btn"]').trigger("click");
+      await vi.waitFor(() => expect(mockPostOrganizationSettings).toHaveBeenCalled());
+      await flushPromises();
+
+      expect(mockPostOrganizationSettings.mock.calls[0][1].trace_id_field_name).toBe("other_trace");
+      expect(bar().attributes("data-state")).toBe("clean");
+    });
+
+    it("a save that completes late keeps later edits and never writes into another organization", async () => {
+      let finish = () => {};
+      const holdSave = () =>
+        mockPostOrganizationSettings.mockImplementationOnce(
+          () => new Promise((resolve) => (finish = () => resolve({ status: 200 }))),
+        );
+      const wrapper = createWrapper();
+      const input = wrapper.get('[data-test="settings-org-trace-id-input-field"]');
+      const save = () => wrapper.get('[data-test="add-alert-submit-btn"]').trigger("click");
+
+      holdSave();
+      await input.setValue("first_trace");
+      await save();
+      await vi.waitFor(() => expect(mockPostOrganizationSettings).toHaveBeenCalled());
+      await input.setValue("later_trace");
+      wrapper.vm.crossLinks = [{ name: "later" }];
+      finish();
+      await flushPromises();
+
+      expect(mockStore.dispatch.mock.calls[0][1]).toMatchObject({
+        trace_id_field_name: "first_trace",
+        cross_links: [],
+      });
+      expect((input.element as HTMLInputElement).value).toBe("later_trace");
+      expect(wrapper.findComponent({ name: "OSaveBar" }).props("changeCount")).toBe(2);
+
+      holdSave();
+      await save();
+      await vi.waitFor(() => expect(mockPostOrganizationSettings).toHaveBeenCalledTimes(2));
+      mockStore.state.selectedOrganization = { identifier: "other-org" };
+      finish();
+      await flushPromises();
+
+      expect(mockStore.dispatch).toHaveBeenCalledTimes(1);
+    });
+
+    it("a Discard confirmed on leaving while the save is open stays discarded when the save lands", async () => {
+      let finish = () => {};
+      mockPostOrganizationSettings.mockImplementationOnce(
+        () => new Promise((resolve) => (finish = () => resolve({ status: 200 }))),
+      );
+      const wrapper = createWrapper();
+      const input = wrapper.get('[data-test="settings-org-trace-id-input-field"]');
+      const dialog = useConfirmDialog();
+
+      await input.setValue("new_trace");
+      await wrapper.get('[data-test="add-alert-submit-btn"]').trigger("click");
+      await vi.waitFor(() => expect(mockPostOrganizationSettings).toHaveBeenCalled());
+      let left = false;
+      void confirmLeave().then((leave) => (left = leave));
+      // Pages left mounted by earlier cases are asked too, one dialog each.
+      await vi.waitFor(() => {
+        dialog.handleConfirm();
+        expect(left).toBe(true);
+      });
+      finish();
+      await flushPromises();
+
+      expect((input.element as HTMLInputElement).value).toBe("new_trace");
+      expect(wrapper.findComponent({ name: "OSaveBar" }).props("changeCount")).toBe(0);
     });
 
     it("should seed the form defaults from the store", () => {
@@ -419,21 +536,6 @@ describe("OrganizationSettings", () => {
       const wrapper = createWrapper();
       expect(getForm(wrapper).vm.form.state.values.redInsightsEnabled).toBe(false);
     });
-
-    it("keeps the help text in a hover tooltip on the info icon, under a Traces heading", () => {
-      config.isEnterprise = "true";
-      config.isCloud = "false";
-      const wrapper = createWrapper();
-      const section = wrapper.find('[data-test="settings-red-insights"]');
-      const help = String(i18n.global.t("settings.redInsightsEnabledHelp"));
-
-      expect(section.find('[data-test="settings-red-insights-btn-info"]').exists()).toBe(true);
-      expect(section.text()).not.toContain(help);
-      expect(section.findComponent({ name: "OTooltip" }).props("content")).toBe(help);
-      expect(section.find('[data-test="settings-traces-heading"]').text()).toBe(
-        String(i18n.global.t("settings.tracesHeading")),
-      );
-    });
   });
 
   describe("RCA thread tool output setting (02 TH34)", () => {
@@ -452,30 +554,6 @@ describe("OrganizationSettings", () => {
 
       expect(mockPostOrganizationSettings.mock.calls[0][1]).not.toHaveProperty(
         "ai_rca_thread_tool_output",
-      );
-    });
-
-    it("renders under its own Incidents heading in enterprise, not the Traces block", () => {
-      config.isEnterprise = "true";
-      const wrapper = createWrapper();
-      const section = wrapper.find('[data-test="settings-ai-rca-thread-tool-output"]');
-
-      expect(section.find('[data-test="settings-incidents-heading"]').text()).toBe(
-        String(i18n.global.t("settings.incidentsHeading")),
-      );
-      const heading = section.find('[data-test="settings-incidents-heading"]').element;
-      const toggle = section.find('[data-test="settings-ai-rca-thread-tool-output-btn"]').element;
-      expect(
-        heading.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
-      expect(
-        wrapper
-          .find('[data-test="settings-red-insights"]')
-          .find('[data-test="settings-ai-rca-thread-tool-output-btn"]')
-          .exists(),
-      ).toBe(false);
-      expect(section.findComponent({ name: "OTooltip" }).props("content")).toBe(
-        String(i18n.global.t("settings.aiRcaThreadToolOutputHelp")),
       );
     });
 
@@ -508,6 +586,134 @@ describe("OrganizationSettings", () => {
       };
       const wrapper = createWrapper();
       expect(getForm(wrapper).vm.form.state.values.aiRcaThreadToolOutput).toBe(true);
+    });
+  });
+
+  describe("Data retention defaults", () => {
+    const bar = (wrapper: any) => wrapper.findComponent({ name: "OSaveBar" });
+    const field = (wrapper: any, name: string) =>
+      wrapper.get(`[data-test="settings-data-retention-${name}-field"]`);
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+      mockStore.state.organizationData.organizationSettings = {
+        trace_id_field_name: "trace_id",
+        span_id_field_name: "span_id",
+        data_retention: { default: 30, logs: 14 },
+      };
+    });
+
+    afterEach(() => {
+      config.isEnterprise = "false";
+    });
+
+    it("is part of the page form: checked on leave, counted by the bar, restored by Discard", async () => {
+      const wrapper = createWrapper();
+      expect(wrapper.find('[data-test="settings-data-retention-save"]').exists()).toBe(false);
+      expect(bar(wrapper).props("changeCount")).toBe(0);
+
+      await field(wrapper, "default").setValue("1");
+      await field(wrapper, "default").trigger("blur");
+      await flushPromises();
+      expect(wrapper.find('[data-test="settings-data-retention-default-error"]').exists()).toBe(
+        true,
+      );
+      expect(bar(wrapper).props("changeCount")).toBe(1);
+
+      await wrapper.get('[data-test="settings-data-retention-remove-0"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="settings-data-retention-row-0"]').exists()).toBe(false);
+      expect(bar(wrapper).props("changeCount")).toBe(2);
+
+      await wrapper.get('[data-test="organization-settings-save-bar-discard"]').trigger("click");
+      await flushPromises();
+      expect((field(wrapper, "default").element as HTMLInputElement).value).toBe("30");
+      expect((field(wrapper, "days-0").element as HTMLInputElement).value).toBe("14");
+      expect(bar(wrapper).props("changeCount")).toBe(0);
+    });
+
+    it("offers only the unused stream types, counts an added one as one change, and blocks the save until it has days", async () => {
+      const wrapper = createWrapper();
+      const offered = () =>
+        wrapper
+          .findAll('[data-test^="settings-data-retention-add-"]')
+          .map((item) => item.attributes("data-test")?.split("-").pop());
+      expect(offered()).toEqual(["metrics", "traces", "profiles"]);
+
+      await wrapper.get('[data-test="settings-data-retention-add-traces"]').trigger("click");
+      await flushPromises();
+      expect(offered()).toEqual(["metrics", "profiles"]);
+      expect(getForm(wrapper).vm.form.state.values.types[1].type).toBe("traces");
+      expect(bar(wrapper).props("changeCount")).toBe(1);
+      await field(wrapper, "days-1").setValue("90");
+      expect(bar(wrapper).props("changeCount")).toBe(1);
+      await field(wrapper, "days-1").setValue("");
+
+      await getForm(wrapper).vm.form.handleSubmit();
+      await flushPromises();
+      expect(mockPostOrganizationSettings).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="settings-data-retention-days-1-error"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("saves with the other settings in one request and stores what the server resolved", async () => {
+      const resolved = { default: 45, logs: 7, metrics: 45, traces: 45, profiles: 45 };
+      mockGetOrganizationSettings.mockResolvedValue({
+        data: {
+          data: { data_retention: { default: 45, logs: 7 } },
+          resolved_data_retention: resolved,
+        },
+      });
+      const wrapper = createWrapper();
+
+      await field(wrapper, "default").setValue("45");
+      await field(wrapper, "days-0").setValue("7");
+      await wrapper.get('[data-test="add-alert-submit-btn"]').trigger("click");
+      await vi.waitFor(() => expect(mockStore.dispatch).toHaveBeenCalled());
+      await flushPromises();
+
+      expect(mockPostOrganizationSettings).toHaveBeenCalledTimes(1);
+      expect(mockPostOrganizationSettings.mock.calls[0][1]).toMatchObject({
+        trace_id_field_name: "trace_id",
+        data_retention: { default: 45, logs: 7 },
+      });
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setOrganizationSettings",
+        expect.objectContaining({
+          data_retention: { default: 45, logs: 7 },
+          resolved_data_retention: resolved,
+        }),
+      );
+      expect(bar(wrapper).props("changeCount")).toBe(0);
+    });
+
+    it("leaves retention out of a save that did not edit it, so an unread value cannot wipe the stored one", async () => {
+      for (const stored of [{ default: 30, logs: 14 }, undefined]) {
+        mockPostOrganizationSettings.mockClear();
+        mockStore.state.organizationData.organizationSettings = {
+          trace_id_field_name: "trace_id",
+          span_id_field_name: "span_id",
+          data_retention: stored,
+        };
+        const wrapper = createWrapper();
+        await wrapper.get('[data-test="settings-org-trace-id-input-field"]').setValue("traceid");
+        await getForm(wrapper).vm.form.handleSubmit();
+        await flushPromises();
+        expect(mockPostOrganizationSettings).toHaveBeenCalledTimes(1);
+        expect(mockPostOrganizationSettings.mock.calls[0][1]).not.toHaveProperty("data_retention");
+        wrapper.unmount();
+      }
+    });
+
+    it("leaves the block and its payload out outside enterprise", async () => {
+      config.isEnterprise = "false";
+      const wrapper = createWrapper();
+      expect(wrapper.find('[data-test="settings-data-retention-defaults"]').exists()).toBe(false);
+
+      await getForm(wrapper).vm.form.handleSubmit();
+      await flushPromises();
+      expect(mockPostOrganizationSettings.mock.calls[0][1]).not.toHaveProperty("data_retention");
     });
   });
 
@@ -607,18 +813,6 @@ describe("OrganizationSettings", () => {
 
         expect(analytics.track).not.toHaveBeenCalled();
       });
-    });
-  });
-
-  describe("Layout and styling", () => {
-    it("should keep the trace/span field width wrappers", () => {
-      const wrapper = createWrapper();
-      const traceDiv = wrapper.find(".trace-id-field-name");
-      const spanDiv = wrapper.find(".span-id-field-name");
-      expect(traceDiv.exists()).toBe(true);
-      expect(traceDiv.classes()).toContain("o2-input");
-      expect(spanDiv.exists()).toBe(true);
-      expect(spanDiv.classes()).toContain("o2-input");
     });
   });
 });

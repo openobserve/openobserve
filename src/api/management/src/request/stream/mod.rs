@@ -292,6 +292,11 @@ pub async fn update_settings(
         .await
         {
             Ok((security, change)) => {
+                stream_settings.index_all_values = indexes_all_values(
+                    stream_type,
+                    security.as_ref(),
+                    stream_settings.index_all_values,
+                );
                 stream_settings.security = Some(security);
                 security_change = change;
             }
@@ -705,7 +710,19 @@ pub async fn list(
         .into_response()
 }
 
-/// Gates a direct `security` write on Security PUT, then plans it as [`plan_security_setting`].
+/// `match_all()` needs every value indexed once a write admits a logs stream to Security readers.
+#[cfg(feature = "enterprise")]
+fn indexes_all_values(
+    stream_type: StreamType,
+    security: Option<&SecuritySourceSetting>,
+    requested: Option<bool>,
+) -> Option<bool> {
+    let admits = stream_type == StreamType::Logs
+        && o2_enterprise::enterprise::security::streams::admits_security_read(security);
+    requested.or(admits.then_some(true))
+}
+
+/// Gates a direct `security` write on Security POST, then plans it as [`plan_security_setting`].
 #[cfg(feature = "enterprise")]
 pub(crate) async fn prepare_security_setting(
     org_id: &str,
@@ -714,10 +731,25 @@ pub(crate) async fn prepare_security_setting(
     user_id: &str,
     security: Option<SecuritySourceSetting>,
 ) -> Result<(Option<SecuritySourceSetting>, Option<String>), Response> {
-    if !security::security_allowed(org_id, user_id, "PUT").await {
+    use o2_enterprise::enterprise::security::streams::admits_security_read;
+
+    // Source administration is the author grant, kept apart from the analyst's PUT triage.
+    if !security::security_allowed(org_id, user_id, "POST").await {
         return Err(MetaHttpResponse::forbidden(
             "Changing a security source needs the Security permission",
         ));
+    }
+    // Opening a stream to Security readers is only for someone who reads it already.
+    if stream_type == StreamType::Logs
+        && admits_security_read(security.as_ref())
+        && !admits_security_read(
+            infra::schema::get_settings(org_id, stream_name, stream_type)
+                .await
+                .as_ref()
+                .and_then(|s| s.security.as_ref()),
+        )
+    {
+        security::guard_own_stream_read(org_id, user_id, stream_name).await?;
     }
     plan_security_setting(org_id, stream_name, stream_type, user_id, security).await
 }
@@ -1306,6 +1338,38 @@ mod tests {
     use config::meta::stream::{StreamStats, StreamType};
 
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_settings_write_admitting_a_logs_stream_to_security_indexes_every_value() {
+        let included = SecuritySourceSetting {
+            source_type: "okta_system_log".to_string(),
+            included: Some(true),
+            ..Default::default()
+        };
+        let excluded = SecuritySourceSetting {
+            included: Some(false),
+            ..included.clone()
+        };
+        assert_eq!(
+            indexes_all_values(StreamType::Logs, Some(&included), None),
+            Some(true)
+        );
+        assert_eq!(
+            indexes_all_values(StreamType::Logs, Some(&excluded), None),
+            None,
+            "a write that does not admit the stream leaves indexing alone"
+        );
+        assert_eq!(
+            indexes_all_values(StreamType::Logs, Some(&included), Some(false)),
+            Some(false),
+            "an explicit choice in the same request wins"
+        );
+        assert_eq!(
+            indexes_all_values(StreamType::Metrics, Some(&included), None),
+            None
+        );
+    }
 
     fn make_stream(
         name: &str,

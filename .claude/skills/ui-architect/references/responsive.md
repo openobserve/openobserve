@@ -175,10 +175,11 @@ The recipe every list toolbar follows:
   column is dropped and persisted desktop column sizes are ignored. Tablets get a
   horizontal-scroll fallback once fill columns can't fit. **Do not hide data columns
   for mobile** — there is no per-column breakpoint flag.
-- **Row actions → one kebab below md.** Inline action buttons get
-  `class="max-md:hidden"`; add one `ODropdown` whose trigger is `md:hidden` and whose
-  items (each `class="md:hidden"`) mirror the inline buttons — same `v-if`, same
-  `:disabled`, `data-test="<inline data-test>-menu"`:
+- **Row actions → one kebab below md.** Prefer `OTable`'s `row-actions` prop: pass
+  the list once and the table draws at most three buttons at md and up (more than
+  three: two plus a menu), in the fixed order Edit, the item's own actions, Delete,
+  and one kebab below md. The hand-written form below remains for tables not yet
+  moved:
 
   ```vue
   <OButton class="max-md:hidden" icon-left="edit" :data-test="`x-${row.id}-edit`" @click="edit(row)" />
@@ -209,7 +210,9 @@ The recipe every list toolbar follows:
 ## Stat strips and KPI cards: one row
 
 `OStatStrip` / `OStatCard` and `KpiCard` / `KpiCardRow` compact below lg to icon +
-value; the label moves into the tile's `title`. Use them. A hand-rolled tile row follows
+value; the label moves into the tile's `title`. Use them. Filter chips (`selectable`)
+are the exception: below md they take their own toolbar line and scroll sideways on
+one line (swipe), never wrapping or compacting; see calm-signal § Summary-strip conventions. A hand-rolled tile row follows
 the same recipe so it never takes two rows of chrome:
 
 - row: `max-lg:flex max-lg:flex-wrap max-lg:gap-1.5` (or `max-md:grid-cols-4` for a

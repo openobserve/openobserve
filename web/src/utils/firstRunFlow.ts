@@ -15,6 +15,7 @@
 
 import config from "@/aws-exports";
 import { isFullConfigLoaded } from "@/services/config.queries";
+import { isTrialExpired } from "@/utils/auth";
 
 /** The `/config` switch (ZO_SAMPLE_DATA_ONBOARDING_ENABLED, default off) that picks the first-run flow. */
 type FirstRunConfig = {
@@ -28,6 +29,10 @@ export const flowsKnown = (cfg?: FirstRunConfig): boolean => isFullConfigLoaded(
 /** The sample-data welcome shows on every build when the switch is on; a backend without the switch counts as off. */
 export const sampleDataFlowOn = (cfg?: FirstRunConfig): boolean =>
   flowsKnown(cfg) && cfg?.sample_data_onboarding_enabled === true;
+
+/** A lapsed trial paywalls every page the sample data opens, so an expired org is not offered it. */
+export const sampleDataOffered = (cfg: FirstRunConfig | undefined, trialExpiry: unknown): boolean =>
+  sampleDataFlowOn(cfg) && !isTrialExpired(trialExpiry);
 
 /** The full-page onboarding is cloud only and shows when the sample-data flow does not. */
 export const onboardingFlowOn = (cfg?: FirstRunConfig): boolean =>

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { liveQuery } from "@/components/autoobserve/v2/autoobserveRoute";
 import { computed, inject, shallowRef, type ComputedRef, type InjectionKey, type Ref } from "vue";
 import { useRoute, type RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
@@ -173,10 +174,10 @@ export function autoObserveRoutes(
   orgIdentifier: string,
 ): { home: RouteLocationRaw; service: RouteLocationRaw } {
   return {
-    home: { name: "autoobserve", query: { org_identifier: orgIdentifier } },
+    home: { name: "autoobserve", query: liveQuery({ org_identifier: orgIdentifier }) },
     service: {
       name: "autoobserve",
-      query: { page: "coverage", service, org_identifier: orgIdentifier },
+      query: liveQuery({ page: "coverage", service, org_identifier: orgIdentifier }),
     },
   };
 }

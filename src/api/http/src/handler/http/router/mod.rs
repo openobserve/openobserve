@@ -102,7 +102,7 @@ use crate::{
         },
         router::middlewares::{
             blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
-            password_policy_middleware, root_only_middleware,
+            memory_breaker_middleware, password_policy_middleware, root_only_middleware,
         },
     },
 };
@@ -1305,6 +1305,8 @@ fn autoobserve_routes(router: Router) -> Router {
         .route("/v2/{org_id}/autoobserve/entity_types", get(autoobserve::entity_types))
         .route("/v2/{org_id}/autoobserve/coverage", get(autoobserve::coverage))
         .route("/v2/{org_id}/autoobserve/coverage/history", get(autoobserve::coverage_history))
+        .route("/v2/{org_id}/autoobserve/folders/writable", get(autoobserve::writable_folders))
+        .route("/v2/{org_id}/autoobserve/streams/volume", get(autoobserve::stream_volume))
         .route("/v2/{org_id}/autoobserve/suggestions", get(autoobserve::suggestions))
         .route("/v2/{org_id}/autoobserve/decisions", get(autoobserve::decisions::list_decisions).post(autoobserve::decisions::decide))
         .route("/v2/{org_id}/autoobserve/decisions/preview", get(autoobserve::decisions::preview_decision))
@@ -1626,7 +1628,18 @@ fn service_route_table() -> Router {
         router = router
             .route("/{org_id}/security/cases", post(security::cases::promote_to_case))
             .route("/{org_id}/security/cases/by_alert", get(security::cases::lookup_cases))
-            .route("/{org_id}/security/cases/settings", get(security::cases::get_case_settings).put(security::cases::update_case_settings));
+            .route("/{org_id}/security/cases/settings", get(security::cases::get_case_settings).put(security::cases::update_case_settings))
+            // Queue work across every page: search is a read, bulk and merge are triage
+            .route("/{org_id}/security/cases/search", get(security::triage::search_cases))
+            .route("/{org_id}/security/cases/bulk", post(security::triage::bulk_update))
+            .route("/{org_id}/security/cases/merge", post(security::triage::merge_cases))
+            // Tuning applied when detections run: reads GET, writes author POST, removals admin DELETE
+            .route("/{org_id}/security/detections/{alert_id}/exceptions", get(security::tuning::list_exceptions).post(security::tuning::create_exception))
+            .route("/{org_id}/security/detections/{alert_id}/exceptions/{exception_id}", put(security::tuning::update_exception).delete(security::tuning::delete_exception))
+            .route("/{org_id}/security/allowlists", get(security::tuning::list_allowlists))
+            .route("/{org_id}/security/allowlists/{list_id}", put(security::tuning::put_allowlist).delete(security::tuning::delete_allowlist))
+            .route("/{org_id}/security/suppressions", get(security::tuning::list_suppressions).post(security::tuning::create_suppression))
+            .route("/{org_id}/security/suppressions/{suppression_id}", delete(security::tuning::delete_suppression));
     }
 
     #[cfg(feature = "enterprise")]
@@ -1653,11 +1666,17 @@ fn service_route_table() -> Router {
             .route("/{org_id}/security/sources/classify", post(security::sources::classify_sources))
             .route("/{org_id}/security/sources/{stream_name}/attach", post(security::sources::attach_pack))
             .route("/{org_id}/security/sources/{stream_name}/detach", post(security::sources::detach_pack))
+            .route("/{org_id}/security/sources/{stream_name}/include", post(security::sources::set_inclusion))
+            .route("/{org_id}/security/sources/{stream_name}/source_type", post(security::sources::set_source_type))
+            .route("/{org_id}/security/sources/{stream_name}/schema", get(security::sources::get_source_schema))
             // Sigma catalog, compiler and ATT&CK coverage: reads, compile is POST only for the body
             .route("/{org_id}/security/sigma/catalog", get(security::sigma::get_catalog))
             .route("/{org_id}/security/sigma/compile", post(security::sigma::compile))
             .route("/{org_id}/security/mitre/coverage", get(security::sigma::get_mitre_coverage))
             .route("/{org_id}/security/detections/{alert_id}/evidence", get(security::sigma::get_detection_evidence))
+            // Detection authoring: edit in place from Sigma, and a scheduler-faithful history preview
+            .route("/{org_id}/security/detections/preview", post(security::detections::preview_detection))
+            .route("/{org_id}/security/detections/{alert_id}", put(security::detections::update_detection))
             // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
             .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
             // Complexity requirements only: readable by any authenticated user, including one the
@@ -2391,6 +2410,9 @@ fn with_service_layers(router: Router) -> Router {
 
     // Snappy preprocessing sits outside RequestDecompressionLayer, which rejects snappy with 415.
     router
+        // Innermost, so auth and the org block answer first; both decoders are lazy, so no body
+        // has been read yet when a tripped breaker refuses the write.
+        .layer(middleware::from_fn(memory_breaker_middleware))
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
         // Between auth and audit: it needs the email authentication resolves, and a request it
@@ -3071,6 +3093,10 @@ pub fn splunk_collector_routes() -> Router {
         // decompression can amplify an unauthenticated body.
         .layer(middleware::from_fn(
             hec_collector::wire_body_limit_middleware,
+        ))
+        // Outside the wire cap, which reads the whole body, so a tripped node never reads it.
+        .layer(middleware::from_fn(
+            hec_collector::memory_breaker_middleware,
         ))
         .layer(middleware::from_fn(ingest_rejections_middleware))
 }

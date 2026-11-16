@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, ref, type MaybeRefOrGetter, toValue } from "vue";
-import type { DecisionView, FieldChange } from "@/services/autoobserveDecisions";
+import type { AppliedEvidence, DecisionView, FieldChange } from "@/services/autoobserveDecisions";
+import type { I18nText, TranslateFn } from "@/types/i18n";
 import type { ApplySuggestion } from "@/components/alert_calibration/applySuggestion";
 
 /** What "Review change" opens: the finding, its alert and the change the finding stores. */
@@ -33,6 +34,8 @@ export interface AppliedEntry {
   fields: FieldChange[];
   /** The changed alert, when the write knew it and the view does not carry it. */
   alertId?: string;
+  /** Null when the server lists the change without it; unset until the server has listed it. */
+  evidence?: AppliedEvidence | null;
 }
 
 // Applies written from this browser, so an older server that lists none still shows them until reload.
@@ -82,13 +85,24 @@ export const useAppliedChanges = (
     for (const view of toValue(listed)) {
       if (view.action !== "apply" || !view.change) continue;
       const mine = rows.get(view.decision_id);
-      if (mine && mine.view.revision >= view.revision) continue;
+      const evidence = view.change.evidence ?? null;
+      if (mine && mine.view.revision >= view.revision) {
+        // A write's own answer carries no evidence, so the listed row supplies it.
+        rows.set(view.decision_id, { ...mine, evidence });
+        continue;
+      }
       rows.set(view.decision_id, {
         org: current,
         view,
         title: view.change.alert.title || view.subject?.title || "",
         fields: view.change.fields,
+        evidence,
       });
     }
     return [...rows.values()].sort((a, b) => b.view.decided_at - a.view.decided_at);
   });
+
+export const reviewedOfferNotice = (t: TranslateFn): { variant: "error"; text: I18nText } => ({
+  variant: "error",
+  text: t("insight.decisions.apply.offerChanged"),
+});

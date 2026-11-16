@@ -138,6 +138,7 @@ import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
 import AlignRight from "~icons/material-symbols/format-align-right";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
+import Apps from "~icons/material-symbols/apps";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
@@ -369,8 +370,18 @@ import AndroidIcon from "~icons/material-symbols/android";
 import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
 import CallIcon from "~icons/material-symbols/call-outline";
 
-// Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
+// Batch 6: Folder icon picker (2026-11-06)
+import BugReportIcon from "~icons/material-symbols/bug-report-outline";
+import ApiIcon from "~icons/material-symbols/api";
+import ShoppingCartIcon from "~icons/material-symbols/shopping-cart-outline";
+import DeployedCodeIcon from "~icons/material-symbols/deployed-code-outline";
+import RouterIcon from "~icons/material-symbols/router-outline";
+import SupportAgentIcon from "~icons/material-symbols/support-agent";
+import CloudSyncIcon from "~icons/material-symbols/cloud-sync-outline";
+
+// Brand marks (not Material Symbols) — local inline SVG components using currentColor.
 import McpLogo from "./McpLogo.vue";
+import SlackLogo from "./SlackLogo.vue";
 
 import type { Component } from "vue";
 
@@ -378,6 +389,7 @@ export const iconRegistry = {
   alarm: Alarm,
   add: Add,
   mcp: McpLogo,
+  slack: SlackLogo,
   "arrow-back": ArrowBack,
   "arrow-back-ios-new": ArrowBackIosNew,
   "arrow-downward": ArrowDownward,
@@ -503,6 +515,7 @@ export const iconRegistry = {
   "align-left": AlignLeft,
   "align-right": AlignRight,
   "all-inclusive": AllInclusive,
+  apps: Apps,
   "assignment-turned-in": AssignmentTurnedIn,
   "auto-awesome": AutoAwesome,
   "bar-chart": BarChart,
@@ -747,6 +760,15 @@ export const iconRegistry = {
   // Batch 5: Downtimes (2026-09-24)
   "notifications-paused": NotificationsPaused,
   repeat: RepeatIcon,
+
+  // Batch 6: Folder icon picker (2026-11-06)
+  "bug-report": BugReportIcon,
+  api: ApiIcon,
+  "shopping-cart": ShoppingCartIcon,
+  "deployed-code": DeployedCodeIcon,
+  router: RouterIcon,
+  "support-agent": SupportAgentIcon,
+  "cloud-sync": CloudSyncIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

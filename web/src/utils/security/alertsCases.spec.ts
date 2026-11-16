@@ -280,4 +280,29 @@ describe("case times", () => {
     expect(entry.params.stream).toBe("okta_auth");
     expect(entry.actor).toBe("a@acme.io");
   });
+
+  it("reads a detection joining the case as its rule and level, with any priority raise", () => {
+    const joined = toTimelineEntry({
+      timestamp: 5,
+      type: "DetectionJoined",
+      data: {
+        alert_id: "a1",
+        alert_name: "Entra_Spray",
+        rule: "Entra ID Password Spray",
+        level: "high",
+      },
+    });
+    expect(joined).toMatchObject({
+      kind: "alert",
+      key: "detectionJoined",
+      params: { rule: "Entra ID Password Spray", level: "high" },
+    });
+    const raised = toTimelineEntry({
+      timestamp: 6,
+      type: "DetectionJoined",
+      data: { alert_name: "Spray", level: "", from_severity: "P2", to_severity: "P1" },
+    });
+    expect(raised.key).toBe("detectionJoinedRaised");
+    expect(raised.params).toMatchObject({ rule: "Spray", level: "—", from: "P2", to: "P1" });
+  });
 });

@@ -106,12 +106,12 @@ const makeDestination = (idx: number, overrides: any = {}) => ({
 
 // ── mount helper ──────────────────────────────────────────────────────────────
 
-function mountComponent() {
+function mountComponent(realTable = false) {
   return mount(PipelinesDestinationList, {
     global: {
       plugins: [i18n, store, router],
       stubs: {
-        OTable: OTableStub,
+        ...(realTable ? {} : { OTable: OTableStub }),
         ConfirmDialog: ConfirmDialogStub,
         PipelineDestinationEditor: {
           template: '<div data-test="pipeline-destination-editor-stub" />',
@@ -615,6 +615,21 @@ describe("PipelinesDestinationList", () => {
       // Forced: creating a destination does not expire the cached scope.
       expect(destinationService.list).toHaveBeenCalled();
     });
+  });
+});
+
+describe("column budget", () => {
+  it("fits a 950 px box without sideways scroll", async () => {
+    (destinationService.list as any).mockResolvedValue({ data: [makeDestination(1)] });
+    (templateService.list as any).mockResolvedValue({ data: [] });
+    const w = mountComponent(true);
+    await flushPromises();
+    const table: any = (w.findComponent({ name: "OTable" }).vm.$ as any).setupState;
+    table.containerWidth = 950;
+    await flushPromises();
+
+    expect(table.allowHorizontalScroll).toBe(false);
+    w.unmount();
   });
 });
 

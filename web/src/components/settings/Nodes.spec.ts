@@ -274,13 +274,28 @@ describe("Nodes", () => {
     it("tracks a health card filter, but not clearing it", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      wrapper.vm.onStatSelect("offline");
-      wrapper.vm.onStatSelect("offline");
+      wrapper.vm.onStatKeys(["offline"]);
+      wrapper.vm.onStatKeys([]);
       expect(analytics.track).toHaveBeenCalledTimes(1);
       expect(analytics.track).toHaveBeenCalledWith("nodes_health_filter_applied", {
         status: "offline",
       });
     });
+  });
+
+  it("ORs two picked health chips", async () => {
+    wrapper = mountComponent();
+    await flushPromises();
+    const health = (row: any) => wrapper.vm.nodeHealth(row);
+    wrapper.vm.onStatKeys(["offline", "online"]);
+    await flushPromises();
+    const shown = wrapper.vm.displayedRows;
+    expect(new Set(shown.map(health)).size).toBe(2);
+    expect(shown.every((row: any) => ["offline", "online"].includes(health(row)))).toBe(true);
+    expect(shown.length).toBe(
+      wrapper.vm.visibleRows.filter((row: any) => ["offline", "online"].includes(health(row)))
+        .length,
+    );
   });
 
   describe("applyFilter", () => {

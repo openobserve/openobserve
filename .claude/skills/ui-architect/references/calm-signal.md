@@ -44,12 +44,13 @@ All token-backed and dark-mode-safe. Reuse these before inventing anything.
   load lands instead of reading "0" (copy-and-values.md § Loading is not zero).
   `max` draws a proportion bar (share of total). The tone icon
   sits in a **rounded-square chip** (`rounded-default`) — every icon chip in the
-  app is a rounded square, never a circle (`rounded-full`). Set `selectable` +
-  `:selected-key` + `@select` to make tiles **double as filters**. Compose
-  `<OStatCard>` directly (with the `#chart` slot) for sparklines on overviews.
-  Place it via `OTable`'s **`#subheader`** slot (wrapped in
-  `px-page-edge py-1.5 border-b border-table-row-divider`) to sit below the
-  search/tabs. See **Summary-strip conventions** below for ordering + selection.
+  app is a rounded square, never a circle (`rounded-full`). A strip has three
+  looks, picked by its job: **filter chips** (`selectable`: counts that filter the
+  table), an **inline KPI line** (`inline`: read-only counts in a toolbar row), and
+  **cards** (read-only overview tiles, or `selectable :tray="false"` tiles that
+  navigate). Compose `<OStatCard>` directly (with the `#chart` slot) for sparklines
+  on overviews. See **Summary-strip conventions** below for placement, selection
+  and overflow.
 - **Status / category chips** — `OTag` with a `type=` group from
   `badgeGroups.ts` (`alertStatus`, `alertType`, `severity`, `streamType`,
   `userRole`, `serviceStatus`, …). One registry → the same value is the same
@@ -98,42 +99,84 @@ Reference implementation of most of the above: the Alerts list,
 
 ### Summary-strip conventions
 
-Once a strip is `selectable`, four rules keep every strip behaving identically
-(reference strips: Alerts, Incidents, Eval Jobs):
+A strip that filters the table is a row of **filter chips**: icon, label and a
+count badge, one click each. Reference: the Pipelines and Alerts lists
+([PipelinesList.vue](../../../web/src/components/pipeline/PipelinesList.vue)).
 
-- **Order attention-first, left → right.** The most critical / attention-worthy
-  tile is leftmost, descending to the calm/inert ones — e.g. `failed → recent →
-active → paused`, `P1 → P2 → P3 → P4`, `degraded → paused → active → draft →
-archived`. This mirrors the row rail's "critical colour on the left edge": what
-  needs attention lives on the left, everywhere.
-- **The "All" / "Total" tile is LAST, stays CLICKABLE, and is never highlighted.**
-  It only clears the facet; it is never itself the active tile. Wire `:selected-key`
-  to the _raw filter value_ (`null` / `"all"` when unfiltered) so nothing shows the
-  ring while viewing everything — never fall back to selecting "All" as the default.
-  **Never put `selectable: false` on it** — that is the one wrong way to express
-  "never highlighted": it turns the tile into a plain `<div>`, so clicking it does
-  nothing and the strip has no way back to unfiltered (the bug users report as
-  "All isn't clickable"). "Never highlighted" is achieved by the `selectedKey`
-  wiring above, not by disabling the tile. `selectable: false` is only for a tile
-  that is genuinely not a facet at all (a pure read-out with no matching filter).
-- **Selection toggles off.** Re-clicking the already-active tile clears the filter
-  (back to unfiltered), matching every other strip:
-  `onSelect(key) → filter = key === "all" || filter === key ? cleared : key`.
-- **Selected state is an accent border, not a fill** — the `OStatCard` default;
-  see Step 3.
-- **A strip in `#subheader` is a CLAIM ABOUT THE ROWS — scope decides position.**
+```vue
+<!-- #toolbar, right after the search box -->
+<OStatStrip
+  :items="summaryStats"
+  :loading="loading"
+  selectable
+  multiple
+  :row="false"
+  :selected-keys="stateFilters"
+  default-key="total"
+  class="max-md:order-last"
+  data-test="pipeline-list-summary"
+  @update:selected-keys="stateFilters = $event"
+/>
+```
+
+- **Stats and filters are one control.** Never a stat row plus a separate filter
+  dropdown for the same facet, never a tab strip (tabs switch views, they don't
+  filter), never a grey tray behind the chips.
+- **Multi-select, OR'ed.** Filter chips are `multiple`: a click toggles that chip,
+  and rows matching ANY picked chip show. State is a `string[]` (empty means
+  unfiltered), filtered with `matchesAnyKey` from
+  [utils/filterKeys.ts](../../../web/src/utils/filterKeys.ts). A filter kept in the
+  URL or view state is read with `readFilterKeys` (it still accepts an old single
+  value) and written with `filterKeysToQuery`. Stay single-select only when the
+  backend takes one value and can't OR, or when the chips split the whole set
+  (picking both equals All).
+- **The reset chip comes FIRST and carries the total.** Its item is the
+  `default-key`; it reads as selected (quietly) while nothing is picked, and a
+  click empties the selection. There is **no Clear button**: the reset chip and Esc
+  do that. Never put `selectable: false` on it (that turns it into a `<div>` and
+  leaves no way back to unfiltered).
+- **Name the reset chip as a filter, not a stat.** "All", never "Total" ("Total"
+  is a read-out). When another "All" sits beside it (a type toggle), name the chip
+  by its facet, "All states" / "All statuses" (`common.allStates`,
+  `common.allStatuses`), and leave the toggle's "All" as it is.
+- **Then attention-first, left → right.** After the reset chip, the most critical
+  chip is leftmost, descending to the calm ones (`failed → firing → … → paused`,
+  `P1 → P4`). This mirrors the row rail's critical colour on the left edge.
+- **Placement: the search row.** Put the strip in `OTable`'s `#toolbar` right
+  after the search (and any filter beside it), before refresh, with `:row="false"`,
+  as a direct flex child of the toolbar (page wrappers are `contents`). Search is
+  `flex-1` with a `md:min-w-48` floor and **no desktop max-width**, so it fills the
+  row. The strip stays beside search only when **every** chip fits; otherwise it
+  takes its own full-width toolbar line under refresh (`useInlineFit` decides;
+  phones are always own-line). Never squeeze chips into a sliver.
+- **Overflow scrolls on one line, never wraps.** When even the full line is too
+  narrow, the chips scroll sideways: a flat edge block with a plain chevron and a
+  surface fade shows only on the side that can scroll, and the chips never shift.
+  Touch swipe, trackpad and mouse wheel all scroll it. Don't add your own arrows.
+- **Size and look come from the component.** Chips are 32px, the height of the
+  search box and toolbar buttons. Selected is an accent border plus soft fill with
+  a primary count badge; error/warning chips with a count above 0 get a tinted
+  badge. The tooltip says what a click does ("Show only / Also show / Stop
+  showing …").
+- **Read-only counts are not chips.** Info-only stats above a list are an `inline`
+  KPI line (icon · value · label, no border, no hover) in the toolbar row, or their
+  own compact `row` above the table header when the toolbar is full (DB
+  monitoring). A strip whose only clickable item would be the reset chip renders
+  as KPIs. Overview/dashboard tiles stay cards; tiles that **navigate** use
+  `selectable :tray="false"` cards, not chips.
+- **A strip in the table toolbar is a CLAIM ABOUT THE ROWS — scope decides position.**
   Inside the table frame, a strip promises "these numbers describe the list below",
   so it must be computed from the same filtered set _and_ be facet-clickable. Before
   writing one, check the fetch: **if the list is server-paginated you only hold one
   page**, so page-local sums are not totals — never sum the visible page and label
   it "Total". When the numbers genuinely can't meet the promise (server pagination,
   or totals that come from a different, wider endpoint such as an org-summary API),
-  do **not** put them in `#subheader` — lift them to the page level as a read-only
+  do **not** put them in the table toolbar — lift them to the page level as a read-only
   strip in `OPageLayout`'s **`#subnav`**, where they read as page context instead of
   a row summary, and label them for their real scope ("Total Streams", not
   "Streams"). What stays honest under pagination is anything derived from the single
   row in front of you: relative recency, a state rail, a per-row ratio. Reference:
-  Alerts (client-side list → filterable `#subheader` strip) vs Streams
+  Alerts (client-side list → filter chips in the toolbar) vs Streams
   (server-paginated list → org footprint in `#subnav`).
 - **`ODataBarCell` needs the whole set — client-paginated tables only.** Its bar is
   a share of the `max` the caller computes over the rendered rows, so on a
@@ -217,7 +260,7 @@ Colour only earns attention if most of the screen stays quiet:
 
 ## Per-archetype quick recipe
 
-- **Monitoring** → `OStatStrip` (state counts, filter tiles) in `#subheader`;
+- **Monitoring** → `OStatStrip` filter chips (state counts) in the `#toolbar`;
   `OTag` status chips; row rail + exception tint; relative recency. _(Alerts.)_
 - **Catalog** → `OStatStrip` counting totals (Total · Folders · Favourites ·
   Updated-this-week, `max` optional); category `OTag` (folder/type/language);

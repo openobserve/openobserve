@@ -4290,6 +4290,11 @@ export class LogsPage {
         return await expect(this.page.locator(this.errorMessage)).not.toBeVisible({ timeout });
     }
 
+    /** Stricter than expectSqlErrorStateNotVisible: the error state must not be rendered at all, hidden or not. */
+    async expectNoQueryError(message) {
+        await expect(this.page.locator(this.errorMessage), message).toHaveCount(0);
+    }
+
     /**
      * Assert the error state element, if visible, does NOT contain the given text.
      * Passes trivially when no error element is shown (intended for edge-case queries

@@ -25,6 +25,9 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("@/services/common", () => ({ default: { list_Folders: api.folders } }));
+vi.mock("@/services/autoobserveFolders", () => ({
+  default: { writable: async () => ({ data: { folders: {} } }) },
+}));
 vi.mock("@/services/stream", () => ({ default: { schema: api.schema } }));
 vi.mock("@/services/alerts", () => ({ default: { listByFolderId: api.alerts } }));
 vi.mock("../targets/baseline", () => ({ measureBaseline: vi.fn(async () => null) }));

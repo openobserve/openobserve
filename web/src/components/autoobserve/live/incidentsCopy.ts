@@ -30,7 +30,7 @@ import {
 } from "@/utils/incidents/rcaCell";
 import type { AiFinding } from "../insight/insightCta";
 import { logsForFinding, PAGED_LEAD_US } from "../insight/targets/logsTargets";
-import type { IssuesRange } from "../v2/fixtures";
+import type { IssuesRange } from "../v2/autoobserveRoute";
 import { agoText, dayKey, formatWhen } from "./liveCopy";
 
 export interface AnalysisLine {

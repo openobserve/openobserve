@@ -54,12 +54,12 @@ import { coverageWord } from "../live/liveCopy";
 
 const props = defineProps<{
   watching: number;
+  partial?: number;
   learning: number;
   gaps: number;
-  live?: boolean;
 }>();
 
-const emit = defineEmits<{ select: [filter: "watching" | "learning" | "attention"] }>();
+const emit = defineEmits<{ select: [filter: "watching" | "partial" | "learning" | "attention"] }>();
 
 const { t } = useI18nTyped();
 
@@ -67,27 +67,32 @@ const { t } = useI18nTyped();
 const shown = computed(() =>
   [
     {
-      key: props.live ? "watched" : "watching",
+      key: "watched",
       count: props.watching,
       color: "bg-badge-success-soft-text",
       filter: "watching" as const,
-      label: props.live
-        ? coverageWord(t, "watched")
-        : t("autoobserve2.coverageDrawer.legend.watching"),
+      label: coverageWord(t, "watched"),
+    },
+    {
+      key: "partial",
+      count: props.partial ?? 0,
+      color: "bg-ingest-accent-amber/50",
+      filter: "partial" as const,
+      label: coverageWord(t, "partial"),
     },
     {
       key: "learning",
       count: props.learning,
-      color: "bg-status-info-text",
+      color: "bg-status-neutral-text/60",
       filter: "learning" as const,
       label: t("autoobserve2.coverageDrawer.legend.learning"),
     },
     {
-      key: props.live ? "gap" : "unseen",
+      key: "gap",
       count: props.gaps,
-      color: "bg-badge-amber-soft-text",
+      color: "bg-ingest-accent-amber",
       filter: "attention" as const,
-      label: props.live ? coverageWord(t, "gap") : t("autoobserve2.coverageDrawer.legend.unseen"),
+      label: coverageWord(t, "gap"),
     },
   ].filter((seg) => seg.count > 0),
 );

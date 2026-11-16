@@ -110,21 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-full w-full"
         @row-click="startReviewing"
       >
-        <!-- Status split as filter tiles: the counts are what tells a reviewer
-             whether this queue is worth opening. -->
-        <template #subheader>
-          <div data-test="ai-queue-detail-summary">
-            <OStatStrip
-              :items="summaryStats"
-              :loading="loading"
-              selectable
-              :selected-key="statusFilter"
-              default-key="all"
-              @select="onStatSelect"
-            />
-          </div>
-        </template>
-
         <template #toolbar-trailing>
           <OButton
             variant="outline"
@@ -141,10 +126,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="search"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('aiObservability.queues.detail.searchPlaceholder')"
             data-test="ai-queue-detail-search-input"
             clearable
+          />
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="statusFilters"
+            default-key="all"
+            class="max-md:order-last"
+            data-test="ai-queue-detail-summary"
+            @update:selected-keys="statusFilters = $event as LlmQueueItemStatus[]"
           />
         </template>
 
@@ -155,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               illustration="check"
               :title="t('aiObservability.queues.detail.emptyTitle')"
               :description="t('aiObservability.queues.detail.emptyBody')"
-              :filtered="Boolean(search) || statusFilter !== 'all'"
+              :filtered="Boolean(search) || statusFilters.length > 0"
               data-test="ai-queue-detail-empty-state"
               @action="clearFilters"
             />
@@ -243,6 +240,7 @@ import llmQueuesService, {
   type LlmQueueItemStatus,
   type QueueRefType,
 } from "@/services/llm-queues.service";
+import { matchesAnyKey } from "@/utils/filterKeys";
 
 defineOptions({ name: "AIQueueDetailPage" });
 
@@ -261,7 +259,7 @@ const queue = ref<LlmQueue | null>(null);
 const items = ref<LlmQueueItem[]>([]);
 const loading = ref(false);
 const search = ref("");
-const statusFilter = ref<LlmQueueItemStatus | "all">("all");
+const statusFilters = ref<LlmQueueItemStatus[]>([]);
 
 // Real browser back when there's history to pop.
 const { goBack: backToQueues } = useSmartBack(() => ({
@@ -277,9 +275,9 @@ const pendingCount = computed(() => items.value.filter((i) => i.status === "pend
 const reviewedCount = computed(() => items.value.filter((i) => i.status === "reviewed").length);
 
 const visibleItems = computed(() =>
-  statusFilter.value === "all"
-    ? items.value
-    : items.value.filter((item) => item.status === statusFilter.value),
+  items.value.filter((item) =>
+    matchesAnyKey(statusFilters.value, item, (row, key) => row.status === key),
+  ),
 );
 
 const summaryStats = computed<StatItem[]>(() => {
@@ -315,15 +313,9 @@ const summaryStats = computed<StatItem[]>(() => {
   ];
 });
 
-// Re-clicking the active tile clears the filter, matching the Alerts strip.
-function onStatSelect(key: string) {
-  statusFilter.value =
-    key === "all" || statusFilter.value === key ? "all" : (key as LlmQueueItemStatus);
-}
-
 function clearFilters() {
   search.value = "";
-  statusFilter.value = "all";
+  statusFilters.value = [];
 }
 
 function isStale(cfg: LlmQueueBinding): boolean {

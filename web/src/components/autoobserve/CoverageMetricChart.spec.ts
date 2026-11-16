@@ -20,7 +20,7 @@ import store from "@/test/unit/helpers/store";
 import { raw } from "@/types/i18n";
 import CoverageMetricChart from "./CoverageMetricChart.vue";
 import type { MetricDef, MetricSeries } from "./coverageSeries";
-import type { CoverageCell } from "./fixtures";
+import type { CoverageCell } from "./aoTypes";
 
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   default: { name: "ChartRenderer", props: ["data"], template: "<div />" },

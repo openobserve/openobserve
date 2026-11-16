@@ -112,7 +112,8 @@ import { useI18nTyped } from "@/types/i18n";
 import { useSampleDataPresence } from "@/composables/sampleData/useSampleDataPresence";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { sampleDataStateQuery } from "@/services/sample_data.queries";
-import { sampleDataFlowOn } from "@/utils/firstRunFlow";
+import { sampleDataOffered } from "@/utils/firstRunFlow";
+import { isTrialExpired } from "@/utils/auth";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 // the menu and its confirm dialog are siblings, so the header's class goes to the menu
@@ -126,7 +127,12 @@ const { isMobile } = useBreakpoint();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const presence = useSampleDataPresence(org);
-const shown = computed(() => presence.hasSample.value && !store.state.kioskMode);
+const trialExpiry = computed(
+  () => store.state.organizationData?.organizationSettings?.free_trial_expiry,
+);
+const shown = computed(
+  () => presence.hasSample.value && !store.state.kioskMode && !isTrialExpired(trialExpiry.value),
+);
 const state = useQuery(
   computed(() => Object.assign(sampleDataStateQuery(org.value), { enabled: shown.value })),
 );
@@ -137,7 +143,7 @@ const unfinished = computed(
 // an empty org gets the way in; once it holds data of its own the header stays clear
 const offerTry = computed(
   () =>
-    sampleDataFlowOn(store.state.zoConfig) &&
+    sampleDataOffered(store.state.zoConfig, trialExpiry.value) &&
     presence.ready.value &&
     !presence.hasRealData.value &&
     !store.state.kioskMode &&

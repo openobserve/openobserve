@@ -22,8 +22,9 @@ import {
   viewDenial,
 } from "@/composables/useAccessStore";
 import type { AutoObserveCellState, AutoObserveLearning } from "@/services/autoobserve";
+import { SYSTEM_ACTOR } from "@/utils/downtimes/quickMute";
 import type { ChartRange } from "../coverageSeries";
-import { LIVE_CHECKS, type CoverageCell, type LiveCheck } from "../fixtures";
+import { LIVE_CHECKS, type CoverageCell, type LiveCheck } from "../aoTypes";
 
 export type LiveFailure = "denied" | "off" | "unavailable" | "failed";
 
@@ -330,6 +331,10 @@ export const formatWhen = (
     ).format(new Date(ms)),
   );
 
+/** Who acted on an incident; the server's own account reads as AutoObserve, never its address. */
+export const actorName = (t: TranslateFn, userId: string): I18nText =>
+  userId === SYSTEM_ACTOR ? t("autoobserve.issueLive.systemActor") : raw(userId);
+
 const DURATION_UNITS = [
   ["day", 1440],
   ["hour", 60],
@@ -463,34 +468,43 @@ export const placeLabels = (t: TranslateFn, places: ServicePlace[]): string[] =>
   });
 };
 
-export type LiveCoverageState = "watched" | "gap";
+export type LiveCoverageState = "watched" | "partial" | "learning" | "gap";
 
 const COVERAGE_WORD: Record<LiveCoverageState, I18nKey> = {
   watched: "autoobserveLive.coverage.stateWatched",
+  partial: "autoobserve.coverageLive.statePartial",
+  learning: "autoobserve.coverageLive.stateLearning",
   gap: "autoobserveLive.coverage.stateGap",
 };
 
 export const coverageWord = (t: TranslateFn, state: LiveCoverageState): I18nText =>
   t(COVERAGE_WORD[state]);
 
-export type LiveCellLook = "covered" | "gap" | "added";
+export type LiveCellLook = "covered" | "gap" | "added" | "learning";
 
-/** A check this page just added an alert for reads "Added" until a pass counts it. */
-export const liveCellLook = (state: AutoObserveCellState, added = false): LiveCellLook => {
-  if (added && state !== "covered") return "added";
-  return state === "covered" ? "covered" : "gap";
+/** "Added" until a pass counts a new alert; a learning service's unwatched checks wait, not gap. */
+export const liveCellLook = (
+  state: AutoObserveCellState,
+  added = false,
+  learning = false,
+): LiveCellLook => {
+  if (state === "covered") return "covered";
+  if (added) return "added";
+  return learning ? "learning" : "gap";
 };
 
 export const LIVE_DOT: Record<LiveCellLook, string> = {
   covered: "bg-badge-success-soft-text",
   gap: "bg-badge-amber-soft-text",
   added: "bg-border-strong",
+  learning: "bg-status-neutral-text/60",
 };
 
 const LOOK_WORD: Record<LiveCellLook, I18nKey> = {
   covered: "autoobserveLive.coverage.stateWatched",
   gap: "autoobserveLive.coverage.stateGap",
   added: "autoobserveLive.cell.added",
+  learning: "autoobserve.coverageLive.stateLearning",
 };
 
 // A check is Watched or has a Coverage gap; why it has one is the detail's job, not the chip's.
@@ -498,7 +512,8 @@ export const liveCellWord = (
   t: TranslateFn,
   state: AutoObserveCellState,
   added = false,
-): I18nText => t(LOOK_WORD[liveCellLook(state, added)]);
+  learning = false,
+): I18nText => t(LOOK_WORD[liveCellLook(state, added, learning)]);
 
 export const liveLookWord = (t: TranslateFn, look: LiveCellLook): I18nText => t(LOOK_WORD[look]);
 
@@ -518,10 +533,11 @@ export const liveCheckText = (
   check: LiveCheck,
   state: AutoObserveCellState,
   added = false,
+  learning = false,
 ): I18nText =>
   t("autoobserve.coverage.chipAria", {
     signal: liveCheckName(t, check),
-    state: liveCellWord(t, state, added),
+    state: liveCellWord(t, state, added, learning),
   });
 
 // The same words as the coverage gap card's Why, so the drawer and the card never disagree.
@@ -660,43 +676,6 @@ export const learningEmpty = (
   return {
     title: t("autoobserveLive.learning.emptyTitle"),
     desc: t(`autoobserveLive.learning.${key}`, learningParams(learning, zone), n),
-  };
-};
-
-/** A service's learning streams: one sentence for a single stream, else a count over every stream with its own date. */
-export const streamLearning = (
-  t: TranslateFn,
-  zone: { locale: string; timeZone: string },
-  streams: { type: string; name: string; learning_until?: number | null }[],
-  nowMs: number = Date.now(),
-): { summary: I18nText; rows: { key: string; stream: string; until: I18nText }[] } | null => {
-  const learning = streams
-    .filter(
-      (s): s is typeof s & { learning_until: number } =>
-        typeof s.learning_until === "number" && s.learning_until / 1000 > nowMs,
-    )
-    .sort((a, b) => a.learning_until - b.learning_until);
-  if (!learning.length) return null;
-  const label = (s: { type: string; name: string }) => `${s.name} (${s.type})`;
-  if (learning.length === 1)
-    return {
-      summary: t("autoobserveLive.learning.until", {
-        date: dayText(learning[0].learning_until, zone),
-        streams: raw(label(learning[0])),
-      }),
-      rows: [],
-    };
-  return {
-    summary: t(
-      "autoobserveLive.learning.streams",
-      { count: count(zone.locale, learning.length) },
-      learning.length,
-    ),
-    rows: learning.map((s) => ({
-      key: `${s.type}/${s.name}`,
-      stream: label(s),
-      until: t("autoobserveLive.learning.streamUntil", { date: dayText(s.learning_until, zone) }),
-    })),
   };
 };
 

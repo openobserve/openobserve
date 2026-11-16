@@ -307,6 +307,25 @@ describe("SampleDataWelcome finish", () => {
     expect(localStorage.getItem("isFirstTimeLogin")).toBe("true");
   });
 
+  it("stays closed for an org whose free trial has ended", async () => {
+    await mountAtHome();
+    expect(session.welcomeOpen.value).toBe(true);
+    wrapper!.unmount();
+    session.closeWelcome();
+    router = makeRouter();
+    await router.push("/");
+    await router.isReady();
+    store = makeStore();
+    (store.state as any).organizationData = {
+      organizationSettings: { free_trial_expiry: (Date.now() - 5 * 86400 * 1000) * 1000 },
+    };
+    wrapper = mount(SampleDataWelcome, {
+      global: { plugins: [i18n, store, router], stubs: { SampleDataProgress: true } },
+    });
+    await flush();
+    expect(session.welcomeOpen.value).toBe(false);
+  });
+
   it("opens once the full config turns the sample data flow on", async () => {
     await mountAtHome({});
     store.state.zoConfig = {

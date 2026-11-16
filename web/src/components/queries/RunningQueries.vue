@@ -17,64 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     v-if="isMetaOrg"
-    :title="t('queries.runningQueries')"
+    :title="t('settings.queryManagement')"
     icon="query-stats"
     :subtitle="t('settings.queryManagementDesc')"
     bleed
   >
-    <!-- Filters live in the sub-nav band directly above the table. -->
-    <template #subnav>
-      <div
-        data-test="running-queries-filter-container"
-        class="px-page-edge flex items-center justify-start gap-3 py-2 max-md:flex-wrap max-md:gap-2"
-      >
-        <OToggleGroup
-          mobile-dropdown
-          :model-value="selectedQueryTypeTab"
-          @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
-          data-test="running-queries-query-type-tabs"
-        >
-          <OToggleGroupItem
-            v-for="visual in runningQueryTypes"
-            :key="visual.value"
-            :value="visual.value"
-            size="sm"
-          >
-            {{ visual.label }}
-          </OToggleGroupItem>
-        </OToggleGroup>
-        <div class="o2-select-input o2-input">
-          <OSelect
-            v-model="selectedSearchField"
-            :options="searchFieldOptions"
-            labelKey="label"
-            valueKey="value"
-            class="w-35 p-0 max-md:w-28"
-            data-test="running-queries-search-fields-select"
-            @update:model-value="filterQuery = ''"
-          />
-        </div>
-        <OSearchInput
-          v-if="selectedSearchField == 'all'"
-          v-model="filterQuery"
-          class="no-border o2-search-input max-md:min-w-24 max-md:flex-1"
-          :placeholder="t('queries.search')"
-          data-test="running-queries-search-input"
-        />
-        <div v-else class="o2-select-input o2-input w-62.5">
-          <OSelect
-            v-model="filterQuery"
-            :placeholder="t('queries.selectOption')"
-            :options="otherFieldOptions"
-            labelKey="label"
-            valueKey="value"
-            class="no-border search-input w-62.5"
-            data-test="running-queries-search-input"
-          />
-        </div>
+    <!-- One toolbar row needs desktop width; below lg the filters keep their own row. -->
+    <template v-if="!lgUp" #subnav>
+      <div class="px-page-edge py-2">
+        <RunningQueriesFilters v-bind="filterBindings" />
       </div>
     </template>
-
     <div class="min-h-0 flex-1">
       <div class="h-full w-full">
         <div class="bg-card-glass-bg h-full">
@@ -87,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rows="rowsQuery"
               :forbidden="forbidden"
               :filtered="!!filterQuery"
-              :last-refreshed="lastRefreshed"
+              :last-refreshed-at="lastRefreshedAt"
               :search-type="selectedSearchType"
               :search-types="searchTypes"
               :search-type-labels="searchTypeLabels"
@@ -98,7 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @show:schema="listSchema"
               @clear:filters="filterQuery = ''"
               @refresh="refreshData"
-            />
+            >
+              <template v-if="lgUp && selectedQueryTypeTab === 'all'" #filters>
+                <RunningQueriesFilters v-bind="filterBindings" />
+              </template>
+            </RunningQueriesList>
           </div>
           <div
             v-show="selectedQueryTypeTab === 'summary'"
@@ -109,13 +66,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rows="summaryRows"
               :forbidden="forbidden"
               :filtered="!!filterQuery"
-              :last-refreshed="lastRefreshed"
+              :last-refreshed-at="lastRefreshedAt"
               v-model:selectedRows="selectedRow['summary']"
               @filter:queries="filterUserQueries"
               @delete:queries="handleMultiQueryCancel"
               @clear:filters="filterQuery = ''"
               @refresh="refreshData"
-            />
+            >
+              <template v-if="lgUp && selectedQueryTypeTab === 'summary'" #filters>
+                <RunningQueriesFilters v-bind="filterBindings" />
+              </template>
+            </SummaryList>
           </div>
         </div>
       </div>
@@ -151,19 +112,17 @@ import { onBeforeMount, ref, defineComponent, computed, toRaw, watch } from "vue
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { durationFormatter, getDuration } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
+import RunningQueriesFilters from "./RunningQueriesFilters.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 export default defineComponent({
   name: "RunningQueries",
@@ -173,18 +132,15 @@ export default defineComponent({
     ConfirmDialog,
     RunningQueriesList,
     SummaryList,
-    OToggleGroup,
-    OToggleGroupItem,
+    RunningQueriesFilters,
     ODrawer,
-    OSelect,
-    OSearchInput,
   },
   setup() {
     // Declared first: the option lists below resolve their labels through `t`.
     const { t } = useI18nTyped();
     const store = useStore();
     const schemaData = ref({});
-    const lastRefreshed = ref("");
+    const lastRefreshedAt = ref<number | null>(null);
     const { isMetaOrg } = useIsMetaOrg();
     const resultTotal = ref<number>(0);
     const selectedRow = ref<{
@@ -196,7 +152,7 @@ export default defineComponent({
     });
 
     const searchFieldOptions = ref([
-      { label: t("search.allFieldsLabel"), value: "all" },
+      { label: t("queries.allFields"), value: "all" },
       { label: t("queries.duration"), value: "exec_duration" },
       { label: t("queries.queryRange"), value: "query_range" },
     ]);
@@ -212,14 +168,14 @@ export default defineComponent({
     };
 
     const runningQueryTypes = [
-      { label: t("queries.userSummary"), value: "summary" },
-      { label: t("queries.allQueries"), value: "all" },
+      { label: t("queries.userSummary"), value: "summary" as const },
+      { label: t("queries.allQueries"), value: "all" as const },
     ];
     const selectedSearchField = ref(searchFieldOptions.value[0].value);
 
     const refreshData = () => {
       getRunningQueries();
-      lastRefreshed.value = getCurrentTime();
+      lastRefreshedAt.value = Date.now();
     };
 
     /**
@@ -292,20 +248,6 @@ export default defineComponent({
     };
 
     // Convert result object to array
-    // Function to get current time in a desired format
-    const getCurrentTime = () => {
-      const now = new Date();
-      const year = now.getFullYear().toString().padStart(4, "0");
-      const month = (now.getMonth() + 1).toString().padStart(2, "0");
-      const day = now.getDate().toString().padStart(2, "0");
-      const hours = now.getHours().toString().padStart(2, "0");
-      const minutes = now.getMinutes().toString().padStart(2, "0");
-      const seconds = now.getSeconds().toString().padStart(2, "0");
-      const timezone = store.state.timezone;
-
-      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${timezone}`;
-    };
-
     const loadingState = ref(false);
     const forbidden = ref<ForbiddenState>(false);
     const queries = ref([]);
@@ -453,7 +395,7 @@ export default defineComponent({
 
     onBeforeMount(() => {
       getRunningQueries();
-      lastRefreshed.value = getCurrentTime();
+      lastRefreshedAt.value = Date.now();
     });
 
     // Watcher to filter queries based on user_id
@@ -774,7 +716,22 @@ export default defineComponent({
       },
     ]);
 
+    const { lgUp } = useBreakpoint();
+    const filterBindings = computed(() => ({
+      tab: selectedQueryTypeTab.value,
+      tabs: runningQueryTypes,
+      searchFieldOptions: searchFieldOptions.value,
+      otherFieldOptions: otherFieldOptions.value,
+      searchField: selectedSearchField.value,
+      query: filterQuery.value,
+      "onUpdate:tab": onChangeQueryTab,
+      "onUpdate:searchField": (value: string) => (selectedSearchField.value = value),
+      "onUpdate:query": (value: string) => (filterQuery.value = value),
+    }));
+
     return {
+      lgUp,
+      filterBindings,
       t,
       store,
       queries,
@@ -793,7 +750,7 @@ export default defineComponent({
       loadingState,
       forbidden,
       refreshData,
-      lastRefreshed,
+      lastRefreshedAt,
       isMetaOrg,
       resultTotal,
       selectedPerPage,
@@ -817,7 +774,6 @@ export default defineComponent({
       summaryRows,
       // Additional functions for testing
       getRunningQueriesSummary,
-      getCurrentTime,
       localTimeToMicroseconds,
       getDuration,
       queryRange,

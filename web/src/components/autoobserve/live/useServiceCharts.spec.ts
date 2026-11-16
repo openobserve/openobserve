@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import type { ChartRange } from "../coverageSeries";
-import type { CoverageRow } from "../fixtures";
+import type { CoverageRow } from "../aoTypes";
 import { resetCorrelationCache, useServiceCharts } from "./useServiceCharts";
 
 const api = vi.hoisted(() => ({

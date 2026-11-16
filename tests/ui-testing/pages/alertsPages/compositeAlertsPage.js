@@ -23,6 +23,9 @@
 
 import { expect } from '@playwright/test';
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { holdGet } = require('../../playwright-tests/utils/route-hold.js');
+
+const CANDIDATES_URL = /\/api\/v2\/[^/]+\/alerts\?.*alert_type=all/;
 
 export class CompositeAlertsPage {
   constructor(page) {
@@ -283,6 +286,21 @@ export class CompositeAlertsPage {
     await this.typeTab().click();
     await expect(this.form()).toBeVisible();
     await optionsLoaded;
+  }
+
+  /** Parks the candidate-children GET; returns { requested, release }. */
+  async holdCandidateLoad() {
+    return holdGet(this.page, CANDIDATES_URL);
+  }
+
+  /** Narrows the candidate-children response to `alertIds`. */
+  async limitCandidatesTo(alertIds) {
+    await this.page.route(CANDIDATES_URL, async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.list = json.list.filter((alert) => alertIds.includes(alert.alert_id));
+      await route.fulfill({ response, json });
+    });
   }
 
   /** Resolve once the candidate-children fetch has returned. */

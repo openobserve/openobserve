@@ -432,7 +432,7 @@ watch(shown, (open) => {
           seamless ? 'pointer-events-none bg-transparent' : 'bg-dialog-overlay',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          'data-[state=closed]:duration-120 data-[state=open]:duration-120',
+          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=open]:duration-(--duration-dialog-in)',
         ]"
         :style="overlayStyle"
       />
@@ -458,11 +458,9 @@ watch(shown, (open) => {
           isRight
             ? 'border-dialog-border border-s border-t'
             : 'border-dialog-border border-e border-t',
-          'shadow-lg',
+          'shadow-dialog',
           // Focus ring
           'focus-visible:ring-dialog-focus-ring outline-none focus-visible:ring-2',
-          // Slide-in animation — direction matches side.
-          // Strong decel curve so it shoots in (170ms) and settles; exit is quicker (120ms).
           isRight
             ? [
                 'data-[state=open]:animate-in data-[state=open]:slide-in-from-right',
@@ -472,8 +470,8 @@ watch(shown, (open) => {
                 'data-[state=open]:animate-in data-[state=open]:slide-in-from-left',
                 'data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left',
               ],
-          'data-[state=open]:duration-170 data-[state=open]:ease-[cubic-bezier(0.32,0.72,0,1)]',
-          'data-[state=closed]:duration-120 data-[state=closed]:ease-in',
+          'data-[state=open]:duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
+          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"

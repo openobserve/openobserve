@@ -149,7 +149,7 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     let req_clusters = in_req.clusters.clone();
 
-    let query: SearchQuery = in_req.query.clone().into();
+    let query: SearchQuery = in_req.query.clone().try_into()?;
     let req_query = query.clone();
     let mut request = config::datafusion::request::Request::new(
         trace_id.clone(),

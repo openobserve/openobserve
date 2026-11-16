@@ -131,8 +131,9 @@ export class RolesPage {
         );
         // The wrapper, not the field: GroupUsers reuses the `alert-list-search-input` slug.
         this.userMemberSearch = page.locator('[data-test="iam-users-selection-search-input"] input');
-        this.serviceAccountMembersEmpty = page.locator(
-            '[data-test="iam-service-accounts-selection-table"] [data-test="o2-empty-state"]',
+        // Under Selected, a role with no accounts in an org that has some shows the none-selected state.
+        this.serviceAccountMembersNoneSelected = page.locator(
+            '[data-test="iam-service-accounts-selection-table"] [data-test="iam-service-accounts-selection-none-selected"]',
         );
 
         // ---------- leaving with unsaved changes ----------

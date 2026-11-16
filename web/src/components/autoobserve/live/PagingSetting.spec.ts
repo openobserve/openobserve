@@ -21,8 +21,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import autoobserve from "@/services/autoobserve";
 import config from "@/aws-exports";
 import PagingSetting from "./PagingSetting.vue";
-import LiveSettingsPanel from "./LiveSettingsPanel.vue";
-import AutoObservePolicyTab from "../AutoObservePolicyTab.vue";
+import AutoObserveSettingsPaging from "../AutoObserveSettingsPaging.vue";
 
 const push = vi.fn();
 vi.mock("vue-router", async (importOriginal) => ({
@@ -64,7 +63,7 @@ const mountIt = <T>(component: T) => {
 const sel = (name: string) => `[data-test="autoobserve-paging${name ? `-${name}` : ""}"]`;
 const switchOf = (w: ReturnType<typeof mountIt>) => w.find(`${sel("switch")} button`);
 
-describe("PagingSetting (W1)", () => {
+describe("PagingSetting", () => {
   beforeEach(() => {
     get.mockReset();
     put.mockReset();
@@ -151,15 +150,6 @@ describe("PagingSetting (W1)", () => {
     expect(switchOf(w).attributes("aria-checked")).toBe("false");
   });
 
-  it("the status row holds two lines from first paint, so a wrapped message moves nothing below", async () => {
-    get.mockResolvedValue(ok(false));
-    const w = mountIt(PagingSetting);
-    await flushPromises();
-    const status = w.find(sel("status"));
-    expect(status.text()).toBe("");
-    expect(status.classes()).toContain("min-h-8");
-  });
-
   it("PUT 409 paging_unavailable: the switch locks with the deployment line", async () => {
     get.mockResolvedValue(ok(false));
     put.mockRejectedValue(httpError(409, { error: "paging_unavailable" }));
@@ -194,34 +184,10 @@ describe("PagingSetting (W1)", () => {
     });
   });
 
-  describe("live settings panel", () => {
-    it("shows the switch and the one neutral line for controls that do not exist yet", async () => {
-      get.mockResolvedValue(ok(false));
-      const w = mountIt(LiveSettingsPanel);
-      await flushPromises();
-      expect(w.find(sel("")).exists()).toBe(true);
-      expect(w.find('[data-test="autoobserve-live-settings-later"]').text()).toContain(
-        "will be set here once those controls exist",
-      );
-      expect(w.find('[data-test="autoobserve-live-empty-settings"]').exists()).toBe(false);
-    });
-
-    it("in the Detailed Policy tab, a denial spans the panel like the Issues denial (T1-N8)", async () => {
-      get.mockRejectedValue(httpError(403));
-      const wrapper = mount(LiveSettingsPanel, {
-        props: { inPage: true },
-        attachTo: document.body,
-        global: { plugins: [i18n, store] },
-      });
-      wrappers.push(wrapper);
-      await flushPromises();
-      const notice = wrapper.get('[data-test="autoobserve-live-settings-paging-notice"]');
-      expect(notice.classes()).not.toContain("max-w-2xl");
-    });
-
+  describe("When I page you (settings drawer and Policy)", () => {
     it("a server without the route keeps today's empty state", async () => {
       get.mockRejectedValue(httpError(404));
-      const w = mountIt(LiveSettingsPanel);
+      const w = mountIt(AutoObserveSettingsPaging);
       await flushPromises();
       expect(w.find(sel("")).exists()).toBe(false);
       expect(w.find('[data-test="autoobserve-live-empty-settings"]').exists()).toBe(true);
@@ -244,7 +210,7 @@ describe("PagingSetting (W1)", () => {
 
     it("GET 403: one request, then a red denial instead of a blank panel", async () => {
       failFor(403);
-      const w = mountIt(LiveSettingsPanel);
+      const w = mountIt(AutoObserveSettingsPaging);
       await settle();
       expect(get).toHaveBeenCalledTimes(1);
       const notice = w.find('[data-test="autoobserve-live-settings-paging-notice"]');
@@ -257,7 +223,7 @@ describe("PagingSetting (W1)", () => {
 
     it("GET 500: one request, a red failure with Retry, and Retry reads once more", async () => {
       failFor(500);
-      const w = mountIt(LiveSettingsPanel);
+      const w = mountIt(AutoObserveSettingsPaging);
       await settle();
       expect(get).toHaveBeenCalledTimes(1);
       const notice = w.find('[data-test="autoobserve-live-settings-paging-notice"]');
@@ -271,28 +237,10 @@ describe("PagingSetting (W1)", () => {
 
     it("an OSS build never asks for the route and keeps today's empty state", async () => {
       config.isEnterprise = "false";
-      const w = mountIt(LiveSettingsPanel);
+      const w = mountIt(AutoObserveSettingsPaging);
       await flushPromises();
       expect(get).not.toHaveBeenCalled();
       expect(w.find('[data-test="autoobserve-live-empty-settings"]').exists()).toBe(true);
-    });
-  });
-
-  describe("sample Policy tab", () => {
-    it("puts the switch at the top of its Paging section", async () => {
-      get.mockResolvedValue(ok(true));
-      const w = mountIt(AutoObservePolicyTab);
-      await flushPromises();
-      const section = w.find('[data-test="autoobserve-policy-paging"]');
-      expect(section.find(sel("")).exists()).toBe(true);
-      expect(section.text()).toContain("Severity decides how a problem reaches people.");
-    });
-
-    it("keeps the section as today when the server has no route", async () => {
-      get.mockRejectedValue(httpError(404));
-      const w = mountIt(AutoObservePolicyTab);
-      await flushPromises();
-      expect(w.find(sel("")).exists()).toBe(false);
     });
   });
 });

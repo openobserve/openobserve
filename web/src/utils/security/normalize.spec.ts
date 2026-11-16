@@ -267,3 +267,20 @@ describe("Windows Security outcome", () => {
     expect(normalizeEvent(row({ eventid: 4625 }), windows, 4).severityId).toBe(4);
   });
 });
+
+describe("array entity values", () => {
+  const k8s = SOURCE_TYPE_BY_ID.get("k8s_audit")!;
+
+  it("reads a stored JSON array of addresses as plain comma-separated values", () => {
+    const event = normalizeEvent(
+      { _timestamp: 1, verb: "get", sourceips: '["45.137.21.9","10.0.0.7"]' },
+      k8s,
+    );
+    expect(event.srcIp).toBe("45.137.21.9, 10.0.0.7");
+  });
+
+  it("reads an array value the same way", () => {
+    const event = normalizeEvent({ _timestamp: 1, verb: "get", sourceIPs: ["45.137.21.9"] }, k8s);
+    expect(event.srcIp).toBe("45.137.21.9");
+  });
+});
