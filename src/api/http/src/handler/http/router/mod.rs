@@ -102,7 +102,7 @@ use crate::{
         },
         router::middlewares::{
             blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
-            password_policy_middleware, root_only_middleware,
+            memory_breaker_middleware, password_policy_middleware, root_only_middleware,
         },
     },
 };
@@ -2410,6 +2410,9 @@ fn with_service_layers(router: Router) -> Router {
 
     // Snappy preprocessing sits outside RequestDecompressionLayer, which rejects snappy with 415.
     router
+        // Innermost, so auth and the org block answer first; both decoders are lazy, so no body
+        // has been read yet when a tripped breaker refuses the write.
+        .layer(middleware::from_fn(memory_breaker_middleware))
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
         // Between auth and audit: it needs the email authentication resolves, and a request it
@@ -3090,6 +3093,10 @@ pub fn splunk_collector_routes() -> Router {
         // decompression can amplify an unauthenticated body.
         .layer(middleware::from_fn(
             hec_collector::wire_body_limit_middleware,
+        ))
+        // Outside the wire cap, which reads the whole body, so a tripped node never reads it.
+        .layer(middleware::from_fn(
+            hec_collector::memory_breaker_middleware,
         ))
         .layer(middleware::from_fn(ingest_rejections_middleware))
 }
