@@ -13299,7 +13299,6 @@
       "udsFieldNotAvailable": "필드 \"{field}\"을(를) 사용할 수 없습니다. 조건에서 사용 가능한 필드만 사용하세요.",
       "udsFieldsNotAvailable": "필드 {fields}을(를) 사용할 수 없습니다. 조건에서 사용 가능한 필드만 사용하세요.",
       "udsFieldsNotAvailableTruncated": "{count}개 필드를 사용할 수 없습니다({fields} 및 {remaining}개 더). 조건에서 사용 가능한 필드만 사용하세요.",
-      "sqlValidationRequestFailed": "SQL 쿼리 유효성 검사 중 오류가 발생했습니다. 쿼리를 확인하고 다시 시도하세요.",
       "alertUpdated": "알림이 성공적으로 업데이트되었습니다.",
       "alertUpdatedNoDestination": "대상 없이 알림이 업데이트되었습니다.",
       "alertSaved": "알림이 성공적으로 저장되었습니다.",

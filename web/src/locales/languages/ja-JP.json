@@ -13299,7 +13299,6 @@
       "udsFieldNotAvailable": "フィールド \"{field}\" は利用できません。条件では利用可能なフィールドのみを使用してください。",
       "udsFieldsNotAvailable": "フィールド {fields} は利用できません。条件では利用可能なフィールドのみを使用してください。",
       "udsFieldsNotAvailableTruncated": "{count} 個のフィールドが利用できません（{fields} と他 {remaining} 個）。条件では利用可能なフィールドのみを使用してください。",
-      "sqlValidationRequestFailed": "SQLクエリの検証中にエラーが発生しました。クエリを確認して再試行してください。",
       "alertUpdated": "アラートが正常に更新されました。",
       "alertUpdatedNoDestination": "宛先なしでアラートを更新しました。",
       "alertSaved": "アラートが正常に保存されました。",

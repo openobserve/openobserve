@@ -13299,7 +13299,6 @@
       "udsFieldNotAvailable": "Pole \"{field}\" jest niedostępne. Używaj tylko dostępnych pól w swoich warunkach.",
       "udsFieldsNotAvailable": "Pola {fields} są niedostępne. Używaj tylko dostępnych pól w swoich warunkach.",
       "udsFieldsNotAvailableTruncated": "Liczba niedostępnych pól: {count} ({fields} i {remaining} więcej). Używaj tylko dostępnych pól w swoich warunkach.",
-      "sqlValidationRequestFailed": "Błąd podczas walidacji zapytania SQL. Sprawdź zapytanie i spróbuj ponownie.",
       "alertUpdated": "Alert zaktualizowany pomyślnie.",
       "alertUpdatedNoDestination": "Alert zaktualizowany bez miejsca docelowego.",
       "alertSaved": "Alert zapisany pomyślnie.",

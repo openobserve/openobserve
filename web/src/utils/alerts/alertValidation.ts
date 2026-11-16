@@ -571,6 +571,9 @@ interface SqlCheckError {
   response?: { status?: number; data?: { message?: string; code?: number; error_detail?: string } };
 }
 
+// Latest check per form, keyed by its error-message ref, so a superseded check cannot overwrite a newer verdict.
+const latestSqlCheck = new WeakMap<object, number>();
+
 export const validateSqlQuery = async (
   formData: AlertFormData,
   context: ValidationContext,
@@ -584,7 +587,12 @@ export const validateSqlQuery = async (
     buildQueryPayload,
     getParser,
   } = context;
-  const clearRanges = () => {
+  const generation = (latestSqlCheck.get(sqlQueryErrorMsg) ?? 0) + 1;
+  latestSqlCheck.set(sqlQueryErrorMsg, generation);
+  const isLatest = () => latestSqlCheck.get(sqlQueryErrorMsg) === generation;
+  const showSqlError = (message: string) => {
+    if (!isLatest()) return;
+    sqlQueryErrorMsg.value = message;
     if (sqlErrorRanges) sqlErrorRanges.value = [];
   };
 
@@ -593,8 +601,7 @@ export const validateSqlQuery = async (
 
   // Skip validation if SQL query is empty or only whitespace
   if (!formData.query_condition.sql || formData.query_condition.sql.trim() === "") {
-    sqlQueryErrorMsg.value = "";
-    clearRanges();
+    showSqlError("");
     return "skipped";
   }
 
@@ -627,28 +634,28 @@ export const validateSqlQuery = async (
       page_type: formData.stream_type,
       validate: true,
     });
-    sqlQueryErrorMsg.value = "";
-    clearRanges();
+    showSqlError("");
     if (res.data?.function_error) {
-      vrlFunctionError.value = res.data.function_error;
-      toast({
-        variant: "error",
-        message: t("alerts.validation.invalidVrlFunction"),
-      });
+      if (isLatest()) {
+        vrlFunctionError.value = res.data.function_error;
+        toast({
+          variant: "error",
+          message: t("alerts.validation.invalidVrlFunction"),
+        });
+      }
       return "function_error";
     }
-    vrlFunctionError.value = "";
+    if (isLatest()) vrlFunctionError.value = "";
     return "valid";
   } catch (caught: unknown) {
     const response = (caught as SqlCheckError)?.response;
     const message = response?.data?.message;
     // The backend answers a bad query with 400 + message; anything else is the check failing, not the SQL.
     if (response?.status !== 400 || !message) {
-      sqlQueryErrorMsg.value = "";
-      clearRanges();
+      showSqlError("");
       return "request_failed";
     }
-    sqlQueryErrorMsg.value = message;
+    showSqlError(message);
 
     if (sqlErrorRanges) {
       rangesFromServerError({
@@ -659,7 +666,7 @@ export const validateSqlQuery = async (
         query: formData.query_condition.sql,
         streamName: formData.stream_name,
       }).then((ranges) => {
-        sqlErrorRanges.value = ranges;
+        if (isLatest()) sqlErrorRanges.value = ranges;
       });
     }
     return "sql_error";

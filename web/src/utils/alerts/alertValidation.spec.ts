@@ -83,6 +83,25 @@ describe("validateSqlQuery verdicts", () => {
     expect(context.sqlQueryErrorMsg.value).toBe("");
   });
 
+  it("lets only the newest check write the inline error", async () => {
+    vi.useFakeTimers();
+    let failOlder: (reason: unknown) => void = () => {};
+    vi.mocked(searchService.search)
+      .mockImplementationOnce(() => new Promise((_, reject) => (failOlder = reject)) as never)
+      .mockImplementationOnce(() => Promise.resolve({ data: {} }) as never);
+    const context = makeContext();
+    const older = validateSqlQuery(formData, context);
+    await vi.advanceTimersByTimeAsync(100);
+    const newer = validateSqlQuery(formData, context);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(await newer).toBe("valid");
+
+    failOlder({ response: { status: 400, data: { message: "old sql" } } });
+
+    expect(await older).toBe("sql_error");
+    expect(context.sqlQueryErrorMsg.value).toBe("");
+  });
+
   it("reports a passing query as valid", async () => {
     const { verdict } = await runValidation(() => Promise.resolve({ data: {} }));
 

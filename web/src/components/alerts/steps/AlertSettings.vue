@@ -773,8 +773,13 @@ export default defineComponent({
         followedSilence = null;
       },
     );
+    // A baseline taken while the period was unset is not finite and leaves nothing to compare, so the field still follows.
     const isLinked = (value: unknown, followed: number) =>
-      value === undefined || value === null || value === "" || Number(value) === followed;
+      !Number.isFinite(followed) ||
+      value === undefined ||
+      value === null ||
+      value === "" ||
+      Number(value) === followed;
 
     // Check every / Quiet after alerting follow the period only while still linked, so user-set and saved values survive.
     const handlePeriodChange = (val: unknown) => {

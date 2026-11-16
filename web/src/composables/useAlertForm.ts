@@ -2365,7 +2365,7 @@ export function useAlertForm(
   // here with the SAME messages so save stays blocked (Rule ④). The field rules
   // (threshold / frequency / conditions / promql-condition / group_by / period /
   // silence / destinations / name / stream) are covered by the composed schema.
-  const runImperativeQueryChecks = (): boolean => {
+  const runImperativeQueryChecks = ({ freshSqlCheckFollows = false } = {}): boolean => {
     if (formData.value.is_real_time === "composite") return true;
     // ── Cron gate (R4 RESTORE) ───────────────────────────────────────────────
     // Pre-migration AlertSettings.validate() ran validateFrequency() first and
@@ -2427,7 +2427,8 @@ export function useAlertForm(
         });
         return false;
       }
-      if (sqlQueryErrorMsg.value?.trim() && !sqlUnchangedSinceLoad()) {
+      const flagIsStale = freshSqlCheckFollows && formData.value.is_real_time === "false";
+      if (sqlQueryErrorMsg.value?.trim() && !flagIsStale && !sqlUnchangedSinceLoad()) {
         activeTab.value = "condition";
         hooks.showSection?.("condition");
         toast({
@@ -2458,33 +2459,45 @@ export function useAlertForm(
     return true;
   };
 
-  // The SQL the edited alert was loaded with; null when creating.
-  let loadedSql: string | null = null;
+  // Everything the SQL check sends, as the edited alert was loaded; null when creating.
+  let loadedSqlCheckInput: string | null = null;
+  const sqlCheckInput = () => {
+    const values = form.state.values;
+    return JSON.stringify([
+      String(values.query_condition?.sql ?? "").trim(),
+      values.query_condition?.vrl_function ?? "",
+      values.stream_type ?? "",
+      values.stream_name ?? "",
+    ]);
+  };
   const sqlUnchangedSinceLoad = () =>
-    loadedSql !== null && String(formData.value.query_condition?.sql ?? "") === loadedSql;
+    loadedSqlCheckInput !== null && sqlCheckInput() === loadedSqlCheckInput;
 
   // Save must judge the SQL being saved, not the verdict of the last blur-triggered check.
-  const validateSqlBeforeSave = async (): Promise<boolean> => {
+  const validateSqlBeforeSave = async (): Promise<"passed" | "blocked" | "unchecked"> => {
     const qc = formData.value.query_condition;
-    if (formData.value.is_real_time !== "false" || qc?.type !== "sql") return true;
-    if (!String(qc.sql ?? "").trim()) return true;
+    if (formData.value.is_real_time !== "false" || qc?.type !== "sql") return "passed";
+    if (!String(qc.sql ?? "").trim()) return "passed";
     const blockOnQuery = (message?: string) => {
       activeTab.value = "condition";
       hooks.showSection?.("condition");
       if (message) toast({ variant: "error", message });
-      return false;
+      return "blocked" as const;
     };
     if (!getParser(qc.sql)) return blockOnQuery(t("alerts.messages.selectAllColumnsNotAllowed"));
-    // An edit that kept the stored SQL must not be blocked by a check that cannot change it.
-    if (sqlUnchangedSinceLoad()) return true;
+    // An edit that kept the stored query must not be blocked by a check that cannot change it.
+    if (sqlUnchangedSinceLoad()) return "passed";
     const verdict = await validateSqlQuery();
     if (verdict === "sql_error") return blockOnQuery(t("alerts.messages.fixSqlErrorBeforeSaving"));
     // The validator already toasted the VRL error.
     if (verdict === "function_error") return blockOnQuery();
-    if (verdict === "request_failed") {
+    return verdict === "request_failed" ? "unchecked" : "passed";
+  };
+
+  const warnIfSqlUnchecked = (sqlCheck: string) => {
+    if (sqlCheck === "unchecked") {
       toast({ variant: "warning", message: t("alerts.messages.sqlCheckUnavailable") });
     }
-    return true;
   };
 
   let callAlert: Promise<{ data: any }>;
@@ -2506,8 +2519,8 @@ export function useAlertForm(
   // reactive read-view and can lag by a tick after a just-written setF).
   const onSubmit = async () => {
     const target = saveTargetNow();
-    if (!(await validateSqlBeforeSave())) return false;
-    if (!runImperativeQueryChecks()) return false;
+    // The save-time SQL check below replaces the blur-time error flag.
+    if (!runImperativeQueryChecks({ freshSqlCheckFollows: true })) return false;
 
     if (
       formData.value.is_real_time == "false" &&
@@ -2577,6 +2590,9 @@ export function useAlertForm(
       return false;
     }
 
+    const sqlCheck = await validateSqlBeforeSave();
+    if (sqlCheck === "blocked") return false;
+
     const payload = getAlertPayload();
     // Read before the save: resetForm in .then clears the form the payload came from.
     const sendsNowhere = !hasDeliveryTarget(payload);
@@ -2618,6 +2634,7 @@ export function useAlertForm(
               ? t("alerts.messages.alertUpdatedNoDestination")
               : t("alerts.messages.alertUpdated"),
           });
+          warnIfSqlUnchecked(sqlCheck);
           showSaveWarnings(res);
         })
         .catch((err: any) => {
@@ -2660,6 +2677,7 @@ export function useAlertForm(
               : t("alerts.messages.alertSaved"),
           });
           noteSavedDraft(target.org, savedDraft);
+          warnIfSqlUnchecked(sqlCheck);
           showSaveWarnings(res);
         })
         .catch((err: any) => {
@@ -2843,7 +2861,7 @@ export function useAlertForm(
 
     // Seed the ONE form (single source of truth) with the fully-transformed obj.
     resetForm(data);
-    loadedSql = props.isUpdated ? String(form.state.values.query_condition?.sql ?? "") : null;
+    loadedSqlCheckInput = props.isUpdated ? sqlCheckInput() : null;
 
     // Resolve the timezone from the stored offset (edit prefill) after the reset.
     if (pendingTimezoneOffset != null) {

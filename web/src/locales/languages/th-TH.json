@@ -13296,7 +13296,6 @@
       "udsFieldNotAvailable": "Field \"{field}\" is not available. Please use only the available fields in your conditions.",
       "udsFieldsNotAvailable": "Fields {fields} are not available. Please use only the available fields in your conditions.",
       "udsFieldsNotAvailableTruncated": "{count} fields are not available ({fields} and {remaining} more). Please use only the available fields in your conditions.",
-      "sqlValidationRequestFailed": "Error while validating sql query. Please check the query and try again.",
       "alertUpdated": "Alert updated successfully.",
       "alertUpdatedNoDestination": "Alert updated without a destination.",
       "alertSaved": "Alert saved successfully.",

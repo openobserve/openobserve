@@ -13299,7 +13299,6 @@
       "udsFieldNotAvailable": "Feld \"{field}\" ist nicht verfügbar. Bitte verwenden Sie nur die verfügbaren Felder in Ihren Bedingungen.",
       "udsFieldsNotAvailable": "Felder {fields} sind nicht verfügbar. Bitte verwenden Sie nur die verfügbaren Felder in Ihren Bedingungen.",
       "udsFieldsNotAvailableTruncated": "{count} Felder sind nicht verfügbar ({fields} und {remaining} weitere). Bitte verwenden Sie nur die verfügbaren Felder in Ihren Bedingungen.",
-      "sqlValidationRequestFailed": "Fehler bei der Validierung der SQL-Abfrage. Bitte überprüfen Sie die Abfrage und versuchen Sie es erneut.",
       "alertUpdated": "Benachrichtigung erfolgreich aktualisiert.",
       "alertUpdatedNoDestination": "Alarm ohne Ziel aktualisiert.",
       "alertSaved": "Benachrichtigung erfolgreich gespeichert.",

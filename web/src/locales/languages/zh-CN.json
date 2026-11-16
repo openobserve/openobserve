@@ -13299,7 +13299,6 @@
       "udsFieldNotAvailable": "字段 \"{field}\" 不可用。请仅在条件中使用可用字段。",
       "udsFieldsNotAvailable": "字段 {fields} 不可用。请仅在条件中使用可用字段。",
       "udsFieldsNotAvailableTruncated": "{count} 个字段不可用（{fields} 及另外 {remaining} 个）。请仅在条件中使用可用字段。",
-      "sqlValidationRequestFailed": "验证 SQL 查询时出错。请检查查询并重试。",
       "alertUpdated": "告警更新成功。",
       "alertUpdatedNoDestination": "告警已更新，但未设置目标。",
       "alertSaved": "告警保存成功。",
