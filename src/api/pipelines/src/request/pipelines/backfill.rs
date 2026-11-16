@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! HTTP handlers for backfill job management
+#[cfg(feature = "enterprise")]
+use axum::Json;
 use axum::{
-    Json,
     extract::{Path, Query},
     response::Response,
 };
@@ -171,10 +172,7 @@ pub async fn create_backfill(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"}))
     )
 )]
-pub async fn create_backfill(
-    Path((_org_id, _pipeline_id)): Path<(String, String)>,
-    Json(_req): Json<BackfillRequest>,
-) -> Response {
+pub async fn create_backfill(Path((_org_id, _pipeline_id)): Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -733,7 +731,6 @@ pub async fn update_backfill(
 )]
 pub async fn update_backfill(
     Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
-    Json(_body): Json<BackfillRequest>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }

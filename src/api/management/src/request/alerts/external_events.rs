@@ -21,7 +21,9 @@
 //! the shared token classifier there caused an auth bypass in the past; this
 //! new `o2iat_` token type must not repeat that mistake.
 
-use axum::{Json, extract::Path, http::HeaderMap, response::Response};
+#[cfg(feature = "enterprise")]
+use axum::Json;
+use axum::{extract::Path, http::HeaderMap, response::Response};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
@@ -286,11 +288,7 @@ async fn handle_events(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn ingest_events(
-    _path: Path<String>,
-    _headers: HeaderMap,
-    _body: Json<serde_json::Value>,
-) -> Response {
+pub async fn ingest_events(_path: Path<String>, _headers: HeaderMap) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -318,7 +316,6 @@ pub async fn ingest_events(
 pub async fn ingest_events_url_token(
     _path: Path<(String, String)>,
     _headers: HeaderMap,
-    _body: Json<serde_json::Value>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }

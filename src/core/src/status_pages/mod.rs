@@ -763,7 +763,7 @@ fn to_admin_view(
 /// error so the handler's `map_err` can map it to one 403, regardless of
 /// which licensed action was attempted.
 #[cfg(not(feature = "enterprise"))]
-fn enterprise_required<T>() -> Result<T, anyhow::Error> {
+pub fn enterprise_required<T>() -> Result<T, anyhow::Error> {
     Err(anyhow::anyhow!(
         "enterprise: Notices and Custom Domains require an enterprise license"
     ))
