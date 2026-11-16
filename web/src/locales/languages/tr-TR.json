@@ -10727,6 +10727,7 @@
     "aiExhaustedMessage": "Yapay zekayı kullanmaya devam etmek için abone olun. Daha fazla kullanım bu kuruluşun faturasına yansıtılır.",
     "aiContractExhaustedMessage": "Daha fazla AI kredisi eklemek için hesap yöneticinizle iletişime geçin",
     "aiPayerSubscribeMessage": "Bu kuruluşun faturalandırması {payer} tarafından yönetilir. Abone olmak için {payer} yöneticisinden isteyin; daha fazla kullanım onun faturasına yansıtılır.",
+    "aiUsedByFeature": "Asistan ve sorgu oluşturma: {chat} · Vaka analizi: {incident} · Yeniden analiz: {reanalysis}",
     "aiPaygMessage": "Ücretsiz krediler tükendi — kullanım aboneliğe faturalandırılır",
     "billingGroup": {
       "tabLabel": "Faturalandırma Grubu",

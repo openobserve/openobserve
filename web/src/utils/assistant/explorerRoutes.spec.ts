@@ -57,6 +57,12 @@ describe("explorerTarget", () => {
     expect(route.query).not.toHaveProperty("run");
   });
 
+  it("opens Logs with the VRL function in the function editor when the query carries one", () => {
+    const route = explorerTarget({ ...sql, functionContent: ".x = 1" }, "logs", "1");
+    expect(route.query).toMatchObject({ fn_editor: "true" });
+    expect(b64DecodeUnicode(route.query!.functionContent)).toBe(".x = 1");
+  });
+
   it("opens Metrics with the PromQL and a millisecond range", () => {
     const route = explorerTarget(
       { language: "promql", text: "rate(x[5m])", from: FROM, to: TO, org: "acme" },

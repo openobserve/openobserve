@@ -79,9 +79,9 @@ async function settle() {
   await flushPromises();
 }
 
-async function mountTab(rows: unknown[] = ROWS) {
+async function mountTab(rows: unknown[] = ROWS, zoConfig: Record<string, unknown> = {}) {
   vi.mocked(aiToolsets.list).mockResolvedValue({ data: { toolsets: rows } } as never);
-  const h = settingsHarness();
+  const h = settingsHarness(zoConfig);
   await h.router.push("/settings/assistant/toolsets");
   const w = mount(ToolsetsTab, { global: { plugins: h.plugins }, attachTo: document.body });
   await settle();
@@ -105,6 +105,22 @@ afterEach(() => {
 });
 
 describe("ToolsetsTab", () => {
+  it.each(["ai_toolsets", "ai_assistant"])(
+    "skips the list request while %s is license-locked",
+    async (key) => {
+      const { w } = await mountTab([], { features: { [key]: "locked" } });
+      wrapper = w;
+      expect(aiToolsets.list).not.toHaveBeenCalled();
+      expect(w.find('[data-test="settings-assistant-toolsets-table"]').exists()).toBe(true);
+    },
+  );
+
+  it("loads the list when both licenses are on", async () => {
+    const { w } = await mountTab(ROWS, { features: { ai_toolsets: "enabled" } });
+    wrapper = w;
+    expect(aiToolsets.list).toHaveBeenCalledTimes(1);
+  });
+
   it("hides the health columns and says why on a server without them", async () => {
     const { w } = await mountTab();
     wrapper = w;

@@ -117,6 +117,11 @@ function logs(query: QueryRef, base: Record<string, string>): Record<string, str
   if (query.stream) out.stream = query.stream;
   const encoded = b64EncodeUnicode(query.text);
   if (encoded) out.query = encoded;
+  const fn = query.functionContent ? b64EncodeUnicode(query.functionContent) : null;
+  if (fn) {
+    out.functionContent = fn;
+    out.fn_editor = "true";
+  }
   return { ...out, ...microRange(query) };
 }
 

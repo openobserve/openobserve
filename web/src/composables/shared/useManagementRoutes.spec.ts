@@ -1006,6 +1006,7 @@ describe("useManagementRoutes assistant settings", () => {
   });
 
   it("redirects the old toolsets page to the tab, keeping its query", () => {
+    config.isEnterprise = "true";
     const legacy = useManagementRoutes()[0].children.find((r: any) => r.name === "aiToolsets");
     expect(legacy.component).toBeUndefined();
     expect(
@@ -1015,6 +1016,16 @@ describe("useManagementRoutes assistant settings", () => {
       params: { tab: "toolsets" },
       query: { action: "edit", id: "pagerduty", org_identifier: "acme" },
     });
+  });
+
+  it("sends the old toolsets page to the locked page where AI Toolsets is not offered", () => {
+    const legacy = useManagementRoutes()[0].children.find((r: any) => r.name === "aiToolsets");
+    expect(legacy.redirect({ fullPath: "/settings/ai_toolsets", query: {} })).toEqual(
+      expect.objectContaining({
+        name: "enterpriseFeatureLocked",
+        query: expect.objectContaining({ feature: "aiToolsets" }),
+      }),
+    );
   });
 
   it("lets an enterprise build through to the route guard", () => {

@@ -10727,6 +10727,7 @@
     "aiExhaustedMessage": "AI を使い続けるにはサブスクライブしてください。以降の使用量はこの組織の請求書に請求されます。",
     "aiContractExhaustedMessage": "AIクレジットを追加するには、アカウントマネージャーにお問い合わせください",
     "aiPayerSubscribeMessage": "この組織の請求は {payer} が管理しています。サブスクライブするには {payer} の管理者に依頼してください。以降の使用量はその請求書に請求されます。",
+    "aiUsedByFeature": "アシスタントとクエリ生成: {chat} · インシデント分析: {incident} · 再分析: {reanalysis}",
     "aiPaygMessage": "無料クレジットを使い切りました — 使用量はサブスクリプションに請求されます",
     "billingGroup": {
       "tabLabel": "請求グループ",

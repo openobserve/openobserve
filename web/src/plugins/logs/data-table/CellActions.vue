@@ -1,6 +1,7 @@
 <template>
   <div
     class="field_overlay table-cell-actions flex items-center gap-1"
+    :title="cellValue"
     :data-test="`log-add-data-from-column-${cellValue}`"
   >
     <OButton

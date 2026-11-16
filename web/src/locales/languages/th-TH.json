@@ -10698,6 +10698,7 @@
     "aiExhaustedMessage": "Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
     "aiContractExhaustedMessage": "Contact your account manager to add more AI credits",
     "aiPayerSubscribeMessage": "Billing for this organization is managed by {payer}. Ask an admin of {payer} to subscribe; further usage is billed on its invoice.",
+    "aiUsedByFeature": "Assistant and query generation: {chat} · Incident analysis: {incident} · Reanalysis: {reanalysis}",
     "aiPaygMessage": "Free credits exhausted — usage billed to subscription",
     "billingGroup": {
       "tabLabel": "Billing Group",

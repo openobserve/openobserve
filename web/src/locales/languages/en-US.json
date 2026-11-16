@@ -11476,6 +11476,7 @@
       },
       "notice": "{percent}% of included AI credits used · they don't renew",
       "noticeDismiss": "Dismiss credit notice",
+      "costs": "A message uses {chat} credit. Incident analysis uses {incident} from the same credits. | A message uses {chat} credits. Incident analysis uses {incident} from the same credits.",
       "more": "More credit actions",
       "noticeResets": "{percent}% of included AI credits used · they reset {date}",
       "predictedExhausted": "AI credits are used up for {org}."
@@ -12885,10 +12886,12 @@
       "failedCount": "{count} failed",
       "fields": "{count} field | {count} fields",
       "hiddenByOwner": "{count} step hidden by the owner | {count} steps hidden by the owner",
+      "inputEvents": "{count} input event | {count} input events",
       "lines": "{count} line | {count} lines",
       "outputTruncated": "Output truncated",
       "rowName": "{step}, {state}",
       "rows": "{count} row | {count} rows",
+      "stderrLines": "stderr {count} line | stderr {count} lines",
       "step": {
         "created": "Created {resource}",
         "deleted": "Deleted {resource}",
@@ -13465,6 +13468,7 @@
     "aiExhaustedMessage": "Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
     "aiContractExhaustedMessage": "Contact your account manager to add more AI credits",
     "aiPayerSubscribeMessage": "Billing for this organization is managed by {payer}. Ask an admin of {payer} to subscribe; further usage is billed on its invoice.",
+    "aiUsedByFeature": "Assistant and query generation: {chat} · Incident analysis: {incident} · Reanalysis: {reanalysis}",
     "aiPaygMessage": "Free credits exhausted — usage billed to subscription",
     "billingGroup": {
       "tabLabel": "Billing Group",

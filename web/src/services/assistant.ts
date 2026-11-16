@@ -70,6 +70,12 @@ export interface AssistantUsage {
   credits_used: number;
   credits_limit: number;
   resetsAt?: number;
+  /** Credits one chat message and one incident analysis take. */
+  costs?: { chat: number; incident: number };
+  /** Credits spent so far, by feature. */
+  used_by_feature?: { chat: number; incident: number; incident_reanalysis: number };
+  /** A contract org whose credits are out needs sales, not a subscription. */
+  requires_additional_credits?: boolean;
 }
 
 /** `POST /api/{org}/ai/capabilities/test` (B-06): no chat, no credit. */
@@ -280,6 +286,18 @@ const count = (value: unknown): number | null =>
     ? Math.floor(value)
     : null;
 
+/** Every key a safe count, or null, so a half-filled breakdown never shows. */
+function counts<K extends string>(body: unknown, keys: readonly K[]): Record<K, number> | null {
+  if (!body || typeof body !== "object") return null;
+  const out = {} as Record<K, number>;
+  for (const key of keys) {
+    const value = count((body as Record<string, unknown>)[key]);
+    if (value === null) return null;
+    out[key] = value;
+  }
+  return out;
+}
+
 /** The server's body is untrusted: an unknown mode or a non-numeric count reads as no usage. */
 export function parseAiUsage(body: unknown): AssistantUsage | null {
   if (!body || typeof body !== "object") return null;
@@ -298,6 +316,11 @@ export function parseAiUsage(body: unknown): AssistantUsage | null {
       ? Date.parse(value.resets_at)
       : NaN;
   if (!Number.isNaN(resets)) usage.resetsAt = resets;
+  const costs = counts(value.costs, ["chat", "incident"]);
+  if (costs) usage.costs = costs;
+  const byFeature = counts(value.used_by_feature, ["chat", "incident", "incident_reanalysis"]);
+  if (byFeature) usage.used_by_feature = byFeature;
+  if (value.requires_additional_credits === true) usage.requires_additional_credits = true;
   return usage;
 }
 

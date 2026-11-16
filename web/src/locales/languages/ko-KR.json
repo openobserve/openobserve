@@ -10727,6 +10727,7 @@
     "aiExhaustedMessage": "AI를 계속 사용하려면 구독하세요. 추가 사용량은 이 조직의 청구서로 청구됩니다.",
     "aiContractExhaustedMessage": "추가 AI 크레딧을 원하시면 계정 관리자에게 문의하세요.",
     "aiPayerSubscribeMessage": "이 조직의 요금 청구는 {payer}에서 관리합니다. {payer}의 관리자에게 구독을 요청하세요. 추가 사용량은 해당 청구서로 청구됩니다.",
+    "aiUsedByFeature": "어시스턴트 및 쿼리 생성: {chat} · 인시던트 분석: {incident} · 재분석: {reanalysis}",
     "aiPaygMessage": "무료 크레딧 소진 — 사용량이 구독에 청구됨",
     "billingGroup": {
       "tabLabel": "결제 그룹",

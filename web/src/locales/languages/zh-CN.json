@@ -10727,6 +10727,7 @@
     "aiExhaustedMessage": "订阅后可继续使用 AI。后续用量将计入本组织的账单。",
     "aiContractExhaustedMessage": "联系您的客户经理以添加更多 AI 积分",
     "aiPayerSubscribeMessage": "本组织的账单由 {payer} 管理。请让 {payer} 的管理员进行订阅；后续用量将计入其账单。",
+    "aiUsedByFeature": "助手与查询生成：{chat} · 事件分析：{incident} · 重新分析：{reanalysis}",
     "aiPaygMessage": "免费积分已用尽 — 使用量计入订阅账单",
     "billingGroup": {
       "tabLabel": "账单组",

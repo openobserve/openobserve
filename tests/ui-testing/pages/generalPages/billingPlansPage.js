@@ -47,9 +47,9 @@ export class BillingPlansPage {
         // AI credits card + paid-AI switch
         // ============================================================
         this.aiUsedByFeature = page.locator('[data-test="billing-ai-used-by-feature"]');
-        this.paidAiUsage = page.locator('[data-test="billing-paid-ai-usage"]');
-        this.paidAiUsageToggle = page.locator('[data-test="billing-paid-ai-usage-toggle"]');
-        this.paidAiUsageHint = page.locator('[data-test="billing-paid-ai-usage-hint"]');
+        this.paidAiUsage = page.locator('[data-test="paid-usage-settings"]');
+        this.paidAiUsageToggle = page.locator('[data-test="paid-usage-own-switch"]');
+        this.paidAiUsageHint = page.locator('[data-test="paid-usage-effective"]');
 
         // ============================================================
         // Text-only anchors (no data-test per feature doc "NEEDS SELECTOR")

@@ -17,7 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 
 import { raw, type TranslateFn } from "@/types/i18n";
-import { b64EncodeUnicode } from "@/utils/formatters";
+import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/formatters";
 
 import {
   MARKDOWN_LINK_ROUTES,
@@ -398,6 +398,15 @@ describe("generateNavigationFromToolResult", () => {
     expect(generateNavigationFromToolResult("Search", args, {}, t)!.target.functionContent).toBe(
       ".x = 1",
     );
+  });
+
+  it("opens the VRL function in the Logs function editor", () => {
+    const args = searchArgs();
+    args.request_body.query.functionContent = ".x = 1";
+    const action = generateNavigationFromToolResult("Search", args, {}, t)!;
+    const link = buildNavigationRoute(action as any, "acme")!;
+    expect(link.route.query).toMatchObject({ fn_editor: "true" });
+    expect(b64DecodeUnicode(link.route.query!.functionContent)).toBe(".x = 1");
   });
 
   it("returns null when the search has no time range", () => {

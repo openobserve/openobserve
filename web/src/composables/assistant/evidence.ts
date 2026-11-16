@@ -84,6 +84,10 @@ export interface StepResult {
   scannedBytes?: number;
   stdout?: string;
   exitCode?: number;
+  /** CLI output line counts and VRL test input events, from the tool's summary. */
+  stdoutLines?: number;
+  stderrLines?: number;
+  inputEvents?: number;
   truncated?: boolean;
 }
 
@@ -586,7 +590,7 @@ function stepFacts(block: ContentBlock, n: number, org: string): StepFacts {
   const summaryRecord =
     summary && typeof summary === "object" ? (summary as Record<string, unknown>) : null;
   const summaryCount = summaryRecord ? finite(summaryRecord.count) : firstNumber(summary);
-  const result = block.result ?? null;
+  const result = withSummaryCounts(block.result ?? null, summaryRecord);
   const rows = QUERY_KINDS.has(kind)
     ? (summaryCount ?? result?.total ?? result?.hits?.length ?? null)
     : null;
@@ -608,6 +612,27 @@ function stepFacts(block: ContentBlock, n: number, org: string): StepFacts {
     result,
     command: kind === "cli" ? (text(args.command) ?? null) : null,
   };
+}
+
+// CLI and VRL tool results carry their counts in the summary, not the response.
+const SUMMARY_COUNTS = {
+  return_code: "exitCode",
+  stdout_lines: "stdoutLines",
+  stderr_lines: "stderrLines",
+  input_count: "inputEvents",
+} as const;
+
+function withSummaryCounts(
+  result: StepResult | null,
+  summary: Record<string, unknown> | null,
+): StepResult | null {
+  if (!summary) return result;
+  const counts: StepResult = {};
+  for (const [from, to] of Object.entries(SUMMARY_COUNTS)) {
+    const value = finite(summary[from]);
+    if (value !== null) counts[to] = value;
+  }
+  return Object.keys(counts).length ? { ...counts, ...result } : result;
 }
 
 // A row chip opens its stream one minute either side of the row.

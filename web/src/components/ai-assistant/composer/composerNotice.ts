@@ -34,6 +34,7 @@ export const NOTICE_PRIORITY = [
   "runLimit",
   "orgBusy",
   "credits",
+  "creditsLow",
   "offline",
   "unreachable",
   "cap",
@@ -73,6 +74,7 @@ export type NoticeAction =
   | "showRunning"
   | "retry"
   | "manageUsage"
+  | "dismissCredits"
   | "undo"
   | "bringDraft"
   | "editQueued"

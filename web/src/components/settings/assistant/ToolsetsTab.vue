@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="visibleRows"
       :columns="columns"
       row-key="id"
-      :loading="list.isPending.value"
+      :loading="loading"
       :forbidden="state === 'forbidden'"
       :error="state === 'error' ? t('assistant.toolsets.loadFailed') : null"
       :row-class="(row: ToolsetRow) => (row.enabled === false ? 'text-text-secondary' : '')"
@@ -254,6 +254,7 @@ import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { useAssistantName } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useListViewState } from "@/composables/useListViewState";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -301,9 +302,18 @@ const { confirm } = useConfirmDialog();
 // Below md the button shows only its icon; above it the visible age is its name, so a label there would contradict it.
 const { mdUp } = useBreakpoint();
 
+const { locked: toolsetsFeatureLocked } = useLicenseLock("ai_toolsets");
+const { locked: assistantLocked } = useLicenseLock("ai_assistant");
+// The list endpoint is licensed under ai_assistant, so either lock would 403 it.
+const toolsetsLocked = computed(() => toolsetsFeatureLocked.value || assistantLocked.value);
 const list = useQuery(
-  computed(() => ({ ...aiToolsetsQuery(page.org.value), enabled: !!page.org.value })),
+  computed(() => ({
+    ...aiToolsetsQuery(page.org.value),
+    enabled: !!page.org.value && !toolsetsLocked.value,
+  })),
 );
+// A disabled query stays pending forever.
+const loading = computed(() => !toolsetsLocked.value && list.isPending.value);
 const capabilities = useQuery(
   computed(() => capabilitiesQuery(page.org.value, page.aiEnabled.value)),
 );
@@ -408,6 +418,7 @@ function enabledOf(row: ToolsetRow): boolean {
 }
 
 function refresh() {
+  if (toolsetsLocked.value) return;
   return list.refetch();
 }
 

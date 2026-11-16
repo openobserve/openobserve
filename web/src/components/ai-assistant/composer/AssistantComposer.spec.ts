@@ -1457,6 +1457,48 @@ describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
     );
   });
 
+  it.each([70, 90] as const)(
+    "shows the %s percent low-credit notice with the per-chat cost, Plans and Dismiss",
+    async (threshold) => {
+      const { wrapper } = setup();
+      wrapper.vm.$router.addRoute({
+        path: "/plans",
+        name: "plans",
+        component: { render: () => null },
+      });
+      const usage = {
+        mode: "free" as const,
+        credits_used: threshold,
+        credits_limit: 100,
+        costs: { chat: 1, incident: 5 },
+      };
+      await wrapper.setProps({ lowCredits: { threshold, usage } });
+      const notice = wrapper.get('[data-notice="creditsLow"]');
+      expect(notice.text()).toContain(`${threshold}% of included AI credits`);
+      expect(notice.attributes("title")).toBe(
+        `${threshold}% of included AI credits used · they don't renew. A message uses 1 credit. Incident analysis uses 5 from the same credits.`,
+      );
+      expect(wrapper.get('[data-test="assistant-composer-notice-manageUsage"]').text()).toBe(
+        "Plans",
+      );
+      await wrapper.get('[data-test="assistant-composer-notice-dismissCredits"]').trigger("click");
+      expect(wrapper.emitted("low-credits")).toEqual([["dismiss"]]);
+      await wrapper.setProps({ lowCredits: null });
+      expect(wrapper.find('[data-notice="creditsLow"]').exists()).toBe(false);
+    },
+  );
+
+  it("lets the used-up notice win over the low-credit one", async () => {
+    const { wrapper, store } = setup({
+      lowCredits: { threshold: 90, usage: { mode: "free", credits_used: 95, credits_limit: 100 } },
+    });
+    store.state.capability.creditMode = "exhausted";
+    await flushPromises();
+    expect(wrapper.find('[data-notice="credits"]').exists()).toBe(true);
+    expect(wrapper.find('[data-notice="creditsLow"]').exists()).toBe(false);
+    store.state.capability.creditMode = undefined;
+  });
+
   it("keeps the used-up credits line while the chat's history is unavailable", async () => {
     const { wrapper, store, sid } = setup();
     store.state.capability.creditMode = "exhausted";

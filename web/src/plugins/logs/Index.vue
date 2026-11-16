@@ -519,7 +519,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.loading == false
                 "
                 data-test="logs-drill-down-no-streams-in-org-text"
-              />
+              >
+                <template #ai-door>
+                  <AiEntryButton v-bind="noStreamDoor" appearance="chip" />
+                </template>
+              </LogsNoDataState>
               <LogsNoStreamState
                 v-else-if="
                   searchObj.data.stream.streamLists.length > 0 &&

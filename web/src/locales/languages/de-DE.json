@@ -10727,6 +10727,7 @@
     "aiExhaustedMessage": "Abonnieren Sie, um KI weiter zu nutzen. Die weitere Nutzung wird über die Rechnung dieser Organisation abgerechnet.",
     "aiContractExhaustedMessage": "Kontaktieren Sie Ihren Account-Manager, um weitere AI-Guthaben hinzuzufügen",
     "aiPayerSubscribeMessage": "Die Abrechnung für diese Organisation wird von {payer} verwaltet. Bitten Sie einen Administrator von {payer} zu abonnieren; die weitere Nutzung wird über dessen Rechnung abgerechnet.",
+    "aiUsedByFeature": "Assistent und Abfragegenerierung: {chat} · Vorfallanalyse: {incident} · Neuanalyse: {reanalysis}",
     "aiPaygMessage": "Kostenlose Credits sind aufgebraucht — Nutzung wird dem Abonnement in Rechnung gestellt",
     "billingGroup": {
       "tabLabel": "Abrechnungsgruppe",

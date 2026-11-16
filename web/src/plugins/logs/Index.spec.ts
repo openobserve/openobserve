@@ -1617,6 +1617,20 @@ describe("Logs Index", async () => {
       );
     });
 
+    it("offers the Ask AI chip when the org has no streams", async () => {
+      await enterDrillDown({ withHits: false, selectedStream: [] });
+      wrapper.vm.searchObj.data.stream.streamLists = [];
+      await flushPromises();
+
+      const state = wrapper
+        .findAllComponents({ name: "LogsNoDataState" })
+        .find((c: any) => c.attributes("data-test") === "logs-drill-down-no-streams-in-org-text");
+      // The chip renders nothing while AI is off, so the slot content is what proves it is wired.
+      const [door] = state.vm.$slots["ai-door"]();
+      expect(door.type).toBe(wrapper.vm.$options.components.AiEntryButton);
+      expect(door.props.appearance).toBe("chip");
+    });
+
     it("shows the pick-a-stream state when no stream is selected", async () => {
       await enterDrillDown({ withHits: false, selectedStream: [] });
 

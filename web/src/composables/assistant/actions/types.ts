@@ -27,6 +27,8 @@ export interface QueryRef {
   to?: number;
   /** A relative window such as `2h`, used when there is no absolute range. */
   period?: string;
+  /** A VRL function the search ran with; Logs opens it in the function editor. */
+  functionContent?: string;
   /** The session's captured org, never tool args (round 2 E-16). */
   org: string;
 }

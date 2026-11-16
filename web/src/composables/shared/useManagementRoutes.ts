@@ -1,6 +1,11 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
-import { withFeatureGate } from "@/utils/enterpriseFeatures";
+import {
+  buildFeatureGateContext,
+  checkFeatureAccess,
+  featureLockedLocation,
+  withFeatureGate,
+} from "@/utils/enterpriseFeatures";
 import { withLicenseFeature } from "@/utils/featureGate";
 import { oncallRouteGuard } from "./oncallRouteGuard";
 import { slackRouteGuard } from "./slackRouteGuard";
@@ -197,11 +202,11 @@ const useManagementRoutes = () => {
           // Old links and bookmarks keep working; `?action=` and `?id=` open the same form in the tab.
           path: "ai_toolsets",
           name: "aiToolsets",
-          redirect: (to: any) => ({
-            name: "assistantSettings",
-            params: { tab: "toolsets" },
-            query: to.query,
-          }),
+          // A redirect record skips `beforeEnter`, so the redirect applies the gate itself.
+          redirect: (to: any) =>
+            checkFeatureAccess("aiToolsets", buildFeatureGateContext()).allowed
+              ? { name: "assistantSettings", params: { tab: "toolsets" }, query: to.query }
+              : featureLockedLocation("aiToolsets", to),
         },
         {
           path: "pipeline_destinations",

@@ -10722,6 +10722,7 @@
     "aiExhaustedMessage": "訂閱即可繼續使用 AI。後續用量將計入此組織的帳單。",
     "aiContractExhaustedMessage": "聯絡您的帳戶管理員以新增更多 AI 額度",
     "aiPayerSubscribeMessage": "此組織的帳務由 {payer} 管理。請要求 {payer} 的管理員訂閱；後續用量將計入其帳單。",
+    "aiUsedByFeature": "助手與查詢生成：{chat} · 事件分析：{incident} · 重新分析：{reanalysis}",
     "aiPaygMessage": "免費額度已用完 — 使用量計入訂閱費用",
     "billingGroup": {
       "tabLabel": "計費群組",

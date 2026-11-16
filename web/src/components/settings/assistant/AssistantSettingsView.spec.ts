@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
 import { RouterView } from "vue-router";
 
+import config from "@/aws-exports";
 import { fakeAssistant } from "@/components/ai-assistant/__tests__/fakeAssistant";
 import assistant from "@/services/assistant";
 import assistantSettings from "@/services/assistant_settings";
@@ -75,8 +76,11 @@ async function mountView(path: string, zo: Record<string, unknown> = {}) {
 }
 
 let wrapper: ReturnType<typeof mount> | null = null;
+const edition = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
 
 beforeEach(() => {
+  config.isEnterprise = "true";
+  config.isCloud = "false";
   fake.current = fakeAssistant("available");
   vi.mocked(assistant.capabilities).mockResolvedValue({
     health: { status: "ok" },
@@ -86,6 +90,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  Object.assign(config, edition);
   wrapper?.unmount();
   wrapper = null;
   vi.clearAllMocks();
@@ -159,5 +164,31 @@ describe("AssistantSettingsView", () => {
     ({ w } = await mountView("/settings/assistant/status", { ai_enabled: false }));
     wrapper = w;
     expect(w.find('[data-test="settings-assistant-off-in-deployment"]').exists()).toBe(false);
+  });
+
+  it("hides Toolsets on Cloud and lands its URL on Status", async () => {
+    config.isEnterprise = "false";
+    config.isCloud = "true";
+    const { w, router } = await mountView("/settings/assistant/toolsets");
+    wrapper = w;
+    expect(w.find('[data-test="settings-assistant-tab-toolsets"]').exists()).toBe(false);
+    expect(router.currentRoute.value.params.tab).toBe("status");
+  });
+
+  it("locks the Toolsets tab, not the tab strip, while ai_toolsets is license-locked", async () => {
+    const zo = { features: { ai_toolsets: "locked" } };
+    let { w } = await mountView("/settings/assistant/toolsets", zo);
+    wrapper = w;
+    const boundary = w.find('[data-test="feature-lock-boundary"]');
+    expect(boundary.attributes("data-locked-feature")).toBe("ai_toolsets");
+    expect(
+      w.find('[data-test="settings-assistant-tabs"]').element.closest("[data-feature-lock-exempt]"),
+    ).not.toBeNull();
+    w.unmount();
+    ({ w } = await mountView("/settings/assistant/status", zo));
+    wrapper = w;
+    expect(
+      w.find('[data-test="feature-lock-boundary"]').attributes("data-locked-feature"),
+    ).toBeUndefined();
   });
 });

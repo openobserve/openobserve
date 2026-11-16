@@ -410,6 +410,7 @@ function explorerQueryOf(type: Explorer, target: Record<string, unknown>, org: s
     ...stringField("stream", idText(stream)),
     streamType: streamTypeOf(target.stream_type) ?? type,
     ...rangeOf(target.from, target.to),
+    ...stringField("functionContent", target.functionContent),
     org,
   };
 }

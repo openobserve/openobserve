@@ -10727,6 +10727,7 @@
     "aiExhaustedMessage": "Đăng ký để tiếp tục sử dụng AI. Phần sử dụng thêm sẽ được tính vào hóa đơn của tổ chức này.",
     "aiContractExhaustedMessage": "Liên hệ với quản lý tài khoản của bạn để thêm tín dụng AI",
     "aiPayerSubscribeMessage": "Việc thanh toán cho tổ chức này do {payer} quản lý. Hãy yêu cầu quản trị viên của {payer} đăng ký; phần sử dụng thêm sẽ được tính vào hóa đơn của tổ chức đó.",
+    "aiUsedByFeature": "Trợ lý và tạo truy vấn: {chat} · Phân tích sự cố: {incident} · Phân tích lại: {reanalysis}",
     "aiPaygMessage": "Tín dụng miễn phí đã hết — mức sử dụng được tính vào đăng ký",
     "billingGroup": {
       "tabLabel": "Nhóm thanh toán",

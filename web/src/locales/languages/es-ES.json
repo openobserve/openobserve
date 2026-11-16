@@ -10727,6 +10727,7 @@
     "aiExhaustedMessage": "Suscríbete para seguir usando la IA. El uso adicional se factura en la factura de esta organización.",
     "aiContractExhaustedMessage": "Póngase en contacto con su administrador de cuenta para agregar más créditos de IA",
     "aiPayerSubscribeMessage": "La facturación de esta organización la gestiona {payer}. Pide a un administrador de {payer} que se suscriba; el uso adicional se factura en su factura.",
+    "aiUsedByFeature": "Asistente y generación de consultas: {chat} · Análisis de incidentes: {incident} · Reanálisis: {reanalysis}",
     "aiPaygMessage": "Créditos gratuitos agotados: el uso se factura a la suscripción",
     "billingGroup": {
       "tabLabel": "Grupo de facturación",

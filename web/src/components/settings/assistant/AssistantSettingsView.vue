@@ -15,75 +15,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    :title="t('assistant.settings.pageTitle', name)"
-    :icon="assistantGlyph.assistant"
-    title-data-test="settings-assistant-page-title"
-    data-assistant-surface
-    tabs-below
-    scroll
-  >
-    <template #header-tabs>
-      <OTabs :model-value="activeTab" align="left" data-test="settings-assistant-tabs">
-        <ORouteTab
-          v-for="entry in TABS"
-          :key="entry.id"
-          :name="entry.id"
-          :label="t(entry.labelKey)"
-          :to="{
-            name: 'assistantSettings',
-            params: { tab: entry.id },
-            query: { org_identifier: page.org.value },
-          }"
-          :data-test="`settings-assistant-tab-${entry.id}`"
-        />
-      </OTabs>
-    </template>
-    <template #actions>
-      <ORefreshButton
-        :loading="refreshing"
-        data-test="settings-assistant-refresh"
-        @click="refresh"
-      />
-    </template>
-    <div
-      class="flex max-w-240 flex-col gap-4 p-4 max-md:p-3"
-      :data-test="`settings-assistant-panel-${activeTab}`"
+  <FeatureLockBoundary :feature="lockedFeature">
+    <OPageLayout
+      :title="t('assistant.settings.pageTitle', name)"
+      :icon="assistantGlyph.assistant"
+      title-data-test="settings-assistant-page-title"
+      data-assistant-surface
+      tabs-below
+      scroll
     >
+      <template #header-tabs>
+        <FeatureLockExempt>
+          <OTabs :model-value="activeTab" align="left" data-test="settings-assistant-tabs">
+            <ORouteTab
+              v-for="entry in TABS"
+              :key="entry.id"
+              :name="entry.id"
+              :label="t(entry.labelKey)"
+              :to="{
+                name: 'assistantSettings',
+                params: { tab: entry.id },
+                query: { org_identifier: page.org.value },
+              }"
+              :data-test="`settings-assistant-tab-${entry.id}`"
+            />
+          </OTabs>
+        </FeatureLockExempt>
+      </template>
+      <template #actions>
+        <ORefreshButton
+          :loading="refreshing"
+          data-test="settings-assistant-refresh"
+          @click="refresh"
+        />
+      </template>
       <div
-        v-if="adminHelper"
-        class="border-border-default rounded-surface flex flex-wrap items-center gap-3 border p-3"
-        data-test="settings-assistant-admin-only"
+        class="flex max-w-240 flex-col gap-4 p-4 max-md:p-3"
+        :data-test="`settings-assistant-panel-${activeTab}`"
       >
-        <p class="text-text-body min-w-0 flex-1 text-sm">
-          {{ t("assistant.settings.adminOnly") }}
+        <div
+          v-if="adminHelper"
+          class="border-border-default rounded-surface flex flex-wrap items-center gap-3 border p-3"
+          data-test="settings-assistant-admin-only"
+        >
+          <p class="text-text-body min-w-0 flex-1 text-sm">
+            {{ t("assistant.settings.adminOnly") }}
+          </p>
+          <AssistantAskAdminPopover kind="settings" :org="page.org.value">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm-action"
+                class="max-md:min-h-11"
+                data-test="settings-assistant-ask-admin"
+                >{{ t("assistant.gate.noPermission.askAdmin") }}</OButton
+              >
+            </template>
+          </AssistantAskAdminPopover>
+        </div>
+        <p
+          v-if="!page.aiEnabled.value && activeTab !== 'status'"
+          class="text-text-secondary text-sm"
+          data-test="settings-assistant-off-in-deployment"
+        >
+          {{ t("assistant.settings.offInDeployment") }}
         </p>
-        <AssistantAskAdminPopover kind="settings" :org="page.org.value">
-          <template #trigger>
-            <OButton
-              variant="outline"
-              size="sm-action"
-              class="max-md:min-h-11"
-              data-test="settings-assistant-ask-admin"
-              >{{ t("assistant.gate.noPermission.askAdmin") }}</OButton
-            >
-          </template>
-        </AssistantAskAdminPopover>
+        <component
+          :is="TAB_COMPONENTS[activeTab]"
+          :key="`${page.org.value}:${activeTab}`"
+          ref="panel"
+        />
       </div>
-      <p
-        v-if="!page.aiEnabled.value && activeTab !== 'status'"
-        class="text-text-secondary text-sm"
-        data-test="settings-assistant-off-in-deployment"
-      >
-        {{ t("assistant.settings.offInDeployment") }}
-      </p>
-      <component
-        :is="TAB_COMPONENTS[activeTab]"
-        :key="`${page.org.value}:${activeTab}`"
-        ref="panel"
-      />
-    </div>
-  </OPageLayout>
+    </OPageLayout>
+  </FeatureLockBoundary>
 </template>
 
 <script lang="ts">
@@ -115,14 +119,18 @@ import { useRouter } from "vue-router";
 
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
 import { useAssistantName } from "@/composables/assistant";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { useI18nTyped } from "@/types/i18n";
+import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
 import AccessTab from "./AccessTab.vue";
 import ActivityTab from "./ActivityTab.vue";
@@ -137,7 +145,11 @@ import { useAssistantSettingsPage } from "./useAssistantSettingsPage";
 // Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
 provideAssistantSurface();
 
-const TABS = SETTINGS_TABS;
+// Toolsets is self-hosted enterprise only, as its old Settings page was.
+const TABS = SETTINGS_TABS.filter(
+  (entry) =>
+    entry.id !== "toolsets" || checkFeatureAccess("aiToolsets", buildFeatureGateContext()).allowed,
+);
 
 const TAB_COMPONENTS: Partial<Record<AssistantSettingsTab, Component>> = {
   status: StatusTab,
@@ -162,6 +174,11 @@ const refreshing = ref(false);
 
 const known = computed(() => TABS.find((entry) => entry.id === props.tab));
 const activeTab = computed<AssistantSettingsTab>(() => known.value?.id ?? "status");
+// The old `ai_toolsets` route was license-tagged; the tab now carries that page lock.
+const { locked: toolsetsLocked } = useLicenseLock("ai_toolsets");
+const lockedFeature = computed(() =>
+  activeTab.value === "toolsets" && toolsetsLocked.value ? "ai_toolsets" : null,
+);
 const adminHelper = computed(() => !page.isAdmin.value && (known.value?.writes ?? true));
 
 watch(

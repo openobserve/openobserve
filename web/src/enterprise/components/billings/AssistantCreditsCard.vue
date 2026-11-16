@@ -36,6 +36,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @retry="retry"
         @manage="focusPaidUsage"
       />
+      <p
+        v-if="usage?.used_by_feature"
+        class="text-text-secondary mt-1 text-xs"
+        data-test="billing-ai-used-by-feature"
+      >
+        {{
+          t("billing.aiUsedByFeature", {
+            chat: usage.used_by_feature.chat,
+            incident: usage.used_by_feature.incident,
+            reanalysis: usage.used_by_feature.incident_reanalysis,
+          })
+        }}
+      </p>
     </div>
     <!-- The paid usage section below states an overage read failure once, with its own Retry. -->
     <div
@@ -64,6 +77,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="emit('subscribe')"
         >{{ t("assistant.billing.subscribe") }}</OButton
       >
+      <OButton
+        v-else-if="mode === 'exhausted' && contract"
+        variant="outline"
+        size="sm-action"
+        class="max-md:min-h-11"
+        data-test="billing-ai-contact-sales"
+        @click="contactSales"
+        >{{ t("billing.contactLabel") }}</OButton
+      >
     </div>
     <AssistantPaidUsageSettings @change="retry" />
   </section>
@@ -73,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, useId } from "vue";
 
 import AssistantCreditMeter from "@/components/ai-assistant/credits/AssistantCreditMeter.vue";
+import { siteURL } from "@/constants/config";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -100,17 +123,27 @@ const usageError = computed(() => usageQuery.isError.value);
 const mode = computed(() => modeOf(usage.value));
 const overageError = computed(() => overage.isError.value);
 const resetsAt = computed(() => dayOf(usage.value?.resetsAt));
+// Either read can say the contract's credits are out; only sales can add more then.
+const contract = computed(
+  () =>
+    overage.data.value?.billing_status === "additional_credits_required" ||
+    usage.value?.requires_additional_credits === true,
+);
 const modeLineKeyValue = computed(() =>
   modeLineKey(mode.value, {
     resets: !!resetsAt.value,
     payer: !!overage.data.value?.payer,
-    billing: overage.data.value?.billing_status,
+    billing: contract.value ? "additional_credits_required" : overage.data.value?.billing_status,
     isAdmin: capability.value.isAdmin,
   }),
 );
 const modeLine = computed(() =>
   modeLineKeyValue.value ? t(modeLineKeyValue.value, { date: resetsAt.value }) : "",
 );
+
+function contactSales() {
+  window.open(siteURL.contactSales, "_blank");
+}
 
 async function focusPaidUsage() {
   await nextTick();

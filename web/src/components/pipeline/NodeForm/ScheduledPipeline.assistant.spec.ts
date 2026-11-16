@@ -124,6 +124,19 @@ describe("ScheduledPipeline with the revamped assistant", () => {
     expect(String(adapter.objectTitle())).toContain("orders");
   });
 
+  it("gives the sidebar assistant the node's pipelines context while the node is open", async () => {
+    setup();
+    await settleAsyncParts();
+    expect(await contextRegistry.getActiveContext()).toMatchObject({
+      currentPage: "Pipelines",
+      pipelineName: "orders",
+      pipelineNodeType: "query",
+      queryType: "sql",
+      streamType: "logs",
+      selectedStreams: expect.any(Array),
+    });
+  });
+
   it("pushes the node's context over the editor's and pops only its own on close", async () => {
     const { wrapper, runtime } = setup();
     await settleAsyncParts();

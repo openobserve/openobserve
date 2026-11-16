@@ -504,7 +504,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t('assistant.composer.rateLimited')
                   : undefined
           "
+          :low-credits="lowCredits"
           @show-running="openChats"
+          @low-credits="onLowCredits"
         >
           <template #chips>
             <slot name="tray">
@@ -671,6 +673,7 @@ import {
   turnLockKey,
   useAssistantCapability,
   useAssistantCredits,
+  useCreditNotice,
   useAssistantName,
   useAssistantHistory,
   useAssistantRuns,
@@ -988,6 +991,23 @@ const credits = useAssistantCredits(
   () => metered.value,
   () => capability.value.isAdmin,
 );
+
+// The old chat showed the low-credit warning above the input; the composer strip carries it now.
+const creditNotice = useCreditNotice(
+  () => store.state.userOrgKey,
+  () => (metered.value ? credits.usage.value : null),
+  () => visible.value,
+);
+const lowCredits = computed(() => {
+  const threshold = creditNotice.threshold.value;
+  const usage = credits.usage.value;
+  return threshold && usage ? { threshold, usage } : null;
+});
+
+function onLowCredits(action: "manage" | "dismiss"): void {
+  if (action === "dismiss") creditNotice.dismiss();
+  else creditNotice.noteAction("manage");
+}
 
 // The welcome's data is built only once the welcome shows, so a gated container never reads it (IW-05 AC 10).
 const welcomeScope = effectScope();

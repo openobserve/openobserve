@@ -10727,6 +10727,7 @@
     "aiExhaustedMessage": "Neem een abonnement om AI te blijven gebruiken. Verder gebruik wordt gefactureerd op de factuur van deze organisatie.",
     "aiContractExhaustedMessage": "Neem contact op met uw accountmanager om meer AI-tegoed toe te voegen",
     "aiPayerSubscribeMessage": "De facturatie voor deze organisatie wordt beheerd door {payer}. Vraag een beheerder van {payer} om een abonnement te nemen; verder gebruik wordt gefactureerd op de factuur ervan.",
+    "aiUsedByFeature": "Assistent en querygeneratie: {chat} · Incidentanalyse: {incident} · Heranalyse: {reanalysis}",
     "aiPaygMessage": "Gratis credits uitgeput — gebruik wordt gefactureerd op het abonnement",
     "billingGroup": {
       "tabLabel": "Factureringsgroep",

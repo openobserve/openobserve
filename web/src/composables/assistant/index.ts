@@ -26,6 +26,7 @@ export {
   useAssistantCredits,
   useCreditNotice,
   type CreditRefusalContext,
+  type CreditThreshold,
 } from "./useAssistantCredits";
 export { openAssistant, type OpenAssistantCall } from "./openAssistant";
 export { useDeepLinkDoor } from "./useDeepLinkDoor";

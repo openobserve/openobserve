@@ -97,6 +97,10 @@ describe("CellActions", () => {
       const container = wrapper.find('[data-test="log-add-data-from-column-200"]');
       expect(container.exists()).toBe(true);
     });
+
+    it("shows the full cell value as the row's tooltip", () => {
+      expect(mountComponent().find(".field_overlay").attributes("title")).toBe("200");
+    });
   });
 
   // ── Layout ────────────────────────────────────────────────────────────────────

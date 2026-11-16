@@ -10727,6 +10727,7 @@
     "aiExhaustedMessage": "Subskrybuj, aby dalej korzystać z AI. Dalsze użycie zostanie rozliczone na fakturze tej organizacji.",
     "aiContractExhaustedMessage": "Skontaktuj się z menedżerem konta, aby dodać więcej kredytów AI",
     "aiPayerSubscribeMessage": "Rozliczeniami tej organizacji zarządza {payer}. Poproś administratora {payer} o subskrypcję; dalsze użycie zostanie rozliczone na jej fakturze.",
+    "aiUsedByFeature": "Asystent i generowanie zapytań: {chat} · Analiza incydentów: {incident} · Ponowna analiza: {reanalysis}",
     "aiPaygMessage": "Bezpłatne kredyty wyczerpane — użycie fakturowane na subskrypcję",
     "billingGroup": {
       "tabLabel": "Grupa rozliczeniowa",

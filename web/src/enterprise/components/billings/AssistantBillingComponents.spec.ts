@@ -315,14 +315,50 @@ describe("AssistantCreditsCard", () => {
     const exhausted = { ...usage, mode: "exhausted", credits_used: 1000 };
     const contract = { ...STATUS, billing_status: "additional_credits_required" as const };
     const admin = await mountCard(contract, exhausted);
-    const adminLine = admin.find('[data-test="billing-ai-mode-line"]').text();
+    const adminLine = admin.find('[data-test="billing-ai-mode-line"] p').text();
     capabilityAdmin.value = false;
     const member = await mountCard(contract, exhausted);
     capabilityAdmin.value = true;
-    expect(member.find('[data-test="billing-ai-mode-line"]').text()).not.toBe(adminLine);
-    expect(member.find('[data-test="billing-ai-mode-line"]').text()).toBe(
+    expect(member.find('[data-test="billing-ai-mode-line"] p').text()).not.toBe(adminLine);
+    expect(member.find('[data-test="billing-ai-mode-line"] p').text()).toBe(
       i18n.global.t("assistant.billing.mode.exhaustedContractMember"),
     );
+  });
+
+  it.each([
+    ["the paid usage status", { billing_status: "additional_credits_required" as const }, {}],
+    ["the usage read", {}, { requires_additional_credits: true }],
+  ])("offers Contact sales when %s says the contract is out", async (_, status, body) => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const w = await mountCard(
+      { ...STATUS, ...status },
+      { ...usage, mode: "exhausted", credits_used: 1000, ...body },
+    );
+    expect(w.find('[data-test="billing-ai-subscribe"]').exists()).toBe(false);
+    await w.find('[data-test="billing-ai-contact-sales"]').trigger("click");
+    expect(open).toHaveBeenCalledWith(expect.stringContaining("contact"), "_blank");
+    open.mockRestore();
+  });
+
+  it("offers Subscribe, not Contact sales, when an exhausted org can subscribe", async () => {
+    const w = await mountCard(STATUS, { ...usage, mode: "exhausted", credits_used: 1000 });
+    expect(w.find('[data-test="billing-ai-subscribe"]').exists()).toBe(true);
+    expect(w.find('[data-test="billing-ai-contact-sales"]').exists()).toBe(false);
+  });
+
+  it("breaks the used credits down by feature when the server sends it", async () => {
+    const w = await mountCard(STATUS, {
+      ...usage,
+      used_by_feature: { chat: 700, incident: 400, incident_reanalysis: 100 },
+    });
+    expect(w.find('[data-test="billing-ai-used-by-feature"]').text()).toBe(
+      "Assistant and query generation: 700 · Incident analysis: 400 · Reanalysis: 100",
+    );
+  });
+
+  it("shows no breakdown when the server sends none", async () => {
+    const w = await mountCard(STATUS, usage);
+    expect(w.find('[data-test="billing-ai-used-by-feature"]').exists()).toBe(false);
   });
 
   it("renders nothing where the server has no AI usage", async () => {

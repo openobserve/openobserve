@@ -191,15 +191,23 @@ function stepFactsText(step: StepFacts, t: TranslateFn): (I18nText | null)[] {
     return [t("assistant.steps.fields", { count: formatCount(step.count) }, step.count), took];
   if (step.kind === "cli") {
     const exit = step.result?.exitCode;
-    const lines = step.result?.stdout
-      ? step.result.stdout.split("\n").filter(Boolean).length
-      : null;
+    const lines =
+      step.result?.stdoutLines ??
+      (step.result?.stdout ? step.result.stdout.split("\n").filter(Boolean).length : null);
+    const stderr = step.result?.stderrLines;
     return [
       exit !== undefined ? t("assistant.steps.exit", { code: exit }) : null,
       lines !== null ? t("assistant.steps.lines", { count: formatCount(lines) }, lines) : null,
+      stderr ? t("assistant.steps.stderrLines", { count: formatCount(stderr) }, stderr) : null,
     ];
   }
-  return [took];
+  const events = step.result?.inputEvents;
+  return [
+    events !== undefined
+      ? t("assistant.steps.inputEvents", { count: formatCount(events) }, events)
+      : null,
+    took,
+  ];
 }
 
 // Splits on the WHERE's top-level ANDs; a quoted or bracketed AND stays inside its term.

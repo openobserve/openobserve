@@ -194,7 +194,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { AssistantHostAdapter, ContextChip, Sid, TurnTerminal } from "@/composables/assistant";
+import type {
+  AssistantHostAdapter,
+  ContextChip,
+  CreditThreshold,
+  Sid,
+  TurnTerminal,
+} from "@/composables/assistant";
+import type { AssistantUsage } from "@/services/assistant";
 import type { I18nText } from "@/types/i18n";
 
 export interface AssistantComposerProps {
@@ -209,11 +216,15 @@ export interface AssistantComposerProps {
   accessLost?: boolean;
   /** The container just opened; the frame plays its one border sweep. */
   opening?: boolean;
+  /** The 70 % / 90 % included-credit notice; the shell decides when it shows. */
+  lowCredits?: { threshold: CreditThreshold; usage: AssistantUsage } | null;
 }
 
 export interface AssistantComposerEmits {
   /** The run-limit notice's link; the shell owns the running-chats list. */
   (e: "show-running"): void;
+  /** The low-credit notice's Plans or Dismiss link. */
+  (e: "low-credits", action: "manage" | "dismiss"): void;
 }
 
 /** A starter prompt over a draft this long asks Replace · Append · Cancel (IW-06 AC 5). */
@@ -288,7 +299,7 @@ import type { FileValue } from "@/lib/forms/File/OFile.types";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { MAX_IMAGE_SIZE_BYTES } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatBytes } from "@/utils/formatters";
+import { formatBytes, formatOrgDay } from "@/utils/formatters";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import AssistantComposerBottomRow, {
@@ -340,6 +351,7 @@ const props = withDefaults(defineProps<AssistantComposerProps>(), {
   cooldownReason: undefined,
   accessLost: false,
   opening: false,
+  lowCredits: null,
 });
 
 const emit = defineEmits<AssistantComposerEmits>();
@@ -775,6 +787,29 @@ const stateNotice = computed<ComposerNotice | null>(() => {
         ? [{ action: "manageUsage", label: t("assistant.composer.strip.managePaid") }]
         : [],
     };
+  const low = props.lowCredits;
+  if (low) {
+    const percent = low.threshold;
+    const line = low.usage.resetsAt
+      ? t("assistant.credits.noticeResets", {
+          percent,
+          date: raw(formatOrgDay(low.usage.resetsAt)),
+        })
+      : t("assistant.credits.notice", { percent });
+    const costs = low.usage.costs;
+    return {
+      id: "creditsLow",
+      tone: "warning",
+      title: line,
+      sentence: costs ? raw(`${line}. ${t("assistant.credits.costs", costs, costs.chat)}`) : line,
+      links: [
+        ...(billingHrefOf(router, org.value)
+          ? [{ action: "manageUsage" as const, label: t("billing.plansLabel") }]
+          : []),
+        { action: "dismissCredits", label: t("common.dismiss") },
+      ],
+    };
+  }
   const offline =
     errorRow.value === t("assistant.composer.offline") || (voice.show.value && voice.offline.value);
   if (offline)
@@ -1481,7 +1516,11 @@ const NOTICE_HANDLERS: Record<NoticeAction, () => void> = {
   turnOn: turnOnVoice,
   showRunning: () => emit("show-running"),
   retry: retryRefused,
-  manageUsage: () => openHref(billingHrefOf(router, org.value)),
+  manageUsage: () => {
+    if (props.lowCredits && !creditsOut.value) emit("low-credits", "manage");
+    openHref(billingHrefOf(router, org.value));
+  },
+  dismissCredits: () => emit("low-credits", "dismiss"),
   undo: () => undoClear(),
   bringDraft: () => undoClear(),
   editQueued,

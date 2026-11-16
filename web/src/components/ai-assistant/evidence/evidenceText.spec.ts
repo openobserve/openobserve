@@ -15,7 +15,79 @@
 
 import { describe, expect, it } from "vitest";
 
-import { queryFragments } from "./evidenceText";
+import { stepsOf } from "@/composables/assistant/evidence";
+import type { ContentBlock } from "@/ts/interfaces/chat";
+import { gt, raw } from "@/types/i18n";
+
+import { queryFragments, stepLine, stepVerb } from "./evidenceText";
+
+// The trail line as the producer leaves it, from the tool_result shapes the server sends.
+const lineOf = (block: Partial<ContentBlock>) =>
+  stepLine(
+    stepsOf(
+      { role: "assistant", content: raw(""), contentBlocks: [{ type: "tool_call", ...block }] },
+      "acme",
+    )[0],
+    gt,
+  );
+
+describe("stepLine / stepVerb", () => {
+  it("reads a CLI step's exit code and stdout and stderr line counts from its summary", () => {
+    const summary = { return_code: 1, stdout_lines: 4, stderr_lines: 2 } as any;
+    expect(
+      lineOf({
+        tool: "cli_kubectl",
+        callArgs: { command: "kubectl get pods" },
+        stepState: "done",
+        summary,
+      }),
+    ).toBe("Ran kubectl get pods · exit 1 · 4 lines · stderr 2 lines");
+  });
+
+  it("leaves out an empty stderr and counts stdout lines from the response", () => {
+    expect(
+      lineOf({
+        tool: "cli_ls",
+        callArgs: { command: "ls" },
+        stepState: "done",
+        result: { exitCode: 0, stdout: "a\nb\n" },
+        summary: { stderr_lines: 0 } as any,
+      }),
+    ).toBe("Ran ls · exit 0 · 2 lines");
+  });
+
+  it("counts a VRL test's input events", () => {
+    const summary = { input_count: 3 } as any;
+    expect(lineOf({ tool: "testFunction", stepState: "done", summary })).toBe(
+      "Ran test function · 3 input events",
+    );
+  });
+
+  it("names a CLI step by its command, falling back to the tool", () => {
+    const [step] = stepsOf(
+      {
+        role: "assistant",
+        content: raw(""),
+        contentBlocks: [{ type: "tool_call", tool: "cli_exec", stepState: "done" }],
+      },
+      "acme",
+    );
+    expect(stepVerb(step, gt)).toBe("Ran cli_exec");
+    expect(stepVerb({ ...step, command: "df -h" }, gt)).toBe("Ran df -h");
+  });
+
+  it("shows a failed step's error after its head", () => {
+    expect(
+      lineOf({ tool: "o2_GetAlert", stepState: "failed", resultMessage: "alert not found" }),
+    ).toBe("Get alert failed · alert not found");
+  });
+
+  it("says an interrupted step stopped before it finished", () => {
+    expect(lineOf({ tool: "o2_StreamList", call_id: "c" })).toBe(
+      "Listed streams · stopped before it finished",
+    );
+  });
+});
 
 describe("queryFragments", () => {
   it("shows what tells each query from its siblings, verbatim", () => {
