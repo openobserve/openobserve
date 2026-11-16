@@ -62,6 +62,20 @@ pub static DATAFUSION_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
     )
 });
 
+/// Blocking-only pool for tantivy index builds. A fixed thread count keeps build garbage in a few
+/// reused allocator heaps instead of spreading it over every blocking thread of the caller.
+pub static TANTIVY_BUILD_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+    let cfg = get_config();
+    tokio::runtime::Builder::new_current_thread()
+        .thread_name("tantivy_build")
+        .thread_stack_size(THREAD_STACK_SIZE)
+        .max_blocking_threads(
+            cfg.compact.tantivy_builder_thread_num * cfg.limit.file_merge_thread_num,
+        )
+        .build()
+        .unwrap()
+});
+
 pub static WAL_RUNTIME: Lazy<Option<Arc<Runtime>>> = Lazy::new(|| {
     let cfg = get_config();
 

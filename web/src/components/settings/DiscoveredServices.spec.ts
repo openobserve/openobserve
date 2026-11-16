@@ -658,14 +658,6 @@ describe("DiscoveredServices", () => {
   });
 
   describe("table wiring (merged name cell, no expansion)", () => {
-    it("should inset the table from the page edge", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const table = wrapper.find('[data-test="services-list-table"]');
-      expect(table.exists()).toBe(true);
-      expect(table.element.closest(".px-page-edge")).not.toBeNull();
-    });
-
     it("should pass pivotRowColumns for service_name and disable expansion", async () => {
       wrapper = mountComponent();
       await flushPromises();

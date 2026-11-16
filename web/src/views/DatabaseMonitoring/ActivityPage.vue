@@ -115,14 +115,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #subheader>
-          <!-- ONE discretionary band above the rows: the state summary doubles
-               as the wait-event breakdown's home, so the two summaries cost the
-               page a single strip rather than two stacked ones. Always
-               rendered — `:loading` draws the skeleton — so arriving data never
-               shifts the rows below it. -->
-          <DbmSubheaderBand data-test="dbm-activity-summary">
-            <OStatStrip :items="summaryStats" :loading="loading" />
-          </DbmSubheaderBand>
+          <!-- Always rendered — `:loading` draws the skeleton — so arriving
+               data never shifts the rows below it. -->
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            row
+            data-test="dbm-activity-summary"
+          />
 
           <!-- The wait-event breakdown, grouped by the ENGINE'S OWN vocabulary.
                A unified cross-engine taxonomy was considered and withdrawn:
@@ -322,7 +322,6 @@ import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
 import DateTime from "@/components/DateTime.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
-import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";

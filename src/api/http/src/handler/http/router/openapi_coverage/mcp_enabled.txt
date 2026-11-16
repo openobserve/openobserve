@@ -18,6 +18,7 @@ ent AutoObservePreviewDecision
 ent AutoObservePutMark
 ent AutoObservePutVerdict
 ent AutoObserveReview
+ent AutoObserveStreamVolume
 ent AutoObserveSuggestions
 ent AutoObserveUndoDecision
 all CancelAlertMute

@@ -1,154 +1,172 @@
 <template>
   <div>
-    <!-- Section header is provided full-width by the Settings shell. The page
-         gutter is owned by ConstrainedPage; this page adds none of its own. -->
-    <div class="pb-3">
-      <div class="text-base font-bold">
-        {{ t("settings.logDetails") }}
-      </div>
-    </div>
-
-    <OForm
-      id="organization-settings-form"
-      class="mb-3"
-      :schema="organizationSettingsSchema"
-      :default-values="organizationSettingsDefaults"
-      @submit="saveOrgSettings"
-      v-slot="{ isSubmitting }"
-    >
-      <div
-        data-test="add-role-rolename-input-btn"
-        class="trace-id-field-name o2-input mb-2 w-100 max-md:w-full"
+    <OForm id="organization-settings-form" :form="form">
+      <OFormSection
+        variant="plain"
+        :title="t('settings.organizationSettings.sectionTitle')"
+        :description="t('settings.organizationSettings.sectionDescription')"
+        data-test="organization-settings-section"
       >
-        <OFormInput
-          data-test="settings-org-trace-id-input"
+        <OSettingRow
+          control-at="end"
           name="traceIdFieldName"
+          error-data-test="settings-org-trace-id-input-error"
           :label="t('settings.traceIdFieldName')"
-          required
-          class="showLabelOnTop py-3"
-          :help-text="t('settings.organizationSettings.fieldNameHelp')"
-        />
-      </div>
+          :description="t('settings.organizationSettings.traceIdHelp')"
+          :loading="!settingsLoaded"
+          data-test="add-role-rolename-input-btn"
+        >
+          <OFormInput
+            data-test="settings-org-trace-id-input"
+            name="traceIdFieldName"
+            required
+            :aria-label="t('settings.traceIdFieldName')"
+          />
+        </OSettingRow>
 
-      <div
-        data-test="add-role-rolename-input-btn"
-        class="span-id-field-name o2-input w-100 max-md:w-full"
-      >
-        <OFormInput
-          data-test="settings-org-span-id-input"
+        <OSettingRow
+          control-at="end"
           name="spanIdFieldName"
+          error-data-test="settings-org-span-id-input-error"
           :label="t('settings.spanIdFieldName')"
-          required
-          class="showLabelOnTop py-3"
-          :help-text="t('settings.organizationSettings.fieldNameHelp')"
-        />
-      </div>
+          :description="t('settings.organizationSettings.spanIdHelp')"
+          :loading="!settingsLoaded"
+          data-test="add-role-rolename-input-btn"
+        >
+          <OFormInput
+            data-test="settings-org-span-id-input"
+            name="spanIdFieldName"
+            required
+            :aria-label="t('settings.spanIdFieldName')"
+          />
+        </OSettingRow>
 
-      <div
-        v-if="config.isCloud !== 'true'"
-        data-test="add-toggle-ingestion"
-        class="span-id-field-name o2-input w-100 max-md:w-full"
-      >
-        <OFormSwitch
-          data-test="add-toggle-ingestion-btn"
+        <OSettingRow
+          v-if="config.isCloud !== 'true'"
+          control-at="end"
           name="toggleIngestionLogs"
           :label="t('settings.toggleIngestionLogsLabel')"
-          class="mt-2"
-        />
-      </div>
+          :description="t('settings.organizationSettings.ingestionLogsHelp')"
+          :loading="!settingsLoaded"
+          data-test="add-toggle-ingestion"
+        >
+          <OFormSwitch
+            data-test="add-toggle-ingestion-btn"
+            name="toggleIngestionLogs"
+            off-tone="neutral"
+            state-text
+            :aria-label="t('settings.toggleIngestionLogsLabel')"
+          />
+        </OSettingRow>
 
-      <div data-test="add-toggle-usage-stream" class="o2-input">
-        <OFormSwitch
-          data-test="add-toggle-usage-stream-btn"
+        <OSettingRow
+          control-at="end"
           name="usageStreamEnabled"
           :label="t('settings.usageStreamEnabledLabel')"
-          class="mt-2"
-        />
-      </div>
+          :description="t('settings.organizationSettings.usageStreamHelp', { org: orgName })"
+          :loading="!settingsLoaded"
+          data-test="add-toggle-usage-stream"
+        >
+          <OFormSwitch
+            data-test="add-toggle-usage-stream-btn"
+            name="usageStreamEnabled"
+            off-tone="neutral"
+            state-text
+            :aria-label="t('settings.usageStreamEnabledLabel')"
+          />
+        </OSettingRow>
 
-      <div v-if="showRedInsights" data-test="settings-red-insights" class="o2-input">
-        <div data-test="settings-traces-heading" class="pt-4 pb-1 text-base font-bold">
-          {{ t("settings.tracesHeading") }}
-        </div>
-        <OFormSwitch
-          data-test="settings-red-insights-btn"
+        <OSettingRow
+          v-if="showRedInsights"
+          control-at="end"
           name="redInsightsEnabled"
           :label="t('settings.redInsightsEnabledLabel')"
-          class="mt-2"
+          :description="t('settings.redInsightsEnabledHelp')"
+          :loading="!settingsLoaded"
+          data-test="settings-red-insights"
         >
-          <template #tooltip>
-            <OTooltip :content="t('settings.redInsightsEnabledHelp')" />
-          </template>
-        </OFormSwitch>
-      </div>
+          <OFormSwitch
+            data-test="settings-red-insights-btn"
+            name="redInsightsEnabled"
+            off-tone="neutral"
+            state-text
+            :aria-label="t('settings.redInsightsEnabledLabel')"
+          />
+        </OSettingRow>
 
-      <div v-if="showRedInsights" data-test="settings-ai-rca-thread-tool-output" class="o2-input">
-        <div data-test="settings-incidents-heading" class="pt-4 pb-1 text-base font-bold">
-          {{ t("settings.incidentsHeading") }}
-        </div>
-        <OFormSwitch
-          data-test="settings-ai-rca-thread-tool-output-btn"
+        <OSettingRow
+          v-if="showRedInsights"
+          control-at="end"
           name="aiRcaThreadToolOutput"
           :label="t('settings.aiRcaThreadToolOutputLabel')"
-          class="mt-2"
+          :description="t('settings.aiRcaThreadToolOutputHelp')"
+          :loading="!settingsLoaded"
+          data-test="settings-ai-rca-thread-tool-output"
         >
-          <template #tooltip>
-            <OTooltip :content="t('settings.aiRcaThreadToolOutputHelp')" />
-          </template>
-        </OFormSwitch>
-      </div>
+          <OFormSwitch
+            data-test="settings-ai-rca-thread-tool-output-btn"
+            name="aiRcaThreadToolOutput"
+            off-tone="neutral"
+            state-text
+            :aria-label="t('settings.aiRcaThreadToolOutputLabel')"
+          />
+        </OSettingRow>
+      </OFormSection>
 
-      <!-- Cross-Linking Configuration -->
+      <DataRetentionDefaults
+        v-if="showDataRetentionDefaults"
+        class="mt-4"
+        :form="form"
+        :loading="!settingsLoaded"
+      />
+
       <template v-if="store.state.zoConfig?.enable_cross_linking">
         <OSeparator class="mt-6 mb-4" />
         <CrossLinkManager
           v-model="crossLinks"
           :title="t('crossLinks.orgConfigTitle')"
           :subtitle="t('crossLinks.orgConfigSubtitle')"
-          @change="formDirty = true"
         />
       </template>
 
-      <div class="mt-3 flex gap-2">
-        <!-- <OButton
-        data-test="add-alert-cancel-btn"
-        variant="outline"
-        size="sm-action"
-        @click="$emit('cancel:hideform')"
-      >{{ t('alerts.cancel') }}</OButton> -->
-        <OButton
-          data-test="add-alert-submit-btn"
-          variant="primary"
-          size="sm-action"
-          type="submit"
-          :loading="isSubmitting"
-          >{{ t("alerts.save") }}</OButton
-        >
-      </div>
+      <Teleport defer :to="SAVE_BAR_SLOT">
+        <OSaveBar
+          class="px-page-edge"
+          form-id="organization-settings-form"
+          :change-count="changes"
+          :loaded="settingsLoaded"
+          data-test="organization-settings-save-bar"
+          save-data-test="add-alert-submit-btn"
+          @discard="discardCrossLinks"
+        />
+      </Teleport>
     </OForm>
-
-    <template v-if="showDataRetentionDefaults">
-      <OSeparator class="mt-6 mb-4" />
-      <DataRetentionDefaults />
-    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { updateOrgSettingsMutation } from "@/services/organizations.queries";
-import { useMutation } from "@tanstack/vue-query";
+import { orgSettingsQuery, updateOrgSettingsMutation } from "@/services/organizations.queries";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { useStore } from "vuex";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import DataRetentionDefaults from "@/components/settings/DataRetentionDefaults.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import {
+  discardFormChanges,
+  rebaseSavedValues,
+  useFormCounts,
+} from "@/lib/forms/SaveBar/formCounts";
+import { useLeaveGuard } from "@/lib/forms/SaveBar/useLeaveGuard";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
@@ -156,28 +174,32 @@ import {
   makeOrganizationSettingsSchema,
   type OrganizationSettingsForm,
 } from "./OrganizationSettings.schema";
+import {
+  retentionRowChanges,
+  toRetentionFormValues,
+  toRetentionPayload,
+} from "./DataRetentionDefaults.schema";
+import { SAVE_BAR_SLOT } from "./saveBarSlot";
 
 const { t } = useI18nTyped();
 
 const store = useStore();
 const orgId = useOrgId();
+const queryClient = useQueryClient();
 const updateOrgSettings = useMutation(() => updateOrgSettingsMutation(orgId.value));
 
-// Schema-driven validation replaces the hand-rolled validate()/error refs.
 const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
-
-// CrossLinkManager has no OForm* equivalent (composite) — kept as local state
-// and merged at submit (the documented exception).
-const crossLinks = ref(store.state?.organizationData?.organizationSettings?.cross_links || []);
-const formDirty = ref(false);
 
 const showRedInsights = config.isEnterprise == "true";
 const showDataRetentionDefaults = config.isEnterprise == "true";
 
-// Dynamic defaults (edit-prefill from the store) → a typed computed. The trace/
-// span/toggle values are form-owned (OFormInput / OFormSwitch).
+const savedSettings = computed(() => store.state?.organizationData?.organizationSettings);
+const settingsLoaded = computed(() => !!savedSettings.value);
+const orgName = computed(() => store.state?.selectedOrganization?.label ?? "");
+
+// The fallbacks only fill the form's shape; rows stay `loading` until the saved values exist.
 const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
-  const s = store.state?.organizationData?.organizationSettings;
+  const s = savedSettings.value;
   return {
     traceIdFieldName: s?.trace_id_field_name ?? "",
     spanIdFieldName: s?.span_id_field_name ?? "",
@@ -185,28 +207,82 @@ const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
     usageStreamEnabled: s?.usage_stream_enabled ?? false,
     redInsightsEnabled: s?.red_insights_enabled ?? false,
     aiRcaThreadToolOutput: s?.ai_rca_thread_tool_output ?? false,
+    ...toRetentionFormValues(s?.data_retention),
   };
 });
 
-watch(
-  () => store.state?.organizationData?.organizationSettings?.cross_links,
-  (newVal) => {
-    if (!formDirty.value) {
-      crossLinks.value = newVal || [];
-    }
-  },
+const form = useOForm<OrganizationSettingsForm>({
+  defaultValues: organizationSettingsDefaults.value,
+  schema: organizationSettingsSchema,
+  validateOn: "leave",
+  onSubmit: (value) => saveOrgSettings(value),
+});
+
+// CrossLinkManager is a composite with no OForm* wrapper, so it is held here and merged at submit.
+const savedCrossLinks = computed(() => savedSettings.value?.cross_links || []);
+const crossLinks = ref(savedCrossLinks.value);
+const formDirty = computed(
+  () => JSON.stringify(crossLinks.value) !== JSON.stringify(savedCrossLinks.value),
 );
 
-// @submit fires only once the schema passes (both field names required + regex),
-// so the old validateOrgSettings()/error refs are gone. Awaited by OForm so the
-// inline Save button's spinner spans the POST.
+// A stream-type row registers several fields; the bar counts one change per stream type instead.
+const isRetentionRowField = (name: string) => name === "types" || name.startsWith("types[");
+const fieldsWithoutRetentionRows = {
+  get options() {
+    return form.options;
+  },
+  useStore: <R,>(selector: (_state: any) => R) =>
+    form.useStore((s: any) =>
+      selector({
+        ...s,
+        fieldMeta: Object.fromEntries(
+          Object.entries(s.fieldMeta).filter(([name]) => !isRetentionRowField(name)),
+        ),
+      }),
+    ),
+};
+const { changes: changedScalars } = useFormCounts(fieldsWithoutRetentionRows);
+const changedRetentionRows = form.useStore((s: any) =>
+  retentionRowChanges(s.values.types, form.options.defaultValues?.types),
+);
+const changedFields = computed(() => changedScalars.value + changedRetentionRows.value);
+const changes = computed(() => changedFields.value + (formDirty.value ? 1 : 0));
+
+const retentionEdited = (value: OrganizationSettingsForm) =>
+  changedRetentionRows.value > 0 ||
+  String(value.default ?? "") !== String(form.options.defaultValues?.default ?? "");
+
+function discardCrossLinks() {
+  crossLinks.value = savedCrossLinks.value;
+}
+
+useLeaveGuard(() => changes.value > 0, {
+  count: () => changes.value,
+  onDiscard: () => {
+    discardFormChanges(form);
+    discardCrossLinks();
+  },
+});
+
+// Saved values that arrive or change under the page replace only what the user has not edited.
+watch(organizationSettingsDefaults, (saved) => {
+  if (changedFields.value === 0) form.reset(saved);
+});
+
+watch(savedCrossLinks, (saved, previous) => {
+  if (JSON.stringify(crossLinks.value) === JSON.stringify(previous)) crossLinks.value = saved;
+});
+
 const saveOrgSettings = async (value: OrganizationSettingsForm) => {
+  const savedOrg = store.state?.selectedOrganization?.identifier;
+  // Held as sent: links edited while the request is pending are not saved yet.
+  const sentCrossLinks = crossLinks.value;
   try {
     const payload: any = {
       trace_id_field_name: value.traceIdFieldName,
       span_id_field_name: value.spanIdFieldName,
       toggle_ingestion_logs: value.toggleIngestionLogs,
-      cross_links: crossLinks.value,
+      cross_links: sentCrossLinks,
       usage_stream_enabled: value.usageStreamEnabled,
     };
 
@@ -215,20 +291,29 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       payload.red_insights_enabled = value.redInsightsEnabled;
       payload.ai_rca_thread_tool_output = value.aiRcaThreadToolOutput;
     }
+    // The backend replaces retention as a whole, so it is sent only when edited: an unread value must not wipe it.
+    if (showDataRetentionDefaults && retentionEdited(value)) {
+      payload.data_retention = toRetentionPayload(value);
+    }
 
-    const crossLinksChanged =
-      JSON.stringify(crossLinks.value) !==
-      JSON.stringify(store.state?.organizationData?.organizationSettings?.cross_links || []);
+    const crossLinksChanged = formDirty.value;
 
     await updateOrgSettings.mutateAsync(payload);
     if (crossLinksChanged) analytics.track("cross_link_saved", { scope: "org" });
+    // Only the server knows the resolved days; a failed re-read must not report the save as failed.
+    const fresh: any =
+      showDataRetentionDefaults && savedOrg
+        ? await queryClient.fetchQuery(orgSettingsQuery(savedOrg)).catch(() => null)
+        : null;
+    // The store holds only the selected organization: a save that outlives a switch has nowhere to land.
+    if (store.state?.selectedOrganization?.identifier !== savedOrg) return;
 
     const updatedSettings: any = {
       ...store.state?.organizationData?.organizationSettings,
       trace_id_field_name: value.traceIdFieldName,
       span_id_field_name: value.spanIdFieldName,
       toggle_ingestion_logs: value.toggleIngestionLogs,
-      cross_links: crossLinks.value,
+      cross_links: sentCrossLinks,
       usage_stream_enabled: value.usageStreamEnabled,
       ...(showRedInsights
         ? {
@@ -237,10 +322,14 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
           }
         : {}),
     };
+    if (showDataRetentionDefaults) {
+      updatedSettings.data_retention =
+        fresh?.data?.data_retention ?? payload.data_retention ?? updatedSettings.data_retention;
+      if (fresh) updatedSettings.resolved_data_retention = fresh.resolved_data_retention;
+    }
 
     store.dispatch("setOrganizationSettings", updatedSettings);
-
-    formDirty.value = false;
+    rebaseSavedValues(form, value, value);
 
     toast({
       message: t("settings.organizationSettings.settingsUpdated"),

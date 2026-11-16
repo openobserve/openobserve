@@ -281,10 +281,10 @@ onBeforeUnmount(() => {
           // Surface
           'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
           // Open/close reveal animation (matches ODropdown)
-          'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-          'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
+          'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
+          'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
+          'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
           contentClass,
         ]"
       >

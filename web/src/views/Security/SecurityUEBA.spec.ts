@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mount, type VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import type { Router } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import securityInvestigate, {
@@ -181,6 +181,19 @@ describe("SecurityUEBA", () => {
     expect(w.find('[data-test="security-ueba-building-alice"]').text()).toContain(
       "Baseline building",
     );
+  });
+
+  it("ORs two picked tone chips", async () => {
+    const w = await mountView();
+    const vm = w.vm as any;
+    const tones = [...new Set(vm.risks.map((r: any) => r.tone))].slice(0, 2) as string[];
+    vm.toneFilters = tones;
+    await flushPromises();
+    const expected = vm.risks.filter((r: any) => tones.includes(r.tone)).length;
+    expect(vm.filtered.length).toBe(expected);
+    vm.toneFilters = [];
+    await flushPromises();
+    expect(vm.filtered.length).toBe(vm.risks.length);
   });
 
   it("shows the server's peer outlier under one identity", async () => {

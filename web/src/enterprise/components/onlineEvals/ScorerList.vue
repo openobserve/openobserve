@@ -25,11 +25,23 @@
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
             data-test="scorer-list-search-input"
             clearable
             @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="typeFilters"
+            default-key="all"
+            class="max-md:order-last"
+            data-test="scorer-list-summary"
+            @update:selected-keys="typeFilters = $event as ScorerType[]"
           />
         </template>
 
@@ -43,21 +55,6 @@
             data-test="scorer-list-refresh-btn"
             @click="emit('refresh')"
           />
-        </template>
-
-        <!-- Type breakdown (catalog signal) — doubles as a filter synced to the
-             type dropdown; Total last, never itself the active tile. -->
-        <template #subheader>
-          <div data-test="scorer-list-summary">
-            <OStatStrip
-              :items="summaryStats"
-              :loading="loading"
-              selectable
-              :selected-key="selectedStatKey"
-              default-key="all"
-              @select="onStatSelect"
-            />
-          </div>
         </template>
 
         <template #empty>
@@ -249,6 +246,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import type { ForbiddenState } from "@/utils/featureGate";
+import { matchesAnyKey } from "@/utils/filterKeys";
 
 const props = defineProps<{
   rows: Scorer[];
@@ -282,7 +280,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const scorerDrafts = useEditorDraftIds("eval_scorer");
-const typeFilter = ref<ScorerType | null>(null);
+const typeFilters = ref<ScorerType[]>([]);
 const selectedIds = ref<string[]>([]);
 
 function handleBulkExport() {
@@ -360,15 +358,15 @@ const columns = computed(() =>
 );
 
 const filteredRows = computed(() =>
-  typeFilter.value
-    ? props.rows.filter((row) => scorerTypeOf(row) === typeFilter.value)
-    : props.rows,
+  props.rows.filter((row) =>
+    matchesAnyKey(typeFilters.value, row, (r, key) => scorerTypeOf(r) === key),
+  ),
 );
 
 const numberedRows = useNumberedRows(filteredRows);
 
 // Type breakdown for the summary strip (over all scorers, so the counts stay
-// stable as you filter). Tiles double as filters wired to `typeFilter`.
+// stable as you filter). Tiles double as filters wired to `typeFilters`.
 const typeCounts = computed(() => {
   const rows = props.rows || [];
   let llm = 0;
@@ -425,13 +423,6 @@ const summaryStats = computed<StatItem[]>(() => {
     },
   ];
 });
-// Nothing is highlighted while viewing all rows (like the Incidents/Alerts strip);
-// the "All" tile clears the facet but is never itself the active tile.
-const selectedStatKey = computed(() => typeFilter.value);
-function onStatSelect(key: string) {
-  // Re-clicking the active tile clears the filter (toggle), matching the Alerts strip.
-  typeFilter.value = key === "all" || typeFilter.value === key ? null : (key as ScorerType);
-}
 
 // When the org has no providers AND no scorers yet, surface a dedicated
 // provider-onboarding screen instead of the standard empty state. LLM Judge
@@ -444,7 +435,7 @@ const showNoProvidersState = computed(
     !props.loading &&
     props.allScorers.length === 0 &&
     !props.search &&
-    !typeFilter.value &&
+    !typeFilters.value.length &&
     props.providers.length === 0,
 );
 
@@ -452,14 +443,14 @@ const showNoProvidersState = computed(
 // filter widgets stay visible). OEmptyState lives inside the table's
 // #empty slot and switches between the first-run and "Clear filters"
 // variants via `:filtered`.
-const hasFilters = computed(() => !!props.search?.trim() || !!typeFilter.value);
+const hasFilters = computed(() => !!props.search?.trim() || typeFilters.value.length > 0);
 
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
   else if (id === "import") emit("import-custom");
   else if (id === "clear-filters") {
     emit("update:search", "");
-    typeFilter.value = null;
+    typeFilters.value = [];
   }
 }
 

@@ -1,16 +1,21 @@
 <!-- Copyright 2026 OpenObserve Inc. SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
+import { securityTime } from "@/utils/security/time";
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import type { SelectOption, SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -25,14 +30,17 @@ import {
   type PreAttachBlock,
   type SourceNoticeCode,
   type SourceRow,
+  type SourceTypeOrigin,
+  CLASSIFIER_ACTOR,
 } from "@/services/securitySources";
 import {
   attachPackMutation,
   attachPlanMutation,
   detachPackMutation,
+  setSourceTypeMutation,
+  sourceTypesQuery,
 } from "@/services/securitySources.queries";
 import { ocsfClass } from "@/utils/security/ocsf";
-import { formatTimestamp } from "@/utils/date";
 
 interface Row {
   name: string;
@@ -40,6 +48,9 @@ interface Row {
   label: I18nText;
   sourceTypeLabel: I18nText;
   sourceType: string;
+  origin: SourceTypeOrigin;
+  /** What the picker shows: a chosen type, or `AUTO_TYPE` while the classifier decides. */
+  pickedType: string;
   /** Who made the last change and what it was, from the server's record. */
   lastChange: I18nText | null;
   included: boolean;
@@ -53,24 +64,38 @@ const store = useStore();
 const secSources = useSecuritySources();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 // Attaching writes a function and pipeline (authoring); including is triage; detaching or excluding weakens coverage (admin).
-const { canTriage, canAuthor, canAdmin } = useSecurityAccess();
+const { canAuthor, canAdmin } = useSecurityAccess();
 const attachMutation = useMutation(computed(() => attachPackMutation(orgId.value)));
 const detachMutation = useMutation(computed(() => detachPackMutation(orgId.value)));
 const planMutation = useMutation(computed(() => attachPlanMutation(orgId.value)));
+/** The picker's "let the classifier decide" choice; an empty value would read as no selection. */
+const AUTO_TYPE = "auto";
+const typeMutation = useMutation(computed(() => setSourceTypeMutation(orgId.value)));
 const busy = computed(() => attachMutation.isPending.value || detachMutation.isPending.value);
+const typesResult = useQuery(() => ({
+  ...sourceTypesQuery(orgId.value),
+  enabled: !!orgId.value,
+}));
+const typeOptions = computed<SelectOption[]>(() => [
+  { label: t("siem.sources.sourceTypeAutomatic"), value: AUTO_TYPE },
+  ...(typesResult.data.value ?? [])
+    .filter((type) => !type.supersededBy)
+    .map((type) => ({ label: raw(type.label), value: type.id, searchText: type.id }))
+    .sort((a, b) => String(a.label).localeCompare(String(b.label))),
+]);
 const globalFlattenLevel = computed(() => Number(store.state.zoConfig?.ingest_flatten_level ?? 3));
 
 const actionNotice = ref<SecurityNotice | null>(null);
 const errorNotice = ref<SecurityNotice | null>(null);
 const blockNotices = ref<SecurityNotice[]>([]);
 
-const minute = (us: number) => formatTimestamp(us, "YYYY-MM-DD HH:mm");
+const minute = (us: number) => securityTime(us / 1000);
 
 function lastChangeText(row: SourceRow): I18nText | null {
   const change = row.last_change;
   if (!change) return null;
   return t("siem.sources.lastChange", {
-    user: raw(change.by),
+    user: change.by === CLASSIFIER_ACTOR ? t("siem.sources.classifierActor") : raw(change.by),
     time: minute(change.at),
     summary: raw(change.summary),
   });
@@ -83,9 +108,15 @@ function excludedText(row: SourceRow) {
 
 function stateText(row: SourceRow): I18nText {
   if (row.state === "mapped") {
-    return t("siem.sources.stateMapped", {
-      pack: `${row.setting?.pack_id ?? ""}@${row.setting?.pack_version ?? 0}`,
-    });
+    const pack = `${row.setting?.pack_id ?? ""}@${row.setting?.pack_version ?? 0}`;
+    const update = row.update_available;
+    if (update) {
+      return t("siem.sources.stateMappedUpdate", {
+        pack,
+        latest: `${update.id}@${update.version}`,
+      });
+    }
+    return t("siem.sources.stateMapped", { pack });
   }
   if (row.state === "excluded") return excludedText(row);
   if (row.state === "included") return t("siem.sources.stateIncluded");
@@ -95,25 +126,36 @@ function stateText(row: SourceRow): I18nText {
   return t("siem.sources.stateNotMapped");
 }
 
+function typeLabel(row: SourceRow, origin: SourceTypeOrigin): I18nText {
+  const label = raw(row.verdict?.label || row.source_type);
+  if (origin === "manual" && row.source_type) return t("siem.sources.sourceTypeManual", { label });
+  if (origin === "pack" && row.source_type) return t("siem.sources.sourceTypePack", { label });
+  if (row.verdict) {
+    return t("siem.sources.sourceTypeConfidence", {
+      label,
+      n: Math.round(row.verdict.confidence * 100),
+    });
+  }
+  return row.source_type ? label : t("siem.sources.notClassified");
+}
+
 const rows = computed<Row[]>(() =>
-  secSources.rows.value.map((row) => ({
-    name: row.name,
-    state: row.state,
-    label: stateText(row),
-    sourceTypeLabel: row.verdict
-      ? t("siem.sources.sourceTypeConfidence", {
-          label: raw(row.verdict.label),
-          n: Math.round(row.verdict.confidence * 100),
-        })
-      : row.source_type
-        ? raw(row.source_type)
-        : t("siem.sources.notClassified"),
-    sourceType: row.source_type,
-    lastChange: lastChangeText(row),
-    included: row.reason !== null,
-    pack: row.offered_pack,
-    detachPack: row.detach_pack,
-  })),
+  secSources.rows.value.map((row) => {
+    const origin: SourceTypeOrigin = row.setting?.origin ?? "auto";
+    return {
+      name: row.name,
+      state: row.state,
+      label: stateText(row),
+      sourceTypeLabel: typeLabel(row, origin),
+      sourceType: row.source_type,
+      origin,
+      pickedType: origin === "auto" || !row.source_type ? AUTO_TYPE : row.source_type,
+      lastChange: lastChangeText(row),
+      included: row.reason !== null,
+      pack: row.offered_pack,
+      detachPack: row.detach_pack,
+    };
+  }),
 );
 
 const columns = computed<OTableColumnDef<Row>[]>(() => [
@@ -122,7 +164,7 @@ const columns = computed<OTableColumnDef<Row>[]>(() => [
     id: "sourceType",
     header: t("siem.sources.colSourceType"),
     accessorKey: "sourceTypeLabel",
-    size: 220,
+    size: 260,
   },
   { id: "mapping", header: t("siem.sources.colMapping"), accessorKey: "label", size: 200 },
   {
@@ -231,10 +273,16 @@ async function onAttach(row: Row) {
   }
 }
 
+/** The stream an attach is running on; the server takes several seconds to write the function and pipeline. */
+const attachingStream = ref<string | null>(null);
+
 async function confirmAttach() {
   const stream = previewStream.value;
   const planned = plan.value;
   if (!stream || !planned || !canAuthor.value) return;
+  attachingStream.value = stream;
+  // A preview opened for another stream meanwhile must stay open.
+  const closeOwnPreview = () => previewStream.value === stream && closePreview();
   try {
     // The previewed pack is pinned, so what runs is exactly what was shown.
     const res = await attachMutation.mutateAsync({
@@ -248,15 +296,17 @@ async function confirmAttach() {
       kind: res.setting.pack_id === "entity" ? "entity" : "full",
       pipeline_created: res.pipeline_created,
     });
-    closePreview();
+    closeOwnPreview();
     actionNotice.value = {
       key: "attached",
       tone: "info",
       text: t("siem.sources.attached", { pack: `${planned.pack_id}@${planned.pack_version}` }),
     };
   } catch (err) {
-    closePreview();
+    closeOwnPreview();
     showRefusal(err, stream, t("siem.sources.actionFailed"));
+  } finally {
+    if (attachingStream.value === stream) attachingStream.value = null;
   }
 }
 
@@ -331,9 +381,31 @@ async function onDetach(row: Row) {
   }
 }
 
+/** A chosen type is never replaced by the classifier; "" hands the stream back to it. */
+async function onPickType(row: Row, value: SelectModelValue) {
+  if (!canAuthor.value || typeof value !== "string" || value === row.pickedType) return;
+  const sourceType = value === AUTO_TYPE ? "" : value;
+  clearNotices();
+  try {
+    await typeMutation.mutateAsync({ stream: row.name, sourceType });
+  } catch (err) {
+    showRefusal(err, row.name, t("siem.sources.actionFailed"));
+    return;
+  }
+  analytics.track("security_source_type_set", { source_type: sourceType || "auto" });
+  actionNotice.value = {
+    key: "source-type",
+    tone: "info",
+    text: sourceType
+      ? t("siem.sources.sourceTypeSaved", { stream: row.name })
+      : t("siem.sources.sourceTypeCleared", { stream: row.name }),
+  };
+}
+
 /** Include/exclude is the org-wide stream setting; a refused save shows in the notices. */
 async function setIncluded(row: Row, included: boolean) {
-  if (!(included ? canTriage.value : canAdmin.value)) return;
+  // Source administration is the author grant; triage is case work only.
+  if (!(included ? canAuthor.value : canAdmin.value)) return;
   clearNotices();
   try {
     await (included ? secSources.include(row.name) : secSources.exclude(row.name));
@@ -369,9 +441,36 @@ onMounted(reload);
       class="min-h-0 flex-1"
       data-test="security-sources-table"
     >
+      <template #cell-sourceType="{ row }">
+        <div class="flex min-w-0 flex-col gap-1" :data-test="`security-sources-type-${row.name}`">
+          <OSelect
+            v-if="canAuthor"
+            size="sm"
+            searchable
+            :model-value="row.pickedType"
+            :options="typeOptions"
+            :aria-label="t('siem.sources.pickSourceType', { stream: row.name })"
+            :disabled="typeMutation.isPending.value"
+            data-test="security-sources-type-picker"
+            @update:model-value="(v: SelectModelValue) => onPickType(row, v)"
+          />
+          <OTruncatedText
+            class="text-text-secondary text-xs"
+            data-test="security-sources-type-verdict"
+            >{{ row.sourceTypeLabel }}</OTruncatedText
+          >
+        </div>
+      </template>
       <template #cell-mapping="{ row }">
         <span class="inline-flex items-center" :data-test="`security-sources-state-${row.name}`">
-          <OTag v-if="row.state === 'mapped'" variant="teal-soft" shape="rounded" size="xs">{{
+          <span
+            v-if="attachingStream === row.name"
+            class="text-text-secondary inline-flex items-center gap-1.5 text-xs"
+            data-test="security-sources-attaching"
+          >
+            <OSpinner size="xs" />{{ t("siem.sources.attaching") }}
+          </span>
+          <OTag v-else-if="row.state === 'mapped'" variant="teal-soft" shape="rounded" size="xs">{{
             row.label
           }}</OTag>
           <OTag
@@ -393,7 +492,7 @@ onMounted(reload);
         </span>
       </template>
       <template #cell-actions="{ row }">
-        <div v-if="canTriage || canAuthor || canAdmin" class="flex items-center justify-end gap-2">
+        <div v-if="canAuthor || canAdmin" class="flex items-center justify-end gap-2">
           <OButton
             v-if="row.detachPack && canAdmin"
             size="sm"
@@ -408,14 +507,15 @@ onMounted(reload);
             v-else-if="!row.detachPack && row.pack && canAuthor"
             size="sm"
             variant="primary"
-            :loading="busy"
+            :loading="attachingStream === row.name"
+            :disabled="busy"
             data-test="security-sources-attach"
             @click="onAttach(row)"
           >
             {{ t("siem.sources.attach") }}
           </OButton>
           <OButton
-            v-if="!row.included && canTriage"
+            v-if="!row.included && canAuthor"
             size="sm"
             variant="ghost"
             data-test="security-sources-include"
@@ -467,6 +567,16 @@ onMounted(reload);
       @click:secondary="closePreview"
       @click:primary="confirmAttach"
     >
+      <OBanner
+        v-if="plan && attachingStream === previewStream"
+        variant="info"
+        icon="hourglass-empty"
+        dense
+        class="mb-3"
+        data-test="security-sources-attach-progress"
+      >
+        {{ t("siem.sources.attachingHint") }}
+      </OBanner>
       <OBanner v-if="!plan" variant="info" icon="hourglass-empty" dense>
         {{ t("siem.sources.previewLoading") }}
       </OBanner>

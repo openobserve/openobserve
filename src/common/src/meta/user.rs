@@ -122,7 +122,9 @@ pub struct UpdateUser {
     pub old_password: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_password: Option<String>,
+    // A flattened `Option` documents as `oneOf: [null, role]`, making `role` mandatory.
     #[serde(skip_serializing_if = "Option::is_none", flatten)]
+    #[schema(value_type = UpdateUserRole)]
     pub role: Option<UserRoleRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
@@ -131,6 +133,13 @@ pub struct UpdateUser {
     /// password — and it is gated like a password reset by an administrator.
     #[serde(default)]
     pub remove_lockout: bool,
+}
+
+// Not a doc comment: utoipa would use it as the request body description.
+#[derive(ToSchema)]
+pub struct UpdateUserRole {
+    pub role: Option<String>,
+    pub custom_role: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="service-identity-setup mt-2 w-full">
+  <div class="service-identity-setup mt-2 w-full max-w-5xl">
     <!-- Loading skeleton while fetching recommendations -->
     <div v-if="loading" class="flex flex-col gap-4 py-4">
       <OSkeleton class="rounded-default h-14 w-full" />
@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-else>
       <!-- Section 1: Service Configuration -->
-      <div class="rounded-default border-card-glass-border mb-3 overflow-hidden border">
-        <div class="flex flex-col gap-3 p-3">
+      <div class="mb-3">
+        <div class="flex flex-col gap-3">
           <!-- Service name source banner -->
           <div
             v-if="!serviceOptional"
@@ -164,122 +164,179 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Service Optional toggle -->
-          <div data-test="service-identity-service-optional" class="mb-3">
-            <OSwitch
-              data-test="service-identity-service-optional-btn"
-              v-model="serviceOptional"
+          <OFormSection
+            variant="plain"
+            :title="t('settings.correlation.distinguishByLabel')"
+            :description="t('settings.correlation.distinguishByHelp')"
+          >
+            <OSettingRow
+              control-at="end"
               :label="t('settings.correlation.serviceOptionalLabel')"
-              size="md"
-            />
-            <div class="ms-9 mt-1 text-xs leading-snug" :class="'text-text-secondary'">
-              {{ t("settings.correlation.serviceOptionalHelp") }}
-            </div>
-          </div>
-
-          <!-- Disambiguation Fields -->
-          <div>
-            <div class="mb-1 flex items-center gap-2">
-              <span class="text-sm font-bold">{{
-                t("settings.correlation.distinguishByLabel")
-              }}</span>
-              <span class="flex-1"><OSeparator /></span>
-            </div>
-            <div class="mb-3 text-xs" :class="'text-text-secondary'">
-              {{ t("settings.correlation.distinguishByHelp") }}
-            </div>
-
-            <!-- Empty state: nothing configured anywhere -->
-            <div
-              v-if="allConfiguredEnvs.length === 0 && !addingToEnv"
-              class="rounded-default flex flex-col items-center gap-2 border border-dashed px-4 py-3"
-              :class="'border-border-default bg-surface-subtle'"
+              :description="t('settings.correlation.serviceOptionalHelp')"
+              data-test="service-identity-service-optional"
             >
-              <OIcon name="tune" size="lg" class="text-icon-color mb-1" />
-              <span class="text-sm font-medium" :class="'text-text-secondary'">
-                {{ t("settings.serviceIdentitySetup.noFieldsConfiguredYet") }}
-              </span>
-              <OButton
-                variant="outline"
-                size="sm"
-                class="mt-1"
-                data-test="service-identity-add-distinguish-btn"
-                @click="addingToEnv = activeEnvironment"
-              >
-                <template #icon-left><OIcon name="add" size="xs" /></template>
-                {{ t("settings.correlation.addField") }}
-              </OButton>
-            </div>
+              <OSwitch
+                data-test="service-identity-service-optional-btn"
+                v-model="serviceOptional"
+                off-tone="neutral"
+                state-text
+                :aria-label="t('settings.correlation.serviceOptionalLabel')"
+              />
+            </OSettingRow>
 
-            <!-- All configured env groups -->
-            <div v-else class="flex flex-col gap-2">
-              <!-- Auto-suggested banner (only when fields came from suggestion, not saved config) -->
-              <div
-                v-if="isAutoSuggested"
-                class="rounded-default flex items-start gap-2 px-3 py-2 text-xs"
-                :class="'bg-status-info-bg text-status-info-text'"
-              >
-                <OIcon name="auto-awesome" size="xs" class="mt-0.5 shrink-0" />
-                <span>{{ t("settings.correlation.autoSuggestedBanner") }}</span>
+            <div>
+              <!-- Empty state: nothing configured anywhere -->
+              <div v-if="allConfiguredEnvs.length === 0 && !addingToEnv" class="px-4 py-3">
+                <div
+                  class="rounded-default flex flex-col items-center gap-2 border border-dashed px-4 py-3"
+                  :class="'border-border-default bg-surface-subtle'"
+                >
+                  <OIcon name="tune" size="lg" class="text-icon-color mb-1" />
+                  <span class="text-sm font-medium" :class="'text-text-secondary'">
+                    {{ t("settings.serviceIdentitySetup.noFieldsConfiguredYet") }}
+                  </span>
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    class="mt-1"
+                    data-test="service-identity-add-distinguish-btn"
+                    @click="addingToEnv = activeEnvironment"
+                  >
+                    <template #icon-left><OIcon name="add" size="xs" /></template>
+                    {{ t("settings.correlation.addField") }}
+                  </OButton>
+                </div>
               </div>
 
-              <!-- One row per configured env -->
-              <template v-for="(envKey, envIdx) in allConfiguredEnvs" :key="envKey">
-                <!-- Environment label -->
-                <div
-                  v-if="allConfiguredEnvs.length > 1"
-                  class="mt-1 flex items-center gap-2"
-                  :class="{ 'border-t pt-2': envIdx > 0 }"
-                >
-                  <span class="text-3xs font-bold" :class="'text-text-secondary'">
-                    {{ getIdentitySetLabel(envKey) }}
-                  </span>
+              <!-- Each group is a direct child, so its rule reaches the card edges. -->
+              <template v-else>
+                <div v-if="isAutoSuggested" class="px-4 pt-3">
+                  <div
+                    class="rounded-default flex items-start gap-2 px-3 py-2 text-xs"
+                    :class="'bg-status-info-bg text-status-info-text'"
+                  >
+                    <OIcon name="auto-awesome" size="xs" class="mt-0.5 shrink-0" />
+                    <span>{{ t("settings.correlation.autoSuggestedBanner") }}</span>
+                  </div>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2">
-                  <!-- Pills for this env's fields -->
+                <div
+                  v-for="envKey in allConfiguredEnvs"
+                  :key="envKey"
+                  class="border-border-default flex flex-col gap-2 border-b px-4 py-3 last:border-b-0"
+                >
                   <div
-                    v-for="fieldId in (setDistinguishBy[envKey] ?? []).filter(Boolean)"
-                    :key="fieldId"
-                    class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 ps-3 pe-1 text-xs font-medium transition-colors"
-                    :class="'bg-surface-base text-text-secondary'"
+                    v-if="allConfiguredEnvs.length > 1"
+                    class="text-text-heading text-sm font-medium"
                   >
-                    <span>{{ getGroupByValue(fieldId)?.display ?? fieldId }}</span>
-                    <OTooltip
-                      v-if="getFieldCardinalityTooltip(fieldId)"
-                      :content="raw(getFieldCardinalityTooltip(fieldId) ?? '')"
-                      side="top"
-                    />
-                    <OButton
-                      :aria-label="t('common.remove')"
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      @click="removeFieldByIdFromEnv(envKey, fieldId)"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        aria-hidden="true"
-                      >
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </OButton>
+                    {{ getIdentitySetLabel(envKey) }}
                   </div>
 
-                  <!-- Inline add select for this group -->
-                  <template v-if="addingToEnv === envKey">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <!-- Pills for this env's fields -->
+                    <div
+                      v-for="fieldId in (setDistinguishBy[envKey] ?? []).filter(Boolean)"
+                      :key="fieldId"
+                      class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 ps-3 pe-1 text-xs font-medium transition-colors"
+                      :class="'bg-surface-base text-text-secondary'"
+                    >
+                      <span>{{ getGroupByValue(fieldId)?.display ?? fieldId }}</span>
+                      <OTooltip
+                        v-if="getFieldCardinalityTooltip(fieldId)"
+                        :content="raw(getFieldCardinalityTooltip(fieldId) ?? '')"
+                        side="top"
+                      />
+                      <OButton
+                        :aria-label="t('common.remove')"
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        @click="removeFieldByIdFromEnv(envKey, fieldId)"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </OButton>
+                    </div>
+
+                    <!-- Inline add select for this group -->
+                    <template v-if="addingToEnv === envKey">
+                      <OSelect
+                        ref="addFieldSelectRef"
+                        v-model="addFieldValue"
+                        :options="getAddFieldOptionsForEnv(envKey)"
+                        labelKey="label"
+                        valueKey="value"
+                        searchable
+                        :placeholder="t('settings.correlation.selectField')"
+                        style="width: 13.75rem"
+                        :dropdown-style="{ minWidth: '18.75rem' }"
+                        data-test="service-identity-add-distinguish-btn"
+                        @update:model-value="onAddFieldToEnv(envKey, $event)"
+                      />
+                      <OButton
+                        :aria-label="t('common.cancel')"
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        @click="
+                          addingToEnv = '';
+                          addFieldValue = undefined;
+                        "
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </OButton>
+                    </template>
+
+                    <!-- + Add field button -->
+                    <OButton
+                      v-else-if="(setDistinguishBy[envKey] ?? []).filter(Boolean).length < 5"
+                      variant="outline"
+                      size="sm"
+                      @click="addingToEnv = envKey"
+                      icon-left="add"
+                    >
+                      {{ t("settings.correlation.addField") }}
+                      <OTooltip
+                        side="top"
+                        :content="t('settings.correlation.addFieldTooltip')"
+                        max-width="15rem"
+                      />
+                    </OButton>
+                  </div>
+                </div>
+
+                <!-- Adding to a new env (not yet in the list) -->
+                <template v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)">
+                  <div class="flex flex-wrap items-center gap-2 px-4 py-3">
                     <OSelect
                       ref="addFieldSelectRef"
                       v-model="addFieldValue"
-                      :options="getAddFieldOptionsForEnv(envKey)"
+                      :options="getAddFieldOptionsForEnv(addingToEnv)"
                       labelKey="label"
                       valueKey="value"
                       searchable
@@ -287,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="width: 13.75rem"
                       :dropdown-style="{ minWidth: '18.75rem' }"
                       data-test="service-identity-add-distinguish-btn"
-                      @update:model-value="onAddFieldToEnv(envKey, $event)"
+                      @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
                     />
                     <OButton
                       :aria-label="t('common.cancel')"
@@ -314,683 +371,600 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <line x1="6" y1="6" x2="18" y2="18" />
                       </svg>
                     </OButton>
-                  </template>
+                  </div>
+                </template>
 
-                  <!-- + Add field button -->
+                <!-- Add group -->
+                <div v-if="!addingToEnv" class="flex items-center justify-between px-4 py-3">
                   <OButton
-                    v-else-if="(setDistinguishBy[envKey] ?? []).filter(Boolean).length < 5"
                     variant="outline"
                     size="sm"
-                    @click="addingToEnv = envKey"
+                    @click="addingToEnv = generateGroupId()"
                     icon-left="add"
                   >
-                    {{ t("settings.correlation.addField") }}
+                    {{ t("settings.correlation.addGroup") }}
                     <OTooltip
                       side="top"
-                      :content="t('settings.correlation.addFieldTooltip')"
+                      :content="t('settings.correlation.addGroupTooltip')"
                       max-width="15rem"
                     />
                   </OButton>
                 </div>
               </template>
+            </div>
+          </OFormSection>
+        </div>
+      </div>
 
-              <!-- Adding to a new env (not yet in the list) -->
-              <template v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)">
-                <div
-                  class="border-card-glass-border flex flex-wrap items-center gap-2 border-t pt-2"
-                >
-                  <OSelect
-                    ref="addFieldSelectRef"
-                    v-model="addFieldValue"
-                    :options="getAddFieldOptionsForEnv(addingToEnv)"
-                    labelKey="label"
-                    valueKey="value"
-                    searchable
-                    :placeholder="t('settings.correlation.selectField')"
-                    style="width: 13.75rem"
-                    :dropdown-style="{ minWidth: '18.75rem' }"
-                    data-test="service-identity-add-distinguish-btn"
-                    @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
-                  />
+      <!-- Section 3: Workload Detection -->
+      <OFormSection
+        v-if="workloadDetectedGroups.length > 0"
+        variant="plain"
+        class="mb-3"
+        :title="t('settings.serviceIdentitySetup.workloadDetection')"
+        :description="t('settings.serviceIdentitySetup.discoveredPatternsHelp')"
+        data-test="service-identity-workload-detection"
+      >
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            data-test="service-identity-go-to-services"
+            @click="emit('navigate-to-services')"
+          >
+            {{ t("settings.serviceIdentitySetup.goToServices") }}
+          </OButton>
+        </template>
+        <div class="-mx-4 -my-3">
+          <!-- Collapsible: Workload detected using fields (N) -->
+          <div
+            class="rounded-default mx-3 mt-3 overflow-hidden border transition-all"
+            :class="'bg-banner-info-bg border-banner-info-border'"
+          >
+            <div
+              class="flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-opacity hover:opacity-80"
+              @click="trackedAliasExpanded = !trackedAliasExpanded"
+            >
+              <OIcon name="check-circle" size="sm" />
+              <div class="text-compact min-w-0 flex-1 leading-tight">
+                {{ t("settings.serviceIdentitySetup.workloadDetectedUsingFields") }}
+                <span class="text-text-secondary text-xs">({{ trackedAliasIds.length }})</span>
+              </div>
+              <OIcon
+                :name="trackedAliasExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
+                size="sm"
+                class="shrink-0 opacity-40"
+              />
+            </div>
+
+            <div
+              v-if="trackedAliasExpanded"
+              class="border-t px-3 pt-2 pb-3"
+              :class="'border-banner-info-border'"
+            >
+              <div class="rounded-default p-2.5" :class="'bg-surface-subtle'">
+                <div class="mb-3 text-xs" :class="'text-text-secondary'">
+                  {{ t("settings.serviceIdentitySetup.workloadTrackedHelp") }}
                   <OButton
-                    :aria-label="t('common.cancel')"
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    @click="
-                      addingToEnv = '';
-                      addFieldValue = undefined;
-                    "
+                    variant="ghost-primary"
+                    size="xs"
+                    class="mx-1 align-middle"
+                    @click="emit('navigate-to-aliases', 'service')"
+                    >{{ t("settings.serviceIdentitySetup.goToFieldAliases") }}</OButton
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
+                  {{ t("settings.serviceIdentitySetup.toConfigureFieldMappings") }}
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <!-- Pills for tracked aliases -->
+                  <div
+                    v-for="alias in resolvedTrackedAliases"
+                    :key="alias.id"
+                    class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 ps-3 pe-1 text-xs font-medium transition-colors"
+                    :class="'bg-surface-base text-text-secondary'"
+                  >
+                    <span>{{ alias.label }}</span>
+                    <OButton
+                      :aria-label="t('common.remove')"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      @click="trackedAliasIds = trackedAliasIds.filter((id) => id !== alias.id)"
                     >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </OButton>
+                  </div>
+                  <!-- Inline add select -->
+                  <template v-if="addingTrackedAlias">
+                    <OSelect
+                      ref="addTrackedAliasSelectRef"
+                      v-model="addTrackedAliasValue"
+                      :options="trackedAliasAddOptions"
+                      labelKey="label"
+                      valueKey="value"
+                      searchable
+                      :placeholder="t('settings.serviceIdentitySetup.selectAliasGroup')"
+                      style="width: 13.75rem"
+                      :dropdown-style="{ minWidth: '18.75rem' }"
+                      @update:model-value="onAddTrackedAlias($event)"
+                    />
+                    <OButton
+                      :aria-label="t('common.cancel')"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      @click="
+                        addingTrackedAlias = false;
+                        addTrackedAliasValue = undefined;
+                      "
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </OButton>
+                  </template>
+                  <!-- Add field button -->
+                  <OButton
+                    v-else
+                    variant="outline"
+                    size="sm"
+                    @click="addingTrackedAlias = true"
+                    icon-left="add"
+                  >
+                    {{ t("settings.correlation.addField") }}
                   </OButton>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Environment Tabs (Chrome-style) -->
+          <div class="border-card-glass-border flex items-end gap-0 border-b px-4">
+            <!-- eslint-disable local/no-hardcoded-px -- hairline: the active tab pulls itself 1 device pixel over the panel border to hide it; that nudge must not scale with text -->
+            <div
+              v-for="env in detectedEnvironments"
+              :key="env.key"
+              class="rounded-t-default relative min-w-17.5 cursor-pointer border border-b-0 px-4 py-2 text-center text-xs font-medium transition-all"
+              :class="
+                activeEnvironment === env.key
+                  ? 'text-text-body'
+                  : 'text-text-muted hover:text-text-secondary border-transparent bg-transparent'
+              "
+              :style="
+                activeEnvironment === env.key
+                  ? 'margin-bottom: -1px; padding-bottom: 0.5625rem; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
+                  : ''
+              "
+              @click="activeEnvironment = env.key"
+            >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              {{ env.label }}
+              <span
+                v-if="(setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0"
+                class="bg-badge-success-solid-bg absolute top-1 right-1 h-1.5 w-1.5 rounded-full"
+                :title="
+                  t('settings.serviceIdentitySetup.fieldsConfigured', {
+                    n: (setDistinguishBy[env.key] ?? []).filter(Boolean).length,
+                  })
+                "
+              />
+            </div>
+          </div>
+
+          <!-- Tab content panel — connects to active tab -->
+          <div v-if="primaryDim" class="overflow-hidden px-4 pt-4 pb-2">
+            <!-- Stat cards -->
+            <div class="flex items-stretch gap-3">
+              <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
+                <!-- Plus connector between cards -->
+                <div v-if="idx > 0" class="flex shrink-0 items-center">
+                  <OIcon name="add" size="sm" class="text-icon-color" />
+                </div>
+
+                <!-- Dim card -->
+                <div
+                  class="dim-stat-card rounded-default flex min-w-0 flex-1 flex-col p-3"
+                  :style="card.theme.border"
+                >
+                  <div class="mb-2 flex items-center gap-2">
+                    <OIcon :name="card.theme.icon" size="sm" :class="card.theme.iconClass" />
+                    <span class="text-2xs font-medium" :class="'text-text-secondary'">{{
+                      card.label
+                    }}</span>
+                    <span class="ms-auto text-lg font-bold" :class="card.theme.countClass">{{
+                      card.count
+                    }}</span>
+                  </div>
+                  <div class="dim-stat-pills flex flex-wrap gap-1 overflow-hidden">
+                    <span
+                      v-for="val in card.values.slice(0, 5)"
+                      :key="val"
+                      class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
+                      :class="card.theme.pill"
+                      :data-test="valuePillTestId(card.dim, val)"
+                      @click.stop="openInsightDialogForCard(val, card)"
+                      ><ServiceNameLabel
+                        v-if="isServiceGroup(card.dim)"
+                        layout="inline"
+                        v-bind="serviceValueLabel(val)" /><OTruncatedText v-else>{{
+                        val
+                      }}</OTruncatedText
+                      ><span v-if="card.dim" class="ms-0.5 inline-flex shrink-0 gap-0.5"
+                        ><span
+                          v-for="st in getValueStreamTypes(card.dim.group_id, val)"
+                          :key="st"
+                          class="inline-block h-1.5 w-1.5 rounded-full"
+                          :class="{
+                            'bg-badge-blue-solid-bg': st === 'logs',
+                            'bg-badge-orange-solid-bg': st === 'traces',
+                            'bg-badge-success-solid-bg': st === 'metrics',
+                            'bg-badge-purple-solid-bg': st === 'profiles',
+                          }" /></span
+                    ></span>
+                    <ODropdown
+                      v-if="card.values.length > 5"
+                      v-model:open="dimCardMoreMenuOpen[idx]"
+                      side="bottom"
+                      align="start"
+                    >
+                      <template #trigger>
+                        <span
+                          class="text-2xs box-border h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer rounded-full px-2 py-0.5 transition-opacity hover:opacity-70"
+                          :class="'text-text-secondary'"
+                          >+{{ card.values.length - 5 }}</span
+                        >
+                      </template>
+                      <div
+                        class="flex max-h-50 max-w-70 flex-wrap gap-1 overflow-y-auto p-2"
+                        :class="'bg-surface-overlay'"
+                      >
+                        <span
+                          v-for="val in card.values.slice(5)"
+                          :key="val"
+                          class="text-2xs inline-flex max-w-full min-w-0 cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
+                          :class="card.theme.pill"
+                          :data-test="valuePillTestId(card.dim, val)"
+                          @click.stop="
+                            openInsightDialogForCard(val, card);
+                            dimCardMoreMenuOpen[idx] = false;
+                          "
+                          ><ServiceNameLabel
+                            v-if="isServiceGroup(card.dim)"
+                            layout="inline"
+                            v-bind="serviceValueLabel(val)" /><OTruncatedText v-else>{{
+                            val
+                          }}</OTruncatedText
+                          ><span v-if="card.dim" class="ms-0.5 inline-flex shrink-0 gap-0.5"
+                            ><span
+                              v-for="st in getValueStreamTypes(card.dim.group_id, val)"
+                              :key="st"
+                              class="inline-block h-1.5 w-1.5 rounded-full"
+                              :class="{
+                                'bg-badge-blue-solid-bg': st === 'logs',
+                                'bg-badge-orange-solid-bg': st === 'traces',
+                                'bg-badge-success-solid-bg': st === 'metrics',
+                                'bg-badge-purple-solid-bg': st === 'profiles',
+                              }" /></span
+                        ></span>
+                      </div>
+                    </ODropdown>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Stream type legend -->
+            <div class="ms-1 mt-2 flex items-center gap-3">
+              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+                <span class="bg-badge-blue-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
+                <span>{{ t("settings.correlation.foundInLogs") }}</span>
+              </div>
+              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+                <span class="bg-badge-orange-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
+                <span>{{ t("settings.correlation.foundInTraces") }}</span>
+              </div>
+              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+                <span class="bg-badge-success-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
+                <span>{{ t("settings.correlation.foundInMetrics") }}</span>
+              </div>
+              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+                <span class="bg-badge-purple-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
+                <span>{{ t("settings.correlation.foundInProfiles") }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recommended Configuration -->
+          <div
+            v-if="
+              suggestedConfig &&
+              activeEnvGroups.length > 0 &&
+              !suggestionDismissed &&
+              !suggestionAlreadyApplied
+            "
+            class="flex items-center gap-3 px-4 py-2.5"
+            :class="'bg-surface-subtle'"
+          >
+            <div class="min-w-0 flex-1 text-xs" :class="'text-text-secondary'">
+              <span class="font-bold" :class="'text-text-body'">{{
+                t("settings.serviceIdentitySetup.recommended")
+              }}</span>
+              {{ " " }}{{ t("settings.serviceIdentitySetup.recommendedUse") }}
+              <span class="font-semibold">{{
+                suggestedConfig.distinguish_by
+                  .map((id) => getGroupByValue(id)?.display ?? id)
+                  .join(" + ")
+              }}</span>
+              {{
+                t("settings.serviceIdentitySetup.coversTelemetry", {
+                  coverage: activeEnvCoverage ?? "–",
+                })
+              }}
+            </div>
+            <div class="flex shrink-0 items-center gap-1">
+              <OButton variant="outline" size="sm" @click="applySuggestion">
+                {{ t("settings.serviceIdentitySetup.apply") }}
+              </OButton>
+              <OButton
+                :aria-label="t('common.dismiss')"
+                variant="ghost"
+                size="icon"
+                class="opacity-40 hover:opacity-100"
+                @click="dismissSuggestion"
+              >
+                <OIcon name="cancel" size="xs" />
+              </OButton>
+            </div>
+          </div>
+
+          <!-- Workload Insight Sidebar -->
+          <ODrawer
+            data-test="service-identity-setup-insight-drawer"
+            v-model:open="insightDialogOpen"
+            :title="insightDrawerName"
+            :width="insightPanelWidthPct"
+          >
+            <!-- #header kept: first line combines plain subtitle text with an inline theme-colored badge
+               containing the title + tooltip; second line is a conditional coverage flex with icon.
+               Cannot be expressed cleanly with title + sub-title props alone. -->
+            <template #header>
+              <div class="min-w-0 flex-1">
+                <div
+                  class="flex items-center text-base"
+                  data-test="service-identity-setup-insight-header"
+                >
+                  {{ insightData.subtitle }}
+                  <span
+                    :class="[
+                      'rounded-default ms-2 inline-block px-2 py-0.5 font-semibold',
+                      'text-status-info-text bg-status-info-bg',
+                    ]"
+                    data-test="service-identity-setup-insight-title"
+                  >
+                    {{ insightTitle }}
+                    <OTooltip
+                      v-if="insightTitle.length > 25"
+                      :content="raw(insightTitle)"
+                      side="top"
+                    />
+                  </span>
+                </div>
+                <div
+                  v-if="insightServiceDisplay?.detected"
+                  class="text-text-secondary mt-0.5 text-xs"
+                  data-test="service-identity-setup-insight-detected"
+                >
+                  {{ t("serviceVersions.names.detectedAs", { name: raw(insightDialogValue) }) }}
+                </div>
+                <div
+                  v-if="
+                    !(insightData as any).isCardLevel &&
+                    (insightData.coverage !== null || coverageLineState(insightData) !== 'ready')
+                  "
+                  class="mt-1 flex items-center gap-1.5 text-xs"
+                  :class="'text-text-secondary'"
+                >
+                  <OIcon
+                    v-if="coverageLineState(insightData) !== 'failed'"
+                    name="verified"
+                    size="xs"
+                    class="text-status-positive"
+                  />
+                  <OSkeleton
+                    v-if="coverageLineState(insightData) === 'loading'"
+                    type="text"
+                    animation="none"
+                    class="h-3 w-28"
+                    data-test="service-identity-setup-insight-coverage-loading"
+                  />
+                  <span
+                    v-else-if="coverageLineState(insightData) === 'failed'"
+                    role="alert"
+                    class="text-status-error-text"
+                    data-test="service-identity-setup-insight-coverage-failed"
+                    >{{ t("settings.serviceIdentitySetup.serviceCountFailed") }}</span
+                  >
+                  <span v-else data-test="service-identity-setup-insight-coverage"
+                    >{{
+                      t("settings.serviceIdentitySetup.percentOfServices", {
+                        coverage: insightData.coverage,
+                      })
+                    }}
+                    <span v-if="insightData.count !== null && insightData.total !== null"
+                      >({{ insightData.count }}/{{ insightData.total }})</span
+                    >
+                  </span>
+                </div>
+              </div>
+            </template>
+            <!-- Stream contribution chart (single-value only) -->
+            <div class="flex h-full flex-col">
+              <template
+                v-if="
+                  !(insightData as any).isCardLevel &&
+                  (insightData as any).streamDetails?.length > 0
+                "
+              >
+                <div class="mb-3 shrink-0" data-test="service-identity-setup-insight-sources">
+                  <div class="text-2xs text-text-label mb-2 font-medium tracking-wide">
+                    {{ t("settings.serviceIdentitySetup.streamSources") }}
+                  </div>
+                  <div style="height: 40vh; min-height: 11.25rem">
+                    <CustomChartRenderer :data="insightChartData.options" />
+                  </div>
+                  <!-- Legend -->
+                  <div class="mt-2 flex items-center justify-center gap-4">
+                    <div
+                      v-for="sd in (insightData as any).streamDetails"
+                      :key="sd.streamType"
+                      class="text-2xs flex items-center gap-1.5"
+                      :class="'text-text-secondary'"
+                    >
+                      <span
+                        class="h-2 w-2 rounded-full"
+                        :class="{
+                          'bg-badge-blue-solid-bg': sd.streamType === 'logs',
+                          'bg-badge-orange-solid-bg': sd.streamType === 'traces',
+                          'bg-badge-success-solid-bg': sd.streamType === 'metrics',
+                        }"
+                      />
+                      <span class="capitalize">{{ sd.streamType }}</span>
+                      <span class="font-medium">{{ sd.streamNames.length }}</span>
+                    </div>
+                  </div>
                 </div>
               </template>
 
-              <!-- Add group + Save — bottom row -->
-              <div v-if="!addingToEnv" class="mt-2 flex items-center justify-between">
-                <OButton
-                  variant="outline"
-                  size="sm"
-                  @click="addingToEnv = generateGroupId()"
-                  icon-left="add"
-                >
-                  {{ t("settings.correlation.addGroup") }}
-                  <OTooltip
-                    side="top"
-                    :content="t('settings.correlation.addGroupTooltip')"
-                    max-width="15rem"
-                  />
-                </OButton>
-                <OButton
-                  variant="primary"
-                  size="sm-action"
-                  :loading="saving"
-                  :disabled="saving || !isDirty"
-                  data-test="service-identity-save-btn"
-                  @click="saveConfig"
-                >
-                  {{ t("settings.correlation.saveIdentityConfig") }}
-                </OButton>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- /padding -->
-      </div>
-      <!-- /Service Configuration card -->
+              <OSeparator class="mb-3 shrink-0" />
 
-      <!-- Section 3: Workload Detection -->
-      <div
-        v-if="workloadDetectedGroups.length > 0"
-        class="rounded-default border-card-glass-border mb-3 overflow-hidden border"
-      >
-        <!-- Section header -->
-        <div class="border-card-glass-border flex items-center gap-2 border-b px-4 py-3">
-          <OIcon name="radar" size="sm" class="text-teal-6" />
-          <span class="text-sm font-bold">{{
-            t("settings.serviceIdentitySetup.workloadDetection")
-          }}</span>
-        </div>
-
-        <!-- Collapsible: Workload detected using fields (N) -->
-        <div
-          class="rounded-default mx-3 mt-3 overflow-hidden border transition-all"
-          :class="'bg-banner-info-bg border-banner-info-border'"
-        >
-          <div
-            class="flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-opacity hover:opacity-80"
-            @click="trackedAliasExpanded = !trackedAliasExpanded"
-          >
-            <OIcon name="check-circle" size="sm" />
-            <div class="text-compact min-w-0 flex-1 leading-tight">
-              {{ t("settings.serviceIdentitySetup.workloadDetectedUsingFields") }}
-              <span class="text-text-secondary text-xs">({{ trackedAliasIds.length }})</span>
-            </div>
-            <OIcon
-              :name="trackedAliasExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
-              size="sm"
-              class="shrink-0 opacity-40"
-            />
-          </div>
-
-          <div
-            v-if="trackedAliasExpanded"
-            class="border-t px-3 pt-2 pb-3"
-            :class="'border-banner-info-border'"
-          >
-            <div class="rounded-default p-2.5" :class="'bg-surface-subtle'">
-              <div class="mb-3 text-xs" :class="'text-text-secondary'">
-                {{ t("settings.serviceIdentitySetup.workloadTrackedHelp") }}
-                <a
-                  class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg hover:bg-badge-blue-ol-border/18 mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background]"
-                  @click.prevent="emit('navigate-to-aliases', 'service')"
-                  >{{ t("settings.serviceIdentitySetup.goToFieldAliases") }}</a
-                >
-                {{ t("settings.serviceIdentitySetup.toConfigureFieldMappings") }}
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <!-- Pills for tracked aliases -->
-                <div
-                  v-for="alias in resolvedTrackedAliases"
-                  :key="alias.id"
-                  class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 ps-3 pe-1 text-xs font-medium transition-colors"
-                  :class="'bg-surface-base text-text-secondary'"
-                >
-                  <span>{{ alias.label }}</span>
-                  <OButton
-                    :aria-label="t('common.remove')"
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    @click="trackedAliasIds = trackedAliasIds.filter((id) => id !== alias.id)"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </OButton>
-                </div>
-                <!-- Inline add select -->
-                <template v-if="addingTrackedAlias">
-                  <OSelect
-                    ref="addTrackedAliasSelectRef"
-                    v-model="addTrackedAliasValue"
-                    :options="trackedAliasAddOptions"
-                    labelKey="label"
-                    valueKey="value"
-                    searchable
-                    :placeholder="t('settings.serviceIdentitySetup.selectAliasGroup')"
-                    style="width: 13.75rem"
-                    :dropdown-style="{ minWidth: '18.75rem' }"
-                    @update:model-value="onAddTrackedAlias($event)"
-                  />
-                  <OButton
-                    :aria-label="t('common.cancel')"
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    @click="
-                      addingTrackedAlias = false;
-                      addTrackedAliasValue = undefined;
-                    "
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </OButton>
-                </template>
-                <!-- Add field button -->
-                <OButton
-                  v-else
-                  variant="outline"
-                  size="sm"
-                  @click="addingTrackedAlias = true"
-                  icon-left="add"
-                >
-                  {{ t("settings.correlation.addField") }}
-                </OButton>
-              </div>
-              <div class="mt-3 flex justify-end">
-                <OButton
-                  variant="primary"
-                  size="sm-action"
-                  :loading="saving"
-                  :disabled="saving || !isDirty"
-                  @click="saveConfig"
-                >
-                  {{ t("settings.correlation.saveIdentityConfig") }}
-                </OButton>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="px-4 pt-3 pb-1">
-          <div class="text-xs" :class="'text-text-secondary'">
-            {{ t("settings.serviceIdentitySetup.discoveredPatternsHelp") }}
-            <a
-              class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg hover:bg-badge-blue-ol-border/18 mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background]"
-              @click.prevent="emit('navigate-to-services')"
-              >{{ t("settings.serviceIdentitySetup.goToServices") }}</a
-            >
-            <span>{{ t("settings.serviceIdentitySetup.toSeeDiscoveredServices") }}</span>
-          </div>
-        </div>
-
-        <!-- Environment Tabs (Chrome-style) -->
-        <div class="border-card-glass-border flex items-end gap-0 border-b px-4">
-          <!-- eslint-disable local/no-hardcoded-px -- hairline: the active tab pulls itself 1 device pixel over the panel border to hide it; that nudge must not scale with text -->
-          <div
-            v-for="env in detectedEnvironments"
-            :key="env.key"
-            class="rounded-t-default relative min-w-17.5 cursor-pointer border border-b-0 px-4 py-2 text-center text-xs font-medium transition-all"
-            :class="
-              activeEnvironment === env.key
-                ? 'text-text-body'
-                : 'text-text-muted hover:text-text-secondary border-transparent bg-transparent'
-            "
-            :style="
-              activeEnvironment === env.key
-                ? 'margin-bottom: -1px; padding-bottom: 0.5625rem; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
-                : ''
-            "
-            @click="activeEnvironment = env.key"
-          >
-            <!-- eslint-enable local/no-hardcoded-px -->
-            {{ env.label }}
-            <span
-              v-if="(setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0"
-              class="bg-badge-success-solid-bg absolute top-1 right-1 h-1.5 w-1.5 rounded-full"
-              :title="
-                t('settings.serviceIdentitySetup.fieldsConfigured', {
-                  n: (setDistinguishBy[env.key] ?? []).filter(Boolean).length,
-                })
-              "
-            />
-          </div>
-        </div>
-
-        <!-- Tab content panel — connects to active tab -->
-        <div v-if="primaryDim" class="overflow-hidden px-4 pt-4 pb-2">
-          <!-- Stat cards -->
-          <div class="flex items-stretch gap-3">
-            <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
-              <!-- Plus connector between cards -->
-              <div v-if="idx > 0" class="flex shrink-0 items-center">
-                <OIcon name="add" size="sm" class="text-icon-color" />
-              </div>
-
-              <!-- Dim card -->
-              <div
-                class="dim-stat-card rounded-default flex min-w-0 flex-1 flex-col p-3"
-                :style="card.theme.border"
-              >
-                <div class="mb-2 flex items-center gap-2">
-                  <OIcon :name="card.theme.icon" size="sm" :class="card.theme.iconClass" />
-                  <span class="text-2xs font-medium" :class="'text-text-secondary'">{{
-                    card.label
-                  }}</span>
-                  <span class="ms-auto text-lg font-bold" :class="card.theme.countClass">{{
-                    card.count
-                  }}</span>
-                </div>
-                <div class="dim-stat-pills flex flex-wrap gap-1 overflow-hidden">
-                  <span
-                    v-for="val in card.values.slice(0, 5)"
-                    :key="val"
-                    class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
-                    :class="card.theme.pill"
-                    :data-test="valuePillTestId(card.dim, val)"
-                    @click.stop="openInsightDialogForCard(val, card)"
-                    ><ServiceNameLabel
-                      v-if="isServiceGroup(card.dim)"
-                      layout="inline"
-                      v-bind="serviceValueLabel(val)" /><OTruncatedText v-else>{{
-                      val
-                    }}</OTruncatedText
-                    ><span v-if="card.dim" class="ms-0.5 inline-flex shrink-0 gap-0.5"
-                      ><span
-                        v-for="st in getValueStreamTypes(card.dim.group_id, val)"
-                        :key="st"
-                        class="inline-block h-1.5 w-1.5 rounded-full"
-                        :class="{
-                          'bg-badge-blue-solid-bg': st === 'logs',
-                          'bg-badge-orange-solid-bg': st === 'traces',
-                          'bg-badge-success-solid-bg': st === 'metrics',
-                          'bg-badge-purple-solid-bg': st === 'profiles',
-                        }" /></span
-                  ></span>
-                  <ODropdown
-                    v-if="card.values.length > 5"
-                    v-model:open="dimCardMoreMenuOpen[idx]"
-                    side="bottom"
-                    align="start"
-                  >
-                    <template #trigger>
-                      <span
-                        class="text-2xs box-border h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer rounded-full px-2 py-0.5 transition-opacity hover:opacity-70"
-                        :class="'text-text-secondary'"
-                        >+{{ card.values.length - 5 }}</span
-                      >
-                    </template>
-                    <div
-                      class="flex max-h-50 max-w-70 flex-wrap gap-1 overflow-y-auto p-2"
-                      :class="'bg-surface-overlay'"
-                    >
-                      <span
-                        v-for="val in card.values.slice(5)"
-                        :key="val"
-                        class="text-2xs inline-flex max-w-full min-w-0 cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
-                        :class="card.theme.pill"
-                        :data-test="valuePillTestId(card.dim, val)"
-                        @click.stop="
-                          openInsightDialogForCard(val, card);
-                          dimCardMoreMenuOpen[idx] = false;
-                        "
-                        ><ServiceNameLabel
-                          v-if="isServiceGroup(card.dim)"
-                          layout="inline"
-                          v-bind="serviceValueLabel(val)" /><OTruncatedText v-else>{{
-                          val
-                        }}</OTruncatedText
-                        ><span v-if="card.dim" class="ms-0.5 inline-flex shrink-0 gap-0.5"
-                          ><span
-                            v-for="st in getValueStreamTypes(card.dim.group_id, val)"
-                            :key="st"
-                            class="inline-block h-1.5 w-1.5 rounded-full"
-                            :class="{
-                              'bg-badge-blue-solid-bg': st === 'logs',
-                              'bg-badge-orange-solid-bg': st === 'traces',
-                              'bg-badge-success-solid-bg': st === 'metrics',
-                              'bg-badge-purple-solid-bg': st === 'profiles',
-                            }" /></span
-                      ></span>
-                    </div>
-                  </ODropdown>
-                </div>
-              </div>
-            </template>
-          </div>
-
-          <!-- Stream type legend -->
-          <div class="ms-1 mt-2 flex items-center gap-3">
-            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
-              <span class="bg-badge-blue-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
-              <span>{{ t("settings.correlation.foundInLogs") }}</span>
-            </div>
-            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
-              <span class="bg-badge-orange-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
-              <span>{{ t("settings.correlation.foundInTraces") }}</span>
-            </div>
-            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
-              <span class="bg-badge-success-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
-              <span>{{ t("settings.correlation.foundInMetrics") }}</span>
-            </div>
-            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
-              <span class="bg-badge-purple-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
-              <span>{{ t("settings.correlation.foundInProfiles") }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Recommended Configuration -->
-        <div
-          v-if="
-            suggestedConfig &&
-            activeEnvGroups.length > 0 &&
-            !suggestionDismissed &&
-            !suggestionAlreadyApplied
-          "
-          class="flex items-center gap-3 px-4 py-2.5"
-          :class="'bg-surface-subtle'"
-        >
-          <div class="min-w-0 flex-1 text-xs" :class="'text-text-secondary'">
-            <span class="font-bold" :class="'text-text-body'">{{
-              t("settings.serviceIdentitySetup.recommended")
-            }}</span>
-            {{ " " }}{{ t("settings.serviceIdentitySetup.recommendedUse") }}
-            <span class="font-semibold">{{
-              suggestedConfig.distinguish_by
-                .map((id) => getGroupByValue(id)?.display ?? id)
-                .join(" + ")
-            }}</span>
-            {{
-              t("settings.serviceIdentitySetup.coversTelemetry", {
-                coverage: activeEnvCoverage ?? "–",
-              })
-            }}
-          </div>
-          <div class="flex shrink-0 items-center gap-1">
-            <OButton variant="outline" size="sm" @click="applySuggestion">
-              {{ t("settings.serviceIdentitySetup.apply") }}
-            </OButton>
-            <OButton
-              :aria-label="t('common.dismiss')"
-              variant="ghost"
-              size="icon"
-              class="opacity-40 hover:opacity-100"
-              @click="dismissSuggestion"
-            >
-              <OIcon name="cancel" size="xs" />
-            </OButton>
-          </div>
-        </div>
-
-        <!-- Workload Insight Sidebar -->
-        <ODrawer
-          data-test="service-identity-setup-insight-drawer"
-          v-model:open="insightDialogOpen"
-          :title="insightDrawerName"
-          :width="insightPanelWidthPct"
-        >
-          <!-- #header kept: first line combines plain subtitle text with an inline theme-colored badge
-               containing the title + tooltip; second line is a conditional coverage flex with icon.
-               Cannot be expressed cleanly with title + sub-title props alone. -->
-          <template #header>
-            <div class="min-w-0 flex-1">
-              <div
-                class="flex items-center text-base"
-                data-test="service-identity-setup-insight-header"
-              >
-                {{ insightData.subtitle }}
-                <span
-                  :class="[
-                    'rounded-default ms-2 inline-block px-2 py-0.5 font-semibold',
-                    'text-status-info-text bg-status-info-bg',
-                  ]"
-                  data-test="service-identity-setup-insight-title"
-                >
-                  {{ insightTitle }}
-                  <OTooltip
-                    v-if="insightTitle.length > 25"
-                    :content="raw(insightTitle)"
-                    side="top"
-                  />
-                </span>
-              </div>
-              <div
-                v-if="insightServiceDisplay?.detected"
-                class="text-text-secondary mt-0.5 text-xs"
-                data-test="service-identity-setup-insight-detected"
-              >
-                {{ t("serviceVersions.names.detectedAs", { name: raw(insightDialogValue) }) }}
-              </div>
-              <div
-                v-if="
-                  !(insightData as any).isCardLevel &&
-                  (insightData.coverage !== null || coverageLineState(insightData) !== 'ready')
-                "
-                class="mt-1 flex items-center gap-1.5 text-xs"
-                :class="'text-text-secondary'"
-              >
-                <OIcon
-                  v-if="coverageLineState(insightData) !== 'failed'"
-                  name="verified"
-                  size="xs"
-                  class="text-status-positive"
-                />
-                <OSkeleton
-                  v-if="coverageLineState(insightData) === 'loading'"
-                  type="text"
-                  animation="none"
-                  class="h-3 w-28"
-                  data-test="service-identity-setup-insight-coverage-loading"
-                />
-                <span
-                  v-else-if="coverageLineState(insightData) === 'failed'"
-                  role="alert"
-                  class="text-status-error-text"
-                  data-test="service-identity-setup-insight-coverage-failed"
-                  >{{ t("settings.serviceIdentitySetup.serviceCountFailed") }}</span
-                >
-                <span v-else data-test="service-identity-setup-insight-coverage"
-                  >{{
-                    t("settings.serviceIdentitySetup.percentOfServices", {
-                      coverage: insightData.coverage,
+              <!-- Card-level: all values with bars -->
+              <template v-if="(insightData as any).isCardLevel && insightData.children.length > 0">
+                <div class="text-2xs mb-3 font-medium" :class="'text-text-secondary'">
+                  {{
+                    t("settings.serviceIdentitySetup.allValues", {
+                      count: insightData.children.length,
                     })
                   }}
-                  <span v-if="insightData.count !== null && insightData.total !== null"
-                    >({{ insightData.count }}/{{ insightData.total }})</span
-                  >
-                </span>
-              </div>
-            </div>
-          </template>
-          <!-- Stream contribution chart (single-value only) -->
-          <div class="flex h-full flex-col">
-            <template
-              v-if="
-                !(insightData as any).isCardLevel && (insightData as any).streamDetails?.length > 0
-              "
-            >
-              <div class="mb-3 shrink-0" data-test="service-identity-setup-insight-sources">
-                <div class="text-2xs text-text-label mb-2 font-medium tracking-wide">
-                  {{ t("settings.serviceIdentitySetup.streamSources") }}
                 </div>
-                <div style="height: 40vh; min-height: 11.25rem">
-                  <CustomChartRenderer :data="insightChartData.options" />
-                </div>
-                <!-- Legend -->
-                <div class="mt-2 flex items-center justify-center gap-4">
+                <div class="flex flex-col gap-2.5">
                   <div
-                    v-for="sd in (insightData as any).streamDetails"
-                    :key="sd.streamType"
-                    class="text-2xs flex items-center gap-1.5"
-                    :class="'text-text-secondary'"
+                    v-for="child in insightData.children"
+                    :key="child.name"
+                    class="flex flex-col gap-1"
                   >
-                    <span
-                      class="h-2 w-2 rounded-full"
-                      :class="{
-                        'bg-badge-blue-solid-bg': sd.streamType === 'logs',
-                        'bg-badge-orange-solid-bg': sd.streamType === 'traces',
-                        'bg-badge-success-solid-bg': sd.streamType === 'metrics',
-                      }"
-                    />
-                    <span class="capitalize">{{ sd.streamType }}</span>
-                    <span class="font-medium">{{ sd.streamNames.length }}</span>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <OSeparator class="mb-3 shrink-0" />
-
-            <!-- Card-level: all values with bars -->
-            <template v-if="(insightData as any).isCardLevel && insightData.children.length > 0">
-              <div class="text-2xs mb-3 font-medium" :class="'text-text-secondary'">
-                {{
-                  t("settings.serviceIdentitySetup.allValues", {
-                    count: insightData.children.length,
-                  })
-                }}
-              </div>
-              <div class="flex flex-col gap-2.5">
-                <div
-                  v-for="child in insightData.children"
-                  :key="child.name"
-                  class="flex flex-col gap-1"
-                >
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="min-w-0 truncate font-medium">{{ child.name }}</span>
-                    <span class="ms-2 shrink-0 tabular-nums" :class="'text-text-secondary'"
-                      >{{ child.count }} {{ insightData.childCountLabel }}</span
-                    >
-                  </div>
-                  <div class="h-2 w-full overflow-hidden rounded-full" :class="'bg-surface-subtle'">
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="min-w-0 truncate font-medium">{{ child.name }}</span>
+                      <span class="ms-2 shrink-0 tabular-nums" :class="'text-text-secondary'"
+                        >{{ child.count }} {{ insightData.childCountLabel }}</span
+                      >
+                    </div>
                     <div
-                      class="h-full rounded-full transition-all"
-                      :class="
-                        insightDialogLevel === 'primary'
-                          ? 'bg-blue-5'
-                          : insightDialogLevel === 'secondary'
-                            ? 'bg-teal-5'
-                            : 'bg-purple-5'
-                      "
-                      :style="{
-                        width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%`,
-                      }"
-                    />
+                      class="h-2 w-full overflow-hidden rounded-full"
+                      :class="'bg-surface-subtle'"
+                    >
+                      <div
+                        class="h-full rounded-full transition-all"
+                        :class="
+                          insightDialogLevel === 'primary'
+                            ? 'bg-blue-5'
+                            : insightDialogLevel === 'secondary'
+                              ? 'bg-teal-5'
+                              : 'bg-purple-5'
+                        "
+                        :style="{
+                          width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%`,
+                        }"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </template>
+              </template>
 
-            <!-- Single-value: related dimension columns (read-only) -->
-            <template
-              v-if="
-                !(insightData as any).isCardLevel &&
-                (insightData as any).relatedDimensions?.length > 0
-              "
-            >
-              <!-- Explanation -->
-              <InfoNotice class="mb-2 shrink-0" data-test="service-identity-setup-insight-notice">
-                <span data-test="service-identity-setup-insight-explain"
-                  >{{ t("settings.serviceIdentitySetup.relatedValuesPre") }}
-                  <strong>{{ formatDimLabels((insightData as any).relatedDimensions) }}</strong>
-                  {{ t("settings.serviceIdentitySetup.valuesCoOccurringWith") }}
-                  <strong>{{ insightTitle }}</strong
-                  >.</span
-                >
-              </InfoNotice>
-              <div
-                class="flex min-h-0 flex-1 py-3"
-                data-test="service-identity-setup-insight-related"
+              <!-- Single-value: related dimension columns (read-only) -->
+              <template
+                v-if="
+                  !(insightData as any).isCardLevel &&
+                  (insightData as any).relatedDimensions?.length > 0
+                "
               >
+                <!-- Explanation -->
+                <InfoNotice class="mb-2 shrink-0" data-test="service-identity-setup-insight-notice">
+                  <span data-test="service-identity-setup-insight-explain"
+                    >{{ t("settings.serviceIdentitySetup.relatedValuesPre") }}
+                    <strong>{{ formatDimLabels((insightData as any).relatedDimensions) }}</strong>
+                    {{ t("settings.serviceIdentitySetup.valuesCoOccurringWith") }}
+                    <strong>{{ insightTitle }}</strong
+                    >.</span
+                  >
+                </InfoNotice>
                 <div
-                  v-for="(dim, dimIdx) in insightRelatedDimensions"
-                  :key="dim.label + dimIdx"
-                  class="flex min-w-0 flex-1 flex-col px-3"
-                  :class="[dimIdx > 0 ? 'border-border-default border-s' : '']"
+                  class="flex min-h-0 flex-1 py-3"
+                  data-test="service-identity-setup-insight-related"
                 >
-                  <div class="text-compact mb-2 font-bold" :class="'text-text-body'">
-                    {{ dim.label }}
-                    <span class="font-normal" :class="'text-text-secondary'"
-                      >({{ dim.values.length }})</span
-                    >
-                  </div>
-                  <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-                    <OTruncatedText
-                      v-for="dVal in dim.values"
-                      :key="dVal"
-                      class="text-compact rounded-default shrink-0 border px-2.5 py-1"
-                      :class="{
-                        'bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text':
-                          dim.color === 'teal',
-                        'bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-soft-text':
-                          dim.color === 'purple',
-                        'bg-badge-blue-soft-bg border-badge-blue-ol-border text-badge-blue-soft-text':
-                          dim.color === 'blue',
-                      }"
-                      >{{ dVal }}</OTruncatedText
-                    >
-                    <span
-                      v-if="dim.values.length === 0"
-                      class="text-xs italic"
-                      :class="'text-text-secondary'"
-                      >{{ t("settings.serviceIdentitySetup.noValues") }}</span
-                    >
+                  <div
+                    v-for="(dim, dimIdx) in insightRelatedDimensions"
+                    :key="dim.label + dimIdx"
+                    class="flex min-w-0 flex-1 flex-col px-3"
+                    :class="[dimIdx > 0 ? 'border-border-default border-s' : '']"
+                  >
+                    <div class="text-compact mb-2 font-bold" :class="'text-text-body'">
+                      {{ dim.label }}
+                      <span class="font-normal" :class="'text-text-secondary'"
+                        >({{ dim.values.length }})</span
+                      >
+                    </div>
+                    <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+                      <OTruncatedText
+                        v-for="dVal in dim.values"
+                        :key="dVal"
+                        class="text-compact rounded-default shrink-0 border px-2.5 py-1"
+                        :class="{
+                          'bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text':
+                            dim.color === 'teal',
+                          'bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-soft-text':
+                            dim.color === 'purple',
+                          'bg-badge-blue-soft-bg border-badge-blue-ol-border text-badge-blue-soft-text':
+                            dim.color === 'blue',
+                        }"
+                        >{{ dVal }}</OTruncatedText
+                      >
+                      <span
+                        v-if="dim.values.length === 0"
+                        class="text-xs italic"
+                        :class="'text-text-secondary'"
+                        >{{ t("settings.serviceIdentitySetup.noValues") }}</span
+                      >
+                    </div>
                   </div>
                 </div>
-              </div>
-            </template>
-          </div>
-        </ODrawer>
-      </div>
+              </template>
+            </div>
+          </ODrawer>
+        </div>
+      </OFormSection>
 
       <!-- Section 3: Warnings -->
       <div v-if="warnings.length > 0" class="mb-6">
@@ -1203,6 +1177,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -3040,7 +3016,8 @@ watch(
   },
 );
 
-async function saveConfig() {
+/** Resolves to whether the configuration was saved. */
+async function saveConfig(): Promise<boolean> {
   saving.value = true;
   try {
     // Build sets array: include only sets that have at least 1 non-empty distinguish_by field.
@@ -3059,7 +3036,7 @@ async function saveConfig() {
         variant: "warning",
         message: t("settings.correlation.identityConfigNoSets"),
       });
-      return;
+      return false;
     }
 
     // "service" is always tracked implicitly by the backend; strip it to avoid 400.
@@ -3094,6 +3071,7 @@ async function saveConfig() {
       variant: "success",
       message: t("settings.correlation.identityConfigSaved"),
     });
+    return true;
   } catch (err: any) {
     toast({
       variant: "error",
@@ -3102,10 +3080,26 @@ async function saveConfig() {
         err?.message ||
         t("settings.correlation.identityConfigSaveFailed"),
     });
+    return false;
   } finally {
     saving.value = false;
   }
 }
+
+/** Puts the editor back on the last loaded or saved configuration. */
+function discardChanges() {
+  const saved = currentIdentityConfig.value;
+  setDistinguishBy.value = Object.fromEntries(
+    (saved?.sets ?? []).map((set) => [set.id, [...set.distinguish_by]]),
+  );
+  trackedAliasIds.value = [...(saved?.tracked_alias_ids ?? [])];
+  serviceOptional.value = saved?.service_optional ?? false;
+  addingToEnv.value = "";
+  addingTrackedAlias.value = false;
+}
+
+// The page's one save bar drives this tab, so the page reads its state and runs its save.
+defineExpose({ isDirty, saving, saveConfig, discardChanges });
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 

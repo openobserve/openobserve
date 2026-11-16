@@ -581,6 +581,15 @@ export class CrossLinkPage {
         return (await res.json())?.enable_cross_linking === true;
     }
 
+    /** For cleanup: Save stays disabled when no link was there to delete, and a click on it would time out. */
+    async saveOrgSettingsIfChanged() {
+        if (await this.page.locator(this.orgSettingsSaveBtn).isDisabled()) {
+            testLogger.debug('Org settings unchanged, nothing to save');
+            return;
+        }
+        await this.clickOrgSettingsSave();
+    }
+
     // ============================================================
     // Log details cross-link helpers (used by multi-stream specs)
     // ============================================================

@@ -73,7 +73,7 @@ const sel = (name: string) => `[data-test="autoobserve-live-history${name ? `-${
 const mountFeed = () => mount(LiveHistory, { global: { plugins: [i18n, store] } });
 const originalBuild = config.isEnterprise;
 
-describe("LiveHistory (G6)", () => {
+describe("LiveHistory", () => {
   beforeEach(() => {
     config.isEnterprise = "true";
     push.mockReset();
@@ -95,19 +95,41 @@ describe("LiveHistory (G6)", () => {
     await flushPromises();
     const rows = w.findAll(`${sel("list")} li`);
     expect(rows.map((r) => r.find("p").text())).toEqual([
-      "ops-lead@example.com dismissed Nothing watches checkout",
-      expect.stringContaining("Opened an incident: pay_api stopped"),
+      "ops-lead@example.com dismissed my suggestion: Nothing watches checkout.",
+      expect.stringContaining("I opened an incident: pay_api stopped."),
     ]);
+    expect(w.find(`${sel("list")} h3`).text()).toBe("Today");
     expect(decisionsApi).toHaveBeenCalledWith(
       expect.any(String),
       expect.not.objectContaining({ family: expect.anything() }),
       expect.anything(),
     );
     await w.find(sel("open-inc-1")).trigger("click");
-    expect(push).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "incidentDetail", params: { id: "inc-1" } }),
-    );
+    expect(w.emitted("open-issue")).toEqual([["inc-1"]]);
     expect(w.find(sel("newest")).exists()).toBe(false);
+  });
+
+  it("the history-drawer filter keeps only its kind, and says so when none is left", async () => {
+    const now = Date.now();
+    incidentsApi.mockResolvedValue(
+      incidentPage([incident("inc-1", "pay_api stopped", now - 60_000)]),
+    );
+    decisionsApi.mockResolvedValue(decisionPage([decision("checkout", now - 30_000)]));
+    const feed = (filter: string) =>
+      mount(LiveHistory, { props: { filter } as never, global: { plugins: [i18n, store] } });
+    const problems = feed("incident");
+    await flushPromises();
+    expect(problems.findAll(`${sel("list")} li`)).toHaveLength(1);
+    expect(problems.text()).toContain("pay_api stopped");
+    expect(problems.text()).not.toContain("Nothing watches checkout");
+    const decisions = feed("decision");
+    await flushPromises();
+    expect(decisions.findAll(`${sel("list")} li`)).toHaveLength(1);
+    const changes = feed("change");
+    await flushPromises();
+    expect(changes.find(sel("list")).exists()).toBe(false);
+    expect(changes.find(sel("filter-empty")).exists()).toBe(true);
+    expect(changes.find('[data-test="autoobserve-live-empty-history"]').exists()).toBe(false);
   });
 
   it("still lists incidents while the decisions route is off", async () => {
@@ -165,12 +187,18 @@ describe("LiveHistory (G6)", () => {
     expect(w.find(sel("newest")).text()).toContain("Older incidents are on the Issues page.");
   });
 
-  it("reads every decision state, so applied, undone and marked ones are listed (T1-N1)", async () => {
+  it("reads every decision state, so applied, undone and marked ones are listed", async () => {
     const now = Date.now();
     incidentsApi.mockResolvedValue(incidentPage([]));
     decisionsApi.mockResolvedValue(
       decisionPage([
-        { ...decision("undone-apply", now - 10_000), action: "apply", state: "undone" },
+        {
+          ...decision("undone-apply", now - 10_000),
+          action: "apply",
+          state: "undone",
+          undone_at: (now - 5_000) * 1000,
+          undone_by: "sre@example.com",
+        },
         { ...decision("marked", now - 20_000), action: "accept" },
       ]),
     );
@@ -181,15 +209,18 @@ describe("LiveHistory (G6)", () => {
       expect.not.objectContaining({ state: expect.anything() }),
       expect.anything(),
     );
-    const rows = w.findAll(`${sel("list")} li`).map((r) => r.find("p").text());
-    expect(rows[0]).toContain("ops-lead@example.com changed Nothing watches undone-apply");
-    expect(rows[0]).toContain("Undone");
-    expect(rows[1]).toBe(
-      "ops-lead@example.com marked Nothing watches marked as an intended report",
+    const rows = w.findAll(`${sel("list")} li`).map((r) => r.text());
+    expect(rows[0]).toContain(
+      "ops-lead@example.com applied my change to Nothing watches undone-apply.",
+    );
+    expect(rows[0]).toContain("Undone by sre@example.com");
+    expect(rows[0]).toContain("See the change");
+    expect(rows[1]).toContain(
+      "ops-lead@example.com marked my report on Nothing watches marked as intended.",
     );
   });
 
-  it("lists the decisions a user may read when incidents are denied, with one red line (T1-N2)", async () => {
+  it("lists the decisions a user may read when incidents are denied, with one red line", async () => {
     incidentsApi.mockRejectedValue(httpError(403));
     decisionsApi.mockResolvedValue(decisionPage([decision("checkout", Date.now())]));
     const w = mountFeed();

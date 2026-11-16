@@ -19,7 +19,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { raw } from "@/types/i18n";
 import CoverageSignalDetail from "./CoverageSignalDetail.vue";
-import type { CoverageCell } from "./fixtures";
+import type { CoverageCell } from "./aoTypes";
 
 const noAlert: CoverageCell = {
   state: "gap",
@@ -28,7 +28,7 @@ const noAlert: CoverageCell = {
 
 const mountDetail = (added: boolean) =>
   mount(CoverageSignalDetail, {
-    props: { cell: noAlert, service: "svc-d", signal: "errors", ledger: [], added },
+    props: { cell: noAlert, service: "svc-d", signal: "errors", added },
     global: { plugins: [i18n, store], stubs: { InsightBlock: true } },
   });
 

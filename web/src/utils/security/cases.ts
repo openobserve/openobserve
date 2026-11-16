@@ -3,6 +3,7 @@
 // Timeline events arrive serde-tagged ({ timestamp, type, data }); each becomes one readable line.
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { securityTime } from "@/utils/security/time";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { SeverityTone } from "./severity";
 
@@ -165,6 +166,22 @@ export function toTimelineEntry(event: IncidentEventRaw): TimelineEntry {
         body: String(d.reason ?? ""),
         actor: d.user_id,
       };
+    case "DetectionJoined": {
+      const from = String(d.from_severity ?? "");
+      const to = String(d.to_severity ?? "");
+      return {
+        ...base,
+        kind: "alert",
+        icon: "data-info-alert",
+        key: from && to && from !== to ? "detectionJoinedRaised" : "detectionJoined",
+        params: {
+          rule: String(d.rule || d.alert_name || ""),
+          level: String(d.level || "—"),
+          from,
+          to,
+        },
+      };
+    }
     case "AlertsAttached":
       return {
         ...base,
@@ -182,7 +199,7 @@ export function toTimelineEntry(event: IncidentEventRaw): TimelineEntry {
         key: "eventAttached",
         params: {
           stream: String(d.stream ?? ""),
-          at: d.event_at ? new Date(Number(d.event_at) / 1000).toLocaleString() : "",
+          at: d.event_at ? securityTime(Number(d.event_at) / 1000) : "",
         },
         actor: d.user_id,
       };
@@ -225,12 +242,57 @@ export function toTimeline(events: IncidentEventRaw[] | null | undefined): Timel
   return (events ?? []).map(toTimelineEntry).sort((a, b) => b.timestamp - a.timestamp);
 }
 
+/** Case-key field holding the detection id a case was opened for; it is not an entity. */
+export const CASE_DETECTION_KEY = "security_detection";
+
+/** The detection id in a case's key, if the case was opened for one detection. */
+export function caseDetectionId(groupValues: unknown): string | null {
+  if (!groupValues || typeof groupValues !== "object" || Array.isArray(groupValues)) return null;
+  const id = (groupValues as Record<string, unknown>)[CASE_DETECTION_KEY];
+  return typeof id === "string" && id ? id : null;
+}
+
 /** Correlation dimensions as label/value pairs; the server stores them as a free-form object. */
 export function groupValueRows(groupValues: unknown): { key: string; value: string }[] {
   if (!groupValues || typeof groupValues !== "object" || Array.isArray(groupValues)) return [];
   return Object.entries(groupValues as Record<string, unknown>)
-    .filter(([, v]) => v !== null && v !== undefined && v !== "")
+    .filter(([k, v]) => k !== CASE_DETECTION_KEY && v !== null && v !== undefined && v !== "")
     .map(([key, v]) => ({ key, value: typeof v === "object" ? JSON.stringify(v) : String(v) }));
+}
+
+export type CaseEntityKind = "host" | "user" | "ip";
+
+/** The fields of a case row the queue reads its entities from. */
+export interface CaseEntitySource {
+  group_values?: unknown;
+  entity?: string | null;
+  entity_kind?: CaseEntityKind | null;
+  entities?: { kind: CaseEntityKind; value: string }[];
+}
+
+export const ENTITY_ICON: Record<CaseEntityKind, IconName> = {
+  host: "computer",
+  user: "person",
+  ip: "lan",
+};
+
+const ENTITY_KEY_ORDER: CaseEntityKind[] = ["host", "user", "ip"];
+
+/** Every entity on a case, primary first; reads the server's list, else the case key's `security_<kind>` values. */
+export function caseEntities(row: CaseEntitySource): { kind: CaseEntityKind; value: string }[] {
+  const out: { kind: CaseEntityKind; value: string }[] = [];
+  const add = (kind: CaseEntityKind, value: unknown) => {
+    const v = typeof value === "string" ? value.trim() : "";
+    if (v && !out.some((e) => e.kind === kind && e.value === v)) out.push({ kind, value: v });
+  };
+  if (row.entity && row.entity_kind) add(row.entity_kind, row.entity);
+  for (const e of row.entities ?? []) add(e.kind, e.value);
+  const gv = row.group_values;
+  if (!out.length && gv && typeof gv === "object" && !Array.isArray(gv)) {
+    for (const kind of ENTITY_KEY_ORDER)
+      add(kind, (gv as Record<string, unknown>)[`security_${kind}`]);
+  }
+  return out;
 }
 
 /** The firing fields read from `IncidentWithAlerts.triggers`. */

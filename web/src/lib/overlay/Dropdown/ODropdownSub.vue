@@ -83,7 +83,7 @@ function onKeydown(event: KeyboardEvent) {
       type="button"
       :text-value="textValue"
       :aria-describedby="description ? descriptionDomId : undefined"
-      class="group/sub rounded-default text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg relative flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-start transition-colors duration-(--duration-hover-out) outline-none select-none data-[highlighted]:duration-(--duration-hover-in)"
+      class="group/sub rounded-default text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg relative flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-start transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none"
     >
       <slot name="icon-left" />
       <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-0.5">

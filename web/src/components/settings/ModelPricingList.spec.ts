@@ -669,6 +669,8 @@ describe("ModelPricingList.vue", () => {
       const filtered = wrapper.vm.filteredModels;
       expect(filtered).toHaveLength(1);
       expect(filtered[0].id).toBe("org-1");
+      // An empty Custom tab is first-run, so it must not read as a filtered list.
+      expect(wrapper.vm.isFiltered).toBe(false);
     });
 
     it("should return only inherited/built-in models when selectedTab is 'inherited'", async () => {
@@ -681,6 +683,7 @@ describe("ModelPricingList.vue", () => {
       expect(ids).toContain("meta-1");
       expect(ids).toContain("bi-1");
       expect(ids).not.toContain("org-1");
+      expect(wrapper.vm.isFiltered).toBe(true);
     });
   });
 

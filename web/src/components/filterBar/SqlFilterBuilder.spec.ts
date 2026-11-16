@@ -16,6 +16,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import SqlFilterBuilder from "./SqlFilterBuilder.vue";
+import OChipInput from "@/lib/forms/ChipInput/OChipInput.vue";
 import type { FilterField } from "@/utils/query/filterBar";
 
 const fields: FilterField[] = [
@@ -31,10 +32,10 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-const mountBuilder = (query: string) => {
+const mountBuilder = (query: string, extra: { maxRows?: number } = {}) => {
   wrapper = mount(SqlFilterBuilder, {
     attachTo: document.body,
-    props: { query, fields, dataTest: "b" },
+    props: { query, fields, dataTest: "b", ...extra },
   });
   return wrapper;
 };
@@ -51,6 +52,22 @@ describe("SqlFilterBuilder", () => {
   it("blends the bar into the editor surface instead of drawing an input frame", () => {
     mountBuilder("");
     expect(wrapper!.find('[data-test="b-bar-field"]').classes()).not.toContain("border");
+  });
+
+  it("activates like a click on the bar: focuses the caret and opens the field list", async () => {
+    mountBuilder("level = 'error'");
+    (wrapper!.vm as unknown as { activate: () => void }).activate();
+    await flushPromises();
+    expect(document.activeElement).toBe(wrapper!.find('[data-test="b-bar-input"]').element);
+    expect(wrapper!.emitted("focus")).toHaveLength(1);
+  });
+
+  it("caps the bar at three lines unless the host lifts the cap", () => {
+    mountBuilder("");
+    expect(wrapper!.findComponent(OChipInput).props("maxRows")).toBe(3);
+    wrapper!.unmount();
+    mountBuilder("", { maxRows: 0 });
+    expect(wrapper!.findComponent(OChipInput).props("maxRows")).toBe(0);
   });
 
   it("re-reads the query when it changes outside the bar", async () => {

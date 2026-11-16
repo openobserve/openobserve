@@ -23,11 +23,15 @@ use std::{
 };
 
 use config::metrics;
-use dashmap::DashMap;
+use dashmap::{DashMap, mapref::entry::Entry};
 use datafusion::{
-    common::{HashMap, TableReference},
+    common::{
+        ColumnStatistics, HashMap, Statistics, TableReference,
+        heap_size::{DFHeapSize, DFHeapSizeCtx},
+    },
     execution::cache::{
-        Cache, CacheEntryInfo, CacheValue, TableScopedPath, cache_manager::CachedFileMetadata,
+        Cache, CacheEntryInfo, SchemaFingerprint, TableScopedPath,
+        cache_manager::CachedFileMetadata,
     },
     physical_expr::{LexOrdering, PhysicalExpr, PhysicalSortExpr, expressions::Column},
 };
@@ -43,6 +47,8 @@ pub static GLOBAL_CACHE: Lazy<Arc<FileStatisticsCache>> =
 pub struct FileStatisticsCache {
     statistics: DashMap<String, (CachedFileMetadata, usize)>,
     cacher: parking_lot::Mutex<VecDeque<String>>,
+    // Equal fingerprints are shared across entries and charged once; the value counts users.
+    fingerprints: DashMap<Arc<SchemaFingerprint>, usize>,
     current_memory: AtomicI64,
 }
 
@@ -51,6 +57,7 @@ impl FileStatisticsCache {
         Self {
             statistics: DashMap::new(),
             cacher: parking_lot::Mutex::new(VecDeque::new()),
+            fingerprints: DashMap::new(),
             current_memory: AtomicI64::new(0),
         }
     }
@@ -68,15 +75,15 @@ impl FileStatisticsCache {
     }
 
     fn estimate_entry_size(key: &str, value: &CachedFileMetadata) -> usize {
-        // Count both key copies and inline storage; CacheValue only reports heap allocations.
-        (std::mem::size_of::<String>() + key.len()) * 2
+        // Count both key copies and inline storage, rounding heap blocks to allocator size classes.
+        (std::mem::size_of::<String>() + alloc_size(key.len())) * 2
             + std::mem::size_of::<(CachedFileMetadata, usize)>()
-            + value.size()
+            + value_heap_size(value)
             + Self::estimate_ordering_size(value.ordering.as_ref())
             + 64
     }
 
-    // CacheValue::size skips the ordering; the schema fingerprint is shared per table, so skip it.
+    // `value_heap_size` skips the ordering; the fingerprint is charged by `intern_fingerprint`.
     fn estimate_ordering_size(ordering: Option<&LexOrdering>) -> usize {
         ordering.map_or(0, |ordering| {
             ordering
@@ -111,8 +118,9 @@ impl FileStatisticsCache {
             let batch = (w.len() / 20).max(1).min(w.len());
             let mut removed_total = 0i64;
             for k in w.drain(0..batch) {
-                if let Some((_, (_, size))) = self.statistics.remove(&k) {
+                if let Some((_, (value, size))) = self.statistics.remove(&k) {
                     removed_total += size as i64;
+                    self.release_fingerprint(&value.schema_fingerprint);
                 }
             }
             if removed_total > 0 {
@@ -127,6 +135,33 @@ impl FileStatisticsCache {
         metrics::QUERY_PARQUET_METADATA_CACHE_GC_TIME
             .with_label_values::<&str>(&[])
             .observe(start.elapsed().as_millis() as f64);
+    }
+
+    // DataFusion builds a fingerprint per table and O2 a table per query, so equal copies pile up.
+    fn intern_fingerprint(&self, fingerprint: &Arc<SchemaFingerprint>) -> Arc<SchemaFingerprint> {
+        match self.fingerprints.entry(fingerprint.clone()) {
+            Entry::Occupied(mut shared) => {
+                *shared.get_mut() += 1;
+                shared.key().clone()
+            }
+            Entry::Vacant(new) => {
+                self.current_memory
+                    .fetch_add(fingerprint_size(fingerprint) as i64, Ordering::Relaxed);
+                new.insert(1);
+                fingerprint.clone()
+            }
+        }
+    }
+
+    fn release_fingerprint(&self, fingerprint: &Arc<SchemaFingerprint>) {
+        if let Entry::Occupied(mut shared) = self.fingerprints.entry(fingerprint.clone()) {
+            *shared.get_mut() -= 1;
+            if *shared.get() == 0 {
+                shared.remove();
+                self.current_memory
+                    .fetch_sub(fingerprint_size(fingerprint) as i64, Ordering::Relaxed);
+            }
+        }
     }
 
     fn format_key(&self, k: &Path) -> String {
@@ -170,6 +205,10 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
     /// Save collected file statistics
     fn put(&self, k: &TableScopedPath, value: CachedFileMetadata) -> Option<CachedFileMetadata> {
         let k = self.format_key(&k.path);
+        let value = CachedFileMetadata {
+            schema_fingerprint: self.intern_fingerprint(&value.schema_fingerprint),
+            ..value
+        };
         let entry_size = Self::estimate_entry_size(&k, &value);
 
         let old = self.statistics.insert(k.clone(), (value, entry_size));
@@ -181,8 +220,9 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
         // When `old.is_some()` the key is already present in `cacher`
         // (it hasn't been drained yet, otherwise stats wouldn't hold it),
         // so pushing again would create a duplicate tombstone.
-        if old.is_none() {
-            self.cacher.lock().push_back(k);
+        match &old {
+            Some((old_value, _)) => self.release_fingerprint(&old_value.schema_fingerprint),
+            None => self.cacher.lock().push_back(k),
         }
 
         let max_bytes = config::get_config()
@@ -200,6 +240,7 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
         self.statistics.remove(&k).map(|(_, (value, size))| {
             self.current_memory
                 .fetch_sub(size as i64, Ordering::Relaxed);
+            self.release_fingerprint(&value.schema_fingerprint);
             value
         })
     }
@@ -215,6 +256,7 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
 
     fn clear(&self) {
         self.statistics.clear();
+        self.fingerprints.clear();
         self.cacher.lock().clear();
         self.current_memory.store(0, Ordering::Relaxed);
     }
@@ -267,6 +309,47 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
     fn drop_table_entries(&self, _table_ref: &TableReference) -> datafusion::error::Result<()> {
         Ok(())
     }
+}
+
+fn fingerprint_size(fingerprint: &Arc<SchemaFingerprint>) -> usize {
+    std::mem::size_of::<(Arc<SchemaFingerprint>, usize)>()
+        + fingerprint.heap_size(&mut DFHeapSizeCtx::default())
+}
+
+/// The heap that `CacheValue::size` counts, with every block rounded to its size class.
+fn value_heap_size(value: &CachedFileMetadata) -> usize {
+    let meta = &value.meta;
+    let tags: usize = [meta.e_tag.as_ref(), meta.version.as_ref()]
+        .into_iter()
+        .flatten()
+        .map(|tag| alloc_size(tag.capacity()))
+        .sum();
+    let columns = &value.statistics.column_statistics;
+    alloc_size(meta.location.as_ref().len())
+        + tags
+        + alloc_size(2 * std::mem::size_of::<usize>() + std::mem::size_of::<Statistics>())
+        + alloc_size(columns.capacity() * std::mem::size_of::<ColumnStatistics>())
+        + columns.iter().map(column_heap_size).sum::<usize>()
+}
+
+fn column_heap_size(column: &ColumnStatistics) -> usize {
+    let mut ctx = DFHeapSizeCtx::default();
+    [&column.min_value, &column.max_value, &column.sum_value]
+        .into_iter()
+        .filter_map(|value| value.get_value())
+        .map(|value| alloc_size(value.heap_size(&mut ctx)))
+        .sum()
+}
+
+/// Block size mimalloc hands out for a `size`-byte request: 8-byte steps up to 64 bytes,
+/// then 4 classes per power of two (jemalloc uses the same classes above 64 bytes).
+fn alloc_size(size: usize) -> usize {
+    let step = if size <= 64 {
+        8
+    } else {
+        size.next_power_of_two() / 8
+    };
+    size.div_ceil(step) * step
 }
 
 #[cfg(test)]
@@ -510,6 +593,137 @@ mod tests {
         let entries = FscTrait::list_entries(&cache);
         assert_eq!(entries.len(), 1);
         assert!(entries.contains_key(&k));
+    }
+
+    #[test]
+    fn test_fingerprint_size_counts_columns() {
+        use datafusion::execution::cache::SchemaFingerprint;
+
+        let names = ["a", "bb", "ccc"];
+        let schema = Schema::new(
+            names
+                .iter()
+                .map(|name| Field::new(*name, DataType::Utf8, true))
+                .collect::<Vec<_>>(),
+        );
+        let with_columns = fingerprint_size(&Arc::new(SchemaFingerprint::from_schema(&schema)));
+        let without_columns =
+            fingerprint_size(&Arc::new(SchemaFingerprint::from_schema(&Schema::empty())));
+        let columns_heap = names.len() * std::mem::size_of::<(String, DataType, bool)>()
+            + names.iter().map(|name| name.len()).sum::<usize>();
+        assert_eq!(with_columns - without_columns, columns_heap);
+    }
+
+    #[test]
+    fn test_equal_fingerprints_are_shared_and_charged_once() {
+        use datafusion::execution::cache::SchemaFingerprint;
+
+        let schema = Schema::new(vec![Field::new("value", DataType::Utf8, true)]);
+        let stats = Arc::new(Statistics::new_unknown(&schema));
+        let cache = FileStatisticsCache::new();
+        let keys = [
+            "q1/schema=a/$$/files/1.parquet",
+            "q2/schema=a/$$/files/2.parquet",
+        ]
+        .map(|location| key(&Path::from(location)));
+        for k in keys.iter().chain([&keys[0]]) {
+            // A fresh fingerprint per put, as each WAL query builds its own table.
+            let fingerprint = Arc::new(SchemaFingerprint::from_schema(&schema));
+            let meta = object_meta(k.path.as_ref(), 64);
+            cache.put(
+                k,
+                CachedFileMetadata::new(meta, fingerprint, stats.clone(), None),
+            );
+        }
+
+        let first = cache.get(&keys[0]).unwrap().schema_fingerprint;
+        let second = cache.get(&keys[1]).unwrap().schema_fingerprint;
+        assert!(Arc::ptr_eq(&first, &second));
+        let entries: usize = cache.list_entries().values().map(|e| e.size_bytes).sum();
+        assert_eq!(cache.memory_size(), entries + fingerprint_size(&first));
+
+        for k in &keys {
+            cache.remove(k);
+        }
+        assert_eq!(cache.memory_size(), 0);
+        assert!(cache.fingerprints.is_empty());
+    }
+
+    #[test]
+    fn test_estimate_counts_min_max_strings() {
+        use datafusion::common::{ColumnStatistics, ScalarValue, stats::Precision};
+
+        let schema = Schema::new(vec![
+            Field::new("a", DataType::Utf8, true),
+            Field::new("b", DataType::Utf8, true),
+        ]);
+        let strings = ["x".repeat(87), "y".repeat(87), "z".repeat(5), String::new()];
+        let mut with_strings = Statistics::new_unknown(&schema);
+        for (column, pair) in with_strings
+            .column_statistics
+            .iter_mut()
+            .zip(strings.chunks(2))
+        {
+            *column = ColumnStatistics {
+                min_value: Precision::Exact(ScalarValue::Utf8(Some(pair[0].clone()))),
+                max_value: Precision::Exact(ScalarValue::Utf8(Some(pair[1].clone()))),
+                ..ColumnStatistics::new_unknown()
+            };
+        }
+        let entry = |stats: Statistics| {
+            CachedFileMetadata::new(
+                object_meta("f", 1),
+                Arc::new(datafusion::execution::cache::SchemaFingerprint::from_schema(&schema)),
+                Arc::new(stats),
+                None,
+            )
+        };
+        let counted = FileStatisticsCache::estimate_entry_size("k", &entry(with_strings))
+            - FileStatisticsCache::estimate_entry_size(
+                "k",
+                &entry(Statistics::new_unknown(&schema)),
+            );
+        // 87-byte strings take 96-byte blocks, the 5-byte one an 8-byte block, the empty one none.
+        assert_eq!(counted, 96 + 96 + 8);
+    }
+
+    #[test]
+    fn test_alloc_size_follows_mimalloc_size_classes() {
+        let cases = [
+            (0, 0),
+            (1, 8),
+            (8, 8),
+            (9, 16),
+            (64, 64),
+            (65, 80),
+            (87, 96),
+            (128, 128),
+            (129, 160),
+            (1000, 1024),
+            (1025, 1280),
+        ];
+        for (requested, allocated) in cases {
+            assert_eq!(
+                alloc_size(requested),
+                allocated,
+                "request of {requested} bytes"
+            );
+        }
+    }
+
+    #[test]
+    fn test_evict_releases_all_entries() {
+        let cache = FileStatisticsCache::new();
+        let stats = unknown_stats(vec![Field::new("col", DataType::Int64, false)]);
+        for i in 0..3 {
+            put(&cache, object_meta(&format!("file_{i}"), 64), stats.clone());
+        }
+        cache.evict(0);
+        assert!(cache.is_empty());
+        assert_eq!(cache.memory_size(), 0);
+        assert!(cache.statistics.is_empty());
+        assert!(cache.cacher.lock().is_empty());
+        assert!(cache.fingerprints.is_empty());
     }
 
     #[test]

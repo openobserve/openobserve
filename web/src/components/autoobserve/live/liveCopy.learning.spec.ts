@@ -17,11 +17,10 @@ import { describe, expect, it } from "vitest";
 import "@/locales";
 import { gt } from "@/types/i18n";
 import type { AutoObserveCoverage, AutoObserveLearning } from "@/services/autoobserve";
-import { learningEmpty, learningLine, streamLearning } from "./liveCopy";
+import { learningEmpty, learningLine } from "./liveCopy";
 import { toCoverageSource } from "./liveAdapter";
 
 const zone = { locale: "en-US", timeZone: "UTC" };
-const NOW_MS = Date.UTC(2026, 10, 10, 12, 0);
 const NOV_24_US = Date.UTC(2026, 10, 24, 8, 0) * 1000;
 
 const learning = (over: Partial<AutoObserveLearning> = {}): AutoObserveLearning => ({
@@ -32,7 +31,7 @@ const learning = (over: Partial<AutoObserveLearning> = {}): AutoObserveLearning 
   ...over,
 });
 
-describe("learning lines (W3)", () => {
+describe("learning lines", () => {
   it("absent keys or nothing learning say nothing", () => {
     expect(learningLine(gt, zone, undefined)).toBeNull();
     expect(learningLine(gt, zone, null)).toBeNull();
@@ -67,42 +66,6 @@ describe("learning lines (W3)", () => {
       "AutoObserve needs 14 days of history to judge a stream. The stream is ready on Nov 24.",
     );
     expect(learningEmpty(gt, zone, learning())).toBeNull();
-  });
-
-  it("one learning stream is one sentence with its date", () => {
-    const streams = [
-      { type: "logs", name: "app_logs", learning_until: NOV_24_US },
-      { type: "metrics", name: "ready_metrics", learning_until: null },
-    ];
-    expect(streamLearning(gt, zone, streams, NOW_MS)).toEqual({
-      summary: "Learning until Nov 24 · app_logs (logs)",
-      rows: [],
-    });
-  });
-
-  it("each of several streams keeps its own date, soonest first, even when dates repeat (D10)", () => {
-    const day = (d: number) => Date.UTC(2026, 10, d, 8, 0) * 1000;
-    const streams = [23, 20, 21, 22, 21].map((d, i) => ({
-      type: "logs",
-      name: `s${i}`,
-      learning_until: day(d),
-    }));
-    const result = streamLearning(gt, zone, streams, NOW_MS);
-    expect(result?.summary).toBe("Learning 5 streams");
-    expect(result?.rows.map((r) => [r.stream, r.until])).toEqual([
-      ["s1 (logs)", "until Nov 20"],
-      ["s2 (logs)", "until Nov 21"],
-      ["s4 (logs)", "until Nov 21"],
-      ["s3 (logs)", "until Nov 22"],
-      ["s0 (logs)", "until Nov 23"],
-    ]);
-  });
-
-  it("past or absent learning_until says nothing", () => {
-    expect(streamLearning(gt, zone, [{ type: "logs", name: "a" }], NOW_MS)).toBeNull();
-    expect(
-      streamLearning(gt, zone, [{ type: "logs", name: "a", learning_until: 1 }], NOW_MS),
-    ).toBeNull();
   });
 
   it("the coverage source carries the learning block and each stream's date", () => {

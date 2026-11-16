@@ -1488,7 +1488,6 @@
 "src/lib/core/RefreshButton/ORefreshButton.spec.ts":1.7,
 "src/lib/core/Separator/OSeparator.spec.ts":1.8,
 "src/lib/core/SettingRow/OSettingRow.spec.ts":1.6,
-"src/lib/core/SettingRow/OSettingRowPair.spec.ts":1.3,
 "src/lib/core/Shortcut/OShortcut.spec.ts":1.3,
 "src/lib/core/Splitter/OSplitter.spec.ts":0.9,
 "src/lib/core/Table/OTable.bench.spec.ts":4,

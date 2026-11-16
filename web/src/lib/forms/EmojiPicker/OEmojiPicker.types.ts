@@ -8,10 +8,7 @@ import type { IconToken } from "./OGlyph.types";
 
 /** One selectable icon plus the lowercase English terms that match it. */
 export interface EmojiOption {
-  /**
-   * A Unicode emoji (including any variation selector) or an `o2:` registry
-   * glyph reference. OGlyph decides how to render it.
-   */
+  /** A Unicode emoji, or an `o2:` / `icon:` / `mono:` reference; OGlyph decides how to render it. */
   token: IconToken;
   /** Matching data for search and suggestion — never rendered as copy. */
   keywords: readonly string[];

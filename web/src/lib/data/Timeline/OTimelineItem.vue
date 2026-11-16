@@ -27,9 +27,14 @@ const dotColorMap: Record<TimelineItemVariant, string> = {
   muted: "var(--color-timeline-dot-muted)",
 };
 
+/** Only the brand-coloured dots change with a custom theme, so only they take the re-picked text. */
+const BRAND_VARIANTS: readonly TimelineItemVariant[] = ["primary", "info"];
+
 const dotStyle = computed(() => ({
   backgroundColor: dotColorMap[props.variant],
-  color: "var(--color-timeline-dot-fg)",
+  color: BRAND_VARIANTS.includes(props.variant)
+    ? "var(--color-timeline-dot-primary-fg)"
+    : "var(--color-timeline-dot-fg)",
 }));
 
 /** True when the icon name is registered in the OIcon SVG registry (kebab-case) */
@@ -52,11 +57,9 @@ const isOIcon = computed<boolean>(() =>
       >
         <span v-if="label" class="whitespace-nowrap">{{ label }}</span>
         <OIcon v-else-if="icon && isOIcon" :name="icon as any" size="xs" />
-        <span
-          v-else-if="icon"
-          class="material-icons text-timeline-dot-fg text-sm leading-none select-none"
-          >{{ icon }}</span
-        >
+        <span v-else-if="icon" class="material-icons text-sm leading-none select-none">{{
+          icon
+        }}</span>
       </div>
 
       <!--

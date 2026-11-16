@@ -4,7 +4,7 @@
 import { computed, inject } from "vue";
 import OCheckbox from "./OCheckbox.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import type { FormCheckboxProps } from "./OFormCheckbox.types";
 import type { CheckboxModelValue } from "./OCheckbox.types";
 
@@ -13,6 +13,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormCheckboxProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormCheckbox] must be rendered inside <OForm>. No form context found.");
@@ -58,8 +59,8 @@ const passthroughProps = computed(() => {
             <slot name="label" />
           </template>
         </OCheckbox>
-        <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text text-xs">
-          {{ firstFieldError(field.state.meta.errors) }}
+        <div v-if="shown(field).message !== undefined" class="text-input-error-text text-xs">
+          {{ shown(field).message }}
         </div>
       </div>
     </template>

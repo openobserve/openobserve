@@ -25,6 +25,7 @@ export default class DashboardTvPlaylistPage {
     this.periodTrigger = page.locator('[data-test="dashboard-playlist-period-trigger"]');
     this.periodOption = page.locator('[data-test="dashboard-playlist-period-option"]');
     this.fitSwitch = page.locator('[data-test="dashboard-playlist-fit-btn"]');
+    this.tooltip = page.locator('[data-test="o-tooltip-content"]');
 
     // TV player
     this.tvRoot = page.locator('[data-test="dashboard-tv-playlist"]');
@@ -127,16 +128,23 @@ export default class DashboardTvPlaylistPage {
 
   // ── Setup dialog actions ───────────────────────────────────────────────
 
+  // A row's tooltip left open under the resting pointer covers the button in the row above.
+  async clickRowAction(button) {
+    await this.page.mouse.move(0, 0);
+    await expect(this.tooltip).toHaveCount(0);
+    await button.click();
+  }
+
   async moveItemDown(index) {
-    await this.getItemDownBtn(index).click();
+    await this.clickRowAction(this.getItemDownBtn(index));
   }
 
   async moveItemUp(index) {
-    await this.getItemUpBtn(index).click();
+    await this.clickRowAction(this.getItemUpBtn(index));
   }
 
   async removeItem(index) {
-    await this.getItemRemoveBtn(index).click();
+    await this.clickRowAction(this.getItemRemoveBtn(index));
   }
 
   async searchDashboards(term) {

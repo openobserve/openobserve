@@ -55,12 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="headerEl"
     class="app-page-header px-page-edge border-border-default shrink-0 border-b"
     :data-drawer-anchor="ownsSidebarTrigger ? 'page-layout-sidebar' : undefined"
-    :class="[tabsBelow ? 'flex flex-col' : ROW_CLASS]"
+    :class="[ownRow ? 'flex flex-col' : ROW_CLASS]"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
          (display:contents) so the title block + actions stay direct children of
          the header — preserving the original single-row inline-tabs layout. -->
-    <div :class="tabsBelow ? ROW_CLASS : 'contents'">
+    <div :class="ownRow ? [ROW_CLASS, contentSize && SIZE_CLASS[contentSize]] : 'contents'">
       <!-- flex-1 is basis-0, so the min-w floor is what forces the actions to wrap. -->
       <div
         class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch max-md:gap-2 md:max-lg:min-w-40 @max-4xl/page:h-auto @max-4xl/page:self-stretch"
@@ -293,6 +293,8 @@ const props = withDefaults(
     overflowFirst?: boolean;
     /** Keep the title at least 10rem wide at every width, for a #title-trail that competes for the row. */
     titleMinWidth?: boolean;
+    /** Ends the title row at this reading-column width (ConstrainedPage's scale); the border still spans the header. */
+    contentSize?: "sm" | "md" | "lg" | "xl";
   }>(),
   {
     title: raw(""),
@@ -303,6 +305,14 @@ const props = withDefaults(
   },
 );
 
+// The same widths as ConstrainedPage and OSaveBar, so the actions end where the form column ends.
+const SIZE_CLASS = {
+  sm: "max-w-2xl",
+  md: "max-w-3xl",
+  lg: "max-w-5xl",
+  xl: "max-w-7xl",
+} as const;
+const ownRow = computed(() => props.tabsBelow || !!props.contentSize);
 // Fixed h-15 so h-full slot content (inline tabs, dividers) spans the row; < lg it may wrap.
 // The @page half repeats the max-lg half against the page container: a wide viewport whose content column is narrow collapses the same way.
 const ROW_CLASS =

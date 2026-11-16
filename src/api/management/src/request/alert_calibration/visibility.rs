@@ -31,9 +31,11 @@ use crate::request::alert_grants::{AlertVisibility, Probe};
 /// A full probe is judged on the whole org's alerts, so the set is never cut (P3-D3).
 pub(super) const PROBE_CAP: usize = 10_000;
 /// Counted over the whole org, so a scoped reader gets null for each (P3-D5).
-const ORG_TOTALS: [&str; 8] = [
+const ORG_TOTALS: [&str; 10] = [
     "alerts_in_scope",
     "dismissed_count",
+    "dismissed_rules",
+    "coverage_definitions_not_checked",
     "omitted_routine_skip_count",
     "coverage_unreadable_definitions",
     "coverage_facts_without_definition",

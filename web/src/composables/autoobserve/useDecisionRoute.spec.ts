@@ -280,6 +280,17 @@ describe("useDecisionRoute", () => {
     expect(last.action).toBeUndefined();
   });
 
+  it("an_undo_whose_alert_was_deleted_says_so_in_amber_with_no_retry", async () => {
+    await mountRoute();
+    vi.mocked(autoobserveDecisions.undo).mockRejectedValue(httpError(410));
+    await route.undo([{ org: "default", view: view("f1"), title: "nightly-summary" }]);
+    await settle();
+    const last = toastRecords.at(-1)!;
+    expect(String(last.message)).toMatch(/deleted/i);
+    expect(last.variant).toBe("warning");
+    expect(last.action).toBeUndefined();
+  });
+
   it("two_failed_undos_with_the_same_words_retry_both", async () => {
     await mountRoute();
     vi.mocked(autoobserveDecisions.undo).mockRejectedValue(httpError(500));

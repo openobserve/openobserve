@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick, ref } from "vue";
 import ODialog from "./ODialog.vue";
@@ -436,6 +436,96 @@ describe("ODialog", () => {
       expect(document.activeElement).toBe(search);
       popper.remove();
       wrapper.unmount();
+    });
+  });
+
+  describe("pinned top", () => {
+    const height = { value: 300 };
+    const centredTop = (panelHeight: number) => `${(window.innerHeight - panelHeight) / 2}px`;
+
+    const openDialog = async () => {
+      height.value = 300;
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+        () => ({ height: height.value }) as DOMRect,
+      );
+      const wrapper = mount(ODialog, {
+        props: { open: true },
+        slots: { default: "<p data-testid='body'>Body</p>" },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+    const panelOf = (w: ReturnType<typeof mount>) =>
+      w.find("[data-o2-dialog]").element as HTMLElement;
+    const grow = async (w: ReturnType<typeof mount>) => {
+      height.value = 420;
+      await w.setProps({ title: "Grown" });
+      await flushPromises();
+    };
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it("stays centred while content changes before the user interacts", async () => {
+      const wrapper = await openDialog();
+      await grow(wrapper);
+      expect(panelOf(wrapper).style.top).toBe("");
+    });
+
+    it("pins its top on the first pointerdown, so later growth extends downward", async () => {
+      const wrapper = await openDialog();
+      await wrapper.find('[data-testid="body"]').trigger("pointerdown");
+      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
+      expect(panelOf(wrapper).getAttribute("style")).toContain("translate: -50% 0");
+
+      await grow(wrapper);
+      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
+    });
+
+    it("pins its top on the first keydown inside the panel", async () => {
+      const wrapper = await openDialog();
+      await wrapper.find('[data-testid="body"]').trigger("keydown", { key: "Tab" });
+      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
+    });
+
+    it("centres again after it is closed and reopened", async () => {
+      const wrapper = await openDialog();
+      await wrapper.find('[data-testid="body"]').trigger("pointerdown");
+      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
+
+      await wrapper.setProps({ open: false });
+      await flushPromises();
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+      expect(panelOf(wrapper).style.top).toBe("");
+    });
+
+    it("drops a resize repin that is still queued when the dialog closes", async () => {
+      const wrapper = await openDialog();
+      await wrapper.find('[data-testid="body"]').trigger("pointerdown");
+      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
+
+      window.dispatchEvent(new Event("resize"));
+      await wrapper.setProps({ open: false });
+      await flushPromises();
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+      expect(panelOf(wrapper).style.top).toBe("");
+    });
+
+    it("clears the non-fullscreen pin when an open dialog becomes fullscreen", async () => {
+      const wrapper = await openDialog();
+      await wrapper.find('[data-testid="body"]').trigger("pointerdown");
+      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
+
+      await wrapper.setProps({ size: "full" });
+      await flushPromises();
+      expect(panelOf(wrapper).style.top).toBe("");
+      expect(panelOf(wrapper).style.maxHeight).toBe("");
+      expect(panelOf(wrapper).getAttribute("style") ?? "").not.toContain("translate");
+
+      await wrapper.setProps({ size: "md" });
+      await flushPromises();
+      expect(panelOf(wrapper).style.top).toBe("");
     });
   });
 });

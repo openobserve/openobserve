@@ -18,6 +18,7 @@ Exit codes:
     1  bad usage / missing source
     2  --check only: translations are pending
     3  at least one string failed validation (retried on the next run)
+    4  the translation service refused the key or account, or is unreachable
 
 Environment:
     DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
@@ -31,22 +32,23 @@ import sys
 
 from translator import (
     SOURCE_LOCALE,
+    FatalTranslationError,
     build_locale,
     build_module_glossary,
     build_state,
     collect_pending_leaves,
     find_duplicate_keys,
-    get_language_file_path,
+    get_language_file_paths,
     get_state_file_path,
     get_supported_languages,
-    load_json,
+    load_locale,
     load_source,
     load_state,
     new_counters,
     save_state,
     set_trace_outcome,
     translate_pending,
-    write_json,
+    write_locale,
 )
 
 
@@ -67,8 +69,8 @@ def run_check(locales):
     # read the last block and ignore the first, so a file looks up to date while
     # half of it is dead. Structural, so it fails like a bad source.
     duplicated = False
-    for path in [get_language_file_path(SOURCE_LOCALE), get_state_file_path()] + [
-        get_language_file_path(locale) for locale in locales
+    for path in get_language_file_paths(SOURCE_LOCALE) + [get_state_file_path()] + [
+        path for locale in locales for path in get_language_file_paths(locale)
     ]:
         if not os.path.exists(path):
             continue
@@ -83,7 +85,7 @@ def run_check(locales):
     state = load_state()
     total = 0
     for locale in locales:
-        existing = load_json(get_language_file_path(locale), {})
+        existing = load_locale(locale)
         pending = collect_pending_leaves(source, existing, state)
         if not pending:
             continue
@@ -138,15 +140,20 @@ def main():
     counters = new_counters()
     locale_targets = {}
     for locale in locales:
-        existing = load_json(get_language_file_path(locale), {})
+        existing = load_locale(locale)
         pending = collect_pending_leaves(source, existing, state)
         print(f"\nTranslating: {locale} ({len(pending)} strings pending)")
 
-        translated = (
-            translate_pending(pending, locale, build_module_glossary(source, existing))
-            if pending
-            else {}
-        )
+        try:
+            translated = (
+                translate_pending(pending, locale, build_module_glossary(source, existing))
+                if pending
+                else {}
+            )
+        except FatalTranslationError as exc:
+            print(f"::error::{exc}", flush=True)
+            set_trace_outcome("error", {"process.exit_code": 4})
+            sys.exit(4)
 
         target = build_locale(source, existing, state, translated, counters)
         locale_targets[locale] = target
@@ -162,7 +169,7 @@ def main():
             # Flushed per locale (atomically), so a run that is cancelled or dies
             # part way through still leaves every completed locale on disk for CI
             # to commit.
-            write_json(get_language_file_path(locale), target)
+            write_locale(locale, target)
 
     # Advance shared state only on a full run, where every supported locale was
     # processed and "present in all locales" is meaningful. Subset runs translate
