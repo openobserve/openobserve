@@ -58,7 +58,15 @@ export type FeatureKey =
   | "evaluations"
   | "scheduledSearch"
   | "customBranding"
-  | "slack";
+  | "slack"
+  | "searchInspector"
+  | "pipelineBackfill"
+  | "privateLocations"
+  | "downtimes"
+  | "alertCalibration"
+  | "anomalyDetection"
+  | "semanticGroups"
+  | "dbmInsights";
 
 /**
  * The flags every predicate below reads — EDITION-only, plus RBAC's own
@@ -314,6 +322,47 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     predicate: (c) => c.isEnterprise || c.isCloud,
     labelKey: "settings.slackApp",
   },
+  searchInspector: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "logs.searchJobInspector.title",
+    pitchKey: "enterpriseFeature.pitch.searchInspector",
+  },
+  pipelineBackfill: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "routeTitles.pipelineBackfillJobs",
+    pitchKey: "enterpriseFeature.pitch.pipelineBackfill",
+  },
+  privateLocations: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "synthetics.privateLocations.detail.title",
+    pitchKey: "enterpriseFeature.pitch.privateLocations",
+  },
+  downtimes: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "menu.downtimes",
+    pitchKey: "enterpriseFeature.pitch.downtimes",
+  },
+  alertCalibration: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "menu.alertCalibration",
+    pitchKey: "enterpriseFeature.pitch.alertCalibration",
+  },
+  anomalyDetection: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "alerts.addAnomalyMode",
+    pitchKey: "enterpriseFeature.pitch.anomalyDetection",
+  },
+  semanticGroups: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "correlation.importSemanticGroups.title",
+    pitchKey: "enterpriseFeature.pitch.semanticGroups",
+  },
+  // Deadlocks, blocked queries and table health: the Database Monitoring tabs whose reads an OSS backend refuses.
+  dbmInsights: {
+    predicate: (c) => c.isEnterprise,
+    labelKey: "menu.databases",
+    pitchKey: "enterpriseFeature.pitch.dbmInsights",
+  },
 };
 
 /** True when `key` names a registered feature gate (vs. some other `gate`/flag string a caller is checking). */
@@ -370,10 +419,23 @@ export function checkFeatureAccess(key: FeatureKey, context: FeatureGateContext)
       ctaRelevant: false,
     };
   }
-  const message = gate.pitchKey
+  return { allowed: false, visible: true, message: lockedMessage(key), ctaRelevant: true };
+}
+
+/** The locked-screen text for `key`, for a page a runtime check (not the build flags) locked. */
+export function lockedMessage(key: FeatureKey): I18nText {
+  const gate = FEATURE_GATES[key];
+  return gate.pitchKey
     ? gt(gate.pitchKey)
     : gt("enterpriseFeature.locked", { feature: gt(gate.labelKey) });
-  return { allowed: false, visible: true, message, ctaRelevant: true };
+}
+
+/** Router location of the locked-feature page for `key`, keeping the org and the page being left. */
+export function featureLockedLocation(key: FeatureKey, to: any) {
+  return {
+    name: "enterpriseFeatureLocked",
+    query: { feature: key, org_identifier: to.query?.org_identifier, redirect: to.fullPath },
+  };
 }
 
 /**
@@ -395,10 +457,7 @@ export function withFeatureGate(
 ) {
   return (to: any, from: any, next: any) => {
     if (!checkFeatureAccess(key, getContext()).allowed) {
-      next({
-        name: "enterpriseFeatureLocked",
-        query: { feature: key, org_identifier: to.query?.org_identifier, redirect: to.fullPath },
-      });
+      next(featureLockedLocation(key, to));
       return;
     }
     guard(to, from, next);

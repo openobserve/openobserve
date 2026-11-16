@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import enLocale from "@/locales/languages/en-US.json";
 import store from "@/stores";
+import config from "@/aws-exports";
 
 /** Every `meta.titleKey` in a route tree, children included. */
 const collectTitleKeys = (routes: any[]): string[] =>
@@ -756,6 +757,50 @@ describe("useEnterpriseRoutes.ts", () => {
       store.state.zoConfig = { synthetics_enabled: false, features: { synthetics: "hidden" } };
       const next = vi.fn();
       find(useEnterpriseRoutes(), "synthetics").beforeEnter({ query: {} }, {}, next);
+      expect(next).toHaveBeenCalledWith("/");
+    });
+  });
+
+  describe("private locations edition gate", () => {
+    const find = (routes: any[], name: string): any =>
+      routes.flatMap((r) => [r, ...(r.children ?? [])]).find((r) => r.name === name);
+    const to = { query: { org_identifier: "acme" }, fullPath: "/synthetic/private-locations/1" };
+
+    afterEach(() => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      store.state.zoConfig = {};
+    });
+
+    it("sends an OSS build to the locked screen instead of rendering 'Location not found'", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      store.state.zoConfig = {};
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), "synthetic-private-location").beforeEnter(to, {}, next);
+      expect(next).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "privateLocations", org_identifier: "acme", redirect: to.fullPath },
+      });
+    });
+
+    it("lets an enterprise build through to the page", async () => {
+      config.isEnterprise = "true";
+      store.state.zoConfig = {};
+      const { routeGuard } = await import("@/utils/zincutils");
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), "synthetic-private-location").beforeEnter(to, {}, next);
+      expect(routeGuard).toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: "enterpriseFeatureLocked" }),
+      );
+    });
+
+    it("keeps sending an enterprise build with the flag off home", () => {
+      config.isEnterprise = "true";
+      store.state.zoConfig = { synthetics_private_locations_enabled: false };
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), "synthetic-private-location").beforeEnter(to, {}, next);
       expect(next).toHaveBeenCalledWith("/");
     });
   });

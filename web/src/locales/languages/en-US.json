@@ -6666,7 +6666,14 @@
       "evaluations": "Score AI quality automatically and track it over time.",
       "genAiAgentMapping": "Group traces by the AI agent that produced them, and compare versions side-by-side.",
       "scheduledSearch": "Run a saved search automatically on a schedule, instead of re-running it by hand.",
-      "customBranding": "Replace the default logo and text with your own branding."
+      "customBranding": "Replace the default logo and text with your own branding.",
+      "searchInspector": "Inspect how a search job ran, step by step, to find out where the time went.",
+      "pipelineBackfill": "Re-run a pipeline over past data to fill in what it missed.",
+      "privateLocations": "Run synthetic checks from agents inside your own network.",
+      "downtimes": "Silence alerts during planned maintenance windows.",
+      "alertCalibration": "Review how your alerts perform and tune the noisy ones.",
+      "semanticGroups": "Import semantic groups so related alerts correlate into one incident.",
+      "dbmInsights": "Find deadlocks, blocked queries and unhealthy tables in your databases."
     }
   },
   "errorInsights": {
