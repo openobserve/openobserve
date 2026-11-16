@@ -908,6 +908,11 @@ describe("WP-06 conversation wiring", () => {
       notify();
       await flushPromises();
       expect(store.state.shell.sheetSnap).toBe("full");
+      // A user who snaps back to half keeps it, though the transcript is still short.
+      store.setSheetSnap("half");
+      notify();
+      await flushPromises();
+      expect(store.state.shell.sheetSnap).toBe("half");
     } finally {
       vi.unstubAllGlobals();
     }

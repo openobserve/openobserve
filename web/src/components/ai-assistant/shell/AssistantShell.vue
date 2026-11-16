@@ -1150,7 +1150,8 @@ const approvalElsewhere = computed(
 const awaitingConsent = computed(
   () => !!decisions.value && session.value?.turn.state === "awaiting_consent",
 );
-const { showInChat } = useChatConsentSurface(() => awaitingConsent.value);
+// A closed container stays mounted, so only a visible one may keep the prompt out of the dialog.
+const { showInChat } = useChatConsentSurface(() => awaitingConsent.value && visible.value);
 const showConsent = computed(() => awaitingConsent.value && showInChat.value);
 
 const reviewClock = ref(Date.now());
@@ -1839,6 +1840,9 @@ watch(
 );
 
 const MIN_SHEET_TRANSCRIPT_PX = 240;
+// The cramped grow runs once per open, so a user who snaps back to half or peek keeps it.
+let crampedGrown = false;
+watch(visible, (shown) => shown || (crampedGrown = false));
 
 // A half sheet whose composer area no longer fits grows to full, so no chip, cap line or control hides in a scroll box (V5).
 watch(lower, (el, _was, onCleanup) => {
@@ -1852,13 +1856,16 @@ watch(lower, (el, _was, onCleanup) => {
     lastContent = el.scrollHeight;
     const shell = root.value;
     // On a short phone the full composer leaves too little for the transcript, so the sheet opens taller; this holds even when the content did not grow.
-    const cramped = (el.previousElementSibling?.clientHeight ?? Infinity) < MIN_SHEET_TRANSCRIPT_PX;
+    const cramped =
+      !crampedGrown &&
+      (el.previousElementSibling?.clientHeight ?? Infinity) < MIN_SHEET_TRANSCRIPT_PX;
     if (!grew && !cramped) return;
     const overflows =
       cramped ||
       el.scrollHeight > el.clientHeight + 1 ||
       (!!shell && shell.scrollHeight > shell.clientHeight + 1);
     if (!overflows || store.state.shell.sheetSnap !== "half") return;
+    if (cramped) crampedGrown = true;
     store.setSheetSnap("full");
     region.value?.announce(t("assistant.announce.sheetExpanded"));
   };
