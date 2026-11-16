@@ -1180,6 +1180,68 @@ describe("AlertList - row actions", () => {
     await flushPromises();
     expect(wrapper.vm.selectedAlerts.length).toBe(0);
   });
+
+  // Each entry is `folder:alertId`; a move names one source folder, or none when the selection spans several.
+  it.each([
+    [
+      "delete",
+      (vm: any) => vm.bulkDeleteAlerts(),
+      () =>
+        alertsSvc.bulkDelete.mock.calls.flatMap((c: any[]) =>
+          c[1].ids.map((id: string) => `${c[2]}:${id}`),
+        ),
+      ["ops:alert-1", "payments:alert-2"],
+    ],
+    [
+      "pause",
+      (vm: any) => vm.bulkToggleAlerts("pause"),
+      () =>
+        alertsSvc.bulkToggleState.mock.calls.flatMap((c: any[]) =>
+          c[2].ids.map((id: string) => `${c[3]}:${id}`),
+        ),
+      ["ops:alert-1", "payments:alert-2"],
+    ],
+    [
+      "export",
+      (vm: any) => vm.multipleExportAlert(),
+      (wrapper: any) =>
+        wrapper
+          .findComponent({ name: "ExportResourceDialog" })
+          .props("terraform")
+          .hcl.split('resource "openobserve_alert"')
+          .slice(1)
+          .map((block: string) => {
+            const name = /name\s+= "([^"]+)"/.exec(block)?.[1] ?? "";
+            const folder = /folder_id\s+= "([^"]+)"/.exec(block)?.[1];
+            return `${folder}:alert-${name.replace("Alert ", "")}`;
+          }),
+      ["ops:alert-1", "payments:alert-2"],
+    ],
+    [
+      "move",
+      (vm: any) => vm.moveMultipleAlerts(),
+      (wrapper: any) => [wrapper.vm.activeFolderToMove],
+      [""],
+    ],
+  ])(
+    "bulk %s acts on each selected alert in its owning folder",
+    async (_action, run, observe, expected) => {
+      alertsDB = [makeAlert(1, { enabled: true }), makeAlert(2, { enabled: true })];
+      const wrapper: any = await mountAlertList({ renderTable: false });
+      await waitData(wrapper);
+      const [ops, payments] = wrapper.vm.filteredResults;
+      ops.folder_name = { id: "ops", name: "Ops" };
+      payments.folder_name = { id: "payments", name: "Payments" };
+      wrapper.vm.selectedAlertIds = [ops.alert_id, payments.alert_id];
+      await flushPromises();
+      expect(wrapper.vm.selectedAlerts).toHaveLength(2);
+
+      await run(wrapper.vm);
+      await flushPromises();
+
+      expect([...observe(wrapper)].sort()).toEqual(expected);
+    },
+  );
 });
 
 // 5. Router query-driven UI states

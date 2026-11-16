@@ -22,7 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t(folderKey(type, 'dashboard.selectFolderLabel'))"
       :options="folderOptions"
       :placeholder="
-        excludeFolderId ? t(folderKey(type, 'dashboard.selectFolderPlaceholder')) : undefined
+        excludeFolderId !== undefined
+          ? t(folderKey(type, 'dashboard.selectFolderPlaceholder'))
+          : undefined
       "
       :data-test="`${type}-index-dropdown-stream_type`"
       labelKey="label"
@@ -161,7 +163,8 @@ export default defineComponent({
       // choice while the list cannot offer it — the state that made a move dialog
       // read as "move this to where it already is". Start blank and make the
       // caller's disabled-submit guard do the rest.
-      return resolved === props.excludeFolderId ? "" : resolved;
+      // An empty exclude is a move from several folders: no source, so no choice to pre-fill.
+      return resolved === props.excludeFolderId || props.excludeFolderId === "" ? "" : resolved;
     };
 
     //dropdown selected folder index (holds primitive folderId string)
@@ -190,7 +193,7 @@ export default defineComponent({
         // folder from the + button lands here as a list change, and the re-seed
         // below would clear the very folder that was just created and selected.
         if (
-          props.excludeFolderId &&
+          props.excludeFolderId !== undefined &&
           folderOptions.value.some((option: any) => option.value === selectedFolder.value)
         ) {
           return;

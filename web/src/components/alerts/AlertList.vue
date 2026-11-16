@@ -1011,12 +1011,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-list-empty-no-firing"
                 >
                   <template #actions>
-                    <EmptyStateActionCard
-                      icon="format-list-bulleted"
-                      :label="t('alerts.showAllAlerts')"
+                    <OButton
+                      variant="outline"
+                      size="md"
+                      icon-left="format-list-bulleted"
                       data-test="alert-list-empty-show-all"
                       @click="stateFilters = []"
-                    />
+                    >
+                      {{ t("alerts.showAllAlerts") }}
+                    </OButton>
                   </template>
                 </OEmptyState>
                 <OEmptyState
@@ -1034,12 +1037,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <template v-if="stateFilterEmptied" #actions>
-                    <EmptyStateActionCard
-                      icon="format-list-bulleted"
-                      :label="t('alerts.showAllAlerts')"
+                    <OButton
+                      variant="outline"
+                      size="md"
+                      icon-left="format-list-bulleted"
                       data-test="alert-list-empty-show-all"
                       @click="stateFilters = []"
-                    />
+                    >
+                      {{ t("alerts.showAllAlerts") }}
+                    </OButton>
                   </template>
                   <!-- First run only: the filtered state keeps its single Clear filters action. -->
                   <template v-else-if="!listFiltered" #actions>
@@ -1401,7 +1407,6 @@ import {
 import sloService from "@/services/slos";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
@@ -1536,7 +1541,6 @@ export default defineComponent({
     AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
     EditorDraftDot,
     OEmptyState,
-    EmptyStateActionCard,
     ConfirmDialog,
     ImportAlert,
     FolderList,
@@ -3112,6 +3116,14 @@ export default defineComponent({
     // In the all-folders view a row's folder is not the sidebar's, and the API checks access per folder.
     const rowFolderId = (row: any): string => row?.folder_name?.id || activeFolderId.value;
 
+    // A bulk request authorizes against one `?folder=`, so a selection spanning folders is sent per folder.
+    const groupByFolder = (rows: any[]): [string, any[]][] => {
+      const groups = new Map<string, any[]>();
+      for (const row of rows)
+        groups.set(rowFolderId(row), [...(groups.get(rowFolderId(row)) ?? []), row]);
+      return [...groups];
+    };
+
     const rowActionTarget = (row: any): AlertActionTarget => ({
       alertId: String(row.alert_id),
       name: row.name,
@@ -4145,11 +4157,11 @@ export default defineComponent({
     // and the user picks there.
     const showExportDialog = ref(false);
     const alertsToExport = ref<Record<string, unknown>[]>([]);
-    const exportFolderId = ref("");
+    const exportFolderIds = ref<string[]>([]);
     // Converted here rather than inside the dialog: each resource type has its
     // own exporter, and the dialog only renders what it is handed.
     const alertsTerraform = computed(() =>
-      alertsToTerraform(alertsToExport.value, { folderId: exportFolderId.value }),
+      alertsToTerraform(alertsToExport.value, { folderId: exportFolderIds.value }),
     );
     // Destination names only exist in the source org; Terraform keeps them for re-applying to it.
     const alertsJsonExport = computed(() =>
@@ -4182,7 +4194,7 @@ export default defineComponent({
         const alert = await fetchAlertForExport(row.alert_id);
         if (!alert) throw new Error("empty export payload");
         alertsToExport.value = [alert];
-        exportFolderId.value = rowFolderId(row);
+        exportFolderIds.value = [rowFolderId(row)];
         showExportDialog.value = true;
       } catch (error: any) {
         if (error?.response?.status === 403) return;
@@ -4400,7 +4412,9 @@ export default defineComponent({
       selectedAnomalyConfigsToMove.value = selectedAlerts.value
         .filter((alert: any) => alert.type === "anomaly")
         .map((alert: any) => alert.alert_id);
-      activeFolderToMove.value = activeFolderId.value;
+      // The move route checks each alert itself, so a selection spanning folders names no source folder.
+      const folders = groupByFolder(selectedAlerts.value);
+      activeFolderToMove.value = folders.length === 1 ? folders[0][0] : "";
     };
 
     const dynamicQueryModel = computed({
@@ -4554,7 +4568,7 @@ export default defineComponent({
         // without this the dialog opens on a blank definition.
         if (!usable.length) throw new Error("empty export payload");
         alertsToExport.value = usable;
-        exportFolderId.value = activeFolderId.value;
+        exportFolderIds.value = selected.filter((_, i) => fetched[i]).map(rowFolderId);
         showExportDialog.value = true;
 
         // A definition that came back empty is a gap in the export. Dropping it
@@ -4670,19 +4684,31 @@ export default defineComponent({
 
       const request = ++bulkRequestSeq;
       bulkToggleBusy.value = action;
-      const payload = {
-        ids: alertsToToggle.map((a: any) => a.alert_id),
-        names: alertsToToggle.map((a: any) => a.name),
-      };
       let failed: any[] = [];
       let failureMessage: I18nText | null = null;
       try {
-        const response = await alertsService.bulkToggleState(
-          store.state.selectedOrganization.identifier,
-          isResuming,
-          payload,
+        const groups = groupByFolder(alertsToToggle);
+        const results = await Promise.allSettled(
+          groups.map(([folder, rows]) =>
+            alertsService.bulkToggleState(
+              store.state.selectedOrganization.identifier,
+              isResuming,
+              { ids: rows.map((a: any) => a.alert_id), names: rows.map((a: any) => a.name) },
+              folder,
+            ),
+          ),
         );
-        const refused = new Set((response?.data?.unsuccessful ?? []).map(String));
+        // Only when every folder's request failed is it the request's error; otherwise those rows count as failed.
+        const rejected = results.find((r) => r.status === "rejected");
+        if (rejected && results.every((r) => r.status === "rejected")) throw rejected.reason;
+        const refused = new Set<string>();
+        results.forEach((result, i) => {
+          const ids =
+            result.status === "fulfilled"
+              ? (result.value?.data?.unsuccessful ?? [])
+              : groups[i][1].map((a: any) => a.alert_id);
+          for (const id of ids) refused.add(String(id));
+        });
         failed = alertsToToggle.filter((a: any) => refused.has(String(a.alert_id)));
         queryClient.invalidateQueries({
           queryKey: alertKeys.firing(store.state.selectedOrganization.identifier),
@@ -4756,74 +4782,71 @@ export default defineComponent({
           return;
         }
 
-        // Extract alert ids
-        const payload = {
-          ids: selectedAlerts.value.map((a: any) => a.alert_id),
-        };
-
-        const response = await alertsService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-          activeFolderId.value,
+        const org = String(store.state.selectedOrganization.identifier);
+        const requested = selectedAlerts.value.map((row: AlertRowRef) => String(row?.alert_id));
+        const groups = groupByFolder(selectedAlerts.value);
+        const results = await Promise.allSettled(
+          groups.map(([folder, rows]) =>
+            alertsService.bulkDelete(org, { ids: rows.map((a: any) => a.alert_id) }, folder),
+          ),
+        );
+        // Only when every folder's request failed is it the request's error; otherwise those rows count as failed.
+        const rejected = results.find((r) => r.status === "rejected");
+        if (rejected && results.every((r) => r.status === "rejected")) throw rejected.reason;
+        const replies = results.map((result, i) =>
+          result.status === "fulfilled"
+            ? result.value?.data
+            : {
+                successful: [],
+                unsuccessful: groups[i][1].map((a: any) => ({ alert_id: a.alert_id })),
+              },
         );
 
         dismiss();
 
-        // Handle response based on successful/unsuccessful arrays
-        if (response.data) {
-          const { successful = [], unsuccessful = [] } = response.data;
-          const successCount = successful.length;
-          const failCount = unsuccessful.length;
-          const referenceFailure = unsuccessful.find(
-            (failure: any) => failure.code === "child_referenced",
-          );
-          if (referenceFailure) openReferenceConflict(referenceFailure);
+        // `successful` carries the ids the server actually deleted; the shape has
+        // varied, so accept a bare id or an object carrying one.
+        const recognised = replies.every((reply: any) => Array.isArray(reply?.successful));
+        const successful = replies.flatMap((reply: any) =>
+          Array.isArray(reply?.successful) ? reply.successful : [],
+        );
+        const unsuccessful = replies.flatMap((reply: any) =>
+          Array.isArray(reply?.unsuccessful) ? reply.unsuccessful : [],
+        );
+        const failCount = unsuccessful.length;
+        const successCount = recognised ? successful.length : requested.length - failCount;
+        const referenceFailure = unsuccessful.find(
+          (failure: any) => failure.code === "child_referenced",
+        );
+        if (referenceFailure) openReferenceConflict(referenceFailure);
 
-          if (failCount > 0 && successCount > 0) {
-            // Partial success
-            toast({
-              variant: "warning",
-              message: t("toastMessages.alerts.alertsDeletedWithFailures", {
-                count: successCount,
-                failed: failCount,
-              }),
-              timeout: 5000,
-            });
-          } else if (failCount > 0) {
-            // All failed
-            toast({
-              variant: "error",
-              message: t("toastMessages.alerts.failedToDeleteAlerts", { count: failCount }),
-            });
-          } else {
-            // All successful
-            toast({
-              variant: "success",
-              message: t("toastMessages.alerts.alertsDeletedSuccessfully", { count: successCount }),
-            });
-          }
+        if (failCount > 0 && successCount > 0) {
+          toast({
+            variant: "warning",
+            message: t("toastMessages.alerts.alertsDeletedWithFailures", {
+              count: successCount,
+              failed: failCount,
+            }),
+            timeout: 5000,
+          });
+        } else if (failCount > 0) {
+          toast({
+            variant: "error",
+            message: t("toastMessages.alerts.failedToDeleteAlerts", { count: failCount }),
+          });
         } else {
-          // Fallback success message
           toast({
             variant: "success",
-            message: t("toastMessages.alerts.alertsDeletedSuccessfully", {
-              count: selectedAlerts.value.length,
-            }),
+            message: t("toastMessages.alerts.alertsDeletedSuccessfully", { count: successCount }),
           });
         }
 
-        // `successful` carries the ids the server actually deleted; the shape has
-        // varied, so accept a bare id or an object carrying one. An unrecognised
-        // shape is NOT taken as "all of them" — splicing rows the server may have
-        // kept would show a delete that never happened; refetch and let the
-        // server say.
-        if (Array.isArray(response.data?.successful)) {
-          dropAlerts(
-            response.data.successful.map((entry: any) => entry?.alert_id ?? entry?.id ?? entry),
-          );
+        // An unrecognised reply is NOT taken as "all of them" — splicing rows the
+        // server may have kept would show a delete that never happened; refetch and
+        // let the server say.
+        if (recognised) {
+          dropAlerts(successful.map((entry: any) => entry?.alert_id ?? entry?.id ?? entry));
         } else {
-          const org = String(store.state.selectedOrganization.identifier);
-          const requested = selectedAlerts.value.map((row: AlertRowRef) => String(row?.alert_id));
           selectedAlerts.value = [];
           queryClient.invalidateQueries({ queryKey: alertKeys.firing(org) });
           // Forced: the point of this branch is to hear it from the server, and an
