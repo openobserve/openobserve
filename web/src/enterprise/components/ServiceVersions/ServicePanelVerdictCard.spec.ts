@@ -102,14 +102,17 @@ it("keeps stored verdict with partial signal error and opens the exact transitio
     expect.objectContaining({ deployKey: "d2", fromPanel: true }),
   );
 });
-it("says why Share is off until the compare loads", async () => {
+it("says why Share is off while the compare loads or failed, and drops it when there is nothing to compare", async () => {
   mocks.query.data.value = undefined as never;
   const wrapper = render();
   await flushPromises();
-  const tip = wrapper
-    .findAllComponents(OTooltip)
-    .find((c) => c.props("content") === "serviceVersions.actions.shareWaiting");
-  expect(tip?.props("disabled")).toBe(false);
+  const tip = () => wrapper.findAllComponents(OTooltip).map((c) => c.props("content"));
+  expect(tip()).toContain("serviceVersions.actions.shareWaiting");
+  mocks.query.isError.value = true;
+  await flushPromises();
+  expect(tip()).toContain("serviceVersions.actions.shareFailed");
+  const skipped = render({ preExisting: true, tracking: producer.versions_tracking });
+  expect(skipped.find('[data-test="svcver-panel-share"]').exists()).toBe(false);
 });
 it("shows loading, error retry and denied states", async () => {
   const wrapper = render();
@@ -365,6 +368,10 @@ it("labels a verdict card outside Kubernetes by the shared where label, never de
     .find((chip) => chip.props("dimKey") === "where");
   expect(where?.props("value")).toBe("serviceVersions.where.outside");
   expect(where?.props("muted")).toBe(true);
+  // Where the panel header already shows the scope, the card does not repeat it.
+  expect(
+    render({ where: "default", showScope: false }).findComponent(ODimensionChip).exists(),
+  ).toBe(false);
 });
 describe("the baseline the card reports", () => {
   it("reports the compared build and names a picked or last good baseline", () => {

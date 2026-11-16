@@ -61,6 +61,12 @@ vi.mock("@/services/common", async (importOriginal) => {
   };
 });
 
+const serverNow = vi.hoisted(() => ({ ms: null as number | null }));
+vi.mock("@/composables/useAnnouncementBanners", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useAnnouncementBanners")>();
+  return { ...actual, serverNowMs: () => serverNow.ms ?? actual.serverNowMs() };
+});
+
 const NOW_MICROS = 1_770_000_000_000_000;
 const HOUR_MICROS = 3600 * 1_000_000;
 
@@ -314,6 +320,54 @@ describe("DowntimeDetail", () => {
     expect(wrapper.find('[data-test="downtime-detail-not-found"]').exists()).toBe(false);
     wrapper.unmount();
   });
+  describe("Mute for an hour", () => {
+    const finished: DowntimeDetailData = {
+      ...detail,
+      status: "ended",
+      current_window: null,
+      targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1"] }],
+      alert_groups: [{ alert_id: "a1", group_key: "k1", group_labels: { region: "pune" } }],
+      end_on_clear: { alert_id: "a1", group_key: "k1" },
+    };
+
+    afterEach(() => {
+      serverNow.ms = null;
+    });
+
+    it("is absent on an active and on a scheduled row", async () => {
+      vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
+      const active = await mountDetail();
+      expect(active.wrapper.find('[data-test="downtime-detail-mute-hour"]').exists()).toBe(false);
+      active.wrapper.unmount();
+      queryClient.clear();
+      vi.mocked(downtimes.get).mockResolvedValue({
+        data: { ...detail, status: "scheduled", current_window: null },
+      } as never);
+      const scheduled = await mountDetail();
+      expect(scheduled.wrapper.find('[data-test="downtime-detail-mute-hour"]').exists()).toBe(
+        false,
+      );
+      scheduled.wrapper.unmount();
+    });
+
+    it("keeps the groups, drops the end and starts at the server time on a finished row", async () => {
+      serverNow.ms = NOW_MICROS / 1000 + 180_000;
+      vi.mocked(downtimes.get).mockResolvedValue({ data: finished } as never);
+      vi.mocked(downtimes.create).mockReset();
+      vi.mocked(downtimes.create).mockResolvedValue({ data: { id: "dt-2" } } as never);
+      const { wrapper } = await mountDetail();
+      await wrapper.get('[data-test="downtime-detail-mute-hour"]').trigger("click");
+      await flushPromises();
+      expect(downtimes.create).toHaveBeenCalledTimes(1);
+      const [, body] = vi.mocked(downtimes.create).mock.calls[0];
+      expect(body.alert_groups).toEqual(finished.alert_groups);
+      expect(body.end_on_clear).toBeNull();
+      expect(body.schedule.starts_at).toBe(NOW_MICROS + 180_000_000);
+      expect(body.schedule.ends_at).toBe(NOW_MICROS + 180_000_000 + HOUR_MICROS);
+      wrapper.unmount();
+    });
+  });
+
   describe("recurring rows and an early end", () => {
     const confirm = () => document.body.querySelector<HTMLElement>('[data-test="confirm-dialog"]');
     const weekly = {

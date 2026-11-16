@@ -598,7 +598,7 @@ pub async fn prepare_cache_response(
     }
 
     // Parse SQL first to get metadata needed for normalization
-    let query: SearchQuery = req.query.clone().into();
+    let query: SearchQuery = req.query.clone().try_into()?;
     let mut sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
@@ -1395,7 +1395,7 @@ pub async fn apply_regex_to_response(
         |_| {},
     )?;
 
-    let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
+    let query: proto::cluster_rpc::SearchQuery = req.query.clone().try_into()?;
     let sql = match crate::sql::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {

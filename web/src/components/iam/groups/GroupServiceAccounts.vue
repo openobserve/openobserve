@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="rows"
         :columns="columns"
         row-key="email"
-        :loading="props.loading"
+        :loading="props.loading || orgListStatus === 'pending'"
         :forbidden="forbidden"
         :global-filter="userSearchKey"
         pagination="client"
@@ -77,6 +77,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #empty>
           <OEmptyState
+            v-if="orgListStatus === 'error'"
+            kind="error"
+            class="shrink-0"
+            data-test="iam-service-accounts-selection-load-error"
+            @action="retryOrgServiceAccounts()"
+          />
+          <OEmptyState
+            v-else-if="showNoneSelected"
+            class="shrink-0"
+            icon="group"
+            data-test="iam-service-accounts-selection-none-selected"
+            :title="t('iam.groupServiceAccounts.noneSelectedTitle')"
+            :text="t('iam.groupServiceAccounts.noneSelectedDescription')"
+            :action-label="t('iam.groupServiceAccounts.showAll')"
+            @action="updateUserTable('all')"
+          />
+          <OEmptyState
+            v-else
+            class="shrink-0"
             :kind="userSearchKey ? 'filtered' : 'first-run'"
             :title="
               userSearchKey
@@ -109,7 +128,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
-import { watch, ref, onBeforeMount } from "vue";
+import { computed, watch, ref, onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -165,6 +184,14 @@ const usersDisplayOptions = [
 const userSearchKey = ref("");
 
 const hasFetchedOrgServiceAccounts = ref(false);
+
+// The org-empty copy is a claim about the org, so it waits for a successful read.
+const orgListStatus = ref<"pending" | "success" | "error">("pending");
+
+// An org with no service accounts keeps the org-empty state even under Selected.
+const showNoneSelected = computed(
+  () => usersDisplay.value === "selected" && !userSearchKey.value && users.value.length > 0,
+);
 
 // A viewer cannot list service accounts; show the no-access state instead of failing.
 const forbidden = ref(false);
@@ -240,6 +267,7 @@ const fetchOrgServiceAccounts = async () => {
   // fetch group users
   hasFetchedOrgServiceAccounts.value = true;
   forbidden.value = false;
+  orgListStatus.value = "pending";
   let data: Array<{ email: string; is_system?: boolean }>;
   try {
     data = (await serviceAccountsState.getServiceAccounts(
@@ -247,7 +275,11 @@ const fetchOrgServiceAccounts = async () => {
     )) as typeof data;
   } catch (e: unknown) {
     const status = (e as { response?: { status?: number } } | undefined)?.response?.status;
-    if (status !== 403) throw e;
+    if (status !== 403) {
+      console.error("Failed to load the organization's service accounts:", e);
+      orgListStatus.value = "error";
+      return false;
+    }
     forbidden.value = true;
     data = [];
   }
@@ -271,7 +303,13 @@ const fetchOrgServiceAccounts = async () => {
       };
     },
   );
+  orgListStatus.value = "success";
   return true;
+};
+
+const retryOrgServiceAccounts = async () => {
+  await fetchOrgServiceAccounts();
+  updateUserTable(usersDisplay.value);
 };
 
 const toggleUserSelection = (user: any) => {

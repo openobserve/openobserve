@@ -456,6 +456,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { useLicensePage } from "@/composables/useLicensePage";
+import { markFullConfigLoaded } from "@/composables/useFullConfigLoad";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -922,6 +923,7 @@ const refreshConfig = async () => {
         })
         .then(() => queryClient.fetchQuery(configFullQuery(orgId.value))),
     );
+    markFullConfigLoaded(orgId.value);
   } catch (error) {
     console.log(error);
   }

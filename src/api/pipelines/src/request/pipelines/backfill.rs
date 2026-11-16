@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! HTTP handlers for backfill job management
+#[cfg(feature = "enterprise")]
+use axum::Json;
 use axum::{
-    Json,
     extract::{Path, Query},
     response::Response,
 };
@@ -171,10 +172,7 @@ pub async fn create_backfill(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"}))
     )
 )]
-pub async fn create_backfill(
-    Path((_org_id, _pipeline_id)): Path<(String, String)>,
-    Json(_req): Json<BackfillRequest>,
-) -> Response {
+pub async fn create_backfill(Path((_org_id, _pipeline_id)): Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -733,7 +731,6 @@ pub async fn update_backfill(
 )]
 pub async fn update_backfill(
     Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
-    Json(_body): Json<BackfillRequest>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -766,6 +763,38 @@ async fn guard_backfill(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn oss_backfill_stubs_answer_403_before_parsing_a_body() {
+        use axum::{
+            Router,
+            body::Body,
+            http::{Request, StatusCode},
+            routing::{patch, post},
+        };
+        use tower::ServiceExt;
+
+        let app = Router::new()
+            .route("/{org}/pipelines/{pid}/backfill", post(create_backfill))
+            .route(
+                "/{org}/pipelines/{pid}/backfill/{job}",
+                patch(update_backfill),
+            );
+        for (method, uri) in [
+            ("POST", "/o/pipelines/p/backfill"),
+            ("PATCH", "/o/pipelines/p/backfill/j"),
+        ] {
+            let req = Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("content-type", "application/json")
+                .body(Body::from("{}"))
+                .unwrap();
+            let resp = app.clone().oneshot(req).await.unwrap();
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{method} {uri}");
+        }
+    }
 
     #[test]
     fn test_backfill_request_optional_fields_absent_when_none() {

@@ -370,6 +370,15 @@ import AndroidIcon from "~icons/material-symbols/android";
 import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
 import CallIcon from "~icons/material-symbols/call-outline";
 
+// Batch 6: Folder icon picker (2026-11-06)
+import BugReportIcon from "~icons/material-symbols/bug-report-outline";
+import ApiIcon from "~icons/material-symbols/api";
+import ShoppingCartIcon from "~icons/material-symbols/shopping-cart-outline";
+import DeployedCodeIcon from "~icons/material-symbols/deployed-code-outline";
+import RouterIcon from "~icons/material-symbols/router-outline";
+import SupportAgentIcon from "~icons/material-symbols/support-agent";
+import CloudSyncIcon from "~icons/material-symbols/cloud-sync-outline";
+
 // Brand marks (not Material Symbols) — local inline SVG components using currentColor.
 import McpLogo from "./McpLogo.vue";
 import SlackLogo from "./SlackLogo.vue";
@@ -751,6 +760,15 @@ export const iconRegistry = {
   // Batch 5: Downtimes (2026-09-24)
   "notifications-paused": NotificationsPaused,
   repeat: RepeatIcon,
+
+  // Batch 6: Folder icon picker (2026-11-06)
+  "bug-report": BugReportIcon,
+  api: ApiIcon,
+  "shopping-cart": ShoppingCartIcon,
+  "deployed-code": DeployedCodeIcon,
+  router: RouterIcon,
+  "support-agent": SupportAgentIcon,
+  "cloud-sync": CloudSyncIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="rows"
         :columns="columns"
         row-key="role_name"
-        :loading="props.loading"
+        :loading="props.loading || orgListLoading"
         :global-filter="userSearchKey"
         pagination="client"
         :page-size="100"
@@ -70,6 +70,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #empty>
           <OEmptyState
+            v-if="orgListFailed"
+            kind="error"
+            class="shrink-0"
+            data-test="iam-roles-selection-load-error"
+            @action="retryOrgRoles()"
+          />
+          <OEmptyState
+            v-else-if="showNoneSelected"
+            class="shrink-0"
+            icon="group"
+            data-test="iam-roles-selection-none-selected"
+            :title="t('iam.groupRoles.noneSelectedTitle')"
+            :text="t('iam.groupRoles.noneSelectedDescription')"
+            :action-label="t('iam.groupRoles.showAll')"
+            @action="updateUserTable('all')"
+          />
+          <OEmptyState
+            v-else
+            class="shrink-0"
             :kind="userSearchKey ? 'filtered' : 'first-run'"
             :title="
               userSearchKey
@@ -235,6 +254,17 @@ const shapeRoles = (data: any) =>
 // The picker is the query, not a copy of it.
 const users = computed<any[]>(() => shapeRoles(rolesList.data.value ?? []));
 
+// A failed refetch keeps the error status, so it counts as loading until it settles again.
+const orgListLoading = computed(
+  () => rolesList.isPending.value || (rolesList.isError.value && rolesList.isFetching.value),
+);
+const orgListFailed = computed(() => rolesList.isError.value && !rolesList.isFetching.value);
+
+// An org with no roles keeps the org-empty state even under Selected.
+const showNoneSelected = computed(
+  () => usersDisplay.value === "selected" && !userSearchKey.value && users.value.length > 0,
+);
+
 const getchOrgUsers = async () => {
   // Enabling the query is what performs the first read; `suspense()` waits for
   // it to settle without issuing a second request.
@@ -242,6 +272,11 @@ const getchOrgUsers = async () => {
   await nextTick();
   await rolesList.suspense();
   return true;
+};
+
+const retryOrgRoles = async () => {
+  await rolesList.refetch();
+  updateUserTable(usersDisplay.value);
 };
 
 const toggleUserSelection = (user: any) => {

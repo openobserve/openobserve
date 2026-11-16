@@ -3915,7 +3915,9 @@ describe("OTable sort header button", () => {
     const tooltip = wrapper
       .findAllComponents(OTooltip)
       .find((c) => c.props("content") === "unused");
-    expect(tooltip!.props("disabled")).toBe(true);
+    expect(tooltip).toBeUndefined();
+    // A tooltip trigger on the sort button would mute the column's header help bubble.
+    expect(trigger().attributes("data-o-tooltip-trigger")).toBeUndefined();
   });
 
   it("sortDisabled also blocks client-side sorting", async () => {

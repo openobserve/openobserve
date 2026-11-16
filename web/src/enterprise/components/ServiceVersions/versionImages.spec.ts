@@ -285,10 +285,17 @@ describe("Versions tab image builds", () => {
       },
       attachTo: document.body,
     });
-
-  it("shows the newest three builds of a version, then one line for the rest, and expands in place", async () => {
+  // Older builds are stopped, so each test shows stopped versions first.
+  const renderAll = async () => {
     const view = render();
     await flushPromises();
+    await view.get('[data-test="svcver-include-inactive-btn"]').trigger("click");
+    await flushPromises();
+    return view;
+  };
+
+  it("shows the newest three builds of a version, then one line for the rest, and expands in place", async () => {
+    const view = await renderAll();
     const shown = () =>
       view
         .findAll('[data-test^="svcver-version-k-"]')
@@ -306,8 +313,7 @@ describe("Versions tab image builds", () => {
   });
 
   it("says why a version known only from Kubernetes cannot be compared, and never prints the raw source key", async () => {
-    const view = render();
-    await flushPromises();
+    const view = await renderAll();
     expect(view.get('[data-test="svcver-compare-k-238"]').attributes("disabled")).toBeDefined();
     expect(view.get('[data-test="svcver-compare-wrap-k-238"]').text()).toContain(
       "Compare is off: spans carry no version yet",

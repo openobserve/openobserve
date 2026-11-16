@@ -1054,7 +1054,7 @@ async fn get_sql(
     stream_type: StreamType,
     search_type: Option<SearchEventType>,
 ) -> Result<search::sql::Sql, infra::errors::Error> {
-    search::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type).await
+    search::sql::Sql::new(&query.clone().try_into()?, org_id, stream_type, search_type).await
 }
 
 #[cfg(test)]

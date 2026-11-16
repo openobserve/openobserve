@@ -21,19 +21,19 @@ test.describe("Alert Calibration testcases", () => {
   });
 
   test(
-    "should redirect the alert calibration route to the alert list on an OSS build",
+    "should show the upgrade screen for the alert calibration route on an OSS build",
     { tag: ["@alert-calibration", "@oss", "@P0", "@all"] },
     async () => {
       const buildType = await pm.alertCalibrationPage.detectBuildType();
       test.skip(buildType !== "opensource", `Runs only on an OSS backend (build: ${buildType})`);
-      await pm.alertCalibrationPage.openRunsExpectingRedirect();
+      await pm.alertCalibrationPage.openRunsExpectingUpgradeScreen();
     },
   );
 
   test.describe("enterprise", () => {
     test.beforeEach(async () => {
       // Alert calibration is enterprise/cloud-gated: on OSS the route guard
-      // bounces /alert-calibration* to alertList, so skip instead of timing out.
+      // sends /alert-calibration* to the upgrade screen, so skip instead of timing out.
       const buildType = await pm.alertCalibrationPage.detectBuildType();
       test.skip(
         buildType !== "enterprise" && buildType !== "cloud",

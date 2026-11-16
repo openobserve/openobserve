@@ -79,11 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="list.isPending.value"
-      class="px-page-edge flex flex-col gap-2"
+      class="px-page-edge flex min-h-64 shrink-0 flex-col gap-2"
       data-test="svcver-name-review-loading"
     >
       <OSkeleton shape="block" class="h-10 w-full" />
-      <OSkeleton shape="block" class="h-40 w-full" />
+      <OSkeleton shape="block" class="w-full flex-1" />
     </div>
     <OEmptyState
       v-else-if="denied"
@@ -100,12 +100,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="svcver-name-review-error"
       @action="list.refetch()"
     />
-    <OEmptyState
-      v-else-if="!rows.length && page === 1"
-      :title="t(`serviceVersions.nameReview.states.${EMPTY[filter]}`)"
-      :text="t('serviceVersions.nameReview.states.emptyBody')"
-      data-test="svcver-name-review-empty"
-    />
+    <!-- Shares min-h-64 with the loading skeleton and is taller than the empty state's content, so Unresolved stays put. -->
+    <div v-else-if="!rows.length && page === 1" class="flex min-h-64 shrink-0 flex-col">
+      <OEmptyState
+        class="flex-1"
+        :title="t(`serviceVersions.nameReview.states.${EMPTY[filter]}`)"
+        :text="t('serviceVersions.nameReview.states.emptyBody')"
+        data-test="svcver-name-review-empty"
+      />
+    </div>
     <div v-else class="px-page-edge">
       <OTable
         :data="rows"
@@ -230,14 +233,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           raw(unresolvedRows.length)
         }}</OTag>
         <span class="text-text-secondary text-xs" data-test="svcver-unresolved-sub">{{
-          t("serviceVersions.nameReview.unresolved.sub")
+          podsSentence && !reasonColumn
+            ? t("serviceVersions.nameReview.unresolved.introPods")
+            : t("serviceVersions.nameReview.unresolved.intro")
         }}</span>
-        <span
-          v-if="podsSentence"
-          class="text-text-secondary text-xs"
-          data-test="svcver-unresolved-pods"
-          >{{ t("serviceVersions.nameReview.unresolved.noTrace") }}</span
-        >
       </div>
       <div class="px-page-edge">
         <OTable
@@ -532,15 +531,21 @@ export const NameReviewEditor = defineComponent({
 // Detection-only keys and SDK placeholder names have no trace name; ambiguous keys list their candidates.
 export function unresolvedFrom(rows: DiscoveredRow[], placeholders: string[]): UnresolvedRow[] {
   const byName = new Map<string, UnresolvedRow>();
+  // A key that sends spans is its own trace name even when the display index has not caught up with it.
+  const traced = new Set(
+    rows.filter((row) => row.traces_streams.length).map((row) => row.service_name),
+  );
+  for (const name of placeholders) traced.delete(name);
   for (const row of rows) {
     if (row.display_source !== "detection" && row.display_source !== "detection_ambiguous")
       continue;
+    if (traced.has(row.service_name)) continue;
     const entry = byName.get(row.service_name) ?? {
       slug: slugOf(row.service_name),
       name: row.service_name,
       signals: [],
       candidates: [],
-      placeholder: false,
+      placeholder: placeholders.includes(row.service_name),
       pods: false,
     };
     entry.pods ||= Object.keys({ ...row.disambiguation, ...row.all_dimensions }).some((key) =>
@@ -595,6 +600,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ServiceEnvChip from "@/components/shared/ServiceEnvChip.vue";
+import { shortList } from "@/utils/shortList";
 
 const props = defineProps<{
   services: DiscoveredRow[];
@@ -695,8 +701,12 @@ const unresolvedRows = computed(() =>
 // The pods sentence is said once for the group, and only when it is true of every row it covers.
 const podsSentence = computed(() => {
   const plain = unresolvedRows.value.filter((row) => !row.candidates.length && !row.placeholder);
-  return plain.length > 0 && plain.every((row) => row.pods);
+  return plain.length > 0 && plain.every(noTracePods);
 });
+// Plain rows share the reason the section line states; a reason column earns its place only when rows differ.
+const reasonColumn = computed(() =>
+  unresolvedRows.value.some((row) => row.candidates.length || row.placeholder),
+);
 const unresolvedExpanded = computed(() =>
   unresolvedRows.value.map((row) => row.slug).filter((slug) => editors[`unresolved:${slug}`]),
 );
@@ -715,13 +725,24 @@ const columns = computed<OTableColumnDef<Alias>[]>(() => [
 ]);
 const unresolvedColumns = computed<OTableColumnDef<UnresolvedRow>[]>(() => [
   { id: "name", header: t("serviceVersions.nameReview.unresolved.cols.name"), size: 200 },
-  { id: "seen", header: t("serviceVersions.nameReview.unresolved.cols.seenIn"), size: 200 },
-  {
-    id: "why",
-    header: t("serviceVersions.nameReview.unresolved.cols.why"),
-    minSize: 320,
-    meta: { flex: true },
-  },
+  reasonColumn.value
+    ? { id: "seen", header: t("serviceVersions.nameReview.unresolved.cols.seenIn"), size: 200 }
+    : {
+        id: "seen",
+        header: t("serviceVersions.nameReview.unresolved.cols.seenIn"),
+        minSize: 200,
+        meta: { flex: true },
+      },
+  ...(reasonColumn.value
+    ? [
+        {
+          id: "why",
+          header: t("serviceVersions.nameReview.unresolved.cols.why"),
+          minSize: 320,
+          meta: { flex: true },
+        },
+      ]
+    : []),
   { id: "action", header: raw(""), size: 160 },
 ]);
 
@@ -765,19 +786,27 @@ function evidenceText(row: Alias) {
 
 function whyText(row: UnresolvedRow) {
   if (row.candidates.length) {
-    const shown = row.candidates.slice(0, 3).join(", ");
     return t("serviceVersions.nameReview.unresolved.ambiguous", {
       n: row.candidates.length,
-      names: row.candidates.length > 3 ? `${shown}…` : shown,
+      names: shortList(row.candidates, 3, String(locale.value || "en"), (count) =>
+        t("serviceVersions.discovered.tiles.more", { count }),
+      ),
     });
   }
-  if (!row.placeholder) return raw("");
-  return t(placeholderLineKey(row.name) ?? "serviceVersions.names.placeholder");
+  if (row.placeholder)
+    return t(placeholderLineKey(row.name) ?? "serviceVersions.names.placeholder");
+  return noTracePods(row)
+    ? t("serviceVersions.nameReview.unresolved.reasonPods")
+    : t("serviceVersions.nameReview.unresolved.reasonName");
 }
 
 // Underscore names are the app's own streams, never a service someone could rename.
 function internalName(name: string) {
   return name.startsWith("_");
+}
+
+function noTracePods(row: UnresolvedRow) {
+  return row.pods && !row.signals.includes("traces");
 }
 
 function unresolvedId(row: UnresolvedRow) {

@@ -377,6 +377,6 @@ test.describe('IAM · Roles list · member counts', { tag: '@enterprise' }, () =
         }
         await pm.rolesPage.serviceAccountShowToggle('selected').click();
         await expect(pm.rolesPage.serviceAccountMemberRows).toHaveCount(0, { timeout: 15000 });
-        await expect(pm.rolesPage.serviceAccountMembersEmpty).toBeVisible();
+        await expect(pm.rolesPage.serviceAccountMembersNoneSelected).toBeVisible();
     });
 });

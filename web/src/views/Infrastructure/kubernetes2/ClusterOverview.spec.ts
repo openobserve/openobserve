@@ -457,9 +457,9 @@ describe("ClusterOverview", () => {
         'sum(k8s_node_cpu_usage{k8s_cluster_name="prod"})',
       ]);
       expect(props.panelSchema.config.mark_line).toEqual([
-        { type: "yAxis", value: 16, name: "Allocatable" },
-        { type: "yAxis", value: 20, name: "Limits" },
-        { type: "yAxis", value: 4, name: "Requests" },
+        { type: "yAxis", value: 16, name: "Allocatable", label: "Allocatable: 16.00" },
+        { type: "yAxis", value: 20, name: "Limits", label: "Limits: 20.00" },
+        { type: "yAxis", value: 4, name: "Requests", label: "Requests: 4.00" },
       ]);
       expect(props.selectedTimeObj).toEqual({
         start_time: new Date(END - 60 * MIN),

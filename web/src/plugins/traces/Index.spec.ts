@@ -4806,6 +4806,34 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(pushSpy).toHaveBeenCalledTimes(1);
     });
 
+    it("writes a catalog stream switch to the URL with auto-run off, and Back moves the shared stream with its query", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: true };
+      localStorage.setItem("oo_toggle_auto_run", "false");
+      const appRouter = makeRouter();
+      await mountOn(appRouter);
+      const oldQuery = "service_name = 'checkout'";
+      await appRouter.replace({
+        path: "/traces",
+        query: { tab: "services-catalog", stream: "default", query: btoa(oldQuery) },
+      });
+      mockSearchObj.data.editorValue = oldQuery;
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+
+      await wrapper.vm.applyStreamChange("test-stream");
+      await flushPromises();
+      expect(appRouter.currentRoute.value.query.stream).toBe("test-stream");
+
+      appRouter.back();
+      await vi.waitFor(() => expect(appRouter.currentRoute.value.query.stream).toBe("default"));
+      await flushPromises();
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+      expect(mockGetStream).toHaveBeenLastCalledWith("default", "traces", true);
+      expect(mockSearchObj.data.editorValue).toBe(oldQuery);
+      delete store.state.zoConfig.auto_query_enabled;
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
     it("does not strip run-query over a pending navigation", async () => {
       const appRouter = makeRouter();
       mockGetStreams.mockClear();

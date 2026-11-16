@@ -18,14 +18,9 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 
 // vi.mock calls are hoisted — must appear before imports of mocked modules
-vi.mock("@/services/search", async (importOriginal) => {
-  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
-  return overlayServiceMock(await importOriginal(), {
-    default: {
-      search: vi.fn(),
-    },
-  });
-});
+vi.mock("@/plugins/correlation/correlationStream", () => ({
+  streamTraceRows: vi.fn(),
+}));
 
 vi.mock("@/services/service_streams", () => ({
   correlate: vi.fn(),
@@ -70,7 +65,7 @@ vi.mock("vue-i18n", async () => {
   };
 });
 
-import searchService from "@/services/search";
+import { streamTraceRows } from "@/plugins/correlation/correlationStream";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
 
 // ---------------------------------------------------------------------------
@@ -152,22 +147,18 @@ const mockTimeRange = {
   endTime: 1700003600000,
 };
 
-// Mock response for searchService.search (operations)
-const mockSearchResponse = {
-  data: {
-    hits: [
-      {
-        operation_name: "/api/orders",
-        request_count: 500,
-        error_count: 10,
-        p50_latency: 12000,
-        p75_latency: 18000,
-        p95_latency: 25000,
-        p99_latency: 40000,
-      },
-    ],
+// Rows the operations read streams back
+const mockOperationRows = [
+  {
+    operation_name: "/api/orders",
+    request_count: 500,
+    error_count: 10,
+    p50_latency: 12000,
+    p75_latency: 18000,
+    p95_latency: 25000,
+    p99_latency: 40000,
   },
-};
+];
 
 // ---------------------------------------------------------------------------
 // Mount factory
@@ -247,7 +238,7 @@ describe("ServiceGraphSidePanel.vue", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
-    vi.mocked(searchService.search).mockResolvedValue(mockSearchResponse);
+    vi.mocked(streamTraceRows).mockResolvedValue(mockOperationRows);
   });
 
   afterEach(() => {
@@ -589,37 +580,30 @@ describe("ServiceGraphSidePanel.vue", () => {
   // -------------------------------------------------------------------------
 
   describe("Async Operations - fetchAggregatedOperations", () => {
-    it("should call searchService.search when visible=true, node set, and streamFilter is not 'all'", async () => {
+    it("should call streamTraceRows when visible=true, node set, and streamFilter is not 'all'", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
-      expect(searchService.search).toHaveBeenCalled();
+      expect(streamTraceRows).toHaveBeenCalled();
     });
 
-    it("should call searchService.search with the correct org_identifier", async () => {
+    it("should stream the operations of the selected org", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
-      const call = vi.mocked(searchService.search).mock.calls[0][0] as any;
+      const call = vi.mocked(streamTraceRows).mock.calls[0][0];
       // Store helper uses "default" as identifier
-      expect(call.org_identifier).toBe("default");
+      expect(call.org).toBe("default");
     });
 
-    it("should call searchService.search with page_type traces", async () => {
-      wrapper = createWrapper({ visible: true, streamFilter: "default" });
-      await flushPromises();
-      const call = vi.mocked(searchService.search).mock.calls[0][0] as any;
-      expect(call.page_type).toBe("traces");
-    });
-
-    it("should NOT call searchService.search when streamFilter is 'all'", async () => {
+    it("should NOT call streamTraceRows when streamFilter is 'all'", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "all" });
       await flushPromises();
-      expect(searchService.search).not.toHaveBeenCalled();
+      expect(streamTraceRows).not.toHaveBeenCalled();
     });
 
-    it("should NOT call searchService.search when visible is false", async () => {
+    it("should NOT call streamTraceRows when visible is false", async () => {
       wrapper = createWrapper({ visible: false, streamFilter: "default" });
       await flushPromises();
-      expect(searchService.search).not.toHaveBeenCalled();
+      expect(streamTraceRows).not.toHaveBeenCalled();
     });
 
     it("should populate recentOperations from the search response", async () => {
@@ -637,7 +621,7 @@ describe("ServiceGraphSidePanel.vue", () => {
 
     it("should keep recentOperations empty and reset loadingOperations on error", async () => {
       const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-      vi.mocked(searchService.search).mockRejectedValueOnce(new Error("API Error"));
+      vi.mocked(streamTraceRows).mockRejectedValueOnce(new Error("API Error"));
 
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
@@ -648,9 +632,7 @@ describe("ServiceGraphSidePanel.vue", () => {
     });
 
     it("should handle an empty hits array without errors", async () => {
-      vi.mocked(searchService.search).mockResolvedValueOnce({
-        data: { hits: [] },
-      });
+      vi.mocked(streamTraceRows).mockResolvedValueOnce([]);
 
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
@@ -664,48 +646,48 @@ describe("ServiceGraphSidePanel.vue", () => {
   // -------------------------------------------------------------------------
 
   describe("Watchers", () => {
-    it("should call searchService.search when visible changes from false to true", async () => {
+    it("should call streamTraceRows when visible changes from false to true", async () => {
       wrapper = createWrapper({ visible: false, streamFilter: "default" });
       await flushPromises();
-      expect(searchService.search).not.toHaveBeenCalled();
+      expect(streamTraceRows).not.toHaveBeenCalled();
 
       await wrapper.setProps({ visible: true });
       await flushPromises();
 
-      expect(searchService.search).toHaveBeenCalled();
+      expect(streamTraceRows).toHaveBeenCalled();
     });
 
-    it("should call searchService.search again when selectedNode changes", async () => {
+    it("should call streamTraceRows again when selectedNode changes", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
-      const callCount = vi.mocked(searchService.search).mock.calls.length;
+      const callCount = vi.mocked(streamTraceRows).mock.calls.length;
 
       await wrapper.setProps({ selectedNode: mockNodes[1] });
       await flushPromises();
 
-      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(callCount);
+      expect(vi.mocked(streamTraceRows).mock.calls.length).toBeGreaterThan(callCount);
     });
 
-    it("should call searchService.search again when streamFilter changes to another stream", async () => {
+    it("should call streamTraceRows again when streamFilter changes to another stream", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
-      const callCount = vi.mocked(searchService.search).mock.calls.length;
+      const callCount = vi.mocked(streamTraceRows).mock.calls.length;
 
       await wrapper.setProps({ streamFilter: "another-stream" });
       await flushPromises();
 
-      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(callCount);
+      expect(vi.mocked(streamTraceRows).mock.calls.length).toBeGreaterThan(callCount);
     });
 
-    it("should NOT call searchService.search when streamFilter changes to 'all'", async () => {
+    it("should NOT call streamTraceRows when streamFilter changes to 'all'", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
-      vi.mocked(searchService.search).mockClear();
+      vi.mocked(streamTraceRows).mockClear();
 
       await wrapper.setProps({ streamFilter: "all" });
       await flushPromises();
 
-      expect(searchService.search).not.toHaveBeenCalled();
+      expect(streamTraceRows).not.toHaveBeenCalled();
     });
   });
 
@@ -714,8 +696,9 @@ describe("ServiceGraphSidePanel.vue", () => {
   // -------------------------------------------------------------------------
 
   describe("UI Rendering - Tabs", () => {
-    it("should show tabs when streamFilter is not 'all'", () => {
+    it("should show tabs when streamFilter is not 'all'", async () => {
       wrapper = createWrapper({ streamFilter: "default" });
+      await flushPromises();
       expect(wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists()).toBe(true);
     });
 
@@ -724,8 +707,9 @@ describe("ServiceGraphSidePanel.vue", () => {
       expect(wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists()).toBe(false);
     });
 
-    it("should render the operations tab", () => {
+    it("should render the operations tab", async () => {
       wrapper = createWrapper({ streamFilter: "default" });
+      await flushPromises();
       expect(wrapper.find('[data-test="service-graph-node-panel-tab-operations"]').exists()).toBe(
         true,
       );

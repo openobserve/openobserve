@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { DowntimeListItem, DowntimeStatus } from "@/services/downtimes";
+import type { DowntimeListItem, DowntimeSchedule, DowntimeStatus } from "@/services/downtimes";
+import { currentOrNextWindow } from "./schedule";
 
 /** Live rows first, then the finished ones from the most to the least complete. */
 const STATUS_ORDER: Record<DowntimeStatus, number> = {
@@ -48,6 +49,24 @@ export const isEditable = (row: Pick<DowntimeListItem, "status">): boolean =>
 
 /** Only a finished row can be deleted. */
 export const isFinished = (row: Pick<DowntimeListItem, "status">): boolean => !isEditable(row);
+
+/** The first window's start: the schedule start of a one-time row, else the first occurrence. */
+export const firstWindowStart = (schedule: DowntimeSchedule): number =>
+  schedule.repeat === "none"
+    ? schedule.starts_at
+    : (currentOrNextWindow(schedule, schedule.starts_at - 1)?.start ?? schedule.starts_at);
+
+/** A finished row whose SLO target took effect stays for history, so it offers no Delete. */
+export const isDeletable = (
+  row: Pick<DowntimeListItem, "status" | "targets" | "schedule" | "cancelled_at">,
+): boolean => {
+  if (!isFinished(row)) return false;
+  if (!row.targets.some((t) => t.module === "slos")) return true;
+  const cancelledAt = row.cancelled_at;
+  return cancelledAt !== undefined && cancelledAt !== null
+    ? cancelledAt <= firstWindowStart(row.schedule)
+    : false;
+};
 
 /** The window that places the row: the running one, else the next, else the schedule start. */
 const startOf = (row: Row): number =>

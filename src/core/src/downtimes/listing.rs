@@ -25,17 +25,43 @@ use o2_enterprise::enterprise::downtimes::scope::{self, TargetItem};
 pub const DEFAULT_PAGE_SIZE: usize = 50;
 pub const MAX_PAGE_SIZE: usize = 500;
 
+const STATUS_VALUES: &[&str] = &["scheduled", "active", "ended", "cancelled", "ended_early"];
+const REPEAT_VALUES: &[&str] = &["recurring", "none", "once", "daily", "weekly"];
+
+/// An unknown filter value is a 400 with the valid values, not an empty 200.
+pub fn check_query(query: &ListQuery) -> Result<(), String> {
+    let known = |name: &str, value: Option<&str>, valid: &[&str]| match value {
+        Some(v) if !valid.contains(&v) => Err(format!(
+            "Unknown {name} {v:?}. Use one of: {}.",
+            valid.join(", ")
+        )),
+        _ => Ok(()),
+    };
+    known("status", query.status.as_deref(), STATUS_VALUES)?;
+    known("repeat", query.repeat.as_deref(), REPEAT_VALUES)
+}
+
 /// Filters, counts and pages already-authorized rows. `alert` is the item behind `alert_id`.
+/// The counts follow every filter but the status, so each status tile keeps its number.
 pub fn list_page(
     items: Vec<DowntimeListItem>,
     query: &ListQuery,
     alert: Option<&TargetItem<'_>>,
 ) -> ListResponse {
-    let mut kept: Vec<DowntimeListItem> = items
+    let in_scope: Vec<DowntimeListItem> = items
         .into_iter()
         .filter(|item| keep(item, query, alert))
         .collect();
-    let counts = count(&kept);
+    let counts = count(&in_scope);
+    let mut kept: Vec<DowntimeListItem> = in_scope
+        .into_iter()
+        .filter(|item| {
+            query
+                .status
+                .as_deref()
+                .is_none_or(|s| status_name(item.status) == s)
+        })
+        .collect();
     kept.sort_by_key(|item| std::cmp::Reverse(item.downtime.updated_at));
     let total = kept.len();
     let size = query
@@ -58,10 +84,6 @@ pub fn list_page(
 fn keep(item: &DowntimeListItem, query: &ListQuery, alert: Option<&TargetItem<'_>>) -> bool {
     let d = &item.downtime;
     query.folder_id.as_ref().is_none_or(|f| *f == d.folder_id)
-        && query
-            .status
-            .as_deref()
-            .is_none_or(|s| status_name(item.status) == s)
         && query
             .repeat
             .as_deref()
@@ -254,6 +276,54 @@ mod tests {
         );
         assert_eq!(ids(&q(|q| q.search = Some("P1 MAINT".into()))), ["p1"]);
         assert_eq!(q(|q| q.search = Some("chg-4471".into())).total, 6);
+    }
+
+    #[test]
+    fn counts_follow_every_filter_but_the_status() {
+        let query = ListQuery {
+            status: Some("active".into()),
+            ..Default::default()
+        };
+        let resp = list_page(rows(), &query, None);
+        assert_eq!(ids(&resp), ["a"]);
+        assert_eq!(resp.total, 1);
+        assert_eq!(resp.counts.scheduled, 2, "totals for every status");
+        assert_eq!(resp.counts.ended, 1);
+        let scoped = ListQuery {
+            folder_id: Some("planned".into()),
+            repeat: Some("weekly".into()),
+            search: Some("p1".into()),
+            status: Some("ended".into()),
+            ..Default::default()
+        };
+        let resp = list_page(rows(), &scoped, None);
+        assert!(resp.items.is_empty());
+        assert_eq!(
+            resp.counts,
+            StatusCounts {
+                scheduled: 1,
+                recurring: 1,
+                ..Default::default()
+            }
+        );
+    }
+
+    #[test]
+    fn an_unknown_status_or_repeat_is_refused() {
+        let with = |status: Option<&str>, repeat: Option<&str>| ListQuery {
+            status: status.map(str::to_string),
+            repeat: repeat.map(str::to_string),
+            ..Default::default()
+        };
+        assert!(check_query(&with(Some("bogus"), None)).is_err_and(|m| m.contains("ended_early")));
+        assert!(check_query(&with(None, Some("bogus"))).is_err_and(|m| m.contains("weekly")));
+        for repeat in ["once", "none", "recurring", "daily", "weekly"] {
+            assert!(check_query(&with(None, Some(repeat))).is_ok());
+        }
+        for status in STATUS_VALUES {
+            assert!(check_query(&with(Some(status), None)).is_ok());
+        }
+        assert!(check_query(&ListQuery::default()).is_ok());
     }
 
     #[test]

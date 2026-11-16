@@ -206,10 +206,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :enable-column-resize="true"
             :get-row-status-color="getCorrelatedRowStatusColor"
             expansion="multiple"
+            :expand-on-row-click="expandOnRowClick"
             :expanded-ids="correlatedExpandedIds"
             class="overflow-y-auto!"
             data-test="logs-tenstack-table"
-            @row-click="handleRowClick"
             @close-column="handleCloseColumn"
             @column-order-change="handleColumnOrderChange"
             @update:expandedIds="onCorrelatedExpandedIdsChange"
@@ -281,12 +281,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="fetchCorrelatedLogs()"
           />
 
-          <OEmptyState
-            v-else-if="isEmpty"
-            :title="t('correlation.logs.noData')"
-            :text="t('correlation.logs.noDataDetails')"
-            data-test="empty-state"
-          />
+          <div v-else-if="noLogStreams" class="min-h-80">
+            <OEmptyState
+              :title="t('correlation.noLogsFound')"
+              :text="t('traces.noLogStreamForCorrelation')"
+              data-test="no-log-streams-state"
+            />
+          </div>
+
+          <div v-else-if="isEmpty" class="min-h-80">
+            <OEmptyState
+              :title="t('correlation.logs.noData')"
+              :text="t('correlation.logs.noDataDetails')"
+              data-test="empty-state"
+            />
+          </div>
         </div>
 
         <!-- Pagination bar -->
@@ -374,6 +383,7 @@ const {
   hasResults,
   isLoading,
   hasError,
+  noLogStreams,
   isEmpty,
   fetchCorrelatedLogs,
   goToPage,
@@ -971,7 +981,8 @@ const handleApplyFilters = () => {
   updateFilters(pendingFilters.value);
 };
 
-const handleRowClick = () => {};
+// A click that ends a text selection must not toggle the row.
+const expandOnRowClick = (): boolean => !window.getSelection()?.toString();
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;

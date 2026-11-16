@@ -2504,6 +2504,12 @@ pub struct Common {
     pub memory_circuit_breaker_enabled: bool,
     #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_RATIO", default = 90)]
     pub memory_circuit_breaker_ratio: usize,
+    #[env_config(
+        name = "ZO_MEMORY_CIRCUIT_BREAKER_RELEASE_RATIO",
+        default = 0,
+        help = "A tripped memory circuit breaker releases only once memory usage drops below this percentage of total memory. 0 means 5 points below ZO_MEMORY_CIRCUIT_BREAKER_RATIO, but not below half of it; it is kept at least 1 point below the trip ratio"
+    )]
+    pub memory_circuit_breaker_release_ratio: usize,
     #[env_config(name = "ZO_DISK_CIRCUIT_BREAKER_ENABLED", default = false)]
     pub disk_circuit_breaker_enabled: bool,
     #[env_config(
@@ -3585,7 +3591,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
-        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. Minimum 2"
+        help = "Per-file concurrent row_group workers for tantivy index generation, on ingesters and compactors. Minimum 2. Times ZO_FILE_MERGE_THREAD_NUM, it is the thread count of the shared tantivy build pool"
     )]
     pub tantivy_builder_thread_num: usize,
 }
@@ -5005,6 +5011,10 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.search.metrics_blocks_cache_max_size,
         cfg.limit.mem_total,
     );
+    cfg.common.memory_circuit_breaker_release_ratio = memory_circuit_breaker_release_ratio(
+        cfg.common.memory_circuit_breaker_ratio,
+        cfg.common.memory_circuit_breaker_release_ratio,
+    );
     Ok(())
 }
 
@@ -5014,6 +5024,16 @@ fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
         1..=9 => 0,
         size => size,
     }
+}
+
+/// At least one point below the trip ratio, so a breaker always has a gap to cross; the
+/// only exception is trip ratio 1, which has no whole percentage below it but 0.
+fn memory_circuit_breaker_release_ratio(trip_ratio: usize, configured: usize) -> usize {
+    let ratio = match configured {
+        0 => trip_ratio.saturating_sub(5).max(trip_ratio / 2),
+        ratio => ratio,
+    };
+    ratio.min(trip_ratio.saturating_sub(1)).max(1)
 }
 
 /// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path
@@ -5649,6 +5669,30 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn memory_circuit_breaker_release_ratio_defaults_below_trip_and_stays_a_point_below_it() {
+        for (trip, configured, expected) in [
+            (90, 0, 85),
+            (95, 0, 90),
+            (16, 0, 11),
+            (10, 0, 5),
+            (8, 0, 4),
+            (2, 0, 1),
+            (1, 0, 1),
+            (90, 70, 70),
+            (90, 89, 89),
+            (90, 90, 89),
+            (90, 95, 89),
+            (2, 2, 1),
+        ] {
+            assert_eq!(
+                memory_circuit_breaker_release_ratio(trip, configured),
+                expected,
+                "trip {trip}, configured {configured}"
+            );
+        }
+    }
 
     /// A coherent starting point, so each ceiling test changes exactly the one
     /// thing it is about. `Synthetics::default()` is all zeroes — the derive
