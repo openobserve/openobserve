@@ -57,7 +57,8 @@ use serde_json::{Map, Value};
 mod watcher;
 
 pub use watcher::{
-    OrganizationProvisioner, SchemaWatcher, create_watcher, set_organization_provisioner,
+    OrganizationProvisioner, SchemaWatcher, StreamDeleteHook, create_watcher,
+    set_organization_provisioner, set_stream_delete_hook,
 };
 
 const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";

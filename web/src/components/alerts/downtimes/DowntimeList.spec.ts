@@ -331,7 +331,7 @@ describe("DowntimeList", () => {
 
     await wrapper.get('[data-test="downtime-summary-scheduled"]').trigger("click");
     await flushPromises();
-    expect(wrapper.router.currentRoute.value.query.status).toBe("scheduled");
+    expect(wrapper.router.currentRoute.value.query.status).toBe("active,scheduled");
     expect(total()).toContain("1");
     wrapper.unmount();
   });
@@ -367,6 +367,27 @@ describe("DowntimeList", () => {
     await flushPromises();
     expect(shown("dt-1")).toBe(false);
     expect(shown("dt-2")).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("ORs two picked status chips and keeps both in the URL", async () => {
+    vi.mocked(downtimes.list).mockResolvedValue(
+      page([
+        row({ id: "dt-1", status: "active" }),
+        row({ id: "dt-2", status: "ended_early" }),
+        row({ id: "dt-3", status: "scheduled" }),
+      ]) as never,
+    );
+    const wrapper = await mountList({ status: "active,ended_early" });
+    const shown = (id: string) => wrapper.find(`[data-test="downtime-list-${id}-name"]`).exists();
+    await vi.waitFor(() => expect(shown("dt-1")).toBe(true));
+    expect(shown("dt-2")).toBe(true);
+    expect(shown("dt-3")).toBe(false);
+
+    await wrapper.get('[data-test="downtime-summary-active"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.router.currentRoute.value.query.status).toBe("ended_early");
+    expect(shown("dt-1")).toBe(false);
     wrapper.unmount();
   });
 

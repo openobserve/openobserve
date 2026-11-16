@@ -27,6 +27,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const LOCALE = resolve(__dirname, "./languages/en-US.json");
+const SECURITY_LOCALE = resolve(__dirname, "./languages/security/en-US.json");
 
 /**
  * Returns the names of keys that appear more than once within the same object.
@@ -111,6 +112,13 @@ describe("en-US locale file", () => {
 
   it("has no duplicate keys within any object", () => {
     expect(findDuplicateKeys(raw)).toEqual([]);
+  });
+
+  it("keeps the lazily loaded Security namespace in its own file, free of duplicate keys", () => {
+    const security = readFileSync(SECURITY_LOCALE, "utf8");
+    expect(Object.keys(JSON.parse(security))).toEqual(["siem"]);
+    expect(findDuplicateKeys(security)).toEqual([]);
+    expect(JSON.parse(raw)).not.toHaveProperty("siem");
   });
 
   it("keeps the Data Sources sidebar labels as strings", () => {

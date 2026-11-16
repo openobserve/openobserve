@@ -59,7 +59,7 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
       'group/item relative flex items-center gap-2',
       'rounded-default w-full px-3 py-1.5',
       'cursor-pointer outline-none select-none',
-      'transition-colors duration-(--duration-hover-out) data-[highlighted]:duration-(--duration-hover-in)',
+      'transition-colors duration-(--duration-control) ease-(--ease-control)',
       variantClasses[variant],
       'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',
       unavailable &&

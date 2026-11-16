@@ -278,11 +278,11 @@ const hasInsideLabel = computed(
             'p-1',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
-            // ease-out-expo in (200ms), quick wipe out (140ms).
-            'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-            'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            // ease-out-expo in, quick wipe out.
+            'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
+            'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
+            'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
+            'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
           ]"
         >
           <ComboboxViewport

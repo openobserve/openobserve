@@ -62,11 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <div v-else-if="run" class="flex flex-col gap-4">
-      <OBanner
-        v-if="run.coverage_gap"
-        variant="warning"
-        data-test="alert-calibration-digest-partial"
-      >
+      <OBanner v-if="partial" variant="warning" data-test="alert-calibration-digest-partial">
         <div class="flex min-w-0 flex-col gap-0.5">
           <span class="text-sm font-medium">{{ t(partialTitleKey) }}</span>
           <span v-if="!measuredNothing" class="text-xs">{{
@@ -78,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OStatStrip :items="stats" data-test="alert-calibration-digest-stats" />
 
-      <OText v-if="!run.coverage_gap && notes.length" variant="meta" as="div">
+      <OText v-if="!partial && notes.length" variant="meta" as="div">
         <span v-for="note in notes" :key="note" class="block">{{ note }}</span>
       </OText>
 
@@ -165,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBanner>
 
       <OEmptyState
-        v-else-if="isQuiet(run)"
+        v-else-if="isQuiet(run, uncheckedSkips)"
         size="block"
         :illustration="isScoped(run) ? 'radar' : 'check'"
         :title="t('alertCalibration.detail.nothingTitle')"
@@ -286,7 +282,7 @@ import { alertFolderOf, editAlertRoute } from "./alertEditorLink";
 import { toEditHandoff, type ReviewAlertAction } from "./applySuggestion";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
-  countOrDash,
+  countTile,
   coverageNotes,
   coverageVerdict,
   isQuiet,
@@ -456,7 +452,12 @@ const onRuleFilter = (value: unknown) => {
   analytics.track("alert_calibration_rule_filtered", { rule: ruleFilter.value });
 };
 
-const notes = computed(() => (run.value ? coverageNotes(t, run.value) : []));
+/** A run from before the count lists its not-checked alerts only as skips, so those count too. */
+const uncheckedSkips = computed(() => notChecked.value.length);
+const partial = computed(
+  () => !!run.value && coverageVerdict(run.value, uncheckedSkips.value) !== "full",
+);
+const notes = computed(() => (run.value ? coverageNotes(t, run.value, uncheckedSkips.value) : []));
 
 /** Measured nothing is not a floor on anything, so the floor sentence would mislead. */
 const measuredNothing = computed(() => !!run.value && coverageVerdict(run.value) === "none");
@@ -469,14 +470,14 @@ const partialTitleKey = computed<I18nKey>(() =>
 const stats = computed<StatItem[]>(() => {
   const r = run.value;
   if (!r) return [];
-  const verdict = coverageBadge(r);
+  const verdict = coverageBadge(r, uncheckedSkips.value);
   const scope = visibilityCopy(t, r).alertsInScope;
   const windowMinutes = Math.round((r.window_end - r.window_start) / 60_000_000);
   return [
     {
       key: "findings",
       label: t("alertCalibration.detail.statFindings"),
-      value: countOrDash(r.finding_count, locale.value),
+      ...countTile(r.finding_count, locale.value),
       sub: t(verdict.labelKey),
       icon: "fact-check",
       tone: hasFindings.value ? "warning" : "neutral",
@@ -484,7 +485,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "scope",
       label: t("alertCalibration.detail.statAlertsInScope"),
-      value: countOrDash(scope.count, locale.value),
+      ...countTile(scope.count, locale.value),
       sub: scope.sub,
       subIcon: scope.subIcon,
       icon: "notifications",
@@ -492,7 +493,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "declined",
       label: t("alertCalibration.detail.statDeclined"),
-      value: countOrDash(r.skip_count, locale.value),
+      ...countTile(r.skip_count, locale.value),
       sub: t("alertCalibration.detail.statDeclinedSub"),
       subTooltip: t("alertCalibration.detail.statDeclinedTooltip"),
       icon: "block",
@@ -515,10 +516,12 @@ const dismissedStat = (r: RunRow): StatItem[] => {
     {
       key: "dismissed",
       label: t("alertCalibration.dismiss.stat"),
-      value: countOrDash(r.dismissed_count, locale.value),
+      ...countTile(r.dismissed_count, locale.value),
       sub: hidden
         ? t("alertCalibration.visibility.orgTotalHidden")
-        : t("alertCalibration.dismiss.statSub"),
+        : t("alertCalibration.dismiss.statSubShort"),
+      // Beside the full sentence a five-tile strip truncates the label, so the sentence is the tooltip.
+      subTooltip: hidden ? undefined : t("alertCalibration.dismiss.statSub"),
       subIcon: hidden ? "info-outline" : undefined,
       icon: "visibility-off",
     },
@@ -529,7 +532,7 @@ const noneFoundReason = computed<I18nText>(() => {
   const r = run.value;
   if (!r) return raw("");
   const reasons: I18nText[] = [];
-  if (r.coverage_gap) reasons.push(t("alertCalibration.detail.noneFoundGap"));
+  if (partial.value) reasons.push(t("alertCalibration.detail.noneFoundGap"));
   const declined = r.skip_count ?? 0;
   if (declined > 0) {
     reasons.push(t("alertCalibration.detail.noneFoundDeclined", { count: declined }, declined));

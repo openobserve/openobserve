@@ -262,6 +262,20 @@ describe("SecurityAlerts", () => {
     expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "inc-1", "acknowledged");
   });
 
+  it("ORs two picked severity chips, keeping both in the URL", async () => {
+    const w = await mountView("/security/alerts?facet=low");
+    await settle();
+    expect(rowOf(w, RULE_STOP_LOGGING.title)).toBeUndefined();
+    expect(rowOf(w, RULE_ACCESS_KEY.title)).toBeUndefined();
+
+    await w.get('[data-test="security-alerts-stat-high"]').trigger("click");
+    await w.get('[data-test="security-alerts-stat-medium"]').trigger("click");
+    await settle();
+    expect(rowOf(w, RULE_STOP_LOGGING.title)).toBeDefined();
+    expect(rowOf(w, RULE_ACCESS_KEY.title)).toBeDefined();
+    expect(router.currentRoute.value.query.facet).toBe("low,high,medium");
+  });
+
   it("narrows the queue to the search text and mirrors it in the URL", async () => {
     const w = await mountView();
     await w.find('[data-test="security-alerts-search"] input').setValue("Access Key");

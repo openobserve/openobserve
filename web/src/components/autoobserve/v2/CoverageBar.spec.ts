@@ -28,33 +28,36 @@ const legend = (wrapper: ReturnType<typeof mountBar>) =>
 
 describe("CoverageBar legend", () => {
   it("uses the two live words, Watched and Coverage gap, with the gap key", () => {
-    expect(legend(mountBar({ watching: 3, learning: 0, gaps: 1, live: true }))).toEqual([
+    expect(legend(mountBar({ watching: 3, learning: 0, gaps: 1 }))).toEqual([
       ["autoobserve2-headline-legend-watched", "Watched 3"],
       ["autoobserve2-headline-legend-gap", "Coverage gap 1"],
     ]);
   });
 
-  it("keeps the fixture words and the unseen key outside live mode", () => {
-    const wrapper = mountBar({ watching: 3, learning: 2, gaps: 1 });
-    const keys = legend(wrapper).map(([key]) => key);
-    expect(keys).toEqual([
-      "autoobserve2-headline-legend-watching",
-      "autoobserve2-headline-legend-learning",
-      "autoobserve2-headline-legend-unseen",
-    ]);
-  });
-
   it("drops a segment with no services", () => {
-    const keys = legend(mountBar({ watching: 4, learning: 0, gaps: 0, live: true })).map(
-      ([key]) => key,
-    );
+    const keys = legend(mountBar({ watching: 4, learning: 0, gaps: 0 })).map(([key]) => key);
     expect(keys).toEqual(["autoobserve2-headline-legend-watched"]);
   });
 
   it("gives the live bar segments the same watched and gap keys", () => {
-    const keys = mountBar({ watching: 3, learning: 0, gaps: 1, live: true })
+    const keys = mountBar({ watching: 3, learning: 0, gaps: 1 })
       .findAll('[data-test^="autoobserve2-headline-bar-"]')
       .map((b) => b.attributes("data-test"));
     expect(keys).toEqual(["autoobserve2-headline-bar-watched", "autoobserve2-headline-bar-gap"]);
+  });
+
+  it("shows partly watched services in their own segment, between watched and learning", () => {
+    expect(legend(mountBar({ watching: 2, partial: 20, learning: 6, gaps: 2 }))).toEqual([
+      ["autoobserve2-headline-legend-watched", "Watched 2"],
+      ["autoobserve2-headline-legend-partial", "Partly watched 20"],
+      ["autoobserve2-headline-legend-learning", "Learning 6"],
+      ["autoobserve2-headline-legend-gap", "Coverage gap 2"],
+    ]);
+  });
+
+  it("selects the partly watched filter from its segment", async () => {
+    const wrapper = mountBar({ watching: 2, partial: 20, learning: 0, gaps: 2 });
+    await wrapper.find('[data-test="autoobserve2-headline-legend-partial"]').trigger("click");
+    expect(wrapper.emitted("select")?.[0]).toEqual(["partial"]);
   });
 });

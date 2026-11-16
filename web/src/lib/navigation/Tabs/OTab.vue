@@ -62,6 +62,9 @@ const imgSrc = computed<string>(() => (props.icon?.startsWith("img:") ? props.ic
 const isOIcon = computed<boolean>(() =>
   Boolean(props.icon && (props.icon as keyof typeof iconRegistry) in iconRegistry),
 );
+// Only a horizontal prop label reserves its bold width, so only it turns bold without moving its neighbours.
+const reservesBoldWidth = computed<boolean>(() => Boolean(props.label) && !isVertical.value);
+const emboldens = computed<boolean>(() => isActive.value && reservesBoldWidth.value);
 
 // ── Classes ────────────────────────────────────────────────────────────────
 const baseClasses = computed<string>(() =>
@@ -81,10 +84,14 @@ const baseClasses = computed<string>(() =>
         : slots.trailing
           ? "ps-2 pe-1"
           : "px-2",
-    isVertical.value && isActive.value ? "font-medium" : "font-normal",
+    emboldens.value
+      ? "font-semibold"
+      : isVertical.value && isActive.value
+        ? "font-medium"
+        : "font-normal",
     "text-sm whitespace-nowrap",
     isVertical.value ? "rounded-default" : "rounded-t-default",
-    "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke] duration-(--duration-hover-out) hover:duration-(--duration-hover-in)",
+    "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke] duration-(--duration-control) ease-(--ease-control)",
     "select-none",
     "focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focus-ring-accent",
     // The horizontal strip scrolls on x, which clips y as well, so an outside outline would lose its bottom edge.
@@ -106,10 +113,7 @@ const stateClasses = computed<string>(() => {
     return "text-tabs-disabled-text cursor-not-allowed opacity-60";
   }
   if (isActive.value) {
-    // Horizontal tabs: colored text only. The active underline is a single
-    // shared bar in OTabs that slides between tabs, so each tab keeps a
-    // transparent 2px border (layout parity with inactive) rather than drawing
-    // its own colored one.
+    // OTabs draws the one sliding underline, so a horizontal tab keeps a transparent border the size of its inactive one.
     return [
       "text-tabs-active-text cursor-pointer",
       isVertical.value
@@ -227,13 +231,21 @@ const heightClasses = computed<string>(() => {
             >{{ icon }}</span
           >
         </slot>
-        <OTruncatedText
+        <span
           v-if="label"
-          class="o-tab__label"
-          :class="context?.collapseLabels && !isActive ? 'max-md:hidden' : ''"
-          :tooltip="tooltip ? false : undefined"
-          >{{ label }}</OTruncatedText
+          :data-otab-label="label"
+          class="inline-grid min-w-0 grid-cols-[minmax(0,1fr)] text-start"
+          :class="[
+            reservesBoldWidth
+              ? 'after:invisible after:h-0 after:overflow-hidden after:font-semibold after:whitespace-nowrap after:content-[attr(data-otab-label)]'
+              : '',
+            context?.collapseLabels && !isActive ? 'max-md:hidden' : '',
+          ]"
         >
+          <OTruncatedText class="o-tab__label" :tooltip="tooltip ? false : undefined">{{
+            label
+          }}</OTruncatedText>
+        </span>
         <OIcon
           v-if="suffixIcon"
           :name="suffixIcon as any"

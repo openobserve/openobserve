@@ -13,44 +13,70 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-import { gt } from "@/types/i18n";
 import AutoObserveIssueDrawer from "./AutoObserveIssueDrawer.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import { issuesFor } from "./fixtures";
 
-const stubs = {
-  ODrawer: { template: "<div><slot /></div>" },
-  AutoObserveAnalysis: { template: "<div data-test='analysis-stub'><slot name='report' /></div>" },
-  AutoObserveUnfoldGraph: true,
-  IncidentAlertTriggersTable: true,
-  ProblemSpark: true,
-};
+describe("AutoObserveIssueDrawer for a live incident", () => {
+  const liveItem = {
+    finding: {
+      id: "f1",
+      kind: "stream_silence",
+      stream_type: "logs",
+      stream_name: "pay_api",
+      first_seen_at: Date.UTC(2026, 10, 10, 16, 45) * 1000,
+    },
+    incident: {
+      id: "V5wPnqa6c0qfMLxGTdrwcF68Xq8",
+      status: "open" as const,
+      severity: "P2" as const,
+      title: "pay_api (logs) stopped sending data",
+      created_at: Date.UTC(2026, 10, 10, 16, 46) * 1000,
+    },
+    investigation: {
+      run_id: null,
+      state: null,
+      outcome: null,
+      summary: null,
+      not_run_reason: null,
+    },
+  };
 
-describe("AutoObserveIssueDrawer report viewer", () => {
-  it("renders the issue report HTML in the shared report view, without the incident analysis panel", async () => {
-    const issue = issuesFor("demo", gt)[0];
+  it("opens the live body, titles it in words and keeps the incident page one click away", async () => {
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
     const wrapper = mount(AutoObserveIssueDrawer, {
-      props: { open: true, issue, ledger: [], scenario: "demo" },
-      global: { plugins: [i18n, store, router], stubs },
+      props: { open: true, liveItem, liveTab: "analysis" },
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          ODrawer: {
+            props: ["title", "subTitle"],
+            template:
+              "<div><h1 data-test='t'>{{ title }}</h1><p data-test='s'>{{ subTitle }}</p><slot name='header-right' /><slot /></div>",
+          },
+          LiveIssueBody: {
+            name: "LiveIssueBody",
+            props: ["item", "initialTab"],
+            template: "<div data-test='body' />",
+          },
+        },
+      },
     });
-    // The analysis tab: OTabs drives the drawer's `tab` through v-model.
-    wrapper.findComponent(OTabs).vm.$emit("update:modelValue", "analysis");
     await flushPromises();
-
-    const report = wrapper.find('[data-test="rca-report-content"]');
-    expect(report.exists()).toBe(true);
-    expect(report.find(".rca-report-content").exists()).toBe(true);
-    expect(report.findAll(".rca-h2").length).toBeGreaterThanOrEqual(4);
-    expect(report.text()).toContain(issue.summary);
-    expect(report.text()).toContain(issue.likelyCause);
-    expect(report.findAll(".rca-list-item")).toHaveLength(issue.evidence.length);
-    expect(wrapper.find('[data-test="rca-analysis-bar"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="rca-thread-column"]').exists()).toBe(false);
+    expect(wrapper.get("[data-test='t']").text()).toBe("pay_api (logs) stopped sending data");
+    expect(wrapper.get("[data-test='s']").text()).toMatch(/^V5wPnqa6 · /);
+    const body = wrapper.findComponent({ name: "LiveIssueBody" });
+    expect(body.props("initialTab")).toBe("analysis");
+    await wrapper.get("[data-test='autoobserve-issue-open-incident']").trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "incidentDetail",
+      params: { id: "V5wPnqa6c0qfMLxGTdrwcF68Xq8" },
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+    push.mockRestore();
     wrapper.unmount();
   });
 });

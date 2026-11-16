@@ -21,6 +21,7 @@ import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -534,54 +535,55 @@ const nextBlocked = computed(() => {
 <template>
   <div class="flex flex-col gap-4" data-test="slack-wizard" :data-step="step">
     <div class="flex flex-col gap-0.5">
-      <h2 class="text-text-heading m-0 text-xl font-semibold">{{ t("slackApp.wizard.title") }}</h2>
+      <h2 class="text-text-heading m-0 text-base font-semibold">
+        {{ t("slackApp.wizard.title") }}
+      </h2>
       <p class="text-text-secondary m-0 text-sm">{{ t("slackApp.wizard.subtitle") }}</p>
     </div>
 
-    <OCard
+    <OFormSection
       v-if="takeOverOptions.length"
-      variant="outlined"
-      class="gap-3 p-5"
+      variant="plain"
+      :title="t('slackApp.wizard.takeOverTitle')"
       data-test="slack-wizard-take-over"
     >
-      <h3 class="text-text-heading m-0 text-base font-semibold">
-        {{ t("slackApp.wizard.takeOverTitle") }}
-      </h3>
-      <OBanner v-if="takeOverRefusal" variant="error-soft" dense icon="error-outline">
-        {{ raw(takeOverRefusal.message) }}
-      </OBanner>
-      <OBanner
-        v-if="takeOverError"
-        variant="error-soft"
-        dense
-        icon="error-outline"
-        data-test="slack-wizard-take-over-error"
-      >
-        {{ raw(takeOverError) }}
-      </OBanner>
-      <div
-        v-for="option in takeOverOptions"
-        :key="option.installation_id"
-        class="border-border-default flex flex-wrap items-center justify-between gap-3 border-t pt-3"
-      >
-        <div class="flex min-w-0 flex-col gap-0.5">
-          <span class="text-text-body text-sm font-medium">{{ raw(option.team_name) }}</span>
-          <span v-if="option.org_ids?.length" class="text-text-secondary text-xs">
-            {{ t("slackApp.wizard.takeOverOrgs", { orgs: option.org_ids.join(", ") }) }}
-          </span>
-        </div>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          :loading="takingOver === option.installation_id"
-          :disabled="takingOver !== null && takingOver !== option.installation_id"
-          :data-test="`slack-wizard-take-over-${option.installation_id}`"
-          @click="takeOver(option)"
+      <div class="flex flex-col gap-3">
+        <OBanner v-if="takeOverRefusal" variant="error-soft" dense icon="error-outline">
+          {{ raw(takeOverRefusal.message) }}
+        </OBanner>
+        <OBanner
+          v-if="takeOverError"
+          variant="error-soft"
+          dense
+          icon="error-outline"
+          data-test="slack-wizard-take-over-error"
         >
-          {{ t("slackApp.wizard.takeOverAction") }}
-        </OButton>
+          {{ raw(takeOverError) }}
+        </OBanner>
+        <div
+          v-for="option in takeOverOptions"
+          :key="option.installation_id"
+          class="border-border-default flex flex-wrap items-center justify-between gap-3 border-t pt-3"
+        >
+          <div class="flex min-w-0 flex-col gap-0.5">
+            <span class="text-text-body text-sm font-medium">{{ raw(option.team_name) }}</span>
+            <span v-if="option.org_ids?.length" class="text-text-secondary text-xs">
+              {{ t("slackApp.wizard.takeOverOrgs", { orgs: option.org_ids.join(", ") }) }}
+            </span>
+          </div>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :loading="takingOver === option.installation_id"
+            :disabled="takingOver !== null && takingOver !== option.installation_id"
+            :data-test="`slack-wizard-take-over-${option.installation_id}`"
+            @click="takeOver(option)"
+          >
+            {{ t("slackApp.wizard.takeOverAction") }}
+          </OButton>
+        </div>
       </div>
-    </OCard>
+    </OFormSection>
 
     <OStepper :model-value="step" :animated="false" orientation="horizontal">
       <OStep :name="0" :title="t('slackApp.wizard.steps.prerequisites')" :done="step > 0">

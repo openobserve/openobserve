@@ -58,7 +58,13 @@ describe("security.getAudit", () => {
 
   it("reads one page of the org's Security audit trail", async () => {
     get.mockResolvedValue({ data: { audit_enabled: true, events: [] } });
-    await security.getAudit("acme", 50);
-    expect(get).toHaveBeenCalledWith("/api/acme/security/audit", { params: { size: 50 } });
+    await security.getAudit("acme", { from: 50, size: 50, includeReads: false });
+    expect(get).toHaveBeenCalledWith("/api/acme/security/audit", {
+      params: { from: 50, size: 50 },
+    });
+    await security.getAudit("acme", { from: 0, size: 50, includeReads: true });
+    expect(get).toHaveBeenLastCalledWith("/api/acme/security/audit", {
+      params: { from: 0, size: 50, include_reads: true },
+    });
   });
 });

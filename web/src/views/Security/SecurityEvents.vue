@@ -3,6 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- Security Events: one stream normalised onto OCSF, or every source at once; the URL carries the whole view. -->
 <script setup lang="ts">
+import { plainEntityText } from "@/utils/security/entityMatch";
 import {
   computed,
   defineAsyncComponent,
@@ -47,11 +48,10 @@ import SecurityNewDetectionDialog, {
   type NewDetectionPreset,
 } from "@/components/security/SecurityNewDetectionDialog.vue";
 import { useSiemDetections } from "@/composables/security/useSiemDetections";
-import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import { generateTraceContext } from "@/utils/auth";
-import type { Classification, SeveritySql } from "@/services/securitySources";
+import securitySources, { type Classification, type SeveritySql } from "@/services/securitySources";
 import { fetchSourceMatch } from "@/services/securitySources.queries";
 import {
   normalizeEvent,
@@ -81,7 +81,10 @@ import {
   histogramInterval,
   histogramSql,
   isAggregateSql,
+  projectedColumns,
   resultColumns,
+  searchErrorText,
+  selectsAll,
   SEVERITY_ALIAS,
   splitSeverity,
   topValuesSql,
@@ -131,8 +134,8 @@ const { showTimeline, showRaw, sidebarWidth, toggleSidebar } = useEventsPrefs(
 );
 
 const secSources = useSecuritySources();
-// Including a source is triage, excluding one weakens coverage (admin), and a detection is authoring.
-const { canTriage, canAuthor, canAdmin } = useSecurityAccess();
+// Including a source is source administration (author), excluding one weakens coverage (admin).
+const { canAuthor, canAdmin } = useSecurityAccess();
 const {
   streams: streamList,
   loading: streamsLoading,
@@ -186,7 +189,7 @@ const sourceSaveFailed = (err: unknown, fallback: I18nText) => {
   toast({ variant: "error", message: raw(data?.message ?? data?.error) || fallback });
 };
 async function addStreamToSecurity(name: string) {
-  if (!canTriage.value) return;
+  if (!canAuthor.value) return;
   try {
     await secSources.include(name);
   } catch (err) {
@@ -366,6 +369,9 @@ const rowSeverity = ref<(number | null)[]>([]);
 /** An aggregate or computed SQL result: shown as returned, never read as events. */
 const resultMode = ref(false);
 const resultCols = ref<string[]>([]);
+/** Columns a hand-written query returned, in order; the grid shows exactly these when it picks them. */
+const sqlCols = ref<string[]>([]);
+const projected = ref(false);
 /** The table a hand-written query reads, when it is a stream the picker knows. */
 const queryOnPicked = ref(true);
 const loading = ref(false);
@@ -446,7 +452,11 @@ const COLUMN_SIZE: Partial<Record<keyof NormalizedEvent, number>> = {
 
 function readRaw(row: Record<string, unknown>, col: string): string {
   const v = col.includes(".") ? col.split(".").reduce((o: any, k) => o?.[k], row) : row[col];
-  return v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+  if (v == null) return "";
+  if (Array.isArray(v) && v.every((x) => x === null || typeof x !== "object")) {
+    return plainEntityText(v);
+  }
+  return typeof v === "object" ? JSON.stringify(v) : String(v);
 }
 
 /** Stored column a table column sorts by on the server; null when it has none. */
@@ -466,13 +476,6 @@ function sortFieldFor(columnId: string): string | null {
   return null;
 }
 
-// A plain-row query can return columns the schema lacks (aliases, computed fields).
-const extraCols = computed(() => {
-  if (!sqlMode.value || resultMode.value) return [];
-  const known = new Set([...fieldNames.value, ...visibleCols.value]);
-  return resultColumns(null, events.value).filter((c) => !known.has(c));
-});
-
 const columns = computed<OTableColumnDef<Row>[]>(() => {
   if (resultMode.value) {
     return resultCols.value.map((col) => ({
@@ -484,8 +487,10 @@ const columns = computed<OTableColumnDef<Row>[]>(() => {
       meta: { rawField: col },
     }));
   }
-  if (showRaw.value) {
-    return [...visibleCols.value, ...extraCols.value].map((col) => ({
+  // A hand-written query's rows hold what it returned, not the picker's columns.
+  const rawCols = sqlMode.value && sqlCols.value.length ? sqlCols.value : visibleCols.value;
+  if (projected.value || showRaw.value) {
+    return rawCols.map((col) => ({
       id: col === "_timestamp" ? "time" : `raw:${col}`,
       header: col === "_timestamp" ? t("siem.column.time") : raw(col),
       accessorFn: (row: Row) => (col === "_timestamp" ? row.time : readRaw(row.raw, col)),
@@ -877,7 +882,7 @@ function newestSource(): string | null {
 async function loadSchema(streamName: string) {
   schemaFields.value = [];
   try {
-    const res = await streamService.schema(orgId.value, streamName, "logs");
+    const res = await securitySources.schema(orgId.value, streamName);
     if (selectedStream.value !== streamName) return;
     const raw: any[] = res.data?.schema ?? res.data?.fields ?? [];
     schemaFields.value = raw.map((f: any) => ({
@@ -966,6 +971,7 @@ async function runSearch({ pageOnly = false, userRun = false } = {}) {
         page_type: "logs",
         signal: run.controller.signal,
         traceparent: run.searchTrace.traceparent,
+        security_scope: true,
       },
       "ui",
     );
@@ -974,7 +980,18 @@ async function runSearch({ pageOnly = false, userRun = false } = {}) {
     const split = splitSeverity(hits);
     resultMode.value =
       sqlMode.value && (isAggregateSql(sql) || (hits.length > 0 && !("_timestamp" in hits[0])));
-    resultCols.value = resultMode.value ? resultColumns(res.data?.columns, split.rows) : [];
+    projected.value = sqlMode.value && !resultMode.value && !selectsAll(sql);
+    const returned = resultColumns(res.data?.columns, split.rows).filter(
+      (c) => c !== SEVERITY_ALIAS,
+    );
+    // An empty answer names no columns, so a query that names its own shows those.
+    resultCols.value = resultMode.value ? projectedColumns(sql, returned) : [];
+    sqlCols.value =
+      sqlMode.value && !resultMode.value
+        ? projected.value
+          ? projectedColumns(sql, returned)
+          : returned
+        : [];
     events.value = split.rows;
     rowSeverity.value = split.severity;
     if (!resultMode.value && !schemaFields.value.length && events.value.length) {
@@ -1003,11 +1020,9 @@ async function runSearch({ pageOnly = false, userRun = false } = {}) {
     if (seq !== searchSeq) return;
     if (isForbiddenError(e)) searchRefusal.value = e;
     else
-      errorMsg.value =
-        e?.response?.data?.error ??
-        e?.response?.data?.message ??
-        e?.message ??
-        t("siem.events.searchFailed");
+      errorMsg.value = withFullTextHint(
+        searchErrorText(e?.response?.data) || e?.message || t("siem.events.searchFailed"),
+      );
     events.value = [];
   } finally {
     if (seq === searchSeq) loading.value = false;
@@ -1015,6 +1030,15 @@ async function runSearch({ pageOnly = false, userRun = false } = {}) {
   if (expandedField.value && !pageOnly) void loadTopValues(expandedField.value);
   await histogramDone;
   if (activeRun === run) activeRun = null;
+}
+
+// Security sources carry no full-text fields, so match_all() is refused; str_match on a column is the working form.
+function withFullTextHint(message: string): string {
+  if (!/match_all|fts|full text search/i.test(message)) return message;
+  return t("siem.events.fullTextHint", {
+    error: raw(message),
+    example: raw("str_match_ignore_case(field, 'value')"),
+  });
 }
 
 /** Points the picker at a hand-written query's table; true when that re-runs the search. */
@@ -1126,6 +1150,8 @@ watch(selectedStream, async (v) => {
   sqlMode.value = keptSql !== null;
   queryOnPicked.value = true;
   resultMode.value = false;
+  projected.value = false;
+  sqlCols.value = [];
   drawerEvent.value = null;
   pendingEventTs.value = null;
   pendingEventKey.value = null;
@@ -1242,6 +1268,7 @@ const widerPeriod = computed(() =>
     : widerPeriodFor(lastReportedUs.value, timeRange.value.start),
 );
 const emptyHint = computed(() => {
+  if (sqlMode.value && sqlQuery.value.trim()) return t("siem.events.noRowsForQuery");
   if (!widerPeriod.value) return t("siem.events.noEventsHint");
   const mins = Math.max(0, Math.round((Date.now() * 1000 - lastReportedUs.value) / 60_000_000));
   const ago =
@@ -1413,7 +1440,7 @@ function widenTo(period: string) {
             :suggestions="suggestedSources"
             :classifying="classifyingSources"
             :other-names="otherStreamNames"
-            :can-include="canTriage"
+            :can-include="canAuthor"
             :can-exclude="canAdmin"
             @select="selectedStream = $event"
             @remove="removeStreamFromSecurity"
@@ -1545,6 +1572,7 @@ function widenTo(period: string) {
         :sort-order="sortOrder"
         :sql-mode="sqlMode"
         :result-table="resultMode"
+        :projected="projected"
         :can-show-timeline="!!selectedStream && !sqlMode"
         :row-class="rowClass"
         :pivot-for="pivotFor"

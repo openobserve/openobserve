@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tokens"
           :columns="columns"
           row-key="name"
+          :row-actions="rowActions"
           :loading="loading"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
@@ -137,24 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-created_by="{ row }">
             <OUserCell :value="row.created_by" />
-          </template>
-
-          <template #cell-actions="{ row }">
-            <OButton
-              :data-test="`synthetics-token-${row.name}-toggle`"
-              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-              :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-              size="icon-sm"
-              :disabled="loading || (row.enabled && row.is_default)"
-              :title="
-                row.enabled && row.is_default
-                  ? t('synthetics.tokens.disableDefaultBlocked')
-                  : row.enabled
-                    ? t('common.disable')
-                    : t('common.enable')
-              "
-              @click.stop="toggleEnabled(row.name, !row.enabled)"
-            />
           </template>
         </OTable>
       </div>
@@ -294,7 +277,7 @@ import {
   createTokenDefaults,
   type CreateTokenForm,
 } from "./SyntheticsTokens.schema";
-import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef, type OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -436,8 +419,21 @@ export default defineComponent({
         accessorKey: "actions",
         sortable: false,
         isAction: true,
-        size: 80,
-        meta: { align: "center", actionCount: 1 },
+      },
+    ];
+
+    const rowActions: OTableRowAction<AgentToken>[] = [
+      {
+        id: "toggle",
+        label: (row) => (row.enabled ? t("common.disable") : t("common.enable")),
+        icon: (row) => (row.enabled ? "pause" : "play-arrow"),
+        tone: (row) => (row.enabled ? "destructive" : "success"),
+        onSelect: (row) => toggleEnabled(row.name, !row.enabled),
+        disabled: (row) =>
+          row.enabled && row.is_default
+            ? t("synthetics.tokens.disableDefaultBlocked")
+            : loading.value,
+        dataTest: (row) => `synthetics-token-${row.name}-toggle`,
       },
     ];
 
@@ -595,6 +591,7 @@ export default defineComponent({
       lastUpdatedAt,
       filterQuery,
       columns,
+      rowActions,
       showCreateForm,
       showRevealedDialog,
       revealedToken,

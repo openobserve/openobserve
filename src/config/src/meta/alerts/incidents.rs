@@ -369,6 +369,10 @@ pub struct Incident {
     /// A security case only backfills over past data fired into.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub historical: bool,
+
+    /// When a different detection last joined the security case while someone was working it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_detection_at: Option<i64>,
 }
 
 /// One alert's firings within an incident, for the list row.
@@ -773,6 +777,20 @@ pub enum IncidentEventType {
         event_at: i64,
     },
 
+    /// A different detection joined the security case.
+    DetectionJoined {
+        alert_id: String,
+        alert_name: String,
+        /// The detection's rule title.
+        rule: String,
+        /// The rule's Sigma level, e.g. `high`.
+        level: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from_severity: Option<IncidentSeverity>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to_severity: Option<IncidentSeverity>,
+    },
+
     /// User comment
     Comment {
         user_id: String,
@@ -871,6 +889,7 @@ impl IncidentEventType {
         "Verdict",
         "AlertsAttached",
         "EventAttached",
+        "DetectionJoined",
         "Comment",
         "ai_analysis_begin",
         "ai_analysis_complete",
@@ -1033,6 +1052,23 @@ impl IncidentEvent {
             user_id: user_id.into(),
             stream: stream.into(),
             event_at,
+        })
+    }
+
+    pub fn detection_joined(
+        alert_id: impl Into<String>,
+        alert_name: impl Into<String>,
+        rule: impl Into<String>,
+        level: impl Into<String>,
+        raised: Option<(IncidentSeverity, IncidentSeverity)>,
+    ) -> Self {
+        Self::now(IncidentEventType::DetectionJoined {
+            alert_id: alert_id.into(),
+            alert_name: alert_name.into(),
+            rule: rule.into(),
+            level: level.into(),
+            from_severity: raised.map(|(from, _)| from),
+            to_severity: raised.map(|(_, to)| to),
         })
     }
 
@@ -1444,6 +1480,14 @@ mod tests {
                 user_id: "u".into(),
                 stream: "s".into(),
                 event_at: 1,
+            },
+            IncidentEventType::DetectionJoined {
+                alert_id: "a".into(),
+                alert_name: "n".into(),
+                rule: "r".into(),
+                level: "high".into(),
+                from_severity: None,
+                to_severity: None,
             },
             IncidentEventType::Comment {
                 user_id: "u".into(),
@@ -2213,6 +2257,7 @@ mod tests {
             alert_groups: None,
             historical: false,
             group_values_display: None,
+            last_detection_at: None,
         }
     }
 

@@ -2,6 +2,9 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { resetListViewState } from "@/composables/useListViewState";
 import { createRouter, createMemoryHistory } from "vue-router";
+import { createStore } from "vuex";
+import logsModule from "@/stores/logs";
+import streamsModule from "@/stores/streams";
 import i18n from "@/locales";
 import ListOrganizations from "./ListOrganizations.vue";
 import organizationsService from "@/services/organizations";
@@ -82,6 +85,7 @@ describe("ListOrganizations", () => {
         theme: "light",
       },
       dispatch: vi.fn(),
+      commit: vi.fn(),
     };
 
     // Setup mock organizations data
@@ -625,6 +629,77 @@ describe("ListOrganizations", () => {
       handleCancel();
       await pending;
       expect(organizationsService.delete_org).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Switching organizations", () => {
+    const rowOf = (name) => wrapper.findAll("tbody tr").find((row) => row.text().includes(name));
+
+    beforeEach(async () => {
+      mockStore.state.organizations = mockOrganizations.data.data;
+      mockStore.state.selectedOrganization.identifier = "test-org-1";
+      await wrapper.vm.getOrganizations();
+      await flushPromises();
+      mockStore.dispatch.mockClear();
+    });
+
+    it("does not switch when a name or a row is clicked", async () => {
+      const row = rowOf("Test Org 2");
+      const nameCell = row.findAll("td").find((cell) => cell.text().includes("Test Org 2"));
+      expect(nameCell.find("a, button").exists()).toBe(false);
+
+      await nameCell.trigger("click");
+      await row.trigger("click");
+
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        expect.anything(),
+      );
+    });
+
+    it("switches to the row's organization from its Switch action", async () => {
+      await rowOf("Test Org 2").find('[data-test="organization-switch"]').trigger("click");
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        expect.objectContaining({ identifier: "test-org-2" }),
+      );
+    });
+
+    it("drops the cached Logs search of the organization being left", async () => {
+      const store = createStore({
+        state: { ...mockStore.state, organizationData: { isDataIngested: true } },
+        mutations: { select: (state, org) => (state.selectedOrganization = org) },
+        actions: {
+          setSelectedOrganization: ({ commit }, org) => commit("select", org),
+          setIsDataIngested: () => {},
+        },
+        modules: { logs: logsModule, streams: streamsModule },
+      });
+      store.dispatch("logs/setLogs", { organizationIdentifier: "test-org-1" });
+      store.dispatch("logs/setIsInitialized", true);
+      const list = mount(ListOrganizations, {
+        global: {
+          plugins: [i18n, router],
+          provide: { store },
+          stubs: { AddUpdateOrganization: true, NoData: true },
+        },
+      });
+      await flushPromises();
+
+      const row = list.findAll("tbody tr").find((tr) => tr.text().includes("Test Org 2"));
+      await row.find('[data-test="organization-switch"]').trigger("click");
+
+      expect(store.state.selectedOrganization.identifier).toBe("test-org-2");
+      expect(store.state.logs).toEqual({ logs: {}, isInitialized: false });
+      list.unmount();
+    });
+
+    it("tags the current organization and gives it no Switch action", () => {
+      const current = rowOf("Test Org 1");
+      expect(current.find('[data-test="organization-current-tag"]').exists()).toBe(true);
+      expect(current.find('[data-test="organization-switch"]').exists()).toBe(false);
+      expect(wrapper.findAll('[data-test="organization-current-tag"]')).toHaveLength(1);
     });
   });
 

@@ -42,6 +42,7 @@ import i18n, {
   localeFileMap,
 } from "@/locales";
 import enMessages from "@/locales/languages/en-US.json";
+import enSecurityMessages from "@/locales/languages/security/en-US.json";
 import entryMessages from "@/locales/languages/en-US.json?without=serviceVersions";
 
 const withNavigatorLanguage = (language: string, assertion: () => void) => {
@@ -80,6 +81,16 @@ describe("locale registry stays in sync", () => {
     expect(onDisk).toEqual(mapped);
   });
 
+  it("has a Security namespace file for every locale it can load", () => {
+    const onDisk = readdirSync(resolve(languagesDir, "security"))
+      .filter((f) => f.endsWith(".json"))
+      .sort();
+    const mapped = Object.values(localeFileMap)
+      .map((f) => `${f}.json`)
+      .sort();
+    expect(onDisk).toEqual(mapped);
+  });
+
   it("formats numbers for every locale it can load", () => {
     expect(Object.keys(APP_LOCALE_TO_BCP47).sort()).toEqual(Object.keys(localeFileMap).sort());
   });
@@ -87,7 +98,8 @@ describe("locale registry stays in sync", () => {
   it("restores every en-US message once the blocks left out of the entry load", async () => {
     expect(entryMessages).not.toHaveProperty("serviceVersions");
     await loadLazyLocaleBlocks();
-    expect(i18n.global.getLocaleMessage("en-us")).toEqual(enMessages);
+    // setupTests merges the Security namespace into en-us as well.
+    expect(i18n.global.getLocaleMessage("en-us")).toEqual({ ...enMessages, ...enSecurityMessages });
   });
 });
 

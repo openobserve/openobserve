@@ -35,6 +35,16 @@ export const EXCLUDED_FIELDS = new Set([
 
 export const MAX_VALUE_LENGTH = 150; // chars — skip values too long to be useful filter candidates
 
+const PREFIX_ENOUGH_MATCHES = 3;
+
+/** Only a truncated top list can be hiding matches, and a few matches already make a useful menu. */
+export const needsPrefixLookup = (prefix: string, truncated: boolean, merged: string[]) => {
+  if (!truncated) return false;
+  const lower = prefix.toLowerCase();
+  const matches = merged.filter((v) => v.toLowerCase().startsWith(lower)).length;
+  return matches < PREFIX_ENOUGH_MATCHES;
+};
+
 /**
  * Extract deduplicated field→values from an array of search hits.
  *

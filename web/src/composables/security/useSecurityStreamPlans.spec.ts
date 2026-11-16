@@ -12,7 +12,8 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 }));
 vi.mock("@/stores", () => ({ default: { state: { zoConfig: {} } } }));
 
-import { createLimiter, runSql } from "./useSecurityStreamPlans";
+import streamService from "@/services/stream";
+import { createLimiter, listStreamStats, runSql } from "./useSecurityStreamPlans";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -119,6 +120,27 @@ describe("runSql", () => {
     });
   });
 
+  it("adds the engine's reason to a rejected query's message", async () => {
+    stream.mockImplementation(
+      replay([], {
+        error: {
+          content: { message: "Search SQL not valid", error_detail: "unknown column x" },
+        },
+      }),
+    );
+    await expect(runSql("org", "SELECT x", 1, 2)).rejects.toMatchObject({
+      message: "Search SQL not valid: unknown column x",
+    });
+  });
+
+  it("settles with no rows when the stream ends without any hits", async () => {
+    stream.mockImplementation(replay([meta({ total: 0 })]));
+    await expect(runSql("org", "SELECT a FROM s", 1, 2)).resolves.toMatchObject({
+      hits: [],
+      total: 0,
+    });
+  });
+
   it("rejects a denied search with its status on the response, as an axios error carries it", async () => {
     stream.mockImplementation(
       replay([], { error: { content: { status: 403, message: "denied" } } }),
@@ -127,6 +149,14 @@ describe("runSql", () => {
       status: 403,
       response: { status: 403 },
     });
+  });
+
+  it("bypasses the result cache without asking to clear it, which needs stream edit rights", async () => {
+    stream.mockImplementation(replay([]));
+    await runSql("org", "SELECT 1", 1, 2, -1, { useCache: false });
+    const req = stream.mock.calls[0][0];
+    expect(req.use_cache).toBe(false);
+    expect(req.clear_cache).toBeUndefined();
   });
 
   it("cancels the stream on the server when aborted", async () => {
@@ -139,5 +169,25 @@ describe("runSql", () => {
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
     expect(cancel).toHaveBeenCalledWith({ trace_id: "t1", org_id: "org" });
+  });
+});
+
+describe("listStreamStats", () => {
+  it("does not ask again after a refusal, so a source-only analyst logs one 403", async () => {
+    const nameList = vi
+      .spyOn(streamService, "nameList")
+      .mockRejectedValue({ response: { status: 403, data: {} } });
+    expect(await listStreamStats("org403")).toBeNull();
+    expect(await listStreamStats("org403")).toBeNull();
+    expect(nameList).toHaveBeenCalledTimes(1);
+    nameList.mockRestore();
+  });
+
+  it("keeps asking after a failure that is not a refusal", async () => {
+    const nameList = vi.spyOn(streamService, "nameList").mockRejectedValue(new Error("network"));
+    await listStreamStats("org500");
+    await listStreamStats("org500");
+    expect(nameList).toHaveBeenCalledTimes(2);
+    nameList.mockRestore();
   });
 });

@@ -18,7 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4" data-test="autoobserve-unfold">
     <slot name="header" />
     <div :class="legendRow.row">
-      <span :class="legendRow.hint">{{ hint ?? t("autoobserve.unfold.hint") }}</span>
+      <span :class="legendRow.hint" data-test="autoobserve-unfold-hint">{{
+        hint ?? t("autoobserve.unfold.hint")
+      }}</span>
+      <span v-if="note" class="text-text-secondary text-xs" data-test="autoobserve-unfold-note">{{
+        note
+      }}</span>
       <ul ref="legendList" :class="legendRow.list" :aria-label="t('autoobserve.unfold.legend')">
         <template v-if="legend">
           <li
@@ -46,11 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-else>
           <li
-            v-for="item in LEGEND"
+            v-for="item in kindLegend"
             :key="item.kind"
             class="text-text-secondary flex items-center gap-1 text-xs"
           >
-            <OIcon :name="KIND_ICON[item.kind]" size="xs" />
+            <OIcon :name="item.icon" size="xs" />
             <span>{{ t(item.key) }}</span>
           </li>
         </template>
@@ -80,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="edge in layout.edges"
             :key="edge.id"
             :d="edge.d"
+            :data-test="`autoobserve-unfold-edge-${edge.id}`"
             fill="none"
             stroke="currentColor"
             :stroke-width="(edge.active ? 2 : 1.5) - (compact ? 0.5 : 0)"
@@ -128,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-surface-base border-border-subtle text-text-secondary absolute max-w-18 -translate-1/2 rounded-full border px-1.5 text-center text-xs leading-tight"
             :class="[
               edge.active ? 'text-accent border-accent' : '',
-              routeAround ? 'max-w-none whitespace-nowrap' : '',
+              routeAround || liveIssue ? 'max-w-none whitespace-nowrap' : '',
               unmirror,
             ]"
             :style="{ left: rem(edge.mid.x), top: rem(edge.mid.y) }"
@@ -256,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span
               class="text-text-heading w-full text-sm font-medium"
-              :class="node.card.kind === 'outcome' ? 'line-clamp-2' : 'truncate'"
+              :class="teamOutcome(node.card) ? 'line-clamp-2' : 'truncate'"
               >{{ node.card.title }}</span
             >
             <span
@@ -276,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               node.card.peak ?? node.card.detail
             }}</span>
             <span
-              v-if="node.card.kind !== 'outcome'"
+              v-if="!teamOutcome(node.card)"
               class="text-text-secondary w-full truncate text-xs"
               >{{ laneName(node.card.lane) }}</span
             >
@@ -370,7 +376,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <div v-if="selected.points" class="flex w-full shrink-0 flex-col gap-1 md:w-64">
+        <div v-if="slots.chart" class="flex w-full shrink-0 flex-col gap-1 md:w-96">
+          <slot name="chart" :card="selected" />
+        </div>
+        <div v-else-if="selected.points" class="flex w-full shrink-0 flex-col gap-1 md:w-64">
           <OSparkline
             :points="sparkPoints(selected)"
             :shape="selected.projected ? 'bar' : 'area'"
@@ -386,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useSlots, watch } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { getIntlLocale } from "@/locales";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -400,7 +409,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { identifierBreaks } from "@/utils/formatters";
-import { sparkPoints } from "./fixtures";
 import type {
   UnfoldCard,
   UnfoldKind,
@@ -408,6 +416,11 @@ import type {
   UnfoldOutcome,
   UnfoldTone,
 } from "./unfold.types";
+
+interface Point {
+  x: number;
+  y: number;
+}
 
 interface PlacedCard {
   card: UnfoldCard;
@@ -422,8 +435,11 @@ interface PlacedCard {
 const props = defineProps<{
   cards: UnfoldCard[];
   focusId?: string;
-  hint?: I18nText;
+  note?: I18nText | null;
+  hint?: I18nText | null;
   legend?: UnfoldLegendItem[];
+  /** A live AutoObserve issue: same-minute cards stack unlinked, links between lanes turn in a wider gap, the legend keys what is drawn. */
+  liveIssue?: boolean;
   /** Cards in other lanes starting within this many minutes share a column; none joins your team's column. */
   columnMinutes?: number;
   /** Links travel along a free lane and turn in a column gap, so none crosses a card. */
@@ -442,6 +458,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{ "expand-lane": [lane: string]; "update:selection": [id: string] }>();
 
+defineSlots<{ header?(): unknown; chart?(props: { card: UnfoldCard }): unknown }>();
+
+const slots = useSlots();
 const { t } = useI18nTyped();
 const intlLocale = computed(() => getIntlLocale());
 
@@ -450,6 +469,9 @@ const CARD_W = 11;
 const COMPACT_CARD_W = 14;
 const STEPPED_CARD_W = 13;
 const COL_GAP = 3.75;
+const LIVE_COL_GAP = 5.5;
+// Cross-lane links turn this close to a card edge, clear of the gap labels centred in the gap.
+const TURN_INSET = 0.6;
 // Stepped cards in one lane sit closer, so a lane's later card still fits beside the open panel.
 const STEPPED_LANE_GAP = 2.25;
 const PAD_X = 1;
@@ -505,6 +527,22 @@ const TONE: Record<UnfoldTone, { bar: string; ink: string }> = {
   team: { bar: "bg-section-accent-secondary", ink: "text-section-accent-secondary" },
 };
 
+// Only kinds on a live issue's graph get a legend entry, so a lane we have no feed for is never implied.
+const kindLegend = computed<{ kind: string; key: I18nKey; icon: IconName }[]>(() => {
+  const kinds = LEGEND.map((item) => ({ ...item, icon: KIND_ICON[item.kind] }));
+  if (!props.liveIssue) return kinds;
+  return [
+    ...kinds.filter((item) => props.cards.some((c) => c.kind === item.kind)),
+    ...[
+      ...new Set(props.cards.flatMap((c) => (c.kind === "outcome" ? [c.outcome ?? "open"] : []))),
+    ].map((outcome) => ({
+      kind: `outcome-${outcome}`,
+      key: `autoobserve.issueLive.unfold.outcome.${outcome}` as I18nKey,
+      icon: OUTCOME_ICON[outcome],
+    })),
+  ];
+});
+
 const geometry = computed(() =>
   props.compact
     ? { cardH: COMPACT_BASE_H + NAME_LINE_H, laneLabel: 1.25, laneH: 0, laneGap: 0.25 }
@@ -513,8 +551,15 @@ const geometry = computed(() =>
 const cardW = computed(() =>
   props.step !== undefined ? STEPPED_CARD_W : props.compact ? COMPACT_CARD_W : CARD_W,
 );
+const colGap = computed(() => (props.liveIssue ? LIVE_COL_GAP : COL_GAP));
 
 const rem = (n: number) => `${n}rem`;
+
+// Forecast points render muted, so a projection never reads as a measurement.
+const sparkPoints = ({ points = [], projected }: UnfoldCard) => {
+  const from = points.length - (projected ?? 0);
+  return projected ? points.map((value, i) => ({ value, provisional: i >= from })) : points;
+};
 const canvasBg = computed(() => (props.compact ? "bg-surface-base" : "bg-surface-subtle"));
 const canvasClass = computed(
   () =>
@@ -627,6 +672,10 @@ const unmirror = computed(() => (props.scrollCue ? "rtl:-scale-x-100" : ""));
 const iconOf = (card: UnfoldCard): IconName =>
   card.kind === "outcome" ? OUTCOME_ICON[card.outcome ?? "open"] : KIND_ICON[card.kind];
 
+// A live issue's outcome in a stream's lane reads like its other cards; your team's keeps two title lines.
+const teamOutcome = (card: UnfoldCard) =>
+  card.kind === "outcome" && !(props.liveIssue && card.lane !== null);
+
 const laneName = (lane: string | null) =>
   lane === null ? t("autoobserve.unfold.team") : raw(lane);
 
@@ -644,7 +693,10 @@ const gapLabel = (from: UnfoldCard, to: UnfoldCard): I18nText | undefined => {
   if (gap === 0) return t("autoobserve.unfold.sameMinute");
   if (gap < 60) return t("autoobserve.unfold.plusMinutes", { count: gap });
   if (!props.compact || gap < 24 * 60) {
-    return t("autoobserve.unfold.plusHours", { hours: Math.floor(gap / 60), minutes: gap % 60 });
+    const key = props.liveIssue
+      ? "autoobserve.issueLive.unfold.plusHours"
+      : "autoobserve.unfold.plusHours";
+    return t(key, { hours: Math.floor(gap / 60), minutes: gap % 60 });
   }
   const hours = Math.floor(gap / 60);
   return t("autoobserve.unfold.plusDays", { days: Math.floor(hours / 24), hours: hours % 24 });
@@ -685,6 +737,7 @@ const place = (cards: UnfoldCard[], lanes: (string | null)[], laneTops: number[]
     const parent = joins ? sharedParent(card, placed, col) : parentOf(card, placed);
     const laneFree = !column.some((p) => p.card.lane === card.lane);
     const dropsBelow = card.kind === "outcome" && parent?.col === col && laneFree;
+    // On a live issue a same-minute card in a free lane stacks under its parent instead of starting a staircase.
     const concurrent =
       joins ||
       (props.columnMinutes === undefined &&
@@ -693,17 +746,19 @@ const place = (cards: UnfoldCard[], lanes: (string | null)[], laneTops: number[]
         column[0].card.kind !== "change" &&
         column[0].card.minute === card.minute &&
         laneFree &&
-        parent?.col !== col);
+        (parent?.col !== col || (!!props.liveIssue && parent?.card.minute === card.minute)));
     if (!dropsBelow && !concurrent) col += 1;
     const row = lanes.indexOf(card.lane);
     placed.push({
       card,
       col,
       row,
-      x: PAD_X + col * (cardW.value + COL_GAP),
+      x: PAD_X + col * (cardW.value + colGap.value),
       y: laneTops[row] + geometry.value.laneLabel,
       h: heightOf(card),
-      parent,
+      // Live cards that happened together run side by side; a link between them would read as a sequence.
+      parent:
+        props.liveIssue && concurrent && !card.after && parent?.col === col ? undefined : parent,
     });
   }
   if (props.step !== undefined) stepColumns(placed, props.step);
@@ -793,6 +848,21 @@ const elbowEdge = (from: PlacedCard, to: PlacedCard, laneTops: number[]) => {
   };
 };
 
+// A live issue's link between lanes turns beside the cards and crosses in the target lane's label strip, never under a card.
+const crossPath = (
+  from: PlacedCard,
+  to: PlacedCard,
+  start: Point,
+  end: Point,
+  laneTops: number[],
+) => {
+  const leave = from.x + cardW.value + TURN_INSET;
+  const arrive = to.x - TURN_INSET;
+  if (to.col <= from.col + 1) return `M${start.x},${start.y} H${leave} V${end.y} H${end.x}`;
+  const strip = laneTops[to.row] + geometry.value.laneLabel / 2;
+  return `M${start.x},${start.y} H${leave} V${strip} H${arrive} V${end.y} H${end.x}`;
+};
+
 // A link within one column runs down from the card above; every other link runs left to right.
 const edgeOf = (from: PlacedCard, to: PlacedCard, taken: Set<string>, laneTops: number[]) => {
   const W = cardW.value;
@@ -806,12 +876,15 @@ const edgeOf = (from: PlacedCard, to: PlacedCard, taken: Set<string>, laneTops: 
     : { x: (start.x + end.x) / 2, y: start.y };
   const c2 = down ? { x: end.x, y: c1.y } : { x: c1.x, y: end.y };
   const stepped = props.step !== undefined && !down && to.row !== from.row && to.x < from.x + W;
+  const across = !!props.liveIssue && !down && from.row !== to.row && to.col > from.col;
   const path = stepped
     ? elbowEdge(from, to, laneTops)
     : props.routeAround && !down
       ? routedEdge(from, to, taken)
       : {
-          d: `M${start.x},${start.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${end.x},${end.y}`,
+          d: across
+            ? crossPath(from, to, start, end, laneTops)
+            : `M${start.x},${start.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${end.x},${end.y}`,
           end,
           mid: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
         };
@@ -822,7 +895,9 @@ const edgeOf = (from: PlacedCard, to: PlacedCard, taken: Set<string>, laneTops: 
   return {
     id: `${from.card.id}>${to.card.id}`,
     ...path,
-    label: gapLabel(from.card, to.card),
+    // On a live issue only a link inside one lane has room for its gap; the cards' own times carry the rest.
+    label:
+      props.liveIssue && (down || from.row !== to.row) ? undefined : gapLabel(from.card, to.card),
     dashed: !!to.card.dependency || to.card.kind === "unwatched" || to.card.kind === "forecast",
     active: selectedId.value === to.card.id || selectedId.value === from.card.id,
   };
@@ -850,7 +925,7 @@ const layout = computed(() => {
     edges,
     width:
       props.step === undefined
-        ? PAD_X * 2 + columns * cardW.value + (columns - 1) * COL_GAP + cue
+        ? PAD_X * 2 + columns * cardW.value + (columns - 1) * colGap.value + cue
         : Math.max(PAD_X, ...nodes.map((n) => n.x + cardW.value)) + PAD_X,
     height: laneTops[lanes.length],
   };

@@ -2,6 +2,7 @@
 
 // Normalized on fetched rows, not in SQL, so a request never bakes in one source's field names.
 
+import { plainEntityText } from "./entityMatch";
 import type { NormalizedEvent } from "./ocsf";
 import { fromOcsfStatusId, ocsfClass, toOcsfSeverity } from "./ocsf";
 import type { SourceType } from "@/services/securitySources";
@@ -27,6 +28,11 @@ function asText(value: unknown): string {
   if (Array.isArray(value)) return value.filter(isPresent).map(String).join(", ");
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+/** Entity columns may hold a stored JSON array (`["10.0.0.1"]`); people read its values, not JSON. */
+function asEntityText(value: unknown): string {
+  return isPresent(value) ? plainEntityText(value) : "";
 }
 
 /** Mapped sources may return ISO strings or seconds, so everything is brought to milliseconds. */
@@ -104,13 +110,13 @@ export function normalizeEvent(
     activity: asText(firstOf(raw, map.activity as string[])),
     severityId: severity,
     statusId,
-    actor: asText(firstOf(raw, map.actor as string[])),
-    actorId: asText(firstOf(raw, map.actorId as string[])),
-    srcIp: asText(firstOf(raw, map.srcIp as string[])),
+    actor: asEntityText(firstOf(raw, map.actor as string[])),
+    actorId: asEntityText(firstOf(raw, map.actorId as string[])),
+    srcIp: asEntityText(firstOf(raw, map.srcIp as string[])),
     srcPort: asText(firstOf(raw, map.srcPort as string[])),
-    dstIp: asText(firstOf(raw, map.dstIp as string[])),
+    dstIp: asEntityText(firstOf(raw, map.dstIp as string[])),
     dstPort: asText(firstOf(raw, map.dstPort as string[])),
-    host: asText(firstOf(raw, map.host as string[])),
+    host: asEntityText(firstOf(raw, map.host as string[])),
     process: asText(firstOf(raw, map.process as string[])),
     product: asText(firstOf(raw, map.product as string[])) || constants.product || "",
     vendor: asText(firstOf(raw, map.vendor as string[])) || constants.vendor || "",

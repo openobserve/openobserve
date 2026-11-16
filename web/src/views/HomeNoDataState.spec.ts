@@ -102,6 +102,26 @@ describe("HomeNoDataState", () => {
     store.state.zoConfig = { ...store.state.zoConfig, sample_data_onboarding_enabled: false };
   });
 
+  it("hides the sample data callout for an org whose free trial has ended", () => {
+    const state = store.state as any;
+    state.zoConfig = { ...state.zoConfig, sample_data_onboarding_enabled: true };
+    state.organizationData = {
+      ...state.organizationData,
+      organizationSettings: { free_trial_expiry: (Date.now() - 5 * 86400 * 1000) * 1000 },
+    };
+    const wrapper = mount(HomeNoDataState, {
+      props: { tab: "overview" },
+      global: { plugins: [i18n, store] },
+    });
+    expect(wrapper.find('[data-test="sample-data-callout"]').exists()).toBe(false);
+    wrapper.unmount();
+    state.organizationData = {
+      ...state.organizationData,
+      organizationSettings: { free_trial_expiry: "" },
+    };
+    state.zoConfig = { ...state.zoConfig, sample_data_onboarding_enabled: false };
+  });
+
   it("on cloud, keeps the setup page once the org has data", async () => {
     awsConfig.isCloud = "true";
     orgData.has = true;

@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Toolbar: status toggle (All / Active / Resolved) + search — same
              shape as the Alerts page tabs. -->
         <template #toolbar>
-          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+          <div class="contents">
             <OToggleGroup
               mobile-dropdown
               :model-value="statusFilter"
@@ -88,24 +88,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="min-w-0 flex-1 max-md:min-w-40"
+              class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
             />
-          </div>
-        </template>
-        <!-- Severity summary strip below the toolbar (mirrors the Alerts state
-             strip): Total + the four severities as selectable filter tiles. -->
-        <template #subheader>
-          <div data-test="incident-list-summary">
             <OStatStrip
               :items="severityStats"
               :loading="loading"
               selectable
-              :selected-key="severityFilter"
+              :row="false"
+              multiple
+              :selected-keys="severityFilters"
               default-key="total"
-              @select="onSeveritySelect"
+              class="max-md:order-last"
+              data-test="incident-list-summary"
+              @update:selected-keys="severityFilters = $event as SeverityKey[]"
             />
           </div>
         </template>
@@ -200,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   count: getSortedDimensions(row.group_values).length - 2,
                 })
               }}
-              <OTooltip :delay="300" :max-width="'28rem'">
+              <OTooltip :max-width="'28rem'">
                 <template #content>
                   <div class="space-y-1">
                     <div v-for="dim in displayDimensions(row.group_values).slice(2)" :key="dim.key">
@@ -235,7 +233,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="shrink-0">&nbsp;×{{ group.count }}</span>
               </span>
               <OTooltip
-                :delay="300"
                 :content="
                   t(
                     'alerts.incidents.alertGroupTooltip',
@@ -253,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="incident-alert-group-more"
             >
               {{ t("alerts.incidents.moreAlertGroups", { count: row.alert_groups.length - 2 }) }}
-              <OTooltip :delay="300" :max-width="'28rem'">
+              <OTooltip :max-width="'28rem'">
                 <template #content>
                   <div
                     class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1"
@@ -415,6 +412,7 @@ import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDi
 import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import { matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -427,6 +425,10 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 /** Re-fetch period while a live RCA run is on the current page. */
 const RCA_LIVE_POLL_MS = 30_000;
+const SEVERITY_KEYS = ["P1", "P2", "P3", "P4"] as const;
+type SeverityKey = (typeof SEVERITY_KEYS)[number];
+const isSeverityKey = (key: string): key is SeverityKey =>
+  (SEVERITY_KEYS as readonly string[]).includes(key);
 
 export default defineComponent({
   name: "IncidentList",
@@ -526,7 +528,7 @@ export default defineComponent({
     const statusFilter = ref(urlStatus ?? "active");
     const isRestoringState = ref(false);
     const viewState = useListViewState("incidents", {
-      severityFilter: "all",
+      severityFilter: [] as SeverityKey[],
       pageSize: 20,
       sortBy: "",
       sortOrder: "asc" as "asc" | "desc",
@@ -540,12 +542,14 @@ export default defineComponent({
       currentPage.value = page;
       savePageState();
     };
-    // Severity facet — independent of status ("all" | "P1".."P4").
+    // Severity facet, independent of status; an empty list is every severity.
     // A status link lands on every severity of that status, so the saved facet is dropped.
-    const severityFilter = ref(urlStatus ? "all" : viewState.severityFilter);
-    watch([severityFilter, pageSize, sortBy, sortOrder], () => {
+    const severityFilters = ref<SeverityKey[]>(
+      urlStatus ? [] : readFilterKeys(viewState.severityFilter, isSeverityKey),
+    );
+    watch([severityFilters, pageSize, sortBy, sortOrder], () => {
       Object.assign(viewState, {
-        severityFilter: severityFilter.value,
+        severityFilter: severityFilters.value,
         pageSize: pageSize.value,
         sortBy: sortBy.value,
         sortOrder: sortOrder.value,
@@ -558,7 +562,7 @@ export default defineComponent({
       qTableRef.value?.restorePage?.(1);
       savePageState();
     };
-    watch([searchQuery, statusFilter, severityFilter, pageSize, sortBy, sortOrder], () => {
+    watch([searchQuery, statusFilter, severityFilters, pageSize, sortBy, sortOrder], () => {
       if (!isRestoringState.value) resetPage();
     });
 
@@ -686,9 +690,12 @@ export default defineComponent({
     });
     const visibleIncidents = computed(() => {
       const rows = statusScopedIncidents.value;
-      if (severityFilter.value === "all") return rows;
-      return rows.filter(
-        (incident) => String(incident.severity).toUpperCase() === severityFilter.value,
+      return rows.filter((incident) =>
+        matchesAnyKey(
+          severityFilters.value,
+          incident,
+          (row, key) => String(row.severity).toUpperCase() === key,
+        ),
       );
     });
 
@@ -738,8 +745,7 @@ export default defineComponent({
       return { p1, p2, p3, p4, total: rows.length };
     });
     // Severity summary strip — mirrors the Alerts state strip: Total + the four
-    // severities as selectable filter tiles. Keys map to severityFilter values
-    // ("all" | "P1" | "P2" | "P3" | "P4").
+    // severities as filter tiles, keyed by severity ("P1" .. "P4").
     const severityStats = computed<StatItem[]>(() => {
       const c = severityCounts.value;
       const hasData = c.total > 0;
@@ -784,7 +790,7 @@ export default defineComponent({
         },
         {
           key: "total",
-          label: t("alerts.summaryTotal"),
+          label: t("common.all"),
           value: v(c.total),
           icon: "format-list-bulleted",
           tone: "primary",
@@ -792,12 +798,6 @@ export default defineComponent({
         },
       ];
     });
-    // Total clears the severity filter (and is never highlighted, like Alerts);
-    // the severity tiles set the facet.
-    const onSeveritySelect = (key: string) => {
-      // Re-clicking the active severity clears back to "all" (toggle), like the Alerts strip.
-      severityFilter.value = key === "total" || severityFilter.value === key ? "all" : key;
-    };
 
     // Extreme-left rail coloured by severity (P1 red … P4 blue); resolved rows
     // stand out. The rail answers "does this need action, and how urgently?":
@@ -888,14 +888,14 @@ export default defineComponent({
     const filterByStatus = (value: string) => {
       statusFilter.value = value;
       // Switching the primary status resets the severity facet back to "all".
-      severityFilter.value = "all";
+      severityFilters.value = [];
       store.dispatch("incidents/setStatusFilter", value);
       savePageState();
     };
 
     const clearFilters = () => {
       searchQuery.value = "";
-      severityFilter.value = "all";
+      severityFilters.value = [];
       filterByStatus("active");
     };
 
@@ -1176,8 +1176,7 @@ export default defineComponent({
       rcaEnabled,
       now,
       severityStats,
-      severityFilter,
-      onSeveritySelect,
+      severityFilters,
       incidentRowStyle,
       searchQuery,
       statusFilter,

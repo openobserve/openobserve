@@ -39,34 +39,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="fleet-collectors-table"
       @row-click="openCollector"
     >
-      <template #subheader>
-        <OStatStrip
-          :items="statusStats"
-          compact
-          selectable
-          :selected-key="statusFilter"
-          default-key="all"
-          @select="onStatSelect"
-        />
-      </template>
-
       <template #toolbar>
-        <div
-          class="flex w-full min-w-0 items-center gap-2 max-md:contents"
-          data-drawer-anchor="fleet-collectors-toolbar"
-        >
+        <div class="contents">
           <OButton
             variant="outline"
             size="icon-toolbar"
             icon-left="filter-list"
             class="lg:hidden"
+            data-drawer-anchor="fleet-collectors-toolbar"
             :aria-label="t('common.filters')"
             data-test="fleet-collectors-mobile-filters-btn"
             @click="mobileFiltersOpen = true"
           >
             <OTooltip :content="t('common.filters')" />
           </OButton>
-          <div class="min-w-0 flex-1 max-md:min-w-40">
+          <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
             <OSearchInput
               v-model="search"
               class="w-full"
@@ -118,6 +105,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="osOptions"
             :placeholder="t('fleet.collectors.allOs')"
             data-test="fleet-collectors-os-filter"
+          />
+          <OStatStrip
+            :items="statusStats"
+            compact
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="statusFilters"
+            default-key="all"
+            class="max-md:order-last"
+            @update:selected-keys="statusFilters = $event"
           />
         </div>
       </template>
@@ -385,8 +383,10 @@ import FleetRemoveDialog from "./FleetRemoveDialog.vue";
 import { useCollectorActions } from "./useCollectorActions";
 import { OS_LABEL, type FleetOs } from "./fleetFormat";
 import { isForbidden, osLabel, useFleetCollectors, type CollectorRow } from "./useFleetApi";
+import { matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
 
 const STATUS_FILTERS = ["offline", "degraded", "unknown", "outdated", "online"];
+const isStatusFilter = (key: string): key is string => STATUS_FILTERS.includes(key);
 const DRAWER_TABS = ["overview", "metrics", "health", "config", "history"];
 
 const DASH = raw("—");
@@ -415,7 +415,7 @@ const loadError = computed(() =>
 );
 
 const search = ref("");
-const statusFilter = ref<string | null>(null);
+const statusFilters = ref<string[]>([]);
 const osFilter = ref<string | null>(null);
 const selectedIds = ref<string[]>([]);
 
@@ -430,7 +430,7 @@ const route = useRoute();
 
 onMounted(() => {
   const { status, q } = route.query;
-  if (typeof status === "string" && STATUS_FILTERS.includes(status)) statusFilter.value = status;
+  statusFilters.value = readFilterKeys(status, isStatusFilter);
   if (typeof q === "string") search.value = q;
 });
 
@@ -454,10 +454,11 @@ watch(
   { immediate: true },
 );
 
-const isFiltered = computed(() => !!search.value || !!statusFilter.value || !!osFilter.value);
+const isFiltered = computed(
+  () => !!search.value || statusFilters.value.length > 0 || !!osFilter.value,
+);
 
-function matchesStatus(c: CollectorRow, key: string | null) {
-  if (!key || key === "all") return true;
+function matchesStatus(c: CollectorRow, key: string) {
   if (key === "outdated") return c.outdated;
   return c.status === key;
 }
@@ -469,7 +470,7 @@ const scopeRows = computed(() =>
 const rows = computed(() => {
   const q = search.value.trim().toLowerCase();
   return scopeRows.value.filter((c) => {
-    if (!matchesStatus(c, statusFilter.value)) return false;
+    if (!matchesAnyKey(statusFilters.value, c, matchesStatus)) return false;
     if (osFilter.value && c.os !== osFilter.value) return false;
     if (!q) return true;
     return [c.id, c.name, c.hostname, c.lastConnectedFrom, c.config, c.version, c.fleetName].some(
@@ -506,7 +507,7 @@ const statusStats = computed<StatItem[]>(() => {
   const items: StatItem[] = [
     {
       key: "all",
-      label: t("fleet.stats.total"),
+      label: t("common.all"),
       value: counts?.total ?? DASH,
       icon: "dns",
       tone: "neutral",
@@ -550,17 +551,13 @@ const statusStats = computed<StatItem[]>(() => {
   return items.map((item) => ({ ...item, dataTest: `fleet-collectors-stat-${item.key}` }));
 });
 
-function onStatSelect(key: string) {
-  statusFilter.value = key === "all" || statusFilter.value === key ? null : key;
-}
-
 const osOptions = computed(() =>
   (Object.keys(OS_LABEL) as FleetOs[]).map((os) => ({ label: raw(OS_LABEL[os]), value: os })),
 );
 
 function clearFilters() {
   search.value = "";
-  statusFilter.value = null;
+  statusFilters.value = [];
   osFilter.value = null;
 }
 

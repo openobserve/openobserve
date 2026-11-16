@@ -2055,7 +2055,8 @@ mod tests {
         let widest = (i64::from(i32::MAX) - 2) * 1_000_000;
         let run = SupportedRun::new("a1", "t", (0, widest), one_second()).unwrap();
         assert_eq!(run.budget, i32::MAX as usize);
-        let wire = proto::cluster_rpc::SearchQuery::from(run.search_request(SQL).query);
+        let wire =
+            proto::cluster_rpc::SearchQuery::try_from(run.search_request(SQL).query).unwrap();
         assert_eq!(wire.size, i32::MAX);
 
         let err = SupportedRun::new("a1", "t", (0, widest + 1), one_second())

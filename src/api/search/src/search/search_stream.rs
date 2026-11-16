@@ -489,6 +489,15 @@ pub async fn search_http2_stream(
         &trace_id,
     )
     .await
+        && !crate::search::security_scope_admits(
+            &req.query.sql,
+            &org_id,
+            &user_id,
+            stream_type,
+            permission_resource_type,
+            &query,
+        )
+        .await
     {
         report_to_audit(
             user_id,
@@ -1045,7 +1054,7 @@ async fn get_sql(
     stream_type: StreamType,
     search_type: Option<SearchEventType>,
 ) -> Result<search::sql::Sql, infra::errors::Error> {
-    search::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type).await
+    search::sql::Sql::new(&query.clone().try_into()?, org_id, stream_type, search_type).await
 }
 
 #[cfg(test)]
