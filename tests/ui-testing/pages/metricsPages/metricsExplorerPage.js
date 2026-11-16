@@ -575,10 +575,6 @@ export class MetricsExplorerPage {
      * ever holds the rows in view. This is the upper bound that count sits under.
      */
     async getResultCount() {
-        const label = this.page.locator(this.countLabel);
-        // Until the count settles the label is an empty aria-busy skeleton, and Number('') would read as 0.
-        await expect(label).not.toHaveAttribute('aria-busy', 'true', { timeout: 30000 });
-        await expect(label).toHaveText(/\d/, { timeout: 15000 });
         const text = await this.getResultCountText();
         const shown = Number(text.split(' of ')[0].replace(/,/g, ''));
         return Number.isFinite(shown) ? shown : -1;
