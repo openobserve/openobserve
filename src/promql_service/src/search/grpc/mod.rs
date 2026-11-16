@@ -27,7 +27,7 @@ use config::{
     },
     utils::time::{now_micros, second_micros},
 };
-use datafusion::error::DataFusionError;
+use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use hashbrown::HashSet;
 use infra::errors::Result;
 use promql::{
@@ -81,7 +81,7 @@ impl TableProvider for StorageProvider {
             return Ok(vec![]);
         }
         // WAL before storage: a sample moved in between is then read twice, never missed.
-        let wal_ctxs = if self.need_wal {
+        let (wal_ctx, wal_warnings) = if self.need_wal {
             let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
             wal::create_context(
                 &trace_id,
@@ -93,11 +93,10 @@ impl TableProvider for StorageProvider {
             )
             .await?
         } else {
-            Vec::new()
+            (None, Vec::new())
         };
-        let mut ctxs = Vec::with_capacity(wal_ctxs.len() + 1);
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
-        let ctx = storage::create_context(
+        let storage_ctx = storage::create_context(
             &trace_id,
             org_id,
             stream_name,
@@ -105,16 +104,13 @@ impl TableProvider for StorageProvider {
             matchers,
             filters,
             storage::SourcePreference {
-                streaming,
+                // WAL rows are merged by materializing, which a streaming-only source cannot feed
+                streaming: streaming && wal_ctx.is_none(),
                 output_labels: &label_selector,
             },
         )
         .await?;
-        if let Some(ctx) = ctx {
-            ctxs.push(ctx);
-        }
-        ctxs.extend(wal_ctxs);
-        Ok(ctxs)
+        Ok(scan_contexts(storage_ctx, wal_ctx, wal_warnings))
     }
 
     #[cfg(feature = "enterprise")]
@@ -189,7 +185,7 @@ pub async fn search(
             && !req.is_super_cluster
             && plan.window.pinned.is_none()
         {
-            wal_cut(start, end, step, micros(plan.window.ahead), wal_floor)
+            wal_cut(start, end, step, micros(plan.window.ahead), wal_head())
         } else {
             None
         };
@@ -550,16 +546,41 @@ async fn matches_nothing(
         .any(|mat| absent_label_rejects_all(schema.schema(), mat)))
 }
 
-/// The time from which a group must also read the WAL.
-fn wal_floor() -> i64 {
+/// Storage and WAL contexts, with the WAL's warnings kept even when it returned no rows.
+fn scan_contexts(
+    storage_ctx: Option<ScanContext>,
+    wal_ctx: Option<ScanContext>,
+    wal_warnings: Vec<String>,
+) -> Vec<ScanContext> {
+    let mut ctxs: Vec<ScanContext> = storage_ctx.into_iter().chain(wal_ctx).collect();
+    if wal_warnings.is_empty() {
+        return ctxs;
+    }
+    match ctxs.first_mut() {
+        Some(ctx) => ctx.warnings.extend(wal_warnings),
+        None => ctxs.push(
+            ScanContext::table(
+                SessionContext::new(),
+                Arc::new(Schema::empty()),
+                ScanStats::default(),
+                true,
+            )
+            .with_warnings(wal_warnings),
+        ),
+    }
+    ctxs
+}
+
+/// The time from which the WAL routinely holds samples that are not flushed yet.
+fn wal_head() -> i64 {
     let retention = config::get_config().limit.max_file_retention_time as i64;
     now_micros() - second_micros(retention * 3)
 }
 
-/// The grid-aligned cut before the WAL floor, `None` when the range does not straddle it.
-fn wal_cut(start: i64, end: i64, step: i64, ahead: i64, wal_floor: i64) -> Option<i64> {
-    // a group ending before the cut still reads `ahead` past its end, which must stay off the WAL
-    let cut = wal_floor - ahead;
+/// The grid-aligned cut before the WAL head, `None` when the range does not straddle it.
+fn wal_cut(start: i64, end: i64, step: i64, ahead: i64, wal_head: i64) -> Option<i64> {
+    // a group ending before the cut still reads `ahead` past its end, which must stay off the head
+    let cut = wal_head - ahead;
     if step <= 0 || cut <= start || cut > end {
         return None;
     }
@@ -655,6 +676,12 @@ async fn generate_search_group(
         groups.push((group_start, end));
     }
     Ok(groups)
+}
+
+/// The oldest sample time the WAL may hold: a sample the ingest window still accepts can wait
+/// there as long as the head does before it is flushed.
+pub(crate) fn wal_floor() -> i64 {
+    wal_head() - config::get_config().limit.ingest_allowed_upto_micro
 }
 
 pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: value::Value) {
@@ -819,6 +846,52 @@ mod tests {
             },
             ..Default::default()
         }
+    }
+
+    fn table_ctx(warnings: &[&str]) -> ScanContext {
+        ScanContext::table(
+            SessionContext::new(),
+            Arc::new(Schema::empty()),
+            ScanStats::default(),
+            true,
+        )
+        .with_warnings(warnings.iter().map(|w| w.to_string()).collect())
+    }
+
+    #[test]
+    fn test_wal_floor_reaches_back_over_the_ingest_window_behind_the_head() {
+        let upto = config::get_config().limit.ingest_allowed_upto_micro;
+        let before = wal_head();
+        let floor = wal_floor();
+        let after = wal_head();
+        assert!(upto > 0);
+        assert!(floor >= before - upto && floor <= after - upto);
+    }
+
+    #[test]
+    fn test_an_empty_wal_leaves_storage_as_the_only_context() {
+        let ctxs = scan_contexts(Some(table_ctx(&[])), None, vec![]);
+        assert_eq!(ctxs.len(), 1);
+        assert!(ctxs[0].warnings.is_empty());
+    }
+
+    #[test]
+    fn test_wal_rows_add_a_second_context_after_storage() {
+        let ctxs = scan_contexts(Some(table_ctx(&["s"])), Some(table_ctx(&[])), vec![]);
+        assert_eq!(ctxs.len(), 2);
+        assert_eq!(ctxs[0].warnings, vec!["s"]);
+    }
+
+    #[test]
+    fn test_wal_warnings_survive_an_empty_wal() {
+        let ctxs = scan_contexts(Some(table_ctx(&["s"])), None, vec!["ingester down".into()]);
+        assert_eq!(ctxs.len(), 1);
+        assert_eq!(ctxs[0].warnings, vec!["s", "ingester down"]);
+
+        let ctxs = scan_contexts(None, None, vec!["ingester down".into()]);
+        assert_eq!(ctxs.len(), 1);
+        assert_eq!(ctxs[0].warnings, vec!["ingester down"]);
+        assert!(scan_contexts(None, None, vec![]).is_empty());
     }
 
     #[test]

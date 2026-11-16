@@ -28,10 +28,7 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
-    utils::{
-        time::{now_micros, second_micros},
-        took_watcher::TookWatcher,
-    },
+    utils::{time::now_micros, took_watcher::TookWatcher},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -436,9 +433,7 @@ async fn search_in_cluster(
         let req_query = req.query.as_mut().unwrap();
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
-        // if the end time is within the last 3 retention time, we need to fetch wal data
-        let wal_floor = now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
-        if window.reaches(req_query.end, wal_floor) {
+        if window.reaches(req_query.end, grpc::wal_floor()) {
             req.need_wal = true;
         }
         let req_need_wal = req.need_wal;
