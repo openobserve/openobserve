@@ -557,9 +557,9 @@ pub struct CorrectionRef {
 pub struct ListDowntimesQuery {
     /// Absent means every folder the user may list.
     pub folder_id: Option<String>,
-    /// `scheduled`, `active`, `ended`, `ended_early` or `cancelled`.
+    /// `scheduled`, `active`, `ended`, `ended_early` or `cancelled`. Any other value is a 400.
     pub status: Option<String>,
-    /// `none`, `daily`, `weekly`, or `recurring` for both.
+    /// `none` (or `once`), `daily`, `weekly`, or `recurring` for both. Any other value is a 400.
     pub repeat: Option<String>,
     pub search: Option<String>,
     /// Rows whose alerts target names this alert, or whose condition matches its dimensions.

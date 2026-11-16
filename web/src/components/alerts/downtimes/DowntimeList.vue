@@ -1202,7 +1202,8 @@ const cancelIds = async (ids: string[]) => {
             }),
       });
     }
-    selectedIds.value = failed;
+    // Rows outside this cancel keep their tick; of the cancelled ones, only the failed stay.
+    selectedIds.value = selectedIds.value.filter((id) => !ids.includes(id) || failed.includes(id));
   } finally {
     cancelling.value = false;
   }

@@ -1174,14 +1174,19 @@ fn check_started_edit(
     if schedule_locked || slo_locked {
         return Err(DowntimeError::Conflict(STARTED.to_string()));
     }
+    // An unchanged end keeps the coverage it has, so a reason edit in the overnight tail of the
+    // last window, after the "until" day, still passes.
+    let day = |at| config::meta::downtimes::local_date(at, &r.timezone);
     let end_kept = match (r.repeat, r.ends_at) {
+        _ if r.ends_at == b.ends_at => true,
         (_, None) => true,
         (Repeat::None, Some(end)) => end >= now,
         (_, Some(until)) => {
-            let day = |at| config::meta::downtimes::local_date(at, &r.timezone);
-            day(until)
-                .zip(day(now))
-                .is_none_or(|(until, today)| until >= today)
+            b.ends_at
+                .is_some_and(|stored| day(stored).is_some() && day(stored) == day(until))
+                || day(until)
+                    .zip(day(now))
+                    .is_none_or(|(until, today)| until >= today)
         }
     };
     if !end_kept {
@@ -2360,6 +2365,29 @@ mod tests {
             check_started_edit(&series, &today, 3 * day + 12 * HOUR).is_ok(),
             "until today, sent as midnight"
         );
+    }
+
+    #[test]
+    fn a_reason_edit_keeps_an_until_day_that_already_passed() {
+        let day = 24 * HOUR;
+        let mut tail = alerts_daily("23:00", 3 * 3_600, 0);
+        tail.schedule.ends_at = Some(9 * day + 23 * HOUR + 59 * 60_000_000);
+        let now = 10 * day + HOUR;
+        let mut reason = request_of(&tail);
+        reason.reason = Some("still in the last window".into());
+        assert!(check_started_edit(&tail, &reason, now).is_ok());
+        let mut same_day = request_of(&tail);
+        same_day.schedule.ends_at = Some(9 * day + 23 * HOUR);
+        assert!(
+            check_started_edit(&tail, &same_day, now).is_ok(),
+            "the same until day sent at another time"
+        );
+        let mut earlier = request_of(&tail);
+        earlier.schedule.ends_at = Some(8 * day + 23 * HOUR + 59 * 60_000_000);
+        assert!(matches!(
+            check_started_edit(&tail, &earlier, now),
+            Err(DowntimeError::Conflict(m)) if m == END_BEFORE_NOW
+        ));
     }
 
     #[test]
