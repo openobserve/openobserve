@@ -70,6 +70,7 @@ vi.mock("./kubernetesPack", () => ({
     id: "kubernetes",
     alerts: ["k8s/one"],
     dashboards: [] as unknown[],
+    savedViews: [] as unknown[],
     aliases: [["k8s_cluster", "k8s_cluster_name"]],
   },
 }));
@@ -316,5 +317,56 @@ describe("one matcher", () => {
     };
     const match = await matchPack("org", pack, await readOrgStreams("org"), library as any);
     expect(match.ready).toBe(false);
+  });
+
+  describe("a pack with a saved view", () => {
+    const view = (selectedStream: string[], streamType?: string) => ({
+      id: "events-view",
+      name: "Events",
+      search: { data: { stream: { selectedStream, streamType } } },
+    });
+    const match = async (savedViews: unknown[]) =>
+      matchPack(
+        "org",
+        { ...KUBERNETES_PACK, savedViews } as any,
+        await readOrgStreams("org"),
+        library as any,
+      );
+
+    beforeEach(() => {
+      fake.columns = { kube_pod: ["phase"] };
+      fake.files = { "k8s/one": query("kube_pod") };
+    });
+
+    it("counts a view whose logs stream has data", async () => {
+      fake.streams = {
+        metrics: [metric(recent())],
+        logs: [{ name: "k8s_events", stats: { doc_time_max: recent() } }],
+      };
+      const result = await match([view(["k8s_events"])]);
+      expect(result.views.get("events-view")).toBe(true);
+      const verdicts = [...result.alerts.values(), ...result.views.values()];
+      expect(`${verdicts.filter(Boolean).length} of ${verdicts.length}`).toBe("2 of 2");
+    });
+
+    it("leaves out a view whose stream is missing", async () => {
+      fake.streams = { metrics: [metric(recent())] };
+      const result = await match([view(["k8s_events"])]);
+      expect(result.views.get("events-view")).toBe(false);
+      expect(result.ready).toBe(true);
+    });
+
+    it("looks the stream up under the view's own stream type", async () => {
+      fake.streams = { metrics: [metric(recent())] };
+      const result = await match([view(["kube_pod"], "metrics")]);
+      expect(result.views.get("events-view")).toBe(true);
+    });
+
+    it("is not ready when only the view fits", async () => {
+      fake.streams = { logs: [{ name: "k8s_events", stats: { doc_time_max: recent() } }] };
+      const result = await match([view(["k8s_events"])]);
+      expect(result.views.get("events-view")).toBe(true);
+      expect(result.ready).toBe(false);
+    });
   });
 });

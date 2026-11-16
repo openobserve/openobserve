@@ -24,10 +24,12 @@ import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import type { FindMoreItem, FindMoreSource } from "./findMore";
 import { STARTER_PACKS } from "./kubernetesPack";
 import { usePackDismissal, usePackHiddenForOrg } from "./packDismissal";
-import type { StarterPack } from "./types";
+import type { PackItemKind, StarterPack } from "./types";
 import { useBrowserMatches, type BrowserInterrupted } from "./useBrowserMatches";
 import { useStarterPackFlow } from "./useStarterPackFlow";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
+
+const FIT_KINDS = new Set<PackItemKind>(["dashboard", "alert", "savedView"]);
 
 type HomePackView =
   | "hidden"
@@ -147,9 +149,7 @@ const matchItems = (item: HomePack): FindMoreItem[] => {
   const preview = flow.preview.value;
   if (preview) {
     return preview.items
-      .filter(
-        ({ kind, status }) => (kind === "dashboard" || kind === "alert") && status !== "existing",
-      )
+      .filter(({ kind, status }) => FIT_KINDS.has(kind) && status !== "existing")
       .map(({ kind, itemId }) => ({
         kind: kind as FindMoreItem["kind"],
         id: itemId,
@@ -165,6 +165,12 @@ const matchItems = (item: HomePack): FindMoreItem[] => {
       queries: 0,
     })),
     ...pack.alerts.map((id) => ({ kind: "alert" as const, id, name: id, queries: 0 })),
+    ...pack.savedViews.map(({ id, name }) => ({
+      kind: "savedView" as const,
+      id,
+      name,
+      queries: 0,
+    })),
   ];
 };
 

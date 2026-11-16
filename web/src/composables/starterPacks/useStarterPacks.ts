@@ -89,7 +89,7 @@ import {
   readOrgStreams,
   readSchemaColumns,
 } from "./packMatchData";
-import { isFresh, MAX_STREAM_COPIES } from "./streamCandidates";
+import { MAX_STREAM_COPIES } from "./streamCandidates";
 import { contentHash, useInstallRecords } from "./useInstallRecords";
 import { mergeUpdate, pickFields, revertUpdate } from "./packUpdate";
 import { panelHash } from "./repairLater";
@@ -477,7 +477,7 @@ export function useStarterPacks(org: string) {
   ) => {
     const here = (name: string) => {
       const found = locateStream(name, "metrics", { streams, repairs: [] });
-      return !!found && isFresh(found.lastIngested, Date.now());
+      return !!found && found.lastIngested > 0;
     };
     const flavours: Record<string, string> = {};
     const unsupported = new Set<string>();
@@ -521,10 +521,9 @@ export function useStarterPacks(org: string) {
       panels: docs.flatMap(dashboardItems),
       sources,
       choices,
-      nowMs: Date.now(),
       readers: {
         columns: async (type, name) => new Set(await readSchemaColumns(org, type, name)),
-        values: (stream, fields) => readValues(stream, fields),
+        values: (stream, fields, lastIngested) => readValues(stream, fields, "logs", lastIngested),
       },
     });
     return { ...plan, alerts, flavours, unsupported, streams, titles: sources.titles };
@@ -598,6 +597,14 @@ export function useStarterPacks(org: string) {
       return unsupported.has(id) ? "no_flavour" : "no_data";
     };
 
+    // Install skips only what the preview leaves out, so an unanswered question must not keep it.
+    const viewMissing = (itemId: string) => {
+      const stream = pack.savedViews.find(({ id }) => id === itemId)?.search?.data?.stream;
+      const type = String(stream?.streamType ?? "logs");
+      const wanted: string[] = stream?.selectedStream ?? [];
+      return wanted.some((name) => !locateStream(name, type, { streams, repairs }));
+    };
+
     const notIncluded: PackNotIncludedItem[] = [];
     const items: PackRecordItem[] = [];
     const reported = new Set<string>();
@@ -615,6 +622,9 @@ export function useStarterPacks(org: string) {
         if (!reported.has(id))
           notIncluded.push({ kind: "alert", itemId: id, name: names[id] ?? id, reason: missing });
         reported.add(id);
+        continue;
+      } else if (item.kind === "savedView" && viewMissing(item.itemId)) {
+        notIncluded.push({ kind: "savedView", itemId: item.itemId, name, reason: "no_data" });
         continue;
       }
       items.push(item);

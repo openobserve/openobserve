@@ -125,6 +125,29 @@ describe("useStarterPackFlow", () => {
     fake.previewPack.mockResolvedValue({ items: [], names: {}, notIncluded: [] });
   });
 
+  it("has no counts before the preview, then counts what the popup would create", async () => {
+    const flow = setup();
+    expect([flow.dashboardCount.value, flow.alertCount.value, flow.viewCount.value]).toEqual([
+      null,
+      null,
+      null,
+    ]);
+    fake.previewPack.mockResolvedValue({
+      items: [
+        { kind: "folder", itemId: "alerts", status: "pending" },
+        { kind: "dashboard", itemId: "overview", status: "pending" },
+        { kind: "alert", itemId: "a1", status: "pending" },
+        { kind: "alert", itemId: "a2", status: "existing" },
+      ],
+      names: {},
+      notIncluded: [{ kind: "savedView", itemId: "events", name: "Events", reason: "no_data" }],
+    });
+    await flow.loadPreview();
+    expect([flow.dashboardCount.value, flow.alertCount.value, flow.viewCount.value]).toEqual([
+      1, 1, 0,
+    ]);
+  });
+
   it("titles an installed alert from the preview, falling back to its saved name", async () => {
     fake.installs = [record()];
     const flow = setup();

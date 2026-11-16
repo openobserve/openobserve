@@ -77,11 +77,18 @@ const nameOf = (source: FindMoreSource): I18nText => {
 
 const logoOf = (source: FindMoreSource) => builtInOf(source.packId)?.pack.logo;
 
+// Visible rows never hold an installed built-in, so its setup makes what the popup would.
+const sourceCounts = (source: FindMoreSource): [number, number, number] => {
+  const flow = builtInOf(source.packId)?.flow;
+  if (flow) {
+    return [flow.dashboardCount.value ?? 0, flow.alertCount.value ?? 0, flow.viewCount.value ?? 0];
+  }
+  const count = (wanted: string) => source.items.filter(({ kind }) => kind === wanted).length;
+  return [count("dashboard"), count("alert"), count("savedView")];
+};
+
 const countsLine = (source: FindMoreSource): I18nText => {
-  const dashboards = source.items.filter(({ kind }) => kind === "dashboard").length;
-  const alerts = source.items.length - dashboards;
-  // Visible rows never hold an installed built-in, so its setup also makes its saved views.
-  const views = builtInOf(source.packId)?.pack.savedViews.length ?? 0;
+  const [dashboards, alerts, views] = sourceCounts(source);
   const parts = [
     ...(dashboards
       ? [t("starterPacks.headerChip.countDashboards", { count: dashboards }, dashboards)]
@@ -266,7 +273,12 @@ const setDrawerOpen = (packId: string, isOpen: boolean) => {
               <template #count>{{ source.streams.length - 1 }}</template>
             </Translation>
           </OTruncatedText>
-          <OText variant="meta">{{ countsLine(source) }}</OText>
+          <OText
+            v-if="countsLine(source)"
+            variant="meta"
+            :data-test="`header-starter-packs-counts-${source.id}`"
+            >{{ countsLine(source) }}</OText
+          >
           <div class="mt-1.5 flex">
             <OButton
               variant="primary"

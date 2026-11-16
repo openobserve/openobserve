@@ -81,7 +81,7 @@ vi.mock("./kubernetesPack", () => ({
 }));
 vi.mock("./packMatchData", () => ({
   readOrgStreams: async () => [],
-  matchPack: async () => ({ dashboards: new Map(), alerts: new Map() }),
+  matchPack: async () => ({ dashboards: new Map(), alerts: new Map(), views: new Map() }),
   matchAlerts: async () => new Map([["nginx/5xx", true]]),
 }));
 vi.mock("./useStarterPacks", () => ({
@@ -141,29 +141,29 @@ describe("useFindMore", () => {
     vi.clearAllMocks();
   });
 
-  it("appends new items of an installed pack to its record", async () => {
+  it("never installs a starter pack source, which sets up through its popup", async () => {
     fake.live = [{ installId: "old", status: "complete" }];
     const api = finder();
-    expect(await api.add(PACK_SOURCE)).toBe(true);
+    expect(await api.add(PACK_SOURCE)).toBe(false);
+    fake.live = [];
+    expect(await api.add(PACK_SOURCE)).toBe(false);
+    expect(fake.installPack).not.toHaveBeenCalled();
+    expect(fake.appendToInstall).not.toHaveBeenCalled();
+    expect(api.added.value).toEqual([]);
+  });
+
+  it("appends a Library group's new alerts to its live record", async () => {
+    fake.live = [{ installId: "old", status: "complete" }];
+    const api = finder();
+    expect(await api.add(NGINX)).toBe(true);
     expect(fake.appendToInstall).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "kubernetes" }),
+      expect.objectContaining({ id: "library-nginx" }),
       "old",
-      ["k8s/two"],
-      expect.objectContaining({ repairs: [{ from: "a", to: "b" }] }),
+      ["nginx/5xx", "nginx/slow"],
+      { repairs: [], bindings: [], flavours: {} },
     );
     expect(fake.installPack).not.toHaveBeenCalled();
     expect(api.added.value[0]).toMatchObject({ installId: "old", newRecord: false });
-  });
-
-  it("starts a new record with only the source's items for a pack not installed", async () => {
-    const api = finder();
-    await api.add(PACK_SOURCE);
-    const [, options] = fake.installPack.mock.calls[0] as unknown as [
-      unknown,
-      { exclude: string[] },
-    ];
-    expect(options.exclude).toEqual(["overview", "k8s/one", "events", "dashboards"]);
-    expect(api.added.value[0]).toMatchObject({ installId: "new", newRecord: true });
   });
 
   it("installs a Library group as its own alerts-only pack", async () => {
@@ -181,12 +181,12 @@ describe("useFindMore", () => {
   it("keeps the source listed and Undo available when the install ends incomplete", async () => {
     fake.installPack.mockResolvedValueOnce({ installId: "new", status: "incomplete" });
     const api = finder();
-    api.result.value = { checkedAt: 1, sources: [PACK_SOURCE], dismissed: 0 };
-    expect(await api.add(PACK_SOURCE)).toBe(false);
-    expect(api.result.value?.sources).toEqual([PACK_SOURCE]);
+    api.result.value = { checkedAt: 1, sources: [NGINX], dismissed: 0 };
+    expect(await api.add(NGINX)).toBe(false);
+    expect(api.result.value?.sources).toEqual([NGINX]);
     expect(api.added.value).toHaveLength(1);
     await api.undo(api.added.value[0]);
-    expect(api.result.value?.sources).toEqual([PACK_SOURCE]);
+    expect(api.result.value?.sources).toEqual([NGINX]);
   });
 
   it("drops an added source from this browser's header matches", async () => {
@@ -203,7 +203,7 @@ describe("useFindMore", () => {
   it("reports a failed append as not added", async () => {
     fake.live = [{ installId: "old", status: "complete" }];
     fake.appendToInstall.mockResolvedValueOnce({ installId: "old", status: "incomplete" });
-    expect(await finder().add(PACK_SOURCE)).toBe(false);
+    expect(await finder().add(NGINX)).toBe(false);
   });
 
   it("keeps both of two quick dismissals", async () => {
@@ -232,9 +232,12 @@ describe("useFindMore", () => {
   it("undoes only what the Add made", async () => {
     fake.live = [{ installId: "old", status: "complete" }];
     const api = finder();
-    await api.add(PACK_SOURCE);
+    await api.add(NGINX);
     await api.undo(api.added.value[0]);
-    expect(fake.undoItems).toHaveBeenCalledWith(expect.anything(), "old", ["k8s/two"]);
+    expect(fake.undoItems).toHaveBeenCalledWith(expect.anything(), "old", [
+      "nginx/5xx",
+      "nginx/slow",
+    ]);
     expect(fake.undoPack).not.toHaveBeenCalled();
     expect(api.added.value).toEqual([]);
   });

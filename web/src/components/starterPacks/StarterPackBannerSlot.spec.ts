@@ -81,6 +81,17 @@ describe("StarterPackBannerSlot", () => {
     );
   });
 
+  it("shows no counts until the preview has loaded", async () => {
+    fake.flow = fakeFlow({
+      alertCount: ref(null),
+      dashboardCount: ref(null),
+      viewCount: ref(null),
+    });
+    const wrapper = await render("typed");
+    expect(wrapper.get('[data-test="first-event-status-pack-setup-btn"]').text()).toBe("Set up");
+    expect(has(wrapper, "first-event-status-pack-card-counts")).toBe(false);
+  });
+
   it("opens the setup popup from Set up without installing", async () => {
     const wrapper = await render("typed");
     const drawer = wrapper.findComponent({ name: "StarterPackDrawer" });

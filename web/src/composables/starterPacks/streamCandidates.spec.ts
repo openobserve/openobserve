@@ -50,13 +50,13 @@ describe("metric candidates", () => {
 
   it("kube_node_status_condition must not match a deployment alert", () => {
     const streams = [stream("kube_node_status_condition", [...labels, "condition"])];
-    expect(metricCandidates(want, streams, sources, NOW)).toEqual([]);
-    expect(repairMetric(want, streams, sources, NOW)).toEqual({ repair: undefined });
+    expect(metricCandidates(want, streams, sources)).toEqual([]);
+    expect(repairMetric(want, streams, sources)).toEqual({ repair: undefined });
   });
 
   it("offers a same-entity metric but never fixes it without asking", () => {
     const streams = [stream("kube_deployment_status_replicas", labels)];
-    const { repair, question } = repairMetric(want, streams, sources, NOW);
+    const { repair, question } = repairMetric(want, streams, sources);
     expect(repair).toBeUndefined();
     expect(question?.candidates.map((row) => row.stream)).toEqual([
       "kube_deployment_status_replicas",
@@ -67,13 +67,13 @@ describe("metric candidates", () => {
   it("refuses a metric the query already uses", () => {
     const used = new Set(["kube_deployment_status_replicas"]);
     const streams = [stream("kube_deployment_status_replicas", labels)];
-    expect(repairMetric({ ...want, used }, streams, sources, NOW).question).toBeUndefined();
+    expect(repairMetric({ ...want, used }, streams, sources).question).toBeUndefined();
   });
 
   it("refuses a strict rename the query already uses", () => {
     const used = new Set(["Kube_Deployment_Spec_Replicas"]);
     const streams = [stream("Kube_Deployment_Spec_Replicas", labels)];
-    expect(repairMetric({ ...want, used }, streams, sources, NOW).repair).toBeUndefined();
+    expect(repairMetric({ ...want, used }, streams, sources).repair).toBeUndefined();
   });
 
   it.each([
@@ -81,20 +81,35 @@ describe("metric candidates", () => {
     "kube_deployment_spec_replicas_total",
     "otel_kube_deployment_spec_replicas",
   ])("fixes the strict rename %s on its own", (name) => {
-    const { repair } = repairMetric(want, [stream(name, labels)], sources, NOW);
+    const { repair } = repairMetric(want, [stream(name, labels)], sources);
     expect(repair).toEqual({ from: want.name, to: name });
   });
 
   it("offers a strict rename outside the entity prefix, so Change has a choice", () => {
     const name = "otel_kube_deployment_spec_replicas";
-    const { question } = repairMetric(want, [stream(name, labels)], sources, NOW);
+    const { question } = repairMetric(want, [stream(name, labels)], sources);
     expect(question?.answer).toEqual({ from: want.name, to: name });
     expect(question?.candidates.map((row) => row.stream)).toEqual([name]);
   });
 
-  it("ignores a stream silent for more than a day", () => {
-    const streams = [stream("KUBE_DEPLOYMENT_SPEC_REPLICAS", labels, 30)];
-    expect(repairMetric(want, streams, sources, NOW).repair).toBeUndefined();
+  it("fixes a strict rename on a stream whose last data is days old", () => {
+    const streams = [stream("KUBE_DEPLOYMENT_SPEC_REPLICAS", labels, 72)];
+    expect(repairMetric(want, streams, sources).repair).toEqual({
+      from: want.name,
+      to: "KUBE_DEPLOYMENT_SPEC_REPLICAS",
+    });
+  });
+
+  it("offers the newest of equal metrics first and never one with no data", () => {
+    const streams = [
+      stream("kube_deployment_status_old", labels, 72),
+      stream("kube_deployment_status_new", labels),
+      { ...stream("kube_deployment_status_never", labels), lastIngested: 0 },
+    ];
+    expect(metricCandidates(want, streams, sources).map((row) => row.stream)).toEqual([
+      "kube_deployment_status_new",
+      "kube_deployment_status_old",
+    ]);
   });
 });
 
@@ -113,20 +128,19 @@ describe("log roles", () => {
       [stream("cluster_events", eventColumns)],
       { cluster_events: agree },
       sources,
-      NOW,
     );
     expect(question.answer).toEqual({ from: "k8s_events", to: "cluster_events" });
   });
 
   it("asks when fields match but no identity agrees", () => {
-    const question = repairRole(role, [stream("edge", eventColumns)], {}, sources, NOW);
+    const question = repairRole(role, [stream("edge", eventColumns)], {}, sources);
     expect(question).toMatchObject({ kind: "confirm", answer: undefined });
   });
 
   it("asks once with every close match", () => {
     const streams = [stream("events_eu", eventColumns), stream("events_us", eventColumns)];
     const values = { events_eu: agree, events_us: agree };
-    const question = repairRole(role, streams, values, sources, NOW);
+    const question = repairRole(role, streams, values, sources);
     expect(question.candidates).toHaveLength(2);
     expect(question.answer).toBeUndefined();
   });
@@ -135,7 +149,7 @@ describe("log roles", () => {
     const values = {
       default: { service_name: ["web", "k8s-events", "api"], instrumentation_library_name: [] },
     };
-    const question = repairRole(role, [stream("default", eventColumns)], values, sources, NOW);
+    const question = repairRole(role, [stream("default", eventColumns)], values, sources);
     expect(question).toMatchObject({
       kind: "shared",
       filters: { default: { field: "service_name", values: ["web", "k8s-events", "api"] } },
@@ -149,7 +163,7 @@ describe("log roles", () => {
       default: { service_name: ["web", "k8s-events"] },
       mixed_logs: { service_name: ["api", "k8s-events"] },
     };
-    const question = repairRole(role, streams, values, sources, NOW);
+    const question = repairRole(role, streams, values, sources);
     expect(question.kind).toBe("shared");
     expect(question.candidates.map((row) => row.stream).sort()).toEqual(["default", "mixed_logs"]);
     expect(question.filters?.mixed_logs).toEqual({
@@ -161,13 +175,24 @@ describe("log roles", () => {
   it("keeps a shared stream out of a list where it would lose its filter", () => {
     const streams = [stream("default", eventColumns), stream("events_eu", eventColumns)];
     const values = { default: { service_name: ["web"] }, events_eu: agree };
-    const question = repairRole(role, streams, values, sources, NOW);
+    const question = repairRole(role, streams, values, sources);
     expect(question.candidates.map((row) => row.stream)).toEqual(["events_eu"]);
     expect(question.answer).toBeUndefined();
   });
 
+  it("offers a stale stream after a fresh one with the same fields", () => {
+    const streams = [stream("events_old", eventColumns, 72), stream("events_new", eventColumns)];
+    const question = repairRole(role, streams, {}, sources);
+    expect(question.candidates.map((row) => row.stream)).toEqual(["events_new", "events_old"]);
+  });
+
+  it("finds nothing to offer in a stream that never had data", () => {
+    const never = { ...stream("events", eventColumns), lastIngested: 0 };
+    expect(repairRole(role, [never], {}, sources)).toMatchObject({ kind: "none", candidates: [] });
+  });
+
   it("falls to the picker with field matches when nothing is close", () => {
-    const question = repairRole(role, [stream("noise", ["kind"])], {}, sources, NOW);
+    const question = repairRole(role, [stream("noise", ["kind"])], {}, sources);
     expect(question.kind).toBe("none");
     expect(question.candidates[0]).toMatchObject({ stream: "noise", matched: 1, total: 3 });
   });

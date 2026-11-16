@@ -151,7 +151,11 @@ watch(
 
 const routeAlerts = () =>
   router.push({ name: "alertDestinations", query: { org_identifier: props.org } }).catch(() => {});
-const alertCount = (pack: StarterPack) => flows.get(pack.id)?.alertCount.value ?? 0;
+const installLabel = (pack: StarterPack) => {
+  const count = flows.get(pack.id)?.alertCount.value ?? null;
+  if (count === null) return t("starterPacks.home.setUpShort");
+  return t("starterPacks.coverage.install", { count }, count);
+};
 const open = (pack: StarterPack) =>
   router
     .push({ name: "starterPack", params: { pack: pack.id }, query: { org_identifier: props.org } })
@@ -220,13 +224,7 @@ const open = (pack: StarterPack) =>
             :data-test="`starter-pack-coverage-install-${gap.pack.id}`"
             @click="drawerPackId = gap.pack.id"
           >
-            {{
-              t(
-                "starterPacks.coverage.install",
-                { count: alertCount(gap.pack) },
-                alertCount(gap.pack),
-              )
-            }}
+            {{ installLabel(gap.pack) }}
           </OButton>
           <OButton
             variant="ghost-primary"

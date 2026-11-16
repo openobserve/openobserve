@@ -80,7 +80,8 @@ describe("rawLogs", () => {
       readValues,
     );
     expect(found).toEqual([{ stream: "edge", column: "message" }]);
-    expect(readValues).not.toHaveBeenCalledWith("parsed", expect.anything());
+    expect(readValues.mock.calls.map(([stream]) => stream)).not.toContain("parsed");
+    expect(readValues).toHaveBeenCalledWith("edge", ["message"], "logs", 3);
   });
 
   it("checks only the most recently written streams", async () => {
@@ -89,9 +90,9 @@ describe("rawLogs", () => {
       Array.from({ length: RAW_LOG_SCAN_LIMIT + 5 }, (_, i) => [`s${i}`, i] as [string, number]),
     );
     for (const name of logs.keys()) schemas.columns[name] = ["_timestamp", "message"];
-    const readValues = vi.fn(async () => ({}));
+    const readValues = vi.fn(async (_stream: string) => ({}));
     await findRawNginxLogs("org", logs, readValues);
     expect(readValues).toHaveBeenCalledTimes(RAW_LOG_SCAN_LIMIT);
-    expect(readValues).not.toHaveBeenCalledWith("s0", expect.anything());
+    expect(readValues.mock.calls.map(([stream]) => stream)).not.toContain("s0");
   });
 });

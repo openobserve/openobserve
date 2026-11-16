@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -29,7 +30,11 @@ import type { FindMoreResult, FindMoreSource } from "@/composables/starterPacks/
 import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
 import { useDailyCheck } from "@/composables/starterPacks/useDailyCheck";
 import { useFindMore } from "@/composables/starterPacks/useFindMore";
+import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
+import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { copyToClipboard } from "@/utils/clipboard";
+import StarterPackDrawer from "./StarterPackDrawer.vue";
 
 const NAMES_SHOWN = 5;
 const MINUTE_US = 60 * 1_000_000;
@@ -44,10 +49,21 @@ const emit = defineEmits<{ changed: []; opened: [] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
 const finder = useFindMore(props.org);
 const daily = useDailyCheck(props.org);
 const open = ref(false);
 const savingDaily = ref(false);
+const activePack = ref<string | null>(null);
+// A setup popup mounts on first use, so opening Find More costs nothing.
+const usedPacks = ref<string[]>([]);
+
+const builtIns = STARTER_PACKS.map((pack) => ({
+  pack,
+  flow: useStarterPackFlow(props.org, pack),
+  matcher: useStarterPackMatcher(props.org, { pack }),
+}));
+const builtInOf = (packId?: string) => builtIns.find(({ pack }) => pack.id === packId);
 
 const isAdmin = computed(() => {
   const role = String(
@@ -86,13 +102,14 @@ const titleOf = (source: FindMoreSource): I18nText => {
 };
 
 const countsOf = (source: FindMoreSource): I18nText => {
-  const dashboards = source.items.filter(({ kind }) => kind === "dashboard").length;
-  const alerts = source.items.length - dashboards;
+  const count = (wanted: string) => source.items.filter(({ kind }) => kind === wanted).length;
+  const [dashboards, alerts, views] = [count("dashboard"), count("alert"), count("savedView")];
   const parts = [
     ...(dashboards
       ? [t("starterPacks.findMore.countDashboards", { count: dashboards }, dashboards)]
       : []),
     ...(alerts ? [t("starterPacks.countAlerts", { count: alerts }, alerts)] : []),
+    ...(views ? [t("starterPacks.countViews", { count: views }, views)] : []),
   ];
   return raw(parts.join(", "));
 };
@@ -104,9 +121,46 @@ const openFinder = () => {
   open.value = true;
   emit("opened");
   void finder.check();
+  for (const { flow } of builtIns) void flow.load();
+};
+
+const installedPack = (source: FindMoreSource) => !!builtInOf(source.packId)?.flow.record.value;
+
+const addLabel = (source: FindMoreSource): I18nText => {
+  if (!source.packId) return t("starterPacks.findMore.add");
+  return installedPack(source)
+    ? t("starterPacks.libraryTabs.openPack")
+    : t("starterPacks.headerChip.setUp");
+};
+
+// An installed pack takes new matches on its own page, so Find More never installs a pack.
+const setUpPack = async (packId: string) => {
+  const entry = builtInOf(packId)!;
+  open.value = false;
+  await entry.flow.load();
+  if (entry.flow.record.value) {
+    await router
+      .push({ name: "starterPack", params: { pack: packId }, query: { org_identifier: props.org } })
+      .catch(() => {});
+    return;
+  }
+  void entry.matcher.check();
+  if (!usedPacks.value.includes(packId)) usedPacks.value = [...usedPacks.value, packId];
+  activePack.value = packId;
+};
+
+const setDrawerOpen = (packId: string, isOpen: boolean) => {
+  if (isOpen) activePack.value = packId;
+  else if (activePack.value === packId) activePack.value = null;
+};
+
+const packInstalled = () => {
+  emit("changed");
+  void finder.check();
 };
 
 const add = async (source: FindMoreSource) => {
+  if (builtInOf(source.packId)) return setUpPack(source.packId!);
   const before = finder.added.value.length;
   const complete = await finder.add(source);
   if (finder.added.value.length > before) emit("changed");
@@ -280,7 +334,7 @@ const toggleDaily = async (on: unknown) => {
                   :data-test="`starter-pack-find-more-add-${source.id}`"
                   @click="add(source)"
                 >
-                  {{ t("starterPacks.findMore.add") }}
+                  {{ addLabel(source) }}
                 </OButton>
               </div>
             </div>
@@ -342,4 +396,16 @@ const toggleDaily = async (on: unknown) => {
       </template>
     </div>
   </ODrawer>
+
+  <template v-for="entry in builtIns" :key="entry.pack.id">
+    <StarterPackDrawer
+      v-if="usedPacks.includes(entry.pack.id)"
+      :open="activePack === entry.pack.id"
+      :flow="entry.flow"
+      :clusters="entry.matcher.clusters.value"
+      @update:open="setDrawerOpen(entry.pack.id, $event)"
+      @installed="packInstalled"
+      @copy-link="copyToClipboard(entry.flow.packLink(), t)"
+    />
+  </template>
 </template>

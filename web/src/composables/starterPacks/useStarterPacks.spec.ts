@@ -23,13 +23,14 @@ import store from "@/test/unit/helpers/store";
 import { HOST_METRICS_DASHBOARD_TITLE } from "@/composables/useHostMetricsDashboard";
 
 import { HOSTS_PACK } from "./hostsPack";
-import type { StarterPack } from "./types";
-import { StarterPackPermissionError } from "./types";
+import type { PackStreamRole, StarterPack } from "./types";
+import { leftOutIds, StarterPackPermissionError } from "./types";
 
 const library = vi.hoisted(() => ({
   down: false,
   matcher: false,
   lastIngested: 0,
+  onlyType: "",
   version: "",
   description: "d1",
   threshold: 3,
@@ -64,6 +65,9 @@ const fake = vi.hoisted(() => {
     let match: RegExpMatchArray | null;
     if (url.includes("/streams")) {
       const stats = { doc_time_max: library.lastIngested };
+      if (library.onlyType && !url.includes(`type=${library.onlyType}`)) {
+        return reply({ list: [], schema: [] });
+      }
       return reply({ list: [{ name: "kube_present", stats }], schema: [{ name: "value" }] });
     }
     if (url.endsWith("/parse_tree")) {
@@ -675,16 +679,40 @@ describe("useStarterPacks", () => {
   describe("previewPack", () => {
     it("leaves out an alert the shared matcher rejects once the constant is on", async () => {
       library.matcher = true;
-      const stale = (Date.now() - 25 * 60 * 60 * 1000) * 1000;
+      const stale = (Date.now() - 3 * 24 * 60 * 60 * 1000) * 1000;
       const reasons = async (lastIngested: number) => {
         library.lastIngested = lastIngested;
         const { notIncluded } = await packs().previewPack(PACK);
         return notIncluded.map(({ itemId }) => itemId);
       };
-      const [live, old] = [await reasons(Date.now() * 1000), await reasons(stale)];
+      const [live, old, never] = [
+        await reasons(Date.now() * 1000),
+        await reasons(stale),
+        await reasons(0),
+      ];
       library.matcher = false;
+      library.lastIngested = 0;
       expect(live).not.toContain("k8s/one");
-      expect(old).toContain("k8s/one");
+      expect(old).not.toContain("k8s/one");
+      expect(never).toContain("k8s/one");
+    });
+
+    it("takes a flavour whose data is days old", async () => {
+      library.lastIngested = (Date.now() - 3 * 24 * 60 * 60 * 1000) * 1000;
+      const preview = await packs().previewPack({
+        ...PACK,
+        alerts: ["k8s/two"],
+        flavours: [
+          {
+            id: "otel",
+            titleKey: "starterPacks.kubernetes.title",
+            detect: ["kube_present"],
+            alerts: { "k8s/two": { promql: "kube_present", streams: ["kube_present"] } },
+          },
+        ],
+      });
+      library.lastIngested = 0;
+      expect(preview.flavours).toEqual({ "k8s/two": "otel" });
     });
 
     it("takes a flavour's query when its data is here, and says when none exists", async () => {
@@ -753,6 +781,86 @@ describe("useStarterPacks", () => {
         ["events", "already_have"],
       ]);
       expect(counts()).toEqual({ ...EMPTY, views: 1 });
+    });
+
+    describe("a saved view whose stream is missing", () => {
+      const EVENTS_PACK: StarterPack = {
+        ...PACK,
+        alerts: [],
+        dashboards: [],
+        savedViews: [
+          {
+            id: "events",
+            name: "Events",
+            search: { meta: {}, data: { stream: { selectedStream: ["k8s_events"] }, query: "" } },
+          },
+        ],
+      };
+      const role = (fields: string[]): PackStreamRole => ({
+        id: "events",
+        titleKey: "starterPacks.kubernetes.title",
+        stream: "k8s_events",
+        fields,
+        identity: [{ field: "service_name", pattern: "^k8s-events$" }],
+      });
+      const viewOf = (preview: Awaited<ReturnType<ReturnType<typeof packs>["previewPack"]>>) => ({
+        included: preview.items.some(({ itemId }) => itemId === "events"),
+        left: preview.notIncluded.find(({ itemId }) => itemId === "events")?.reason,
+      });
+
+      beforeEach(() => {
+        library.lastIngested = (Date.now() - 3 * 24 * 60 * 60 * 1000) * 1000;
+      });
+      afterEach(() => {
+        library.lastIngested = 0;
+      });
+
+      it("leaves out the view when k8s_events cannot be found, and install skips it", async () => {
+        const api = packs();
+        const preview = await api.previewPack(EVENTS_PACK);
+        expect(viewOf(preview)).toEqual({ included: false, left: "no_data" });
+        const pack = { ...EVENTS_PACK, roles: [role(["missing_field"])] };
+        expect(viewOf(await api.previewPack(pack))).toEqual({ included: false, left: "no_data" });
+        await api.installPack(EVENTS_PACK, {
+          exclude: preview.notIncluded.map((row) => row.itemId),
+        });
+        expect(fake.state.views).toEqual([]);
+      });
+
+      it("leaves the view out while its stream question is open, and brings it back once chosen", async () => {
+        const api = packs();
+        const pack = { ...EVENTS_PACK, roles: [role(["value"])] };
+        const open = await api.previewPack(pack);
+        expect(open.questions[0]).toMatchObject({ want: "k8s_events", answer: undefined });
+        expect(viewOf(open)).toEqual({ included: false, left: "no_data" });
+        await api.installPack(pack, { exclude: leftOutIds(open), repairs: open.repairs });
+        expect(fake.state.views).toEqual([]);
+        const choices = { streams: { k8s_events: { to: "kube_present" } }, fields: {} };
+        const chosen = await api.previewPack(pack, choices);
+        expect(viewOf(chosen)).toEqual({ included: true, left: undefined });
+        await api.installPack(pack, { exclude: leftOutIds(chosen), repairs: chosen.repairs });
+        expect(JSON.stringify(fake.state.views[0])).toContain("kube_present");
+      });
+
+      it("finds the view's stream under the stream type it declares", async () => {
+        const traces: StarterPack = {
+          ...EVENTS_PACK,
+          savedViews: [
+            {
+              id: "events",
+              name: "Events",
+              search: {
+                meta: {},
+                data: { stream: { streamType: "traces", selectedStream: ["kube_present"] } },
+              },
+            },
+          ],
+        };
+        library.onlyType = "traces";
+        const preview = await packs().previewPack(traces);
+        library.onlyType = "";
+        expect(viewOf(preview)).toEqual({ included: true, left: undefined });
+      });
     });
 
     it("installs without excluded items, reporting progress and who installed", async () => {

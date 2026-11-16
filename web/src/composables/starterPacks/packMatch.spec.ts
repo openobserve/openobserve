@@ -27,7 +27,7 @@ const fresh = (NOW - 1000) * 1000;
 const facts = (over: Partial<MatchFacts> = {}): MatchFacts => ({
   streams: toStreamsByType([
     { name: "Kube_Pod", stream_type: "metrics", stats: { doc_time_max: fresh } },
-    { name: "old", stream_type: "metrics", stats: { doc_time_max: fresh - 25 * HOUR_US } },
+    { name: "old", stream_type: "metrics", stats: { doc_time_max: fresh - 72 * HOUR_US } },
     { name: "never", stream_type: "metrics" },
   ]),
   fields: new Map([
@@ -45,7 +45,7 @@ const entry = (required: string[]) =>
 const promql = (query: string) => ({ query_condition: { type: "promql", promql: query } });
 
 describe("matchItem", () => {
-  it("is ready when stream, labels and 24 h data all hold, ignoring case", () => {
+  it("is ready when stream, labels and data all hold, ignoring case", () => {
     const item = alertItem(entry(["kube_pod"]), promql('sum by (PHASE) (kube_pod{phase="x"})'));
     expect(matchItem(item, facts())).toBe(true);
   });
@@ -84,8 +84,8 @@ describe("matchItem", () => {
     expect(matchItem(item, facts({ aliases: [] }))).toBe(false);
   });
 
-  it("is not ready without data in the last 24 h or with no data at all", () => {
-    expect(matchItem(alertItem(entry(["old"])), facts())).toBe(false);
+  it("counts a stream whose last data is days old, but never one with no data", () => {
+    expect(matchItem(alertItem(entry(["old"])), facts())).toBe(true);
     expect(matchItem(alertItem(entry(["never"])), facts())).toBe(false);
   });
 

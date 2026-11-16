@@ -51,7 +51,12 @@ const alertsTile = computed<Tile>(() => {
       ...base,
       label: t("starterPacks.page.strip.alerts"),
       value: "—",
-      sub: count ? t("starterPacks.page.strip.willAddAlerts", { count }, count) : none(),
+      sub:
+        count === null
+          ? raw("")
+          : count
+            ? t("starterPacks.page.strip.willAddAlerts", { count }, count)
+            : none(),
       tone: "neutral",
     };
   }
@@ -88,10 +93,15 @@ const countTile = (
   kind: "dashboard" | "savedView",
   icon: IconName,
   label: I18nText,
-  planned: number,
+  planned: number | null,
 ): Tile => {
   if (!props.page.installed.value) {
-    const sub = planned ? t("starterPacks.page.strip.willAdd", { count: planned }) : none();
+    const sub =
+      planned === null
+        ? raw("")
+        : planned
+          ? t("starterPacks.page.strip.willAdd", { count: planned })
+          : none();
     return { key, label, value: "—", sub, icon, tone: "neutral" };
   }
   const count = madeCount(kind);

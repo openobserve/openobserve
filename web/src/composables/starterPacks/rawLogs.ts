@@ -47,7 +47,12 @@ export const looksLikeNginx = (samples: string[]) =>
 export const findRawNginxLogs = async (
   org: string,
   logs: Map<string, number>,
-  readValues: (stream: string, fields: string[]) => Promise<IdentityValues>,
+  readValues: (
+    stream: string,
+    fields: string[],
+    type: string,
+    lastIngested: number,
+  ) => Promise<IdentityValues>,
 ): Promise<RawLogNotice[]> => {
   const streams = [...logs]
     .sort(([, a], [, b]) => b - a)
@@ -56,7 +61,8 @@ export const findRawNginxLogs = async (
   const found = await inBatches(streams, async (stream): Promise<RawLogNotice | null> => {
     const column = plainTextColumn(await readSchemaColumns(org, "logs", stream).catch(() => []));
     if (!column) return null;
-    const samples = (await readValues(stream, [column]))[column] ?? [];
+    const samples =
+      (await readValues(stream, [column], "logs", logs.get(stream) ?? 0))[column] ?? [];
     return looksLikeNginx(samples) ? { stream, column } : null;
   });
   return found.filter((notice): notice is RawLogNotice => notice !== null);

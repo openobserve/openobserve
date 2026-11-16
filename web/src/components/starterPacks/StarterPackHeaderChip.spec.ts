@@ -71,6 +71,9 @@ vi.mock("@/composables/starterPacks/useStarterPackFlow", async () => {
         running,
         record,
         installed: computed(() => record.value?.status === "complete"),
+        dashboardCount: ref<number | null>(null),
+        alertCount: ref<number | null>(null),
+        viewCount: ref<number | null>(null),
         install: vi.fn(),
         load: vi.fn(async () => {}),
         packLink: () => "",
@@ -123,6 +126,7 @@ const source = (id: string, packId?: string): FindMoreSource => ({
   items: [
     { kind: "dashboard", id: `${id}/d`, name: "D", queries: 0 },
     { kind: "alert", id: `${id}/a`, name: "A", queries: 1 },
+    { kind: "savedView", id: `${id}/v`, name: "V", queries: 0 },
   ],
   queriesPerDay: 1,
 });
@@ -189,6 +193,21 @@ describe("StarterPackHeaderChip", () => {
     expect(byTest("header-starter-packs-count").text()).toBe("2");
     expect(chip().attributes("aria-label")).toBe("Starter packs, 2 fit your data");
     expect(byTest("header-starter-packs-fits-hosts").text()).toBe("Fits hosts_logs +1");
+  });
+
+  it("counts a built-in pack as its popup would, and hides the count until then", async () => {
+    save([source("library-nginx"), source("hosts", "hosts")]);
+    await render();
+    expect(byTest("header-starter-packs-counts-library-nginx").text()).toBe(
+      "1 dashboard · 1 alert · 1 saved view",
+    );
+    expect(wrapper!.find('[data-test="header-starter-packs-counts-hosts"]').exists()).toBe(false);
+    const hosts = fake.flows.find((flow) => flow.pack.id === "hosts")!;
+    hosts.dashboardCount.value = 1;
+    hosts.alertCount.value = 3;
+    hosts.viewCount.value = 0;
+    await nextTick();
+    expect(byTest("header-starter-packs-counts-hosts").text()).toBe("1 dashboard · 3 alerts");
   });
 
   it("makes no check on its own", async () => {

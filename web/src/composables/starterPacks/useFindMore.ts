@@ -201,8 +201,6 @@ export function useFindMore(org: string) {
   };
 
   const packFor = async (source: FindMoreSource): Promise<StarterPack> => {
-    const shipped = STARTER_PACKS.find(({ id }) => id === source.packId);
-    if (shipped) return shipped;
     const manifest = await loadManifest();
     const ids = new Set(source.items.map(({ id }) => id));
     return libraryPack(
@@ -226,12 +224,7 @@ export function useFindMore(org: string) {
   ): Promise<{ done: FindMoreAdded; complete: boolean }> => {
     const itemIds = source.items.map(({ id }) => id);
     const live = (await installer.listInstalls(pack.id)).find(({ status }) => status !== "removed");
-    const preview = source.packId ? await installer.previewPack(pack) : null;
-    const adaptation = {
-      repairs: preview?.repairs ?? [],
-      bindings: preview?.bindings ?? [],
-      flavours: preview?.flavours ?? {},
-    };
+    const adaptation = { repairs: [], bindings: [], flavours: {} };
     if (live) {
       const record = await installer.appendToInstall(pack, live.installId, itemIds, adaptation);
       const done = { source, installId: live.installId, itemIds, newRecord: false };
@@ -244,15 +237,16 @@ export function useFindMore(org: string) {
     ].filter((id) => !itemIds.includes(id));
     const record = await installer.installPack(pack, {
       ...adaptation,
-      copies: preview?.copies,
       exclude: [...others, ...unusedFolders(source)],
     });
     const done = { source, installId: record.installId, itemIds, newRecord: true };
     return { done, complete: record.status === "complete" };
   };
 
-  /** Installs one source's new matches with alerts off, like a first install. */
+  /** Installs one Library group's new matches with alerts off, like a first install. */
   const add = async (source: FindMoreSource): Promise<boolean> => {
+    // A starter pack is only ever set up through its setup popup.
+    if (source.packId) return false;
     busy.value = source.id;
     try {
       const { done, complete } = await install(await packFor(source), source);
@@ -260,7 +254,7 @@ export function useFindMore(org: string) {
       // An incomplete install keeps the source listed; Undo still covers what was made.
       if (complete) {
         dropSource(source.id);
-        browser.markInstalled(source.id, source.packId);
+        browser.markInstalled(source.id);
       }
       return complete;
     } catch {

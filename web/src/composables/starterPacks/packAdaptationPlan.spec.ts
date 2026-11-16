@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { planAdaptation, type PlanInput } from "./packAdaptationPlan";
 
@@ -28,7 +28,6 @@ const input = (over: Partial<PlanInput> & { columns?: Record<string, string[]> }
     alerts: [],
     panels: [],
     sources: { groups: [], aliases: [["k8s_cluster", "cluster_name"]] },
-    nowMs: NOW,
     readers: {
       columns: async (_type, name) => new Set(columns[name] ?? []),
       values: async () => ({}),
@@ -83,5 +82,28 @@ describe("planAdaptation", () => {
     expect(plan.repairs).toEqual([
       { from: "kube_pod_info", to: "kube_pod_labels", also: ["kube_pod_other"] },
     ]);
+  });
+
+  it("offers a log stream whose last data is days old, reading its values up to that time", async () => {
+    const stale = (NOW - 3 * 24 * 3_600_000) * 1000;
+    const values = vi.fn(async () => ({ service_name: ["k8s-events"] }));
+    const role = {
+      id: "events",
+      titleKey: "starterPacks.kubernetes.title",
+      stream: "k8s_events",
+      fields: ["kind", "reason"],
+      identity: [{ field: "service_name", pattern: "^k8s-events$" }],
+    };
+    const plan = await planAdaptation({
+      ...input({ columns: { cluster_events: ["kind", "reason", "service_name"] } }),
+      pack: { id: "k", roles: [role] } as unknown as PlanInput["pack"],
+      streams: { metrics: new Map(), logs: new Map([["cluster_events", stale]]) },
+      readers: {
+        columns: async () => new Set(["kind", "reason", "service_name"]),
+        values,
+      },
+    });
+    expect(values).toHaveBeenCalledWith("cluster_events", ["service_name"], stale);
+    expect(plan.repairs).toEqual([{ from: "k8s_events", to: "cluster_events" }]);
   });
 });

@@ -17,7 +17,14 @@ import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 
-const fake = vi.hoisted(() => ({ metrics: [] as string[], ready: false, matchPack: vi.fn() }));
+const fake = vi.hoisted(() => ({
+  metrics: [] as string[],
+  lastIngested: 1,
+  columns: [] as string[],
+  requests: [] as any[],
+  ready: false,
+  matchPack: vi.fn(),
+}));
 
 vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: true }));
 vi.mock("@/composables/alerts/useAlertLibrary", () => ({
@@ -25,13 +32,18 @@ vi.mock("@/composables/alerts/useAlertLibrary", () => ({
 }));
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
-    fetchQueryDataWithHttpStream: vi.fn(),
+    fetchQueryDataWithHttpStream: (request: any, handlers: any) => {
+      fake.requests.push(request);
+      handlers.complete(request, {});
+    },
     cancelStreamQueryBasedOnRequestId: vi.fn(),
   }),
 }));
 vi.mock("./packMatchData", () => ({
-  readOrgStreams: async () => ({ metrics: new Map(fake.metrics.map((name) => [name, 1])) }),
-  readSchemaColumns: async () => [],
+  readOrgStreams: async () => ({
+    metrics: new Map(fake.metrics.map((name) => [name, fake.lastIngested])),
+  }),
+  readSchemaColumns: async () => fake.columns,
   matchPack: (...args: unknown[]) => {
     fake.matchPack(...args);
     return Promise.resolve({ ready: fake.ready });
@@ -39,14 +51,15 @@ vi.mock("./packMatchData", () => ({
 }));
 
 import { HOSTS_PACK } from "./hostsPack";
+import { KUBERNETES_PACK } from "./kubernetesPack";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
 
-const check = async () => {
+const check = async (pack = HOSTS_PACK) => {
   let api!: ReturnType<typeof useStarterPackMatcher>;
   mount(
     defineComponent({
       setup() {
-        api = useStarterPackMatcher("org", { pack: HOSTS_PACK });
+        api = useStarterPackMatcher("org", { pack });
         return () => null;
       },
     }),
@@ -57,7 +70,7 @@ const check = async () => {
 
 describe("useStarterPackMatcher with the Library on, Hosts pack", () => {
   beforeEach(() => {
-    Object.assign(fake, { metrics: [], ready: false });
+    Object.assign(fake, { metrics: [], lastIngested: 1, columns: [], requests: [], ready: false });
     fake.matchPack.mockClear();
   });
 
@@ -82,5 +95,35 @@ describe("useStarterPackMatcher with the Library on, Hosts pack", () => {
     fake.metrics = ["kube_pod_status_phase"];
     expect(await check()).toBe("none");
     expect(fake.matchPack).not.toHaveBeenCalled();
+  });
+});
+
+describe("useStarterPackMatcher with the Library on, Kubernetes pack", () => {
+  it("reads clusters in the day before a stale stream's last data", async () => {
+    const lastIngested = Date.now() * 1000 - 3 * 24 * 60 * 60 * 1_000_000;
+    Object.assign(fake, {
+      metrics: ["kube_pod_status_phase"],
+      lastIngested,
+      columns: ["k8s_cluster"],
+      requests: [],
+      ready: true,
+    });
+    expect(await check(KUBERNETES_PACK)).toBe("matched");
+    const { query } = fake.requests[0].queryReq;
+    expect(query.end_time).toBe(lastIngested + 1);
+    expect(query.start_time).toBe(lastIngested + 1 - 24 * 60 * 60 * 1_000_000);
+  });
+
+  it("reads clusters up to now for a stream created within the day", async () => {
+    const before = Date.now() * 1000;
+    Object.assign(fake, {
+      metrics: ["kube_pod_status_phase"],
+      lastIngested: before - 3_600_000_000,
+      columns: ["k8s_cluster"],
+      requests: [],
+      ready: true,
+    });
+    expect(await check(KUBERNETES_PACK)).toBe("matched");
+    expect(fake.requests[0].queryReq.query.end_time).toBeGreaterThanOrEqual(before);
   });
 });

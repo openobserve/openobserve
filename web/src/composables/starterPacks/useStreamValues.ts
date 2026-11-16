@@ -23,15 +23,25 @@ import type { IdentityValues } from "./streamCandidates";
 const WINDOW_US = 24 * 60 * 60 * 1_000_000;
 const TOP_VALUES = 10;
 
+/** Ends a window at a stream's newest record, or now while that record is inside the window. */
+export const windowEnd = (lastIngested: number, windowUs: number) => {
+  const now = Date.now() * 1000;
+  // A new stream reports its creation time, so the window must still reach its data.
+  if (lastIngested <= 0 || now - lastIngested < windowUs) return now;
+  // The end bound may be exclusive, so the record at doc_time_max needs one more microsecond.
+  return lastIngested + 1;
+};
+
 /** Top values of a stream's identity fields over the streaming endpoint; a failure proves nothing. */
 export function useStreamValues(org: string) {
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
   const running = new Set<string>();
 
-  const readValues = (stream: string, fields: string[], type = "logs") =>
+  /** `lastIngested` ends the window at the stream's newest data, so a quiet stream still answers. */
+  const readValues = (stream: string, fields: string[], type = "logs", lastIngested = 0) =>
     new Promise<IdentityValues>((resolve) => {
       const traceId = generateTraceContext()?.traceId ?? "";
-      const end = Date.now() * 1000;
+      const end = windowEnd(lastIngested, WINDOW_US);
       const found: IdentityValues = {};
       const finish = () => {
         running.delete(traceId);

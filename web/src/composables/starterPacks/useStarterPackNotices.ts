@@ -210,19 +210,16 @@ export function useStarterPackNotices(page: StarterPackPage, actions: NoticeActi
   };
 
   const notSetUp = (): Notice[] => {
+    const dashboards = flow.dashboardCount.value;
+    const alerts = flow.alertCount.value;
+    const views = flow.viewCount.value;
+    // Without the preview there is nothing true to say about what setup adds.
+    if (dashboards === null || alerts === null || views === null) return [];
     const parts = [
-      t(
-        "starterPacks.page.notice.countDashboards",
-        { count: flow.dashboardCount.value },
-        flow.dashboardCount.value,
-      ),
-      t(
-        "starterPacks.page.notice.countAlertsPaused",
-        { count: flow.alertCount.value },
-        flow.alertCount.value,
-      ),
-      t("starterPacks.countViews", { count: flow.viewCount.value }, flow.viewCount.value),
-    ].filter((_, index) => [flow.dashboardCount, flow.alertCount, flow.viewCount][index].value > 0);
+      t("starterPacks.page.notice.countDashboards", { count: dashboards }, dashboards),
+      t("starterPacks.page.notice.countAlertsPaused", { count: alerts }, alerts),
+      t("starterPacks.countViews", { count: views }, views),
+    ].filter((_, index) => [dashboards, alerts, views][index] > 0);
     const what = new Intl.ListFormat(String(locale.value), { type: "conjunction" }).format(parts);
     return [
       {

@@ -207,7 +207,7 @@ const madeOfKind = (record: PackInstallRecord, kind: PackItemKind) =>
 const countsLine = (row: LibraryRow): I18nText => {
   const flow = flowOf(row);
   const made = row.record && !isSettingUp(row) ? row.record : null;
-  const parts: Array<[string, number]> = made
+  const parts: Array<[string, number | null]> = made
     ? [
         ["starterPacks.findMore.countDashboards", madeOfKind(made, "dashboard")],
         ["starterPacks.countAlerts", madeOfKind(made, "alert")],
@@ -220,7 +220,7 @@ const countsLine = (row: LibraryRow): I18nText => {
       ];
   return join(
     parts
-      .filter(([, value]) => value > 0)
+      .filter((part): part is [string, number] => (part[1] ?? 0) > 0)
       .map(([key, value]) => t(key as "starterPacks.countAlerts", { count: value }, value)),
   );
 };
@@ -376,7 +376,11 @@ const load = async ({ quiet = false }: { quiet?: boolean } = {}) => {
         // Without a preview the flow counts every manifest item, not what install would create.
         if (match.ready && !live.length) void flows.get(pack.id)?.loadPreview();
         if (live.length) void loadInstallState(pack).catch(() => {});
-        const verdicts = [...match.alerts.values(), ...match.dashboards.values()];
+        const verdicts = [
+          ...match.alerts.values(),
+          ...match.dashboards.values(),
+          ...match.views.values(),
+        ];
         return packRows(
           pack,
           {

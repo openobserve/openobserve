@@ -27,7 +27,7 @@ export const LIBRARY_SOURCE_PREFIX = "library-";
 export const NO_DISMISSALS: FindMoreDismissals = { sources: [], items: [] };
 
 export interface FindMoreItem {
-  kind: "dashboard" | "alert";
+  kind: "dashboard" | "alert" | "savedView";
   id: string;
   name: string;
   /** Background queries a day once this alert is on. */
@@ -158,6 +158,9 @@ const packSource = (
         name: entries.get(id)?.title ?? id,
         queries: inputs.queriesOf(id),
       })),
+    ...pack.savedViews
+      .filter(({ id }) => fresh(id, match.views.get(id) ?? false))
+      .map(({ id, name }) => ({ kind: "savedView" as const, id, name, queries: 0 })),
   ];
   const { kept, dismissed } = splitDismissed(pack.id, items, inputs.dismissals);
   const streams = kept.flatMap((item) => entries.get(item.id)?.required_streams ?? []);

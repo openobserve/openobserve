@@ -44,9 +44,18 @@ const emit = defineEmits<{ install: [] }>();
 
 const { t } = useI18nTyped();
 
-const dashboards = computed(() => props.flow.dashboardCount.value);
-const alerts = computed(() => props.flow.alertCount.value);
-const views = computed(() => props.flow.viewCount.value);
+// Without a preview an install in progress still counts the items its record plans.
+const countOf = (kind: PackItemKind, count: number | null) =>
+  count ?? props.flow.toCreate.value.filter((item) => item.kind === kind).length;
+const dashboards = computed(() => countOf("dashboard", props.flow.dashboardCount.value));
+const alerts = computed(() => countOf("alert", props.flow.alertCount.value));
+const views = computed(() => countOf("savedView", props.flow.viewCount.value));
+const counted = computed(
+  () =>
+    props.flow.dashboardCount.value !== null ||
+    !!props.flow.record.value ||
+    ["running", "failed", "interrupted"].includes(props.status),
+);
 const total = computed(() => dashboards.value + alerts.value + views.value);
 const made = computed(() => props.flow.made.value.length);
 const planned = computed(() => props.flow.toCreate.value.length);
@@ -99,7 +108,9 @@ const headIcon = computed(() => {
 const primaryText = computed(() => {
   if (props.status === "checking") return t("starterPacks.guide.checkingBtn");
   if (props.status === "running") return t("starterPacks.guide.settingUpBtn");
-  return props.primaryLabel ?? t("starterPacks.card.install", { count: total.value }, total.value);
+  if (props.primaryLabel !== undefined) return props.primaryLabel;
+  if (!counted.value) return t("starterPacks.home.setUpShort");
+  return t("starterPacks.card.install", { count: total.value }, total.value);
 });
 
 const STATE_ICONS = {
@@ -176,7 +187,7 @@ const rows = computed(() => [
     </div>
 
     <ul
-      v-if="status !== 'checking' && status !== 'forbidden'"
+      v-if="counted && status !== 'checking' && status !== 'forbidden'"
       class="flex flex-col gap-2"
       :data-test="`${testId}-counts`"
     >

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ref } from "vue";
 
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -88,6 +89,7 @@ describe("StarterPackCoverageLine", () => {
     }));
     fake.push.mockClear();
     flow.running.value = false;
+    Object.assign(flow, { alertCount: ref(2) });
   });
 
   it("stays hidden when no pack matches", async () => {
@@ -105,6 +107,15 @@ describe("StarterPackCoverageLine", () => {
       "Install 2 alerts",
     );
     expect(wrapper.find('[data-test="starter-pack-coverage-see-kubernetes"]').exists()).toBe(true);
+  });
+
+  it("offers Set up without a count until the pack's preview has loaded", async () => {
+    fake.ready = { kubernetes: true };
+    Object.assign(flow, { alertCount: ref(null) });
+    const wrapper = await mountLine();
+    expect(wrapper.find('[data-test="starter-pack-coverage-install-kubernetes"]').text()).toBe(
+      "Set up",
+    );
   });
 
   it("links an installed pack with every alert off to its page", async () => {

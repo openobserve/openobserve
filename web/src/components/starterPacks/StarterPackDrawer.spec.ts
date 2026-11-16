@@ -157,6 +157,22 @@ describe("StarterPackDrawer", () => {
     expect(wrapper.text()).not.toContain("Mine");
   });
 
+  it("lists a saved view whose stream was not found under Not included", async () => {
+    const flow = ready({
+      preview: shallowRef({
+        ...PREVIEW,
+        items: PREVIEW.items.filter(({ kind }) => kind !== "savedView"),
+        notIncluded: [{ kind: "savedView", itemId: "v1", name: "Events", reason: "no_data" }],
+      }),
+    });
+    const wrapper = render(flow);
+    await group(wrapper, "not").find("div").trigger("click");
+    const row = group(wrapper, "not").get('[data-test="starter-pack-drawer-not-row"]');
+    expect(row.text()).toContain("Events");
+    expect(row.text()).toContain("Not seen yet");
+    expect(wrapper.find('[data-test="starter-pack-drawer-group-savedView"]').exists()).toBe(false);
+  });
+
   it("leaves an unticked row out of the install and drops the count", async () => {
     const flow = ready();
     const wrapper = await shown(flow);

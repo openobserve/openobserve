@@ -20,7 +20,6 @@ import type { MatchItem } from "./packMatch";
 import { locateStream } from "./packMatch";
 import {
   fieldMatches,
-  isFresh,
   metricEntity,
   repairMetric,
   repairRole,
@@ -42,7 +41,8 @@ const LOG_STREAM_CAP = 50;
 
 export interface PlanReaders {
   columns: (type: string, name: string) => Promise<Set<string>>;
-  values: (stream: string, fields: string[]) => Promise<IdentityValues>;
+  /** Reads up to `lastIngested`, so a stream that went quiet still shows what it carried. */
+  values: (stream: string, fields: string[], lastIngested: number) => Promise<IdentityValues>;
 }
 
 export interface PlanInput {
@@ -52,7 +52,6 @@ export interface PlanInput {
   panels: MatchItem[];
   sources: BindingSources;
   choices?: PackChoices;
-  nowMs: number;
   readers: PlanReaders;
 }
 
@@ -105,7 +104,7 @@ const streamFacts = async (
   }));
 };
 
-const metricQuestions = async ({ streams, alerts, panels, sources, nowMs, readers }: PlanInput) => {
+const metricQuestions = async ({ streams, alerts, panels, sources, readers }: PlanInput) => {
   const known = streams.metrics ?? new Map<string, number>();
   const alertWants = metricWants(alerts, streams);
   const asked = new Set(alertWants.map(({ name }) => name));
@@ -125,7 +124,7 @@ const metricQuestions = async ({ streams, alerts, panels, sources, nowMs, reader
     columns: facts.find((row) => row.name === name)?.columns ?? new Set<string>(),
   }));
   return wants.flatMap((want) => {
-    const { question, repair } = repairMetric(want, names, sources, nowMs);
+    const { question, repair } = repairMetric(want, names, sources);
     if (!question) return [];
     // Panels are dropped by the fit check, so only an alert's metric is worth a question.
     return repair || asked.has(want.name) ? [question] : [];
@@ -135,14 +134,14 @@ const metricQuestions = async ({ streams, alerts, panels, sources, nowMs, reader
 const identityFields = (rules: PackIdentityRule[], columns: Set<string>) =>
   rules.map(({ field }) => field).filter((field) => columns.has(field));
 
-const roleQuestions = async ({ pack, streams, sources, nowMs, readers }: PlanInput) => {
+const roleQuestions = async ({ pack, streams, sources, readers }: PlanInput) => {
   const known = streams.logs ?? new Map<string, number>();
   const roles = (pack.roles ?? []).filter(
     ({ stream }) => !locateStream(stream, "logs", { streams, repairs: [] }),
   );
   if (!roles.length) return [];
   const recent = [...known]
-    .filter(([, lastIngested]) => isFresh(lastIngested, nowMs))
+    .filter(([, lastIngested]) => lastIngested > 0)
     .sort((left, right) => right[1] - left[1])
     .slice(0, LOG_STREAM_CAP);
   const facts = await streamFacts("logs", new Map(recent), () => true, readers);
@@ -156,10 +155,10 @@ const roleQuestions = async ({ pack, streams, sources, nowMs, readers }: PlanInp
       (name) => {
         const row = passing.find((stream) => stream.name === name)!;
         const fields = identityFields(role.identity, row.columns);
-        return fields.length ? readers.values(name, fields) : Promise.resolve({});
+        return fields.length ? readers.values(name, fields, row.lastIngested) : Promise.resolve({});
       },
     );
-    questions.push(repairRole(role, facts, Object.fromEntries(values), sources, nowMs));
+    questions.push(repairRole(role, facts, Object.fromEntries(values), sources));
   }
   return questions;
 };

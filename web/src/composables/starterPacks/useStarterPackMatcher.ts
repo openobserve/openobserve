@@ -29,6 +29,7 @@ import {
 
 import { KUBERNETES_PACK } from "./kubernetesPack";
 import { matchPack, readOrgStreams, readSchemaColumns } from "./packMatchData";
+import { windowEnd } from "./useStreamValues";
 import type { StarterPack } from "./types";
 
 export type PackMatchState = "checking" | "matched" | "waiting" | "none" | "error";
@@ -73,11 +74,12 @@ export function useStarterPackMatcher(
       nowMs.value - waitingSinceMs.value >= MATCH_PARTIAL_AFTER_MS,
   );
 
-  const readClusters = (stream: string, type: string, column: string) =>
+  // Ends at the stream's newest data, so a quiet cluster stream still names its clusters.
+  const readClusters = (stream: string, type: string, column: string, lastIngested = 0) =>
     new Promise<string[]>((resolve) => {
       const traceId = generateTraceContext()?.traceId ?? "";
       const found = new Set<string>();
-      const end = Date.now() * 1000;
+      const end = windowEnd(lastIngested, CLUSTER_WINDOW_US);
       clusterTrace = traceId;
       fetchQueryDataWithHttpStream(
         {
@@ -151,7 +153,8 @@ export function useStarterPackMatcher(
     if (matched) {
       if (anchor < 0) return { next: "matched", seen: [], found };
       const column = CLUSTER_COLUMNS.find((name) => columns[anchor].includes(name));
-      const seen = column ? await readClusters(present[anchor], "metrics", column) : [];
+      const last = orgStreams?.metrics?.get(present[anchor]);
+      const seen = column ? await readClusters(present[anchor], "metrics", column, last) : [];
       return { next: "matched", seen, found };
     }
     const arriving =

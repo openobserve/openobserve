@@ -39,7 +39,7 @@ import {
 } from "./packMatch";
 import type { BindingSources } from "./packBinding";
 import { strictRenames } from "./strictRenames";
-import type { PackDashboard, PackRepair, StarterPack } from "./types";
+import type { PackDashboard, PackRepair, PackSavedView, StarterPack } from "./types";
 
 const FILE_READS_AT_ONCE = 8;
 const FORCED_READ_GAP_MS = 30_000;
@@ -65,6 +65,7 @@ export interface PackLibrary {
 export interface PackMatch {
   alerts: Map<string, boolean>;
   dashboards: Map<string, boolean>;
+  views: Map<string, boolean>;
   ready: boolean;
 }
 
@@ -275,6 +276,16 @@ const strictPackRepairs = (entries: AlertLibraryEntry[], streams: StreamsByType)
   return [...new Map(found.map((repair) => [repair.from, repair])).values()];
 };
 
+// Same rule as the setup popup, so both count the same items.
+const viewFits = ({ search }: PackSavedView, streams: StreamsByType) => {
+  const stream = search?.data?.stream;
+  const type = String(stream?.streamType ?? "logs");
+  const wanted: string[] = stream?.selectedStream ?? [];
+  return wanted.every(
+    (name) => (locateStream(name, type, { streams, repairs: [] })?.lastIngested ?? 0) > 0,
+  );
+};
+
 /** A pack is ready when any item is; items without data are simply left out of it. */
 export const matchPack = async (
   org: string,
@@ -304,6 +315,8 @@ export const matchPack = async (
       panels[index].some((item) => matchItem(item, facts)),
     ]),
   );
+  const views = new Map(pack.savedViews.map((view) => [view.id, viewFits(view, streams)]));
+  // A saved view alone is not worth setting a pack up for.
   const ready = [...alerts.values(), ...dashboards.values()].some(Boolean);
-  return { alerts, dashboards, ready };
+  return { alerts, dashboards, views, ready };
 };

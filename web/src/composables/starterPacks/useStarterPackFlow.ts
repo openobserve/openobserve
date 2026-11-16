@@ -205,13 +205,10 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
 
   const planned = (kind: PackRecordItem["kind"]) =>
     (preview.value?.items ?? []).filter((item) => item.kind === kind && item.status !== "existing");
-  const alertCount = computed(() => (preview.value ? planned("alert").length : pack.alerts.length));
-  const dashboardCount = computed(() =>
-    preview.value ? planned("dashboard").length : pack.dashboards.length,
-  );
-  const viewCount = computed(() =>
-    preview.value ? planned("savedView").length : pack.savedViews.length,
-  );
+  // Null until the preview loads, since the raw pack counts items the data may not support.
+  const alertCount = computed(() => (preview.value ? planned("alert").length : null));
+  const dashboardCount = computed(() => (preview.value ? planned("dashboard").length : null));
+  const viewCount = computed(() => (preview.value ? planned("savedView").length : null));
 
   const alertsRoute = computed(() => ({
     name: "alertList",

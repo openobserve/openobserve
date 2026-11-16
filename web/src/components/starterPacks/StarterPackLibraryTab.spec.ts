@@ -15,6 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ref } from "vue";
 
 import i18n from "@/locales";
 
@@ -82,6 +83,7 @@ vi.mock("@/composables/starterPacks/packMatchData", () => ({
       ["a2", false],
     ]),
     dashboards: new Map([["overview", fake.ready]]),
+    views: new Map([["events", fake.ready]]),
   }),
 }));
 vi.mock("@/composables/starterPacks/useStarterPackFlow", async (importOriginal) => {
@@ -148,6 +150,7 @@ describe("StarterPackLibraryTab", () => {
     fake.copy.mockClear();
     fake.update.available.value = false;
     fake.state.userInfo.role = "admin";
+    Object.assign(flow, { alertCount: ref(2), dashboardCount: ref(1), viewCount: ref(1) });
     flow.record.value = null;
     flow.running.value = false;
     flow.alertsOff.value = 0;
@@ -185,7 +188,7 @@ describe("StarterPackLibraryTab", () => {
     expect(text(wrapper, "library-tab-counts-kubernetes")).toBe(
       "1 dashboard · 2 alerts · 1 saved view",
     );
-    expect(text(wrapper, "library-tab-meta-kubernetes")).toBe("2 of 3 items fit your data");
+    expect(text(wrapper, "library-tab-meta-kubernetes")).toBe("3 of 4 items fit your data");
     expect(text(wrapper, "library-tab-install-kubernetes")).toBe("Set up Kubernetes monitoring");
     expect(has(wrapper, "library-tab-see-kubernetes")).toBe(false);
     expect(wrapper.text()).not.toContain("What gets created");
@@ -209,7 +212,11 @@ describe("StarterPackLibraryTab", () => {
 
   it("offers Open pack and Ingestion guide, never Set up, for a pack without data", async () => {
     fake.ready = false;
+    Object.assign(flow, { alertCount: ref(null), dashboardCount: ref(null), viewCount: ref(null) });
+    vi.mocked(flow.loadPreview).mockClear();
     const wrapper = await render();
+    expect(flow.loadPreview).not.toHaveBeenCalled();
+    expect(has(wrapper, "library-tab-counts-kubernetes")).toBe(false);
     expect(text(wrapper, "library-tab-state-kubernetes")).toBe("Not ingested");
     expect(text(wrapper, "library-tab-meta-kubernetes")).toBe("Needs Kubernetes data");
     expect(has(wrapper, "library-tab-install-kubernetes")).toBe(false);

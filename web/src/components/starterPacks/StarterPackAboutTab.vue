@@ -51,7 +51,7 @@ const showUpdate = computed(
   () => STARTER_PACKS_ENABLED && props.page.canManage.value && props.page.updates.available.value,
 );
 // The flow's counts are what setup would still make, so a set-up pack counts what it made.
-const countOf = (kind: ContentKind, planned: number) =>
+const countOf = (kind: ContentKind, planned: number | null) =>
   record.value
     ? props.page.contents.value.filter(
         (row) => row.kind === kind && !["notCreated", "skipped"].includes(row.state),
@@ -61,6 +61,7 @@ const adds = computed(() => {
   const dashboards = countOf("dashboard", flow.dashboardCount.value);
   const alerts = countOf("alert", flow.alertCount.value);
   const views = countOf("savedView", flow.viewCount.value);
+  if (dashboards === null || alerts === null || views === null) return t(pack.descriptionKey);
   const counts = [
     t("starterPacks.page.notice.countDashboards", { count: dashboards }, dashboards),
     t("starterPacks.countAlerts", { count: alerts }, alerts),

@@ -173,6 +173,19 @@ describe("StarterPackHomeSection", () => {
     expect(wrapper.get('[data-test="home-pack-card-streams"]').text()).toContain("Fits k8s_events");
   });
 
+  it("shows no count rows until the preview has loaded", async () => {
+    fake.flows.kubernetes = fakeFlow({
+      alertCount: ref(null),
+      dashboardCount: ref(null),
+      viewCount: ref(null),
+    });
+    const wrapper = await render();
+    expect(has(wrapper, "home-pack-card")).toBe(true);
+    expect(has(wrapper, "home-pack-card-row-dashboard")).toBe(false);
+    expect(has(wrapper, "home-pack-card-row-alert")).toBe(false);
+    expect(has(wrapper, "home-pack-card-row-savedView")).toBe(false);
+  });
+
   it("opens the setup popup from Set up and never installs from the card", async () => {
     const wrapper = await render();
     const setUp = wrapper.get('[data-test="home-pack-card-setup-btn"]');
@@ -214,7 +227,8 @@ describe("StarterPackHomeSection", () => {
         streams: ["k8s_events", "k8s_logs"],
       }),
     ]);
-    expect(sources[0].items.map((item: { kind: string }) => item.kind)).toContain("alert");
+    const kinds = sources[0].items.map((item: { kind: string }) => item.kind);
+    expect(kinds).toEqual(expect.arrayContaining(["alert", "savedView"]));
     expect(installed).toEqual([]);
     expect(interrupted).toBeNull();
     wrapper.unmount();
