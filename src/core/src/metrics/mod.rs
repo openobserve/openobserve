@@ -479,11 +479,7 @@ mod tests {
     }
 
     fn schema_with_metadata(blob: &str) -> Schema {
-        Schema::empty().with_metadata(
-            [(METADATA_LABEL.to_string(), blob.to_string())]
-                .into_iter()
-                .collect(),
-        )
+        Schema::empty().with_metadata([(METADATA_LABEL.to_string(), blob.to_string())])
     }
 
     /// The historical shape: the OTLP writer built the family name with `Value::to_string()`,

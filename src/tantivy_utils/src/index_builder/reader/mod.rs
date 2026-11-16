@@ -16,8 +16,10 @@
 //! Record readers used by the Tantivy index builder.
 
 mod parquet;
+#[cfg(feature = "vortex")]
 mod vortex;
 
+#[cfg(feature = "vortex")]
 use std::ops::Range;
 
 use arrow::{error::ArrowError, record_batch::RecordBatch};
@@ -26,7 +28,8 @@ use bytes::Bytes;
 pub(super) type RecordBatchIter = Box<dyn Iterator<Item = Result<RecordBatch, ArrowError>>>;
 
 pub(super) enum ChunkSelector {
-    Parquet(usize),     // row_group id
+    Parquet(usize), // row_group id
+    #[cfg(feature = "vortex")]
     Vortex(Range<u64>), // row range
 }
 
@@ -40,6 +43,7 @@ pub(super) fn chunk_iter(
         ChunkSelector::Parquet(row_group_id) => {
             parquet::scan_parquet_row_group(data, projection, row_group_id)
         }
+        #[cfg(feature = "vortex")]
         ChunkSelector::Vortex(row_range) => {
             vortex::scan_vortex_row_range(data, projection, row_range)
         }

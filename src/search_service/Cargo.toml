@@ -37,7 +37,6 @@ config.workspace = true
 db.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
-datafusion-functions-json.workspace = true
 flight.workspace = true
 futures.workspace = true
 hashbrown.workspace = true

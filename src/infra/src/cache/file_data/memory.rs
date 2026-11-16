@@ -275,6 +275,7 @@ pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<G
         attributes: Default::default(),
         meta,
         range,
+        extensions: Default::default(),
     })
 }
 

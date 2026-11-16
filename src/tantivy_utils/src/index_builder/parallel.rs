@@ -17,8 +17,10 @@ use std::sync::Arc;
 
 use anyhow::{Context, Error};
 use bytes::Bytes;
+#[cfg(feature = "vortex")]
+use config::PARQUET_MAX_ROW_GROUP_SIZE;
 use config::{
-    FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
+    FileFormat, TIMESTAMP_COL_NAME,
     tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
 };
 use futures::future::join_all;
@@ -26,6 +28,7 @@ use infra::runtime::TANTIVY_BUILD_RUNTIME;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use tantivy::indexer::merge_indices;
 use tokio::task::JoinHandle;
+#[cfg(feature = "vortex")]
 use vortex::{
     VortexSessionDefault,
     file::OpenOptionsSessionExt,
@@ -69,6 +72,9 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
             )
             .await
         }
+        #[cfg(not(feature = "vortex"))]
+        FileFormat::Vortex => anyhow::bail!("vortex support is not compiled in"),
+        #[cfg(feature = "vortex")]
         FileFormat::Vortex => {
             let buf_meta = buf.clone();
             let row_count: u64 = tokio::task::spawn_blocking(move || -> Result<u64, Error> {
@@ -608,6 +614,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "vortex")]
     mod vortex_tests {
         use std::sync::Arc;
 

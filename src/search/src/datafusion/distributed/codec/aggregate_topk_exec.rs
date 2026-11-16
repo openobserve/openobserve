@@ -152,6 +152,7 @@ mod tests {
             physical_plan_type: Some(PhysicalPlanType::Extension(PhysicalExtensionNode {
                 node: node.encode_to_vec(),
                 inputs: vec![],
+                plan_name: None,
             })),
         }
         .encode_to_vec();

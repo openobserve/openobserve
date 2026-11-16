@@ -53,7 +53,7 @@ pub fn try_decode(
     Ok(Arc::new(NewEmptyExec::new(
         &node.name,
         schema,
-        projection.as_ref(),
+        projection.as_deref(),
         &filters,
         node.limit.map(|v| v as usize),
         // only the classic `_timestamp DESC` order travels with distributed
@@ -111,7 +111,7 @@ mod tests {
         let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
             &plan_table_name,
             Arc::clone(&schema),
-            Some(&vec![0]),
+            Some(&[0]),
             &[],
             Some(10),
             FileSortOrder::None,

@@ -29,6 +29,7 @@ pub mod sort_order;
 pub mod storage;
 pub mod udaf;
 pub mod udf;
+#[cfg(feature = "vortex")]
 pub mod vortex;
 
 #[derive(PartialEq, Debug)]

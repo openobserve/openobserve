@@ -16,16 +16,17 @@
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;
+#[cfg(feature = "vortex")]
+use config::utils::parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta};
 use config::{
-    CompactMergeOutput, FileFormat,
-    meta::stream::FileMeta,
-    utils::parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
+    CompactMergeOutput, FileFormat, meta::stream::FileMeta, utils::parquet::new_parquet_writer,
 };
 use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
 };
 use parquet::arrow::async_writer::AsyncFileWriter;
+#[cfg(feature = "vortex")]
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
@@ -36,6 +37,7 @@ use vortex::{
 };
 
 use super::{MergeMode, MergeOutput, MergedFile, append_metadata, new_temp_file};
+#[cfg(feature = "vortex")]
 use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
 
 pub(super) async fn write(
@@ -140,7 +142,21 @@ async fn write_parquet_to<W: AsyncFileWriter>(
     Ok(new_file_meta)
 }
 
+#[cfg(not(feature = "vortex"))]
+async fn write_vortex_to<W>(
+    _sink: W,
+    _schema: Arc<Schema>,
+    _metadata: &FileMeta,
+    _rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    _read_task: tokio::task::JoinHandle<Result<()>>,
+) -> Result<W> {
+    Err(DataFusionError::NotImplemented(
+        "vortex support is not compiled in".to_string(),
+    ))
+}
+
 /// Encode into `sink` and hand it back once the file is finished.
+#[cfg(feature = "vortex")]
 async fn write_vortex_to<W: VortexWrite + Unpin + 'static>(
     sink: W,
     schema: Arc<Schema>,
@@ -196,6 +212,7 @@ mod tests {
     use arrow::array::{Int64Array, StringArray};
     use arrow_schema::{DataType, Field};
     use config::TIMESTAMP_COL_NAME;
+    #[cfg(feature = "vortex")]
     use vortex::file::OpenOptionsSessionExt;
 
     use super::*;
@@ -249,6 +266,7 @@ mod tests {
         assert_eq!(read, vec![batch]);
     }
 
+    #[cfg(feature = "vortex")]
     #[tokio::test]
     async fn test_write_vortex_carries_file_meta() {
         let schema = Arc::new(Schema::new(vec![

@@ -129,6 +129,7 @@ impl ObjectStore for Local {
                 Ok(PutResult {
                     e_tag: None,
                     version: None,
+                    extensions: Default::default(),
                 })
             }
             Err(err) => {

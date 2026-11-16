@@ -53,10 +53,6 @@ impl OptimizerRule for LimitJoinRightSide {
         Some(ApplyOrder::TopDown)
     }
 
-    fn supports_rewrite(&self) -> bool {
-        true
-    }
-
     fn rewrite(
         &self,
         plan: LogicalPlan,
@@ -256,8 +252,8 @@ mod tests {
             "          DataSourceExec: partitions=1, partition_sizes=[1]",
             "          RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
             "            DeduplicationExec: columns: [name@0]",
-            "              SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
-            "                CoalescePartitionsExec",
+            "              SortExec: expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
+            "                CoalescePartitionsExec: fetch=50000",
             "                  AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]",
             "                    RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=1",
             "                      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]",

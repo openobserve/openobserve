@@ -82,7 +82,7 @@ pub async fn search(
     let trace_id = query_tracker.trace_id().to_string();
 
     // create datafusion context, just used for decode plan, the params can use default
-    let mut ctx = DataFusionContextBuilder::new()
+    let ctx = DataFusionContextBuilder::new()
         .trace_id(&trace_id)
         .work_group(req.work_group.clone())
         .build(cfg.limit.cpu_num)
@@ -90,7 +90,6 @@ pub async fn search(
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
     let proto = get_physical_extension_codec();

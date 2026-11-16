@@ -41,13 +41,11 @@ use hashbrown::HashMap;
 use o2_enterprise::enterprise::search::sampling::execution::generate_row_group_row_selection;
 use rayon::prelude::*;
 
-use crate::{
-    datafusion::{
-        storage,
-        vortex::{generate_vortex_access_plan, generate_vortex_access_plan_from_ranges},
-    },
-    index::IndexCondition,
+#[cfg(feature = "vortex")]
+use crate::datafusion::vortex::{
+    generate_vortex_access_plan, generate_vortex_access_plan_from_ranges,
 };
+use crate::{datafusion::storage, index::IndexCondition};
 
 /// Row group size used by writers before the `row_group_size` puffin property
 /// existed. Any .ttv file without the property was produced with this value.
@@ -99,6 +97,9 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
             #[cfg(not(feature = "enterprise"))]
             FileSelection::RowGroups(_) => {}
         },
+        #[cfg(not(feature = "vortex"))]
+        FileFormat::Vortex => {}
+        #[cfg(feature = "vortex")]
         FileFormat::Vortex => match selection {
             FileSelection::Rows(row_ids) => {
                 if let Some(access_plan) = generate_vortex_access_plan(&row_ids) {
@@ -253,7 +254,7 @@ fn exact_num_rows(file: &PartitionedFile) -> Option<usize> {
 pub fn apply_projection(
     schema: &SchemaRef,
     diff_rules: &HashMap<String, DataType>,
-    projection: Option<&Vec<usize>>,
+    projection: Option<&[usize]>,
     memory_exec: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if diff_rules.is_empty() {
@@ -282,7 +283,7 @@ pub fn apply_combined_filter(
     schema: &arrow_schema::Schema,
     fst_fields: &[String],
     exec_plan: Arc<dyn ExecutionPlan>,
-    filter_projection: Option<&Vec<usize>>,
+    filter_projection: Option<&[usize]>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if index_condition.is_none() && timestamp_filter.is_none() {
         return Ok(exec_plan);
@@ -324,7 +325,7 @@ pub fn apply_combined_filter(
 
     Ok(Arc::new(
         FilterExecBuilder::new(combined_expr, exec_plan)
-            .apply_projection(filter_projection.cloned())?
+            .apply_projection(filter_projection.map(<[usize]>::to_vec))?
             .build()?,
     ))
 }
@@ -378,9 +379,12 @@ pub(crate) fn file_scan_config(plan: &Arc<dyn ExecutionPlan>) -> Option<&FileSca
 #[cfg(test)]
 mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
+    #[cfg(feature = "vortex")]
     use config::meta::stream::FileKey;
     use datafusion::{common::Statistics, parquet::arrow::arrow_reader::RowSelector};
+    #[cfg(feature = "vortex")]
     use vortex::scan::selection::Selection;
+    #[cfg(feature = "vortex")]
     use vortex_datafusion::VortexAccessPlan;
 
     use super::*;
@@ -520,6 +524,7 @@ mod tests {
         assert_eq!(plan, expected);
     }
 
+    #[cfg(feature = "vortex")]
     #[tokio::test]
     async fn test_generate_access_plan_attaches_vortex_metrics_ranges() {
         let trace_id = "test_vortex_metrics_ranges";
