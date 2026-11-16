@@ -68,6 +68,11 @@ write({
   "web/src/comp/Attr.spec.ts": `import A from "./Attr.vue";`,
   "web/src/comp/Hi.vue": `<template>{{ t("x.hello") }}</template>`,
   "web/src/comp/Hi.spec.ts": `import Hi from "./Hi.vue";`,
+  "web/src/comp/New.vue": `<template>{{ t("z.added") }}</template>`,
+  "web/src/comp/New.spec.ts": `import N from "./New.vue";`,
+  "web/src/one.ts": `export const one = import.meta.glob("./one/?.json");`,
+  "web/src/one/a.json": "{}",
+  "web/src/one.spec.ts": `import { one } from "./one";`,
 });
 const base = commit();
 
@@ -114,6 +119,23 @@ test("an added locale key selects only the specs that read locale files", () => 
   assert.equal(r.mode, "picked");
   assert.ok(r.specs.includes(FS_SPEC));
   assert.deepEqual(graphSpecs(r), []);
+});
+
+test("an added locale key selects the specs of components that already use it", () => {
+  const r = run({
+    "web/src/locales/languages/en-US.json": JSON.stringify({ ...EN, z: { added: "Added" } }),
+  });
+  assert.deepEqual(graphSpecs(r), ["src/comp/New.spec.ts"]);
+});
+
+test("a bulk change of over 200 locale values runs everything", () => {
+  const z = Object.fromEntries(Array.from({ length: 201 }, (_, i) => [`k${i}`, `value ${i}`]));
+  const r = run({ "web/src/locales/languages/en-US.json": JSON.stringify({ ...EN, z }) });
+  assert.equal(r.mode, "full");
+});
+
+test("a question mark in an import.meta.glob pattern is a wildcard", () => {
+  assert.deepEqual(graphSpecs(run({ "web/src/one/a.json": `{"a":1}` })), ["src/one.spec.ts"]);
 });
 
 test("a non-English locale change selects the specs that read locale files", () => {

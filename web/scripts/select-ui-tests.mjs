@@ -121,8 +121,9 @@ export function parseAliases(configTexts) {
 }
 
 // Web-relative base path a specifier points at, or null for a package import.
-function specBase(spec, from, aliases) {
-  spec = spec.replace(/[?#].*$/, "");
+function specBase(spec, from, aliases, glob = false) {
+  // In a glob, "?" is a wildcard, not a query string.
+  if (!glob) spec = spec.replace(/[?#].*$/, "");
   for (const [k, dir] of Object.entries(aliases))
     if (spec === k || spec.startsWith(k + "/")) return posix.join(dir, spec.slice(k.length));
   if (spec.startsWith("./") || spec.startsWith("../")) {
@@ -181,7 +182,7 @@ export function buildGraph(texts, nodes, aliases) {
   const globRes = [];
   for (const [f, pat] of globs) {
     if (pat.startsWith("!")) continue;
-    const abs = specBase(pat, f, aliases);
+    const abs = specBase(pat, f, aliases, true);
     if (abs == null) continue;
     const re = globToRe(abs);
     const prefix = abs.slice(0, abs.search(/[*?{]|$/));
@@ -218,11 +219,13 @@ function flatten(o, pre = "", out = new Map()) {
   return out;
 }
 
-// Removed or value-changed keys with their old value; added keys cannot break an existing spec.
+// Added, removed or value-changed keys with their old value; an added key changes a t() call that fell back to the key.
 export function localeKeyChanges(oldText, newText) {
   const a = flatten(oldText == null ? {} : JSON.parse(oldText));
   const b = flatten(newText == null ? {} : JSON.parse(newText));
-  return [...a].filter(([k, v]) => !b.has(k) || b.get(k) !== v);
+  const changed = [...a].filter(([k, v]) => !b.has(k) || b.get(k) !== v);
+  for (const k of b.keys()) if (!a.has(k)) changed.push([k, undefined]);
+  return changed;
 }
 
 // Literal text a spec could assert on: the value minus {placeholders}, " | " plurals and @:links.
@@ -379,11 +382,8 @@ export function select({ repo, base, head }) {
       }
       const users = new Set();
       const out = new Set(direct);
-      // ponytail: a bulk rewrite makes the value search slow, so it falls back to the file's importers.
-      if (new Set(keys.map(([, v]) => v)).size > 200) {
-        take(`${repoPath} (over 200 values changed: every importer)`, [f], direct);
-        continue;
-      }
+      // ponytail: a bulk rewrite makes the value search slow; key users are not importers, so run everything.
+      if (keys.length > 200) return { ...full(`${repoPath}: over 200 keys changed`), changed };
       for (const [k, v] of keys) {
         for (const u of idx.keyUsers(k)) users.add(u);
         for (const s of valueSegments(v)) idx.specsContaining(s, out);
