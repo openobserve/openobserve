@@ -53,6 +53,7 @@ const baseRow: FiringRow = {
   name: "checkout_5xx_rate",
   alert_type: "scheduled",
   stream_name: "nginx_logs",
+  stream_type: "logs",
   priority: 1,
   last_outcome: "firing",
   firing_started_at: NOW_US - 42 * 60_000_000,
@@ -72,6 +73,7 @@ const getDetail = vi.fn();
 const getHistory = vi.fn();
 const ackAlert = vi.fn();
 const listAlertAcks = vi.fn();
+const generateSql = vi.fn();
 const router = makeAlertSectionRouter();
 
 const mountDrawer = async (row: FiringRow | null, alertId: string | null = "a1") => {
@@ -86,7 +88,11 @@ const mountDrawer = async (row: FiringRow | null, alertId: string | null = "a1")
           props: ["open"],
           template: "<div v-if='open'><slot name='header' /><slot /></div>",
         },
-        AlertGroupChart: { template: "<div data-test='chart' />" },
+        AlertGroupChart: {
+          name: "AlertGroupChart",
+          props: ["alert"],
+          template: "<div data-test='chart' />",
+        },
         QuickMuteDialog: true,
       },
     },
@@ -95,6 +101,11 @@ const mountDrawer = async (row: FiringRow | null, alertId: string | null = "a1")
   return wrapper;
 };
 const has = (wrapper: any, id: string) => wrapper.find(`[data-test="${id}"]`).exists();
+const deferred = <T>() => {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((r) => (resolve = r));
+  return { promise, resolve };
+};
 
 describe("FiringAlertDrawer", () => {
   beforeEach(() => {
@@ -105,6 +116,7 @@ describe("FiringAlertDrawer", () => {
       data: { changed: true, acks: [], other_groups_unacked: 0 },
     });
     listAlertAcks.mockReset().mockResolvedValue({ data: { acks: [] } });
+    generateSql.mockReset().mockResolvedValue({ data: { sql: "" } });
     getHistory.mockReset().mockResolvedValue({
       data: {
         hits: [
@@ -123,6 +135,7 @@ describe("FiringAlertDrawer", () => {
       getHistory,
       ackAlert,
       listAlertAcks,
+      generate_sql: generateSql,
     });
   });
 
@@ -424,7 +437,8 @@ describe("FiringAlertDrawer", () => {
     getHistory.mockReturnValue(new Promise(() => {}));
     await wrapper.setProps({ alertId: "a2", row: { ...baseRow, alert_id: "a2" } });
     await flushPromises();
-    expect(wrapper.find('[data-test="alerts-firing-drawer-now"]').text()).toContain("—");
+    expect(wrapper.find('[data-test="alerts-firing-drawer-now"]').text()).not.toContain("6.4");
+    expect(has(wrapper, "alerts-firing-drawer-now-loading")).toBe(true);
   });
 
   it("keeps the last runs through a failed read", async () => {
@@ -461,5 +475,104 @@ describe("FiringAlertDrawer", () => {
         .exists(),
     ).toBe(true);
     expect(wrapper.find('[data-test="alerts-firing-drawer-flaps"]').text()).toContain("0");
+  });
+
+  it("holds the chart's place while the alert of a row with a stream loads", async () => {
+    getDetail.mockReturnValue(new Promise(() => {}));
+    const wrapper = await mountDrawer(baseRow);
+    expect(wrapper.find('[data-section="chart"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "AlertGroupChart" }).props("alert")).toBeNull();
+  });
+
+  it("holds no chart place for a row with no stream", async () => {
+    getDetail.mockReturnValue(new Promise(() => {}));
+    const wrapper = await mountDrawer({ ...baseRow, stream_name: undefined });
+    expect(wrapper.find('[data-section="chart"]').exists()).toBe(false);
+  });
+
+  it("hands the chart the alert once it loads", async () => {
+    const wrapper = await mountDrawer(baseRow);
+    expect(wrapper.findComponent({ name: "AlertGroupChart" }).props("alert")).toMatchObject({
+      stream_name: "nginx_logs",
+    });
+  });
+
+  it("shows no chart section for an anomaly", async () => {
+    const wrapper = await mountDrawer({ ...baseRow, alert_type: "anomaly_detection" });
+    expect(wrapper.find('[data-section="chart"]').exists()).toBe(false);
+  });
+
+  it("shows skeletons for history and its tiles until the first read lands", async () => {
+    const read = deferred<any>();
+    getHistory.mockReturnValue(read.promise);
+    const wrapper = await mountDrawer(baseRow);
+    expect(has(wrapper, "alerts-firing-history-loading")).toBe(true);
+    expect(has(wrapper, "alerts-firing-history-event")).toBe(false);
+    for (const id of ["alerts-firing-drawer-now", "alerts-firing-drawer-flaps"]) {
+      expect(has(wrapper, `${id}-loading`)).toBe(true);
+      expect(wrapper.find(`[data-test="${id}"]`).text()).not.toContain("—");
+    }
+    expect(has(wrapper, "alerts-firing-drawer-firing-for-loading")).toBe(false);
+
+    read.resolve({ data: { hits: [{ timestamp: NOW_US - 1000, status: "firing" }] } });
+    await flushPromises();
+    expect(has(wrapper, "alerts-firing-history-loading")).toBe(false);
+    expect(has(wrapper, "alerts-firing-history-event")).toBe(true);
+    expect(has(wrapper, "alerts-firing-drawer-now-loading")).toBe(false);
+    expect(has(wrapper, "alerts-firing-drawer-flaps-loading")).toBe(false);
+  });
+
+  it("keeps the shown history, not skeletons, through a background re-read", async () => {
+    const wrapper = await mountDrawer(baseRow);
+    getHistory.mockReturnValue(new Promise(() => {}));
+    await wrapper.setProps({ refreshedAt: 1 });
+    await flushPromises();
+    expect(has(wrapper, "alerts-firing-history-loading")).toBe(false);
+    expect(has(wrapper, "alerts-firing-drawer-now-loading")).toBe(false);
+    expect(wrapper.find('[data-test="alerts-firing-drawer-now"]').text()).toContain("6.4");
+  });
+
+  it("holds the Open in Logs place while its SQL is pending, and drops it if none comes back", async () => {
+    const sql = deferred<any>();
+    generateSql.mockReturnValue(sql.promise);
+    getDetail.mockResolvedValue({
+      data: { ...detail, query_condition: { type: "custom", conditions: [] } },
+    });
+    const wrapper = await mountDrawer(baseRow);
+    const pending = wrapper.find('[data-test="alerts-firing-drawer-logs"]');
+    expect(pending.exists()).toBe(true);
+    expect(pending.attributes("aria-busy")).toBe("true");
+    expect(pending.attributes("href")).toBeUndefined();
+
+    sql.resolve({ data: { sql: "" } });
+    await flushPromises();
+    expect(has(wrapper, "alerts-firing-drawer-logs")).toBe(false);
+  });
+
+  it("holds the Open in Logs place while a logs alert itself loads", async () => {
+    getDetail.mockReturnValue(new Promise(() => {}));
+    const wrapper = await mountDrawer(baseRow);
+    expect(wrapper.find('[data-test="alerts-firing-drawer-logs"]').attributes("aria-busy")).toBe(
+      "true",
+    );
+  });
+
+  it("holds no Open in Logs place while a metrics alert loads", async () => {
+    getDetail.mockReturnValue(new Promise(() => {}));
+    const wrapper = await mountDrawer({ ...baseRow, stream_type: "metrics" });
+    expect(has(wrapper, "alerts-firing-drawer-logs")).toBe(false);
+  });
+
+  it("links a custom-condition alert to Logs once its SQL arrives", async () => {
+    generateSql.mockResolvedValue({
+      data: { sql: 'SELECT * FROM "nginx_logs" WHERE code >= 500' },
+    });
+    getDetail.mockResolvedValue({
+      data: { ...detail, query_condition: { type: "custom", conditions: [] } },
+    });
+    const wrapper = await mountDrawer(baseRow);
+    const link = wrapper.find('[data-test="alerts-firing-drawer-logs"]');
+    expect(link.attributes("aria-busy")).toBeUndefined();
+    expect(link.attributes("href")).toContain("/logs");
   });
 });

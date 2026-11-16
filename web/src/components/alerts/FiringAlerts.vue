@@ -138,7 +138,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-priority="{ row }">
           <OTag v-if="row.priority" type="alertPriority" :value="`p${row.priority}`" />
-          <span v-else class="text-text-muted">—</span>
+          <OTag
+            v-else
+            variant="default-soft"
+            size="sm"
+            shape="pill"
+            :label="t('alerts.firing.priorityUnset')"
+            :data-test="`alerts-firing-row-priority-unset-${row.alert_id}`"
+          />
         </template>
 
         <template #cell-state="{ row }">
@@ -167,29 +174,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-name="{ row }">
-          <div class="flex min-w-0 flex-col py-1">
-            <div class="flex min-w-0 items-center gap-2">
-              <OTruncatedText
-                as="span"
-                class="text-text-heading min-w-0 font-medium"
-                :data-test="`alerts-firing-row-name-${row.alert_id}`"
-              >
-                {{ raw(row.name) }}
-              </OTruncatedText>
-              <AckChip
-                v-if="row.ack"
-                :ack="row.ack"
-                :data-test="`alerts-firing-row-ack-${row.alert_id}`"
-              />
-            </div>
+          <div class="flex min-w-0 items-center gap-2">
             <OTruncatedText
               as="span"
-              class="text-text-secondary text-xs"
-              :data-test="`alerts-firing-row-sub-${row.alert_id}`"
+              class="text-text-heading min-w-0 font-medium"
+              :data-test="`alerts-firing-row-name-${row.alert_id}`"
             >
-              {{ raw(row.stream_name ?? "—") }}
+              {{ raw(row.name) }}
             </OTruncatedText>
+            <AckChip
+              v-if="row.ack"
+              :ack="row.ack"
+              :data-test="`alerts-firing-row-ack-${row.alert_id}`"
+            />
           </div>
+        </template>
+
+        <template #cell-stream_name="{ row }">
+          <OTruncatedText
+            as="span"
+            :class="{ 'text-text-secondary': !row.stream_name }"
+            :data-test="`alerts-firing-row-sub-${row.alert_id}`"
+          >
+            {{ raw(row.stream_name ?? "—") }}
+          </OTruncatedText>
         </template>
 
         <template #cell-firing_for="{ row }">
@@ -410,6 +418,15 @@ const columns = computed<OTableColumnDef<FiringRow>[]>(() => [
     sortable: true,
   },
   {
+    id: "stream_name",
+    header: t("alerts.firing.columnStream"),
+    accessorKey: "stream_name",
+    size: 160,
+    hideable: true,
+    sortable: true,
+    sortUndefined: "last",
+  },
+  {
     id: "firing_for",
     header: t("alerts.firing.columnFiringFor"),
     accessorFn: (row) => (row.firing_started_at ? -row.firing_started_at : undefined),
@@ -435,7 +452,8 @@ const folderOptions = computed(() => {
   ];
 });
 
-const rowRailTone = (row: FiringRow) => (row.priority ? (`p${row.priority}` as RowRailTone) : null);
+const rowRailTone = (row: FiringRow): RowRailTone =>
+  row.priority ? (`p${row.priority}` as RowRailTone) : "neutral";
 
 const rowClass = (row: FiringRow) =>
   row.alert_id === selectedAlertId.value ? "bg-table-row-selected-bg" : "";

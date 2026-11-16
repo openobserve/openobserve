@@ -134,12 +134,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.ack.takeOver") }}
           </OButton>
           <OButton
-            v-if="logsHref"
+            v-if="logsHref || logsPending"
             as="a"
             variant="outline"
             size="xs"
             icon-left="open-in-new"
-            :href="logsHref"
+            :href="logsHref || undefined"
+            :loading="logsPending"
             target="_blank"
             rel="noopener"
             data-test="alerts-firing-drawer-logs"
@@ -186,7 +187,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="tile.dataTest"
         >
           <OTruncatedText class="text-text-secondary text-xs">{{ tile.label }}</OTruncatedText>
+          <OSkeleton
+            v-if="tile.loading"
+            type="text"
+            class="h-7 w-16"
+            :data-test="`${tile.dataTest}-loading`"
+          />
           <span
+            v-else
             class="text-xl font-semibold tabular-nums"
             :class="tile.alarming ? 'text-icon-chip-error-text' : 'text-text-heading'"
           >
@@ -206,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div
-        v-if="chartAlert"
+        v-if="chartAlert || chartReserved"
         class="rounded-surface border-border-default border p-3"
         data-section="chart"
       >
@@ -227,6 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :view-all="viewAll"
           :failed="historyRead.isError.value && !hits.length"
           :partial="partialRead"
+          :loading="historyLoading"
         />
       </div>
     </div>
@@ -247,6 +256,7 @@ import { useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -336,6 +346,9 @@ const detailRead = useQuery(() =>
 const detail = computed<any>(() =>
   props.alertId && !isAnomaly.value ? detailRead.data.value : null,
 );
+const detailLoading = computed(
+  () => !!props.alertId && !isAnomaly.value && detailRead.isPending.value,
+);
 
 const acksRead = useQuery(() =>
   Object.assign(alertAcksQuery(orgId.value, props.alertId ?? "", detail.value?.folder_id), {
@@ -371,6 +384,8 @@ const historyRead = useQuery(() =>
   }),
 );
 const hits = computed<AlertRun[]>(() => historyRead.data.value?.hits ?? []);
+// Pending only until a first read lands; a refetch or a window change keeps the shown runs.
+const historyLoading = computed(() => !!props.alertId && historyRead.isPending.value);
 const partialRead = computed(() => (historyRead.data.value?.total ?? 0) > hits.value.length);
 
 // A same-minute refresh keeps the bucketed key, so nothing else would re-read; an in-flight read is reused.
@@ -468,6 +483,7 @@ const tiles = computed<
     value: string | number;
     sub?: I18nText;
     alarming?: boolean;
+    loading?: boolean;
     dataTest: string;
   }[]
 >(() => {
@@ -481,6 +497,7 @@ const tiles = computed<
       sub: reading.value?.threshold
         ? t("alerts.firing.drawer.threshold", { value: raw(reading.value.threshold) })
         : undefined,
+      loading: historyLoading.value,
       dataTest: "alerts-firing-drawer-now",
     },
     {
@@ -499,6 +516,7 @@ const tiles = computed<
       label: t("alerts.firing.drawer.flaps"),
       value: flaps.value,
       sub: t("alerts.firing.drawer.flapsUnit"),
+      loading: historyLoading.value,
       dataTest: "alerts-firing-drawer-flaps",
     },
   ];
@@ -507,6 +525,8 @@ const tiles = computed<
 const chartAlert = computed(() =>
   detail.value?.stream_name && detail.value?.query_condition ? detail.value : null,
 );
+// Only the list row is known before the detail lands, so it decides which places to hold.
+const chartReserved = computed(() => detailLoading.value && !!props.row?.stream_name);
 
 const destinations = computed<string[]>(
   () => props.row?.destinations ?? detail.value?.destinations ?? [],
@@ -548,6 +568,12 @@ const sqlRead = useQuery(() =>
     enabled: logsAlert.value?.query_condition?.type === "custom",
     retry: false,
   }),
+);
+// The button holds its place until the SQL is known, so the action row never shifts under the cursor.
+const logsPending = computed(
+  () =>
+    (detailLoading.value && props.row?.stream_type === "logs") ||
+    (logsAlert.value?.query_condition?.type === "custom" && sqlRead.isPending.value),
 );
 const logsSql = computed<string>(() =>
   logsAlert.value?.query_condition?.type === "sql"

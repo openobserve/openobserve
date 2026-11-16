@@ -131,9 +131,43 @@ describe("FiringAlerts", () => {
     wrapper.unmount();
   });
 
-  it("falls back to the stream on the subline", async () => {
+  it("keeps the Alert cell to one line and shows the stream in its own column", async () => {
+    listByFolderId.mockResolvedValue(
+      respond([...rowsFixture, { ...rowsFixture[1], alert_id: "4", stream_name: undefined }]),
+    );
     const wrapper = await mountPage();
+    const nameCell = wrapper.find('[data-test="alerts-firing-row-name-1"]').element.closest("td")!;
+    const streamCell = wrapper.find('[data-test="alerts-firing-row-sub-1"]').element.closest("td")!;
+    expect(nameCell).not.toBe(streamCell);
+    expect(nameCell.querySelector('[data-test="alerts-firing-row-sub-1"]')).toBeNull();
+    expect(nameCell.querySelector(".flex-col")).toBeNull();
     expect(wrapper.find('[data-test="alerts-firing-row-sub-1"]').text()).toBe("nginx_logs");
+    expect(wrapper.find('[data-test="alerts-firing-row-sub-4"]').text()).toBe("—");
+    const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+    const ids = columns.map((column) => column.id);
+    expect(ids.indexOf("stream_name")).toBe(ids.indexOf("folder_name") + 1);
+    const stream = columns.find((column) => column.id === "stream_name");
+    expect(stream).toMatchObject({ header: "Stream", hideable: true, sortable: true });
+    wrapper.unmount();
+  });
+
+  it("still finds a row by its stream", async () => {
+    const wrapper = await mountPage();
+    await wrapper.find('[data-test="alerts-firing-search"] input').setValue("k8s_events");
+    await flushPromises();
+    expect(bodyRows(wrapper).map((r: any) => r.text())).toEqual(["cert_expiry"]);
+    wrapper.unmount();
+  });
+
+  it("tags a row with no priority and gives it the neutral rail", async () => {
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="alerts-firing-row-priority-unset-3"]').text()).toBe(
+      "No priority",
+    );
+    expect(wrapper.find('[data-test="alerts-firing-row-priority-unset-1"]').exists()).toBe(false);
+    const railTone = wrapper.findComponent({ name: "OTable" }).props("rowRailTone") as any;
+    expect(railTone({ priority: undefined })).toBe("neutral");
+    expect(railTone({ priority: 2 })).toBe("p2");
     wrapper.unmount();
   });
 
@@ -261,6 +295,7 @@ describe("FiringAlerts", () => {
       "priority",
       "name",
       "folder_name",
+      "stream_name",
       "firing_for",
     ]);
     const rank = (id: string, row: object) =>

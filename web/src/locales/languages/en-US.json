@@ -12082,6 +12082,7 @@
       "columnState": "State",
       "columnAlert": "Alert",
       "columnFolder": "Folder",
+      "columnStream": "Stream",
       "columnFiringFor": "Firing for",
       "acknowledgeCount": "Acknowledge {count}",
       "mute": "Mute",

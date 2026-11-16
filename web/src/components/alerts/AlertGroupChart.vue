@@ -70,7 +70,7 @@
         searchType="ui"
         data-test="alerts-alertgroupchart-panel"
       />
-      <PanelChartPlaceholder v-else-if="pending" data-test="alerts-alertgroupchart-placeholder" />
+      <OSkeleton v-else-if="pending" class="h-full" data-test="alerts-alertgroupchart-loading" />
       <div
         v-else-if="chartError"
         class="flex h-full flex-col items-center justify-center gap-2"
@@ -101,9 +101,9 @@ import { useStore } from "vuex";
 
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import alertsService from "@/services/alerts";
 import {

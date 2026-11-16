@@ -40,6 +40,14 @@ const mountHistory = (props: Record<string, unknown>) =>
   });
 
 describe("FiringAlertHistory", () => {
+  it("shows skeleton rows, not the synthetic start, while loading", () => {
+    const wrapper = mountHistory({ loading: true, firingStartedAt: NOW - 10 * MIN });
+    expect(wrapper.find('[data-test="alerts-firing-history-loading"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="alerts-firing-history-event"]')).toHaveLength(0);
+    expect(wrapper.find('[data-test="alerts-firing-history-empty"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("History");
+  });
+
   it("stretches the bar to the firing start and reads as such", () => {
     const wrapper = mountHistory({
       hits: [{ timestamp: NOW - MIN, status: "firing" }],

@@ -306,7 +306,7 @@ describe("AlertGroupChart — loading", () => {
     trigger_condition: { threshold: 500 },
   };
   const line = (w: any) => w.findComponent({ name: "LoadingProgress" });
-  const placeholder = (w: any) => w.find('[data-test="alerts-alertgroupchart-placeholder"]');
+  const skeleton = (w: any) => w.find('[data-test="alerts-alertgroupchart-loading"]');
   const panel = (w: any) => w.findComponent({ name: "PanelSchemaRenderer" });
   const deferred = () => {
     let resolve: (value: any) => void = () => {};
@@ -321,29 +321,29 @@ describe("AlertGroupChart — loading", () => {
     await flushPromises();
   };
 
-  it("holds the chart's place with the placeholder and a line before the alert arrives", async () => {
+  it("holds the chart's place with a skeleton and a line before the alert arrives", async () => {
     wrapper = await mountChart(null as any);
 
-    expect(placeholder(wrapper).exists()).toBe(true);
+    expect(skeleton(wrapper).exists()).toBe(true);
     expect(line(wrapper).props("loading")).toBe(true);
     expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain(i18n.global.t("alerts.groups.chartUnavailable"));
     expect(alertsService.generate_sql).not.toHaveBeenCalled();
   });
 
-  it("keeps the placeholder and the line, not the unavailable text, while generate_sql runs", async () => {
+  it("keeps the same skeleton and the line, not the unavailable text, while generate_sql runs", async () => {
     const sql = deferred();
     vi.mocked(alertsService.generate_sql).mockReturnValue(sql.promise as any);
     wrapper = await mountChart(alert);
 
-    expect(placeholder(wrapper).exists()).toBe(true);
+    expect(skeleton(wrapper).exists()).toBe(true);
     expect(line(wrapper).props("loading")).toBe(true);
     expect(wrapper.text()).not.toContain(i18n.global.t("alerts.groups.chartUnavailable"));
 
     sql.resolve(sqlResponse);
     await flushPromises();
     expect(panel(wrapper).exists()).toBe(true);
-    expect(placeholder(wrapper).exists()).toBe(false);
+    expect(skeleton(wrapper).exists()).toBe(false);
     expect(line(wrapper).props("loading")).toBe(false);
   });
 
@@ -370,7 +370,7 @@ describe("AlertGroupChart — loading", () => {
 
     expect(line(wrapper).props("loading")).toBe(true);
     expect(panel(wrapper).exists()).toBe(true);
-    expect(placeholder(wrapper).exists()).toBe(false);
+    expect(skeleton(wrapper).exists()).toBe(false);
 
     sql.resolve(sqlResponse);
     await flushPromises();

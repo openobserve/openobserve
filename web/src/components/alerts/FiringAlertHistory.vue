@@ -30,7 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </router-link>
     </div>
 
-    <OText v-if="failed" variant="meta" data-test="alerts-firing-history-error">
+    <div v-if="loading" class="flex flex-col gap-2" data-test="alerts-firing-history-loading">
+      <OSkeleton class="h-3" />
+      <OSkeleton type="text" />
+      <div v-for="n in HISTORY_SKELETON_ROWS" :key="n" class="mt-1 flex gap-3">
+        <OSkeleton type="text" class="w-12 shrink-0" />
+        <div class="flex min-w-0 flex-1 flex-col gap-1 pb-3">
+          <OSkeleton type="text" class="h-5 w-2/3" />
+          <OSkeleton type="text" class="w-1/3" />
+        </div>
+      </div>
+    </div>
+    <OText v-else-if="failed" variant="meta" data-test="alerts-firing-history-error">
       {{ t("alerts.firing.drawer.historyFailed") }}
     </OText>
     <OText
@@ -89,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import type { RouteLocationRaw } from "vue-router";
 import OText from "@/lib/core/Typography/OText.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { ackEventText } from "@/utils/alerts/ackState";
@@ -102,6 +114,7 @@ import {
 import { formatInZone } from "@/utils/oncall";
 
 const WINDOW_US = 2 * 3_600_000_000;
+const HISTORY_SKELETON_ROWS = 3;
 const segmentClass = {
   firing: "bg-badge-error-solid-bg",
   ok: "bg-border-strong",
@@ -118,6 +131,8 @@ const props = defineProps<{
   failed?: boolean;
   /** The read holds only the newest runs of a longer history. */
   partial?: boolean;
+  /** The first read has not landed, so no run is known yet. */
+  loading?: boolean;
 }>();
 
 const { t } = useI18nTyped();
