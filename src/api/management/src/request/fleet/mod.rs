@@ -40,15 +40,16 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_api_common::extractors::ValidatedJson;
 
 #[cfg(feature = "enterprise")]
-use crate::service::auth::{UserEmail, check_permissions};
+use crate::service::{
+    auth::{UserEmail, check_permissions},
+    fleet::FLEETS,
+};
 
 #[cfg(feature = "enterprise")]
 const FLEET_CONFIGS: &str = "fleet_configs";
 /// Settings, audit, summary and pipelines.
 #[cfg(feature = "enterprise")]
 const FLEET_MANAGEMENT: &str = "fleet_management";
-#[cfg(feature = "enterprise")]
-const FLEETS: &str = "fleets";
 /// Per-fleet checks in flight at once when withholding token values.
 #[cfg(feature = "enterprise")]
 const FLEET_CHECK_CONCURRENCY: usize = 16;
@@ -1992,10 +1993,7 @@ async fn fleet_allowed(org_id: &str, user_id: &str, fleet: &str, verb: &str) -> 
     if let Some(answer) = tests::fga_answer(org_id, user_id, fleet, verb) {
         return answer;
     }
-    check_permissions(
-        fleet, org_id, user_id, FLEETS, verb, None, false, false, true,
-    )
-    .await
+    crate::service::fleet::fleet_allowed(org_id, user_id, fleet, verb).await
 }
 
 /// Every collector write is `PUT` on the collector's current fleet, which audits it.

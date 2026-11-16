@@ -34,6 +34,7 @@ use super::{readable_streams, readable_subjects};
 use crate::request::{organization::require_credential_access, security::security_allowed};
 
 const PIPELINE_CHECK_CONCURRENCY: usize = 16;
+const FLEET_CHECK_CONCURRENCY: usize = 16;
 
 /// The read check each subject kind's own GET route makes.
 #[async_trait]
@@ -43,6 +44,7 @@ pub trait ReadRights: Send + Sync {
     /// One answer per alert subject.
     async fn alerts(&self, subjects: Vec<EntityRef>) -> Vec<bool>;
     async fn pipeline(&self, pipeline_id: &str) -> bool;
+    async fn fleet(&self, fleet_id: &str) -> bool;
     async fn ingestion_tokens(&self) -> bool;
     /// One answer per service name.
     async fn services(&self, names: Vec<String>) -> Vec<bool>;
@@ -96,6 +98,11 @@ impl ReadRights for LiveRights<'_> {
                 true,
             )
             .await
+    }
+
+    /// The fleet GET routes' own check, the only fleet RBAC.
+    async fn fleet(&self, fleet_id: &str) -> bool {
+        openobserve_core::fleet::fleet_allowed(self.org_id, self.user_id, fleet_id, "GET").await
     }
 
     /// The token list route needs Admin or Root even with RBAC off.
@@ -153,7 +160,7 @@ pub async fn resolve_with<R: ReadRights>(rights: &R, subjects: &[EntityRef]) -> 
     let distinct: BTreeSet<&EntityRef> = subjects.iter().take(PROVIDER_RECORDS).collect();
     let dim = |s: &EntityRef, k: &str| s.key_dims.get(k).cloned();
     let (mut streams, mut alerts, mut pipelines, mut tokens) = (vec![], vec![], vec![], vec![]);
-    let mut services = vec![];
+    let (mut services, mut fleets) = (vec![], vec![]);
     for s in distinct {
         match s.kind.as_str() {
             kinds::STREAM => {
@@ -173,8 +180,11 @@ pub async fn resolve_with<R: ReadRights>(rights: &R, subjects: &[EntityRef]) -> 
                     services.push((s.clone(), name));
                 }
             }
-            // L4 replaces this with the fleet routes' own check.
-            kinds::FLEET => {}
+            kinds::FLEET => {
+                if let Some(id) = dim(s, dims::ENTITY_ID) {
+                    fleets.push((s.clone(), id));
+                }
+            }
             _ => {}
         }
     }
@@ -188,6 +198,12 @@ pub async fn resolve_with<R: ReadRights>(rights: &R, subjects: &[EntityRef]) -> 
         .collect()
         .await;
     readable.extend(pipelines.into_iter().filter_map(|(s, ok)| ok.then_some(s)));
+    let fleets: Vec<(EntityRef, bool)> = stream::iter(fleets)
+        .map(|(s, id)| async move { (s, rights.fleet(&id).await) })
+        .buffer_unordered(FLEET_CHECK_CONCURRENCY)
+        .collect()
+        .await;
+    readable.extend(fleets.into_iter().filter_map(|(s, ok)| ok.then_some(s)));
     if !services.is_empty() {
         let (subjects, names): (Vec<_>, Vec<_>) = services.into_iter().unzip();
         keep(&mut readable, subjects, rights.services(names).await);
@@ -251,6 +267,10 @@ mod tests {
             self.grants(pipeline_id)
         }
 
+        async fn fleet(&self, fleet_id: &str) -> bool {
+            self.grants(fleet_id)
+        }
+
         async fn ingestion_tokens(&self) -> bool {
             self.grants("tokens")
         }
@@ -302,7 +322,8 @@ mod tests {
             ("readable pipeline", by_id(kinds::PIPELINE, "p1"), true),
             ("unreadable pipeline", by_id(kinds::PIPELINE, "p2"), false),
             ("ingestion token", by_id(kinds::INGESTION_TOKEN, "ci"), true),
-            ("fleet stub", by_id(kinds::FLEET, "f1"), false),
+            ("readable fleet", by_id(kinds::FLEET, "f1"), true),
+            ("unreadable fleet", by_id(kinds::FLEET, "f2"), false),
             ("readable service", service("checkout"), true),
             ("unreadable service", service("billing"), false),
             (

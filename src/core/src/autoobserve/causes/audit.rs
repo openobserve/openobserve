@@ -252,7 +252,8 @@ fn audit_sql(org: &str, streams: &BTreeSet<EntityRef>, has_target: bool) -> Stri
     format!(
         "SELECT _timestamp, user_email, http_method, http_path, http_query_params, \
          substr(http_body, 1, {BODY_CHARS}) AS body{target} FROM \"{AUDIT_STREAM}\" \
-         WHERE org_id = {} AND http_method IN ('POST', 'PUT', 'PATCH', 'DELETE') AND ({}) \
+         WHERE org_id = {} AND http_method IN ('POST', 'PUT', 'PATCH', 'DELETE') \
+         AND http_response_code >= 200 AND http_response_code < 300 AND ({}) \
          ORDER BY _timestamp DESC LIMIT {ROWS}",
         quoted(org),
         paths.join(" OR ")
@@ -603,7 +604,8 @@ mod tests {
         }
     }
 
-    /// Calls on other streams, other orgs, reads, acks and calls outside the window are dropped.
+    /// Calls on other streams, other orgs, reads, acks, failed calls and calls outside the window
+    /// are dropped.
     #[tokio::test]
     async fn audit_rows_become_changes_that_touch_the_issue_streams() {
         let rows = vec![
@@ -620,6 +622,14 @@ mod tests {
         ];
         let mut rows = rows;
         rows[6]["target"] = "5xx".into();
+        for (at, method, path, code) in [
+            (105, "PUT", "acme/streams/app/settings", 400),
+            (125, "DELETE", "acme/streams/api", 500),
+        ] {
+            let mut failed = audit_row(at, method, path, "type=logs", "");
+            failed["http_response_code"] = code.into();
+            rows.push(failed);
+        }
         let mut other_org = audit_row(160, "DELETE", "other/streams/app", "", "");
         other_org["org_id"] = "other".into();
         let mut all = rows;
