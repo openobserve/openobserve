@@ -2723,7 +2723,10 @@ fn typed_query(tool: &str, args: Option<&Map<String, Value>>) -> Option<Value> {
         if typed.get("stream").is_none()
             && let Some(found) = SQL_FROM.captures(typed["text"].as_str().unwrap_or_default())
         {
-            let stream = found.get(1).or_else(|| found.get(2)).map(|m| m.as_str().to_string());
+            let stream = found
+                .get(1)
+                .or_else(|| found.get(2))
+                .map(|m| m.as_str().to_string());
             typed["stream"] = stream.into();
         }
         return Some(typed);
