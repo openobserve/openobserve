@@ -8020,6 +8020,7 @@ dependencies = [
  "http 1.5.0",
  "http-auth-basic",
  "infra",
+ "ingester",
  "ingestion-common",
  "log",
  "o2_enterprise",

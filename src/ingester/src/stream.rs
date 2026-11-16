@@ -32,13 +32,22 @@ use crate::{
 
 pub(crate) struct Stream {
     partitions: BTreeMap<Arc<str>, Partition>, // key: schema hash, val: partitions
+    min_ts: i64,                               // 0 until a batch with a timestamp is written
+    max_ts: i64,
 }
 
 impl Stream {
     pub(crate) fn new() -> Self {
         Self {
             partitions: BTreeMap::default(),
+            min_ts: 0,
+            max_ts: 0,
         }
+    }
+
+    /// Time range of all written batches, `None` when nothing with a timestamp was written.
+    pub(crate) fn time_range(&self) -> Option<(i64, i64)> {
+        (self.min_ts > 0).then_some((self.min_ts, self.max_ts))
     }
 
     pub(crate) fn write(
@@ -55,7 +64,13 @@ impl Stream {
                 v.insert(Partition::new())
             }
         };
+        let (min_ts, max_ts) = (batch.min_ts, batch.max_ts);
         arrow_size += partition.write(entry, batch)?;
+        // pop_time_range reports (0, 0) for a batch without timestamps
+        if min_ts > 0 && (self.min_ts == 0 || min_ts < self.min_ts) {
+            self.min_ts = min_ts;
+        }
+        self.max_ts = self.max_ts.max(max_ts);
         Ok(arrow_size)
     }
 
@@ -115,11 +130,12 @@ mod tests {
     use super::*;
 
     fn write_entry(s: &mut Stream, schema: &Arc<Schema>, schema_key: &str) -> usize {
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(Int64Array::from(vec![1_i64, 2, 3]))],
-        )
-        .unwrap();
+        write_ts(s, schema, schema_key, vec![1, 2, 3])
+    }
+
+    fn write_ts(s: &mut Stream, schema: &Arc<Schema>, schema_key: &str, ts: Vec<i64>) -> usize {
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int64Array::from(ts))]).unwrap();
         let arrow_size = batch.size();
         let batch = RecordBatchEntry::new("logs".into(), batch, 10, arrow_size);
         let entry = Entry {
@@ -155,5 +171,22 @@ mod tests {
         assert_eq!(write_entry(&mut s, &schema, "hash_a"), 0);
         assert_eq!(write_entry(&mut s, &schema, "hash_b"), schema.size());
         assert_eq!(s.partitions.len(), 2);
+    }
+
+    #[test]
+    fn test_stream_time_range_tracks_out_of_order_batches() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "_timestamp",
+            DataType::Int64,
+            false,
+        )]));
+        let mut s = Stream::new();
+        assert_eq!(s.time_range(), None);
+        write_ts(&mut s, &schema, "hash_a", vec![500, 600]);
+        assert_eq!(s.time_range(), Some((500, 600)));
+        write_ts(&mut s, &schema, "hash_b", vec![900, 100]);
+        assert_eq!(s.time_range(), Some((100, 900)));
+        write_ts(&mut s, &schema, "hash_a", vec![300, 700]);
+        assert_eq!(s.time_range(), Some((100, 900)));
     }
 }
