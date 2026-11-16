@@ -18,7 +18,6 @@ import {
   assertPanelTimeInURL,
   assertPanelTimeNotInURL,
   assertPanelTimeToggleState,
-  assertPanelDataNotRefreshed,
   assertPanelDataRefreshed,
   assertGlobalTimeDisplay
 } from "./utils/panelTimeAssertions.js";
@@ -385,9 +384,9 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await cleanupDashboard(page, pm, dashboardName);
   });
 
-  test("4-should change panel time with Apply button", async ({ page }) => {
+  test("4-should apply a picked panel time at once, with Auto Run off", async ({ page }) => {
     const pm = new PageManager(page);
-    // This test covers the Apply gate; Auto Run (on where auto_query_enabled) applies picks without Apply.
+    // A picked range on dashboards applies at once even with Auto Run off, so no Apply step is needed.
     await pm.dashboardAutoRun.setStoredAutoRun("false");
     const timestamp = Date.now();
     const dashboardName = `Dashboard_ChangeTime_${timestamp}`;
@@ -408,30 +407,25 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       { timeout: 10000 }
     );
 
-    // Capture initial URL
     const initialURL = page.url();
 
-    // Step 2: Click panel picker, select "Last 6 days"
+    // Step 2: Click panel picker; the panel query must start once "Last 6 days" is picked
     await pm.dashboardPanelTime.clickPanelTimePicker(panelId);
+    const requery = page.waitForRequest(
+      (req) => req.url().includes('/query') || req.url().includes('/_search'),
+      { timeout: 15000 }
+    );
     await pm.dashboardPanelTime.clickDateTimeRelative("6-d");
 
-    // Step 3: Verify panel data does NOT refresh yet
-    await assertPanelDataNotRefreshed(page, 2000);
+    // Step 3: Verify the panel re-queries without Apply
+    await requery;
 
-    // Step 4: Verify URL has NOT updated yet
-    expect(page.url()).toBe(initialURL);
-
-    // Step 5: Click Apply button
-    await pm.dashboardPanelTime.clickDateTimeApplyBtn();
-
-    // Step 6: Verify API call fires immediately
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-    // Step 7: Verify URL updates
+    // Step 4: Verify URL updates without Apply
     await assertPanelTimeInURL(page, panelId, "6d");
-
-    // Step 8: Verify URL changed from initial
     expect(page.url()).not.toBe(initialURL);
+
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Step 9: Open Query Inspector from panel dropdown menu in View Dashboard
     await pm.dashboardPanelActions.selectPanelAction(panelName, "Inspector");
