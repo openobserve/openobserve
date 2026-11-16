@@ -373,7 +373,12 @@ pub async fn preview_detection(
     let start = end - range_us;
     let settings = db::organization::read_org_setting(&org_id, |s| s.security_tuning.shared())
         .await
-        .unwrap_or_default();
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "[SECURITY] security tuning of org {org_id} unreadable, using defaults: {e}"
+            );
+            Default::default()
+        });
     let tuned = authoring::PreviewTuning::new(
         &settings,
         req.alert_id.as_deref(),

@@ -1237,8 +1237,12 @@ async fn create_pipeline(
     let found = realtime_pipelines_for(&list, stream_name);
     if found.len() > 1 {
         let winner = pick_winner(&found).to_string();
-        if winner != mine {
-            let _ = pipeline_service::delete_user_pipeline(org_id, &mine).await;
+        if winner != mine
+            && let Err(e) = pipeline_service::delete_user_pipeline(org_id, &mine).await
+        {
+            log::warn!(
+                "[SECURITY] attach on {org_id}/{stream_name} left duplicate pipeline {mine}: {e}"
+            );
         }
         let created = winner == mine;
         return Ok((winner, created));
@@ -1362,7 +1366,18 @@ async fn detach(
     let function = setting_function_name(&target, stream_name);
     if can(org_id, user_id, "functions", "DELETE", &function).await {
         // A function another pipeline still uses refuses deletion; detach succeeds either way.
-        let _ = openobserve_core::functions::delete_function(org_id, &function).await;
+        if let Err(e) = openobserve_core::functions::delete_function(org_id, &function).await {
+            use openobserve_core::functions::FunctionDeleteError;
+            match e {
+                FunctionDeleteError::FunctionInUse(m)
+                | FunctionDeleteError::PipelineDependencies(m) => log::debug!(
+                    "[SECURITY] detach on {org_id}/{stream_name} kept function {function}: {m}"
+                ),
+                FunctionDeleteError::NotFound => log::warn!(
+                    "[SECURITY] detach on {org_id}/{stream_name} could not delete function {function}"
+                ),
+            }
+        }
     }
     Ok(DetachResponse { setting, skipped })
 }

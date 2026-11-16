@@ -1152,7 +1152,13 @@ pub async fn correlate_alert_to_incident(
     }
     let group_window = db::organization::read_org_setting(&alert.org_id, |s| s.security_cases)
         .await
-        .unwrap_or_default()
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "[SECURITY] case settings of org {} unreadable, using defaults: {e}",
+                alert.org_id
+            );
+            Default::default()
+        })
         .group_window_micros();
     // One case per entity and window, so old and current evidence never share a case.
     let mut merged: Option<CorrelatedIncident> = None;
@@ -1200,7 +1206,12 @@ fn merge_correlations(
 async fn load_risk_scan(org_id: &str) -> RiskScan {
     let tuning = db::organization::read_org_setting(org_id, |s| s.security_tuning.shared())
         .await
-        .unwrap_or_default();
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "[SECURITY] security tuning of org {org_id} unreadable, using defaults: {e}"
+            );
+            Default::default()
+        });
     let open_cases = match infra::table::alert_incidents::find_correlation_candidates(
         org_id,
         infra::table::alert_incidents::CaseFilter::OnlyCases,
@@ -1377,7 +1388,13 @@ async fn correlate_rows(
         use o2_enterprise::enterprise::security::{cases, risk};
         let settings = db::organization::read_org_setting(&alert.org_id, |s| s.security_cases)
             .await
-            .unwrap_or_default();
+            .unwrap_or_else(|e| {
+                log::warn!(
+                    "[SECURITY] case settings of org {} unreadable, using defaults: {e}",
+                    alert.org_id
+                );
+                Default::default()
+            });
         let entity = settings.group_window_micros().and(entity);
         let evidence = if notify_rows.is_empty() {
             std::slice::from_ref(result_row)
