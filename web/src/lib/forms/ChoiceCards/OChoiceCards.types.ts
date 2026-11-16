@@ -18,6 +18,8 @@ export interface ChoiceCardsProps {
   /** Names the group for assistive technology. */
   label: I18nText;
   disabled?: boolean;
+  /** Fixed column count; by default as many cards fit per row as the width allows. */
+  columns?: 2;
 }
 
 export interface ChoiceCardsEmits {
