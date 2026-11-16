@@ -1769,6 +1769,7 @@ describe("SearchResult AI doors (as on main: add to chat only)", () => {
     expect(addDoorToChat).toHaveBeenCalledWith(
       expect.objectContaining({ objectKind: "log_row", boundOrg: "test-org" }),
       "u|org-a",
+      null,
     );
     expect(wrapper.find('[data-test="ai-entry-log-row-explain"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="ai-entry-log-field-explain"]').exists()).toBe(false);

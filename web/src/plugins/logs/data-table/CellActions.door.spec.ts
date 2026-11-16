@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
+import { OTableToolbarOwnerKey } from "@/lib/core/Table/OTable.types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -75,7 +76,22 @@ describe("CellActions AI button (main's sparkle)", () => {
     expect(env.add).toHaveBeenCalledWith(
       expect.objectContaining({ objectKind: "log_field", boundOrg: "org-a" }),
       "u|org-a",
+      null,
     );
+  });
+
+  it("names the table cell as the invoker, since its toolbar unmounts once focus leaves it", async () => {
+    const cell = document.createElement("td");
+    const w = mount(CellActions, {
+      global: { plugins: [i18n], provide: { [OTableToolbarOwnerKey as symbol]: () => cell } },
+      props: {
+        column: { id: "status" },
+        row: { status: "200" },
+        selectedStreamFields: [{ name: "status", isSchemaField: true }],
+      },
+    });
+    await w.get('[data-test="ai-sparkle-stub"]').trigger("click");
+    expect(env.add).toHaveBeenCalledWith(expect.anything(), "u|org-a", cell);
   });
 
   it("holds copy, include, exclude and the AI button together in one toolbar, as on main", () => {

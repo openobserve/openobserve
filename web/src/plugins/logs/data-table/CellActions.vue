@@ -41,7 +41,7 @@
     </template>
     <O2AIContextAddBtn
       v-if="!hideAi && doorShown"
-      @send-to-ai-chat="addDoorToChat(fieldDoor(), userOrgKey)"
+      @send-to-ai-chat="addDoorToChat(fieldDoor(), userOrgKey, toolbarCell())"
       class="size-6! border border-solid border-white"
       :imageHeight="'14'"
       :imageWidth="'14'"
@@ -70,6 +70,7 @@ import {
   logFieldBuild,
   logsDoorBase,
   useAssistantDoorShown,
+  useToolbarInvoker,
   type LogsDoorBase,
 } from "@/plugins/logs/logsDoors";
 
@@ -145,6 +146,7 @@ const loadedOrg = useLoadedOrg(
 
 const doorShown = useAssistantDoorShown();
 const userOrgKey = currentUserOrgKey();
+const toolbarCell = useToolbarInvoker();
 
 // Field doors attach `{field, value}` with the field name, the stream and range as provenance.
 const fieldDoor = () => ({

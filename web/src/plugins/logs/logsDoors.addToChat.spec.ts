@@ -27,6 +27,7 @@ vi.mock("@/composables/assistant/pure", async () => {
 });
 
 import { addDoorToChat, useAssistantDoorShown, type ChatDoor } from "./logsDoors";
+import { closeLockedPanel, useLockedPanel } from "@/components/ai-assistant/shell/lockedPanel";
 
 const chip = { kind: "log_row", ref: { org: "org-b" }, sizeBytes: 1 };
 const door = (chips: unknown[] = [chip]): ChatDoor => ({
@@ -66,6 +67,16 @@ describe("addDoorToChat", () => {
   it("returns openAssistant's result so the drawer can close only on ok", async () => {
     env.open.mockResolvedValueOnce({ ok: false, reason: "org_changed" });
     await expect(addDoorToChat(door())).resolves.toEqual({ ok: false, reason: "org_changed" });
+    expect(useLockedPanel().value).toBeNull();
+  });
+
+  it("opens the locked panel for a locked gate, returning focus to the toolbar's cell", async () => {
+    const cell = document.createElement("td");
+    env.open.mockResolvedValueOnce({ ok: false, reason: "no_permission" });
+    await addDoorToChat(door(), "u|org-a", cell);
+    expect(env.open.mock.calls[0][0].invoker).toBe(cell);
+    expect(useLockedPanel().value).toEqual({ invoker: cell });
+    closeLockedPanel();
   });
 });
 

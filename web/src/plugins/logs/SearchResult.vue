@@ -634,10 +634,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </ODropdown>
                     <template v-else-if="active && !contextMenuOpen">
                       <template v-if="column.id === logsTimestampCol">
-                        <O2AIContextAddBtn
+                        <ToolbarAddToChat
                           v-if="assistantDoorsShown"
                           data-test="logs-search-result-ai-btn"
-                          @send-to-ai-chat="addDoorToChat(logRowDoor(row), userOrgKey)"
+                          :door="() => logRowDoor(row)"
+                          :user-org-key="userOrgKey"
                         />
                       </template>
                       <CellActions
@@ -996,9 +997,8 @@ import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButto
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
-import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import ToolbarAddToChat from "@/plugins/logs/data-table/ToolbarAddToChat.vue";
 import {
-  addDoorToChat,
   currentUserOrgKey,
   logFieldBuild,
   logRowBuild,
@@ -1077,7 +1077,7 @@ export default defineComponent({
     CellActions,
     LogsMissingStreamBanner,
     LogsTableSkeleton,
-    O2AIContextAddBtn,
+    ToolbarAddToChat,
     AiEntryButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
     ),
@@ -3185,7 +3185,6 @@ export default defineComponent({
       logsRowHeight,
       logRowDoor,
       logFieldDoor,
-      addDoorToChat,
       assistantDoorsShown,
       userOrgKey,
       noFtsRecoverySchemas,

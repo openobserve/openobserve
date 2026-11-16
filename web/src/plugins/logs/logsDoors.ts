@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, type ComputedRef } from "vue";
+import { computed, inject, type ComputedRef } from "vue";
 import type { Router } from "vue-router";
 import type { Store } from "vuex";
 
@@ -25,6 +25,7 @@ import {
   type OpenAssistantResult,
 } from "@/composables/assistant/pure";
 import type { LogRowInput } from "@/utils/assistant/prompts";
+import { OTableToolbarOwnerKey } from "@/lib/core/Table/OTable.types";
 
 /** What every Logs door prompt reads from the page; built at click time, never at render. */
 export type LogsDoorBase = Omit<LogRowInput, "row" | "source">;
@@ -201,8 +202,9 @@ export interface ChatDoor {
   boundOrg?: string;
 }
 
-// Ready and locked gates show the button (openAssistant explains a lock); others hide it.
-const DOOR_GATES = ["available", "unhealthy", "no_permission", "off_for_org"];
+// Ready and locked gates show the button (a locked click opens the locked panel); others hide it.
+const LOCKED_GATES: string[] = ["no_permission", "off_for_org"];
+const DOOR_GATES = ["available", "unhealthy", ...LOCKED_GATES];
 
 /** Whether the Add to chat buttons show for the current assistant gate. */
 export function useAssistantDoorShown(): ComputedRef<boolean> {
@@ -214,13 +216,21 @@ export function useAssistantDoorShown(): ComputedRef<boolean> {
 export const currentUserOrgKey = (): string | null =>
   runtimeHandle().value?.store.state.userOrgKey ?? null;
 
+/** The cell whose toolbar holds the caller, for `addDoorToChat`; call it in the setup of a component inside the toolbar. */
+export function useToolbarInvoker(): () => HTMLElement | null {
+  const owner = inject(OTableToolbarOwnerKey, null);
+  return () => owner?.() ?? null;
+}
+
 /** Add to chat: stage the door's chips, stamped with its bound org, in the current chat and open it. */
 export async function addDoorToChat(
   door: ChatDoor,
   userOrgKey?: string | null,
+  toolbarCell?: HTMLElement | null,
 ): Promise<OpenAssistantResult> {
-  // The clicked button has focus now; the chat returns focus to it when it closes.
-  const invoker = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  // The chat returns focus to the clicked button when it closes; a cell toolbar unmounts on blur, so its cell stands in.
+  const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const invoker = toolbarCell ?? focused;
   const [built, { openAssistant }] = await Promise.all([
     door.build(),
     import("@/composables/assistant"),
@@ -228,7 +238,7 @@ export async function addDoorToChat(
   const stamp = (chip: ContextChip): ContextChip =>
     chip.ref && door.boundOrg ? { ...chip, ref: { ...chip.ref, org: door.boundOrg } } : chip;
   const chips = (built?.chips ?? []).map(stamp);
-  return openAssistant({
+  const result = await openAssistant({
     entryKind: door.entryKind,
     entryVerb: "add_to_chat",
     objectKind: door.objectKind,
@@ -239,6 +249,12 @@ export async function addDoorToChat(
     invoker,
     ...(userOrgKey && { userOrgKey }),
   });
+  // openAssistant refuses a locked gate silently; the locked panel says why, as the header button does.
+  if (!result.ok && LOCKED_GATES.includes(result.reason)) {
+    const { openLockedPanel } = await import("@/components/ai-assistant/shell/lockedPanel");
+    openLockedPanel(invoker);
+  }
+  return result;
 }
 
 /** A cheap, stable key for the object behind an Add door, so its "In chat" tick never outlives it. */
