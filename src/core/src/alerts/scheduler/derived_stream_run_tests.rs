@@ -332,6 +332,15 @@ fn t24_tolerance_below_the_frequency_is_dropped_with_a_delay() {
             hm(11, 10)
         );
     }
+    // Each possible draw is below 30 seconds, and the aligned path rounds it down to the slot.
+    for draw in 0..30 {
+        let with_tolerance = hm(11, 0) + second_micros(draw);
+        assert_eq!(
+            TriggerCondition::align_time(with_tolerance, 0, Some(60 * 60), None),
+            hm(11, 0),
+            "{draw}"
+        );
+    }
 }
 
 #[test]
