@@ -7,6 +7,8 @@ import destinationService from "@/services/alert_destination";
 import alertsService from "@/services/alerts";
 import templateService from "@/services/alert_templates";
 import { queryClient } from "@/composables/query/queryClient";
+import { fenceAlertWrite } from "@/services/alerts.readFence";
+import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
@@ -42,7 +44,7 @@ vi.mock("@/services/alert_templates", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
     default: {
-      list: vi.fn(() => Promise.resolve({ data: [] })),
+      list: vi.fn(),
     },
   });
 });

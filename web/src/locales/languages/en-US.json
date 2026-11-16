@@ -12115,7 +12115,6 @@
         "noisy": "That is often, so people may start to ignore it. A higher limit would make it quieter."
       },
       "filtersMode": "Filters",
-      "addFilter": "Add a filter",
       "typeHelp": {
         "scheduled": "Looks at recent data on a timer. The right choice for most alerts.",
         "realtime": "Checks each event the moment it arrives, so any match alerts you.",
@@ -15283,8 +15282,7 @@
       "compareAddWindow": "Add a past window",
       "rename": "Rename",
       "limitLine": "limit",
-      "warnLine": "warn",
-      "dedupTitle": "Skip duplicates"
+      "warnLine": "warn"
     },
     "tiers": {
       "rowFires": "When it fires",
@@ -15303,7 +15301,6 @@
         "variables": "Variables",
         "recovery": "recovery message",
         "oncall": "on-call",
-        "dedup": "skip duplicates",
         "keepFiring": "keep firing",
         "description": "description",
         "rowTemplate": "row template",
@@ -15407,7 +15404,6 @@
           "template": "Message template",
           "variables": "Variables",
           "oncall": "On-call team",
-          "dedup": "Skip duplicates",
           "rowTemplate": "Row template",
           "priority": "Priority",
           "tags": "Tags",
@@ -15415,7 +15411,8 @@
           "composite": "Combined condition",
           "children": "Alerts combined",
           "aggregation": "Aggregate",
-          "enabled": "Enabled"
+          "enabled": "Enabled",
+          "suppressRepeats": "Suppress repeats"
         }
       },
       "saveChanges": "Save changes",
@@ -15454,6 +15451,48 @@
         "details": "Details",
         "more": "More settings"
       }
+    },
+    "priorityUnsetPagesAs": "Not set (pages as P2)",
+    "notificationKinds": {
+      "alert": "Alert",
+      "incident": "Incident",
+      "anomaly": "Anomaly",
+      "synthetics": "Synthetics",
+      "downtime": "Downtime",
+      "on_call": "On-call"
+    },
+    "templateOverride": {
+      "label": "Template override",
+      "placeholder": "Use the destination's template",
+      "help": "Overrides the destination template for {kind} messages. Prebuilt templates cannot be chosen; copy one first.",
+      "empty": "No templates apply to {kind} yet.",
+      "create": "Create template",
+      "loadFailed": "Could not load templates",
+      "forbidden": "Listing templates needs the templates read permission",
+      "mismatch": "Does not fit {count} of your destinations ({names}); those fall back to their own template.",
+      "groupContent": "Content",
+      "groupCustom": "Custom",
+      "webhookOnly": "(webhook only)",
+      "emailOnly": "(email only)",
+      "snsOnly": "(SNS only)",
+      "stale": "Template {name} is not available for this kind. Pick another one or clear the field.",
+      "clear": "Clear",
+      "willUse": "Will use: {template}",
+      "willUsePerDestination": "Will use, per destination:",
+      "willUseRow": "{destination}: {template}",
+      "templateWithSource": "{name} ({source})",
+      "builtIn": "Built-in {kind} message",
+      "sourceExplicit": "this override",
+      "sourceDestination": "destination template",
+      "sourceOrgDefault": "org default",
+      "sourceCompiled": "built in",
+      "sourcePlatformResolve": "platform resolve",
+      "sourceLegacy": "legacy payload",
+      "sourceLegacyPayload": "the kind's own JSON payload (generic webhook)"
+    },
+    "siemDetection": {
+      "notice": "This alert is a Security detection. Its query is compiled from its Sigma rule, so the rule, stream and schedule are edited in Security, which keeps the rule and the query in step.",
+      "open": "Edit in Security"
     }
   },
   "alert_dependencies": {

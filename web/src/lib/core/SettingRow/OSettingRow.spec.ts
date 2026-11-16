@@ -10,7 +10,7 @@ import OFormInput from "../../forms/Input/OFormInput.vue";
 
 import { raw } from "@/types/i18n";
 
-import { SETTING_ROW_BARE_KEY, SETTING_ROW_PAIR_KEY } from "./OSettingRow.types";
+import { SETTING_ROW_BARE_KEY } from "./OSettingRow.types";
 import OSettingRow from "./OSettingRow.vue";
 
 const HELP = "Shortest password accepted";

@@ -68,7 +68,7 @@ describe("sectionTierView", () => {
       state({ revealed, isSet: (id) => id === "createsIncident" }),
     );
     expect(view.addLinks.map((d) => d.id)).toEqual(["variables"]);
-    expect(view.tucked.map((d) => d.id)).toEqual(["recovery", "oncall", "dedup", "keepFiring"]);
+    expect(view.tucked.map((d) => d.id)).toEqual(["recovery", "oncall", "keepFiring"]);
   });
 });
 

@@ -32,6 +32,8 @@ export interface Shortcut {
   skipInInput?: boolean;
   /** Leave the key alone inside a dialog, drawer, popover, listbox, menu or field, or once a widget handled it. */
   skipInOverlay?: boolean;
+  /** Fire a plain-key shortcut even while focus is inside a dialog or drawer, which otherwise owns those keys. */
+  allowInDialog?: boolean;
 }
 
 /**

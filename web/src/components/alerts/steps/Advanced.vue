@@ -111,12 +111,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`alert-variables-${index + 1}`"
                     >
                       <OFormInput
+                        :aria-label="t('common.name')"
                         data-test="alert-variables-key-input"
                         :name="`context_attributes[${index}].key`"
                         :placeholder="t('common.name')"
                         class="min-w-35"
                       />
                       <OFormInput
+                        :aria-label="t('common.value')"
                         data-test="alert-variables-value-input"
                         :name="`context_attributes[${index}].value`"
                         :placeholder="t('common.value')"
@@ -186,22 +188,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="!sectionTargets?.advancedOncall"
             >
               <OSettingRow
-                v-if="oncallEnabled && tierShows('oncall')"
+                v-if="(oncallEnabled && tierShows('oncall')) || oncallTeamLocked"
                 :label="t('alerts.oncallTeam')"
-                :info="t('alerts.oncallTeamTooltip')"
+                :info="oncallTeamLocked ? undefined : t('alerts.oncallTeamTooltip')"
                 fill
               >
-                <OFormSelect
-                  name="oncall_team"
-                  :aria-label="t('alerts.oncallTeam')"
-                  :options="oncallTeamOptions"
-                  clearable
-                  width="md"
-                  :placeholder="t('alerts.oncallTeamPlaceholder')"
-                  data-test="alert-oncall-team-select"
-                >
-                  <template #empty>{{ t("alerts.oncallTeamNoTeams") }}</template>
-                </OFormSelect>
+                <div class="flex items-center gap-2">
+                  <OFormSelect
+                    name="oncall_team"
+                    :aria-label="t('alerts.oncallTeam')"
+                    :options="oncallTeamOptions"
+                    clearable
+                    width="md"
+                    :placeholder="t('alerts.oncallTeamPlaceholder')"
+                    data-test="alert-oncall-team-select"
+                  >
+                    <template #empty>{{ t("alerts.oncallTeamNoTeams") }}</template>
+                  </OFormSelect>
+                  <OTooltip v-if="oncallTeamLocked" :content="oncallLockReason" side="right">
+                    <span class="inline-flex" data-test="alert-oncall-team-locked">
+                      <OIcon name="lock" size="sm" />
+                    </span>
+                  </OTooltip>
+                </div>
               </OSettingRow>
             </Teleport>
             <OSettingRow
@@ -212,8 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OFormTagInput
                 name="tags"
-                :aria-label="t('alerts.tags')"
                 :placeholder="t('alerts.placeholders.addTag')"
+                :aria-label="t('alerts.tags')"
                 data-test="alert-tags-input"
               />
             </OSettingRow>
@@ -227,6 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSettingRow :label="t('alerts.description')" fill>
                 <OFormTextarea
                   name="description"
+                  :aria-label="t('alerts.description')"
                   data-test="add-alert-description-textarea"
                   :placeholder="t('alerts.sections.rows.descriptionPlaceholder')"
                   :rows="2"
@@ -243,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex flex-col gap-2">
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
-                      <span class="text-xs opacity-60">{{
+                      <span class="text-text-secondary text-xs">{{
                         t("alerts.advanced.templateType")
                       }}</span>
                       <OFormToggleGroup
@@ -272,6 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </div>
                   <OFormTextarea
+                    :aria-label="t('alerts.row')"
                     data-test="add-alert-row-input-textarea"
                     name="row_template"
                     :placeholder="rowTemplatePlaceholder"
@@ -321,12 +332,14 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { queryClient } from "@/composables/query/queryClient";
 import { oncallTeamsQuery } from "@/services/oncall.queries";
 import { useTierVisibility } from "@/composables/alerts/useAlertSettingTiers";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
 
 export interface Variable {
@@ -343,6 +356,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OIcon,
+    OTooltip,
     OFormInput,
     OFormTextarea,
     OFormSelect,

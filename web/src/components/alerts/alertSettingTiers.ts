@@ -30,7 +30,6 @@ export type AlertSettingId =
   | "variables"
   | "recovery"
   | "oncall"
-  | "dedup"
   | "keepFiring"
   | "description"
   | "rowTemplate"
@@ -88,7 +87,6 @@ export const ALERT_SETTING_TIERS: readonly AlertSettingTierDef[] = [
   },
   { id: "recovery", section: "notify", tier: "tucked", nameKey: "alerts.tiers.names.recovery" },
   { id: "oncall", section: "notify", tier: "tucked", nameKey: "alerts.tiers.names.oncall" },
-  { id: "dedup", section: "notify", tier: "tucked", nameKey: "alerts.tiers.names.dedup" },
   { id: "keepFiring", section: "notify", tier: "tucked", nameKey: "alerts.tiers.names.keepFiring" },
   {
     id: "description",
