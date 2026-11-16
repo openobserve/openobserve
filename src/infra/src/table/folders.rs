@@ -159,6 +159,7 @@ pub async fn put(
         }
     };
 
+    announce_summary_change(org_id, folder_type).await;
     Ok((model_ksuid(&model)?, model.into()))
 }
 
@@ -174,7 +175,11 @@ pub async fn get_or_create(
     folder: Folder,
     folder_type: FolderType,
 ) -> Result<(Ksuid, Folder, bool), errors::Error> {
-    get_or_create_with(get_orm_client_rw().await, org_id, folder, folder_type).await
+    let result = get_or_create_with(get_orm_client_rw().await, org_id, folder, folder_type).await?;
+    if result.2 {
+        announce_summary_change(org_id, folder_type).await;
+    }
+    Ok(result)
 }
 
 /// [`get_or_create`] on a given connection.
@@ -221,7 +226,9 @@ pub async fn delete(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), errors::Error> {
-    delete_with(get_orm_client_rw().await, org_id, folder_id, folder_type).await
+    delete_with(get_orm_client_rw().await, org_id, folder_id, folder_type).await?;
+    announce_summary_change(org_id, folder_type).await;
+    Ok(())
 }
 
 pub async fn delete_with<C: ConnectionTrait>(
@@ -381,7 +388,19 @@ async fn list_models(
 pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, i16)>, errors::Error> {
     let client = get_orm_client_rw().await;
     let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
-    Ok(super::delete_returning(client, delete, &[Column::FolderId, Column::Type]).await?)
+    let deleted =
+        super::delete_returning(client, delete, &[Column::FolderId, Column::Type]).await?;
+    crate::coordinator::resources::folder_changed(org_id).await;
+    Ok(deleted)
+}
+
+async fn announce_summary_change(org: &str, folder_type: FolderType) {
+    if matches!(
+        folder_type,
+        FolderType::Dashboards | FolderType::Alerts | FolderType::Synthetics
+    ) {
+        crate::coordinator::resources::folder_changed(org).await;
+    }
 }
 
 #[cfg(test)]

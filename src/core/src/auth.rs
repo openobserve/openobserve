@@ -393,11 +393,30 @@ where
             return opamp_extractor(&parts.headers, &method, &org_id, &folder);
         }
 
-        // Only a matched ingestion route takes the stream-level bypass, never a look-alike path.
         let route = parts
             .extensions
             .get::<axum::extract::MatchedPath>()
             .map(|route| route.as_str());
+        if resource_search_authorizes(&parts.method, route) {
+            let auth = extract_auth_str_from_headers(&parts.headers).await;
+            if auth.is_empty() {
+                return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
+            }
+            return Ok(AuthExtractor {
+                auth,
+                method,
+                o2_type: String::new(),
+                org_id,
+                bypass_check: true,
+                parent_id: String::new(),
+                use_all_org: false,
+                use_self_context: false,
+                use_self_parent: false,
+                feature: None,
+            });
+        }
+
+        // Only a matched ingestion route takes the stream-level bypass, never a look-alike path.
         if common::meta::ingestion_routes::is_ingestion_write(&parts.method, path, route) {
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
@@ -604,6 +623,16 @@ fn opamp_extractor(
         use_self_parent: false,
         feature: None,
     })
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn resource_search_authorizes(method: &axum::http::Method, route: Option<&str>) -> bool {
+    // Resource-specific gates run in the handler; credentials and organization still authenticate.
+    method == axum::http::Method::GET
+        && matches!(
+            route,
+            Some("/api/{org_id}/resources/_search" | "/{org_id}/resources/_search")
+        )
 }
 
 fn extract_cookies_from_headers(headers: &HeaderMap) -> HashMap<&str, &str> {
@@ -1000,6 +1029,33 @@ mod tests {
         assert!(!is_valid_email("user@.com"));
         assert!(!is_valid_email("user@com"));
         assert!(!is_valid_email("user@domain..com"));
+    }
+
+    #[test]
+    fn resource_search_delegation_requires_the_exact_get_route_template() {
+        use axum::http::Method;
+
+        assert!(resource_search_authorizes(
+            &Method::GET,
+            Some("/api/{org_id}/resources/_search")
+        ));
+        assert!(!resource_search_authorizes(
+            &Method::POST,
+            Some("/api/{org_id}/resources/_search")
+        ));
+        assert!(!resource_search_authorizes(
+            &Method::GET,
+            Some("/api/{org_id}/resources/_search_extra")
+        ));
+        assert!(!resource_search_authorizes(
+            &Method::GET,
+            Some("/api/{org_id}/resources/{name}")
+        ));
+        assert!(!resource_search_authorizes(
+            &Method::GET,
+            Some("/api/default/resources/_search")
+        ));
+        assert!(!resource_search_authorizes(&Method::GET, None));
     }
 
     #[test]

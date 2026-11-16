@@ -175,6 +175,8 @@ pub async fn set_composite_enabled(
     if result.rows_affected != 1 {
         return Err(CompositeServiceError::NotFound);
     }
+    infra::coordinator::resources::changed(org, config::meta::resources::ResourceKind::Alert, id)
+        .await;
     if enabled {
         let definition = composite_entity::Entity::find_by_id(id)
             .filter(composite_entity::Column::Org.eq(org))
@@ -298,6 +300,12 @@ pub async fn move_composite(
         .await;
     }
     if result.rows_affected == 1 {
+        infra::coordinator::resources::changed(
+            org,
+            config::meta::resources::ResourceKind::Alert,
+            id,
+        )
+        .await;
         Ok(())
     } else {
         Err(CompositeServiceError::NotFound)
@@ -404,6 +412,12 @@ async fn persist(
     .await;
 
     schedule_definition(&definition).await;
+    infra::coordinator::resources::changed(
+        &definition.org,
+        config::meta::resources::ResourceKind::Alert,
+        &definition.id,
+    )
+    .await;
     Ok(definition)
 }
 
@@ -837,6 +851,12 @@ pub async fn delete_composite(org: &str, id: &str) -> Result<(), CompositeServic
                 .await?;
         if parents.is_empty() {
             alert_composites::delete_by_id(db, org, id).await?;
+            infra::coordinator::resources::changed(
+                org,
+                config::meta::resources::ResourceKind::Alert,
+                id,
+            )
+            .await;
             remove_ownership(org, "alerts", Authz::new(id)).await;
             Ok(())
         } else {

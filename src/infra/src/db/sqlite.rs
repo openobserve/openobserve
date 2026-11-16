@@ -138,6 +138,13 @@ impl SqliteDbChannel {
         }
     }
 
+    pub async fn send(
+        &self,
+        event: Event,
+    ) -> std::result::Result<(), mpsc::error::SendError<Event>> {
+        send_watch_event(&self.watch_tx, event).await
+    }
+
     fn handle_watch_channel() -> EventChannel {
         let (tx, mut rx) = mpsc::channel::<Event>(10000);
         tokio::task::spawn(async move {
@@ -149,6 +156,7 @@ impl SqliteDbChannel {
                     Some(v) => v,
                     None => {
                         log::info!("[SQLITE] watch event channel closed");
+                        crate::coordinator::resources::mark_lost();
                         break;
                     }
                 };
@@ -162,6 +170,7 @@ impl SqliteDbChannel {
                                 let tx = tx.clone();
                                 tokio::task::spawn(async move {
                                     if let Err(e) = tx.send(Event::Put(e)).await {
+                                        crate::coordinator::resources::mark_hint_lost();
                                         log::error!("[SQLITE] send put event error: {e}");
                                     }
                                 });
@@ -172,6 +181,7 @@ impl SqliteDbChannel {
                                 let tx = tx.clone();
                                 tokio::task::spawn(async move {
                                     if let Err(e) = tx.send(Event::Delete(e)).await {
+                                        crate::coordinator::resources::mark_hint_lost();
                                         log::error!("[SQLITE] send delete event error: {e}");
                                     }
                                 });
@@ -314,8 +324,6 @@ impl super::Db for SqliteDb {
         // event watch
         if need_watch
             && let Err(e) = CHANNEL
-                .watch_tx
-                .clone()
                 .send(Event::Put(EventData {
                     key: key.to_string(),
                     value: Some(value),
@@ -466,8 +474,6 @@ impl super::Db for SqliteDb {
             };
             if (new_value.is_some() || value.is_some())
                 && let Err(e) = CHANNEL
-                    .watch_tx
-                    .clone()
                     .send(Event::Put(EventData {
                         key: key.to_string(),
                         value: Some(Bytes::from("")),
@@ -521,13 +527,15 @@ impl super::Db for SqliteDb {
             let tx = CHANNEL.watch_tx.clone();
             tokio::task::spawn(async move {
                 for key in items {
-                    if let Err(e) = tx
-                        .send(Event::Delete(EventData {
+                    if let Err(e) = send_watch_event(
+                        &tx,
+                        Event::Delete(EventData {
                             key: key.to_string(),
                             value: None,
                             start_dt,
-                        }))
-                        .await
+                        }),
+                    )
+                    .await
                     {
                         log::error!("[SQLITE] send event error: {e}");
                     }
@@ -686,6 +694,17 @@ impl super::Db for SqliteDb {
         add_start_dt_column().await?;
         Ok(())
     }
+}
+
+async fn send_watch_event(
+    sender: &mpsc::Sender<Event>,
+    event: Event,
+) -> std::result::Result<(), mpsc::error::SendError<Event>> {
+    let result = sender.send(event).await;
+    if result.is_err() {
+        crate::coordinator::resources::mark_lost();
+    }
+    result
 }
 
 async fn create_table() -> Result<()> {
@@ -983,6 +1002,27 @@ fn push_key2_filter(sql: &mut String, params: &mut Vec<String>, key2: String) {
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn failed_local_watch_delivery_invalidates_catalog_epoch() {
+        let (sender, receiver) = tokio::sync::mpsc::channel(1);
+        drop(receiver);
+        let before = crate::coordinator::resources::continuity_snapshot().1;
+        let result = super::send_watch_event(
+            &sender,
+            crate::db::Event::Put(crate::db::EventData {
+                key: "/function/test/rename".into(),
+                value: None,
+                start_dt: None,
+            }),
+        )
+        .await;
+        assert!(result.is_err());
+        assert_ne!(
+            before,
+            crate::coordinator::resources::continuity_snapshot().1
+        );
+    }
+
     use super::*;
     use crate::db::MetaRecord;
 

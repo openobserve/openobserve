@@ -84,6 +84,7 @@ pub async fn init() -> Result<()> {
     tokio::task::spawn(async move {
         if let Err(e) = subscribe(tx).await {
             log::error!("[COORDINATOR::EVENTS] failed to subscribe to coordinator topic: {e}");
+            resource_continuity_lost().await;
         }
     });
     tokio::task::spawn(async move {
@@ -119,6 +120,32 @@ pub async fn watch(prefix: &str) -> Result<Arc<mpsc::Receiver<crate::db::Event>>
     w.push((prefix.to_string(), tx));
     w.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(Arc::new(rx))
+}
+
+pub(crate) async fn resource_continuity_lost() {
+    super::resources::mark_lost();
+    resource_continuity_event(super::resources::CONTINUITY_LOST_KEY).await;
+}
+
+pub(crate) async fn resource_hint_lost() {
+    super::resources::mark_hint_lost();
+    resource_continuity_event(super::resources::CONTINUITY_LOST_KEY).await;
+}
+
+pub(crate) async fn resource_continuity_restored() {
+    super::resources::mark_restored();
+    resource_continuity_event(super::resources::CONTINUITY_RESTORED_KEY).await;
+}
+
+async fn resource_continuity_event(key: &str) {
+    let watchers = COORDINATOR_WATCHER_PREFIXES.read().await;
+    for (prefix, sender) in watchers.iter() {
+        if key.starts_with(prefix)
+            && let Err(error) = sender.send(super::resources::continuity_event(key)).await
+        {
+            log::error!("[resources] continuity notification failed: {error}");
+        }
+    }
 }
 
 async fn create_stream() -> Result<()> {
@@ -164,11 +191,13 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
             Ok(receiver) => receiver,
             Err(e) => {
                 log::error!("[COORDINATOR::EVENTS] failed to subscribe to coordinator topic: {e}");
+                resource_continuity_lost().await;
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 reconnect = true;
                 continue;
             }
         };
+        resource_continuity_restored().await;
         let receiver = Arc::get_mut(&mut receiver).unwrap_or_else(|| {
             panic!("[COORDINATOR::EVENTS] failed to get mutable reference to receiver")
         });
@@ -181,6 +210,8 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
                             log::error!(
                                 "[COORDINATOR::EVENTS] failed to deserialize coordinator event: {e}"
                             );
+                            resource_continuity_lost().await;
+                            resource_continuity_restored().await;
                             continue;
                         }
                     };
@@ -197,11 +228,13 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
                             log::error!(
                                 "[COORDINATOR::EVENTS] failed to process coordinator event: {e}"
                             );
+                            resource_continuity_lost().await;
                         }
                     }
                 }
                 None => {
                     log::error!("[COORDINATOR::EVENTS] coordinator topic closed");
+                    resource_continuity_lost().await;
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     reconnect = true;
                     break;
@@ -219,6 +252,7 @@ async fn publish(event: CoordinatorEvent) -> Result<()> {
     let q = queue::get_queue().await;
     if let Err(e) = q.publish(COORDINATOR_STREAM, Bytes::from(payload)).await {
         log::error!("[COORDINATOR::EVENTS] failed to publish coordinator event: {e}");
+        resource_hint_lost().await;
         return Err(e);
     }
     Ok(())

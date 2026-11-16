@@ -24,6 +24,7 @@ pub mod oncall;
 pub mod org_status;
 pub mod pipelines;
 pub mod prompts;
+pub mod resources;
 pub mod service_identity;
 pub mod service_streams;
 pub mod synthetics;
@@ -34,13 +35,37 @@ pub async fn get_coordinator() -> &'static Box<dyn crate::db::Db> {
 
 /// Announces a change on `key` to every watcher; the value is empty because watchers reload.
 pub async fn emit_put(key: &str) -> Result<(), crate::errors::Error> {
-    get_coordinator()
-        .await
-        .put(key, bytes::Bytes::new(), true, None)
-        .await
+    notification_result(
+        get_coordinator()
+            .await
+            .put(key, bytes::Bytes::new(), true, None)
+            .await,
+    )
 }
 
 /// Announces a removal on `key` to every watcher.
 pub async fn emit_delete(key: &str) -> Result<(), crate::errors::Error> {
-    get_coordinator().await.delete(key, false, true, None).await
+    notification_result(get_coordinator().await.delete(key, false, true, None).await)
+}
+
+pub(crate) fn notification_result<T>(
+    result: Result<T, crate::errors::Error>,
+) -> Result<T, crate::errors::Error> {
+    if result.is_err() {
+        resources::mark_hint_lost();
+    }
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn legacy_notification_failure_fences_existing_catalog_generations() {
+        let before = super::resources::continuity_snapshot().1;
+        let result = super::notification_result::<()>(Err(crate::errors::Error::Message(
+            "delivery failed".into(),
+        )));
+        assert!(result.is_err());
+        assert_ne!(before, super::resources::continuity_snapshot().1);
+    }
 }

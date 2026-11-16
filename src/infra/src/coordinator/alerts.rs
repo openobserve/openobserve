@@ -32,14 +32,16 @@ pub async fn emit_put_event(
     let alert_id = alert.get_unique_key();
     let key = alert_key(org, &alert_id);
     let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .put(
-            &key,
-            bytes::Bytes::from(folder_id.unwrap_or_else(|| "default".to_string())),
-            true,
-            None,
-        )
-        .await?;
+    super::notification_result(
+        cluster_coordinator
+            .put(
+                &key,
+                bytes::Bytes::from(folder_id.unwrap_or_else(|| "default".to_string())),
+                true,
+                None,
+            )
+            .await,
+    )?;
     Ok(())
 }
 

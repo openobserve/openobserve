@@ -54,6 +54,7 @@ pub mod pipeline_errors;
 pub mod prompt_settings;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
+pub mod resources;
 pub mod saved_view;
 pub mod scheduler;
 pub mod schema;

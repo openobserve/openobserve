@@ -46,9 +46,9 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, sample_data, security, service_accounts, service_identity,
-    service_streams, service_versions, short_url, slack, slos, sourcemaps, status, status_pages,
-    stream, synthetics, users,
+    query_history, resources, rum_analytics, sample_data, security, service_accounts,
+    service_identity, service_streams, service_versions, short_url, slack, slos, sourcemaps,
+    status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -600,6 +600,18 @@ fn audit_org_and_next<'a>(path_columns: &[&'a str]) -> (&'a str, &'a str) {
     (org, next)
 }
 
+#[cfg(any(feature = "enterprise", test))]
+fn resource_search_audit_query(uri: &Uri) -> String {
+    if uri
+        .path()
+        .trim_end_matches('/')
+        .ends_with("/resources/_search")
+    {
+        return uri.query().map_or_else(String::new, |_| "…".to_owned());
+    }
+    uri.query().unwrap_or("").to_owned()
+}
+
 /// A delegated `/ai/chat` is audited like a Slack `chat_stream` turn: no question text.
 #[cfg(feature = "enterprise")]
 fn delegated_chat_audit_body(
@@ -741,7 +753,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 matched_route(&request).as_deref(),
             ))
     {
-        let query_params = request.uri().query().unwrap_or("").to_string();
+        let query_params = resource_search_audit_query(request.uri());
         let org_id = if audit_org == "organizations" {
             String::new()
         } else {
@@ -1331,6 +1343,7 @@ fn service_route_table() -> Router {
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
+    router = router.route("/{org_id}/resources/_search", get(resources::search));
     // Users
     // Reading one member returns their lockout counters, which only an enterprise build has.
 
@@ -3300,6 +3313,18 @@ mod tests {
     /// A **static** second segment does not conflict, which is why every
     /// token-authenticated route here lives under `/api/v2/`. If you add one,
     /// it must too.
+    #[test]
+    fn resource_search_audit_omits_query_text_and_cursors() {
+        let uri: Uri = "/acme/resources/_search?%71=private-name&cursor=private-cursor"
+            .parse()
+            .unwrap();
+        assert_eq!(resource_search_audit_query(&uri), "…");
+        let unrelated: Uri = "/acme/dashboards?title=overview".parse().unwrap();
+        assert_eq!(resource_search_audit_query(&unrelated), "title=overview");
+        let no_query: Uri = "/acme/resources/_search".parse().unwrap();
+        assert_eq!(resource_search_audit_query(&no_query), "");
+    }
+
     #[test]
     fn test_basic_routes_cannot_conflict_with_the_router_catch_all() {
         // Registration is where the panic would happen, so building it is the

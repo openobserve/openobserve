@@ -243,10 +243,7 @@ impl super::Db for PostgresDb {
 
         // event watch
         if need_watch {
-            let cluster_coordinator = super::get_coordinator().await;
-            cluster_coordinator
-                .put(key, Bytes::from(""), true, start_dt)
-                .await?;
+            super::put_into_db_coordinator(key, Bytes::new(), true, start_dt).await?;
         }
         DB_QUERY_TIME
             .with_label_values(&["put_item", "meta"])
@@ -416,10 +413,7 @@ impl super::Db for PostgresDb {
             } else {
                 start_dt
             };
-            let cluster_coordinator = super::get_coordinator().await;
-            cluster_coordinator
-                .put(key, Bytes::from(""), true, start_dt)
-                .await?;
+            super::put_into_db_coordinator(key, Bytes::new(), true, start_dt).await?;
         }
 
         Ok(())
@@ -466,12 +460,10 @@ impl super::Db for PostgresDb {
         };
 
         if need_watch {
-            let cluster_coordinator = super::get_coordinator().await;
             tokio::task::spawn(async move {
                 for key in items {
-                    if let Err(e) = cluster_coordinator
-                        .delete(&key, false, true, start_dt)
-                        .await
+                    if let Err(e) =
+                        super::delete_from_db_coordinator(&key, false, true, start_dt).await
                     {
                         log::error!("[POSTGRES] send event error: {e}");
                     }

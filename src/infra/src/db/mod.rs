@@ -164,9 +164,14 @@ pub async fn put_into_db_coordinator(
         Bytes::from("")
     };
     let cluster_coordinator = get_coordinator().await;
-    cluster_coordinator
+    let result = cluster_coordinator
         .put(key, value, need_watch, start_dt)
-        .await
+        .await;
+    if need_watch {
+        crate::coordinator::notification_result(result)
+    } else {
+        result
+    }
 }
 
 pub async fn delete_from_db_coordinator(
@@ -176,9 +181,14 @@ pub async fn delete_from_db_coordinator(
     start_dt: Option<i64>,
 ) -> Result<()> {
     let cluster_coordinator = get_coordinator().await;
-    cluster_coordinator
+    let result = cluster_coordinator
         .delete(key, with_prefix, need_watch, start_dt)
-        .await
+        .await;
+    if need_watch {
+        crate::coordinator::notification_result(result)
+    } else {
+        result
+    }
 }
 
 async fn init_super_cluster() -> Box<dyn Db> {

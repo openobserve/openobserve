@@ -756,6 +756,12 @@ pub async fn create_config(
     let result = anomaly_config_table::create(db, new_config)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    infra::coordinator::resources::changed(
+        org_id,
+        config::meta::resources::ResourceKind::Alert,
+        &result.anomaly_id,
+    )
+    .await;
 
     set_ownership(
         org_id,
@@ -1085,6 +1091,12 @@ pub async fn update_config(
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
     let mut updated = active_model.update(db).await?;
+    infra::coordinator::resources::changed(
+        org_id,
+        config::meta::resources::ResourceKind::Alert,
+        anomaly_id,
+    )
+    .await;
     if let Some((from, to)) = moved_folders {
         repoint_folder(anomaly_id, &from, &to).await;
     }
@@ -1241,6 +1253,12 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
     anomaly_config_table::delete(db, org_id, anomaly_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    infra::coordinator::resources::changed(
+        org_id,
+        config::meta::resources::ResourceKind::Alert,
+        anomaly_id,
+    )
+    .await;
 
     // Clean up FGA ownership tuple so stale grants don't linger.
     let folder_name = pk_to_name(Some(&existing.folder_id)).await;
@@ -1387,6 +1405,12 @@ pub async fn clone_config(
     let result = anomaly_config_table::create(db, cloned)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    infra::coordinator::resources::changed(
+        org_id,
+        config::meta::resources::ResourceKind::Alert,
+        &result.anomaly_id,
+    )
+    .await;
 
     // Set FGA ownership so non-root users can access the config they just cloned.
     let folder_name = pk_to_name(Some(&result.folder_id)).await;

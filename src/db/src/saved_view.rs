@@ -56,7 +56,7 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
     if val.is_empty() {
         return Err(Error::Message("Saved views value is empty".to_string()));
     }
-    db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?;
+    db::put(&key, val.into(), db::NEED_WATCH, None).await?;
     Ok(view)
 }
 
@@ -90,7 +90,7 @@ pub async fn update_view(
     if val.is_empty() {
         return Err(Error::Message("Saved views value is empty".to_string()));
     }
-    db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?;
+    db::put(&key, val.into(), db::NEED_WATCH, None).await?;
     Ok(updated_view)
 }
 
@@ -121,7 +121,7 @@ pub async fn get_views_list_only(org_id: &str) -> Result<ViewsWithoutData, Error
 // {
 pub async fn delete_view(org_id: &str, view_id: &str) -> Result<(), Error> {
     let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
-    db::delete(&key, false, db::NO_NEED_WATCH, None).await?;
+    db::delete(&key, false, db::NEED_WATCH, None).await?;
     Ok(())
 }
 
