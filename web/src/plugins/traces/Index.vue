@@ -2492,8 +2492,31 @@ const applyStreamChange = async (newStream: string) => {
   };
   searchObj.data.editorValue = "";
   streamChangeDialog.value.show = false;
+  // With auto-run off no search writes the URL, and the catalog's Back and Forward follow the URL's stream.
+  if (isAutoRunOff() && activeTab.value === "services-catalog" && canWriteTracesUrl()) {
+    const query = {
+      ...router.currentRoute.value.query,
+      stream: newStream,
+      query: b64EncodeUnicode(""),
+    };
+    delete query.columns;
+    router.push({ query });
+  }
   await onChangeStream();
 };
+
+// Back and Forward across a catalog stream switch move the shared stream, so the Traces and Spans tabs agree.
+watch(
+  () => [router.currentRoute.value.name, router.currentRoute.value.query.stream] as const,
+  ([routeName, stream]) => {
+    if (routeName !== "traces" || !pageActive.value || !pageLoaded) return;
+    if (activeTab.value !== "services-catalog" || typeof stream !== "string") return;
+    if (stream === searchObj.data.stream.selectedStream.value) return;
+    if (!searchObj.data.stream.streamLists.some((s: any) => s.value === stream)) return;
+    searchObj.data.stream.selectedStream = { label: stream, value: stream };
+    void extractFields();
+  },
+);
 
 const onChildStreamChangeRequest = (newStream: string) => {
   if (searchObj.data.editorValue?.trim()) {

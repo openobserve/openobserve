@@ -142,6 +142,12 @@
       ><NotComparedMark :reason="t('serviceVersions.catalog.noDeployRecorded')"
     /></span>
   </div>
+  <span
+    v-else-if="emptyReason === ''"
+    class="text-text-muted text-xs"
+    data-test="svcver-cell-empty"
+    >{{ raw("—") }}</span
+  >
   <span v-else-if="content === 'deployed'" class="text-xs" data-test="svcver-deployed"
     ><NotComparedMark :reason="emptyReason || t('serviceVersions.catalog.noDeployRecorded')"
   /></span>
@@ -187,7 +193,7 @@ const props = withDefaults(
     tracking?: Tracking;
     /** The banner above the table already gives the no-verdict sentence, so the chip does not repeat it. */
     explained?: boolean;
-    /** Why the row has no registry scope, for the dash shown in its place. */
+    /** Why the row has no registry scope; an empty string leaves a plain dash because the header already says why. */
     emptyReason?: string;
   }>(),
   { state: "ready", unavailable: false, content: "versions" },

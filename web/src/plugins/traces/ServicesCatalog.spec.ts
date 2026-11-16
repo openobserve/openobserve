@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { mount, VueWrapper, DOMWrapper, flushPromises } from "@vue/test-utils";
 import { reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
@@ -206,15 +206,19 @@ const setRouteQuery = (query: Record<string, string>) => {
   for (const key of Object.keys(routeQuery)) delete routeQuery[key];
   Object.assign(routeQuery, query);
 };
+// A ref like the router's, so a test can navigate (Back/Forward) by assigning a new route.
+const routerState = vi.hoisted(() => ({ currentRoute: undefined as any }));
 vi.mock("vue-router", async () => {
   const actual: any = await vi.importActual("vue-router");
+  const { shallowRef } = await vi.importActual<typeof import("vue")>("vue");
+  routerState.currentRoute = shallowRef({ query: routeQuery });
   return {
     ...actual,
     useRoute: () => ({ query: routeQuery }),
     useRouter: () => ({
       push: mockRouterPush,
       replace: mockRouterReplace,
-      currentRoute: { value: { query: routeQuery } },
+      currentRoute: routerState.currentRoute,
     }),
   };
 });
@@ -225,7 +229,8 @@ vi.mock("vue-router", async () => {
 import ServicesCatalog from "./ServicesCatalog.vue";
 import config from "@/aws-exports";
 import serviceVersionsService from "@/services/service_versions";
-import { healthWithheld } from "./servicesCatalogVersions";
+import { catalogFilterEmptyText, healthWithheld } from "./servicesCatalogVersions";
+import { gt } from "@/types/i18n";
 
 // ---------------------------------------------------------------------------
 // Mock store
@@ -344,6 +349,7 @@ function mountServicesCatalog(
   options: {
     storeOverrides?: Record<string, any>;
     stubs?: Record<string, any>;
+    attachTo?: HTMLElement;
   } = {},
 ) {
   const mockStore = options.storeOverrides
@@ -351,6 +357,7 @@ function mountServicesCatalog(
     : createMockStore();
 
   return mount(ServicesCatalog, {
+    attachTo: options.attachTo,
     global: {
       plugins: [i18n, mockStore],
       provide: {
@@ -363,7 +370,7 @@ function mountServicesCatalog(
           // slots. The catalog feeds OTable the FULL sorted list; OTable owns
           // pagination + footer internally, so the stub just renders all rows.
           template: `
-              <div data-test="services-catalog-table" :data-loading="loading">
+              <div data-test="services-catalog-table" :data-loading="loading" :data-reset-key="loadingResetKey">
                 <template v-if="data.length > 0">
                   <div v-for="(row, idx) in data" :key="idx"
                     :data-test="'services-catalog-status-' + row.service_name"
@@ -392,6 +399,7 @@ function mountServicesCatalog(
             "data",
             "columns",
             "loading",
+            "loadingResetKey",
             "sortBy",
             "sortOrder",
             "sorting",
@@ -1492,26 +1500,6 @@ describe("ServicesCatalog", () => {
   });
 
   // -----------------------------------------------------------------------
-  // formatPercent utility
-  // -----------------------------------------------------------------------
-  describe("formatPercent", () => {
-    it("should format a number with two decimal places and percent sign", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-        if (callbacks?.complete) {
-          callbacks.complete(null, {});
-        }
-      });
-
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      expect(wrapper.vm.formatPercent(5.5)).toBe("5.50%");
-      expect(wrapper.vm.formatPercent(0.05)).toBe("0.05%");
-      expect(wrapper.vm.formatPercent(100)).toBe("100.00%");
-    });
-  });
-
-  // -----------------------------------------------------------------------
   // loadServicesCatalog
   // -----------------------------------------------------------------------
   describe("loadServicesCatalog", () => {
@@ -1697,6 +1685,10 @@ describe("ServicesCatalog", () => {
         await flushPromises();
 
         expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+        // The stream keys the table's kept rows, so the old stream's rows never show under the new one.
+        expect(
+          wrapper.find('[data-test="services-catalog-table"]').attributes("data-reset-key"),
+        ).toBe("production");
       });
 
       it("should persist the new stream to localStorage when the global stream changes", async () => {
@@ -1738,6 +1730,41 @@ describe("ServicesCatalog", () => {
         await flushPromises();
 
         expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("Back and Forward", () => {
+      const navigate = async (query: Record<string, string>) => {
+        routerState.currentRoute.value = { name: "traces", query };
+        await flushPromises();
+      };
+      afterEach(() => {
+        routerState.currentRoute.value = { query: routeQuery };
+      });
+
+      it("reloads the entry's stream with its filters, keeping its category while rows load", async () => {
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+        mockFetchQueryDataWithHttpStream.mockClear();
+
+        await navigate({ tab: "services-catalog", stream: "production", catalogType: "datastore" });
+
+        expect(wrapper.vm.streamFilter).toBe("production");
+        expect(wrapper.vm.typeFilter).toBe("datastore");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+      });
+
+      it("keeps the shown stream when only the entry's filters change", async () => {
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+        await navigate({ tab: "services-catalog", stream: "default" });
+        mockSearchObj.data.stream.selectedStream = { label: "production", value: "production" };
+        await flushPromises();
+
+        await navigate({ tab: "services-catalog", stream: "default", catalogType: "all" });
+
+        expect(wrapper.vm.streamFilter).toBe("production");
+        expect(wrapper.vm.typeFilter).toBe("all");
       });
     });
 
@@ -2058,7 +2085,13 @@ describe("ServicesCatalog", () => {
       expect(wrapper.vm.typeFilter).toBe("queue");
 
       // Replace inventory with services only — the Queue tab vanishes.
-      wrapper.vm.services = mixedRows.filter((r) => !r.infer_service_type);
+      const rows = mixedRows.filter((r) => !r.infer_service_type);
+      wrapper.vm.services = rows;
+      await flushPromises();
+      expect(wrapper.vm.typeFilter).toBe("queue");
+
+      // Only a settled load of the stream may drop the tab, so a link's category survives loading.
+      wrapper.vm.loadedFor = { stream: "default", period: wrapper.vm.periodKey, rows };
       await flushPromises();
       expect(wrapper.vm.typeFilter).toBe("service");
     });
@@ -2631,7 +2664,7 @@ describe("ServicesCatalog", () => {
     });
   });
 
-  describe("RED insights strip", () => {
+  describe("RED insights chip", () => {
     const T = 1_700_000_000_000_000;
     const FIVE_MIN_US = 300_000_000;
     const MANAGED_TAGS = ["auto:red-insights", "red:p95"];
@@ -2661,9 +2694,10 @@ describe("ServicesCatalog", () => {
       );
     }
 
+    // The anomaly read streams; mockSearchFn stays the source of its hits so each test names them once.
     function anomalyCalls(): any[] {
-      return mockSearchFn.mock.calls.filter((call: any[]) =>
-        call[0]?.query?.query?.sql?.includes('"_anomalies"'),
+      return mockFetchQueryDataWithHttpStream.mock.calls.filter((call: any[]) =>
+        String(call[0]?.queryReq?.query?.sql).includes('"_anomalies"'),
       );
     }
 
@@ -2675,12 +2709,33 @@ describe("ServicesCatalog", () => {
             streams: {},
           },
         },
+        attachTo: document.body,
       });
       await flushPromises();
     }
 
+    // The entries render in a portalled popover, outside the wrapper's own tree.
+    async function openInsights(): Promise<DOMWrapper<Element>> {
+      await wrapper.get('[data-test="services-catalog-insights"]').trigger("click");
+      await flushPromises();
+      return new DOMWrapper(document.body);
+    }
+
     beforeEach(() => {
       config.isEnterprise = "true";
+      mockFetchQueryDataWithHttpStream.mockImplementation(async (req: any, callbacks: any) => {
+        if (!String(req?.queryReq?.query?.sql).includes('"_anomalies"')) return;
+        try {
+          const res = await mockSearchFn(req);
+          callbacks.data(req, {
+            type: "search_response_hits",
+            content: { results: { hits: res?.data?.hits ?? [] } },
+          });
+          callbacks.complete(req, {});
+        } catch (error) {
+          callbacks.error(req, error);
+        }
+      });
       stubSchemas(() => Promise.resolve(anomaliesSchema("is_absence", "direction")));
       mockSearchFn.mockResolvedValue({ data: { hits: [anomalyRow()] } });
       mockAnomalyList.mockResolvedValue({
@@ -2742,37 +2797,57 @@ describe("ServicesCatalog", () => {
       await mountEnabled();
       const calls = anomalyCalls();
       expect(calls).toHaveLength(1);
-      const { sql, start_time, end_time } = calls[0][0].query.query;
+      const { sql, start_time, end_time } = calls[0][0].queryReq.query;
+      expect(calls[0][0].pageType).toBe("logs");
       expect(sql).toContain("stream_type = 'traces'");
+      expect(sql).toContain("stream_name = 'default'");
       expect(sql).toContain("anomaly_name LIKE 'RED %'");
       expect(sql).toContain("is_anomaly = true");
       expect(sql).toContain("(is_absence IS NULL OR is_absence = false)");
       expect(sql).toContain("(anomaly_name LIKE 'RED rate %' OR direction = 'above')");
-      const catalogQuery = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.query;
+      const catalogQuery = mockFetchQueryDataWithHttpStream.mock.calls.find(
+        (call: any[]) => call[0].queryReq.encoding === "base64",
+      )[0].queryReq.query;
       expect([start_time, end_time]).toEqual([catalogQuery.start_time, catalogQuery.end_time]);
     });
 
     it("leaves out filters on columns the _anomalies stream has never written", async () => {
       stubSchemas(() => Promise.resolve(anomaliesSchema()));
       await mountEnabled();
-      const { sql } = anomalyCalls()[0][0].query.query;
+      const { sql } = anomalyCalls()[0][0].queryReq.query;
       expect(sql).not.toContain("is_absence");
       expect(sql).not.toContain("direction");
       expect(sql).toContain("anomaly_name LIKE 'RED rate %'");
     });
 
-    it("renders each anomaly once with its traces and Charts links", async () => {
+    it.each([
+      [0, null],
+      [1, "1 insight"],
+      [3, "3 insights"],
+    ])("keeps the toolbar slot and labels %i insights as %s", async (count, label) => {
+      const hits = Array.from({ length: count }, (_, i) =>
+        anomalyRow({ anomaly_id: `A${i}`, _timestamp: T + i }),
+      );
+      mockSearchFn.mockResolvedValue({ data: { hits } });
+      await mountEnabled();
+      expect(wrapper.find('[data-test="services-catalog-insights-slot"]').exists()).toBe(true);
+      const chip = wrapper.find('[data-test="services-catalog-insights-label"]');
+      expect(chip.exists() ? chip.text() : null).toBe(label);
+      expect(wrapper.find('[data-test^="services-catalog-insight-entry-"]').exists()).toBe(false);
+    });
+
+    it("lists each anomaly once in the popover with its traces and Charts links", async () => {
       mockSearchFn.mockResolvedValue({ data: { hits: [anomalyRow(), anomalyRow()] } });
       await mountEnabled();
-      const strip = wrapper.find('[data-test="services-catalog-insights"]');
-      expect(strip.exists()).toBe(true);
-      const entries = wrapper.findAll('[data-test^="services-catalog-insight-entry-"]');
+      expect(document.querySelector('[data-test^="services-catalog-insight-entry-"]')).toBeNull();
+      const body = await openInsights();
+      const entries = body.findAll('[data-test^="services-catalog-insight-entry-"]');
       expect(entries).toHaveLength(1);
       expect(entries[0].text()).toContain("checkout");
       expect(entries[0].text()).toContain("p95");
       expect(entries[0].text()).toContain("42.5%");
 
-      await wrapper.find('[data-test="services-catalog-insight-traces-0"]').trigger("click");
+      await body.get('[data-test="services-catalog-insight-traces-0"]').trigger("click");
       expect(wrapper.emitted("view-traces")?.[0]?.[0]).toEqual({
         serviceName: "checkout",
         stream: "default",
@@ -2780,7 +2855,11 @@ describe("ServicesCatalog", () => {
         timeRange: { startTime: T, endTime: T + FIVE_MIN_US },
       });
 
-      await wrapper.find('[data-test="services-catalog-insight-charts-0"]').trigger("click");
+      await (
+        await openInsights()
+      )
+        .get('[data-test="services-catalog-insight-charts-0"]')
+        .trigger("click");
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "alertDetail",
         params: { alert_id: "A1" },
@@ -2788,7 +2867,7 @@ describe("ServicesCatalog", () => {
       });
     });
 
-    it("links traces on the detector's stream, not the catalog's", async () => {
+    it("decodes the slashes in the detector's stream and service names", async () => {
       mockSearchFn.mockResolvedValue({
         data: {
           hits: [
@@ -2800,7 +2879,11 @@ describe("ServicesCatalog", () => {
         },
       });
       await mountEnabled();
-      await wrapper.find('[data-test="services-catalog-insight-traces-0"]').trigger("click");
+      await (
+        await openInsights()
+      )
+        .get('[data-test="services-catalog-insight-traces-0"]')
+        .trigger("click");
       expect(wrapper.emitted("view-traces")?.[0]?.[0]).toMatchObject({
         serviceName: "api/v1",
         stream: "team/edge",
@@ -2810,15 +2893,9 @@ describe("ServicesCatalog", () => {
     it("omits the Charts link but keeps the strip when the config list is forbidden", async () => {
       mockAnomalyList.mockRejectedValue({ response: { status: 403 } });
       await mountEnabled();
-      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="services-catalog-insight-traces-0"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="services-catalog-insight-charts-0"]').exists()).toBe(false);
-    });
-
-    it("is hidden when there are no anomalies", async () => {
-      mockSearchFn.mockResolvedValue({ data: { hits: [] } });
-      await mountEnabled();
-      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
+      const body = await openInsights();
+      expect(body.find('[data-test="services-catalog-insight-traces-0"]').exists()).toBe(true);
+      expect(body.find('[data-test="services-catalog-insight-charts-0"]').exists()).toBe(false);
     });
 
     it("is hidden when the _anomalies search is forbidden", async () => {
@@ -3081,16 +3158,28 @@ describe("ServicesCatalog", () => {
       };
     }
 
-    it("keeps the previous search's rows on screen until the new search's first batch", async () => {
+    it("hides the previous stream's counts, space kept, until the new stream's rows land", async () => {
       mockHits([realEmail]);
       wrapper = mountServicesCatalog();
       await flushPromises();
+      const hidden = () =>
+        ["services-catalog-type-rail", "services-catalog-status-pills"].map((id) =>
+          wrapper.find(`[data-test="${id}"]`).classes("invisible"),
+        );
+      expect(hidden()).toEqual([false, false]);
 
-      mockFetchQueryDataWithHttpStream.mockImplementation(() => {});
-      await wrapper.vm.loadServicesCatalog();
+      let callbacks: any;
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, cb: any) => {
+        callbacks = cb;
+      });
+      wrapper.vm.streamFilter = "production";
       await flushPromises();
+      expect(hidden()).toEqual([true, true]);
 
-      expect(wrapper.vm.services.map((s: any) => s.service_name)).toEqual(["email-service"]);
+      callbacks.data(null, hitsResponse([realEmail]));
+      callbacks.complete(null, {});
+      await flushPromises();
+      expect(hidden()).toEqual([false, false]);
     });
 
     it("clears the previous search's rows when the new search finds nothing", async () => {
@@ -3157,7 +3246,7 @@ describe("ServicesCatalog", () => {
       expect(wrapper.vm.selectedServiceRow?.service_name).toBe("email-service");
     });
 
-    it("keeps the previous rows through a metadata event and replaces them on the first hits", async () => {
+    it("keeps the previous rows, with the table loading, until the refetch completes", async () => {
       mockHits([realEmail]);
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -3168,18 +3257,21 @@ describe("ServicesCatalog", () => {
       });
       await wrapper.vm.loadServicesCatalog();
       await flushPromises();
+      const table = () => wrapper.find('[data-test="services-catalog-table"]');
+      expect(table().attributes("data-loading")).toBe("true");
 
       callbacks.data(null, {
         type: "search_response_metadata",
         content: { results: { hits: [], total: 1, took: 3 } },
       });
-      await flushPromises();
-      expect(wrapper.vm.services.map((s: any) => s.service_name)).toEqual(["email-service"]);
-
       callbacks.data(null, hitsResponse([inferredEmailExternal]));
       await flushPromises();
-      expect(wrapper.vm.services).toHaveLength(1);
-      expect(wrapper.vm.services[0].infer_service_type).toBe("external");
+      expect(wrapper.vm.services.map((s: any) => s.infer_service_type)).toEqual([undefined]);
+
+      callbacks.complete(null, {});
+      await flushPromises();
+      expect(wrapper.vm.services.map((s: any) => s.infer_service_type)).toEqual(["external"]);
+      expect(table().attributes("data-loading")).toBe("false");
     });
 
     it("closes the side panel when a batch drops its row and the search then errors", async () => {
@@ -3404,9 +3496,9 @@ describe("ServicesCatalog env column", () => {
   };
   const stubs = {
     OTable: {
-      props: ["data", "columns"],
+      props: ["data", "columns", "columnVisibility"],
       setup: () => ({ scope }),
-      template: `<div data-test="services-catalog-table"><span data-test="catalog-columns">{{ columns.map((c) => c.id).join(",") }}</span><span data-test="catalog-sizes">{{ columns.map((c) => c.id + ":" + c.size).join(",") }}</span><slot name="cell-version_env" :row="{ versionScope: scope }" /></div>`,
+      template: `<div data-test="services-catalog-table"><span data-test="catalog-columns">{{ columns.map((c) => c.id).join(",") }}</span><span data-test="catalog-hidden">{{ columns.filter((c) => columnVisibility?.[c.id] === false).map((c) => c.id).join(",") }}</span><span data-test="catalog-status-header">{{ columns.find((c) => c.id === "status")?.header }}</span><slot name="cell-version_env" :row="{ versionScope: scope }" /></div>`,
     },
     CatalogVersionControls: {
       emits: ["env"],
@@ -3428,17 +3520,32 @@ describe("ServicesCatalog env column", () => {
     config.isEnterprise = "false";
   });
 
-  it("puts the version columns after the latency columns, Env first only while Env is All envs", async () => {
+  it("shows all columns by default, the original ten first, Env only while Env is All envs", async () => {
+    localStorage.clear();
     view = mountServicesCatalog({ stubs });
     await flushPromises();
     const ids = () => view!.get('[data-test="catalog-columns"]').text().split(",");
-    expect(ids().slice(ids().indexOf("max_duration_ns") + 1)).toEqual([
+    expect(ids()).toEqual([
+      "service_name",
+      "status",
+      "total_requests",
+      "error_count",
+      "error_rate",
+      "p50_latency_ns",
+      "p95_latency_ns",
+      "p99_latency_ns",
+      "avg_duration_ns",
+      "max_duration_ns",
       "version_env",
       "version_where",
       "service_versions",
       "version_verdict",
       "version_deployed",
     ]);
+    expect(view.get('[data-test="catalog-hidden"]').text()).toBe("");
+    expect(view.get('[data-test="catalog-status-header"]').text()).toBe(
+      i18n.global.t("traces.servicesCatalog.columns.status"),
+    );
     expect(view.get('[data-test="env-cell"]').text()).toBe("prod/ingester");
     await view.get('[data-test="pick-env"]').trigger("click");
     await flushPromises();
@@ -3451,6 +3558,213 @@ describe("ServicesCatalog env column", () => {
     view = mountServicesCatalog({ stubs });
     await flushPromises();
     expect(view.get('[data-test="catalog-columns"]').text()).not.toContain("version_env");
+  });
+
+  it("lets every version column be hidden but keeps the Service column, even when stored hidden", async () => {
+    localStorage.clear();
+    view = mountServicesCatalog({ stubs });
+    await flushPromises();
+    const vm = view.vm as any;
+    const hideable = vm.tableColumns.filter((col: any) => col.hideable).map((col: any) => col.id);
+    expect(hideable).not.toContain("service_name");
+    expect(hideable).toEqual(expect.arrayContaining(["version_env", "version_deployed"]));
+    vm.setColumnVisibility({ service_name: false, version_where: false });
+    await flushPromises();
+    expect(view.get('[data-test="catalog-hidden"]').text()).toBe("version_where");
+  });
+});
+
+describe("ServicesCatalog Env and Deploy verdict filters", () => {
+  const scope = {
+    service: "checkout",
+    scope_key: "s1",
+    where_key: "k8s:c1/prod",
+    env: "prod",
+    env_source: "attribute",
+    signals: ["traces"],
+    active_versions: [],
+  };
+  const sqlOf = (req: any) =>
+    atob(req.queryReq.query.sql.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "="));
+  // A null where key serves a period with no spans at all; claude_code's spans never carry one.
+  const serve = (whereKey: string | null) =>
+    mockFetchQueryDataWithHttpStream.mockImplementation((req: any, callbacks: any) => {
+      const stamped = !sqlOf(req).includes("claude_code");
+      const key = stamped ? whereKey : "";
+      const hits =
+        key === null
+          ? []
+          : [
+              { where_key: key, service_name: "checkout", _is_real_service: 1 },
+              {
+                where_key: key,
+                service_name: "pg",
+                _infer_service_name: "pg",
+                _infer_service_type: "database",
+              },
+            ];
+      callbacks.data(null, { type: "search_response_hits", content: { results: { hits } } });
+      callbacks.complete(null, {});
+    });
+  const stubs = {
+    CatalogVersionControls: {
+      props: ["noEnvStamps", "envCounts", "env"],
+      emits: ["env", "verdict"],
+      template: `<div data-test="controls" :data-env="env" :data-no-env-stamps="String(noEnvStamps)" :data-env-counts="envCounts && JSON.stringify([...envCounts])"><button data-test="pick-env" @click="$emit('env', 'prod')" /><button data-test="pick-verdict" @click="$emit('verdict', 'regressed')" /></div>`,
+    },
+  };
+  let view: VueWrapper | undefined;
+  beforeEach(() => {
+    config.isEnterprise = "true";
+    queryClient.clear();
+    resetListViewState();
+    mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+    mockGetStreams.mockResolvedValue({ list: [{ name: "default" }] });
+    vi.spyOn(serviceVersionsService, "services").mockResolvedValue({
+      data: {
+        services: [scope],
+        envs: [{ env: "prod", where_keys: [scope.where_key] }],
+        verdict_status: "ok",
+        registry_status: "ok",
+      },
+    } as any);
+    mockStreamSchema.mockResolvedValue({ data: { schema: [{ name: "o2_service_where" }] } });
+  });
+  afterEach(() => {
+    view?.unmount();
+    config.isEnterprise = "false";
+    vi.restoreAllMocks();
+    mockStreamSchema.mockResolvedValue({ data: { schema: [] } });
+    queryClient.clear();
+  });
+
+  it.each([
+    { spans: "carry no env stamp", whereKey: "", schema: true, disabled: "true" },
+    { spans: "carry env stamps", whereKey: "k8s:c1/prod", schema: true, disabled: "false" },
+    {
+      spans: "come from a stream without the env field",
+      whereKey: null,
+      schema: false,
+      disabled: "true",
+    },
+  ])("disables the filters when spans $spans", async (c) => {
+    if (!c.schema) mockStreamSchema.mockResolvedValue({ data: { schema: [] } });
+    serve(c.whereKey);
+    view = mountServicesCatalog({ stubs });
+    await flushPromises();
+    expect(view.get('[data-test="controls"]').attributes("data-no-env-stamps")).toBe(c.disabled);
+  });
+
+  it("offers this stream's envs with counts, filters client-side and clears a pick the next stream lacks", async () => {
+    mockGetStreams.mockResolvedValue({ list: [{ name: "default" }, { name: "claude_code" }] });
+    serve("k8s:c1/prod");
+    view = mountServicesCatalog({ stubs });
+    await flushPromises();
+    const controls = () => view!.get('[data-test="controls"]');
+    // The scopeless pg row is reachable under No env, so the options add up to All.
+    expect(controls().attributes("data-env-counts")).toBe('[["prod",1],[":no_env",1]]');
+    expect(view.get('[data-test="services-catalog-type-all"]').text()).toContain("2");
+    const loads = mockFetchQueryDataWithHttpStream.mock.calls.length;
+    await view.get('[data-test="pick-env"]').trigger("click");
+    await flushPromises();
+    expect(mockFetchQueryDataWithHttpStream.mock.calls.length).toBe(loads);
+    expect(view.get('[data-test="services-catalog-type-all"]').text()).toContain("1");
+    mockSearchObj.data.stream.selectedStream = { label: "claude_code", value: "claude_code" };
+    await flushPromises();
+    expect(controls().attributes("data-no-env-stamps")).toBe("true");
+    expect(controls().attributes("data-env")).toBe("");
+    mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+    await flushPromises();
+    expect(controls().attributes("data-env")).toBe("");
+  });
+
+  it("holds a filter write while a stream switch navigates, then writes it on the new stream", async () => {
+    mockGetStreams.mockResolvedValue({ list: [{ name: "default" }, { name: "production" }] });
+    serve("k8s:c1/prod");
+    const route = (stream: string) => ({
+      name: "traces",
+      query: { tab: "services-catalog", stream },
+    });
+    routerState.currentRoute.value = route("default");
+    view = mountServicesCatalog({ stubs });
+    await flushPromises();
+    mockRouterReplace.mockClear();
+    // The switch moved the stream; its URL push has not landed when the env pick writes.
+    mockSearchObj.data.stream.selectedStream = { label: "production", value: "production" };
+    await view.get('[data-test="pick-env"]').trigger("click");
+    await flushPromises();
+    expect(mockRouterReplace).not.toHaveBeenCalledWith({
+      query: expect.objectContaining({ stream: "default" }),
+    });
+    routerState.currentRoute.value = route("production");
+    await flushPromises();
+    expect(mockRouterReplace).toHaveBeenLastCalledWith({
+      query: expect.objectContaining({ stream: "production", catalogEnv: "prod" }),
+    });
+    expect(view.get('[data-test="controls"]').attributes("data-env")).toBe("prod");
+    routerState.currentRoute.value = { query: routeQuery };
+  });
+
+  it("explains filters that hide every row, keeps the rail rows and clears the filters", async () => {
+    serve("k8s:c1/prod");
+    view = mountServicesCatalog({ stubs });
+    await flushPromises();
+    await view.get('[data-test="pick-env"]').trigger("click");
+    await view.get('[data-test="pick-verdict"]').trigger("click");
+    await flushPromises();
+    const empty = view.get('[data-test="services-catalog-filter-empty"]');
+    expect(empty.text()).toContain(
+      catalogFilterEmptyText({ env: "prod", verdict: "regressed", locale: "en" }, gt),
+    );
+    expect(view.get('[data-test="services-catalog-type-all"]').text()).toContain("0");
+    expect(view.find('[data-test="services-catalog-empty"]').exists()).toBe(false);
+    expect(view.find('[data-test="services-catalog-type-datastore"]').exists()).toBe(true);
+    await view.get('[data-test="o2-empty-state-action-clear-filters"]').trigger("click");
+    await flushPromises();
+    expect(view.find('[data-test="services-catalog-filter-empty"]').exists()).toBe(false);
+  });
+
+  it("gives a search with no match the same filter-aware empty state and clears it", async () => {
+    serve("k8s:c1/prod");
+    view = mountServicesCatalog({ stubs });
+    await flushPromises();
+    (view.vm as any).filterText = "zzzz";
+    await flushPromises();
+    const empty = view.get('[data-test="services-catalog-filter-empty"]');
+    expect(empty.text()).toContain(
+      catalogFilterEmptyText({ env: "", verdict: "", search: "zzzz", locale: "en" }, gt),
+    );
+    await view.get('[data-test="o2-empty-state-action-clear-filters"]').trigger("click");
+    await flushPromises();
+    expect((view.vm as any).filterText).toBe("");
+  });
+
+  it("asks for an explicit row count and says so when the catalog fills it", async () => {
+    const hits = Array.from({ length: 10_000 }, (_, i) => ({ service_name: `svc-${i}` }));
+    mockFetchQueryDataWithHttpStream.mockImplementation((req: any, callbacks: any) => {
+      callbacks.data(null, { type: "search_response_hits", content: { results: { hits } } });
+      callbacks.complete(null, {});
+    });
+    view = mountServicesCatalog({
+      stubs: { ...stubs, OTable: { template: '<div><slot name="footer-note" /></div>' } },
+    });
+    await flushPromises();
+    const catalogCall = mockFetchQueryDataWithHttpStream.mock.calls.find(
+      (call: any[]) => call[0].queryReq.encoding === "base64",
+    );
+    expect(catalogCall[0].queryReq.query.size).toBe(10_000);
+    expect(view.get('[data-test="services-catalog-footer-note"]').text()).toContain("10,000");
+  });
+
+  it("keeps the no-data state when the period has no spans even without the filter", async () => {
+    serve(null);
+    view = mountServicesCatalog({ stubs });
+    await flushPromises();
+    await view.get('[data-test="pick-env"]').trigger("click");
+    await flushPromises();
+    expect(view.find('[data-test="services-catalog-empty"]').exists()).toBe(true);
+    expect(view.find('[data-test="services-catalog-filter-empty"]').exists()).toBe(false);
+    expect(view.find('[data-test="services-catalog-type-filter"]').exists()).toBe(false);
   });
 });
 
@@ -3859,8 +4173,20 @@ describe("ServicesCatalog version cells with no registry scope", () => {
         "cell-version_where": "svcver-where-unreported",
       },
       tip: "",
+      header: "serviceVersions.catalog.notReported",
     },
-  ])("shows the muted dash with its reason in each version cell when $state", async (c) => {
+    {
+      state: "the registry read is denied",
+      row: "{ service_name: 'cart', where_key: 'k8s:c1/prod' }",
+      registry: () =>
+        vi.spyOn(serviceVersionsService, "services").mockRejectedValue({
+          isAxiosError: true,
+          response: { status: 403 },
+        }),
+      cells: { "cell-version_env": "svcver-cell-denied" },
+      tip: null,
+    },
+  ])("shows each version cell's state and reason when $state", async (c) => {
     const service = c.row.match(/service_name: '([^']+)'/)![1];
     mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
       callbacks.data(null, {
@@ -3880,11 +4206,20 @@ describe("ServicesCatalog version cells with no registry scope", () => {
     await flushPromises();
     for (const id of Object.values(c.cells)) {
       const cell = view.get(`[data-test="${id}"]`);
+      if (c.tip === null) continue;
       expect(cell.text()).toContain("—");
-      const tip = cell.get(".tip").text();
-      if (c.tip) expect(tip).toBe(c.tip);
-      else expect(tip.trim()).not.toBe("");
+      // A reason every row shares is said once, in the column header, so the cell is a plain dash.
+      if (c.header) {
+        expect(cell.find(".tip").exists()).toBe(false);
+        continue;
+      }
+      expect(cell.get(".tip").text()).toBe(c.tip);
     }
+    if (c.header)
+      for (const column of (view.vm as any).tableColumns.filter((col: any) =>
+        col.id.startsWith("version_"),
+      ))
+        expect(column.meta?.headerTooltip).toContain(gt(c.header as never));
   });
 });
 
