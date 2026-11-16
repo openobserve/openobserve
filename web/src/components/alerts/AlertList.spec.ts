@@ -105,6 +105,7 @@ import { announcePolite } from "@/lib/feedback/RegionStatus/announcer";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
   deleteEditorDraft,
   readEditorDraft,
@@ -308,7 +309,8 @@ beforeEach(() => {
   // so a leftover action/tab from an earlier test (e.g. "when action=add"
   // pushes {action:"add"}) would asynchronously re-open the add/import dialog
   // and hide the list (and its type filter), breaking every later assertion.
-  router.currentRoute.value.query = {};
+  // Most cases read every row, so they open past the Firing default; its own cases clear this.
+  router.currentRoute.value.query = { state: ALERT_LIST_ALL_STATES };
   router.currentRoute.value.params = {};
   router.currentRoute.value.name = "alertList";
 
@@ -1223,13 +1225,22 @@ describe("AlertList - router query behaviors", () => {
       name: "Alert 1",
       page: "3",
     };
+    wrapper.vm.stateFilters = ["firing"];
+    wrapper.vm.filterQuery = "cpu";
+    await flushPromises();
     const spy = vi.spyOn(router, "push");
     await wrapper.vm.hideForm();
+    await flushPromises();
 
     const pushedQuery = spy.mock.calls[0][0].query;
     expect(pushedQuery.page).toBe("3");
     expect(pushedQuery.action).toBeUndefined();
     expect(pushedQuery.alert_id).toBeUndefined();
+    // Closing the editor, after a save or not, opens the list unfiltered so the alert is in view.
+    expect(pushedQuery.state).toBe(ALERT_LIST_ALL_STATES);
+    expect(wrapper.vm.stateFilters).toEqual([]);
+    // A search left in place would hide an alert saved under another name.
+    expect(wrapper.vm.filterQuery).toBe("");
   });
 
   it("a folder read answered after an AutoObserve Apply or Undo does not refill the rows with the old alert (F2)", async () => {
@@ -1342,11 +1353,11 @@ describe("AlertList - row actions keep the view", () => {
   const mountOnPageTwo = async (stateFilter: string | null = "active") => {
     // An earlier test's navigation can still land after beforeEach blanked the query.
     await flushPromises();
-    router.currentRoute.value.query = {};
+    router.currentRoute.value.query = { state: stateFilter ?? ALERT_LIST_ALL_STATES };
     router.currentRoute.value.name = "alertList";
     (store.state as any).organizationData.allAlertsListByFolderId = {};
     alertsDB = Array.from({ length: 25 }, (_, i) => makeAlert(i + 1, { enabled: true }));
-    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 2, stateFilter });
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 2 });
     const wrapper: any = await mountAlertList();
     await flushPromises();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -2002,9 +2013,7 @@ describe("AlertList - row actions keep the view", () => {
         await settleWrite();
         const bDone = wrapper.vm.refreshAlerts();
         await flushPromises();
-        // The write also refreshes the Firing badge, which reads every folder with size 0.
-        const folderReads = alertsSvc.listByFolderId.mock.calls.filter((c: any[]) => c[1] !== 0);
-        expect(folderReads).toHaveLength(1);
+        expect(alertsSvc.listByFolderId).toHaveBeenCalledTimes(1);
         a.resolve({ data: { list: staleList().filter((r) => r.alert_id !== "alert-99") } });
         await Promise.all([aDone, bDone]);
         await flushPromises();
@@ -2187,10 +2196,14 @@ describe("AlertList - filters from the Overview links", () => {
     expect(wrapper.vm.stateFilters).toEqual([state]);
   });
 
-  it("lets ?state win over the saved state and ignores an invalid value", async () => {
-    Object.assign(useListViewState("alerts", {}), { stateFilter: ["paused"] });
-    expect((await withQuery({ state: "firing" })).vm.stateFilters).toEqual(["firing"]);
-    expect((await withQuery({ state: "bogus" })).vm.stateFilters).toEqual(["paused"]);
+  it("opens on the Firing tile unless ?state picks the tiles, the all-states value meaning none", async () => {
+    expect((await withQuery({})).vm.stateFilters).toEqual(["firing"]);
+    expect((await withQuery({ state: "paused,error" })).vm.stateFilters).toEqual([
+      "paused",
+      "error",
+    ]);
+    expect((await withQuery({ state: ALERT_LIST_ALL_STATES })).vm.stateFilters).toEqual([]);
+    expect((await withQuery({ state: "bogus" })).vm.stateFilters).toEqual([]);
   });
 
   it("starts without the saved search when the link carries a state or level", async () => {
@@ -2199,7 +2212,8 @@ describe("AlertList - filters from the Overview links", () => {
     expect(linked.vm.searchQuery).toBe("");
     expect(linked.vm.filterQuery).toBe("");
     expect((await withQuery({ level: "critical" })).vm.searchQuery).toBe("");
-    expect((await withQuery({ state: "bogus" })).vm.searchQuery).toBe("saved");
+    expect((await withQuery({ all_folders: "true" })).vm.searchQuery).toBe("");
+    expect((await withQuery({ state: ALERT_LIST_ALL_STATES })).vm.filterQuery).toBe("");
   });
 
   it("clears the level filter with the Total tile", async () => {
@@ -2252,7 +2266,7 @@ describe("AlertList - filters from the Overview links", () => {
   });
 
   it("filters rules whose last evaluation errored and alerts whose delivery failed", async () => {
-    const wrapper = await withQuery({});
+    const wrapper = await withQuery({ state: ALERT_LIST_ALL_STATES });
     wrapper.vm.filteredResults = [
       { enabled: true, name: "errored", last_outcome: "error" },
       { enabled: true, name: "undelivered", last_outcome: "notify_failed" },
@@ -2270,9 +2284,14 @@ describe("AlertList - filters from the Overview links", () => {
     expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["undelivered"]);
   });
 
-  it("strips state and level from the URL after reading them, keeping other keys", async () => {
+  it("strips state, level and scope from the URL after reading them, keeping other keys", async () => {
     const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
-    await withQuery({ state: "firing", level: "warning", org_identifier: "acme" });
+    await withQuery({
+      state: "firing",
+      level: "warning",
+      all_folders: "true",
+      org_identifier: "acme",
+    });
     expect(replace).toHaveBeenCalledWith({ query: { org_identifier: "acme" } });
     replace.mockRestore();
   });
@@ -2295,10 +2314,13 @@ describe("AlertList - filters from the Overview links", () => {
     expect(again.vm.filterQuery).toBe("f=1");
   });
 
-  it("starts a linked filter inside the current folder, not across folders", async () => {
+  it("starts a linked filter inside the current folder unless the link asks for every folder", async () => {
     Object.assign(useListViewState("alerts", {}), { searchAcrossFolders: true });
     expect((await withQuery({ state: "firing" })).vm.searchAcrossFolders).toBe(false);
     expect((await withQuery({})).vm.searchAcrossFolders).toBe(true);
+    const everywhere = await withQuery({ state: "firing", all_folders: "true" });
+    expect(everywhere.vm.searchAcrossFolders).toBe(true);
+    expect(alertsSvc.listByFolderId.mock.lastCall[6]).toBe("");
   });
 
   it("says what pressing the level chip does", async () => {
@@ -2317,9 +2339,10 @@ describe("AlertList - filters from the Overview links", () => {
 });
 
 describe("AlertList - view state restoration", () => {
-  it("restores the stat-tile chip, sort and page size saved before navigating away", async () => {
+  it("restores the sort and page size saved before navigating away, but not the stat tile", async () => {
+    router.currentRoute.value.query = {};
     Object.assign(useListViewState("alerts", {}), {
-      stateFilter: "paused",
+      stateFilter: ["paused"],
       sortBy: "name",
       sortOrder: "desc",
       perPage: 50,
@@ -2327,14 +2350,13 @@ describe("AlertList - view state restoration", () => {
     const wrapper: any = await mountAlertList();
     await flushPromises();
 
-    // A single key saved before chips went multi-select still restores.
-    expect(wrapper.vm.stateFilters).toEqual(["paused"]);
+    expect(wrapper.vm.stateFilters).toEqual(["firing"]);
     expect(wrapper.vm.sortBy).toBe("name");
     expect(wrapper.vm.sortOrder).toBe("desc");
     expect(wrapper.vm.pageSize).toBe(50);
   });
 
-  it("saves chip, sort and page size changes for the next visit", async () => {
+  it("saves sort and page size changes for the next visit", async () => {
     const wrapper: any = await mountAlertList();
     await flushPromises();
 
@@ -2345,7 +2367,6 @@ describe("AlertList - view state restoration", () => {
     await flushPromises();
 
     expect(useListViewState("alerts", {})).toMatchObject({
-      stateFilter: ["active", "paused"],
       sortBy: "name",
       sortOrder: "asc",
       perPage: 100,
@@ -2509,6 +2530,19 @@ describe("AlertList - micro validations", () => {
   });
 
   // Note: multipleExportAlert functionality is already tested in "exports multiple selected alerts to JSON" test above
+
+  it("lists every folder, with the Folder column, once the scope is all folders and the search is empty", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    alertsSvc.listByFolderId.mockClear();
+    wrapper.vm.searchAcrossFolders = true;
+    await flushPromises();
+
+    const [, , , , , , folder, term] = alertsSvc.listByFolderId.mock.lastCall;
+    expect(folder).toBe("");
+    expect(term).toBe("");
+    expect(wrapper.vm.columns.map((c: any) => c.id)).toContain("folder_name");
+  }, 10000);
 
   it("toggle searchAcrossFolders rebinds models", async () => {
     const wrapper: any = await mountAlertList();
@@ -4226,6 +4260,29 @@ describe("AlertList - first run and the alert library", () => {
     emptyState(wrapper).vm.$emit("action", "clear-filters");
     await flushPromises();
     expect(wrapper.vm.filterQuery).toBe("");
+  });
+
+  it("names an empty Firing tile by scope, shows all alerts from it, and keeps first run for an empty folder", async () => {
+    router.currentRoute.value.query = {};
+    const wrapper = await mountList();
+    expect(wrapper.vm.stateFilters).toEqual(["firing"]);
+    const folderTitle = emptyState(wrapper).props("title");
+    expect(folderTitle).toBeTruthy();
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(false);
+
+    wrapper.vm.searchAcrossFolders = true;
+    await flushPromises();
+    expect(emptyState(wrapper).props("title")).not.toBe(folderTitle);
+
+    await wrapper.get('[data-test="alert-list-empty-show-all"]').trigger("click");
+    expect(wrapper.vm.stateFilters).toEqual([]);
+
+    wrapper.vm.stateFilters = ["firing"];
+    wrapper.vm.allAlerts = [];
+    wrapper.vm.filteredResults = [];
+    await flushPromises();
+    expect(emptyState(wrapper).props("filtered")).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(true);
   });
 
   it("hides both library entry points when custom_hide_menus lists alertLibrary", async () => {

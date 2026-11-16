@@ -124,7 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
         >
           <div class="h-full">
-            <FolderList type="alerts" @update:activeFolderId="updateActiveFolderId" />
+            <FolderList
+              type="alerts"
+              :hide-active="!!searchAcrossFolders"
+              @update:activeFolderId="updateActiveFolderId"
+            />
           </div>
         </div>
         <!-- Right: Table -->
@@ -963,7 +967,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   size="block"
                   preset="no-alerts"
-                  :filtered="!!(filterQuery || searchQuery || stateFilters.length || levelFilter)"
+                  :filtered="listFiltered"
+                  :title="stateEmptyTitle"
+                  :description="stateEmptyTitle ? t('alerts.noAlertsFiringDescription') : undefined"
                   @action="
                     (id) =>
                       id === 'clear-filters' &&
@@ -973,11 +979,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (levelFilter = null))
                   "
                 >
+                  <template v-if="stateFilterEmptied" #actions>
+                    <EmptyStateActionCard
+                      icon="format-list-bulleted"
+                      :label="t('alerts.showAllAlerts')"
+                      data-test="alert-list-empty-show-all"
+                      @click="stateFilters = []"
+                    />
+                  </template>
                   <!-- First run only: the filtered state keeps its single Clear filters action. -->
-                  <template
-                    v-if="!(filterQuery || searchQuery || stateFilters.length || levelFilter)"
-                    #actions
-                  >
+                  <template v-else-if="!listFiltered" #actions>
                     <OButton
                       v-if="showAlertLibrary"
                       variant="primary"
@@ -1315,6 +1326,7 @@ import {
 import sloService from "@/services/slos";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
@@ -1390,6 +1402,7 @@ import { isAnomalyDataReadinessStatus } from "@/components/anomaly_detection/ste
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { matchesAnyKey, readFilterKeys, toggleFilterKey } from "@/utils/filterKeys";
+import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
   ALERT_DRAFT_KIND,
   ANOMALY_DRAFT_VARIANT,
@@ -1441,6 +1454,7 @@ export default defineComponent({
     AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
     EditorDraftDot,
     OEmptyState,
+    EmptyStateActionCard,
     ConfirmDialog,
     ImportAlert,
     FolderList,
@@ -1516,7 +1530,6 @@ export default defineComponent({
       searchQuery: "",
       filterQuery: "",
       searchAcrossFolders: false,
-      stateFilter: [] as AlertStateKey[],
       sortBy: "",
       sortOrder: "asc" as "asc" | "desc",
       perPage: 20,
@@ -2048,13 +2061,12 @@ export default defineComponent({
     });
 
     // ── Stat-tile quick filter ──────────────────────────────────────────────
-    // Tiles toggle states in and out (OR'd); the tile counts stay folder totals, only the rows filter.
+    // Tiles toggle states in and out (OR'd); the tile counts stay scope totals, only the rows filter.
     const urlQuery = router.currentRoute.value.query;
     const urlStates = readFilterKeys(urlQuery.state, isAlertStateKey);
+    // A fresh visit opens on what is firing; any `?state=` link, the all-states value included, picks the tiles instead.
     const stateFilters = ref<AlertStateKey[]>(
-      urlStates.length
-        ? urlStates
-        : readFilterKeys(savedAlertListFilters.stateFilter, isAlertStateKey),
+      urlQuery.state === undefined ? ["firing"] : urlStates,
     );
     // URL-only: the saved state never carries it.
     const levelFilter = ref<AlertLevelFilter | null>(
@@ -2097,6 +2109,25 @@ export default defineComponent({
           )
         : rows;
       return level ? byState.filter((r: any) => r.level === level) : byState;
+    });
+    // Only the state tiles emptied the table: the scope still holds alerts, so the copy names the tile, not a search.
+    const stateFilterEmptied = computed(
+      () =>
+        stateFilters.value.length > 0 &&
+        !(filterQuery.value || searchQuery.value || levelFilter.value) &&
+        displayedAlerts.value.length === 0 &&
+        (filteredResults.value?.length ?? 0) > 0,
+    );
+    // A tile over a folder with no alerts at all still reads as first run.
+    const listFiltered = computed(
+      () =>
+        !!(filterQuery.value || searchQuery.value || levelFilter.value) || stateFilterEmptied.value,
+    );
+    const stateEmptyTitle = computed<I18nText | undefined>(() => {
+      if (!stateFilterEmptied.value || stateFilters.value.join() !== "firing") return undefined;
+      return searchAcrossFolders.value
+        ? t("alerts.noAlertsFiringAnyFolder")
+        : t("alerts.noAlertsFiringThisFolder");
     });
     const markIfLeftFilter = (row: any): boolean => {
       const f = stateFilters.value;
@@ -2376,7 +2407,7 @@ export default defineComponent({
       ];
 
       // insert folder_name column after the name column if applicable
-      if (searchAcrossFolders.value && searchQuery.value !== "") {
+      if (searchAcrossFolders.value) {
         baseColumns.splice(1, 0, {
           id: "folder_name",
           accessorKey: "folder_name",
@@ -2421,18 +2452,40 @@ export default defineComponent({
       immediate: true,
     });
 
-    // A state or level link lands on exactly the rows clicked, so the saved search is not restored.
-    const linkedFilter = urlStates.length > 0 || levelFilter.value !== null;
+    // A state, level or scope link lands on exactly the rows clicked, so the saved search is not restored.
+    const urlAllFolders = urlQuery.all_folders === ALERT_LIST_ALL_FOLDERS;
+    const linkedFilter =
+      urlQuery.state !== undefined || levelFilter.value !== null || urlAllFolders;
     const searchQuery = ref<any>(linkedFilter ? "" : savedAlertListFilters.searchQuery || "");
     const filterQuery = ref<any>(linkedFilter ? "" : savedAlertListFilters.filterQuery || "");
     const searchAcrossFolders = ref<any>(
-      !linkedFilter && (savedAlertListFilters.searchAcrossFolders || false),
+      urlAllFolders || (!linkedFilter && (savedAlertListFilters.searchAcrossFolders || false)),
     );
+    if (urlAllFolders) isRestoringState.value = true;
     // The link filters apply once; leaving them in the URL would override the saved search on Back or reload.
-    if (urlQuery.state !== undefined || urlQuery.level !== undefined) {
-      const { state: _state, level: _level, ...rest } = router.currentRoute.value.query;
+    const dropListLink = () => {
+      const query = router.currentRoute.value.query;
+      if (query.state === undefined && query.level === undefined && query.all_folders === undefined)
+        return;
+      const { state: _state, level: _level, all_folders: _allFolders, ...rest } = query;
       router.replace({ query: rest });
-    }
+    };
+    dropListLink();
+    // The in-list editor closes onto this same instance, so a `?state=` it navigates with applies here too.
+    watch(
+      () => router.currentRoute.value.query.state,
+      (state) => {
+        const route = router.currentRoute.value;
+        if (state === undefined || route.name !== "alertList") return;
+        stateFilters.value = readFilterKeys(state, isAlertStateKey);
+        levelFilter.value = parseQueryChoice(route.query.level, ALERT_LEVEL_FILTERS);
+        // Same as a fresh mount: the link's scope, and no search left over to hide the linked rows.
+        searchAcrossFolders.value = route.query.all_folders === ALERT_LIST_ALL_FOLDERS;
+        searchQuery.value = "";
+        filterQuery.value = "";
+        dropListLink();
+      },
+    );
     const selectedAlertToMove: Ref<any[]> = ref([]);
     const selectedAnomalyConfigsToMove: Ref<any[]> = ref([]);
     const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
@@ -2564,7 +2617,9 @@ export default defineComponent({
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];
       }
-      if (query) {
+      // The scope toggle widens the table itself, so a table read with no term still spans every folder.
+      const allFolders = !!query || (refreshResults && !!searchAcrossFolders.value);
+      if (allFolders) {
         folderId = "";
       }
 
@@ -2720,7 +2775,7 @@ export default defineComponent({
         //this is the condition where we are checking the if the folderId is not equal to the activeFolderId
         //if it is not equal then we are returning  and if is not search across folders then we are returning as well as in previous step we are anyways storing in the store for future use
         //this will prevent the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
-        if (folderId != activeFolderId.value && !query) {
+        if (allFolders ? !query && !searchAcrossFolders.value : folderId != activeFolderId.value) {
           return false;
         }
         //here we are actually assigning the localAllAlerts to the allAlerts to avoid the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
@@ -3624,6 +3679,7 @@ export default defineComponent({
         alert_type: _alertType,
         ...rest
       } = router.currentRoute.value.query;
+      // Unfiltered, so the alert just saved is in view whatever tile was selected before.
       await router.push({
         name: "alertList",
         query: {
@@ -3631,6 +3687,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value,
           tab: activeTab.value,
+          state: ALERT_LIST_ALL_STATES,
         },
       });
       track("Button Click", {
@@ -4280,6 +4337,8 @@ export default defineComponent({
         searchQuery.value = null;
         searchQuery.value = filterQuery.value;
         filterQuery.value = null;
+        // An empty term never reaches the searchQuery watcher, so the widened list is loaded here.
+        if (!searchQuery.value) void getAlertsByFolderId(store, activeFolderId.value);
       }
       if (!newVal) {
         //here we are restoring the current folder's alerts and re-filtering by the active tab
@@ -4290,6 +4349,8 @@ export default defineComponent({
         filterQuery.value = null;
         searchQuery.value = null;
         filterAlertsByTab();
+        // An all-folders entry never loaded this folder on its own.
+        void getAlertsByFolderId(store, activeFolderId.value);
       }
     });
     // Persist filter state to Vuex so it survives navigation to add/edit screens
@@ -4304,22 +4365,12 @@ export default defineComponent({
       }
     });
     watch(
-      [
-        searchQuery,
-        filterQuery,
-        searchAcrossFolders,
-        stateFilters,
-        sortBy,
-        sortOrder,
-        pageSize,
-        currentPage,
-      ],
+      [searchQuery, filterQuery, searchAcrossFolders, sortBy, sortOrder, pageSize, currentPage],
       () => {
         Object.assign(savedAlertListFilters, {
           searchQuery: searchQuery.value || "",
           filterQuery: filterQuery.value || "",
           searchAcrossFolders: !!searchAcrossFolders.value,
-          stateFilter: stateFilters.value,
           sortBy: sortBy.value,
           sortOrder: sortOrder.value,
           perPage: pageSize.value,
@@ -4761,6 +4812,9 @@ export default defineComponent({
       stateCounts,
       summaryStats,
       stateFilters,
+      stateFilterEmptied,
+      listFiltered,
+      stateEmptyTitle,
       levelFilter,
       levelFilterLabel,
       clearLevelFilter,

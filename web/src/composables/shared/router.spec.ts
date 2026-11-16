@@ -1430,6 +1430,17 @@ describe("useRoutes (router.ts)", () => {
       expect(enTitle(route.meta.titleKey)).toBe("Alerts");
     });
 
+    it("sends an old /alerts/firing bookmark to the list's Firing tile across every folder", () => {
+      const firing = useRoutes().homeChildRoutes.find(
+        (route: any) => route.path === "alerts/firing",
+      );
+      expect(firing.component).toBeUndefined();
+      expect(firing.redirect({ query: { org_identifier: "o" } })).toEqual({
+        name: "alertList",
+        query: { org_identifier: "o", state: "firing", all_folders: "true" },
+      });
+    });
+
     it("should include addAlert route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "addAlert");

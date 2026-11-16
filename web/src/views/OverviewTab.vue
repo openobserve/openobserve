@@ -852,6 +852,7 @@ import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDi
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import analytics from "@/services/product_analytics";
 import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
+import { ALERT_LIST_ALL_FOLDERS } from "@/utils/alerts/alertListLink";
 import type { AiChatHandoff } from "@/plugins/traces/utils/traceAiPayload";
 
 const AlertHistoryDrawer = defineAsyncComponent(
@@ -1834,13 +1835,14 @@ const openAlertList = (filter: Record<string, string> = {}) => {
   router.push({ name: "alertList", query: { org_identifier: orgId.value, ...filter } });
 };
 
-// Each filter yields exactly the rows its count tallies.
+// Each filter yields exactly the rows its count tallies; the counts are org-wide, so the list opens on every folder.
+const all_folders = ALERT_LIST_ALL_FOLDERS;
 const ALERT_LIST_FILTERS = {
-  firing: { state: "firing" },
-  failing: { state: "error" },
-  delivery: { state: "notify_failed" },
-  critical: { state: "firing", level: "critical" },
-  warning: { state: "firing", level: "warning" },
+  firing: { state: "firing", all_folders },
+  failing: { state: "error", all_folders },
+  delivery: { state: "notify_failed", all_folders },
+  critical: { state: "firing", level: "critical", all_folders },
+  warning: { state: "firing", level: "warning", all_folders },
 } as const;
 
 const goToAddAlert = () => {

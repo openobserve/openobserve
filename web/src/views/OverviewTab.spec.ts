@@ -2688,9 +2688,17 @@ describe("OverviewTab", () => {
       const lastQuery = () => (push.mock.lastCall![0] as any).query;
 
       const cases: [string, string, Record<string, string>][] = [
-        ["overview-alerts-box-failing", "alertList", { state: "error" }],
-        ["overview-alerts-box-critical", "alertList", { state: "firing", level: "critical" }],
-        ["overview-alerts-box-warning", "alertList", { state: "firing", level: "warning" }],
+        ["overview-alerts-box-failing", "alertList", { state: "error", all_folders: "true" }],
+        [
+          "overview-alerts-box-critical",
+          "alertList",
+          { state: "firing", level: "critical", all_folders: "true" },
+        ],
+        [
+          "overview-alerts-box-warning",
+          "alertList",
+          { state: "firing", level: "warning", all_folders: "true" },
+        ],
       ];
       for (const [id, name, query] of cases) {
         await wrapper.get(`[data-test="${id}"]`).trigger("click");
