@@ -33735,7 +33735,8 @@
         "none": "first version",
         "previous_by_first_seen": "previous by first seen (no deploy history)",
         "pre_existing": "running before deploy tracking started",
-        "warming_up": "deploy tracking is warming up"
+        "warming_up": "deploy tracking is warming up",
+        "no_data": "version metrics have not reached this window"
       },
       "notServingRequests": "Requests, {window}",
       "notServingNote": "Nothing to compare until {version} serves traffic.",

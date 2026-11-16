@@ -115,7 +115,13 @@ export function noVerdictBaselineRule(
   context: NoVerdictContext,
   t: TranslateFn,
 ) {
-  return noVerdictRule(context.tracking, t, undefined, scopeFlag(reason, context));
+  return noVerdictRule(
+    context.tracking,
+    t,
+    undefined,
+    scopeFlag(reason, context),
+    reason === "no_data",
+  );
 }
 // Only a pre-existing compare reads the scope's own flag; the other reasons are warm-up by definition.
 function scopeFlag(reason: NoVerdict, context: NoVerdictContext) {

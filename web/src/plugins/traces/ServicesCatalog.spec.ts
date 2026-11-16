@@ -1860,7 +1860,7 @@ describe("ServicesCatalog", () => {
         expect(decodedSql).toContain('FROM "production-stream"');
       });
 
-      it("hands the panel every spelling the service's rows folded, across places", async () => {
+      it("hands the panel every spelling the service's rows folded, across places, and finds a row by any of them", async () => {
         mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
           callbacks.data(null, {
             type: "search_response_hits",
@@ -1895,6 +1895,9 @@ describe("ServicesCatalog", () => {
           "checkout.service",
           "CHECKOUT",
         ]);
+        wrapper.vm.filterText = "Checkout.Service";
+        await flushPromises();
+        expect(wrapper.vm.filteredServices.map((s: any) => s.where_key)).toEqual(["east"]);
       });
 
       it("keeps inferred dependencies with the same name but different identities separate", async () => {

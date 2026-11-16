@@ -987,11 +987,15 @@ describe("a no-verdict drawer's picker uses the no-verdict wording", () => {
     return data;
   };
   const tracking = { epoch: 1_000_000, warmup_ends_at: 2_000_000 };
-  it("names a warming scope as warming up", () => {
+  it("names a warming scope as warming up, and a tracked window metrics have not reached as no data", () => {
     const rows = [row("v2", "k2", { tracking_started: false })];
     const label = autoLabel(render(firstLook(), rows, [], { tracking }));
     expect(label).toContain("baselineRule.warming_up");
     expect(label).not.toContain("baselineRule.none");
+    const data = firstLook();
+    data.arms.a = { ...data.arms.a, has_rollup: false };
+    const noData = autoLabel(render(data, [row("v2", "k2")], [], { tracking }));
+    expect(noData).toContain("baselineRule.no_data");
   });
   it("keeps first version for a real first version", () => {
     expect(autoLabel(render(firstLook(), [row("v2", "k2")], [], { tracking }))).toContain(

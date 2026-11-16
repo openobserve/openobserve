@@ -286,8 +286,11 @@ export function noVerdictRule(
   t: TranslateFn,
   now = Date.now() * 1000,
   scopeStarted?: boolean,
+  noData = false,
 ) {
-  return noVerdictState(tracking, now, scopeStarted).startsWith("warming")
+  const state = noVerdictState(tracking, now, scopeStarted, noData);
+  if (state === "noData") return t("serviceVersions.compare.baselineRule.no_data");
+  return state.startsWith("warming")
     ? t("serviceVersions.compare.baselineRule.warming_up")
     : t("serviceVersions.compare.baselineRule.pre_existing");
 }

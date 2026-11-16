@@ -1605,7 +1605,10 @@ const filteredServices = computed(() => {
   );
   if (!filterText?.value?.trim()) return byType;
   const q = filterText.value?.trim().toLowerCase();
-  return byType.filter((s) => s.service_name.toLowerCase().includes(q));
+  // A folded row shows one spelling, so a search or deep link by any other spelling must still find it.
+  return byType.filter((s) =>
+    [s.service_name, ...(s.service_names ?? [])].some((name) => name.toLowerCase().includes(q)),
+  );
 });
 
 // Count of entities per category, plus the "all" total, for the tab badges.
