@@ -84,6 +84,13 @@ const noEnvRow = {
   inferred_value: "default",
   inferred_source: "default",
 };
+// A pipeline-set o2_service_env "default" is a real env (is_no_env), whatever its text.
+const pipelineDefaultRow = {
+  ...noEnvRow,
+  rule_key: "org/cluster/c3//",
+  k8s_cluster: "c3",
+  inferred_source: "attribute",
+};
 let wrapper: VueWrapper | undefined;
 const $ = (test: string) => document.body.querySelector<HTMLElement>(`[data-test="${test}"]`);
 const fail = (status: number) => ({ isAxiosError: true, response: { status, data: {} } });
@@ -113,7 +120,7 @@ afterEach(() => {
 
 describe("Environments & versions", () => {
   it("lists what each override matches, its inferred and set labels and its reach", async () => {
-    serve([whereRow, clusterRow, noEnvRow]);
+    serve([whereRow, clusterRow, noEnvRow, pipelineDefaultRow]);
     const view = await render();
     expect(transport.get).toHaveBeenCalledWith(
       "/api/org/service_identity/overrides",
@@ -125,9 +132,16 @@ describe("Environments & versions", () => {
     expect(text).toContain("cluster c1 (all namespaces)");
     expect(text).toContain("from cluster name");
     expect(text).toContain("prabhat");
-    expect(text).toContain("No env");
-    expect(text).not.toContain("default");
-    expect(view.text()).toContain("3 · they win over detection for what they match");
+    const row = (cluster: string) =>
+      view
+        .findAll("tbody tr")
+        .find((tr) => tr.text().includes(`cluster ${cluster} `))!
+        .text();
+    expect(row("c2")).toContain("No env");
+    expect(row("c2")).not.toContain("default");
+    expect(row("c3")).toContain("default");
+    expect(row("c3")).not.toContain("No env");
+    expect(view.text()).toContain("4 · they win over detection for what they match");
   });
 
   it("removes with DELETE and Undo re-PUTs the removed override", async () => {

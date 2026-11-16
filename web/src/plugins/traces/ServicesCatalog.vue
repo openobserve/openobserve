@@ -839,7 +839,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { useListViewState } from "@/composables/useListViewState";
 import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
-import { serviceKeySql } from "@/utils/serviceCount";
+import { serviceKey, serviceKeySql } from "@/utils/serviceCount";
 
 const { t, locale } = useI18nTyped();
 const placeholderLine = (name: string) => {
@@ -2262,10 +2262,15 @@ async function loadServicesCatalog() {
             const name = inferredName ?? hit.service_name ?? "";
             const inferredSystem = hit._infer_service_system ?? undefined;
             const inferredType = hit._infer_service_type ?? undefined;
+            const spellings: string[] | undefined =
+              !inferredName && Array.isArray(hit.service_names)
+                ? hit.service_names.map(String)
+                : undefined;
+            // The shown spelling is MIN over the window and can change between loads; the folded key cannot.
             const id = JSON.stringify([
               hit.where_key || "",
               serviceRowId({
-                service_name: name,
+                service_name: inferredName ? name : serviceKey(name),
                 infer_service_name: inferredName,
                 infer_service_system: inferredSystem,
                 infer_service_type: inferredType,
@@ -2275,10 +2280,7 @@ async function loadServicesCatalog() {
               where_key: hit.where_key || "",
               id,
               service_name: name,
-              service_names:
-                !inferredName && Array.isArray(hit.service_names)
-                  ? hit.service_names.map(String)
-                  : undefined,
+              service_names: spellings,
               total_requests: hit.total_requests ?? 0,
               error_count: hit.error_count ?? 0,
               error_rate: hit.error_rate ?? 0,
@@ -2293,7 +2295,7 @@ async function loadServicesCatalog() {
               infer_service_system: inferredSystem,
               infer_service_type: inferredType,
             });
-            if (hit._is_real_service) realNames.add(name);
+            if (hit._is_real_service) (spellings ?? [name]).forEach((n) => realNames.add(n));
           }
         }
       },

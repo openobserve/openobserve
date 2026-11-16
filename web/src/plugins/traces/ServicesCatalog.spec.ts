@@ -2982,48 +2982,57 @@ describe("ServicesCatalog", () => {
       props: ["data"],
     };
 
-    it("drops inferred rows named like an instrumented service instead of listing it again", async () => {
-      mockHits([
-        { service_name: "email-service", _is_real_service: 1, total_requests: 14152 },
-        {
-          service_name: "email-service",
-          _infer_service_name: "email-service",
-          _infer_service_system: "http",
-          _infer_service_type: "external",
-          _is_real_service: 0,
-          total_requests: 14129,
-        },
-        {
-          service_name: "email-service",
-          _infer_service_name: "email-service",
-          _infer_service_type: "rpc",
-          _is_real_service: 0,
-          total_requests: 13937,
-        },
-        {
-          service_name: "google.com",
-          _infer_service_name: "google.com",
-          _infer_service_system: "http",
-          _infer_service_type: "external",
-          _is_real_service: 0,
-          total_requests: 10,
-        },
-      ]);
-      wrapper = mountServicesCatalog();
-      await flushPromises();
+    it.each([
+      { real: { service_name: "email-service" } },
+      // The folded row shows MIN(service_name), which need not be the spelling its callers use.
+      {
+        real: { service_name: "Email-Service", service_names: ["Email-Service", "email-service"] },
+      },
+    ])(
+      "drops inferred rows named like the instrumented $real.service_name instead of listing it again",
+      async ({ real }) => {
+        mockHits([
+          { ...real, _is_real_service: 1, total_requests: 14152 },
+          {
+            service_name: "email-service",
+            _infer_service_name: "email-service",
+            _infer_service_system: "http",
+            _infer_service_type: "external",
+            _is_real_service: 0,
+            total_requests: 14129,
+          },
+          {
+            service_name: "email-service",
+            _infer_service_name: "email-service",
+            _infer_service_type: "rpc",
+            _is_real_service: 0,
+            total_requests: 13937,
+          },
+          {
+            service_name: "google.com",
+            _infer_service_name: "google.com",
+            _infer_service_system: "http",
+            _infer_service_type: "external",
+            _is_real_service: 0,
+            total_requests: 10,
+          },
+        ]);
+        wrapper = mountServicesCatalog();
+        await flushPromises();
 
-      const emailRows = wrapper.vm.services.filter((s: any) => s.service_name === "email-service");
-      expect(emailRows).toHaveLength(1);
-      expect(emailRows[0].total_requests).toBe(14152);
-      expect(wrapper.vm.categoryCounts).toEqual({
-        all: 2,
-        service: 1,
-        datastore: 0,
-        queue: 0,
-        external: 1,
-        rpc: 0,
-      });
-    });
+        const emailRows = wrapper.vm.services.filter((s: any) => s.service_name !== "google.com");
+        expect(emailRows).toHaveLength(1);
+        expect(emailRows[0].total_requests).toBe(14152);
+        expect(wrapper.vm.categoryCounts).toEqual({
+          all: 2,
+          service: 1,
+          datastore: 0,
+          queue: 0,
+          external: 1,
+          rpc: 0,
+        });
+      },
+    );
 
     it("labels same-named dependencies with their system", async () => {
       mockHits([
@@ -3310,18 +3319,33 @@ describe("ServicesCatalog", () => {
       expect(wrapper.vm.selectedServiceRow).toBeNull();
     });
 
-    it("keeps the side panel open when a new search still has its row", async () => {
-      mockHits([realEmail]);
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+    it.each([
+      { before: realEmail, after: realEmail },
+      // The last span of the shown spelling left the window, so MIN(service_name) moved on.
+      {
+        before: {
+          ...realEmail,
+          service_name: "Email-Service",
+          service_names: ["Email-Service", "email-service"],
+        },
+        after: { ...realEmail, service_names: ["email-service"] },
+      },
+    ])(
+      "keeps the side panel open when a new search still has its $before.service_name row",
+      async ({ before, after }) => {
+        mockHits([before]);
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+        wrapper.vm.handleRowClick(wrapper.vm.services[0]);
 
-      await wrapper.vm.loadServicesCatalog();
-      await flushPromises();
+        mockHits([after]);
+        await wrapper.vm.loadServicesCatalog();
+        await flushPromises();
 
-      expect(wrapper.vm.showSidePanel).toBe(true);
-      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("email-service");
-    });
+        expect(wrapper.vm.showSidePanel).toBe(true);
+        expect(wrapper.vm.selectedServiceRow?.service_name).toBe("email-service");
+      },
+    );
 
     it("keeps the previous rows, with the table loading, until the refetch completes", async () => {
       mockHits([realEmail]);

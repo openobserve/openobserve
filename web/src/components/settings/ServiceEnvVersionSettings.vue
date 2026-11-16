@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex items-center gap-2">
             <span class="flex flex-col items-start py-1.5">
               <ODimensionChip
-                v-if="isNoEnvValue(row.inferred_value, row.inferred_source)"
+                v-if="row.inferred_source === 'default'"
                 dim-key="env"
                 :key-label="t('serviceVersions.compare.envChip')"
                 :value="t('serviceVersions.env.noEnv')"
@@ -247,7 +247,6 @@ import {
 } from "@/services/service_versions.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { isOutsideK8s } from "@/utils/serviceVersionsCopy";
-import { isNoEnvValue } from "@/services/service_versions.envs";
 import { envKind, flatWhere, overrideWrite } from "@/components/shared/ChangeEnvPopover.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTable from "@/lib/core/Table/OTable.vue";
