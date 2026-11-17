@@ -7,6 +7,7 @@ class SlackWorkspaceCardPage {
     this.root = page.locator('[data-test="slack-workspace"]');
     this.name = page.locator('[data-test="slack-workspace-card"] h2');
     this.meta = page.locator('[data-test="slack-workspace-card-description"]');
+    this.connectedBy = this.meta.locator(':scope > span');
     this.tooltip = page.locator('[data-test="o-tooltip-content"]:visible');
     this.status = page.locator('[data-test="slack-workspace-status"]');
     this.sockets = page.locator('[data-test="slack-workspace-sockets"]');
