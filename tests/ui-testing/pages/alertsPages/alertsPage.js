@@ -16,7 +16,7 @@
 
 import { expect } from '@playwright/test';
 import fs from 'fs';
-import { CommonActions } from '../commonActions';
+import { CommonActions, showAllAlertStates } from '../commonActions';
 import { AlertCreationWizard } from './alertCreationWizard.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
 import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
@@ -2169,6 +2169,7 @@ export class AlertsPage {
     async waitForAlertListPageReady() {
         await this.page.locator(this.locators.alertListPage).waitFor({ state: 'visible', timeout: 30000 });
         await this.page.waitForTimeout(2000);
+        await showAllAlertStates(this.page);
     }
 
     /**
@@ -4899,6 +4900,7 @@ export class AlertsPage {
         const tabQuery = tab ? `&tab=${tab}` : '';
         await this.page.goto(`/web/alerts?org_identifier=${org}&folder=${folderId}${tabQuery}`);
         await expect(this.page.locator('[data-test="alert-list-table"]')).toBeVisible({ timeout: 30000 });
+        await showAllAlertStates(this.page);
     }
 
     _alertRowByName(name) {

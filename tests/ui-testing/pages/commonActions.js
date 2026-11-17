@@ -99,6 +99,16 @@ export async function gotoStreamsViaNav(page) {
 }
 
 /**
+ * Select the alerts list's Total tile; the list opens on Firing, and flows that look for an alert they made need every row.
+ * @param {import('@playwright/test').Page} page
+ */
+export async function showAllAlertStates(page) {
+    const total = page.locator('[data-test="alert-summary-total"]').first();
+    await total.waitFor({ state: 'visible', timeout: 15000 });
+    await total.click();
+}
+
+/**
  * Click a left-nav link, re-clicking until the SPA route actually lands on `pathSuffix` (e.g. '/logs').
  * @param {import('@playwright/test').Page} page
  * @param {string} selector
@@ -182,6 +192,7 @@ export class CommonActions {
         await this.page.waitForTimeout(2000);
         // Check for alerts page loaded - use alert list page element
         await expect(this.page.locator('[data-test="alert-list-page"]')).toBeVisible();
+        await showAllAlertStates(this.page);
     }
 
     async navigateToSettings() {
