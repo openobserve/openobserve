@@ -18,7 +18,7 @@ import { convertPanelData } from "./convertPanelData";
 import { convertLogsPanelData, resolveLogsFields, toEpochMillis } from "./convertLogsPanelData";
 
 vi.mock("./convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn(),
+  prepareCustomChartRun: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
 
