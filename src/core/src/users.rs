@@ -57,6 +57,13 @@ use crate::{
     organization,
 };
 
+#[cfg(feature = "cloud")]
+const MEMBER_ROLE_REFUSED: &str = "A member's role can be Admin, Editor, Viewer or User. Service accounts are managed under Service Accounts";
+#[cfg(feature = "cloud")]
+const NEW_SERVICE_ACCOUNT_DOMAIN: &str = "@sa.internal";
+#[cfg(feature = "cloud")]
+const SYSTEM_IDENTITY_DOMAIN: &str = "openobserve.internal";
+
 /// The account kind a removal endpoint acts on; any other membership answers as not found.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RemovalTarget {
@@ -73,6 +80,13 @@ impl RemovalTarget {
             Self::Any => true,
         }
     }
+}
+
+/// An account that already exists, as the cloud service-account check sees it.
+#[cfg(feature = "cloud")]
+struct ExistingAccount {
+    is_sso: bool,
+    memberships: Vec<(String, UserRole)>,
 }
 
 /// True when `requested` is not the same set of custom roles as `current`.
@@ -497,6 +511,10 @@ pub async fn update_user(
     // Admins Role can still be mutable.
     {
         let new_org_role = UserOrgRole::from(&role);
+        #[cfg(feature = "cloud")]
+        if !is_allowed_role_change(&local_user.role, &new_org_role.base_role) {
+            return Ok(MetaHttpResponse::bad_request(MEMBER_ROLE_REFUSED));
+        }
         old_role = Some(new_user.role);
         new_user.role = new_org_role.base_role;
         new_role = Some(new_user.role.clone());
@@ -1527,6 +1545,43 @@ fn fga_member_role(role: &UserRole) -> String {
     }
 }
 
+// Resending the current role is not a change: the edit dialog sends it back for any member.
+#[cfg(feature = "cloud")]
+fn is_allowed_role_change(current: &UserRole, requested: &UserRole) -> bool {
+    requested == current || requested.is_member_role()
+}
+
+/// An existing account is reused only if it is purely a service account the caller controls;
+/// a new one must be in the reserved domain, so no person's email can be registered.
+#[cfg(feature = "cloud")]
+fn service_account_refusal(
+    email: &str,
+    existing: Option<&ExistingAccount>,
+    caller_controls: impl Fn(&str) -> bool,
+) -> Option<String> {
+    let Some(account) = existing else {
+        return (!email.ends_with(NEW_SERVICE_ACCOUNT_DOMAIN)).then(|| {
+            format!(
+                "On OpenObserve Cloud, a new service account's email must end in {NEW_SERVICE_ACCOUNT_DOMAIN}"
+            )
+        });
+    };
+    let only_service_account = !account.memberships.is_empty()
+        && account
+            .memberships
+            .iter()
+            .all(|(_, role)| *role == UserRole::ServiceAccount);
+    let caller_owns = account
+        .memberships
+        .iter()
+        .any(|(org, _)| caller_controls(org));
+    let reusable = only_service_account
+        && !account.is_sso
+        && !email.ends_with(SYSTEM_IDENTITY_DOMAIN)
+        && caller_owns;
+    (!reusable).then(|| format!("{email} belongs to another account. Use a new name."))
+}
+
 #[cfg(feature = "cloud")]
 async fn delete_cloud_invites(org_id: &str, email_id: &str) -> Option<Response> {
     use o2_enterprise::enterprise::cloud::org_invites;
@@ -1602,6 +1657,39 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
     log::info!("Service account user record created for '{}'", email);
 
     Ok(())
+}
+
+/// Why `caller` may not add `email` as a service account on cloud, or None when it may.
+/// `email` must already be trimmed and lowercased.
+#[cfg(feature = "cloud")]
+pub async fn cloud_service_account_refusal(
+    email: &str,
+    caller: &str,
+) -> Result<Option<String>, anyhow::Error> {
+    if infra::table::users::get_id_by_email(email).await?.is_none() {
+        return Ok(service_account_refusal(email, None, |_| false));
+    }
+    let account = ExistingAccount {
+        is_sso: db::user::get_user_record(email)
+            .await?
+            .user_type
+            .is_external(),
+        memberships: db::org_users::list_orgs_by_user(email)
+            .await?
+            .into_iter()
+            .map(|m| (m.org_id, m.role))
+            .collect(),
+    };
+    let caller_is_root = is_root_user(caller);
+    let caller_admin_of: hashbrown::HashSet<String> = db::org_users::list_orgs_by_user(caller)
+        .await?
+        .into_iter()
+        .filter(|m| matches!(m.role, UserRole::Admin | UserRole::Root))
+        .map(|m| m.org_id)
+        .collect();
+    Ok(service_account_refusal(email, Some(&account), |org| {
+        caller_is_root || caller_admin_of.contains(org)
+    }))
 }
 
 #[cfg(test)]
@@ -2958,6 +3046,75 @@ mod tests {
                 .collect();
 
             assert_eq!(visible, vec!["active-org"]);
+        }
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn cloud_role_change_allows_member_roles_and_the_current_role_only() {
+        use UserRole::*;
+
+        use super::is_allowed_role_change;
+        for (current, requested, allowed) in [
+            (Viewer, Editor, true),
+            (Editor, Admin, true),
+            (Admin, User, true),
+            (ServiceAccount, Viewer, true),
+            (ServiceAccount, ServiceAccount, true),
+            (Viewer, ServiceAccount, false),
+            (Admin, Root, false),
+            (Viewer, SreAgent, false),
+        ] {
+            assert_eq!(
+                is_allowed_role_change(&current, &requested),
+                allowed,
+                "{current:?} -> {requested:?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn cloud_service_account_reuse_and_creation_rules() {
+        use super::{ExistingAccount, service_account_refusal};
+        let account = |is_sso: bool, memberships: &[(&str, UserRole)]| ExistingAccount {
+            is_sso,
+            memberships: memberships
+                .iter()
+                .map(|(org, role)| (org.to_string(), role.clone()))
+                .collect(),
+        };
+        let sa = UserRole::ServiceAccount;
+        let owned = account(false, &[("mine", sa.clone())]);
+        let elsewhere = account(false, &[("theirs", sa.clone())]);
+        let person = account(false, &[("mine", UserRole::Viewer), ("other", sa.clone())]);
+        let converted_sso = account(true, &[("mine", sa.clone())]);
+        let sre_agent = account(false, &[("mine", UserRole::SreAgent)]);
+        let orphan = account(false, &[]);
+        let controls = |org: &str| org == "mine";
+        let cases: [(&str, Option<&ExistingAccount>, bool); 10] = [
+            ("ci.acme@sa.internal", None, true),
+            ("bot@company.com", None, false),
+            ("x@openobserve.internal", None, false),
+            ("ci.acme@sa.internal", Some(&owned), true),
+            ("ci.other@sa.internal", Some(&elsewhere), false),
+            ("jane@company.com", Some(&person), false),
+            ("jane@company.com", Some(&converted_sso), false),
+            (
+                "o2-sre-agent.org-mine@openobserve.internal",
+                Some(&sre_agent),
+                false,
+            ),
+            (
+                "o2-sre-agent.org-mine@openobserve.internal",
+                Some(&owned),
+                false,
+            ),
+            ("old@sa.internal", Some(&orphan), false),
+        ];
+        for (email, existing, allowed) in cases {
+            let refusal = service_account_refusal(email, existing, controls);
+            assert_eq!(refusal.is_none(), allowed, "{email}: {refusal:?}");
         }
     }
 }
