@@ -38,6 +38,8 @@ export type AlertFindId =
   | "name"
   | "folder"
   | "destinations"
+  | "recoveryDestinations"
+  | "recoveryPlan"
   | AnomalyFindId;
 
 /** Controls only the anomaly ("When unusual") editor has. */
@@ -70,6 +72,8 @@ export interface AlertFindEntry {
   groupKey: I18nKey;
   /** The tiered setting that shows or hides this control, when it is not the entry itself. */
   setting?: AlertSettingId;
+  /** The setting this one sits under, shown after the group in the result's path. */
+  parentKey?: I18nKey;
   /** data-test ids of the control in preference order; the first one on screen gets focus. */
   targets: readonly string[];
 }
@@ -255,6 +259,28 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     section: "notify",
     tier: "smart",
     groupKey: MORE,
+    targets: ["alert-notify-on-recovery-toggle"],
+  },
+  {
+    id: "recoveryDestinations",
+    labelKey: "alerts.alertSettings.recoveryDestinations",
+    aliases: ["recovery destinations", "resolved destination", "recovery channel"],
+    section: "notify",
+    tier: "smart",
+    groupKey: MORE,
+    setting: "recovery",
+    parentKey: "alerts.plain.notifyOnRecovery",
+    targets: ["alert-settings-recovery-destinations", "alert-notify-on-recovery-toggle"],
+  },
+  {
+    id: "recoveryPlan",
+    labelKey: "alerts.find.labels.recoveryPlan",
+    aliases: ["recovery message", "resolved message", "resolve", "close ticket"],
+    section: "notify",
+    tier: "smart",
+    groupKey: MORE,
+    setting: "recovery",
+    parentKey: "alerts.plain.notifyOnRecovery",
     targets: ["alert-notify-on-recovery-toggle"],
   },
   {

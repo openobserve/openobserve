@@ -103,6 +103,15 @@ describe("searchAlertSettings", () => {
     expect(top(query)).toBe(id);
   });
 
+  it("finds the recovery switch and the two settings under it by recov", () => {
+    const found = searchAlertSettings("recov", t, (id) => !isAnomalyOnlyFindId(id));
+    expect(found.map((m) => t(m.entry.labelKey)).sort()).toEqual([
+      "Recovery destination",
+      "Tell them when it recovers",
+      "What each destination does on recovery",
+    ]);
+  });
+
   it("matches the visible label too", () => {
     expect(top("suppress repeats")).toBe("suppressRepeats");
     expect(top("at most once")).toBe("cooldown");

@@ -61,8 +61,14 @@ describe("useAlertSettingFind", () => {
     expect(find.items.value[0]).toEqual({
       id: "keepFiring",
       label: "Keep firing after it clears",
-      context: ["Who should hear about it?", "More settings"],
+      context: ["Who should hear about it?", "More options"],
     });
+    find.query.value = "recovery destination";
+    expect(find.items.value[0]?.context).toEqual([
+      "Who should hear about it?",
+      "More options",
+      "Tell them when it recovers",
+    ]);
     expect(find.countText.value).toMatch(/setting/);
   });
 

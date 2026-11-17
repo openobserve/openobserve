@@ -78,7 +78,11 @@ export function useAlertSettingFind(opts: {
     searchAlertSettings(query.value, t, opts.available).map(({ entry }) => ({
       id: entry.id,
       label: t(entry.labelKey),
-      context: [sectionTitle(entry.section), t(entry.groupKey)],
+      context: [
+        sectionTitle(entry.section),
+        t(entry.groupKey),
+        ...(entry.parentKey ? [t(entry.parentKey)] : []),
+      ],
     })),
   );
   const countText = computed(() =>
