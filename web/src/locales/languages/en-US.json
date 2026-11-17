@@ -12239,7 +12239,7 @@
         "whichEventsFiltered": "Only events that match these filters count.",
         "whichEventsSql": "Write a query. The rows it returns are what the alert looks at.",
         "whichEventsPromql": "Write a PromQL query. The value it returns is what the alert looks at.",
-        "checkEvery": "How often we run the check",
+        "checkEvery": "Check every",
         "rowTemplate": "How each matching row reads in the message",
         "descriptionPlaceholder": "Optional. What should someone do when this fires?",
         "name": "Shown in the alert list and in notifications"
@@ -13739,7 +13739,7 @@
       "targetsDestinationsGroup": "Destinations",
       "targetsWorkflowsGroup": "Workflows",
       "refreshDestinations": "Refresh latest Destinations",
-      "addNewDestination": "Add Destination",
+      "addNewDestination": "New destination",
       "cooldownTooltip": "If the alert triggers then how long should it wait before sending another notification. e.g. if the alert triggers at 4:00 PM and the silence notification is set to 10 minutes then it will not send another notification until 4:10 PM even if the alert is still after 1 minute. This is to avoid spamming the user with notifications.",
       "periodTooltip": "Period for which the query should run. e.g. 10 minutes means that whenever the query will run it will use the last 10 minutes of data.",
       "timezoneWarning": "Warning: The displayed timezone is approximate. Verify and select the correct timezone manually.",
@@ -13898,7 +13898,7 @@
       "sqlEditorHint": "Use open full editor to run and validate",
       "checkEvery": "Check every",
       "pendingPeriod": "Hold for",
-      "cronExpressionPlaceholder": "0 */10 * * * *",
+      "cronExpressionPlaceholder": "0 0 9 * * 1-5",
       "timezonePlaceholder": "timezone",
       "onThese": "on these",
       "filters": "filters",
@@ -15470,7 +15470,7 @@
       "placeholder": "Find a setting",
       "count": "{count} setting matches | {count} settings match",
       "empty": "No setting matches “{query}”",
-      "hint": "Finds today's labels and older names too, like “cooldown”. Enter jumps to the setting, even one behind “more”. Esc closes.",
+      "hint": "Finds today's labels and older names too, like “cooldown”. Enter jumps to the setting, even one in More options. Esc closes.",
       "labels": {
         "queryMode": "Query mode",
         "filters": "Filters",
@@ -15480,7 +15480,8 @@
         "warning": "Warning threshold",
         "holdFor": "Hold for at least",
         "groupBy": "Group by",
-        "cron": "Cron schedule"
+        "cron": "Cron schedule",
+        "recoveryPlan": "What each destination does on recovery"
       },
       "groups": {
         "type": "Alert type",
@@ -15490,7 +15491,7 @@
         "destinations": "Destinations",
         "schedule": "Schedule",
         "details": "Details",
-        "more": "More settings"
+        "more": "More options"
       }
     },
     "priorityUnsetPagesAs": "Not set (pages as P2)",
@@ -15542,6 +15543,7 @@
       "moreOptions": "More options ({count})",
       "suggestionsQueued": "({count} more suggestion after this) | ({count} more suggestions after this)",
       "messageRow": "What the message says",
+      "rowTemplateType": "Row template format",
       "messageRowHelp": "Defaults work for most alerts",
       "watch": {
         "library": "Or {link} in the Alert Library.",
@@ -15611,6 +15613,7 @@
         "lookingAt": "looking at the last",
         "lookingAtRow": "Looking at the last",
         "cronRow": "Run on cron",
+        "cronHint": "Second, minute, hour, day of month, month, day of week",
         "cronIn": "in",
         "overlap": "Each check looks at the last {period} min, so checks overlap by {minutes} min.",
         "equal": "Each check looks at the last {period} min, the same as the time between checks: no gaps, no overlap.",
