@@ -239,6 +239,7 @@ def test_e2e_trace_invalid_ids(create_session, base_url):
 
     assert (original_count == new_count), "Expected count of traces to increase by 1."
 
+
 GEN_AI_INPUT = '[{"role":"user","parts":[{"type":"text","content":"What is 2+2?"}]}]'
 GEN_AI_OUTPUT = '[{"role":"assistant","parts":[{"type":"text","content":"4"}]}]'
 
@@ -275,8 +276,10 @@ def test_gen_ai_messages_survive_a_prompt_reference_and_traceloop_keys(client: O
 
     rows = wait_until(lambda: _gen_ai_rows(client, temp_trace_stream, 3), timeout=30, msg="the three spans never became searchable")
     for name in ("plain", "with-prompt-ref"):
-        assert json.loads(rows[name]["gen_ai_input_messages"]) == json.loads(GEN_AI_INPUT), f"{name}: {rows[name]}"
-        assert json.loads(rows[name]["gen_ai_output_messages"]) == json.loads(GEN_AI_OUTPUT), f"{name}: {rows[name]}"
+        row = rows[name]
+        assert {"gen_ai_input_messages", "gen_ai_output_messages"} <= row.keys(), f"{name} lost its messages: {row}"
+        assert json.loads(row["gen_ai_input_messages"]) == json.loads(GEN_AI_INPUT), f"{name}: {row}"
+        assert json.loads(row["gen_ai_output_messages"]) == json.loads(GEN_AI_OUTPUT), f"{name}: {row}"
     ref = rows["with-prompt-ref"]
     assert (ref.get("gen_ai_prompt_name"), ref.get("gen_ai_prompt_version"), ref.get("gen_ai_prompt_label")) == (
         "support-answer", "3", "production"), ref
