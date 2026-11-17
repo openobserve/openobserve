@@ -29,7 +29,7 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { computed, nextTick, reactive, ref } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -80,6 +80,12 @@ import {
   lookBackWindowFloorSeconds,
 } from "./AnomalyDetectionConfig.schema";
 import enLocale from "@/locales/languages/en-US.json";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
+import { alertTierContext, tierAvailable, tierIsSet } from "@/components/alerts/alertSettingTiers";
+import { ALERT_FORM_CONTEXT_KEY } from "@/components/alerts/alertFormContext";
 import { anomalyBandPayload, defaultAnomalyConfig } from "@/composables/useAlertForm";
 
 // ---------------------------------------------------------------------------
@@ -170,6 +176,20 @@ const sensitivityHintText = (w: VueWrapper): string | undefined => {
   const hint = w.find('[data-test="anomaly-sensitivity-hint"]');
   return hint.exists() ? hint.text() : undefined;
 };
+
+// The filter sentence folds the builder away; Change (or "+ Add filter" when empty) opens it.
+async function openFilters(w: VueWrapper) {
+  const change = w.find('[data-test="add-alert-filter-sentence-change"]');
+  await (change.exists() ? change : w.find('[data-test="add-alert-add-filters"]')).trigger("click");
+  await flushPromises();
+}
+
+// Sensitivity reads "Auto" with Change until opened; the tiers and level live inside after Change.
+async function openSensitivity(w: VueWrapper) {
+  const change = w.find('[data-test="anomaly-sensitivity-row-change"]');
+  if (change.exists()) await change.trigger("click");
+  await flushPromises();
+}
 
 // A valid custom SQL query (aliases time_bucket, NOT the timestamp column).
 const VALID_CUSTOM_SQL =
@@ -555,6 +575,7 @@ describe("AnomalyDetectionConfig", () => {
     it("offers Auto, then maps Conservative, Balanced and Aggressive to 4, 3 and 2.5", async () => {
       wrapper = mountConfig();
       await flushPromises();
+      await openSensitivity(wrapper);
 
       expect(
         SENSITIVITY_TIERS.map((value) =>
@@ -571,6 +592,7 @@ describe("AnomalyDetectionConfig", () => {
     it("a new config defaults to Auto, with no band width", async () => {
       wrapper = mountConfig();
       await flushPromises();
+      await openSensitivity(wrapper);
 
       expect(getForm(wrapper).state.values.band_width).toBeNull();
       expect(tierStates(wrapper)).toEqual(["on", "off", "off", "off"]);
@@ -610,6 +632,7 @@ describe("AnomalyDetectionConfig", () => {
     ])("renders an honest Auto lifecycle readout for %j", async (model, value, label) => {
       wrapper = mountConfig({ band_width: null, ...model });
       await flushPromises();
+      await openSensitivity(wrapper);
       expect(wrapper.find('[data-test="anomaly-sensitivity-tier-auto"]').text()).toBe("Auto");
       expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').text()).toBe(
         `${label}${value}`,
@@ -626,6 +649,7 @@ describe("AnomalyDetectionConfig", () => {
         band_k: 4.23,
       });
       await flushPromises();
+      await openSensitivity(wrapper);
       getForm(wrapper).setFieldValue("detection_function", "sum");
       await flushPromises();
       expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').text()).not.toContain(
@@ -678,6 +702,7 @@ describe("AnomalyDetectionConfig", () => {
       const { wrapper: w, config } = mountReturning();
       wrapper = w;
       await flushPromises();
+      await openSensitivity(wrapper);
 
       await wrapper.find('[data-test="anomaly-sensitivity-tier-2.5"]').trigger("click");
       await flushPromises();
@@ -820,6 +845,7 @@ describe("AnomalyDetectionConfig", () => {
       const { wrapper: w, config } = mountReturning({ threshold: 97 });
       wrapper = w;
       await flushPromises();
+      await openSensitivity(wrapper);
 
       await wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').trigger("click");
       await flushPromises();
@@ -832,6 +858,7 @@ describe("AnomalyDetectionConfig", () => {
     it("tier labels re-resolve when the locale changes", async () => {
       wrapper = mountConfig();
       await flushPromises();
+      await openSensitivity(wrapper);
       const before = wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').text();
 
       const previous = i18n.global.locale.value;
@@ -1067,6 +1094,7 @@ describe("AnomalyDetectionConfig", () => {
     it("collapses the tier group to a dropdown on narrow screens", async () => {
       wrapper = mountConfig();
       await flushPromises();
+      await openSensitivity(wrapper);
       const group = wrapper
         .findAllComponents(OToggleGroup)
         .find((c) => c.vm.$attrs["data-test"] === "anomaly-sensitivity-tier");
@@ -1076,6 +1104,7 @@ describe("AnomalyDetectionConfig", () => {
     it("gives the tier group an accessible name", async () => {
       wrapper = mountConfig();
       await flushPromises();
+      await openSensitivity(wrapper);
 
       // The row's "Sensitivity" text is a plain div bound to neither control,
       // so aria-label is the group's only accessible name.
@@ -1139,9 +1168,32 @@ describe("AnomalyDetectionConfig", () => {
       { field: "gamma", operator: "Is Not Null", value: "" },
     ];
 
+    it("reads the rows as one sentence until Change opens the builder", async () => {
+      wrapper = mountConfig({ filters: saved.map((f) => ({ ...f })) });
+      await flushPromises();
+      const sentence = wrapper.find('[data-test="add-alert-filter-sentence"]');
+      expect(sentence.findAll('[data-test^="add-alert-filter-sentence-condition-"]')).toHaveLength(
+        3,
+      );
+      expect(wrapper.findComponent({ name: "FilterBuilder" }).exists()).toBe(false);
+      await openFilters(wrapper);
+      expect(wrapper.find('[data-test="add-alert-filter-sentence"]').exists()).toBe(false);
+      expect(renderedFilterFields(wrapper)).toEqual(["alpha", "beta", "gamma"]);
+    });
+
+    it("Remove on the sentence clears every row", async () => {
+      const { wrapper: w, config } = mountReturning({ filters: saved.map((f) => ({ ...f })) });
+      wrapper = w;
+      await flushPromises();
+      await wrapper.find('[data-test="add-alert-filter-sentence-remove"]').trigger("click");
+      await flushPromises();
+      expect(config.filters).toEqual([]);
+    });
+
     it("draws one chip per saved row, in order", async () => {
       wrapper = mountConfig({ filters: saved.map((f) => ({ ...f })) });
       await flushPromises();
+      await openFilters(wrapper);
       const builder = wrapper.findComponent({ name: "FilterBuilder" });
       expect(builder.props("profile")).toBe("anomaly");
       expect(renderedFilterFields(wrapper)).toEqual(["alpha", "beta", "gamma"]);
@@ -1151,6 +1203,7 @@ describe("AnomalyDetectionConfig", () => {
       const { wrapper: w, config } = mountReturning({ filters: saved.map((f) => ({ ...f })) });
       wrapper = w;
       await flushPromises();
+      await openFilters(wrapper);
 
       await wrapper.find('[data-test="anomaly-filter-builder-chip-beta-remove"]').trigger("click");
       await flushPromises();
@@ -1164,6 +1217,7 @@ describe("AnomalyDetectionConfig", () => {
     it("writes a builder edit back in the flat row format", async () => {
       wrapper = mountConfig({ filters: [] });
       await flushPromises();
+      await openFilters(wrapper);
       wrapper
         .findComponent({ name: "FilterBuilder" })
         .vm.$emit("update:modelValue", [{ field: "level", operator: "<>", value: "debug" }]);
@@ -1487,6 +1541,109 @@ describe("AnomalyDetectionConfig", () => {
         false,
       );
     });
+  });
+});
+
+describe("AnomalyDetectionConfig — section 2 in the sectioned editor (E1)", () => {
+  const anomalyCtx = alertTierContext({
+    isRealTime: "anomaly",
+    aggregate: false,
+    incidentsEnabled: false,
+    oncallEnabled: false,
+    suppressRepeatsEnabled: false,
+  });
+
+  function mountSectioned(overrides: Record<string, unknown> = {}) {
+    const config = reactive(buildConfig(overrides));
+    const tiers = useAlertSettingTiers({
+      available: (id) => tierAvailable(id, anomalyCtx),
+      isSet: (id) => tierIsSet(id, { form: {}, anomaly: config }),
+      showAll: ref(false),
+    });
+    const goToSection = vi.fn();
+    const w = mount(AnomalyDetectionConfig, {
+      global: {
+        ...mountOptions.global,
+        provide: {
+          [ALERT_SETTING_TIERS_KEY]: tiers,
+          [ALERT_FORM_CONTEXT_KEY]: {
+            isEditing: computed(() => false),
+            showAll: ref(false),
+            goToSection,
+            reveal: vi.fn(),
+          },
+        },
+      },
+      props: { config },
+    });
+    return { w, config, tiers, goToSection };
+  }
+
+  it("shows Sensitivity as Auto with Change, and no tier or level until Change", async () => {
+    const { w } = mountSectioned();
+    await flushPromises();
+    const row = w.find('[data-test="anomaly-sensitivity-row"]');
+    expect(row.text()).toContain(i18n.global.t("alerts.form.anomaly.sensitivityAuto"));
+    expect(w.find('[data-test="anomaly-sensitivity-tier"]').exists()).toBe(false);
+    await openSensitivity(w);
+    expect(w.find('[data-test="anomaly-sensitivity-tier"]').exists()).toBe(true);
+    expect(levelInput(w).exists()).toBe(false);
+    await w.find('[data-test="anomaly-sensitivity-tier-2.5"]').trigger("click");
+    await flushPromises();
+    expect(levelInput(w).exists()).toBe(true);
+  });
+
+  it("opens Sensitivity on load for a stored level", async () => {
+    const { w } = mountSectioned({ band_width: 3.5 });
+    await flushPromises();
+    expect(levelInput(w).exists()).toBe(true);
+  });
+
+  it("the schedule line states both numbers and links to How often to check", async () => {
+    const { w, goToSection } = mountSectioned({
+      schedule_interval_value: 1,
+      schedule_interval_unit: "h",
+      detection_window_value: 3,
+      detection_window_unit: "h",
+    });
+    await flushPromises();
+    const line = w.find('[data-test="anomaly-schedule-line"]');
+    expect(line.text()).toContain("1h");
+    expect(line.text()).toContain("3h");
+    await w.find('[data-test="anomaly-schedule-line-link"]').trigger("click");
+    expect(goToSection).toHaveBeenCalledWith("schedule");
+  });
+
+  it("Write SQL instead switches to custom SQL and shows the query tabs", async () => {
+    const { w, config } = mountSectioned();
+    await flushPromises();
+    expect(w.find('[data-test="anomaly-query-tabs"]').exists()).toBe(false);
+    await w.find('[data-test="add-alert-add-anomalySql"]').trigger("click");
+    await flushPromises();
+    expect(config.query_mode).toBe("custom_sql");
+    expect(w.find('[data-test="anomaly-query-tabs"]').exists()).toBe(true);
+  });
+
+  it.each<[string, string]>([["add-alert-add-anomalyRetrain", "anomaly-retrain-every-row"]])(
+    "%s adds its row in place",
+    async (link, row) => {
+      const { w } = mountSectioned();
+      await flushPromises();
+      expect(w.find(`[data-test="${row}"]`).exists()).toBe(false);
+      await w.find(`[data-test="${link}"]`).trigger("click");
+      await flushPromises();
+      expect(w.find(`[data-test="${row}"]`).exists()).toBe(true);
+      expect(w.find(`[data-test="${link}"]`).exists()).toBe(false);
+    },
+  );
+
+  it("keeps the generated SQL behind More options", async () => {
+    const { w, tiers } = mountSectioned();
+    await flushPromises();
+    expect(w.find('[data-test="anomaly-sql-preview-row"]').exists()).toBe(false);
+    tiers.reveal("anomalySqlPreview");
+    await flushPromises();
+    expect(w.find('[data-test="anomaly-sql-preview-row"]').exists()).toBe(true);
   });
 });
 

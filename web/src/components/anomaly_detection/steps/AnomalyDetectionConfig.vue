@@ -41,7 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ whichEventsHelp }}
             </div>
           </div>
-          <OFormToggleGroup name="query_mode" data-test="anomaly-query-tabs">
+          <OFormToggleGroup
+            v-if="tierShows('anomalySql')"
+            name="query_mode"
+            data-test="anomaly-query-tabs"
+          >
             <OToggleGroupItem
               v-for="tab in queryTabOptions"
               :key="tab.value"
@@ -55,10 +59,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ tab.label }}
             </OToggleGroupItem>
           </OFormToggleGroup>
+          <OButton
+            v-else
+            variant="ghost-primary"
+            size="sm"
+            icon-left="add"
+            data-test="add-alert-add-anomalySql"
+            @click="writeSqlInstead"
+          >
+            {{ t("alerts.tiers.add.anomalySql") }}
+          </OButton>
         </div>
 
-        <div v-if="queryMode === 'filters'" class="pb-2">
+        <div v-if="queryMode === 'filters' && !filtersOpen" class="pb-2">
+          <AlertFilterSentence
+            :group="filterGroup"
+            :stream-name="config.stream_name || ''"
+            dialect="sql"
+            data-test="add-alert-filter-sentence"
+            @add="openFilters"
+            @change="openFilters"
+            @edit="openFilters"
+            @toggle-connector="openFilters"
+            @remove="onFiltersChange([])"
+          />
+        </div>
+        <div v-if="queryMode === 'filters' && filtersOpen" class="pb-2">
           <FilterBuilder
+            ref="filterBuilderRef"
             profile="anomaly"
             :model-value="filterRows"
             :fields="filterFields"
@@ -340,15 +368,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             fill
             data-test="anomaly-training-window-row"
           >
-            <OFormInput
-              name="training_window_days"
-              type="number"
-              :min="1"
-              :suffix="t('alerts.anomaly.daysUnit')"
-              :aria-label="t('alerts.trainingWindow')"
-              data-test="anomaly-training-window"
-              class="alert-v3-input max-w-30 min-w-30"
-            />
+            <div class="flex flex-wrap items-start gap-2">
+              <OFormInput
+                name="training_window_days"
+                type="number"
+                :min="1"
+                :suffix="t('alerts.anomaly.daysUnit')"
+                :aria-label="t('alerts.trainingWindow')"
+                data-test="anomaly-training-window"
+                class="alert-v3-input max-w-30 min-w-30"
+              />
+              <OButton
+                v-if="!tierShows('anomalyRetrain')"
+                variant="ghost-primary"
+                size="sm"
+                icon-left="add"
+                data-test="add-alert-add-anomalyRetrain"
+                @click="tiers?.reveal('anomalyRetrain')"
+              >
+                {{ t("alerts.tiers.add.anomalyRetrain") }}
+              </OButton>
+            </div>
             <div
               class="text-text-secondary pt-1 text-xs"
               data-test="anomaly-training-window-floor-hint"
@@ -357,6 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OSettingRow>
           <OSettingRow
+            v-if="tierShows('anomalyRetrain')"
             :label="t('alerts.anomaly.retrainEvery')"
             :info="t('alerts.anomaly.retrainEveryTooltip')"
             fill
@@ -373,6 +414,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OSettingRow>
           <OSettingRow
+            v-if="formContext"
+            :label="t('alerts.groups.schedule')"
+            fill
+            data-test="anomaly-schedule-line"
+          >
+            <i18n-t
+              keypath="alerts.form.anomaly.scheduleLine"
+              tag="p"
+              class="text-text-body m-0 text-sm"
+            >
+              <template #every>{{ scheduleEvery }}</template>
+              <template #window>{{ scheduleWindow }}</template>
+              <template #link>
+                <OButton
+                  variant="link"
+                  size="sm"
+                  class="h-auto! p-0!"
+                  data-test="anomaly-schedule-line-link"
+                  @click="formContext.goToSection('schedule')"
+                >
+                  {{ t("alerts.form.anomaly.scheduleLink") }}
+                </OButton>
+              </template>
+            </i18n-t>
+          </OSettingRow>
+          <AlertSentenceRow
+            v-if="!sensitivityOpened"
+            :label="t('alerts.sensitivity')"
+            data-test="anomaly-sensitivity-row"
+            changeable
+            @change="sensitivityOpened = true"
+          >
+            <span class="text-text-heading font-medium">{{
+              t("alerts.form.anomaly.sensitivityAuto")
+            }}</span>
+            {{ t("alerts.form.anomaly.learned") }}
+          </AlertSentenceRow>
+          <OSettingRow
+            v-else
             :label="t('alerts.sensitivity')"
             :info="sensitivityTooltip"
             required
@@ -519,7 +599,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- SQL preview — in custom_sql mode the user's own editor is already on this form -->
         <OSettingRow
-          v-if="queryMode !== 'custom_sql'"
+          v-if="queryMode !== 'custom_sql' && tierShows('anomalySqlPreview')"
           :label="t('alerts.sqlPreview')"
           fill
           data-test="anomaly-sql-preview-row"
@@ -543,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { computed, defineComponent, ref, watch, type PropType } from "vue";
+import { computed, defineComponent, inject, nextTick, ref, watch, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { streamSchemaQuery } from "@/services/stream.queries";
@@ -557,7 +637,16 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
+import AlertFilterSentence from "@/components/alerts/AlertFilterSentence.vue";
+import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
+import { ALERT_FORM_CONTEXT_KEY } from "@/components/alerts/alertFormContext";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useTierVisibility,
+} from "@/composables/alerts/useAlertSettingTiers";
+import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -592,8 +681,11 @@ export default defineComponent({
     OIcon,
     OForm,
     OSettingRow,
+    OButton,
     OFormInput,
     OFormSelect,
+    AlertFilterSentence,
+    AlertSentenceRow,
   },
 
   props: {
@@ -734,6 +826,13 @@ export default defineComponent({
 
     const budgetMode = computed(() => sensitivityMode.value === "budget");
 
+    const tierShows = useTierVisibility();
+    const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
+    const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
+
+    // Auto reads as one sentence row; Change, a stored level or a stored budget opens the controls.
+    const sensitivityOpened = ref(false);
+
     const sensitivityError = computed(() =>
       budgetMode.value ? budgetCountError.value : bandWidthError.value,
     );
@@ -772,6 +871,14 @@ export default defineComponent({
     };
 
     const autoSensitivity = computed(() => bandWidth.value == null);
+    // Once open it stays open, so picking Auto again does not fold the row under the cursor.
+    watch(
+      () => !autoSensitivity.value || budgetMode.value,
+      (open) => {
+        if (open) sensitivityOpened.value = true;
+      },
+      { immediate: true },
+    );
     const customSensitivity = computed(
       () =>
         !autoSensitivity.value &&
@@ -1155,6 +1262,34 @@ export default defineComponent({
       form.setFieldValue("filters", next as AnomalyFilterRow[]);
     };
 
+    const filtersOpen = ref(false);
+    const filterBuilderRef = ref<{ focus(): void } | null>(null);
+    const filterGroup = computed(() =>
+      FILTER_PROFILES.anomaly.codec.parse(filterRows.value, { fields: filterFields.value }),
+    );
+    // The builder only allows "and", so every sentence phrase and connector opens it instead.
+    const openFilters = async () => {
+      filtersOpen.value = true;
+      await nextTick();
+      filterBuilderRef.value?.focus();
+    };
+
+    const writeSqlInstead = () => {
+      tiers?.reveal("anomalySql");
+      form.setFieldValue("query_mode", "custom_sql");
+    };
+
+    const intervalText = (value: unknown, unit: unknown) => {
+      const secs = anomalyIntervalSeconds(Number(value), String(unit));
+      return raw(secs === null ? "—" : formatAnomalySeconds(secs));
+    };
+    const scheduleEvery = computed(() =>
+      intervalText(scheduleIntervalValue.value, scheduleIntervalUnit.value),
+    );
+    const scheduleWindow = computed(() =>
+      intervalText(detectionWindowValue.value, detectionWindowUnit.value),
+    );
+
     // No stream context means no value lookup; the picker then takes typed values only.
     const loadFilterValues = (field: string, search: string) =>
       resolveFieldValues(field, { prefix: search }).catch(() => [] as string[]);
@@ -1223,6 +1358,17 @@ export default defineComponent({
       sensitivityTooltip,
       minTrainingDays: ANOMALY_MIN_TRAINING_DAYS,
       onCustomSqlChange,
+      tierShows,
+      tiers,
+      formContext,
+      sensitivityOpened,
+      filtersOpen,
+      filterBuilderRef,
+      filterGroup,
+      openFilters,
+      writeSqlInstead,
+      scheduleEvery,
+      scheduleWindow,
     };
   },
 });
