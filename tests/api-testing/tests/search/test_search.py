@@ -1885,10 +1885,11 @@ def test_long_histogram_buckets_sit_on_the_origin_grid_across_partitions(
         return (hits, ratio) if ratio > 0 else None
 
     # The cache keeps only finished buckets, which exist only when the rows (ending 10 min ago) cross a bucket edge.
-    if len(expected) > 1:
-        # The cache file is written after the response, so only a repeat that reports a cache hit tests the cached buckets.
-        hits, _ = wait_until(
-            served_from_cache, timeout=30, interval=1, msg=f"the {days}-day histogram was never answered from the result cache"
-        )
-        assert {hit["ts"]: hit["c"] for hit in hits} == expected, f"cached repeat: {hits}"
-        assert len(hits) == len(expected), f"the cached repeat repeated a bucket: {hits}"
+    if len(expected) < 2:
+        pytest.skip(f"cached leg: the seeded rows cross no {days}-day bucket edge today; the 2-day case covers it on almost every run")
+    # The cache file is written after the response, so only a repeat that reports a cache hit tests the cached buckets.
+    hits, _ = wait_until(
+        served_from_cache, timeout=30, interval=1, msg=f"the {days}-day histogram was never answered from the result cache"
+    )
+    assert {hit["ts"]: hit["c"] for hit in hits} == expected, f"cached repeat: {hits}"
+    assert len(hits) == len(expected), f"the cached repeat repeated a bucket: {hits}"
