@@ -174,6 +174,7 @@ const bootFrame = (code: string) => {
     echarts,
     el,
     frameDocument,
+    parentWindow,
     fire: (type: string, event?: unknown) => listeners[type]?.forEach((fn) => fn(event)),
     fireDocument: (type: string, event?: unknown) => docListeners[type]?.forEach((fn) => fn(event)),
     fireRoot: (type: string, event?: unknown) => rootListeners[type]?.forEach((fn) => fn(event)),
@@ -294,6 +295,34 @@ describe("sandbox runtime", () => {
       name: "cluster",
       detail: { cluster: "prod-eu" },
     });
+  });
+
+  it("never returns the option of an earlier run when a later run of the same code skips assigning it", async () => {
+    const frame = bootFrame('if (data[0].length) option = { title: { text: "first run" } };');
+    frame.send({ type: "appearance", ...LIGHT });
+    frame.run(1, [[1]]);
+    await settle();
+    frame.run(2, [[]]);
+    await settle();
+
+    expect(frame.charts[0].setOption.mock.calls[0][0].title).toEqual({ text: "first run" });
+    expect(frame.charts[0].setOption.mock.calls[1][0].title).toBeUndefined();
+  });
+
+  it("unbinds an o2_events handler that a later run of the same code no longer defines", async () => {
+    const frame = bootFrame(`var option = data[0].length
+      ? { o2_events: { click: function () { o2.drilldown("cluster", { cluster: "stale" }); } } }
+      : {};`);
+    frame.send({ type: "appearance", ...LIGHT });
+    frame.run(1, [[1]]);
+    await settle();
+    expect(frame.charts[0].handlers.click).toBeTypeOf("function");
+
+    frame.run(2, [[]]);
+    await settle();
+
+    expect(frame.charts[0].clear).toHaveBeenCalled();
+    expect(frame.charts[0].handlers.click).toBeUndefined();
   });
 
   it("confines tooltips to the frame unless the code chose otherwise", async () => {
@@ -522,6 +551,23 @@ describe("sandbox runtime", () => {
   });
 
   it("ignores a second connect, so only the first port ever talks to the frame", async () => {
+    const frame = bootFrame("var option = {};");
+    const intruder = { postMessage: vi.fn(), onmessage: null };
+    frame.fire("message", {
+      source: frame.parentWindow,
+      data: { type: "connect" },
+      ports: [intruder],
+    });
+    frame.send({ type: "appearance", ...LIGHT });
+    frame.run(1);
+    await settle();
+
+    expect(intruder.onmessage).toBeNull();
+    expect(intruder.postMessage).not.toHaveBeenCalled();
+    expect(frame.sent).toEqual([{ type: "rendered", runId: 1 }]);
+  });
+
+  it("ignores a connect from a window other than the parent", async () => {
     const frame = bootFrame("var option = {};");
     const intruder = { postMessage: vi.fn(), onmessage: null };
     frame.fire("message", { source: {}, data: { type: "connect" }, ports: [intruder] });

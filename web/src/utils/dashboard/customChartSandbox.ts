@@ -102,6 +102,13 @@ interface Frame {
   onWindowMessage: (event: MessageEvent) => void;
 }
 
+type LoopStatement =
+  | acorn.WhileStatement
+  | acorn.DoWhileStatement
+  | acorn.ForStatement
+  | acorn.ForInStatement
+  | acorn.ForOfStatement;
+
 let sandboxFontPromise: Promise<SandboxFont | null> | null = null;
 
 // The parent sees no pointer events over a sandboxed frame, so "the frame reported pointer" stands in for "the pointer is inside it".
@@ -172,7 +179,7 @@ export const parseSandboxMessage = (data: unknown): SandboxMessage | null => {
 
 /** Adds a time check to every loop in chart code, so a runaway loop throws instead of hanging every chart frame. */
 export const guardLoops = (code: string, guard: string): string => {
-  let ast: acorn.Node;
+  let ast: acorn.Program;
   try {
     ast = acorn.parse(code, { ecmaVersion: 2020 });
   } catch {
@@ -181,8 +188,8 @@ export const guardLoops = (code: string, guard: string): string => {
   const started = `${guard}t`;
   const inserts: { at: number; depth: number; text: string }[] = [];
   const close = (at: number) => inserts.push({ at, depth: -1, text: "}" });
-  const onLoop = (node: acorn.Node, _state: unknown, ancestors: acorn.Node[]) => {
-    const body = (node as acorn.Node & { body: acorn.Node }).body;
+  const onLoop = (node: LoopStatement, _state: unknown, ancestors: acorn.AnyNode[]) => {
+    const { body } = node;
     // Wrapping the label too keeps `continue label` pointing at the loop itself.
     let depth = ancestors.length - 1;
     while (depth > 0 && ancestors[depth - 1].type === "LabeledStatement") depth--;
@@ -448,10 +455,11 @@ const toScriptJson = (value: unknown): string => JSON.stringify(value).replace(/
 const escapeInlineScript = (code: string): string =>
   code.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--");
 
-// A block, so `let option` stays scoped to it while `var option` and a bare assignment are returned.
+// Declared per call so a bare `option =` cannot outlive its run on the reused frame; the block keeps a user `let option` legal.
 const userChartScript = (
   code: string,
 ): string => `function __o2UserChart(data, echarts, context, o2) {
+  var option;
   {
 ${escapeInlineScript(code)}
   }
@@ -476,6 +484,7 @@ const sandboxRuntime = (messagesJson: string, guard: string): string => `(functi
   var chartDark = null;
   var appearance = { dark: false, palette: [], fontFamily: "" };
   var lastOption = null;
+  var boundEvents = [];
   var deferred = false;
   var activeRun = null;
   var cspViolation = false;
@@ -529,15 +538,20 @@ const sandboxRuntime = (messagesJson: string, guard: string): string => `(functi
     return out;
   };
   var bindEvents = function (events) {
-    if (!events || typeof events !== "object") return;
     var bound = chart;
+    // clear() keeps listeners, so every event the previous draw bound is dropped, not only the ones this option names.
+    boundEvents.forEach(function (name) {
+      bound.off(name);
+    });
+    boundEvents = [];
+    if (!events || typeof events !== "object") return;
     Object.keys(events).forEach(function (name) {
       var handler = events[name];
       if (typeof handler !== "function") return;
-      bound.off(name);
       bound.on(name, function (params) {
         handler(params, bound);
       });
+      boundEvents.push(name);
     });
   };
   var draw = function () {
