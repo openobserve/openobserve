@@ -12180,7 +12180,30 @@
         "minutesAgo": "{count} min ago"
       },
       "review": {
-        "title": "Your alert so far"
+        "title": "Your alert so far",
+        "watchScheduled": "Watches {type} in {stream}, on a schedule.",
+        "watchRealtime": "Watches {type} in {stream}, as events arrive.",
+        "watchAnomaly": "Watches {type} in {stream} for unusual values.",
+        "watchCombined": "Combines {count} alert. | Combines {count} alerts.",
+        "watchNoStream": "Watches no stream yet.",
+        "firesCount": "Fires when {condition} turn up in the last {window}.",
+        "firesRows": "Fires when the query returns {condition} in the last {window}.",
+        "firesValue": "Fires when {condition} in the last {window}.",
+        "firesRealtime": "Fires on each matching event.",
+        "firesAnomaly": "Fires when values look unusual.",
+        "firesComposite": "Fires when {expression} holds.",
+        "firesCompositeUnset": "Fires once you choose how its alerts combine.",
+        "tells": "Tells {targets}{incident}{reminder}.",
+        "tellsNobody": "Tells no one yet.",
+        "incidentOnly": "{incident}{reminder}.",
+        "incidentTail": " and opens an incident",
+        "reminder": ", reminding at most every {duration}",
+        "checksEvery": "Checks every {every}, looking at the last {window}.",
+        "checksCron": "Checks on the cron schedule {cron}, looking at the last {window}.",
+        "checksRealtime": "Checks as events arrive.",
+        "checksAnomaly": "Checks every {every}.",
+        "minutes": "{count} min",
+        "hours": "{count} h"
       },
       "watch": {
         "title": "What should we watch?",
@@ -12198,7 +12221,10 @@
         "helpAnomaly": "Choose what to measure and how unusual a value must be before it alerts you.",
         "realtime": "Any matching event",
         "anomaly": "Unusual values",
-        "composite": "When the expression holds"
+        "composite": "When the expression holds",
+        "rows": "{count} rows",
+        "series": "{count} series",
+        "seriesOver": "{count} series {limit}"
       },
       "notify": {
         "title": "Who should hear about it?",
