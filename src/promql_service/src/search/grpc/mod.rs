@@ -49,6 +49,7 @@ use tokio::sync::mpsc;
 
 mod storage;
 mod wal;
+pub(crate) mod wal_probe;
 
 /// What a range query's groups are planned from.
 struct GroupPlan {
@@ -56,6 +57,8 @@ struct GroupPlan {
     files: Vec<FileKey>,
     /// What the query reads beyond its evaluation range.
     window: SelectorWindow,
+    /// The streams the query's selectors read.
+    streams: std::collections::HashSet<String>,
 }
 
 struct StorageProvider {
@@ -178,7 +181,7 @@ pub async fn search(
 
         // 2. generate search group with max records stream
         let start_ts = std::time::Instant::now();
-        let wal_floor = wal_floor();
+        let wal_floor = request_floor(req.wal_since);
         // no cut without streaming, or with an `@` pin on the WAL
         let cut = if cfg.search.feature_metrics_streaming_agg_enabled
             && !query.query_exemplars
@@ -358,7 +361,13 @@ pub async fn data(
     );
 
     // 3. search each group
-    let wal_floor = wal_floor();
+    // a super-cluster peer cannot see this cluster's ingesters, so it never sends a probe result
+    let wal_since = if req.wal_since == 0 && wal_probe::needs_probe(&plan.window, start, end) {
+        wal_probe::wal_since(&trace_id, org_id, &plan.streams).await
+    } else {
+        req.wal_since
+    };
+    let wal_floor = request_floor(wal_since);
     for (start, end) in group {
         let mut req = req.clone();
         req.need_wal = plan.window.reaches(end, wal_floor);
@@ -492,27 +501,20 @@ async fn get_max_file_list(
 ) -> Result<GroupPlan> {
     // 1. get metrics name
     let ast = promql::parse(query).map_err(DataFusionError::Execution)?;
-    let mut visitor = name_visitor::MetricNameVisitor::default();
-    walk_expr(&mut visitor, &ast).map_err(|e| DataFusionError::Execution(e.to_string()))?;
-    let mut metrics_name = visitor.into_names();
-    if query_exemplars {
-        let mut mapped = std::collections::HashSet::with_capacity(metrics_name.len());
-        for name in &metrics_name {
-            mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
-        }
-        metrics_name = mapped;
-    }
+    let metrics_name = query_streams(org_id, &ast, query_exemplars)
+        .await
+        .map_err(|e| DataFusionError::Execution(e.to_string()))?;
     let window = selector_window(&ast);
 
     // 2. get max records stream
     let mut file_list = Vec::new();
     let mut max_records = 0;
-    for stream_name in metrics_name {
+    for stream_name in &metrics_name {
         let stream_file_list = search_service::file_list::query(
             trace_id,
             org_id,
             StreamType::Metrics,
-            &stream_name,
+            stream_name,
             PartitionTimeLevel::default(),
             start,
             end,
@@ -528,6 +530,7 @@ async fn get_max_file_list(
     Ok(GroupPlan {
         files: file_list,
         window,
+        streams: metrics_name,
     })
 }
 
@@ -569,12 +572,6 @@ fn scan_contexts(
         ),
     }
     ctxs
-}
-
-/// The time from which the WAL routinely holds samples that are not flushed yet.
-fn wal_head() -> i64 {
-    let retention = config::get_config().limit.max_file_retention_time as i64;
-    now_micros() - second_micros(retention * 3)
 }
 
 /// The grid-aligned cut before the WAL head, `None` when the range does not straddle it.
@@ -682,6 +679,40 @@ async fn generate_search_group(
 /// there as long as the head does before it is flushed.
 pub(crate) fn wal_floor() -> i64 {
     wal_head() - config::get_config().limit.ingest_allowed_upto_micro
+}
+
+/// The time from which the WAL routinely holds samples that are not flushed yet.
+pub(crate) fn wal_head() -> i64 {
+    let retention = config::get_config().limit.max_file_retention_time as i64;
+    now_micros() - second_micros(retention * 3)
+}
+
+/// The streams the query's selectors read; an exemplar query reads each metric's exemplar stream.
+pub(crate) async fn query_streams(
+    org_id: &str,
+    ast: &parser::Expr,
+    query_exemplars: bool,
+) -> std::result::Result<std::collections::HashSet<String>, &'static str> {
+    let mut visitor = name_visitor::MetricNameVisitor::default();
+    walk_expr(&mut visitor, ast)?;
+    let names = visitor.into_names();
+    if !query_exemplars {
+        return Ok(names);
+    }
+    let mut mapped = std::collections::HashSet::with_capacity(names.len());
+    for name in &names {
+        mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
+    }
+    Ok(mapped)
+}
+
+/// The floor a request's groups read the WAL from, the widest when its sender did not probe.
+pub(crate) fn request_floor(wal_since: i64) -> i64 {
+    if wal_since > 0 {
+        wal_since
+    } else {
+        wal_floor()
+    }
 }
 
 pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: value::Value) {
@@ -866,6 +897,14 @@ mod tests {
         let after = wal_head();
         assert!(upto > 0);
         assert!(floor >= before - upto && floor <= after - upto);
+    }
+
+    #[test]
+    fn test_request_floor_uses_the_probe_and_falls_back_to_the_ingest_window() {
+        assert_eq!(request_floor(42), 42);
+        let before = wal_floor();
+        let floor = request_floor(0);
+        assert!(floor >= before && floor <= wal_floor());
     }
 
     #[test]

@@ -37,7 +37,8 @@ message MetricsQueryRequest {
     repeated string clusters = 12;
     bool    is_super_cluster = 13;
     optional SearchEventContext search_event_context = 14;
-
+    // time from which groups read the WAL, probed in this cluster; 0 = unknown, read the whole ingest window
+    int64           wal_since = 15;
 }
 
 message MetricsQueryStmt {

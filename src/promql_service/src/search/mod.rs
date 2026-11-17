@@ -417,6 +417,17 @@ async fn search_in_cluster(
         partition: 0,
     };
 
+    // one probe for the whole query, so no worker reads the WAL past its head without late samples
+    let wal_since = if grpc::wal_probe::needs_probe(&window, start, end) {
+        match grpc::query_streams(&req.org_id, &ast, query_exemplars).await {
+            Ok(streams) => grpc::wal_probe::wal_since(trace_id, &req.org_id, &streams).await,
+            Err(_) => 0,
+        }
+    } else {
+        0
+    };
+    let wal_floor = grpc::request_floor(wal_since);
+
     // make cluster request
     let mut tasks = Vec::with_capacity(nodes.len());
     let mut worker_start = start;
@@ -429,11 +440,15 @@ async fn search_in_cluster(
             partition: node.id as _,
             ..job.clone()
         });
-        let mut req = cluster_rpc::MetricsQueryRequest { job, ..req.clone() };
+        let mut req = cluster_rpc::MetricsQueryRequest {
+            job,
+            wal_since,
+            ..req.clone()
+        };
         let req_query = req.query.as_mut().unwrap();
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
-        if window.reaches(req_query.end, grpc::wal_floor()) {
+        if window.reaches(req_query.end, wal_floor) {
             req.need_wal = true;
         }
         let req_need_wal = req.need_wal;
