@@ -225,11 +225,11 @@ describe("ack and mute queries", () => {
     expect(analytics.track).toHaveBeenCalledWith("alert_acknowledged", { count: 1 });
   });
 
-  it("refreshes the Firing read after a pause or resume", () => {
-    expect(toggleAlertStateMutation(ORG).meta?.invalidates).toContainEqual(alertKeys.firing(ORG));
-    expect(toggleAnomalyAlertStateMutation(ORG).meta?.invalidates).toContainEqual(
-      alertKeys.firing(ORG),
-    );
+  it("refreshes the Firing read and the cached alert reads after a pause or resume", () => {
+    for (const mutation of [toggleAlertStateMutation, toggleAnomalyAlertStateMutation]) {
+      expect(mutation(ORG).meta?.invalidates).toContainEqual(alertKeys.firing(ORG));
+      expect(mutation(ORG).meta?.invalidates).toContainEqual(alertKeys.details(ORG));
+    }
   });
 
   it("refreshes alerts and downtimes after a mute, and the banner after extend or cancel", async () => {
