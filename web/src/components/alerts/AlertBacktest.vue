@@ -15,15 +15,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from "vue";
+import {
+  computed,
+  inject,
+  onBeforeUnmount,
+  ref,
+  shallowRef,
+  watch,
+  watchEffect,
+  type ComponentPublicInstance,
+} from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
-import { backtestWindows, windowedCountSql } from "@/utils/alerts/alertBacktest";
+import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
+import {
+  backtestBucketMinutes,
+  backtestWindows,
+  cronCheckTimes,
+  windowedCountSql,
+} from "@/utils/alerts/alertBacktest";
 
 const props = defineProps<{
-  /** The builder's count-per-bucket SQL; its histogram is re-bucketed to the look-back. */
+  /** The builder's count-per-bucket SQL; its histogram is re-bucketed to fit every check window. */
   query: string;
   streamType: string;
   /** Look-back in minutes. */
@@ -51,7 +66,28 @@ const NOISY_SHARE = 0.25;
 const { t } = useI18nTyped();
 const search = useAlertStreamQuery();
 
-const sql = computed(() => windowedCountSql(props.query, props.period));
+const signal = inject(ALERT_BACKTEST_SIGNAL_KEY, null);
+
+const isCron = computed(() => props.triggerCondition?.frequency_type === "cron");
+// Without a schedule the alert checks once per look-back.
+const frequency = computed(() => Number(props.triggerCondition?.frequency) || props.period);
+const cronTimes = (endMs: number) =>
+  cronCheckTimes(
+    props.triggerCondition?.cron ?? "",
+    props.triggerCondition?.timezone,
+    endMs - DAY_MS,
+    endMs,
+  );
+
+const sql = computed(() => {
+  if (isCron.value && !cronTimes(Date.now())?.length) return null;
+  const bucket = backtestBucketMinutes({
+    period: props.period,
+    frequency: frequency.value,
+    checkTimesMs: isCron.value ? [] : undefined,
+  });
+  return windowedCountSql(props.query, bucket);
+});
 const runKey = computed(() => (sql.value ? `${props.streamType}\u0000${sql.value}` : null));
 
 const rowRef = ref<ComponentPublicInstance | null>(null);
@@ -61,6 +97,7 @@ const ranKey = ref<string | null>(null);
 const timedOut = ref(false);
 
 let startMs = Date.now() - DAY_MS;
+const checkTimesMs = shallowRef<number[] | undefined>();
 let debounce: ReturnType<typeof setTimeout> | undefined;
 let deadline: ReturnType<typeof setTimeout> | undefined;
 
@@ -76,14 +113,24 @@ const start = () => {
   if (!sql.value) return;
   const endMs = Date.now();
   startMs = endMs - DAY_MS;
+  checkTimesMs.value = isCron.value ? (cronTimes(endMs) ?? []) : undefined;
+  // The oldest check looks back one period before the day starts.
+  const queryStartMs = startMs - props.period * 60_000;
+  const bucketMs =
+    backtestBucketMinutes({
+      period: props.period,
+      frequency: frequency.value,
+      checkTimesMs: checkTimesMs.value,
+    }) * 60_000;
   timedOut.value = false;
   ranKey.value = runKey.value;
   search.run({
     sql: sql.value,
     streamType: props.streamType,
-    startTime: startMs * 1000,
+    startTime: queryStartMs * 1000,
     endTime: endMs * 1000,
-    size: -1,
+    // An explicit size, since -1 stops at the server's default of 1000 rows.
+    size: Math.ceil((endMs - queryStartMs) / bucketMs) + 1,
   });
   deadline = setTimeout(() => {
     if (search.state.value !== "loading") return;
@@ -121,6 +168,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  if (signal) signal.value = null;
   clearTimeout(debounce);
   clearTimeout(deadline);
   observer?.disconnect();
@@ -138,14 +186,54 @@ const result = computed(() =>
     startMs,
     hours: HOURS,
     period: props.period,
+    frequency: frequency.value,
+    silence: Number(props.triggerCondition?.silence) || 0,
+    checkTimesMs: checkTimesMs.value,
     operator: props.operator,
     threshold: props.threshold,
   }),
 );
 
+// The smallest gap stands in for "one check" of an irregular cron.
+const frequencyMinutes = computed(() => {
+  const times = checkTimesMs.value;
+  if (!times) return frequency.value;
+  const gaps = times.slice(1).map((at, i) => (at - times[i]) / 60_000);
+  return gaps.length ? Math.round(Math.min(...gaps)) : 24 * 60;
+});
+
+watchEffect(() => {
+  if (!signal) return;
+  const r = result.value;
+  signal.value =
+    sql.value && status.value === "ready"
+      ? {
+          checks: r.total,
+          alerts: r.alerts,
+          singleCheckSpikes: r.singleCheckSpikes,
+          refires: r.refires,
+          frequencyMinutes: frequencyMinutes.value,
+        }
+      : null;
+});
+
+const resultText = computed(() =>
+  isCron.value
+    ? t("alerts.sections.backtest.cronResult", {
+        count: result.value.alerts,
+        total: result.value.total,
+      })
+    : t("alerts.sections.backtest.result", {
+        count: result.value.alerts,
+        total: result.value.total,
+        frequency: frequency.value,
+      }),
+);
+
 const hint = computed(() => {
-  if (result.value.fired === 0) return t("alerts.sections.backtest.never");
-  if (result.value.fired / result.value.total > NOISY_SHARE)
+  if (result.value.total === 0) return null;
+  if (result.value.alerts === 0) return t("alerts.sections.backtest.never");
+  if (result.value.alerts / result.value.total > NOISY_SHARE)
     return t("alerts.sections.backtest.noisy");
   return null;
 });
@@ -183,13 +271,7 @@ const hint = computed(() => {
     </p>
     <template v-else>
       <p class="text-text-body m-0 text-sm" data-test="add-alert-backtest-result">
-        {{
-          t("alerts.sections.backtest.result", {
-            count: result.fired,
-            total: result.total,
-            period,
-          })
-        }}
+        {{ resultText }}
       </p>
       <div class="mt-2 grid grid-cols-24 gap-0.5" aria-hidden="true">
         <span

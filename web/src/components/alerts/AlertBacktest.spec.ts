@@ -15,10 +15,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { ref, type Ref } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
+import type { BacktestSignal } from "./alertSuggestions";
 import AlertBacktest from "./AlertBacktest.vue";
 
 interface StreamHandlers {
@@ -30,7 +33,7 @@ interface StreamHandlers {
 interface StreamCall {
   request: {
     traceId: string;
-    queryReq: { query: { sql: string; start_time: number; end_time: number } };
+    queryReq: { query: { sql: string; start_time: number; end_time: number; size: number } };
   };
   handlers: StreamHandlers;
 }
@@ -51,11 +54,29 @@ vi.mock("@/stores", () => ({ default: store }));
 const SQL = (stream: string) =>
   `SELECT histogram(_timestamp) AS zo_sql_key, COUNT(*) as zo_sql_val FROM "${stream}" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC`;
 
-const mountBacktest = (query = SQL("default")): VueWrapper =>
+const NOW = Date.UTC(2026, 10, 5, 12, 0);
+const TRIGGER = { frequency: 5, frequency_type: "minutes", silence: 0 };
+
+const mountBacktest = (
+  query = SQL("default"),
+  signal: Ref<BacktestSignal | null> = ref(null),
+): VueWrapper =>
   mount(AlertBacktest, {
-    props: { query, streamType: "logs", period: 10, operator: ">=", threshold: 5 },
-    global: { plugins: [i18n] },
+    props: {
+      query,
+      streamType: "logs",
+      period: 10,
+      operator: ">=",
+      threshold: 5,
+      triggerCondition: TRIGGER,
+    },
+    global: { plugins: [i18n], provide: { [ALERT_BACKTEST_SIGNAL_KEY]: signal } },
   });
+
+const respond = (call: StreamCall, hits: Record<string, unknown>[]) => {
+  call.handlers.data(null, { type: "search_response_hits", content: { results: { hits } } });
+  call.handlers.complete();
+};
 
 const status = (wrapper: VueWrapper) =>
   wrapper.find('[data-test="add-alert-backtest-status"]').text();
@@ -66,6 +87,7 @@ describe("AlertBacktest", () => {
   beforeEach(() => {
     observer = installFakeIntersectionObserver({ autoVisible: true });
     vi.useFakeTimers();
+    vi.setSystemTime(NOW);
     calls.length = 0;
     cancelMock.mockClear();
   });
@@ -75,21 +97,44 @@ describe("AlertBacktest", () => {
     observer.restore();
   });
 
-  it("runs one day-long histogram scan after the props settle", async () => {
-    const wrapper = mountBacktest();
+  it("replays every check of the day in one scan and publishes the signal", async () => {
+    const signal = ref<BacktestSignal | null>(null);
+    const wrapper = mountBacktest(SQL("default"), signal);
     expect(calls).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(700);
     expect(calls).toHaveLength(1);
-    const { start_time, end_time } = calls[0].request.queryReq.query;
-    expect(end_time - start_time).toBe(24 * 60 * 60 * 1000 * 1000);
+    const { sql, start_time, end_time, size } = calls[0].request.queryReq.query;
+    expect(b64DecodeUnicode(sql)).toContain("histogram(_timestamp, '5 minute')");
+    expect(end_time - start_time).toBe((24 * 60 + 10) * 60 * 1000 * 1000);
+    expect(size).toBeGreaterThanOrEqual((24 * 60 + 10) / 5);
 
-    calls[0].handlers.data(null, {
-      type: "search_response_hits",
-      content: { results: { hits: [{ zo_sql_key: start_time + 1, zo_sql_val: 9 }] } },
-    });
-    calls[0].handlers.complete();
+    respond(calls[0], [{ zo_sql_key: (NOW - 7 * 60_000) * 1000, zo_sql_val: 9 }]);
     await flushPromises();
-    expect(wrapper.find('[data-test="add-alert-backtest-result"]').text()).toContain("1 of 144");
+    expect(wrapper.find('[data-test="add-alert-backtest-result"]').text()).toContain("2 of 288");
+    expect(signal.value).toEqual({
+      checks: 288,
+      alerts: 2,
+      singleCheckSpikes: 0,
+      refires: 0,
+      frequencyMinutes: 5,
+    });
+    wrapper.unmount();
+  });
+
+  it("a failed check publishes null and shows Retry", async () => {
+    const signal = ref<BacktestSignal | null>(null);
+    const wrapper = mountBacktest(SQL("default"), signal);
+    await vi.advanceTimersByTimeAsync(700);
+    respond(calls[0], []);
+    await flushPromises();
+    expect(signal.value).not.toBeNull();
+
+    await wrapper.setProps({ query: SQL("other") });
+    await vi.advanceTimersByTimeAsync(700);
+    calls[1].handlers.error();
+    await flushPromises();
+    expect(signal.value).toBeNull();
+    expect(wrapper.find('[data-test="add-alert-backtest-retry"]').exists()).toBe(true);
     wrapper.unmount();
   });
 
