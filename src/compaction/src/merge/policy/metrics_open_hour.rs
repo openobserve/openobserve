@@ -61,9 +61,6 @@ mod tests {
         *,
     };
 
-    /// In the still-open hour the legacy files keep the incremental rules:
-    /// a full group is sealed, the remainder waits, and the hash files never
-    /// join it.
     #[tokio::test]
     async fn test_plan_batches_incremental_legacy_group_seals_only_full_groups() {
         let mut files: Vec<FileKey> = (1..=4)

@@ -306,7 +306,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     if offset == 0 {
         return Ok(()); // no data
     }
-    // only a 00:00 job covers the whole day, see policy::window_level
+    // Only a 00:00 job covers the whole day; see policy::downsampling::select_from_rules.
     let offset = offset - offset % day_micros(1);
 
     let cfg = get_config();
