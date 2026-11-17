@@ -96,9 +96,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Shrinks so a long time range cuts its own text, not the agent pill under mic and Send -->
               <span class="flex min-w-0 items-center gap-2">
                 <AssistantSessionTime :sid="sid" :disabled="inertKind !== null || accessLost" />
-                <AssistantAgentPicker :sid="sid" :disabled="inertKind !== null || accessLost" />
+                <!-- Dictation wave needs the room; only the time range stays -->
+                <AssistantAgentPicker
+                  v-if="!voice.mine.value"
+                  :sid="sid"
+                  :disabled="inertKind !== null || accessLost"
+                />
               </span>
-              <template v-if="!running">
+              <template v-if="!running && !voice.mine.value">
                 <span
                   class="bg-badge-default-soft-bg ring-badge-default-ol-border/30 rounded-default flex h-7 shrink-0 items-center px-2 ring-1 ring-inset"
                 >
