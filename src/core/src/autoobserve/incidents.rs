@@ -1170,7 +1170,8 @@ mod tests {
             ],
             "the incident holding that very firing, a re-fire included; none for an unlinked onset"
         );
-        let read: Vec<Vec<(&str, Option<i64>)>> = per_incident(items.len(), &members, found)
+        let per = per_incident(items.len(), &members, found);
+        let read: Vec<Vec<(&str, Option<i64>)>> = per
             .iter()
             .map(|issues| {
                 issues
