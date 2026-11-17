@@ -2209,7 +2209,9 @@ export default defineComponent({
       const expandFilter = <T extends { operator?: string | null; value?: unknown }>(filter: T) =>
         expandMultiValueFilter(filter, (name) => {
           const parent = variablesByName.get(name);
-          return parent?.isVariablePartialLoaded ? resolveQueryVariableValue(parent) : undefined;
+          return (
+            !!parent?.isVariablePartialLoaded && Array.isArray(resolveQueryVariableValue(parent))
+          );
         });
       const filterGroup = variableObject.query_data?.filter_group;
 

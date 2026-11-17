@@ -73,10 +73,11 @@ const autoPromqlVariable = {
   },
 };
 
-const mountForm = async (variable: any = autoPromqlVariable) => {
-  getDashboard.mockResolvedValue({ tabs: [], variables: { list: [variable] } });
+const mountForm = async (variable: any = autoPromqlVariable, others: any[] = []) => {
+  const list = [...others, variable];
+  getDashboard.mockResolvedValue({ tabs: [], variables: { list } });
   const wrapper = mount(AddSettingVariable, {
-    props: { variableName: variable.name, dashboardVariablesList: [variable] },
+    props: { variableName: variable.name, dashboardVariablesList: list },
     global: { plugins: [i18n, store], provide: qLayoutInjections() },
     attachTo: document.body,
   });
@@ -147,6 +148,36 @@ describe("AddSettingVariable with the real query editor", () => {
     expect(saved.query).toBe("SELECT svc FROM logs");
     expect(saved).not.toHaveProperty("custom_query");
     expect(saved).not.toHaveProperty("query_type");
+    wrapper.unmount();
+  });
+
+  it("prefills IN for a filter on a multi-select parent, as the auto query runs it", async () => {
+    const env = {
+      name: "env",
+      type: "query_values",
+      multiSelect: true,
+      query_data: { stream_type: "logs", stream: "app", field: "env", filter: [] },
+    };
+    const service = {
+      name: "service",
+      type: "query_values",
+      query_data: {
+        stream_type: "logs",
+        stream: "app",
+        field: "service",
+        max_record_size: null,
+        filter: [
+          { name: "env", operator: "=", value: "$env" },
+          { name: "region", operator: "=", value: "eu" },
+        ],
+      },
+    };
+    const wrapper = await mountForm(service, [env]);
+    await click(wrapper, "dashboard-variable-query-mode-custom");
+
+    expect(editorText(wrapper)).toBe(
+      `SELECT DISTINCT "service" FROM "app" WHERE "env" IN ('$env') AND "region" = 'eu'`,
+    );
     wrapper.unmount();
   });
 

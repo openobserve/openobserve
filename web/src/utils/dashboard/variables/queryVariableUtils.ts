@@ -193,16 +193,16 @@ const promMatcher = (filter: VariableFilterRow): string => {
 const SINGLE_PLACEHOLDER =
   /^'?(?:\$\{\s*([a-zA-Z0-9_-]+)\s*\}|\$([a-zA-Z0-9_-]+)|\{\{\s*([a-zA-Z0-9_-]+)\s*\}\})'?$/;
 
-/** Turns `= $var` / `!= $var` into IN / NOT IN when `$var` currently holds a list, since `= 'a', 'b'` is invalid SQL. */
+/** Turns `= $var` / `!= $var` into IN / NOT IN when `$var` holds a list, since `= 'a', 'b'` is invalid SQL. */
 export const expandMultiValueFilter = <T extends { operator?: string | null; value?: unknown }>(
   filter: T,
-  valueOf: (name: string) => unknown,
+  holdsList: (name: string) => boolean,
 ): T => {
   const negated = filter.operator === "!=" || filter.operator === "<>";
   if (filter.operator !== "=" && !negated) return filter;
   const match = SINGLE_PLACEHOLDER.exec(String(filter.value ?? "").trim());
   const name = match && (match[1] ?? match[2] ?? match[3]);
-  if (!name || !Array.isArray(valueOf(name))) return filter;
+  if (!name || !holdsList(name)) return filter;
   return { ...filter, operator: negated ? "NOT IN" : "IN" };
 };
 
@@ -341,15 +341,21 @@ const joinSqlLabelGroup = (group: SqlLabelGroup): string =>
     .join(" ");
 
 /** The WHERE text of a `filter_group`, each leaf written as `buildFilterRowsSql` writes its row. */
-export const buildFilterGroupSql = (group: DashboardFilterGroup): string =>
-  joinSqlLabelGroup(toSqlLabelGroup(group));
+export const buildFilterGroupSql = (
+  group: DashboardFilterGroup,
+  mapRow?: (row: SqlLabel) => SqlLabel,
+): string => joinSqlLabelGroup(toSqlLabelGroup(group, mapRow));
 
-/** The SQL an auto variable stands for, used to prefill the custom editor. */
-export const buildAutoSqlQuery = (queryData?: QueryVariableData | null): string => {
+/** The SQL an auto variable stands for, used to prefill the custom editor; `holdsList` names multi-select parents. */
+export const buildAutoSqlQuery = (
+  queryData?: QueryVariableData | null,
+  holdsList: (name: string) => boolean = () => false,
+): string => {
   const base = `SELECT DISTINCT "${queryData?.field ?? ""}" FROM "${queryData?.stream ?? ""}"`;
+  const expand = <T extends SqlLabel>(row: T) => expandMultiValueFilter(row, holdsList);
   const where = queryData?.filter_group
-    ? buildFilterGroupSql(queryData.filter_group)
-    : buildFilterRowsSql(queryData?.filter ?? []);
+    ? buildFilterGroupSql(queryData.filter_group, expand)
+    : buildFilterRowsSql(queryData?.filter ?? [], expand);
   return where ? `${base} WHERE ${where}` : base;
 };
 

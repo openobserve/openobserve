@@ -947,10 +947,15 @@ export default defineComponent({
     const otherLanguageTexts: Partial<Record<QueryVariableLanguage, string>> = {};
     const lastPrefills: Partial<Record<QueryVariableLanguage, string>> = {};
 
+    const isMultiSelectVariable = (name: string): boolean =>
+      (props.dashboardVariablesList ?? []).some((v: any) => v.name === name && v.multiSelect);
+
     const autoQueryFor = (language: QueryVariableLanguage): string => {
       const queryData = variableData.query_data as QueryVariableData | undefined;
       if (!queryData?.stream || !queryData?.field) return "";
-      return language === "promql" ? buildAutoPromqlQuery(queryData) : buildAutoSqlQuery(queryData);
+      return language === "promql"
+        ? buildAutoPromqlQuery(queryData)
+        : buildAutoSqlQuery(queryData, isMultiSelectVariable);
     };
 
     // A hand-edited text stays; an empty one or an untouched prefill follows the auto settings.

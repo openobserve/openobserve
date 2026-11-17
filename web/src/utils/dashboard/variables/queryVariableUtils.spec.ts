@@ -190,7 +190,7 @@ describe("buildAutoPromqlQuery", () => {
 
 describe("expandMultiValueFilter", () => {
   const values: Record<string, unknown> = { cluster: ["eu", "us"], env: "prod" };
-  const valueOf = (name: string) => values[name];
+  const valueOf = (name: string) => Array.isArray(values[name]);
 
   it("turns = and != on a list-valued variable into IN and NOT IN", () => {
     for (const value of ["$cluster", "${cluster}", "{{cluster}}", "'$cluster'"]) {
@@ -258,6 +258,42 @@ describe("buildAutoSqlQuery", () => {
     expect(where("Ends With")).toBe(`"c" LIKE '%v'`);
     expect(where("Is Null")).toBe(`"c" IS NULL`);
     expect(where("Is Not Null")).toBe(`"c" IS NOT NULL`);
+  });
+
+  it("writes = and != on a multi-select parent as IN and NOT IN, as the auto query runs them", () => {
+    expect(
+      buildAutoSqlQuery(
+        {
+          stream: "s",
+          field: "f",
+          filter: [
+            { name: "env", operator: "=", value: "$env" },
+            { name: "zone", operator: "!=", value: "'${env}'" },
+            { name: "team", operator: "=", value: "$team" },
+          ],
+        },
+        (name) => name === "env",
+      ),
+    ).toBe(
+      `SELECT DISTINCT "f" FROM "s" WHERE "env" IN ('$env') AND "zone" NOT IN ('\${env}') AND "team" = '$team'`,
+    );
+  });
+
+  it("prefills a multi-select filter that runs with one value or several", () => {
+    const sql = buildAutoSqlQuery(
+      { stream: "s", field: "f", filter: [{ name: "env", operator: "=", value: "$env" }] },
+      () => true,
+    );
+    const run = (value: unknown, multiSelect: boolean) =>
+      substituteQueryVariables(
+        sql,
+        [{ name: "env", type: "query_values", value, multiSelect, isVariablePartialLoaded: true }],
+        "sql",
+      );
+    expect(run(["dev", "it's"], true)).toBe(
+      `SELECT DISTINCT "f" FROM "s" WHERE "env" IN ('dev', 'it''s')`,
+    );
+    expect(run("dev", false)).toBe(`SELECT DISTINCT "f" FROM "s" WHERE "env" IN ('dev')`);
   });
 
   it("joins several filters with AND", () => {
@@ -336,7 +372,9 @@ describe("filter_group SQL", () => {
   it("maps every leaf to its flat row, rewritten by mapRow", () => {
     const values: Record<string, unknown> = { env: "prod", svc: ["a", "b"] };
     expect(
-      toSqlLabelGroup(group, (row) => expandMultiValueFilter(row, (name) => values[name])),
+      toSqlLabelGroup(group, (row) =>
+        expandMultiValueFilter(row, (name) => Array.isArray(values[name])),
+      ),
     ).toEqual({
       logicalOperator: "AND",
       conditions: [
@@ -355,6 +393,14 @@ describe("filter_group SQL", () => {
   it("prefills the custom SQL with the same WHERE", () => {
     expect(buildAutoSqlQuery({ stream: "s", field: "f", filter_group: group })).toBe(
       `SELECT DISTINCT "f" FROM "s" WHERE "env" = '$env' AND ("svc" <> '$svc' OR "level" = 'error')`,
+    );
+  });
+
+  it("prefills IN and NOT IN on the group leaves of a multi-select parent", () => {
+    expect(
+      buildAutoSqlQuery({ stream: "s", field: "f", filter_group: group }, (name) => name === "svc"),
+    ).toBe(
+      `SELECT DISTINCT "f" FROM "s" WHERE "env" = '$env' AND ("svc" NOT IN ('$svc') OR "level" = 'error')`,
     );
   });
 

@@ -74,6 +74,21 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     await qv.filters.expectValue(0, "error");
   });
 
+  test("D1: Auto -> Custom writes IN for a filter on a multi-select parent, so the preview runs with two values", async ({ page }) => {
+    const qv = new PageManager(page).dashboardQueryVariable;
+    const id = await createDashboard([fx.customVariable("nsm", ["checkout", "payments", "default"], { multiSelect: true })]);
+    await qv.openDashboard(fx.dashboardUrl(id, "&var-nsm=checkout&var-nsm=payments"));
+    await qv.openVariablesSettings();
+    await qv.startNewVariable("svc");
+    await qv.setAutoSource("logs", S, "service_name");
+    await qv.addFilter("k8s_namespace", "=", "$nsm");
+
+    await qv.setMode("custom");
+    await expect.poll(() => qv.queryText()).toBe(`SELECT DISTINCT "service_name" FROM "${S}" WHERE "k8s_namespace" IN ('$nsm')`);
+    await qv.runPreview();
+    expect((await qv.previewTexts("service_name")).sort()).toEqual(["cart", "checkout", "payments"]);
+  });
+
   test("D2: custom query with value and label columns previews, saves the new keys and shows labels", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const id = await startCustomVariable(qv);
