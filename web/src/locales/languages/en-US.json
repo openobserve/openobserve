@@ -12026,6 +12026,8 @@
       "navLabel": "Alert sections",
       "eyebrow": "Step {n} of {total}",
       "eyebrowOptional": "Step {n} of {total} · Optional",
+      "previousStep": "Previous step",
+      "nextStep": "Next step",
       "optional": {
         "title": "Optional",
         "help": "Skip these unless you need them. The defaults work for most alerts."
@@ -13830,6 +13832,7 @@
       "vrlEditor": "VRL Editor",
       "showVrlEditor": "Show VRL editor",
       "hideVrlEditor": "Hide VRL editor",
+      "vrlToggle": "VRL function",
       "alertIfValueIsTooltip": "Alert when the PromQL expression evaluates to this condition for a time series. Example: >= 100 triggers when the result is 100 or more.",
       "sqlHavingClauseWarning": "Having clause in query will apply before the filters of alert if condition",
       "havingSeriesTooltip": "Minimum number of time series that must satisfy the condition above to trigger the alert.",
