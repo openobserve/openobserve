@@ -25,7 +25,8 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::UserEmail,
     profiles::query::{
-        MergeResult, build_merge_result, is_snapshot_profile_type, resolve_max_nodes,
+        MergeResult, build_merge_result, group_stack_by_function, is_snapshot_profile_type,
+        resolve_max_nodes,
     },
 };
 use search::datafusion::udf::fold_native_frames_udf::FOLD_NATIVE_FRAMES_UDF_NAME;
@@ -69,6 +70,14 @@ pub(crate) struct StackSet {
     pub truncated: bool,
     /// Divisor applied to every value: average snapshots per instance for in-use types, else 1.
     pub snapshots: f64,
+}
+
+/// Maps every stack through `group_stack_by_function`; folding sums the duplicates.
+pub(crate) fn group_stacks(stacks: Vec<(String, i64)>) -> Vec<(String, i64)> {
+    stacks
+        .into_iter()
+        .map(|(stack, value)| (group_stack_by_function(&stack), value))
+        .collect()
 }
 
 /// ProfilesMerge
@@ -141,6 +150,7 @@ pub async fn merge_profiles(
         ("profile_unit" = Option<String>, Query, description = "Filter by profile_unit (required)"),
         ("filters" = Option<String>, Query, description = "Comma-separated key=value pairs"),
         ("max_nodes" = Option<usize>, Query, description = "Maximum tree node count"),
+        ("group_by_function" = Option<bool>, Query, description = "Merge per-line frames into one frame per function"),
         ("timeout" = Option<i64>, Query, description = "Query timeout in seconds")
     ),
     responses(
@@ -238,6 +248,12 @@ async fn merge_profiles_impl(
     {
         Ok(v) => v,
         Err(response) => return response,
+    };
+
+    let stacks = if body.group_by_function.unwrap_or(false) {
+        group_stacks(stacks)
+    } else {
+        stacks
     };
 
     let MergeResult {

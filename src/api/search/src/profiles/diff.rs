@@ -31,7 +31,7 @@ use utoipa::ToSchema;
 
 use super::{
     ProfilesQueryBody, ProfilesSqlParams, build_where_clause, check_stream_permission,
-    merge::{StackSet, load_stacks, load_total, snapshot_instance_key},
+    merge::{StackSet, group_stacks, load_stacks, load_total, snapshot_instance_key},
     parse_required_time_range, require_profile_type_and_unit, resolve_timeout,
 };
 use crate::common::{
@@ -215,18 +215,24 @@ pub async fn diff_profiles(
         (Err(response), _) | (_, Err(response)) => return response,
     };
 
+    let baseline_stacks = if body.baseline.group_by_function.unwrap_or(false) {
+        group_stacks(baseline_set.stacks)
+    } else {
+        baseline_set.stacks
+    };
+    let comparison_stacks = if body.comparison.group_by_function.unwrap_or(false) {
+        group_stacks(comparison_set.stacks)
+    } else {
+        comparison_set.stacks
+    };
+
     let DiffResult {
         baseline_total,
         comparison_total,
         root,
         top,
         tree_truncated,
-    } = build_diff_result(
-        &baseline_set.stacks,
-        &comparison_set.stacks,
-        full_totals,
-        max_nodes,
-    );
+    } = build_diff_result(&baseline_stacks, &comparison_stacks, full_totals, max_nodes);
 
     Json(ProfilesDiffResponse {
         unit,

@@ -161,6 +161,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="profiles-type-select"
           />
         </div>
+        <OSwitch
+          :model-value="groupByFunction"
+          :label="t('profiles.groupByFunction')"
+          size="sm"
+          class="shrink-0"
+          data-test="profiles-group-by-function"
+          @update:model-value="pickInput('groupByFunction', !!$event)"
+        />
       </OContent>
 
       <OContent class="border-border-default border-t py-1.5">
@@ -673,6 +681,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
@@ -744,6 +753,7 @@ type RouteSeed = {
   focus: string | null;
   details: string | null;
   breakdown: string | null;
+  groupByFunction: boolean;
   compare: CompareState;
 };
 
@@ -775,6 +785,7 @@ type HeldInputs = {
   service: string | null;
   profileType: string | null;
   date: DateInput;
+  groupByFunction: boolean;
 };
 const dateState = ref(defaultDateState());
 const datePickerRef = ref<{
@@ -878,6 +889,8 @@ const lastRun = ref<{
 const compareState = ref<CompareState>(defaultCompareState());
 /** The label the chart draws one line per value of; null draws one line. */
 const breakdownLabel = ref<string | null>(null);
+// Drops the line number from each frame, so one function is one row.
+const groupByFunction = ref(false);
 const seriesLoading = ref(false);
 let seriesAbort: AbortController | null = null;
 let seriesRequestSeq = 0;
@@ -1482,6 +1495,7 @@ const queryPayload = (range = resolveTimeRange()): ProfilesQueryBody | null => {
     profile_type: profileType.type,
     profile_unit: profileType.unit,
     filters: appliedFilters.value.map((filter) => ({ ...filter })),
+    ...(groupByFunction.value && { group_by_function: true }),
   };
 };
 
@@ -1513,6 +1527,7 @@ const resetProfilesState = () => {
   mergeResult.value = null;
   lastRun.value = null;
   breakdownLabel.value = null;
+  groupByFunction.value = false;
   compareState.value = defaultCompareState();
   expandedStackIds.value = [];
   activeView.value = "top";
@@ -1819,6 +1834,7 @@ const parseRouteSeed = (query: LocationQuery): RouteSeed | null => {
     focus: queryString(query.focus) || null,
     details: queryString(query.details) || null,
     breakdown: queryString(query.breakdown) || null,
+    groupByFunction: queryString(query.group_by_function) === "true",
     compare: {
       label: queryString(query.compare_label) || null,
       baseline: queryString(query.compare_a) || null,
@@ -1878,6 +1894,7 @@ const pageQuery = (range?: { startTime: number; endTime: number } | null) => {
   }
   const filters = encodeProfileRouteFilters(appliedFilters.value);
   if (filters) query.filters = filters;
+  if (groupByFunction.value) query.group_by_function = "true";
   query.view = activeView.value;
   return query;
 };
@@ -1981,6 +1998,7 @@ const initPage = async () => {
       flameFocus.value = seed.focus;
       keepSeededFocus = !!seed.focus;
       breakdownLabel.value = seed.breakdown;
+      groupByFunction.value = seed.groupByFunction;
       compareState.value = seed.compare;
     }
     await runAlongsideMeta(loadMeta);
@@ -2034,6 +2052,7 @@ const inputRefs: { [K in keyof HeldInputs]: Ref<HeldInputs[K]> } = {
   service: selectedService,
   profileType: selectedProfileType,
   date: dateState,
+  groupByFunction,
 };
 
 // A relative window's times are resolved only at query time, so its period alone identifies it.
@@ -2067,6 +2086,11 @@ onMounted(() =>
 const finishSeeding = async () => {
   const held = heldChanges;
   heldChanges = {};
+  // A switch flip the first successful run already used needs no second run.
+  const ran = lastRun.value?.payload;
+  if (ran && "groupByFunction" in held && held.groupByFunction === !!ran.group_by_function) {
+    delete held.groupByFunction;
+  }
   if (!Object.keys(held).length) {
     seeding = false;
     return;
@@ -2076,6 +2100,7 @@ const finishSeeding = async () => {
   if ("stream" in held) selectedStream.value = held.stream ?? null;
   if ("service" in held) selectedService.value = held.service ?? null;
   if ("profileType" in held) selectedProfileType.value = held.profileType ?? null;
+  if ("groupByFunction" in held) groupByFunction.value = !!held.groupByFunction;
   const run = initRunSeq;
   await nextTick();
   if (run !== initRunSeq) return;
@@ -2088,6 +2113,11 @@ const finishSeeding = async () => {
 watch([selectedService, selectedProfileType], async ([service], [previousService]) => {
   if (seeding || reloadingMeta) return;
   await onSelectionChange(service !== previousService);
+});
+
+watch(groupByFunction, async () => {
+  if (seeding) return;
+  await runOrMarkPending();
 });
 
 watch(selectedStream, async (stream, previousStream) => {

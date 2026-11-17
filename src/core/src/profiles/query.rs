@@ -505,6 +505,21 @@ pub fn normalize_tag_key(key: &str) -> String {
     key.replace('.', "_")
 }
 
+/// Drops the trailing `:<line>` of each `file:function:line` frame, so one function is one frame.
+pub fn group_stack_by_function(stack: &str) -> String {
+    let strip = |frame: &str| match frame.rsplit_once(':') {
+        Some((head, line))
+            if head.contains(':')
+                && !line.is_empty()
+                && line.bytes().all(|b| b.is_ascii_digit()) =>
+        {
+            head.to_string()
+        }
+        _ => frame.to_string(),
+    };
+    stack.split(';').map(strip).collect::<Vec<_>>().join(";")
+}
+
 /// Split a stored leaf→root stack into depth-capped root→leaf frames.
 fn root_to_leaf_frames(stack: &str) -> Vec<&str> {
     let mut frames: Vec<&str> = stack
@@ -673,6 +688,37 @@ fn share(value: i64, total: i64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn group_stack_by_function_drops_line_suffix() {
+        let rows = [
+            ("./a.js:fmt:854", "./a.js:fmt"),
+            (
+                "node:internal/buffer:utf8Write:988",
+                "node:internal/buffer:utf8Write",
+            ),
+            (
+                "./node_modules/lodash/lodash.js:(anonymous:L#2732:C#41):2732",
+                "./node_modules/lodash/lodash.js:(anonymous:L#2732:C#41)",
+            ),
+            ("(idle)", "(idle)"),
+            ("utf8Slice", "utf8Slice"),
+            ("Garbage Collection", "Garbage Collection"),
+            ("main.handler", "main.handler"),
+            ("foo:12", "foo:12"),
+            ("", ""),
+            ("./a.js:f:10;./b.js:g:3;(root)", "./a.js:f;./b.js:g;(root)"),
+        ];
+        for (input, want) in rows {
+            assert_eq!(group_stack_by_function(input), want, "{input}");
+        }
+        // Two lines of one function fold into one node
+        let stacks = [
+            (group_stack_by_function("./a.js:fmt:851"), 1),
+            (group_stack_by_function("./a.js:fmt:854"), 2),
+        ];
+        assert_eq!(build_merge_result(&stacks, 0).top.len(), 1);
+    }
 
     #[test]
     fn fold_stacks_builds_root_to_leaf_tree_with_self_and_total() {

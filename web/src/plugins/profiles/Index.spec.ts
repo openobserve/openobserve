@@ -346,6 +346,17 @@ describe("Profiles page", () => {
     expect(wrapper.find('[data-test="profiles-top-table"]').exists()).toBe(true);
   });
 
+  it("sends group_by_function when the switch is on", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(mocks.merge.mock.calls[0][2]).not.toHaveProperty("group_by_function");
+
+    await wrapper.find('[data-test="profiles-group-by-function-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.merge.mock.calls.at(-1)?.[2]).toMatchObject({ group_by_function: true });
+  });
+
   it("picks CPU as the default profile type when the stream has it", async () => {
     mocks.meta.mockResolvedValue({
       data: {
@@ -1527,6 +1538,34 @@ describe("Profiles page", () => {
           .value,
       ).toBe("service-b");
       expect(lastMerge()[2]).toMatchObject({ service_name: "service-b" });
+    });
+
+    it("runs once when the switch is flipped before the first query", async () => {
+      const streams = deferred<unknown>();
+      mocks.nameList.mockReturnValueOnce(streams.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+
+      await wrapper.find('[data-test="profiles-group-by-function-btn"]').trigger("click");
+      streams.resolve(streamResponse);
+      await flushPromises();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      expect(lastMerge()[2]).toMatchObject({ group_by_function: true });
+    });
+
+    it("re-runs grouped by function when the switch is flipped during the first query", async () => {
+      const firstMerge = deferred<unknown>();
+      mocks.merge.mockReturnValueOnce(firstMerge.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+      expect(lastMerge()[2]).not.toHaveProperty("group_by_function");
+
+      await wrapper.find('[data-test="profiles-group-by-function-btn"]').trigger("click");
+      firstMerge.resolve(mergeResponse);
+      await flushPromises();
+
+      expect(lastMerge()[2]).toMatchObject({ group_by_function: true });
     });
 
     it("queries the window picked while meta loads", async () => {

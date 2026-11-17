@@ -92,6 +92,9 @@ pub struct ProfilesQueryBody {
     pub step: Option<String>,
     #[serde(default)]
     pub max_nodes: Option<usize>,
+    /// Merge per-line frames into one frame per function.
+    #[serde(default)]
+    pub group_by_function: Option<bool>,
     #[serde(default)]
     pub timeout: Option<i64>,
     /// Label column that splits `series` into `groups` (series endpoint only).
@@ -198,6 +201,7 @@ pub(crate) fn query_body_from_params(
         filters: parse_filters_param(params.get("filters").map(|s| s.as_str()))?,
         step: params.get("step").cloned().filter(|s| !s.is_empty()),
         max_nodes: parse_param(params, "max_nodes")?,
+        group_by_function: parse_param(params, "group_by_function")?,
         timeout: parse_param(params, "timeout")?,
         group_by: params.get("group_by").cloned().filter(|s| !s.is_empty()),
         group_limit: parse_param(params, "group_limit")?,
@@ -468,6 +472,9 @@ pub(crate) fn merge_params_into_body(
     }
     if body.max_nodes.is_none() {
         body.max_nodes = parse_param(params, "max_nodes")?;
+    }
+    if body.group_by_function.is_none() {
+        body.group_by_function = parse_param(params, "group_by_function")?;
     }
     if body.filters.is_empty() {
         body.filters = parse_filters_param(params.get("filters").map(|s| s.as_str()))?;

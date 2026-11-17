@@ -2145,6 +2145,7 @@
     "breakdownOthers": "Others",
     "breakdownNoValue": "No value",
     "breakdownFilter": "Filter to {key} = {value}",
+    "groupByFunction": "Group by function",
     "viewTop": "Top Table",
     "viewFlame": "Flame Graph",
     "viewTree": "Call Tree",

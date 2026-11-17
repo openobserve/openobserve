@@ -129,6 +129,8 @@ export interface ProfilesQueryBody {
   filters?: ProfileFilter[];
   step?: string;
   max_nodes?: number;
+  /** Merge per-line frames into one frame per function. */
+  group_by_function?: boolean;
   timeout?: number;
   /** A label to draw one series per value of. */
   group_by?: string;
