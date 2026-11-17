@@ -355,6 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OFormSwitch
               name="creates_incident"
+              off-tone="neutral"
               :aria-label="t('alerts.alertSettings.createsIncident')"
               data-test="alert-creates-incident-toggle"
             />
@@ -407,6 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    delivered, so it cannot be turned on. It can still be turned off. -->
                 <OFormSwitch
                   name="notify_on_recovery"
+                  off-tone="neutral"
                   :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
                   :disabled="notifiesNobody && !formData?.notify_on_recovery"
                   data-test="alert-notify-on-recovery-toggle"
@@ -488,6 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OFormSwitch
                 name="suppress_repeats"
+                off-tone="neutral"
                 :aria-label="t('alerts.alertSettings.suppressRepeats')"
                 data-test="alert-suppress-repeats-toggle"
               />
