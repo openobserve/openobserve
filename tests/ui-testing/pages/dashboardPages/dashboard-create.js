@@ -28,10 +28,10 @@ export default class DashboardCreate {
     this.defaultFolderTab = this.page.locator(
       'button[data-test="dashboard-folder-tab-default"]'
     );
-    // Excludes Favorites: that pseudo-folder renders before the folder list has loaded.
+    // Excludes the Favorites and Public dashboards pseudo-folders: both render before folders load.
     this.anyFolderTab = this.page
       .locator(
-        'button[data-test^="dashboard-folder-tab-"]:not([data-test="dashboard-folder-tab-__favorites__"])'
+        'button[data-test^="dashboard-folder-tab-"]:not([data-test="dashboard-folder-tab-__favorites__"]):not([data-test="dashboard-folder-tab-__public_links__"])'
       )
       .first();
     this.defaultDashboardTab = this.page.locator(
