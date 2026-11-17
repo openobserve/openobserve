@@ -13207,7 +13207,6 @@
       "udsFieldNotAvailable": "\"{field}\" alanı mevcut değil. Lütfen koşullarınızda yalnızca mevcut alanları kullanın.",
       "udsFieldsNotAvailable": "{fields} alanları mevcut değil. Lütfen koşullarınızda yalnızca mevcut alanları kullanın.",
       "udsFieldsNotAvailableTruncated": "{count} alan mevcut değil ({fields} ve {remaining} tane daha). Lütfen koşullarınızda yalnızca mevcut alanları kullanın.",
-      "sqlValidationRequestFailed": "SQL sorgusu doğrulanırken hata oluştu. Lütfen sorguyu kontrol edip tekrar deneyin.",
       "alertUpdated": "Uyarı başarıyla güncellendi.",
       "alertUpdatedNoDestination": "Uyarı hedef olmadan güncellendi.",
       "alertSaved": "Uyarı başarıyla kaydedildi.",

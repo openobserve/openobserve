@@ -10,6 +10,7 @@ import OFormInput from "../../forms/Input/OFormInput.vue";
 
 import { raw } from "@/types/i18n";
 
+import { SETTING_ROW_BARE_KEY } from "./OSettingRow.types";
 import OSettingRow from "./OSettingRow.vue";
 
 const HELP = "Shortest password accepted";
@@ -36,6 +37,17 @@ async function mountWithRevealedError() {
 }
 
 describe("OSettingRow", () => {
+  it("drops its rule and side padding inside a bare form", () => {
+    const wrapper = mount(OSettingRow, {
+      props: { label: raw("Name"), dataTest: "row" },
+      global: { provide: { [SETTING_ROW_BARE_KEY as symbol]: true } },
+    });
+    const classes = wrapper.find('[data-test="row"]').classes();
+    expect(classes).toContain("py-2");
+    expect(classes).not.toContain("border-b");
+    expect(classes).not.toContain("px-3");
+  });
+
   it("renders the label and the description", () => {
     const wrapper = mount(OSettingRow, {
       props: { label: raw("Minimum length"), description: raw("Shortest password accepted") },
@@ -159,5 +171,38 @@ describe("OSettingRow", () => {
     expect(wrapper.text()).toContain(HELP);
     expect(wrapper.find("input").attributes("aria-describedby")).toBeUndefined();
     expect(wrapper.find("input").element).toBe(input.element);
+  });
+  it("shows an info icon carrying the explanation only when info is set", () => {
+    const plain = mount(OSettingRow, { props: { label: raw("Look back"), dataTest: "row" } });
+    expect(plain.find('[data-test="row-info"]').exists()).toBe(false);
+
+    const wrapper = mount(OSettingRow, {
+      props: {
+        label: raw("Look back"),
+        info: raw("How much data each run reads"),
+        dataTest: "row",
+      },
+    });
+    expect(wrapper.find('[data-test="row-info"]').attributes("aria-label")).toBe(
+      "How much data each run reads",
+    );
+  });
+
+  it("marks a required setting after its label", () => {
+    const wrapper = mount(OSettingRow, { props: { label: raw("Check every"), required: true } });
+
+    expect(wrapper.text()).toContain("Check every *");
+  });
+
+  it("lets a fill row's control take the rest of the row from the top", () => {
+    const wrapper = mount(OSettingRow, {
+      props: { label: raw("Send to"), fill: true },
+      slots: { default: '<div data-test="control">wide</div>' },
+    });
+
+    expect(wrapper.classes()).toContain("items-start");
+    expect(wrapper.find('[data-test="control"]').element.parentElement?.className).toContain(
+      "flex-1",
+    );
   });
 });

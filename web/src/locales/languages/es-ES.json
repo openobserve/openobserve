@@ -13207,7 +13207,6 @@
       "udsFieldNotAvailable": "El campo \"{field}\" no está disponible. Use solo los campos disponibles en sus condiciones.",
       "udsFieldsNotAvailable": "Los campos {fields} no están disponibles. Use solo los campos disponibles en sus condiciones.",
       "udsFieldsNotAvailableTruncated": "{count} campos no están disponibles ({fields} y {remaining} más). Use solo los campos disponibles en sus condiciones.",
-      "sqlValidationRequestFailed": "Error al validar la consulta SQL. Verifique la consulta e intente de nuevo.",
       "alertUpdated": "Alerta actualizada exitosamente.",
       "alertUpdatedNoDestination": "Alerta actualizada sin un destino.",
       "alertSaved": "Alerta guardada exitosamente.",

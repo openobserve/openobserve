@@ -13,6 +13,12 @@ import MonacoEditorHelper from '../../playwright-tests/utils/MonacoEditorHelper.
 import { openOSelectDropdown } from './oselectHelpers.js';
 import { FilterBuilderDriver } from '../generalPages/filterBuilderPage.js';
 import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
+import {
+    destinationsShowAsList,
+    openAlertSectionForTab,
+    pickAlertDestination,
+    settleIntoView,
+} from './alertSectionHelpers.js';
 
 export class AlertCreationWizard {
     constructor(page, commonActions, locators) {
@@ -93,9 +99,7 @@ export class AlertCreationWizard {
             await this.fillAlertNameField(this.currentAlertName);
 
             // Re-select stream type (logs) via OSelect popover pattern (§4)
-            await this.page.locator(this.locators.streamTypeDropdown).click();
-            await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-            await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+            await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
             await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
             await this.page.waitForTimeout(1000);
 
@@ -126,9 +130,7 @@ export class AlertCreationWizard {
 
             await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
             await this.fillAlertNameField(this.currentAlertName);
-            await this.page.locator(this.locators.streamTypeDropdown).click();
-            await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-            await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+            await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
             await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
             await this.page.waitForTimeout(1000);
 
@@ -202,9 +204,7 @@ export class AlertCreationWizard {
         await this.fillAlertNameField(randomAlertName);
 
         // Select stream type via OSelect popover pattern (§4)
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
         // Wait for stream list API call to complete after stream type selection
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
@@ -227,32 +227,36 @@ export class AlertCreationWizard {
         }
 
         // Destination selection with fallback
-        const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await openOSelectDropdown(this.page, destinationDropdown);
-        await this.page.waitForTimeout(1000);
+        if (await destinationsShowAsList(this.page)) {
+            await pickAlertDestination(this.page, destinationName);
+        } else {
+            const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
+            await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
+            await openOSelectDropdown(this.page, destinationDropdown);
+            await this.page.waitForTimeout(1000);
 
-        // Destination dropdown is OSelect (Reka Listbox) post-migration.
-        const destMenuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(destMenuItems.first()).toBeVisible({ timeout: 5000 });
+            // Destination dropdown is OSelect (Reka Listbox) post-migration.
+            const destMenuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+            await expect(destMenuItems.first()).toBeVisible({ timeout: 5000 });
 
-        let destFound = false;
-        const destOption = destMenuItems.filter({ hasText: destinationName }).first();
-        if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await destOption.click();
-            destFound = true;
-        }
-
-        if (!destFound) {
-            try {
-                await this.commonActions.scrollAndFindOption(destinationName, 'template');
-            } catch (scrollError) {
-                await destMenuItems.first().click();
-                testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
+            let destFound = false;
+            const destOption = destMenuItems.filter({ hasText: destinationName }).first();
+            if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await destOption.click();
+                destFound = true;
             }
+
+            if (!destFound) {
+                try {
+                    await this.commonActions.scrollAndFindOption(destinationName, 'template');
+                } catch (scrollError) {
+                    await destMenuItems.first().click();
+                    testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
+                }
+            }
+            await this.page.waitForTimeout(500);
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         }
-        await this.page.waitForTimeout(500);
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -291,9 +295,7 @@ export class AlertCreationWizard {
         await this.fillAlertNameField(randomAlertName);
 
         // Select stream type via OSelect popover pattern (§4)
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
         await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
@@ -313,28 +315,32 @@ export class AlertCreationWizard {
         }
 
         // Destination selection with fallback
-        const destinationSection = this.page.locator('[data-test="alert-destinations-select"]');
-        await destinationSection.waitFor({ state: 'visible', timeout: 10000 });
-        await openOSelectDropdown(this.page, destinationSection);
-        await this.page.waitForTimeout(1000);
+        if (await destinationsShowAsList(this.page)) {
+            await pickAlertDestination(this.page, destinationName);
+        } else {
+            const destinationSection = this.page.locator('[data-test="alert-destinations-select"]');
+            await destinationSection.waitFor({ state: 'visible', timeout: 10000 });
+            await openOSelectDropdown(this.page, destinationSection);
+            await this.page.waitForTimeout(1000);
 
-        const visibleDestMenuDefItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleDestMenuDefItems.first()).toBeVisible({ timeout: 5000 });
+            const visibleDestMenuDefItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+            await expect(visibleDestMenuDefItems.first()).toBeVisible({ timeout: 5000 });
 
-        let destFoundDef = false;
-        const destOptionDef = visibleDestMenuDefItems.filter({ hasText: destinationName }).first();
-        if (await destOptionDef.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await destOptionDef.click();
-            destFoundDef = true;
+            let destFoundDef = false;
+            const destOptionDef = visibleDestMenuDefItems.filter({ hasText: destinationName }).first();
+            if (await destOptionDef.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await destOptionDef.click();
+                destFoundDef = true;
+            }
+
+            if (!destFoundDef) {
+                await visibleDestMenuDefItems.first().click();
+                testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
+            }
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+
+            await this.page.waitForTimeout(300);
         }
-
-        if (!destFoundDef) {
-            await visibleDestMenuDefItems.first().click();
-            testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
-        }
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-
-        await this.page.waitForTimeout(300);
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -378,9 +384,7 @@ export class AlertCreationWizard {
         await this.fillAlertNameField(randomAlertName);
 
         // Select stream type via OSelect popover pattern (§4)
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
         await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
@@ -482,28 +486,32 @@ export class AlertCreationWizard {
         testLogger.info('Set period: 15 minutes');
 
         // Destination selection using v3 data-test locator
-        const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await openOSelectDropdown(this.page, destinationDropdown);
-        await this.page.waitForTimeout(1000);
+        if (await destinationsShowAsList(this.page)) {
+            await pickAlertDestination(this.page, destinationName);
+        } else {
+            const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
+            await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+            await openOSelectDropdown(this.page, destinationDropdown);
+            await this.page.waitForTimeout(1000);
 
-        const visibleDestMenuSqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleDestMenuSqlItems.first()).toBeVisible({ timeout: 5000 });
+            const visibleDestMenuSqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+            await expect(visibleDestMenuSqlItems.first()).toBeVisible({ timeout: 5000 });
 
-        let destFoundSql = false;
-        const destOptionSql = visibleDestMenuSqlItems.filter({ hasText: destinationName }).first();
-        if (await destOptionSql.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await destOptionSql.click();
-            destFoundSql = true;
+            let destFoundSql = false;
+            const destOptionSql = visibleDestMenuSqlItems.filter({ hasText: destinationName }).first();
+            if (await destOptionSql.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await destOptionSql.click();
+                destFoundSql = true;
+            }
+
+            if (!destFoundSql) {
+                await visibleDestMenuSqlItems.first().click();
+                testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
+            }
+            await this.page.waitForTimeout(500);
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+            testLogger.info('Selected destination', { destinationName });
         }
-
-        if (!destFoundSql) {
-            await visibleDestMenuSqlItems.first().click();
-            testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
-        }
-        await this.page.waitForTimeout(500);
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-        testLogger.info('Selected destination', { destinationName });
 
         // ==================== SUBMIT ====================
         // Deterministic success signal = the alert-save API response. The success toast is
@@ -572,9 +580,7 @@ export class AlertCreationWizard {
         await this.fillAlertNameField(randomAlertName);
 
         // Select stream type (logs) via OSelect popover pattern (§4)
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
         await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
@@ -604,30 +610,34 @@ export class AlertCreationWizard {
         }
 
         // Select destination for REAL-TIME alerts
-        const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await openOSelectDropdown(this.page, destinationDropdown);
-        await this.page.waitForTimeout(1000);
+        if (await destinationsShowAsList(this.page)) {
+            await pickAlertDestination(this.page, destinationName);
+        } else {
+            const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
+            await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
+            await openOSelectDropdown(this.page, destinationDropdown);
+            await this.page.waitForTimeout(1000);
 
-        // Use popover selector for destination
-        const visibleDestMenuMultiItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleDestMenuMultiItems.first()).toBeVisible({ timeout: 5000 });
+            // Use popover selector for destination
+            const visibleDestMenuMultiItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+            await expect(visibleDestMenuMultiItems.first()).toBeVisible({ timeout: 5000 });
 
-        let destFoundMulti = false;
-        const destOptionMulti = visibleDestMenuMultiItems.filter({ hasText: destinationName }).first();
-        if (await destOptionMulti.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await destOptionMulti.click();
-            destFoundMulti = true;
-            testLogger.info('Selected destination via popover', { destinationName });
+            let destFoundMulti = false;
+            const destOptionMulti = visibleDestMenuMultiItems.filter({ hasText: destinationName }).first();
+            if (await destOptionMulti.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await destOptionMulti.click();
+                destFoundMulti = true;
+                testLogger.info('Selected destination via popover', { destinationName });
+            }
+
+            if (!destFoundMulti) {
+                // Fallback: select first available destination
+                await visibleDestMenuMultiItems.first().click();
+                testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
+            }
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+            testLogger.info('Selected destination', { destinationName });
         }
-
-        if (!destFoundMulti) {
-            // Fallback: select first available destination
-            await visibleDestMenuMultiItems.first().click();
-            testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
-        }
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-        testLogger.info('Selected destination', { destinationName });
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -667,9 +677,7 @@ export class AlertCreationWizard {
         await this.fillAlertNameField(alertName);
 
         // Select stream type (logs) via OSelect popover pattern (§4)
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
         await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
@@ -751,36 +759,8 @@ export class AlertCreationWizard {
     }
 
     async _switchToTab(tabName) {
-        // Preferred: stable data-test toggle items from AddAlert.vue
-        // (`add-alert-tab-<key>`, keys: condition = "Alert Rules", advanced = "Advanced").
-        const tabKey = tabName === 'Alert Rules' ? 'condition' : tabName.toLowerCase();
-        const dataTestTab = this.page.locator(`[data-test="add-alert-tab-${tabKey}"]`).first();
-        if (await dataTestTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await dataTestTab.click({ force: true });
-            await this.page.waitForTimeout(500);
-            testLogger.info('Switched to tab via data-test', { tabName, tabKey });
-            return;
-        }
-
-        // Legacy v3 UI fallback: tabs are inner divs within the tab header bar
-        const tab = this.page.locator('.alert-v3-tabs > div:first-child > div').filter({ hasText: tabName }).first();
-        if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
-            // Check if this tab is already active (has active-tab class)
-            const isActive = await tab.evaluate(el => el.classList.contains('active-tab')).catch(() => false);
-            if (isActive) {
-                testLogger.info('Tab already active, skipping click', { tabName });
-                return;
-            }
-            await tab.click({ force: true });
-            await this.page.waitForTimeout(500);
-            testLogger.info('Switched to tab', { tabName });
-            return;
-        }
-
-        // Last resort: click the tab label text (works on builds without either hook)
-        await this.page.getByText(tabName, { exact: false }).first().click({ force: true });
-        await this.page.waitForTimeout(500);
-        testLogger.info('Switched to tab via text fallback', { tabName });
+        const sectionId = await openAlertSectionForTab(this.page, tabName);
+        testLogger.info('Switched to editor section', { tabName, sectionId });
     }
 
     async _switchToAdvancedTab() {
@@ -838,9 +818,7 @@ export class AlertCreationWizard {
         await this.fillAlertNameField(randomAlertName);
 
         // Select stream type (logs) via OSelect popover pattern (§4)
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
         await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
@@ -948,24 +926,28 @@ export class AlertCreationWizard {
         }
 
         // Destination (v3 uses data-test locator)
-        const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await openOSelectDropdown(this.page, destinationDropdown);
-        await this.page.waitForTimeout(1000);
-
-        const visibleDestMenuAggItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleDestMenuAggItems.first()).toBeVisible({ timeout: 5000 });
-
-        const destOptionAgg = visibleDestMenuAggItems.filter({ hasText: destinationName }).first();
-        if (await destOptionAgg.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await destOptionAgg.click();
+        if (await destinationsShowAsList(this.page)) {
+            await pickAlertDestination(this.page, destinationName);
         } else {
-            await visibleDestMenuAggItems.first().click();
-            testLogger.warn('Selected first available destination (fallback)');
+            const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
+            await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+            await openOSelectDropdown(this.page, destinationDropdown);
+            await this.page.waitForTimeout(1000);
+
+            const visibleDestMenuAggItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+            await expect(visibleDestMenuAggItems.first()).toBeVisible({ timeout: 5000 });
+
+            const destOptionAgg = visibleDestMenuAggItems.filter({ hasText: destinationName }).first();
+            if (await destOptionAgg.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await destOptionAgg.click();
+            } else {
+                await visibleDestMenuAggItems.first().click();
+                testLogger.warn('Selected first available destination (fallback)');
+            }
+            await this.page.waitForTimeout(500);
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+            testLogger.info('Configured alert settings');
         }
-        await this.page.waitForTimeout(500);
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-        testLogger.info('Configured alert settings');
 
         // Remaining advanced features (CompareWithPast) are in Advanced tab
         // but we skip them for this test
@@ -1036,9 +1018,7 @@ export class AlertCreationWizard {
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
         // Select stream type (metrics) via OSelect popover pattern (§4) — IMPORTANT: Must be metrics for PromQL tab to appear
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="metrics"]`).click();
+        await this.page.locator(`[data-test="add-alert-stream-type-card-metrics"]`).click();
         // Wait for stream listing API to complete after type change
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
@@ -1107,21 +1087,16 @@ export class AlertCreationWizard {
         await this.page.waitForSelector('[data-o2-drawer][data-state="open"]', { state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.info('Closed PromQL Editor dialog');
 
-        // Fill PromQL trigger condition (in Alert Rules tab - QueryConfig.vue)
-        // In v3 UI the label is "Alert if the value is *" (NOT "Trigger if the value is")
-        const queryConfigSection = this.page.locator('.step-query-config');
-        const promqlConditionLabel = queryConfigSection.getByText('Alert if the value').first();
-        await promqlConditionLabel.waitFor({ state: 'visible', timeout: 10000 });
-        testLogger.info('PromQL trigger condition section visible in Alert Rules tab');
-
-        // The outer flex container holds both the label div and controls div as siblings
-        const promqlConditionRow = promqlConditionLabel.locator('..');
+        // PromQL condition row ("Notify me when the value is [op] [value]") in QueryConfig.vue
+        await this.page.locator('[data-test="alert-threshold-operator-select"]').first().waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('PromQL trigger condition row visible');
 
         // Select operator — v3 UI renders this as an OSelect with a stable data-test.
         // The old `.alert-v3-select` class was removed in PR #12764; use the data-test
         // hook + popover pattern (same as the SQL threshold operator in this file).
         const promqlOperatorSelect = this.page.locator('[data-test="alert-threshold-operator-select"]').first();
         await promqlOperatorSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await settleIntoView(this.page, promqlOperatorSelect);
         await promqlOperatorSelect.click();
         const promqlOperatorPopover = this.page.locator('[data-test="alert-threshold-operator-select-popover"]').first();
         await promqlOperatorPopover.waitFor({ state: 'visible', timeout: 5000 });
@@ -1144,7 +1119,7 @@ export class AlertCreationWizard {
         testLogger.info('Set PromQL condition operator', { operator });
 
         // Set value (input has debounce="300")
-        const promqlValueInput = promqlConditionRow.locator('input[type="number"]');
+        const promqlValueInput = this.page.locator('input[data-test="alert-threshold-value-input"], [data-test="alert-threshold-value-input"] input').first();
         await promqlValueInput.clear();
         await promqlValueInput.fill(String(conditionValue));
         await this.page.waitForTimeout(500);
@@ -1163,29 +1138,33 @@ export class AlertCreationWizard {
         }
 
         // Select destination (v3 uses data-test locator)
-        const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await openOSelectDropdown(this.page, destinationDropdown);
-        await this.page.waitForTimeout(1000);
+        if (await destinationsShowAsList(this.page)) {
+            await pickAlertDestination(this.page, destinationName);
+        } else {
+            const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
+            await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+            await openOSelectDropdown(this.page, destinationDropdown);
+            await this.page.waitForTimeout(1000);
 
-        const visibleDestMenuPromqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleDestMenuPromqlItems.first()).toBeVisible({ timeout: 5000 });
+            const visibleDestMenuPromqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+            await expect(visibleDestMenuPromqlItems.first()).toBeVisible({ timeout: 5000 });
 
-        let destFound = false;
-        const destOption = visibleDestMenuPromqlItems.filter({ hasText: destinationName }).first();
-        if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await destOption.click();
-            destFound = true;
-            testLogger.info('Selected destination via popover', { destinationName });
+            let destFound = false;
+            const destOption = visibleDestMenuPromqlItems.filter({ hasText: destinationName }).first();
+            if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await destOption.click();
+                destFound = true;
+                testLogger.info('Selected destination via popover', { destinationName });
+            }
+
+            if (!destFound) {
+                await visibleDestMenuPromqlItems.first().click();
+                testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
+            }
+            await this.page.waitForTimeout(500);
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+            testLogger.info('Selected destination', { destinationName });
         }
-
-        if (!destFound) {
-            await visibleDestMenuPromqlItems.first().click();
-            testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
-        }
-        await this.page.waitForTimeout(500);
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-        testLogger.info('Selected destination', { destinationName });
 
         // Remaining advanced features (CompareWithPast) are in Advanced tab
         // but we skip them for this test

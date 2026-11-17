@@ -13207,7 +13207,6 @@
       "udsFieldNotAvailable": "Trường \"{field}\" không khả dụng. Vui lòng chỉ sử dụng các trường khả dụng trong điều kiện của bạn.",
       "udsFieldsNotAvailable": "Các trường {fields} không khả dụng. Vui lòng chỉ sử dụng các trường khả dụng trong điều kiện của bạn.",
       "udsFieldsNotAvailableTruncated": "{count} trường không khả dụng ({fields} và {remaining} trường khác). Vui lòng chỉ sử dụng các trường khả dụng trong điều kiện của bạn.",
-      "sqlValidationRequestFailed": "Lỗi khi xác thực truy vấn SQL. Vui lòng kiểm tra truy vấn và thử lại.",
       "alertUpdated": "Cảnh báo đã được cập nhật thành công.",
       "alertUpdatedNoDestination": "Đã cập nhật cảnh báo mà không có đích.",
       "alertSaved": "Cảnh báo đã được lưu thành công.",

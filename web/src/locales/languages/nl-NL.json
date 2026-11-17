@@ -13207,7 +13207,6 @@
       "udsFieldNotAvailable": "Veld \"{field}\" is niet beschikbaar. Gebruik alleen de beschikbare velden in uw voorwaarden.",
       "udsFieldsNotAvailable": "Velden {fields} zijn niet beschikbaar. Gebruik alleen de beschikbare velden in uw voorwaarden.",
       "udsFieldsNotAvailableTruncated": "{count} velden zijn niet beschikbaar ({fields} en {remaining} meer). Gebruik alleen de beschikbare velden in uw voorwaarden.",
-      "sqlValidationRequestFailed": "Fout bij het valideren van de SQL-query. Controleer de query en probeer het opnieuw.",
       "alertUpdated": "Melding succesvol bijgewerkt.",
       "alertUpdatedNoDestination": "Alarm bijgewerkt zonder bestemming.",
       "alertSaved": "Melding succesvol opgeslagen.",

@@ -13202,7 +13202,6 @@
       "udsFieldNotAvailable": "欄位「{field}」不可用。請僅在條件中使用可用欄位。",
       "udsFieldsNotAvailable": "欄位 {fields} 不可用。請僅在條件中使用可用欄位。",
       "udsFieldsNotAvailableTruncated": "{count} 個欄位不可用（{fields} 及其他 {remaining} 個）。請僅在條件中使用可用欄位。",
-      "sqlValidationRequestFailed": "驗證 SQL 查詢時發生錯誤。請檢查查詢後重試。",
       "alertUpdated": "警示已成功更新。",
       "alertUpdatedNoDestination": "警示已更新，但未設定目標。",
       "alertSaved": "警示已成功儲存。",

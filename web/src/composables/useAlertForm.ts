@@ -23,7 +23,7 @@ import {
   nextTick,
   type Ref,
 } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, debounce, set } from "lodash-es";
@@ -69,6 +69,7 @@ import {
   saveAlertJson as saveAlertJsonUtil,
   type ValidationContext,
   type JsonValidationContext,
+  type SqlCheckResult,
 } from "@/utils/alerts/alertValidation";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
@@ -127,6 +128,7 @@ import { anomalyWhereClause, toDetectionFunctionSql } from "@/utils/alerts/anoma
 import { invalidateSiemDetections } from "@/composables/security/useSiemDetections";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
+import type { AlertSectionId } from "@/components/alerts/alertFormSections";
 import {
   anomalyBandWidthPrefill,
   anomalyBudgetPerDay,
@@ -502,7 +504,17 @@ export type AlertFormValues = PayloadFormData & {
   _meta: Record<string, unknown>;
 } & Record<string, unknown>;
 
-export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
+/** What the host editor does on the form's behalf. */
+export interface AlertFormHooks {
+  /** Bring a section into view when a save gate stops on a field inside it. */
+  showSection?: (id: AlertSectionId) => void;
+}
+
+export function useAlertForm(
+  props: AlertFormProps,
+  emit: AlertFormEmit,
+  hooks: AlertFormHooks = {},
+) {
   const store: any = useStore();
   const { t } = useI18nTyped();
   const router = useRouter();
@@ -821,7 +833,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // Drives the QueryConfig warning that it runs before the Multi Alert's own
   // "Alert if [column]" condition.
   const sqlQueryHasHaving = ref(false);
-  const validateSqlQueryPromise = ref<Promise<unknown>>();
   const addAlertFormRef = ref(null);
   const viewSqlEditorDialog = ref(false);
   const plotChart: any = ref(null);
@@ -1197,6 +1208,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return getStreams(streamType, false)
       .then(async (res: any) => {
         streams.value[streamType] = res.list;
+        // A slower reply for a type the user already switched away from must not replace the current list.
+        if (form.state.values.stream_type !== streamType) return Promise.resolve();
         schemaList.value = res.list;
         indexOptions.value = res.list.map((data: any) => {
           return data.name;
@@ -1447,7 +1460,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const validationContext: ValidationContext = {
       store,
       t,
-      validateSqlQueryPromise,
       sqlQueryErrorMsg,
       vrlFunctionError,
       buildQueryPayload,
@@ -1456,11 +1468,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return validateInputsUtil(input, validationContext, notify);
   };
 
-  const validateSqlQuery = async () => {
+  const validateSqlQuery = async (): Promise<SqlCheckResult> => {
     const validationContext: ValidationContext = {
       store,
       t,
-      validateSqlQueryPromise,
       sqlQueryErrorMsg,
       sqlErrorRanges,
       vrlFunctionError,
@@ -1617,43 +1628,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return false;
   };
 
+  // Every section is always rendered, so the first visible message is the one to focus.
   const focusOnFirstError = () => {
-    nextTick(async () => {
+    nextTick(() => {
       const form = document.querySelector("form");
-      if (!form) return;
-
-      // The offending field is on the tab the user is already looking at.
-      if (focusVisibleError(form)) return;
-
-      // Nothing VISIBLE is erroring, but the form is still invalid — so the
-      // offending field lives on a tab the user isn't looking at. That pane is
-      // v-show'd off, so every message inside it has a null offsetParent and the
-      // scan above skips it: the toast fires, points at nothing, and the user is
-      // told to fix a field they cannot see. Bring the owning tab forward first,
-      // then focus for real (this is what the pre-migration save gate did by
-      // hardcoding `activeTab = "condition"` before focusing).
-      // Only hop to a tab that is REACHABLE in the current mode. Every pane stays
-      // in the DOM in both modes (v-show, not v-if) while `alertTabs` swaps the
-      // headers wholesale between anomaly and alert — so a stale message on a
-      // pane whose header isn't rendered would strand the user on a tab the
-      // toggle group cannot show or leave.
-      const stranded = Array.from(form.querySelectorAll<HTMLElement>('[role="alert"]')).find(
-        (el) => {
-          if (!el.textContent?.trim()) return false;
-          const key = el.closest<HTMLElement>("[data-tab-pane]")?.dataset.tabPane;
-          return !!key && !!form.querySelector(`[data-test="add-alert-tab-${key}"]`);
-        },
-      );
-      const pane = stranded?.closest<HTMLElement>("[data-tab-pane]");
-      const tab = pane?.dataset.tabPane;
-      if (!tab || tab === activeTab.value) return;
-
-      activeTab.value = tab;
-      await nextTick();
-      // Re-scan with the visibility filter intact: now that the pane is shown,
-      // its messages have an offsetParent. Anything still hidden (a collapsed
-      // section) is correctly skipped rather than focused into the void.
-      focusVisibleError(form);
+      if (form) focusVisibleError(form);
     });
   };
 
@@ -1798,7 +1777,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const updateFunctionVisibility = () => {
     if (!showVrlFunction.value && vrlFunctionError.value) {
-      validateSqlQueryPromise.value = Promise.resolve("");
       vrlFunctionError.value = "";
     }
   };
@@ -2155,16 +2133,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return;
     }
 
-    // These two gates must move the user to the tab holding the offending field.
-    // They used to set `wizardStep`, which the V2 stepper navigated by — the V3
-    // single-pane layout navigates by `activeTab` and passes a hardcoded
-    // wizard-step to the summary, so setting it here steered nothing and Save &
-    // Train just appeared dead. Toast as well: the invalid field is on a tab the
-    // user isn't looking at, so the highlight alone is invisible.
+    // The invalid field may be in a section off-screen, so scroll to it as well as toasting.
     if (anomalyStep2Ref.value) {
       const step2Valid = await anomalyStep2Ref.value.validate();
       if (!step2Valid) {
         activeTab.value = "anomaly-config";
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.fixHighlightedFields"),
@@ -2175,6 +2149,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     if (Object.values(anomalyWindowShareErrors(anomalyConfig.value)).some((e) => e !== null)) {
       activeTab.value = "anomaly-alerting";
+      hooks.showSection?.("notify");
       toast({
         variant: "error",
         message: t("alerts.messages.fixHighlightedFields"),
@@ -2390,7 +2365,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // here with the SAME messages so save stays blocked (Rule ④). The field rules
   // (threshold / frequency / conditions / promql-condition / group_by / period /
   // silence / destinations / name / stream) are covered by the composed schema.
-  const runImperativeQueryChecks = (): boolean => {
+  const runImperativeQueryChecks = ({ freshSqlCheckFollows = false } = {}): boolean => {
     if (formData.value.is_real_time === "composite") return true;
     // ── Cron gate (R4 RESTORE) ───────────────────────────────────────────────
     // Pre-migration AlertSettings.validate() ran validateFrequency() first and
@@ -2409,6 +2384,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // inline "Cron expression and timezone are required". Parity: no toast.
       if (!tc.cron || !tc.timezone) {
         activeTab.value = "condition";
+        hooks.showSection?.("schedule");
         return false;
       }
       try {
@@ -2419,6 +2395,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         ) {
           const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
           activeTab.value = "condition";
+          hooks.showSection?.("schedule");
           toast({
             variant: "error",
             message: t("alerts.queryConfig.frequencyGreaterThanSeconds", {
@@ -2429,6 +2406,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         }
       } catch {
         activeTab.value = "condition";
+        hooks.showSection?.("schedule");
         toast({
           variant: "error",
           message: t("alerts.queryConfig.invalidCronExpression"),
@@ -2442,14 +2420,17 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (tab === "sql") {
       if (!qc.sql || String(qc.sql).trim() === "") {
         activeTab.value = "condition";
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.sqlQueryEmpty"),
         });
         return false;
       }
-      if (sqlQueryErrorMsg.value && sqlQueryErrorMsg.value.trim() !== "") {
+      const flagIsStale = freshSqlCheckFollows && formData.value.is_real_time === "false";
+      if (sqlQueryErrorMsg.value?.trim() && !flagIsStale && !sqlUnchangedSinceLoad()) {
         activeTab.value = "condition";
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.fixSqlErrorBeforeSaving"),
@@ -2459,6 +2440,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     } else if (tab === "promql") {
       if (!qc.promql || String(qc.promql).trim() === "") {
         activeTab.value = "condition";
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.promqlQueryEmpty"),
@@ -2475,6 +2457,47 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // blocked: a schema issue fails handleSubmit before onSubmit runs, so this
     // function is never even reached in that state.
     return true;
+  };
+
+  // Everything the SQL check sends, as the edited alert was loaded; null when creating.
+  let loadedSqlCheckInput: string | null = null;
+  const sqlCheckInput = () => {
+    const values = form.state.values;
+    return JSON.stringify([
+      String(values.query_condition?.sql ?? "").trim(),
+      values.query_condition?.vrl_function ?? "",
+      values.stream_type ?? "",
+      values.stream_name ?? "",
+    ]);
+  };
+  const sqlUnchangedSinceLoad = () =>
+    loadedSqlCheckInput !== null && sqlCheckInput() === loadedSqlCheckInput;
+
+  // Save must judge the SQL being saved, not the verdict of the last blur-triggered check.
+  const validateSqlBeforeSave = async (): Promise<"passed" | "blocked" | "unchecked"> => {
+    const qc = formData.value.query_condition;
+    if (formData.value.is_real_time !== "false" || qc?.type !== "sql") return "passed";
+    if (!String(qc.sql ?? "").trim()) return "passed";
+    const blockOnQuery = (message?: I18nText) => {
+      activeTab.value = "condition";
+      hooks.showSection?.("condition");
+      if (message) toast({ variant: "error", message });
+      return "blocked" as const;
+    };
+    if (!getParser(qc.sql)) return blockOnQuery(t("alerts.messages.selectAllColumnsNotAllowed"));
+    // An edit that kept the stored query must not be blocked by a check that cannot change it.
+    if (sqlUnchangedSinceLoad()) return "passed";
+    const verdict = await validateSqlQuery();
+    if (verdict === "sql_error") return blockOnQuery(t("alerts.messages.fixSqlErrorBeforeSaving"));
+    // The validator already toasted the VRL error.
+    if (verdict === "function_error") return blockOnQuery();
+    return verdict === "request_failed" ? "unchecked" : "passed";
+  };
+
+  const warnIfSqlUnchecked = (sqlCheck: string) => {
+    if (sqlCheck === "unchecked") {
+      toast({ variant: "warning", message: t("alerts.messages.sqlCheckUnavailable") });
+    }
   };
 
   let callAlert: Promise<{ data: any }>;
@@ -2496,21 +2519,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // reactive read-view and can lag by a tick after a just-written setF).
   const onSubmit = async () => {
     const target = saveTargetNow();
-    if (!runImperativeQueryChecks()) return false;
-
-    if (
-      formData.value.is_real_time == "false" &&
-      formData.value.query_condition.type == "sql" &&
-      !getParser(formData.value.query_condition.sql)
-    ) {
-      activeTab.value = "condition";
-      toast({
-        variant: "error",
-        message: t("alerts.messages.selectAllColumnsNotAllowed"),
-        timeout: 1500,
-      });
-      return false;
-    }
+    // The save-time SQL check below replaces the blur-time error flag.
+    if (!runImperativeQueryChecks({ freshSqlCheckFollows: true })) return false;
 
     if (
       formData.value.is_real_time == "false" &&
@@ -2576,8 +2586,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       });
 
       activeTab.value = "condition";
+      hooks.showSection?.("condition");
       return false;
     }
+
+    const sqlCheck = await validateSqlBeforeSave();
+    if (sqlCheck === "blocked") return false;
 
     const payload = getAlertPayload();
     // Read before the save: resetForm in .then clears the form the payload came from.
@@ -2588,21 +2602,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       message: t("common.pleaseWait"),
       timeout: 0,
     });
-
-    if (formData.value.is_real_time == "false" && formData.value.query_condition.type == "sql") {
-      try {
-        await validateSqlQueryPromise.value;
-      } catch (error) {
-        dismiss();
-        toast({
-          variant: "error",
-          message: t("alerts.messages.sqlValidationRequestFailed"),
-          timeout: 1500,
-        });
-        console.error("Error while validating sql query", error);
-        return false;
-      }
-    }
 
     if (formData.value.is_real_time !== "composite") {
       // VERSION HANDLING - wrap conditions with version field for backend
@@ -2635,6 +2634,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ? t("alerts.messages.alertUpdatedNoDestination")
               : t("alerts.messages.alertUpdated"),
           });
+          warnIfSqlUnchecked(sqlCheck);
           showSaveWarnings(res);
         })
         .catch((err: any) => {
@@ -2677,6 +2677,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               : t("alerts.messages.alertSaved"),
           });
           noteSavedDraft(target.org, savedDraft);
+          warnIfSqlUnchecked(sqlCheck);
           showSaveWarnings(res);
         })
         .catch((err: any) => {
@@ -2860,6 +2861,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     // Seed the ONE form (single source of truth) with the fully-transformed obj.
     resetForm(data);
+    loadedSqlCheckInput = props.isUpdated ? sqlCheckInput() : null;
 
     // Resolve the timezone from the stored offset (edit prefill) after the reset.
     if (pendingTimezoneOffset != null) {
@@ -3060,26 +3062,35 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               },
             });
           }
-          if ((newVal as any).pendingPeriodFieldRef) {
-            focusManager.registerField("pending_period", {
-              ref: (newVal as any).pendingPeriodFieldRef,
-              onBeforeFocus: () => {
-                if (isAnomalyMode.value) {
-                  activeTab.value = "anomaly-alerting";
-                } else {
-                  activeTab.value = "condition";
-                }
+          // Hold-for and keep-firing render only once shown, so resolve their element at focus time.
+          const settings = newVal as {
+            pendingPeriodFieldRef?: unknown;
+            keepFiringForFieldRef?: unknown;
+          };
+          focusManager.registerField("pending_period", {
+            ref: {
+              get value() {
+                return settings.pendingPeriodFieldRef;
               },
-            });
-          }
-          if ((newVal as any).keepFiringForFieldRef) {
-            focusManager.registerField("keep_firing_for", {
-              ref: (newVal as any).keepFiringForFieldRef,
-              onBeforeFocus: () => {
+            },
+            onBeforeFocus: () => {
+              if (isAnomalyMode.value) {
+                activeTab.value = "anomaly-alerting";
+              } else {
                 activeTab.value = "condition";
+              }
+            },
+          });
+          focusManager.registerField("keep_firing_for", {
+            ref: {
+              get value() {
+                return settings.keepFiringForFieldRef;
               },
-            });
-          }
+            },
+            onBeforeFocus: () => {
+              activeTab.value = "condition";
+            },
+          });
         });
       }
     },
@@ -3400,7 +3411,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     sqlErrorRanges,
     sqlAggColumnOptions,
     sqlQueryHasHaving,
-    validateSqlQueryPromise,
     addAlertFormRef,
     viewSqlEditorDialog,
     plotChart,

@@ -13207,7 +13207,6 @@
       "udsFieldNotAvailable": "الحقل \"{field}\" غير متاح. يرجى استخدام الحقول المتاحة فقط في شروطك.",
       "udsFieldsNotAvailable": "الحقول {fields} غير متاحة. يرجى استخدام الحقول المتاحة فقط في شروطك.",
       "udsFieldsNotAvailableTruncated": "حقول غير متاحة عددها {count} ({fields} و{remaining} أخرى). يرجى استخدام الحقول المتاحة فقط في شروطك.",
-      "sqlValidationRequestFailed": "حدث خطأ أثناء التحقق من صحة استعلام SQL. يرجى التحقق من الاستعلام والمحاولة مرة أخرى.",
       "alertUpdated": "تم تحديث التنبيه بنجاح.",
       "alertUpdatedNoDestination": "تم تحديث التنبيه بدون وجهة.",
       "alertSaved": "تم حفظ التنبيه بنجاح.",

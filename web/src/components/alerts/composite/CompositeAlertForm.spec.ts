@@ -9,6 +9,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import CompositeAlertForm from "./CompositeAlertForm.vue";
+import CompositeAlertPreview from "./CompositeAlertPreview.vue";
 import alertsService from "@/services/alerts";
 import i18n from "@/locales";
 
@@ -130,6 +131,24 @@ describe("CompositeAlertForm", () => {
     );
   });
 
+  it("lays sub-alerts, expression and settings out as setting rows with the explainer behind an info icon", () => {
+    const wrapper = mountForm(draft());
+    const rows = wrapper.findAll("[data-o-setting-row]");
+
+    expect(rows.map((row) => row.attributes("data-test"))).toEqual([
+      "alerts-composite-sub-alerts-row",
+      "alerts-composite-expression-row",
+      "alerts-composite-warning-row",
+      "alerts-composite-stale-policy-row",
+    ]);
+    expect(rows[1].find('[data-test="alerts-composite-expression-builder"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="alerts-composite-expression-row-info"]').attributes("aria-label"),
+    ).toBe(i18n.global.t("alerts.composite.banner"));
+    expect(wrapper.text()).not.toContain(i18n.global.t("alerts.composite.banner"));
+    expect(rows[3].find('[data-test="alerts-composite-stale-policy-help"]').exists()).toBe(true);
+  });
+
   it("defaults Warning to firing and stale children to explicit use-last-state", () => {
     const wrapper = mountForm(draft());
 
@@ -192,5 +211,32 @@ describe("CompositeAlertForm", () => {
     expect(slot.text()).not.toMatch(/critical|warning|ok|stale/i);
     await wrapper.find('[data-test="alerts-composite-child-remove-secret-id"]').trigger("click");
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+  });
+
+  it("ignores a slow server reply for an earlier expression once the expression turns invalid", async () => {
+    let resolvePending: (value: { data: typeof validPreview }) => void = () => undefined;
+    vi.mocked(alertsService.validateComposite).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePending = resolve;
+      }) as ReturnType<typeof alertsService.validateComposite>,
+    );
+    const wrapper = mountForm(draft());
+    await flushPromises();
+
+    await wrapper.setProps({
+      modelValue: draft({
+        composite_condition: {
+          expression: "{id-a} &&",
+          warning_counts_as_firing: true,
+          stale_child_policy: "use_last_state",
+        },
+      }),
+    });
+    await flushPromises();
+    resolvePending({ data: validPreview });
+    await flushPromises();
+
+    expect(wrapper.emitted("validation")?.at(-1)?.[0]).toEqual({ valid: false });
+    expect(wrapper.findComponent(CompositeAlertPreview).exists()).toBe(false);
   });
 });

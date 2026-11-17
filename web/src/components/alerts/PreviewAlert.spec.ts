@@ -634,6 +634,29 @@ describe("PreviewAlert - watcher behavior", () => {
     w.unmount();
   });
 
+  it("drops the verdict when the SQL changes until the new query returns a result", async () => {
+    const w = await mountComp({
+      query: `SELECT count(*) AS zo_sql_num FROM "logs"`,
+      selectedTab: "sql",
+      formData: {
+        ...baseFormData(),
+        is_real_time: false,
+        trigger_condition: { period: 10, threshold: 5, operator: ">=" },
+      },
+    });
+    await flushPromises();
+    await emitResultMetadata(w, [[{ total: 4001 }]]);
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(true);
+
+    await w.setProps({ query: "SELECT FROM WHERE oops" });
+    expect(w.vm.evaluationStatus).toBeNull();
+
+    await w.setProps({ query: `SELECT count(*) AS zo_sql_num FROM "logs" WHERE a=1` });
+    await emitResultMetadata(w, [[{ total: 2 }]]);
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(false);
+    w.unmount();
+  });
+
   it("chartData is defined after prop update", async () => {
     const w = await mountComp({
       query: "SELECT * FROM logs",

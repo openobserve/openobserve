@@ -13207,7 +13207,6 @@
       "udsFieldNotAvailable": "Поле \"{field}\" недоступно. Используйте только доступные поля в ваших условиях.",
       "udsFieldsNotAvailable": "Поля {fields} недоступны. Используйте только доступные поля в ваших условиях.",
       "udsFieldsNotAvailableTruncated": "Недоступно полей: {count} ({fields} и еще {remaining}). Используйте только доступные поля в ваших условиях.",
-      "sqlValidationRequestFailed": "Ошибка при проверке SQL-запроса. Проверьте запрос и попробуйте снова.",
       "alertUpdated": "Оповещение успешно обновлено.",
       "alertUpdatedNoDestination": "Оповещение обновлено без получателя.",
       "alertSaved": "Оповещение успешно сохранено.",
