@@ -15,7 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 import { contextRegistry } from "@/composables/contextProviders/registry";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -30,6 +30,12 @@ import AssistantTimePrefix from "../context/AssistantTimePrefix.vue";
 import AssistantComposerPlusMenu, {
   type ComposerPlusAction,
 } from "../composer/AssistantComposerPlusMenu.vue";
+import {
+  isAutoNavigationEnabled,
+  useAutoNavigationPreferences,
+} from "@/composables/useAutoNavigationPreferences";
+import { fakeVoiceEngine } from "../__tests__/fakeVoice";
+import { resetVoiceForTests, setVoiceOptIn } from "../composer/useAssistantVoice";
 import AssistantLauncher, { launcherState } from "./AssistantLauncher.vue";
 import AssistantLauncherAgent from "./AssistantLauncherAgent.vue";
 
@@ -944,5 +950,51 @@ describe("AssistantLauncher", () => {
       expect(document.activeElement).toBe(input(wrapper).element);
       expect(router.currentRoute.value.query).toEqual({ row: "incident:7" });
     });
+  });
+});
+
+describe("AssistantLauncher: auto navigation toggle", () => {
+  const TOGGLE = '[data-test="assistant-composer-auto-navigation-btn"]';
+
+  beforeEach(() => {
+    open.mockReset().mockResolvedValue({ ok: true });
+    document.body.innerHTML = "";
+  });
+  afterEach(() => {
+    mounted.splice(0).forEach((wrapper) => wrapper.unmount());
+    resetVoiceForTests();
+  });
+
+  it("renders the toggle on, and hides it while dictating", async () => {
+    const engine = fakeVoiceEngine();
+    resetVoiceForTests(engine);
+    localStorage.setItem("o2.assistant.hints:k1", JSON.stringify({ dictate: true }));
+    const { wrapper } = setup();
+    setVoiceOptIn("k1", true);
+    await flushPromises();
+    expect(wrapper.get(TOGGLE).attributes("aria-checked")).toBe("true");
+    await wrapper.get('[data-test="assistant-dictate"]').trigger("click");
+    await flushPromises();
+    engine.handlers!.onStart();
+    await flushPromises();
+    expect(wrapper.find(TOGGLE).exists()).toBe(false);
+  });
+
+  it("hands a turn-off made on Home to the chat Ask opens", async () => {
+    const { wrapper, store } = setup();
+    await wrapper.get(TOGGLE).trigger("click");
+    expect(wrapper.get(TOGGLE).attributes("aria-checked")).toBe("false");
+    await input(wrapper).setValue("count errors");
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open).toHaveBeenCalled();
+    // The new chat's composer mounts with its id already set.
+    const { useAutoNavigationPreferences } =
+      await import("@/composables/useAutoNavigationPreferences");
+    const { isAutoNavigationEnabled: onNewChat } = useAutoNavigationPreferences(
+      ref("new-chat"),
+      computed(() => store.state.userOrgKey),
+    );
+    expect(onNewChat.value).toBe(false);
+    expect(isAutoNavigationEnabled(store.state.userOrgKey, "new-chat")).toBe(false);
   });
 });

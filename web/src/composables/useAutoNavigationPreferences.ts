@@ -67,17 +67,15 @@ export function useAutoNavigationPreferences(
   currentChatId: Ref<string | null>,
   scopeKey: Ref<string | null>,
 ) {
-  watch(
-    currentChatId,
-    (id) => {
-      if (!id || !scopeKey.value) return;
-      if (!pending.value && prefsOf(scopeKey.value)[id] === undefined) {
-        setAutoNavigation(scopeKey.value, id, false);
-      }
-      pending.value = true;
-    },
-    { flush: "sync" },
-  );
+  // Immediate, because the chat Ask opens mounts its composer with the id already set.
+  const inherit = (id: string | null) => {
+    if (!id || !scopeKey.value) return;
+    if (!pending.value && prefsOf(scopeKey.value)[id] === undefined) {
+      setAutoNavigation(scopeKey.value, id, false);
+    }
+    pending.value = true;
+  };
+  watch(currentChatId, inherit, { flush: "sync", immediate: true });
   const autoNavigationEnabled = computed({
     get: () =>
       currentChatId.value

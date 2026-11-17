@@ -165,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <AssistantLauncherAgent v-model="agent" :disabled="fieldLoading" />
                 </span>
+                <AssistantAutoNavToggle v-if="!voice.mine.value" v-model="autoNavigation" />
               </template>
               <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
               <AssistantDictateButton
@@ -422,6 +423,7 @@ import {
   type TimeWindow,
 } from "@/composables/assistant";
 import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
+import { useAutoNavigationPreferences } from "@/composables/useAutoNavigationPreferences";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -448,6 +450,7 @@ import { announceComposer, composerUi } from "@/components/ai-assistant/composer
 import AssistantComposerPlusMenu, {
   type ComposerPlusAction,
 } from "@/components/ai-assistant/composer/AssistantComposerPlusMenu.vue";
+import AssistantAutoNavToggle from "@/components/ai-assistant/composer/AssistantAutoNavToggle.vue";
 import AssistantDictateButton from "@/components/ai-assistant/composer/AssistantDictateButton.vue";
 import AssistantDictationWave from "@/components/ai-assistant/composer/AssistantDictationWave.vue";
 import {
@@ -486,6 +489,11 @@ const vuex = useStore();
 const capability = useAssistantCapability();
 const assistant = useAssistantStore();
 const { mdUp } = useBreakpoint();
+// No chat yet: the choice waits and the chat that Ask opens inherits it.
+const { isAutoNavigationEnabled: autoNavigation } = useAutoNavigationPreferences(
+  ref(null),
+  computed(() => assistant.state.userOrgKey),
+);
 // The layout is fixed per mount, and only the card lists starters and recent chats.
 const isCard = props.layout === "card";
 const starterList = isCard ? useAssistantStarters({ page: "home" }) : null;

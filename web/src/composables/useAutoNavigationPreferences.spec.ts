@@ -61,4 +61,14 @@ describe("useAutoNavigationPreferences", () => {
     chat.value = "s2";
     expect(on.value).toBe(true);
   });
+
+  it("gives a choice made on Home to a chat whose composer mounts with its id already set", () => {
+    const home = useAutoNavigationPreferences(ref<string | null>(null), ref("scope-f"));
+    home.isAutoNavigationEnabled.value = false;
+    const mounted = useAutoNavigationPreferences(ref("s1"), ref("scope-f"));
+    expect(mounted.isAutoNavigationEnabled.value).toBe(false);
+    expect(
+      useAutoNavigationPreferences(ref("s2"), ref("scope-f")).isAutoNavigationEnabled.value,
+    ).toBe(true);
+  });
 });

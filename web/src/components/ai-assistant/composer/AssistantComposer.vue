@@ -103,37 +103,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="inertKind !== null || accessLost"
                 />
               </span>
-              <template v-if="!running && !voice.mine.value">
-                <span
-                  :class="[
-                    'bg-badge-default-soft-bg ring-badge-default-ol-border/30 rounded-default flex h-7 shrink-0 items-center px-2 ring-1 ring-inset',
-                    SWITCH_HIT_AREA_CLASS,
-                  ]"
-                >
-                  <OSwitch
-                    v-model="autoNavigation"
-                    size="sm"
-                    data-test="assistant-composer-auto-navigation"
-                  >
-                    <template #label>
-                      <OIcon :name="assistantGlyph.autoNavigation" size="sm" />
-                      <span class="sr-only">{{
-                        t("assistant.composer.autoNavigation.label")
-                      }}</span>
-                    </template>
-                  </OSwitch>
-                </span>
-                <OTooltip
-                  :content="
-                    t(
-                      autoNavigation
-                        ? 'assistant.composer.autoNavigation.enabledTooltip'
-                        : 'assistant.composer.autoNavigation.disabledTooltip',
-                      { product: t('assistant.name') },
-                    )
-                  "
-                />
-              </template>
+              <AssistantAutoNavToggle
+                v-if="!running && !voice.mine.value"
+                v-model="autoNavigation"
+              />
             </template>
             <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
             <AssistantDictateButton
@@ -301,8 +274,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { MAX_IMAGE_SIZE_BYTES } from "@/ts/interfaces/chat";
@@ -321,6 +292,7 @@ import AssistantComposerPlusMenu, {
 } from "./AssistantComposerPlusMenu.vue";
 import AssistantComposerStrip from "./AssistantComposerStrip.vue";
 import AssistantSessionTime from "@/components/ai-assistant/context/AssistantSessionTime.vue";
+import AssistantAutoNavToggle from "./AssistantAutoNavToggle.vue";
 import AssistantDictateButton from "./AssistantDictateButton.vue";
 import AssistantDictationTail from "./AssistantDictationTail.vue";
 import AssistantDictationWave from "./AssistantDictationWave.vue";
@@ -346,7 +318,6 @@ import {
   noteCap,
   noteDraftCleared,
   STRIP_LINK_CLASS,
-  SWITCH_HIT_AREA_CLASS,
 } from "./composerUi";
 import { useAssistantVoice } from "./useAssistantVoice";
 import { useComposerQueue } from "./useComposerQueue";
