@@ -1681,18 +1681,22 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find(`[data-test="add-alert-section-schedule"] ${tabs}`).exists()).toBe(false);
     });
 
-    it("steps from each section header: Back from the second step, Next names the following one", async () => {
+    it("steps from each section header: Next names the following step, the ends stay in place disabled", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const btn = (id: string, dir: string) => `[data-test="add-alert-section-${id}-${dir}"]`;
-      expect(wrapper.find(btn("watch", "prev")).exists()).toBe(false);
+      const firstBack = wrapper.find(btn("watch", "prev"));
+      expect(firstBack.attributes("disabled")).toBeDefined();
+      expect(firstBack.attributes("aria-label")).toBe("Previous step");
       expect(wrapper.find(btn("watch", "next")).attributes("aria-label")).toBe(
         "Next: When to alert",
       );
       expect(wrapper.find(btn("notify", "next")).attributes("aria-label")).toBe(
         "Next: How often to check",
       );
-      expect(wrapper.find(btn("details", "next")).exists()).toBe(false);
+      const lastNext = wrapper.find(btn("details", "next"));
+      expect(lastNext.attributes("disabled")).toBeDefined();
+      expect(lastNext.attributes("aria-label")).toBe("Next step");
 
       const scrollToSection = vi.fn();
       wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
