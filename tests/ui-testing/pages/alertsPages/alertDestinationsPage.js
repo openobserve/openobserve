@@ -2062,6 +2062,11 @@ export class AlertDestinationsPage {
     // EDIT MODE METHODS FOR PREBUILT DESTINATIONS
     // ============================================================================
 
+    async expectHeaderRow(key, value) {
+        await expect(this.page.locator(`[data-test="add-destination-header-${key}-key-input-field"]`)).toHaveValue(key, { timeout: 15000 });
+        await expect(this.page.locator(`[data-test="add-destination-header-${key}-value-input-field"]`)).toHaveValue(value);
+    }
+
     /**
      * Click Edit button for a destination
      * @param {string} name - Destination name

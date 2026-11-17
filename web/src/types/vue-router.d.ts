@@ -31,5 +31,7 @@ declare module "vue-router" {
     licenseFeatureFromStreamType?: boolean;
     /** Tab-title key per `?tab=` value, for a route several rail items share; wins over `titleKey`. */
     titleKeyByTab?: Record<string, I18nKey>;
+    /** Tab-title key per `?folder=` value, for a pseudo-folder that swaps the page body. */
+    titleKeyByFolder?: Record<string, I18nKey>;
   }
 }

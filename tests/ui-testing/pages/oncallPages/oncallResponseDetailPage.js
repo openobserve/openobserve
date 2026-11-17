@@ -55,6 +55,7 @@ export class OnCallResponseDetailPage {
       empty: '[data-test="oncall-response-detail-empty"]',
       subtitle: '[data-test="oncall-response-subtitle"]',
       teamLink: '[data-test="oncall-response-team-link"]',
+      teamNone: '[data-test="oncall-response-team-none"]',
       originLink: '[data-test="oncall-response-origin-link"]',
       opened: '[data-test="oncall-response-opened"]',
       stats: '[data-test="oncall-response-stats"]',
@@ -157,6 +158,24 @@ export class OnCallResponseDetailPage {
 
   async expectDetailVisible() {
     await expect(this.page.locator(this.locators.root)).toBeVisible({ timeout: 45000 });
+  }
+
+  async expectUnrouted() {
+    await expect(this.page.locator(this.locators.teamNone)).toHaveText('Unrouted', { timeout: 30000 });
+    await expect(this.page.locator(this.locators.teamLink)).toHaveCount(0);
+  }
+
+  /** Escalate and Snooze need a team; checked on whichever surface the viewport shows, with Hand off as the control. */
+  async expectNoTeamOnlyVerbs() {
+    const inline = this.page.locator(this.locators.handoffButton);
+    const more = this.page.locator(this.locators.moreButton);
+    await expect(inline.or(more).first()).toBeVisible({ timeout: 45000 });
+    const inMenu = !(await inline.isVisible());
+    if (inMenu) await more.click();
+    await expect(this.page.locator(inMenu ? this.locators.handoffMenuItem : this.locators.handoffButton)).toBeVisible({ timeout: 20000 });
+    await expect(this.page.locator('[data-test^="oncall-response-escalate-btn"]')).toHaveCount(0);
+    await expect(this.page.locator('[data-test^="oncall-response-snooze-"]')).toHaveCount(0);
+    if (inMenu) await this.page.keyboard.press('Escape');
   }
 
   /** The record's own title line — what the responder reads first. */
