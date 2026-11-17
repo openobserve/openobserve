@@ -1,6 +1,7 @@
 """openobserve#16633: a failed incident notification is retried in place, and only when it can still pass."""
 from __future__ import annotations
 
+import json
 import os
 import time
 from collections.abc import Generator
@@ -151,3 +152,11 @@ def test_incident_notification_refused_with_4xx_is_not_retried(incident_alerts):
     assert [d.status for d in call] == [400], call
     _history_has(incident_alerts, "refused400", "notify_failed")
     _incident_opened(incident_alerts, "refused400")
+
+
+def test_incident_notification_is_rendered_through_the_destination_template(incident_alerts):
+    """o2-enterprise#2998: the body was a fixed {"incident": ...} object, so Slack refused it with no_text."""
+    call = _first_notify_call(incident_alerts, "flip")
+    body = json.loads(call[-1].body)
+    assert isinstance(body.get("text"), str), body
+    assert body["text"].startswith("inc_retry_flip_alert"), body

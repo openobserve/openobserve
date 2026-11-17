@@ -6,7 +6,7 @@
 
 import * as crypto from "crypto";
 import { setupTestDashboard, deleteDashboard } from "./dashCreation.js";
-import { ingestionForMaps } from "./dashIngestion.js";
+import { ingestionForMaps, ingestionForStateTimeline } from "./dashIngestion.js";
 import testLogger from '../../utils/test-logger.js';
 
 // ---------------------------------------------------------------------------
@@ -315,6 +315,25 @@ export async function setupBarGaugePanelWithConfig(page, pm, dashboardName, pane
   await buildPanel(page, pm, dashboardName, { chartType: "bar-gauge", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Bar gauge panel with config ready", { dashboardName, panelName });
+}
+
+/** State timeline panel — max(state_code) over time with one row per host; config sidebar opened. */
+export async function setupStateTimelinePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  const streamName = "e2e_state_timeline";
+  await ingestionForStateTimeline(page, streamName);
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType("state-timeline");
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream(streamName);
+  // State timeline seeds only the time axis; the state and the row field are picked by the user.
+  await pm.chartTypeSelector.searchAndAddField("state_code", "y");
+  await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "max");
+  await pm.chartTypeSelector.searchAndAddField("host", "b");
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("State timeline panel with config ready", { dashboardName, panelName });
 }
 
 /**

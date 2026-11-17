@@ -68,6 +68,15 @@ vi.mock("@/composables/shared/router", () => ({
         component: { template: "<div>Logs</div>" },
         meta: { titleKey: "menu.search" },
       },
+      {
+        path: "dashboards",
+        name: "dashboards",
+        component: { template: "<div>Dashboards</div>" },
+        meta: {
+          titleKey: "menu.dashboard",
+          titleKeyByFolder: { __public_links__: "dashboard.publicLinks.pageTitle" },
+        },
+      },
     ],
   }),
 }));
@@ -119,6 +128,8 @@ vi.mock("@/layouts/MainLayout.vue", () => ({
 import createAppRouter from "@/router/index";
 import { getDecodedUserInfo } from "@/utils/zincutils";
 import { openobserveRum } from "@openobserve/browser-rum";
+import i18n from "@/locales";
+import { PUBLIC_LINKS_FOLDER_ID } from "@/utils/dashboard/pseudoFolders";
 
 // ---------------------------------------------------------------------------
 // Helper: build a minimal Vuex store for tests
@@ -379,6 +390,14 @@ describe("router/index (factory)", () => {
       router = createAppRouter(buildStore(false));
       await router.push("/login").catch(() => {});
       expect(document.title).toBe("OpenObserve - Login");
+    });
+
+    it("titles the tab after a pseudo-folder that swaps the page body, and back on leaving it", async () => {
+      await router.push({ path: "/dashboards", query: { folder: PUBLIC_LINKS_FOLDER_ID } });
+      expect(document.title).toBe("OpenObserve - Public dashboards");
+
+      await router.push({ path: "/dashboards", query: { folder: "default" } });
+      expect(document.title).toBe(`OpenObserve - ${i18n.global.t("menu.dashboard")}`);
     });
   });
 });
