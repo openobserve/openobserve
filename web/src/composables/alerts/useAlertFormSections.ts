@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, type ComputedRef, type Ref } from "vue";
-import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type {
   SectionNavItem,
   SectionNavState,
@@ -33,6 +33,7 @@ export type FieldMetaMap = Record<string, { errors?: readonly unknown[] } | unde
 /** The slice of the alert form the section list reads. */
 export interface AlertSectionsFormData extends Omit<ReadBackAlert, "is_real_time"> {
   is_real_time?: string | boolean;
+  stream_type?: string;
   name?: string;
   creates_incident?: boolean;
   children?: { alert_id?: string }[];
@@ -73,6 +74,12 @@ export interface AlertFormSectionsInput {
   invalid?: ComputedRef<Partial<Record<AlertSectionId, boolean>>>;
   t: TranslateFn;
 }
+
+const STREAM_TYPE_LABELS: Record<string, I18nKey> = {
+  logs: "alerts.sections.dataTypes.logs.label",
+  metrics: "alerts.sections.dataTypes.metrics.label",
+  traces: "alerts.sections.dataTypes.traces.label",
+};
 
 const hasValue = (v: unknown): boolean => v !== null && v !== undefined && String(v).trim() !== "";
 
@@ -215,12 +222,14 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
         if (mode.value === "composite") {
           return { missing: false, summary: t("alerts.sections.whenCombined") };
         }
-        return {
-          missing: !hasValue(fd.stream_name),
-          summary: hasValue(fd.stream_name)
-            ? raw(fd.stream_name)
-            : t("alerts.sections.watch.pickStream"),
-        };
+        if (!hasValue(fd.stream_name)) {
+          return { missing: true, summary: t("alerts.sections.watch.pickStream") };
+        }
+        const stream = raw(fd.stream_name);
+        if (!hasValue(fd.stream_type)) return { missing: false, summary: stream };
+        const typeKey = STREAM_TYPE_LABELS[fd.stream_type!];
+        const type = typeKey ? t(typeKey) : raw(fd.stream_type);
+        return { missing: false, summary: t("alerts.sections.watch.navSummary", { stream, type }) };
       }
       case "condition": {
         const count = fd.children?.length ?? 0;
@@ -261,6 +270,8 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       const facts = sectionFacts(id, fd);
       const errors = errorCounts.value[id];
       const seen = input.isEditing.value || (input.visited?.value.has(id) ?? true);
+      // A section that cannot save is never ticked, even before its error shows.
+      const invalid = input.invalid?.value[id] === true;
       let state: SectionNavState = "none";
       let stateLabel: I18nText | undefined;
       if (errors > 0) {
@@ -274,7 +285,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       } else if (input.changedSections?.value.has(id)) {
         state = "changed";
         stateLabel = t("alerts.editMode.unsaved.changed");
-      } else if (seen && !("empty" in facts && facts.empty)) {
+      } else if (seen && !invalid && !("empty" in facts && facts.empty)) {
         state = input.isEditing.value ? "saved" : "done";
       }
       // A saved alert's name is fixed, so its last step holds only the optional details.

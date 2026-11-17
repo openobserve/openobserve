@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 import { useAlertFormSections, checkEveryLabel, type FieldMetaMap } from "./useAlertFormSections";
@@ -245,6 +245,34 @@ describe("useAlertFormSections", () => {
       stateLabel: "1 thing to fix",
     });
     expect(byId(items.value, "condition").state).toBe("done");
+  });
+
+  it.each([
+    { when: "a query that cannot save, before Save", invalid: true, extra: 0, state: "none" },
+    { when: "a query that cannot save, after Save", invalid: true, extra: 1, state: "error" },
+    { when: "a query that can save", invalid: false, extra: 0, state: "done" },
+  ])("never ticks $when", ({ invalid, extra, state }) => {
+    const { items } = useAlertFormSections({
+      fieldMeta: ref({}),
+      formData: ref(scheduled({ stream_name: "k8s_logs", name: "x" })),
+      anomalyConfig: ref({}),
+      isAnomalyMode: ref(false),
+      isAggregationEnabled: ref(false),
+      isEditing: ref(false),
+      extraErrors: ref({ condition: extra }),
+      invalid: computed(() => ({ condition: invalid })),
+      t,
+    });
+    expect(byId(items.value, "condition").state).toBe(state);
+    if (extra)
+      expect(byId(items.value, "condition").stateLabel).toBe(
+        t("alerts.sections.needsFix", { count: 1 }, 1),
+      );
+  });
+
+  it("names the stream and its type in the watch summary", () => {
+    const { items } = setup(scheduled({ stream_name: "default", stream_type: "logs" }));
+    expect(byId(items.value, "watch").summary).toBe("default · Logs");
   });
 
   it("shows a muted tick while editing a saved alert", () => {
