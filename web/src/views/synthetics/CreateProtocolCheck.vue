@@ -42,6 +42,7 @@ import {
   mapResponseToProtocolCheck,
 } from "@/utils/synthetics/buildPayload";
 import { getFoldersListByType } from "@/utils/commons";
+import { selectSyntheticsFolder, withCheckFolder } from "@/utils/synthetics/selectFolder";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -106,7 +107,7 @@ function makeDefaultCheck(type: ProtocolCheckType): ProtocolCheck {
     name: "",
     url: "",
     enabled: true,
-    folder: "default",
+    folder: "",
     tags: [],
     journey: [],
     schedule: { type: "interval", intervalValue: 5, intervalUnit: "minutes" },
@@ -145,6 +146,11 @@ const locationsLoading = ref(false);
 const destinations = ref<string[]>([]);
 const folders = ref<SyntheticsFolder[]>([]);
 const foldersLoading = ref(false);
+const foldersLoaded = ref(false);
+const loadedFolder = ref<string>();
+const pickerFolders = computed(() =>
+  withCheckFolder(folders.value, loadedFolder.value, t("dashboard.currentFolderLabel")),
+);
 /** Only ever carries `folder` today — the folder select is the one field this
  *  view can invalidate on its own. */
 const validationErrors = ref<Record<string, string>>({});
@@ -195,6 +201,7 @@ async function fetchFolders() {
     await waitForOrgIdentifier();
     const res = await getFoldersListByType(store, "synthetics");
     folders.value = (res ?? []) as SyntheticsFolder[];
+    foldersLoaded.value = true;
   } catch (err) {
     console.error("[synthetics] failed to load folders", err);
     folders.value = [];
@@ -203,24 +210,22 @@ async function fetchFolders() {
   }
 }
 
-/**
- * Reconcile the selected folder against the folders this org actually has.
- * Same hazard as the browser flow: `?folder=` and stored checks are unvalidated,
- * and an unresolvable id is rendered raw and then sent back as `?folder=`, which
- * the server treats as authoritative for the destination folder and the RBAC
- * gate. Skipped while the list is empty — that means the fetch has not landed.
- */
+// Only new checks fall back; a direct grant can reach a saved check in an unlisted folder.
 watch(
-  [folders, () => check.value.folder],
+  [folders, foldersLoaded, () => check.value.folder],
   () => {
-    if (!folders.value.length) return;
+    if (!foldersLoaded.value || props.editId) return;
     const folderId = check.value.folder;
-    if (!folderId || folders.value.some((f) => f.folderId === folderId)) return;
-    check.value = { ...check.value, folder: "default" };
-    validationErrors.value = {
-      ...validationErrors.value,
-      folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
-    };
+    if (folders.value.some((f) => f.folderId === folderId)) return;
+    const folder = selectSyntheticsFolder(folders.value) ?? "";
+    if (folder === folderId) return;
+    check.value = { ...check.value, folder };
+    if (folderId) {
+      validationErrors.value = {
+        ...validationErrors.value,
+        folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
+      };
+    }
   },
   { immediate: true },
 );
@@ -328,6 +333,7 @@ async function loadForEdit(id: string): Promise<boolean> {
     const res = await syntheticsService.get(org, id, String(route.query.folder ?? ""));
     check.value = mapResponseToProtocolCheck(res.data as Record<string, unknown>);
     serverCheck = JSON.parse(JSON.stringify(check.value)) as ProtocolCheck;
+    loadedFolder.value = check.value.folder;
     return true;
   } catch (err: any) {
     // If the check doesn't exist in this org (e.g. user switched orgs while editing),
@@ -512,7 +518,7 @@ async function saveCheck() {
             :locations="locations"
             :loading-locations="locationsLoading"
             :destinations="destinations"
-            :folders="folders"
+            :folders="pickerFolders"
             :folders-loading="foldersLoading"
             :validation-errors="{ ...validationErrors, ...reentryErrors }"
             :allow-private-locations="privateLocationsEnabled"

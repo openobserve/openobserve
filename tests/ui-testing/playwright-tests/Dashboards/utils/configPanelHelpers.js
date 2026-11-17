@@ -318,6 +318,25 @@ export async function setupBarGaugePanelWithConfig(page, pm, dashboardName, pane
 }
 
 /**
+ * Distribution (histogram) panel over the raw values of a numeric field — config sidebar opened and ready.
+ * The panel has no X axis; pass breakdownField to stack the buckets by that field's values.
+ */
+export async function setupDistributionPanelWithConfig(page, pm, dashboardName, {
+  panelName = "Test Panel",
+  yField = "code",
+  breakdownField = null,
+} = {}) {
+  await buildPanel(page, pm, dashboardName, {
+    chartType: "distribution",
+    panelName,
+    yField,
+    breakdownField,
+  });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Distribution panel with config ready", { dashboardName, panelName, yField, breakdownField });
+}
+
+/**
  * GeoMap chart panel — ingests geo data, builds panel with lat/lon fields, opens config sidebar.
  */
 export async function setupGeomapPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {

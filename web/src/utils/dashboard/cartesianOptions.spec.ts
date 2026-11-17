@@ -25,7 +25,7 @@ import * as echarts from "echarts";
 
 // The custom-chart runner imports the ECharts bundle as a URL, which only resolves in a browser build.
 vi.mock("./convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn(),
+  prepareCustomChartRun: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
 

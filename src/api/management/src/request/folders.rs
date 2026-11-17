@@ -227,6 +227,12 @@ pub async fn list_folders(
     let user_id = Some(user_email.user_id.as_str());
 
     let folder_type = folder_type.into();
+    if folder_type == config::meta::folder::FolderType::Synthetics {
+        return match crate::request::synthetics::listable_folders(&org_id, user_id).await {
+            Ok(folders) => MetaHttpResponse::json(ListFoldersResponseBody::from(folders)),
+            Err(resp) => resp,
+        };
+    }
     match folders::list_folders(&org_id, user_id, folder_type).await {
         Ok(folders) => {
             #[cfg(feature = "enterprise")]

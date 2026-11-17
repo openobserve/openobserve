@@ -33,8 +33,6 @@ use config::{
     utils::util::is_trace_time_index_stream,
 };
 use metrics_index::{MetricsFileLayout, metrics_index_stream};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 
 use crate::datafusion::sort_order::FileSortOrder;
 
@@ -66,35 +64,6 @@ pub enum MergeMode {
 }
 
 impl MergeMode {
-    /// Mode for the compactor's merge of one `stream_name` hour (or day) that
-    /// ends at `max_ts`. `finalize` is true once that hour is closed; only then
-    /// may the whole hour be rewritten (metrics downsampling, whose rules
-    /// select by how old `max_ts` is). Incremental merges of the still-open
-    /// hour always use the plain per-stream mode.
-    pub fn for_compactor(
-        stream_type: StreamType,
-        stream_name: &str,
-        schema: &Schema,
-        _max_ts: i64,
-        finalize: bool,
-    ) -> Self {
-        #[cfg(feature = "enterprise")]
-        if finalize
-            && stream_type == StreamType::Metrics
-            && let Some(rule) = get_largest_downsampling_rule(stream_name, _max_ts)
-        {
-            return Self::Downsampling(rule.clone());
-        }
-        if metrics_index_stream(stream_type, schema) {
-            return if finalize {
-                Self::MetricsIndexed
-            } else {
-                Self::MetricsHashMerged
-            };
-        }
-        Self::for_stream(stream_type, stream_name)
-    }
-
     /// Mode for the ingester movers: never downsamples, never finalizes.
     pub fn for_ingester(stream_type: StreamType, stream_name: &str, schema: &Schema) -> Self {
         if metrics_index_stream(stream_type, schema) {
@@ -103,7 +72,8 @@ impl MergeMode {
         Self::for_stream(stream_type, stream_name)
     }
 
-    fn for_stream(stream_type: StreamType, stream_name: &str) -> Self {
+    /// Mode of a stream's plain size-bounded merge.
+    pub fn for_stream(stream_type: StreamType, stream_name: &str) -> Self {
         match stream_type {
             StreamType::Metadata if is_trace_time_index_stream(stream_name) => Self::TraceTimeIndex,
             StreamType::Filelist => Self::FileList,
@@ -111,10 +81,8 @@ impl MergeMode {
         }
     }
 
-    /// True when the whole hour must be merged as one batch — every file of
-    /// the hour, including ones already above the size target, and regardless
-    /// of `ZO_COMPACT_MAX_FILE_SIZE` (the writer splits the output itself).
-    pub fn merges_whole_batch(&self) -> bool {
+    /// True when a batch of one file is still merged: the mode changes what the file holds.
+    pub fn rewrites_single_file(&self) -> bool {
         match self {
             #[cfg(feature = "enterprise")]
             Self::Downsampling(_) => true,
@@ -279,7 +247,7 @@ mod tests {
             MergeMode::Classic
         ));
         assert!(matches!(
-            MergeMode::for_compactor(StreamType::Traces, "app", &schema, 0, true),
+            MergeMode::for_stream(StreamType::Traces, "app"),
             MergeMode::Classic
         ));
         assert!(matches!(
@@ -287,12 +255,12 @@ mod tests {
             MergeMode::Classic
         ));
         assert!(matches!(
-            MergeMode::for_compactor(StreamType::Filelist, "x", &schema, 0, false),
+            MergeMode::for_stream(StreamType::Filelist, "x"),
             MergeMode::FileList
         ));
-        assert!(!MergeMode::Classic.merges_whole_batch());
-        assert!(MergeMode::MetricsIndexed.merges_whole_batch());
-        assert!(!MergeMode::MetricsHashSorted.merges_whole_batch());
+        assert!(!MergeMode::Classic.rewrites_single_file());
+        assert!(MergeMode::MetricsIndexed.rewrites_single_file());
+        assert!(!MergeMode::MetricsHashSorted.rewrites_single_file());
         assert_eq!(
             MergeMode::Classic.input_sort_order(&[]),
             FileSortOrder::TimestampDesc

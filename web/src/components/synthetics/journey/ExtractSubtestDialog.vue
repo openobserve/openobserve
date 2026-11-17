@@ -123,6 +123,14 @@ watch(
   },
 );
 
+// The host's folder list can land after opening; follow it unless the user already picked a folder.
+watch(
+  () => props.defaultFolder,
+  (next, prev) => {
+    if (props.open && form.getFieldValue("folder") === prev) form.setFieldValue("folder", next);
+  },
+);
+
 // The dialog persists across opens, so the setup-time schema goes stale when a locations edit flips the flag.
 watch(
   () => props.needsSchedule,

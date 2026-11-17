@@ -27,7 +27,10 @@ use config::{
         self_reporting::usage::{TRIGGERS_STREAM, TriggerDataType, normalize_outcome},
         stream::StreamType,
     },
-    utils::{sql::quote_like_pattern, time::now_micros},
+    utils::{
+        sql::{quote_like_pattern, quote_sql_string},
+        time::now_micros,
+    },
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
@@ -1117,14 +1120,14 @@ fn hit_text(hit: &serde_json::Value, column: &str) -> Option<String> {
         .map(String::from)
 }
 
-/// The downtime filters of the history read, quoted with the same single-quote escaping.
+/// The downtime filters of the history read; values must survive the search service's re-print.
 fn downtime_filters(downtime_id: Option<&str>, status: Option<&str>) -> String {
     let mut clause = String::new();
     if let Some(id) = downtime_id.filter(|id| !id.is_empty()) {
-        clause.push_str(&format!(" AND downtime_id = '{}'", id.replace('\'', "''")));
+        clause.push_str(&format!(" AND downtime_id = {}", quote_sql_string(id)));
     }
     if let Some(status) = status.filter(|status| !status.is_empty()) {
-        clause.push_str(&format!(" AND status = '{}'", status.replace('\'', "''")));
+        clause.push_str(&format!(" AND status = {}", quote_sql_string(status)));
     }
     clause
 }
@@ -2050,6 +2053,26 @@ mod tests {
             " AND downtime_id = 'a''b' AND status = 'suppressed'"
         );
         assert_eq!(downtime_filters(Some(""), Some("")), "");
+    }
+
+    #[test]
+    fn downtime_filters_survive_reserialisation() {
+        use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
+
+        let parse = |sql: &str| Parser::parse_sql(&PostgreSqlDialect {}, sql).unwrap();
+        let payload = r"x\' OR 1=1 --";
+        for (downtime_id, status) in [(Some(payload), None), (None, Some(payload))] {
+            let sql = format!(
+                "SELECT * FROM t WHERE org = 'o'{} AND NOT siem",
+                downtime_filters(downtime_id, status)
+            );
+            let first = parse(&sql);
+            let reprinted = parse(&first[0].to_string());
+            assert_eq!(first, reprinted, "{sql}");
+            let reprinted = reprinted[0].to_string();
+            assert!(reprinted.ends_with("AND NOT siem"), "{reprinted}");
+            assert!(!reprinted.contains("OR 1 = 1"), "{reprinted}");
+        }
     }
 
     #[test]

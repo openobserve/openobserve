@@ -125,14 +125,14 @@ pub use variables::*;
 /// So no cross-region reference may name a folder by primary key: replicated
 /// checks carry the folder's public SLUG, and the receiving region resolves it
 /// against — or creates it in — its own table.
-async fn create_default_synthetics_folder(org_id: &str) -> anyhow::Result<()> {
+pub async fn create_default_synthetics_folder(org_id: &str) -> anyhow::Result<Folder> {
     let folder = Folder {
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: "default".to_owned(),
         description: "default".to_owned(),
         icon: None,
     };
-    let (_id, _folder, created) = folders::get_or_create(org_id, folder, FolderType::Synthetics)
+    let (_id, folder, created) = folders::get_or_create(org_id, folder, FolderType::Synthetics)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     // Register the folder in OpenFGA — writes owningOrg + selfParent so a
@@ -146,7 +146,7 @@ async fn create_default_synthetics_folder(org_id: &str) -> anyhow::Result<()> {
         let obj = format!("{}:{}", get_ofga_type("synthetic_folder"), DEFAULT_FOLDER);
         set_ownership(org_id, &obj, "", "").await;
     }
-    Ok(())
+    Ok(folder)
 }
 
 #[cfg(test)]

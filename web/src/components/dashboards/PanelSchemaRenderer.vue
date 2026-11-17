@@ -22,7 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="relative h-full" ref="chartPanelRef" :class="chartPanelClass">
       <div
-        v-if="!errorDetail?.message && !isAwaitingFirstLoad && !statHasNoData"
+        v-if="
+          (!errorDetail?.message || showsCustomChartError) && !isAwaitingFirstLoad && !statHasNoData
+        "
+        v-show="!errorDetail?.message"
         :style="{ height: chartPanelHeight, width: '100%' }"
       >
         <MapsRenderer
@@ -117,11 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="panelData.chartType == 'logs' ? panelData : null"
           :config="panelSchema.config"
         />
-        <CustomChartRenderer
+        <CustomChartSandboxRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
-          :data="panelData"
+          :run="customChartRun"
           class="flex h-full w-full flex-col"
-          @error="errorDetail = $event"
+          @error="onCustomChartError"
+          @rendered="onCustomChartRendered"
         />
         <ChartRenderer
           v-else
@@ -393,6 +397,7 @@ import {
   defineAsyncComponent,
   onMounted,
   onUnmounted,
+  toRaw,
   type PropType,
 } from "vue";
 import { useStore } from "vuex";
@@ -409,6 +414,7 @@ import {
   panelRefreshEpoch,
   type CustomChartContext,
 } from "@/utils/dashboard/convertCustomChartData";
+import type { CustomChartRun } from "@/utils/dashboard/customChartSandbox";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
 import { showsMissingValue } from "@/utils/dashboard/tableConfigUtils";
@@ -511,7 +517,7 @@ const AddAnnotation = defineAsyncComponent(() => {
 // Statically imported by several route-level components, so it cannot be
 // code-split into its own chunk — import it statically to avoid the mixed
 // dynamic/static import build warning.
-import CustomChartRenderer from "./panels/CustomChartRenderer.vue";
+import CustomChartSandboxRenderer from "./panels/CustomChartSandboxRenderer.vue";
 
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
@@ -548,7 +554,7 @@ export default defineComponent({
     FlameGraphPanelRenderer,
     LogsPanelRenderer,
     AddAnnotation,
-    CustomChartRenderer,
+    CustomChartSandboxRenderer,
     LoadingProgress,
     PanelChartPlaceholder,
     OButton,
@@ -1562,6 +1568,31 @@ export default defineComponent({
     // Conversions can resolve out of order; only the most recently started may land.
     let conversionGeneration = 0;
     let customChartRunSkipped = false;
+    const customChartRun = computed<CustomChartRun | null>(() =>
+      panelData.value?.chartType === "custom_chart" ? (panelData.value.run ?? null) : null,
+    );
+    // The renderer stays mounted under its own error, so only the next run's result replaces or clears it.
+    const customChartError = shallowRef<{ message: string; code: string } | null>(null);
+    const showsCustomChartError = computed(
+      () => !!errorDetail.value?.message && toRaw(errorDetail.value) === customChartError.value,
+    );
+    const errorBlocksConversion = () =>
+      !!errorDetail.value?.message && !showsCustomChartError.value;
+    const isCurrentCustomChartRun = (run: CustomChartRun | null) =>
+      !!run && toRaw(run) === toRaw(customChartRun.value);
+    const onCustomChartError = (
+      detail: { message: string; code: string },
+      run: CustomChartRun | null,
+    ) => {
+      if (!isCurrentCustomChartRun(run)) return;
+      customChartError.value = detail;
+      errorDetail.value = detail;
+    };
+    const onCustomChartRendered = (run: CustomChartRun | null) => {
+      if (isCurrentCustomChartRun(run) && showsCustomChartError.value) {
+        errorDetail.value = { message: "", code: "" };
+      }
+    };
     const convertPanelDataCommon = async (applyOverlay = false) => {
       // Converting the empty pre-load buffer would publish an empty result to the header and curated tiles.
       if (isAwaitingFirstLoad.value) return;
@@ -1580,11 +1611,10 @@ export default defineComponent({
         return;
       }
 
-      if (!errorDetail?.value?.message && validatePanelData?.value?.length === 0) {
+      if (!errorBlocksConversion() && validatePanelData?.value?.length === 0) {
         const generation = ++conversionGeneration;
         // A stream error set while awaiting is newer than this conversion's data.
-        const superseded = () =>
-          generation !== conversionGeneration || !!errorDetail?.value?.message;
+        const superseded = () => generation !== conversionGeneration || errorBlocksConversion();
         try {
           const result = await convertPanelData(
             filteredPanelSchema.value,
@@ -1714,10 +1744,13 @@ export default defineComponent({
           regionJoin.value = panelData.value?.extras?.regionJoin ?? null;
           sankeyNotice.value = panelData.value?.extras?.sankeyNotice ?? null;
 
-          errorDetail.value = {
-            message: "",
-            code: "",
-          };
+          // A new run reports its own outcome; with no run left there is nothing to report it.
+          if (!showsCustomChartError.value || !customChartRun.value) {
+            errorDetail.value = {
+              message: "",
+              code: "",
+            };
+          }
         } catch (error: any) {
           if (superseded()) return;
           if (error instanceof CustomChartSkippedError) {
@@ -1785,7 +1818,7 @@ export default defineComponent({
         }
 
         if (
-          !errorDetail?.value?.message &&
+          !errorBlocksConversion() &&
           validatePanelData?.value?.length === 0 &&
           data.value?.length
         ) {
@@ -1879,7 +1912,7 @@ export default defineComponent({
           }
           emit("updated:vrlFunctionFieldList", perQueryFields);
         }
-        if (panelData.value.chartType == "custom_chart")
+        if (panelData.value.chartType == "custom_chart" && !showsCustomChartError.value)
           errorDetail.value = {
             message: "",
             code: "",
@@ -2002,6 +2035,8 @@ export default defineComponent({
 
     // Listen for layout changes to update chart dimensions
     const handleWindowLayoutChanges = async () => {
+      // The frame resizes its own chart; a new run would re-run the code and drop the user's zoom and legend picks.
+      if (panelSchema.value?.type === "custom_chart") return;
       if (chartPanelRef.value) {
         await nextTick();
         await convertPanelDataCommon();
@@ -2781,6 +2816,10 @@ export default defineComponent({
       searchRequestTraceIds,
       errorDetail,
       panelData,
+      customChartRun,
+      onCustomChartError,
+      onCustomChartRendered,
+      showsCustomChartError,
       noData,
       statHasNoData,
       noDataTitle,

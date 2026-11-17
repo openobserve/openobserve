@@ -96,6 +96,7 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 
 import CreateProtocolCheck from "./CreateProtocolCheck.vue";
 import destinationService from "@/services/alert_destination";
+import { getFoldersListByType } from "@/utils/commons";
 
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
@@ -182,6 +183,15 @@ describe("CreateProtocolCheck", () => {
     mockServiceCreate.mockResolvedValue({ data: { id: "proto-check-1" } });
     mockServiceUpdate.mockResolvedValue({});
     mockServiceGet.mockResolvedValue({ data: {} });
+  });
+
+  it("selects the first listable folder when default is unavailable", async () => {
+    vi.mocked(getFoldersListByType).mockResolvedValueOnce([{ folderId: "team", name: "Team" }]);
+    wrapper = mountPage();
+    await flushPromises();
+    expect(
+      wrapper.findComponent('[data-test="synthetics-check-configure"]').props("check").folder,
+    ).toBe("team");
   });
 
   afterEach(() => {
@@ -297,6 +307,9 @@ describe("CreateProtocolCheck", () => {
     });
 
     it("should call syntheticsService.update on save when editing", async () => {
+      // A direct grant reaches the check, so its unlisted folder stays its folder.
+      mockServiceGet.mockResolvedValue({ data: { folder: "direct-grant-folder" } });
+      vi.mocked(getFoldersListByType).mockResolvedValueOnce([{ folderId: "team", name: "Team" }]);
       wrapper = mountPage("http", "edit-id-123");
       await flushPromises();
 
@@ -308,6 +321,14 @@ describe("CreateProtocolCheck", () => {
       // The second argument should be the edit ID
       const callArgs = mockServiceUpdate.mock.calls[0];
       expect(callArgs[1]).toBe("edit-id-123");
+      expect(callArgs[2].folder).toBe("direct-grant-folder");
+      expect(callArgs[3]).toBe("direct-grant-folder");
+      expect(
+        wrapper.findComponent('[data-test="synthetics-check-configure"]').props("folders"),
+      ).toEqual([
+        { folderId: "team", name: "Team" },
+        { folderId: "direct-grant-folder", name: "dashboard.currentFolderLabel" },
+      ]);
     });
 
     // B5: the save sent null for the hidden override, so the local name is dropped too.

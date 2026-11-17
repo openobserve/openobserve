@@ -3665,6 +3665,21 @@ export class LogsPage {
         }
     }
 
+    async waitForSavedViewViaApi(org, viewName, timeout = 30000) {
+        let view;
+        await expect.poll(async () => {
+            const response = await this.page.request.get(`${process.env.ZO_BASE_URL}/api/${org}/savedviews`, { headers: getAuthHeaders() });
+            view = response.ok() ? ((await response.json()).views ?? []).find((v) => v.view_name === viewName) : undefined;
+            return Boolean(view);
+        }, { timeout }).toBe(true);
+        return view;
+    }
+
+    async fetchSavedViewViaApi(org, viewId) {
+        const response = await this.page.request.get(`${process.env.ZO_BASE_URL}/api/${org}/savedviews/${viewId}`, { headers: getAuthHeaders() });
+        return response.json();
+    }
+
     async clickDeleteSavedViewButton(savedViewName) {
         // Re-open the saved views panel (waits for any ongoing search to settle first).
         await this.clickSavedViewsExpand();

@@ -148,14 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="danger-ghost"
             icon="delete"
             class="max-md:hidden"
-            :disabled="checksUsing(row) > 0"
-            :title="
-              checksUsing(row) > 0
-                ? t('synthetics.privateLocations.deleteBlocked', {
-                    count: checksUsing(row),
-                  })
-                : t('synthetics.table.delete')
-            "
+            :disabled="inUse(row)"
+            :title="deleteLabel(row)"
             :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}`"
             @click="emit('delete', row as any)"
           />
@@ -184,17 +178,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="delete"
               tone="danger"
               class="md:hidden"
-              :disabled="checksUsing(row) > 0"
+              :disabled="inUse(row)"
               :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}-menu`"
               @select="emit('delete', row as any)"
             >
-              <span>{{
-                checksUsing(row) > 0
-                  ? t("synthetics.privateLocations.deleteBlocked", {
-                      count: checksUsing(row),
-                    })
-                  : t("synthetics.table.delete")
-              }}</span>
+              <span>{{ deleteLabel(row) }}</span>
             </ODropdownItem>
           </ODropdown>
         </div>
@@ -317,6 +305,18 @@ const filteredLocations = computed(() => {
 const checksUsing = (row: unknown): number => {
   const r = row as { checks_count?: number; monitors_count?: number };
   return r.checks_count ?? r.monitors_count ?? 1;
+};
+
+// `checks_count` skips folders the caller cannot list; `in_use` does not, and the server refuses by it.
+const inUse = (row: unknown): boolean =>
+  (row as { in_use?: boolean }).in_use ?? checksUsing(row) > 0;
+
+const deleteLabel = (row: unknown): string => {
+  if (!inUse(row)) return t("synthetics.table.delete");
+  const count = checksUsing(row);
+  return count > 0
+    ? t("synthetics.privateLocations.deleteBlocked", { count })
+    : t("synthetics.privateLocations.deleteBlockedHidden");
 };
 
 const statusVariant = (status: string) =>

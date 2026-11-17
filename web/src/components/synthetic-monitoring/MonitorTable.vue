@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data="data"
     :loading="loading"
     :forbidden="forbidden"
+    :error="error"
     pagination="client"
     :page-size="pageSize"
     :page-size-options="[10, 20, 25, 50]"
@@ -43,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:page-size="emit('update:pageSize', $event)"
     @update:sort-by="emit('update:sortBy', $event)"
     @update:sort-order="emit('update:sortOrder', $event)"
+    @retry="emit('retry')"
   >
     <!-- Summary strip supplied by the parent (it owns the status facet). -->
     <template v-if="$slots.subheader" #subheader>
@@ -657,6 +659,7 @@ const props = withDefaults(
     data: any[];
     loading?: boolean;
     forbidden?: ForbiddenState;
+    error?: string | null;
     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
      *  component and must not reach into the store for it. */
     timezone?: string;
@@ -730,6 +733,7 @@ const emit = defineEmits<{
   "update:pageSize": [size: number];
   "update:sortBy": [columnId: string];
   "update:sortOrder": [order: "asc" | "desc"];
+  retry: [];
 }>();
 
 const oTableRef = ref<any>(null);
