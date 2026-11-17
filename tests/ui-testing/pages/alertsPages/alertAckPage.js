@@ -43,7 +43,7 @@ export class AlertAckPage {
   }
 
   async openList() {
-    await this.page.goto(`/web/alerts?org_identifier=${getOrgIdentifier()}&folder=default`);
+    await this.page.goto(`/web/alerts?org_identifier=${getOrgIdentifier()}&folder=default&state=all`);
     await expect(this.page.locator('[data-test="alert-summary-acknowledged"]')).toBeVisible({ timeout: 30000 });
   }
 
