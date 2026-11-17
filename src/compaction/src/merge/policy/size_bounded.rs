@@ -35,24 +35,7 @@ pub(super) fn batches(
 ) -> Vec<PlannedBatch> {
     size_bounded_groups(files, limits)
         .into_iter()
-        .map(|group| take_size_bounded_prefix(group, limits.max_file_size as i64))
-        // a group cut down to one file has nothing left to merge with
-        .filter(|group| group.len() > 1)
         .map(|group| (group, mode.clone()))
-        .collect()
-}
-
-/// The leading files of `group` whose original and compressed sizes both sum within the target.
-fn take_size_bounded_prefix(group: Vec<FileKey>, max_file_size: i64) -> Vec<FileKey> {
-    let mut original_size = 0;
-    let mut compressed_size = 0;
-    group
-        .into_iter()
-        .take_while(|file| {
-            original_size += file.meta.original_size;
-            compressed_size += file.meta.compressed_size;
-            original_size <= max_file_size && compressed_size <= max_file_size
-        })
         .collect()
 }
 
@@ -63,30 +46,33 @@ fn size_bounded_groups(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Vec<F
     let mut groups = Vec::new();
     let mut new_file_list: Vec<FileKey> = Vec::new();
     let mut new_file_size = 0;
+    let mut new_compressed_size = 0;
     for file in files {
-        if new_file_size + file.meta.original_size > max_file_size
+        let exceeds_original_size = new_file_size + file.meta.original_size > max_file_size;
+        if exceeds_original_size
+            || new_compressed_size + file.meta.compressed_size > max_file_size
             || (max_group_files > 0 && new_file_list.len() >= max_group_files)
         {
             if new_file_list.len() <= 1 {
-                if *limits.strategy == MergeStrategy::FileSize {
+                // Original-size ordering cannot justify stopping at a compressed-size boundary.
+                if exceeds_original_size && *limits.strategy == MergeStrategy::FileSize {
                     break;
                 }
                 new_file_list.clear();
-                new_file_size = file.meta.original_size;
-                new_file_list.push(file.clone());
-                continue; // replace previous file with current file
+            } else {
+                groups.push(std::mem::take(&mut new_file_list));
             }
-            groups.push(std::mem::take(&mut new_file_list));
             new_file_size = 0;
+            new_compressed_size = 0;
+        }
+        if file.meta.original_size > max_file_size || file.meta.compressed_size > max_file_size {
+            continue;
         }
         new_file_size += file.meta.original_size;
+        new_compressed_size += file.meta.compressed_size;
         new_file_list.push(file.clone());
     }
-    // The trailing batch is always below max_file_size (the loop flushes a group
-    // only when adding the next file would exceed it). In incremental mode we do
-    // NOT seal this remainder: more files will arrive in the still-open hour, and
-    // sealing now would force re-merging it later (write amplification). Carry it
-    // to the next round; the scheduled hour-end pass seals whatever is left.
+    // Open hours keep the remainder for later arrivals to avoid rewriting it repeatedly.
     if new_file_list.len() > 1 && !limits.is_incremental {
         groups.push(new_file_list);
     }
@@ -115,7 +101,98 @@ mod tests {
     }
 
     #[test]
-    fn test_batches_stop_at_the_compressed_size_target() {
+    fn test_batches_continue_after_compressed_size_boundaries() {
+        let mut files: Vec<FileKey> = (1..=6)
+            .map(|i| metrics_file(&format!("{i}.parquet"), 300))
+            .collect();
+        for file in &mut files {
+            file.meta.compressed_size = 450;
+        }
+        let expected = [
+            vec!["1.parquet", "2.parquet"],
+            vec!["3.parquet", "4.parquet"],
+            vec!["5.parquet", "6.parquet"],
+        ];
+        for strategy in [
+            MergeStrategy::FileTime,
+            MergeStrategy::FileSize,
+            MergeStrategy::TimeRange,
+        ] {
+            for incremental in [false, true] {
+                let limits = limits(&strategy, 0, incremental);
+                let planned = batches(&files, &limits, &MergeMode::Classic);
+                let actual: Vec<_> = planned.iter().map(|(files, _)| names(files)).collect();
+                let count = if incremental { 2 } else { 3 };
+                assert_eq!(
+                    actual,
+                    expected[..count],
+                    "{strategy:?}, incremental={incremental}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_batches_continue_after_unmergeable_compressed_files() {
+        for (strategy, sizes, expected) in [
+            (
+                MergeStrategy::FileSize,
+                vec![(100, 900), (200, 200), (300, 100)],
+                vec![vec!["2.parquet", "3.parquet"]],
+            ),
+            (
+                MergeStrategy::FileSize,
+                vec![(100, 1200), (200, 100), (300, 100)],
+                vec![vec!["2.parquet", "3.parquet"]],
+            ),
+            (
+                MergeStrategy::FileTime,
+                vec![(100, 100), (100, 100), (100, 1200), (100, 100), (100, 100)],
+                vec![
+                    vec!["1.parquet", "2.parquet"],
+                    vec!["4.parquet", "5.parquet"],
+                ],
+            ),
+            (
+                MergeStrategy::TimeRange,
+                vec![(100, 100), (100, 1200), (100, 100), (100, 100)],
+                vec![vec!["3.parquet", "4.parquet"]],
+            ),
+        ] {
+            let files: Vec<_> = sizes
+                .iter()
+                .enumerate()
+                .map(|(i, &(original, compressed))| {
+                    let mut file = metrics_file(&format!("{}.parquet", i + 1), original);
+                    file.meta.compressed_size = compressed;
+                    file
+                })
+                .collect();
+            let limits = limits(&strategy, 0, false);
+            let planned = batches(&files, &limits, &MergeMode::Classic);
+            let actual: Vec<_> = planned.iter().map(|(files, _)| names(files)).collect();
+            assert_eq!(actual, expected, "{strategy:?}, sizes={sizes:?}");
+            for (files, _) in planned {
+                assert!(
+                    files
+                        .iter()
+                        .map(|file| file.meta.original_size)
+                        .sum::<i64>()
+                        <= limits.max_file_size as i64
+                );
+                assert!(
+                    files
+                        .iter()
+                        .map(|file| file.meta.compressed_size)
+                        .sum::<i64>()
+                        <= limits.max_file_size as i64
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_batches_respect_the_compressed_size_target() {
         let mut files: Vec<FileKey> = (1..=3)
             .map(|i| metrics_file(&format!("{i}.parquet"), 300))
             .collect();
@@ -127,7 +204,7 @@ mod tests {
         let planned = batches(&files, &limits, &MergeMode::Classic);
         assert_eq!(planned.len(), 1);
         assert_eq!(names(&planned[0].0), ["1.parquet", "2.parquet"]);
-        // a group cut down to one file is dropped
+        // Neither singleton can form a merge within the compressed-size budget.
         files.truncate(2);
         files[1].meta.compressed_size = 600;
         assert!(batches(&files, &limits, &MergeMode::Classic).is_empty());
