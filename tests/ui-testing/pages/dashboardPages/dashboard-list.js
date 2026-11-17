@@ -11,6 +11,24 @@ export default class DashboardListPage {
     // info span that renders "Showing X - Y of Z".
     this.nextPageBtn = page.locator('[data-test="o2-table-next-page-btn"]');
     this.paginationInfo = page.locator('[data-test="o2-table-pagination-info"]');
+    this.dashboardTable = page.locator('[data-test="dashboard-table"]');
+    this.dashboardNotFoundToast = page
+      .locator('[data-test="o-toast-message"]')
+      .filter({ hasText: "Dashboard not found" });
+  }
+
+  async expectListInOrg(orgId) {
+    await expect(this.page).toHaveURL(
+      (url) =>
+        url.pathname.replace(/\/+$/, "").endsWith("/dashboards") &&
+        url.searchParams.get("org_identifier") === orgId,
+      { timeout: 20000 },
+    );
+    await expect(this.dashboardTable).toBeVisible({ timeout: 20000 });
+  }
+
+  async expectNoDashboardNotFoundToast() {
+    await expect(this.dashboardNotFoundToast).toHaveCount(0);
   }
 
   // Duplicate dashboard
