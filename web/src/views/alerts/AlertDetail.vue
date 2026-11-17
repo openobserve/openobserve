@@ -459,6 +459,7 @@ import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatDuration } from "@/utils/downtimes/schedule";
 import { formatInZone } from "@/utils/oncall";
 import { isFiringOutcome, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
+import { isFiringNow as isOpenFiring } from "@/utils/alerts/firingAlerts";
 import { ackedCount, unackedFiringCount } from "@/utils/alerts/ackState";
 import sloService from "@/services/slos";
 import {
@@ -721,6 +722,7 @@ interface AlertListRow {
   last_outcome?: string | null;
   last_outcome_since?: number | null;
   firing_started_at?: number | null;
+  groups_firing?: number | null;
   level?: string | null;
   ack?: AlertListAck | null;
   active_downtime?: (ActiveDowntime & { version?: number }) | null;
@@ -745,10 +747,11 @@ const showHeaderActions = computed(() => !!alert.value && !notFound.value && !is
 
 const isFiringNow = computed(() => {
   const row = listRow.value;
+  // Same rule as the list's Firing tile: an errored run during an open firing saw no recovery.
   const runFiring =
     !!row &&
-    shouldShowRunOutcome(row.enabled, row.last_outcome) &&
-    isFiringOutcome(row.last_outcome);
+    ((shouldShowRunOutcome(row.enabled, row.last_outcome) && isFiringOutcome(row.last_outcome)) ||
+      (!!row.enabled && isOpenFiring(row)));
   return runFiring || (isCompositeAlert.value && alert.value?.evaluation?.result === true);
 });
 

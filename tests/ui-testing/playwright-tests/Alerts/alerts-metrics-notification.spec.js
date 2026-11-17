@@ -298,7 +298,7 @@ test.describe("Metrics Alert Notification Chain", () => {
         // Navigate to alerts page
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const org = getOrgIdentifier();
-        await page.goto(`${baseUrl}/web/alerts?org_identifier=${org}`);
+        await page.goto(`${baseUrl}/web/alerts?org_identifier=${org}&state=all`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
         await pm.alertsPage.waitForLoadingOverlayToDisappear();
         testLogger.info('Navigated to alerts page');

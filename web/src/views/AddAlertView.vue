@@ -46,6 +46,7 @@ import AddAlert from "@/components/alerts/AddAlert.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { clearAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
   dropDraftOfMissingAlert,
   isNotFoundError,
@@ -173,6 +174,18 @@ export default defineComponent({
       await getTemplates();
     };
 
+    // Unfiltered, so the alert just saved or edited is in view rather than hidden by the list's Firing default.
+    const openAlertList = (folder: string) =>
+      router.push({
+        name: "alertList",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder,
+          tab: route.query.tab || "all",
+          state: ALERT_LIST_ALL_STATES,
+        },
+      });
+
     const handleUpdateList = (folderId?: string, options?: AlertSavedOptions) => {
       const resolvedFolder = folderId || (route.query.folder as string) || "default";
 
@@ -197,21 +210,10 @@ export default defineComponent({
       // The leave dialog's Save is already on its way somewhere else.
       if (options?.navigate === false) return;
 
-      // Navigate back to alert list after successful save
-      router.push({
-        name: "alertList",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          folder: resolvedFolder,
-          tab: route.query.tab || "all",
-        },
-      });
+      openAlertList(resolvedFolder);
     };
 
-    const handleCancel = () => {
-      // Navigate back on cancel
-      router.back();
-    };
+    const handleCancel = () => openAlertList((route.query.folder as string) || "default");
 
     onBeforeMount(() => {
       // In parallel: the form needs destinations and templates either way, and edit mode
