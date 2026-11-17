@@ -1561,6 +1561,15 @@ export default defineComponent({
       failedCustomChartRun.value = toRaw(run);
       errorDetail.value = detail;
     };
+    // The error arrives from the frame only after a re-run, so a theme or timezone change must not clear one that would recur.
+    const failsLikeLastCustomChartRun = () => {
+      const failed = failedCustomChartRun.value;
+      return (
+        !!failed &&
+        failed.code === (panelSchema.value?.customChartContent ?? "") &&
+        toRaw(failed.data) === toRaw(filteredData.value)
+      );
+    };
     const convertPanelDataCommon = async (applyOverlay = false) => {
       // Converting the empty pre-load buffer would publish an empty result to the header and curated tiles.
       if (isAwaitingFirstLoad.value) return;
@@ -1878,7 +1887,7 @@ export default defineComponent({
           }
           emit("updated:vrlFunctionFieldList", perQueryFields);
         }
-        if (panelData.value.chartType == "custom_chart")
+        if (panelData.value.chartType == "custom_chart" && !failsLikeLastCustomChartRun())
           errorDetail.value = {
             message: "",
             code: "",

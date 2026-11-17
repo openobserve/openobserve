@@ -1334,6 +1334,71 @@ describe("PanelSchemaRenderer", () => {
         expect(wrapper.vm.errorDetail.message).toBe("");
       });
 
+      it("keeps a chart error through a theme change and clears it for new data", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const code = 'throw new Error("pt boom");';
+        vi.mocked(convertPanelData).mockImplementation(async (_schema, chartData) => ({
+          chartType: "custom_chart",
+          run: { code, data: chartData, panelId: "panel-1" },
+        }));
+        onTestFinished(() => {
+          vi.mocked(convertPanelData).mockResolvedValue({
+            chartType: "line",
+            options: {},
+            extras: { isTimeSeries: true },
+          } as any);
+        });
+        wrapper = createWrapper(
+          {
+            panelSchema: {
+              ...defaultProps.panelSchema,
+              type: "custom_chart",
+              customChartContent: code,
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+            },
+          },
+          {
+            stubs: {
+              CustomChartSandboxRenderer: {
+                name: "CustomChartSandboxRenderer",
+                props: ["run"],
+                emits: ["error"],
+                template: '<div data-test="custom-chart-renderer"></div>',
+              },
+            },
+          },
+        );
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        const renderer = wrapper.findComponent({ name: "CustomChartSandboxRenderer" });
+        renderer.vm.$emit(
+          "error",
+          { message: "Execution Error: pt boom", code: "" },
+          renderer.props("run"),
+        );
+        await flushPromises();
+
+        store.state.theme = "dark";
+        await flushPromises();
+
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+        expect(wrapper.find('[data-test="custom-chart-renderer"]').exists()).toBe(false);
+
+        data.value = [[{ count: 2 }]];
+        await flushPromises();
+
+        expect(wrapper.vm.errorDetail.message).toBe("");
+        expect(
+          wrapper.findComponent({ name: "CustomChartSandboxRenderer" }).props("run").data,
+        ).toEqual([[{ count: 2 }]]);
+      });
+
       it("clears a thrown chart error for good once corrected code renders, with the real sandbox renderer", async () => {
         type Handler = ((event: { data: unknown }) => void) | null;
         class FakePort {
