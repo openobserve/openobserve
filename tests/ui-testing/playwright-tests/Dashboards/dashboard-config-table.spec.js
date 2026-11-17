@@ -13,8 +13,15 @@ import {
   reopenPanelConfig,
 } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
-const { getAuthHeaders, getOrgIdentifier } = require("../utils/cloud-auth.js");
 const { DashboardPanelTablePage } = require("../../pages/dashboardPages/dashboard-panel-table.js");
+const {
+  orgIdentifier,
+  ingestLogRows,
+  createDashboard,
+  deleteSeededTablePanel,
+  statusRows,
+  uniqueValueColorDashboard,
+} = require("../utils/dashboard-seed-api.js");
 
 test.describe.configure({ mode: "parallel" });
 test.describe.configure({ retries: 1 });
@@ -132,9 +139,6 @@ test.describe("ConfigPanel — Table Settings", () => {
 });
 
 test.describe("Table — unique value color (ENT#702)", { tag: ["@dashboards", "@regression", "@P2"] }, () => {
-  const BASE = (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, "");
-  const ORG = () => getOrgIdentifier() || process.env.ORGNAME || "default";
-  const headers = () => ({ ...getAuthHeaders(), "Content-Type": "application/json" });
   const STATUSES = ["active", "active", "active", "inactive", "inactive", "pending"];
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -147,51 +151,11 @@ test.describe("Table — unique value color (ENT#702)", { tag: ["@dashboards", "
     const stream = `ovn_c702_${stamp}`;
     let dashboardId = null;
     try {
-      const now = Date.now() * 1000;
-      const rows = STATUSES.map((status, i) => ({ _timestamp: now - i * 1000, svc: `svc${i}`, status }));
-      const ing = await fetch(`${BASE}/api/${ORG()}/${stream}/_json`, { method: "POST", headers: headers(), body: JSON.stringify(rows) });
-      expect(ing.ok, `ingest ${ing.status}`).toBeTruthy();
-
-      const axis = (alias) => ({ label: "", alias, column: alias, type: "custom", color: null, functionName: null, args: [] });
-      const res = await fetch(`${BASE}/api/${ORG()}/dashboards?folder=default`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          version: 8,
-          title: `ovn_c702_${stamp}`,
-          description: "ENT#702",
-          variables: { list: [], showDynamicFilters: false },
-          tabs: [{
-            tabId: "default",
-            name: "Default",
-            panels: [{
-              id: "Panel_ent702",
-              type: "table",
-              title: "status colors",
-              description: "",
-              queryType: "sql",
-              config: {
-                show_legends: true,
-                override_config: [{ field: { matchBy: "name", value: "status" }, config: [{ type: "unique_value_color", autoColor: true }] }],
-              },
-              queries: [{
-                query: `SELECT svc as "svc", status as "status" FROM "${stream}"`,
-                vrlFunctionQuery: "",
-                customQuery: true,
-                fields: { stream, stream_type: "logs", x: [axis("svc")], y: [axis("status")], z: [], filter: { filterType: "group", logicalOperator: "AND", conditions: [] } },
-                config: { promql_legend: "" },
-              }],
-              layout: { x: 0, y: 0, w: 96, h: 18, i: 1 },
-            }],
-          }],
-        }),
-      });
-      const body = await res.json().catch(() => ({}));
-      expect(res.ok, `create dashboard ${res.status}: ${JSON.stringify(body)}`).toBeTruthy();
-      dashboardId = (body[`v${body.version}`] || body).dashboardId;
+      await ingestLogRows(stream, statusRows(STATUSES));
+      dashboardId = await createDashboard(uniqueValueColorDashboard(stamp, stream));
 
       const panelTable = new DashboardPanelTablePage(page);
-      await panelTable.gotoDashboardView(dashboardId, { org: ORG(), period: "15m" });
+      await panelTable.gotoDashboardView(dashboardId, { org: orgIdentifier(), period: "15m" });
       await expect(panelTable.cell(/^pending$/)).toBeVisible({ timeout: 60000 });
 
       const active = await panelTable.cellBackgrounds("active");
@@ -208,8 +172,7 @@ test.describe("Table — unique value color (ENT#702)", { tag: ["@dashboards", "
       }
       expect(new Set([active[0], inactive[0], pending[0]]).size, "each distinct value gets its own colour").toBe(3);
     } finally {
-      if (dashboardId) await fetch(`${BASE}/api/${ORG()}/dashboards/${dashboardId}?folder=default`, { method: "DELETE", headers: getAuthHeaders() }).catch(() => {});
-      await fetch(`${BASE}/api/${ORG()}/streams/${stream}?type=logs`, { method: "DELETE", headers: getAuthHeaders() }).catch(() => {});
+      await deleteSeededTablePanel({ stream, dashboardId });
     }
   });
 });
