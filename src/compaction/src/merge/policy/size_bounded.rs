@@ -44,37 +44,40 @@ fn size_bounded_groups(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Vec<F
     let max_file_size = limits.max_file_size as i64;
     let max_group_files = limits.max_group_files;
     let mut groups = Vec::new();
-    let mut new_file_list: Vec<FileKey> = Vec::new();
-    let mut new_file_size = 0;
-    let mut new_compressed_size = 0;
+    let mut current_group: Vec<FileKey> = Vec::new();
+    let mut original_size = 0;
+    let mut compressed_size = 0;
     for file in files {
-        let exceeds_original_size = new_file_size + file.meta.original_size > max_file_size;
+        let exceeds_original_size = original_size + file.meta.original_size > max_file_size;
+        // FileSize order guarantees later files cannot form a smaller original-size pair.
         if exceeds_original_size
-            || new_compressed_size + file.meta.compressed_size > max_file_size
-            || (max_group_files > 0 && new_file_list.len() >= max_group_files)
+            && current_group.len() <= 1
+            && *limits.strategy == MergeStrategy::FileSize
         {
-            if new_file_list.len() <= 1 {
-                // Original-size ordering cannot justify stopping at a compressed-size boundary.
-                if exceeds_original_size && *limits.strategy == MergeStrategy::FileSize {
-                    break;
-                }
-                new_file_list.clear();
+            break;
+        }
+        if exceeds_original_size
+            || compressed_size + file.meta.compressed_size > max_file_size
+            || (max_group_files > 0 && current_group.len() >= max_group_files)
+        {
+            if current_group.len() > 1 {
+                groups.push(std::mem::take(&mut current_group));
             } else {
-                groups.push(std::mem::take(&mut new_file_list));
+                current_group.clear();
             }
-            new_file_size = 0;
-            new_compressed_size = 0;
+            original_size = 0;
+            compressed_size = 0;
         }
         if file.meta.original_size > max_file_size || file.meta.compressed_size > max_file_size {
             continue;
         }
-        new_file_size += file.meta.original_size;
-        new_compressed_size += file.meta.compressed_size;
-        new_file_list.push(file.clone());
+        original_size += file.meta.original_size;
+        compressed_size += file.meta.compressed_size;
+        current_group.push(file.clone());
     }
     // Open hours keep the remainder for later arrivals to avoid rewriting it repeatedly.
-    if new_file_list.len() > 1 && !limits.is_incremental {
-        groups.push(new_file_list);
+    if current_group.len() > 1 && !limits.is_incremental {
+        groups.push(current_group);
     }
     groups
 }
