@@ -25,6 +25,7 @@ const NAMESPACE_FIELD = 'kubernetes_namespace_name';
 const CONTAINER_FIELD = 'kubernetes_container_name';
 // Each fixture namespace has exactly one container, so a chained child value is known per parent.
 const CONTAINER_OF = { ziox: 'ziox', 'ingress-nginx': 'controller', velero: 'velero' };
+const HOME_PIN_KEY = 'home_dashboard';
 
 let layoutSeq = 0;
 const createdDashboardIds = [];
@@ -100,6 +101,34 @@ async function deleteCreatedDashboards() {
   while (createdDashboardIds.length) await deleteDashboard(createdDashboardIds.pop());
 }
 
+async function settingsApi(method, path, body) {
+  const res = await fetch(`${BASE}/api/${ORG()}/settings/v2${path}`, {
+    method,
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  return { status: res.status, body: await res.json().catch(() => ({})) };
+}
+
+async function setHomePin(value) {
+  const { status } = await settingsApi('POST', '', { setting_key: HOME_PIN_KEY, setting_value: value, setting_category: 'ui' });
+  if (status >= 400) throw new Error(`pin home dashboard -> ${status}`);
+}
+
+// The pin is org-wide, so the previous value is put back rather than deleted.
+async function restoreHomePin(previous) {
+  if (previous) await setHomePin(previous);
+  else await settingsApi('DELETE', `/${HOME_PIN_KEY}`);
+}
+
+// An unreadable pin must stop the test, or the restore in `finally` would delete the org's real pin.
+async function readHomePin() {
+  const { status, body } = await settingsApi('GET', `/${HOME_PIN_KEY}`);
+  if (status === 404) return null;
+  if (status >= 400) throw new Error(`read home dashboard pin -> ${status}`);
+  return body?.setting_value ?? null;
+}
+
 // ZO_AUTO_QUERY_ENABLED is read once at server start, so it is pinned in the config response instead of needing its own shard.
 async function pinAutoQuery(page, enabled) {
   await page.route(/\/api\/[^/]+\/config(\?.*)?$/, async (route) => {
@@ -122,6 +151,11 @@ function decodeSql(body) {
   if (typeof sql !== 'string') return '';
   if (body.encoding !== 'base64') return sql;
   return decodeUrlSafeBase64(sql);
+}
+
+function inListValues(sql) {
+  const match = /IN \(([^)]*)\)/.exec(sql);
+  return match ? match[1].split(',').map((v) => v.trim()).sort() : null;
 }
 
 function trackPanelRuns(page) {
@@ -157,4 +191,8 @@ module.exports = {
   pinAutoQuery,
   trackPanelRuns,
   decodeUrlSafeBase64,
+  inListValues,
+  readHomePin,
+  setHomePin,
+  restoreHomePin,
 };

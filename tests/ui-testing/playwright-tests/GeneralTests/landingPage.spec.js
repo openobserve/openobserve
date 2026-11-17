@@ -15,18 +15,19 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
-const { getOrgIdentifier, getAuthHeaders } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 const {
-  BASE,
+  ORG,
   NAMESPACE_FIELD,
   STREAM,
   namespaceTablePanel,
   createDashboard,
   deleteDashboard,
+  inListValues,
+  readHomePin,
+  setHomePin,
+  restoreHomePin,
 } = require('../utils/dashboard-auto-run-fixtures.js');
-
-const HOME_PIN_KEY = 'home_dashboard';
-const orgId = () => getOrgIdentifier() || process.env.ORGNAME || 'default';
 
 test.describe("Landing Page Test Cases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -561,59 +562,18 @@ test.describe("Landing Page Test Cases", () => {
   });
 });
 
-async function settingsApi(method, path, body) {
-  const res = await fetch(`${BASE}/api/${orgId()}/settings/v2${path}`, {
-    method,
-    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  return { status: res.status, body: await res.json().catch(() => ({})) };
-}
-
-async function setHomePin(value) {
-  const { status } = await settingsApi('POST', '', { setting_key: HOME_PIN_KEY, setting_value: value, setting_category: 'ui' });
-  if (status >= 400) throw new Error(`pin home dashboard -> ${status}`);
-}
-
-// The pin is org-wide, so the previous value is put back rather than deleted.
-async function restoreHomePin(previous) {
-  if (previous) await setHomePin(previous);
-  else await settingsApi('DELETE', `/${HOME_PIN_KEY}`);
-}
-
-// An unreadable pin must stop the test, or the restore in `finally` would delete the org's real pin.
-async function readHomePin() {
-  const { status, body } = await settingsApi('GET', `/${HOME_PIN_KEY}`);
-  if (status === 404) return null;
-  if (status >= 400) throw new Error(`read home dashboard pin -> ${status}`);
-  return body?.setting_value ?? null;
-}
-
-// Recent events load in the same batch as anomalies, so their answer proves the anomaly loader already ran.
-function waitForOverviewHistory(page) {
-  return page.waitForResponse(
-    (res) => res.url().includes(`/api/v2/${orgId()}/alerts/history?`) && res.request().method() === 'GET',
-    { timeout: 60000 },
-  );
-}
-
-function inListValues(sql) {
-  const match = /IN \(([^)]*)\)/.exec(sql);
-  return match ? match[1].split(',').map((v) => v.trim()).sort() : null;
-}
-
 test.describe('Home Overview on the OSS build (#16634)', { tag: ['@landingPage', '@homeOverview', '@P1'] }, () => {
   test('Overview sends no anomaly_detection request and the user stays signed in', async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     const pm = new PageManager(page);
-    const buildType = await pm.statusPagesPage.detectBuildType(orgId());
+    const buildType = await pm.statusPagesPage.detectBuildType(ORG());
     test.skip(buildType !== 'opensource', `OSS build only: the ${buildType} build registers the anomaly_detection routes, so Overview calling them is correct there`);
 
     const anomalyRequests = [];
     page.on('request', (req) => {
       if (/\/api\/[^/]+\/anomaly_detection/.test(new URL(req.url()).pathname)) anomalyRequests.push(req.url());
     });
-    const historyAnswered = waitForOverviewHistory(page);
+    const historyAnswered = pm.homePage.waitForOverviewHistory(ORG());
 
     await navigateToBase(page);
     await pm.homePage.openHomeTab('overview');
@@ -622,8 +582,8 @@ test.describe('Home Overview on the OSS build (#16634)', { tag: ['@landingPage',
     await expect(pm.homePage.homeOverviewPanel).toBeVisible();
     expect(anomalyRequests, 'OSS Overview must not call the unregistered anomaly_detection route').toEqual([]);
     await expect(page).not.toHaveURL(/\/login/);
-    const historyAfterReload = waitForOverviewHistory(page);
-    await pm.homePage.loadHome(orgId());
+    const historyAfterReload = pm.homePage.waitForOverviewHistory(ORG());
+    await pm.homePage.loadHome(ORG());
     expect((await historyAfterReload).status(), 'Overview recent-events request after a reload').toBeLessThan(400);
     await expect(page).not.toHaveURL(/\/login/);
     expect(anomalyRequests).toEqual([]);
@@ -666,7 +626,7 @@ test.describe('Home pinned dashboard variables (#16699)', { tag: ['@landingPage'
       await setHomePin({ dashboardId, folderId: 'default', label: title });
 
       autoRun.trackRuns();
-      await pm.homePage.loadHome(orgId());
+      await pm.homePage.loadHome(ORG());
       await pm.homePage.openHomeTab(`dash:default:${dashboardId}`);
 
       await autoRun.expectPanelRows('p_home', { shows: ['ziox'], hides: ['velero'] });

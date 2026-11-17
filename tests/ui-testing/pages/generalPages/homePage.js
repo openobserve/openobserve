@@ -169,6 +169,14 @@ export class HomePage {
         await this.pinnedDashboardRefreshBtn.click();
     }
 
+    // Recent events load in the same batch as anomalies, so their answer proves the anomaly loader already ran.
+    waitForOverviewHistory(orgId) {
+        return this.page.waitForResponse(
+            (res) => res.url().includes(`/api/v2/${orgId}/alerts/history?`) && res.request().method() === 'GET',
+            { timeout: 60000 },
+        );
+    }
+
     // ===== VALIDATION METHODS =====
 
     async homePageValidation() {
