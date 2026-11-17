@@ -66,6 +66,13 @@
       "target": "tests/regression/test_wal_month_boundary_search.py",
       "server_env": "ZO_INGEST_ALLOWED_UPTO=3120 ZO_MAX_FILE_RETENTION_TIME=10 ZO_FILE_PUSH_INTERVAL=3600",
       "category": "api_integration_tests"
+    },
+    {
+      "label": "uds_enabled",
+      "_comment": "openobserve#16307 only reproduces once a user-defined schema is saved, which needs the flag on.",
+      "target": "tests/regression/test_uds_late_required_columns.py",
+      "server_env": "ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
+      "category": "api_integration_tests"
     }
   ]
 }
