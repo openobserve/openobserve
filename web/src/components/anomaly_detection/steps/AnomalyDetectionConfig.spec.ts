@@ -454,12 +454,17 @@ describe("AnomalyDetectionConfig", () => {
       await nextTick();
       expect(form.state.isValid).toBe(false);
       expect(error().text()).toContain("p99_ms");
+      expect((wrapper.vm as any).hasSqlError).toBe(true);
 
+      // The error clears on the edit itself, before any resubmit.
       (wrapper.vm as any).onCustomSqlChange(VALID_CUSTOM_SQL.replace("AS value", "AS p99_ms"));
+      await nextTick();
+      expect(error().exists()).toBe(false);
+      expect((wrapper.vm as any).hasSqlError).toBe(false);
+
       await form.handleSubmit();
       await nextTick();
       expect(form.state.isValid).toBe(true);
-      expect(error().exists()).toBe(false);
     });
 
     it("a new custom_sql alert has no stored value column to check", async () => {
