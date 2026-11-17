@@ -526,6 +526,9 @@ export class LogsPage {
         // The settled status dot is the only analyze-mode id besides the in-flight elapsed counter.
         this.queryPlanAnalyzeSettled = `${this.queryPlanDialog} [data-test^="query-plan-mode-analyze-"]:not([data-test$="-elapsed"])`;
         this.queryPlanModeAnalyzeDone = `${this.queryPlanDialog} [data-test="query-plan-mode-analyze-done"]`;
+        this.queryPlanAnalyzeWarning = `${this.queryPlanDialog} [data-test="query-plan-analyze-warning"]`;
+        this.queryPlanAnalyzeBarWarning = `${this.queryPlanDialog} [data-test="query-plan-analyze-bar-warning"]`;
+        this.queryPlanAnalyzeBarSuccess = `${this.queryPlanDialog} [data-test="query-plan-analyze-bar-success"]`;
         this.queryProfileView = `${this.queryPlanDialog} [data-test="query-profile-view"]`;
         this.queryProfileSummary = `${this.queryPlanDialog} [data-test="query-profile-summary"]`;
         this.queryProfileTileRows = `${this.queryPlanDialog} [data-test="query-profile-tile-rows"]`;
@@ -11564,8 +11567,11 @@ export class LogsPage {
         testLogger.info('Query profile rendered operator cards');
     }
 
-    async expectAnalyzeNotShownAsSuccess() {
-        await expect(this.page.locator(this.queryPlanModeAnalyzeDone)).toHaveCount(0);
+    /** A partial EXPLAIN ANALYZE run settles as done but must carry the warning bar and banner, never the success bar. */
+    async expectAnalyzeShownAsPartial() {
+        await expect(this.page.locator(this.queryPlanAnalyzeBarWarning)).toBeVisible();
+        await expect(this.page.locator(this.queryPlanAnalyzeWarning)).toBeVisible();
+        await expect(this.page.locator(this.queryPlanAnalyzeBarSuccess)).toHaveCount(0);
     }
 
     /** The logs table delegates scrolling to an unnamed ancestor, so resolve it at runtime. */
