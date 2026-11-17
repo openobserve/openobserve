@@ -298,11 +298,20 @@ fn record(
         Object::Pipeline { id, name } => {
             let named = a.target.clone().or(name);
             let id = id.or_else(|| only_named(names, named.as_deref()?))?;
-            let f = fed.get(&id)?;
             let subject = EntityRef::new(kinds::PIPELINE, &[(dims::ENTITY_ID, &id)]);
-            let open = link("pipeline/pipelines/edit", &[("id", &id)]).filter(|_| !a.deleted);
-            let name = a.target.clone().unwrap_or_else(|| f.name.clone());
-            (subject, name, f.affects.clone(), open)
+            match fed.get(&id) {
+                Some(f) => {
+                    let open =
+                        link("pipeline/pipelines/edit", &[("id", &id)]).filter(|_| !a.deleted);
+                    let name = a.target.clone().unwrap_or_else(|| f.name.clone());
+                    (subject, name, f.affects.clone(), open)
+                }
+                // Gone since, so what it fed is unknown and the change counts org-wide.
+                None if !names.contains_key(&id) => {
+                    (subject, named.unwrap_or_default(), Vec::new(), None)
+                }
+                None => return None,
+            }
         }
         Object::Alert { id, stream } => {
             let stored = alerts.iter().find(|s| match &id {
@@ -312,11 +321,14 @@ fn record(
                         && stream.as_ref().is_none_or(|st| *st == s.stream)
                 }
             });
-            let stream = stream.or_else(|| stored.map(|s| s.stream.clone()))?;
-            if !streams.contains(&stream) {
-                return None;
-            }
+            let stream = stream.or_else(|| stored.map(|s| s.stream.clone()));
             let id = id.or_else(|| stored.map(|s| s.id.clone()))?;
+            let affects = match stream {
+                Some(stream) if streams.contains(&stream) => vec![stream],
+                Some(_) => return None,
+                // Gone since, so the stream it read is unknown and the change counts org-wide.
+                None => Vec::new(),
+            };
             let folder = stored.map_or("default", |s| s.folder.as_str());
             let open = link(
                 "alerts",
@@ -328,7 +340,12 @@ fn record(
                 .or_else(|| stored.map(|s| s.name.clone()))
                 .unwrap_or_default();
             let subject = EntityRef::new(kinds::ALERT, &[(dims::ENTITY_ID, &id)]);
-            (subject, name, vec![stream], open.filter(|_| !a.deleted))
+            (
+                subject,
+                name,
+                affects,
+                open.filter(|_| !a.deleted && stored.is_some()),
+            )
         }
     };
     Some(ChangeRecord {
@@ -654,7 +671,9 @@ mod tests {
                 r#"{"name":"Mask-App ","nodes":[{"id":"#,
             ),
             audit_row(135, "PUT", "acme/pipelines", "", r#"{"pipeline_id":"p9"}"#),
+            audit_row(137, "DELETE", "acme/pipelines/p7", "", ""),
             audit_row(140, "PUT", "v2/acme/alerts/a1", "", "{}"),
+            audit_row(142, "DELETE", "v2/acme/alerts/a7", "", ""),
             audit_row(145, "POST", "v2/acme/alerts/a1/ack", "", ""),
             audit_row(150, "GET", "acme/streams/app/schema", "", ""),
             audit_row(5_000, "PUT", "acme/streams/app/settings", "", "{}"),
@@ -716,11 +735,18 @@ mod tests {
         assert_eq!(
             got,
             [
+                (142, ChangeKind::AlertChanged, kinds::ALERT, Vec::new()),
                 (
                     140,
                     ChangeKind::AlertChanged,
                     kinds::ALERT,
                     vec![logs("app")]
+                ),
+                (
+                    137,
+                    ChangeKind::PipelineChanged,
+                    kinds::PIPELINE,
+                    Vec::new()
                 ),
                 (
                     132,
@@ -778,6 +804,7 @@ mod tests {
             Some("ops")
         );
         assert_eq!(at(132).subject.key_dims[dims::ENTITY_ID], "p2");
+        assert!(at(137).open.is_none() && at(142).open.is_none());
         assert_eq!(*search.orgs.lock().unwrap(), [META_ORG_ID]);
     }
 }
