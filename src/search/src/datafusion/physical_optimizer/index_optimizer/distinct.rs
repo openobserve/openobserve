@@ -21,7 +21,7 @@ use datafusion::{
         Result,
         tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     },
-    physical_expr::{ScalarFunctionExpr, split_conjunction},
+    physical_expr::{ScalarFunctionExpr, expressions::Column, split_conjunction},
     physical_plan::{
         ExecutionPlan, PhysicalExpr, aggregates::AggregateExec, filter::FilterExec,
         projection::ProjectionExec, sorts::sort_preserving_merge::SortPreservingMergeExec,
@@ -131,8 +131,10 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             let renames_field = self.simple_distinct.as_ref().is_some_and(|(field, ..)| {
                 !field.is_empty()
                     && exprs.first().is_some_and(|expr| {
-                        !is_column(&expr.expr)
-                            || get_column_name(&expr.expr) != field
+                        // a bare column only: a cast changes the values and their order
+                        expr.expr
+                            .downcast_ref::<Column>()
+                            .is_none_or(|column| column.name() != field)
                             || expr.alias != *field
                     })
             });
@@ -255,6 +257,11 @@ mod tests {
             ),
             (
                 "select name from (select id as name from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000) s group by name order by name asc limit 10",
+                None,
+            ),
+            // a cast below the aggregate changes the values the query groups and orders by
+            (
+                "select name from (select cast(name as bigint) as name from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000) s group by name order by name asc limit 10",
                 None,
             ),
             // str_match on another index field filters rows, not the distinct field's terms

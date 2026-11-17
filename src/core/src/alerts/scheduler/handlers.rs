@@ -6751,6 +6751,7 @@ async fn handle_backfill_triggers(
                 // refuse before any deletion is queued: a queued deletion is not taken back
                 for stream in destination_streams.iter() {
                     if let Err(e) = crate::alerts::backfill::delete_covers_daily_days(
+                        &trigger.org,
                         stream,
                         config.start_time,
                         config.end_time,
@@ -7631,7 +7632,8 @@ async fn initiate_stream_deletion(
 
     // only a logs delete outside a daily day is sent by the hour, so the range must be whole days
     let whole_days =
-        crate::alerts::backfill::delete_covers_daily_days(stream, start_time, end_time).await?;
+        crate::alerts::backfill::delete_covers_daily_days(org_id, stream, start_time, end_time)
+            .await?;
 
     // Convert microseconds to formatted time range strings
     let time_range_start = {

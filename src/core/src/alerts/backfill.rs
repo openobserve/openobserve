@@ -165,7 +165,10 @@ fn validate_time_alignment_daily(start_time: i64, end_time: i64) -> Result<(), a
 /// True when the delete must be sent as whole days: the stream is not a logs stream, or a day
 /// of the range is stored as one daily file. Such a delete is refused unless it is day aligned,
 /// because the whole day goes.
+///
+/// `org_id` is the org the deletion runs in: a stored destination node can hold a blank org.
 pub(crate) async fn delete_covers_daily_days(
+    org_id: &str,
     stream: &config::meta::stream::StreamParams,
     start_time: i64,
     end_time: i64,
@@ -174,7 +177,7 @@ pub(crate) async fn delete_covers_daily_days(
     // only a logs delete can be sent by the hour: every other type is deleted by date
     let needs_whole_days = stream.stream_type != config::meta::stream::StreamType::Logs
         || stream::delete_range_needs_whole_days(
-            &stream.org_id,
+            org_id,
             stream.stream_type,
             &stream.stream_name,
             &range,
@@ -263,7 +266,7 @@ pub async fn check_backfill_job(
             validate_time_alignment_daily(start_time, end_time)?;
         }
         for stream in &destination_streams {
-            delete_covers_daily_days(stream, start_time, end_time).await?;
+            delete_covers_daily_days(&pipeline.org, stream, start_time, end_time).await?;
         }
     }
     Ok(())
