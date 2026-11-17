@@ -736,10 +736,17 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
     wrapper?.unmount();
   });
 
-  it("hands a firing single-row alert to the header actions", async () => {
-    withListRow({ last_outcome: "firing" });
+  it.each([
+    ["a firing run", { last_outcome: "firing", last_outcome_since: 1_700_000_000_000_000 }],
+    [
+      "an errored run during an open firing",
+      { last_outcome: "error", firing_started_at: 1_700_000_000_000_000 },
+    ],
+  ])("hands a single-row alert with %s to the header actions as firing", async (_case, row) => {
+    withListRow(row);
     wrapper = await mountView();
     expect(header().exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-alertdetail-firing-for"]').exists()).toBe(true);
     expect(header().props()).toMatchObject({
       alertId: "alert-1",
       name: "cpu-high",

@@ -19,6 +19,7 @@ import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import { fieldRows, m12Rows } from "./bulkFixtures";
 import { dismissAll, toastRecords } from "@/lib/feedback/Toast/useToast";
 import {
@@ -381,8 +382,17 @@ describe("BulkReviewDrawer — results", () => {
     expect(text("bulk-review-failure-a-j")).toBe(
       "svc-a · ns-j: an alert named svc-a-ns-j-no-data already exists in folder default.",
     );
-    expect(q("bulk-review-open-existing-a-j")).not.toBeNull();
     expect(q("bulk-review-retry-a-j")).toBeNull();
+    // Unfound, it opens the folder, where the list's Firing default could hide the quiet duplicate.
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    await click("bulk-review-open-existing-a-j");
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertList",
+        query: expect.objectContaining({ state: ALERT_LIST_ALL_STATES }),
+      }),
+    );
+    push.mockRestore();
   });
 
   it("offers Retry for a timeout and re-sends only that row", async () => {
