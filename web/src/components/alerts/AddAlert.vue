@@ -982,6 +982,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </p>
           <p
+            v-else-if="compositeNeedsChildren"
+            class="text-text-secondary min-w-0 text-xs"
+            data-test="add-alert-save-reason"
+          >
+            {{ t("alerts.form.save.compositeNeeds") }}
+          </p>
+          <p
             v-else-if="viaIncidentDraft"
             class="text-text-secondary min-w-0 text-xs"
             data-test="add-alert-via-incident"
@@ -1003,14 +1010,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           :loading="isSubmitting || (isAnomalyMode && anomalySaving)"
           :disabled="compositeSaveDisabled"
+          class="min-w-28"
           @click="handleSave"
-          >{{
-            isAnomalyMode && !anomalyEditMode
-              ? t("alerts.saveAndTrain")
-              : isEditingAlert
-                ? t("alerts.editMode.saveChanges")
-                : t("alerts.save")
-          }}</OButton
+          >{{ saveLabel }}</OButton
         >
       </div>
     </OPageLayout>
@@ -1778,7 +1780,7 @@ export default defineComponent({
         (config.isEnterprise === "true" || config.isCloud === "true") &&
         store.state.zoConfig?.incidents_enabled === true,
     );
-    const { items: sectionItems } = useAlertFormSections({
+    const { items: sectionItems, errorCounts } = useAlertFormSections({
       extraErrors: computed(() => ({
         condition: submitAttempted.value && querySaveProblem.value ? 1 : 0,
         schedule: submitAttempted.value && cronSaveProblem.value ? 1 : 0,
@@ -1800,6 +1802,27 @@ export default defineComponent({
     });
 
     const reviewItems = computed(() => sectionItems.value.filter((item) => item.id !== "details"));
+    const issueCount = computed(() =>
+      Object.values(errorCounts.value).reduce((sum, count) => sum + count, 0),
+    );
+    const saveLabel = computed(() => {
+      if (issueCount.value > 0) {
+        return alertForm.t(
+          "alerts.form.save.fixIssues",
+          { count: issueCount.value },
+          issueCount.value,
+        );
+      }
+      if (alertForm.isAnomalyMode.value && !alertForm.anomalyEditMode.value) {
+        return alertForm.t("alerts.saveAndTrain");
+      }
+      return isEditingAlert.value
+        ? alertForm.t("alerts.editMode.saveChanges")
+        : alertForm.t("alerts.save");
+    });
+    const compositeNeedsChildren = computed(
+      () => isCompositeMode.value && compositeValidation.value.valid !== true,
+    );
 
     const alertSentence = computed(() => {
       if (alertForm.isAnomalyMode.value) return "";
@@ -2113,6 +2136,9 @@ export default defineComponent({
       showsBacktest,
       backtestQuery,
       reviewItems,
+      issueCount,
+      saveLabel,
+      compositeNeedsChildren,
       lgUp,
       snapScrollRef,
       activeSection,

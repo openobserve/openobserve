@@ -2261,6 +2261,72 @@ describe("AddAlert (OForm owner)", () => {
     );
   });
 
+  describe("Save names the issues to fix", () => {
+    const submitText = () => wrapper.get('[data-test="add-alert-submit-btn"]').text();
+    const failField = (name: string) =>
+      wrapper.vm.form.setFieldMeta(name, (meta: object) => ({
+        ...meta,
+        errorMap: { onSubmit: "invalid" },
+      }));
+
+    it.each([0, 1, 3])("%s issues", async (count) => {
+      wrapper = mountAlert();
+      await flushPromises();
+      ["name", "destinations", "description"].slice(0, count).forEach(failField);
+      await flushPromises();
+      expect(submitText()).toBe(
+        count
+          ? i18n.global.t("alerts.form.save.fixIssues", { count }, count)
+          : i18n.global.t("alerts.save"),
+      );
+    });
+
+    it("a composite with no alerts shows why Save is disabled", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("is_real_time", "composite");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-save-reason"]').exists()).toBe(true);
+      expect(
+        wrapper.get('[data-test="add-alert-submit-btn"]').attributes("disabled"),
+      ).toBeDefined();
+    });
+
+    it("an edit with an unknown column reads Fix 1 issue after Save and focuses the error", async () => {
+      vi.mocked(searchService.search).mockRejectedValueOnce({
+        response: { status: 400, data: { message: "Schema error: No field named servce" } },
+      });
+      wrapper = mountAlert(
+        {
+          isUpdated: true,
+          modelValue: savedAlert({
+            query_condition: {
+              ...savedAlert().query_condition,
+              type: "sql",
+              sql: "SELECT service FROM app_logs",
+            },
+          }),
+        },
+        {
+          attachTo: document.body,
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, QueryConfig: false },
+          },
+        },
+      );
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("query_condition.sql", "SELECT servce FROM app_logs");
+      await wrapper.vm.handleSave();
+      await vi.waitFor(() => expect(wrapper.vm.sqlQueryErrorMsg).toBeTruthy(), { timeout: 2000 });
+      await flushPromises();
+      expect(submitText()).toBe(i18n.global.t("alerts.form.save.fixIssues", { count: 1 }, 1));
+      const error = document.querySelector('[data-test="add-alert-sql-error"]');
+      expect(error?.contains(document.activeElement)).toBe(true);
+    });
+  });
+
   // ── Error focus across sections ───────────────────────────────────────────
   // focusOnFirstError skips messages with a null offsetParent, so a slice the
   // current alert type hides is never focused into the void.
@@ -2814,7 +2880,7 @@ describe("AddAlert (OForm owner)", () => {
     });
 
     // The schema runs first: a form with field errors shows them, not the dialog.
-    it("shows the invalid-form toast and no dialog when the form has field errors", async () => {
+    it("counts the field errors on Save, with no toast and no dialog", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
@@ -2825,11 +2891,9 @@ describe("AddAlert (OForm owner)", () => {
 
       expect(dialogEl("dialog")).toBeNull();
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-          message: i18n.global.t("alerts.messages.fixHighlightedFields"),
-        }),
+      expect(wrapper.vm.issueCount).toBeGreaterThan(0);
+      expect(toast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: i18n.global.t("alerts.messages.fixHighlightedFields") }),
       );
     });
 

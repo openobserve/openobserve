@@ -1679,6 +1679,14 @@ export function useAlertForm(
     });
   };
 
+  // The error line renders once the check's message lands, so focus waits a tick.
+  const focusSqlError = () =>
+    nextTick(() =>
+      document
+        .querySelector<HTMLElement>('[data-test="add-alert-sql-error"]')
+        ?.focus({ preventScroll: true }),
+    );
+
   // Schema-driven validity predicate (validation ONLY — never triggers the save;
   // the real save path is handleSave → form.handleSubmit). The ONE composed
   // schema owns name/stream + the step field rules, so this just runs the
@@ -2299,15 +2307,10 @@ export function useAlertForm(
   // SILENTLY: handleSubmit rejects, performSave never runs, and nothing tells the
   // user why. The anomaly branch's ONLY rule is the blank name, so this can only
   // fire for that.
+  // The Save label counts the issues, so a failed save only moves focus to the first one.
   const handleSave = async () => {
     await form.handleSubmit();
-    if (!form.state.isValid) {
-      focusOnFirstError();
-      toast({
-        variant: "error",
-        message: t("alerts.messages.fixHighlightedFields"),
-      });
-    }
+    if (!form.state.isValid) focusOnFirstError();
   };
 
   // ── Save-mode dialog ──────────────────────────────────────────────────────
@@ -2451,6 +2454,7 @@ export function useAlertForm(
       if (sqlQueryErrorMsg.value?.trim() && !flagIsStale && !sqlUnchangedSinceLoad()) {
         activeTab.value = "condition";
         hooks.showSection?.("condition");
+        focusSqlError();
         toast({
           variant: "error",
           message: t("alerts.messages.fixSqlErrorBeforeSaving"),
@@ -2508,7 +2512,10 @@ export function useAlertForm(
     // An edit that kept the stored query must not be blocked by a check that cannot change it.
     if (sqlUnchangedSinceLoad()) return "passed";
     const verdict = await validateSqlQuery();
-    if (verdict === "sql_error") return blockOnQuery(t("alerts.messages.fixSqlErrorBeforeSaving"));
+    if (verdict === "sql_error") {
+      focusSqlError();
+      return blockOnQuery(t("alerts.messages.fixSqlErrorBeforeSaving"));
+    }
     // The validator already toasted the VRL error.
     if (verdict === "function_error") return blockOnQuery();
     return verdict === "request_failed" ? "unchecked" : "passed";
