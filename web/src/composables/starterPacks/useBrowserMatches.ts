@@ -140,7 +140,7 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
     );
   });
   const count = computed(() => visible.value.length);
-  const show = computed(() => (copy.value?.installedPackIds.length ?? 0) > 0 && count.value > 0);
+  const show = computed(() => count.value > 0);
 
   const setCopy = (next: BrowserMatchCopy) => {
     state.value.copy = next;

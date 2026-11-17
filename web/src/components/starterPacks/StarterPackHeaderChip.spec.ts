@@ -168,8 +168,14 @@ describe("StarterPackHeaderChip", () => {
     wrapper = null;
   });
 
-  it("stays hidden before any pack is installed", async () => {
+  it("shows before any pack is installed", async () => {
     save([source("library-nginx")], []);
+    await render();
+    expect(chip().exists()).toBe(true);
+  });
+
+  it("stays hidden when no pack matches", async () => {
+    save([], []);
     await render();
     expect(chip().exists()).toBe(false);
   });

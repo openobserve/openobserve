@@ -156,11 +156,11 @@ describe("useBrowserMatches", () => {
     expect(JSON.parse(window.localStorage.getItem(notNowKey("org"))!)).toEqual(["library-nginx"]);
   });
 
-  it("shows only with a pack installed and at least one match left", () => {
+  it("shows while at least one match is left, with or without a pack installed", () => {
     const matches = useBrowserMatches("org");
     expect(matches.show.value).toBe(false);
     matches.saveFull(result([NGINX]), []);
-    expect(matches.show.value).toBe(false);
+    expect(matches.show.value).toBe(true);
     matches.saveFull(result([NGINX]), ["hosts"]);
     expect(matches.show.value).toBe(true);
     matches.notNowAll();
