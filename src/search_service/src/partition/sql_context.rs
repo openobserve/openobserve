@@ -405,6 +405,8 @@ mod tests {
             r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY c ASC LIMIT 3"#,
             r#"SELECT histogram(_timestamp, '1 hour') AS ts, service, count(*) AS c FROM "default" GROUP BY ts, service ORDER BY c DESC, ts DESC LIMIT 5"#,
             r#"SELECT histogram(_timestamp) AS "x_axis_1", count(*) AS "y_axis_1" FROM "default" GROUP BY "x_axis_1" ORDER BY "y_axis_1" DESC"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY 2 DESC LIMIT 3"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY count(*) DESC, 1 LIMIT 3"#,
         ] {
             let ctx = ctx_for(sql, None).await;
             assert!(ctx.ts_column.is_some(), "{sql}");
@@ -420,6 +422,8 @@ mod tests {
             r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY ts ASC, c DESC LIMIT 3"#,
             r#"SELECT histogram(_timestamp) AS "x_axis_1", count(*) AS "y_axis_1" FROM "default" GROUP BY "x_axis_1" ORDER BY "x_axis_1" ASC"#,
             r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY 1 DESC"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY 1 ASC, 2 DESC LIMIT 3"#,
         ] {
             let ctx = ctx_for(sql, None).await;
             assert!(ctx.ts_column.is_some(), "{sql}");
