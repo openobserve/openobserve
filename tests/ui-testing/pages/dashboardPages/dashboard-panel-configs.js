@@ -181,6 +181,16 @@ export default class DashboardPanelConfigs {
     this.stateTimelineShowStateText = page.locator('[data-test="dashboard-config-state-timeline-show-state-text"]');
     this.stateValueAlign = page.locator(`[data-test="${this.stateValueAlignId}"]`);
     this.stateValueAlignOptions = page.locator(`[data-test="${this.stateValueAlignId}-option"]`);
+    //Distribution locators (OInput wrapper, its inner -field input and -error message)
+    this.distributionBucketCount = page.locator('[data-test="dashboard-config-distribution_bucket_count"]');
+    this.distributionBucketCountField = page.locator('[data-test="dashboard-config-distribution_bucket_count-field"]');
+    this.distributionBucketCountError = page.locator('[data-test="dashboard-config-distribution_bucket_count-error"]');
+    this.distributionBucketSize = page.locator('[data-test="dashboard-config-distribution_bucket_size"]');
+    this.distributionBucketSizeField = page.locator('[data-test="dashboard-config-distribution_bucket_size-field"]');
+    this.distributionBucketSizeError = page.locator('[data-test="dashboard-config-distribution_bucket_size-error"]');
+    this.distributionBucketOffset = page.locator('[data-test="dashboard-config-distribution_bucket_offset"]');
+    this.distributionBucketOffsetField = page.locator('[data-test="dashboard-config-distribution_bucket_offset-field"]');
+    this.queryLimitField = page.locator('[data-test="dashboard-config-limit-field"]');
 
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
@@ -2329,6 +2339,36 @@ export default class DashboardPanelConfigs {
     await this.heatmapYMaxField.fill(max);
     await expect(this.heatmapYMinField).toHaveValue(min);
     await expect(this.heatmapYMaxField).toHaveValue(max);
+  }
+
+  /**
+   * Fill a distribution number input and confirm the value stuck. An empty string clears it,
+   * which drops the key from the panel config so the chart falls back to its default.
+   */
+  async _setDistributionNumber(field, value) {
+    await this.scrollSidebarToElement(field);
+    await field.fill(value);
+    await expect(field).toHaveValue(value, { timeout: 5000 });
+  }
+
+  async setDistributionBucketCount(value) {
+    await this._setDistributionNumber(this.distributionBucketCountField, value);
+  }
+
+  async setDistributionBucketSize(value) {
+    await this._setDistributionNumber(this.distributionBucketSizeField, value);
+  }
+
+  async setDistributionBucketOffset(value) {
+    await this._setDistributionNumber(this.distributionBucketOffsetField, value);
+  }
+
+  /** Assert the three bucket inputs hold the given values ("" = unset, showing the default placeholder). */
+  async expectDistributionBuckets({ count = "", size = "", offset = "" } = {}) {
+    await this.scrollSidebarToElement(this.distributionBucketCount);
+    await expect(this.distributionBucketCountField).toHaveValue(count);
+    await expect(this.distributionBucketSizeField).toHaveValue(size);
+    await expect(this.distributionBucketOffsetField).toHaveValue(offset);
   }
 
   async toggleHeatmapHistogramMode() {

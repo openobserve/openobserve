@@ -60,6 +60,7 @@ export default class DashboardactionPage {
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
     // Error toast surfaced on validation/apply/save errors
     this.errorToast = page.locator('[data-test-variant="error"]');
+    this.errorToastDismissBtn = this.errorToast.locator('[data-test="o-toast-dismiss"]');
     // Panel validation messages listed under the chart (DashboardErrors.vue)
     this.dashboardErrorItems = page.locator('[data-test="dashboard-errors-list-item"]');
     // Inline OForm field error under the panel name input (shown when the
@@ -258,6 +259,49 @@ export default class DashboardactionPage {
       this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
       this.panelNameError.waitFor({ state: "visible", timeout: 20000 }),
     ]).catch(() => {});
+  }
+
+  /** Dismiss every visible error toast and wait until none is left. */
+  async dismissErrorToasts() {
+    for (let i = 0; i < 10 && (await this.errorToastDismissBtn.count()) > 0; i++) {
+      await this.errorToastDismissBtn.first().click().catch(() => {});
+    }
+    await expect(this.errorToast).toHaveCount(0, { timeout: 10000 });
+  }
+
+  /**
+   * Click Save on a panel whose config is invalid and prove the save was blocked.
+   *
+   * savePanel() alone cannot prove this on a repeat attempt: an error toast left over
+   * from an earlier failed save resolves its wait at once, and the URL check that follows
+   * passes before any navigation could happen. So this clears old error toasts first,
+   * waits for a fresh toast naming the expected reason, and fails if the dashboard
+   * save request (PUT/POST /api/{org}/dashboards/{id}) was sent.
+   *
+   * @param {string} expectedError - text the new error toast must contain
+   */
+  async savePanelExpectingBlocked(expectedError) {
+    await this.dismissErrorToasts();
+    const saveRequests = [];
+    const onRequest = (request) => {
+      const { pathname } = new URL(request.url());
+      if (
+        ["PUT", "POST"].includes(request.method()) &&
+        /^\/api\/[^/]+\/dashboards\/(?!bulk$|move$)[^/]+$/.test(pathname)
+      ) {
+        saveRequests.push(`${request.method()} ${pathname}`);
+      }
+    };
+    this.page.on("request", onRequest);
+    try {
+      await this.panelSaveBtn.waitFor({ state: "visible" });
+      await this.panelSaveBtn.click();
+      await expect(this.getErrorToastWithText(expectedError)).toBeVisible({ timeout: 20000 });
+      await expect(this.page).toHaveURL(/\/add_panel/);
+    } finally {
+      this.page.off("request", onRequest);
+    }
+    expect(saveRequests, "a blocked save must not send the dashboard save request").toEqual([]);
   }
 
   /**
