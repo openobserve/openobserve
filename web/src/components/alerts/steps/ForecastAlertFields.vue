@@ -15,38 +15,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col gap-1" data-test="alert-forecast-fields">
-    <div
-      class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-    >
-      <label
-        :for="directionId"
-        class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-        >{{ t("alerts.forecast.alertWhen") }} *</label
+  <AlertSentenceRow
+    :label="t('alerts.forecast.alertWhen')"
+    :description="t('alerts.forecast.help')"
+    data-test="alert-forecast-fields"
+    removable
+    @remove="emit('remove')"
+  >
+    <div class="flex flex-col gap-1">
+      <i18n-t
+        keypath="alerts.form.forecast.sentence"
+        tag="div"
+        scope="global"
+        class="flex flex-wrap items-start gap-x-2 gap-y-1.5 leading-8.5"
       >
-      <div class="flex flex-wrap items-start gap-2">
-        <OFormSelect
-          :id="directionId"
-          :aria-label="t('alerts.forecast.alertWhen')"
-          name="_ui.forecast.direction"
-          :options="directionOptions"
-          :searchable="false"
-          width="xs"
-          data-test="alert-forecast-direction"
-        />
-        <label :for="thresholdId" class="sr-only">{{ t("alerts.forecast.threshold") }}</label>
-        <OFormInput
-          :id="thresholdId"
-          name="_ui.forecast.T"
-          type="number"
-          width="xs"
-          :placeholder="t('alerts.forecast.threshold')"
-          :debounce="300"
-          data-test="alert-forecast-threshold"
-        />
-        <div class="flex items-start gap-2" data-test="alert-forecast-horizon-group">
-          <span class="text-text-secondary leading-8.5">{{ t("alerts.forecast.within") }}</span>
-          <div class="flex flex-col gap-1">
+        <template #direction>
+          <span class="inline-flex">
+            <label :for="directionId" class="sr-only">{{ t("alerts.forecast.alertWhen") }}</label>
+            <OFormSelect
+              :id="directionId"
+              :aria-label="t('alerts.forecast.alertWhen')"
+              name="_ui.forecast.direction"
+              :options="directionOptions"
+              :searchable="false"
+              width="xs"
+              data-test="alert-forecast-direction"
+            />
+          </span>
+        </template>
+        <template #threshold>
+          <span class="inline-flex">
+            <label :for="thresholdId" class="sr-only">{{ t("alerts.forecast.threshold") }}</label>
+            <OFormInput
+              :id="thresholdId"
+              name="_ui.forecast.T"
+              type="number"
+              width="xs"
+              :placeholder="t('alerts.forecast.threshold')"
+              :debounce="300"
+              data-test="alert-forecast-threshold"
+            />
+          </span>
+        </template>
+        <template #horizon>
+          <span class="inline-flex" data-test="alert-forecast-horizon-group">
             <label :for="horizonId" class="sr-only">{{ t("alerts.forecast.horizonLabel") }}</label>
             <OFormInput
               :id="horizonId"
@@ -60,47 +72,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #suffix>{{ t("alerts.forecast.days") }}</template>
               <template #error />
             </OFormInput>
-            <div
-              v-if="horizonError"
-              class="text-input-error-text text-xs whitespace-nowrap"
-              data-test="alert-forecast-horizon-error"
-              role="alert"
-            >
-              {{ horizonError }}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div
-      class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-    >
-      <label
-        :for="windowId"
-        class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-        >{{ t("alerts.forecast.basedOn") }}</label
+          </span>
+        </template>
+        <template #window>
+          <span class="inline-flex">
+            <label :for="windowId" class="sr-only">{{ t("alerts.forecast.basedOn") }}</label>
+            <OFormSelect
+              :id="windowId"
+              :aria-label="t('alerts.forecast.basedOn')"
+              name="_ui.forecast.W"
+              :options="windowOptions"
+              :searchable="false"
+              width="sm"
+              data-test="alert-forecast-window"
+            />
+          </span>
+        </template>
+      </i18n-t>
+      <div
+        v-if="horizonError"
+        class="text-input-error-text text-xs"
+        data-test="alert-forecast-horizon-error"
+        role="alert"
       >
-      <div class="flex flex-col gap-1">
-        <OFormSelect
-          :id="windowId"
-          :aria-label="t('alerts.forecast.basedOn')"
-          name="_ui.forecast.W"
-          :options="windowOptions"
-          :searchable="false"
-          width="sm"
-          data-test="alert-forecast-window"
-        />
-        <span class="text-text-secondary text-xs" data-test="alert-forecast-help">{{
-          t("alerts.forecast.help")
-        }}</span>
+        {{ horizonError }}
       </div>
     </div>
-  </div>
+  </AlertSentenceRow>
 </template>
 
 <script setup lang="ts">
 import { computed, inject, ref, useId, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -114,6 +118,8 @@ import {
   isForecastRowTemplate,
   type ForecastAlert,
 } from "@/utils/alerts/forecastAlert";
+
+const emit = defineEmits<{ (e: "remove"): void }>();
 
 const { t } = useI18nTyped();
 const form: any = inject(FORM_CONTEXT_KEY, null);

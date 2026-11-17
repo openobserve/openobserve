@@ -35,6 +35,7 @@ import {
   ALERT_SETTING_TIERS_KEY,
   useAlertSettingTiers,
 } from "@/composables/alerts/useAlertSettingTiers";
+import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
 
 // The composed orchestrator schema — messages resolve through the real locale.
 const t = (key: string, named?: Record<string, unknown>): string =>
@@ -1097,12 +1098,6 @@ describe("QueryConfig.vue", () => {
       await input.trigger("blur");
       await flushPromises();
       expect(host.find('[data-test="alert-forecast-horizon-error"]').exists()).toBe(false);
-    });
-
-    it("keeps “within” together with the horizon input so it never wraps alone", () => {
-      const group = host.find('[data-test="alert-forecast-horizon-group"]');
-      expect(group.text()).toContain(t("alerts.forecast.within"));
-      expect(group.find('[data-test="alert-forecast-horizon"]').exists()).toBe(true);
     });
 
     it("reopens its own generated query with the same fields, not as a nested expression", async () => {
@@ -2315,6 +2310,77 @@ describe("QueryConfig.vue", () => {
         tiersWith(["generatedSql"]),
       );
       expect(host.find('[data-test="add-alert-generated-sql"]').exists()).toBe(shown);
+    });
+
+    it.each([
+      [12, true],
+      [4, false],
+    ])("a %i-line query folds: %s", async (lines, folds) => {
+      const sql = Array.from({ length: lines }, (_, i) => `-- line ${i + 1}`).join("\n");
+      remount({ ...sectioned, tab: "sql", sqlQuery: sql });
+      const fold = host.find('[data-test="add-alert-editor-fold"]');
+      expect(fold.exists()).toBe(folds);
+      if (!folds) return;
+      expect(wrapper.vm.foldedLines).toBe(lines);
+      await fold.trigger("click");
+      expect(wrapper.vm.editorFolded).toBe(false);
+    });
+
+    it("the VRL editor opens only from More options", async () => {
+      const provide = tiersWith();
+      remount({ ...sectioned, tab: "sql" }, {}, provide);
+      expect(host.find('[data-test="alert-vrl-toggle"]').exists()).toBe(false);
+      (provide[ALERT_SETTING_TIERS_KEY as symbol] as any).reveal("vrl");
+      await flushPromises();
+      expect(host.find('[data-test="add-alert-vrl-pane"]').exists()).toBe(true);
+    });
+
+    it("the forecast link switches to forecast mode and Remove switches back", async () => {
+      remount(
+        {
+          ...sectioned,
+          tab: "promql",
+          streamType: "metrics",
+          promqlQuery: "avg(x)",
+          promqlCondition: { operator: ">=", value: 1 },
+        },
+        {
+          query_condition: {
+            ...hostDefaults().query_condition,
+            type: "promql",
+            promql: "avg(x)",
+            promql_condition: { column: "value", operator: ">=", value: 1 },
+          },
+        },
+      );
+      await flushPromises();
+      await host.find('[data-test="add-alert-add-forecast"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.vm.isForecastMode).toBe(true);
+      await host.find('[data-test="alert-forecast-fields-remove"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.vm.isForecastMode).toBe(false);
+    });
+
+    it("Use as rule turns rule mode on", async () => {
+      const handlers: Record<string, () => void> = {};
+      const suggestions = {
+        current: () => null,
+        add: vi.fn(),
+        notNow: vi.fn(),
+        onApply: (id: string, handler: () => void) => {
+          handlers[id] = handler;
+          return () => delete handlers[id];
+        },
+      };
+      remount(
+        { ...sectioned, tab: "promql", streamType: "metrics" },
+        {},
+        { [ALERT_SUGGESTIONS_KEY as symbol]: suggestions },
+      );
+      handlers.ruleExpression();
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_rule_mode).toBe(true);
     });
 
     it("an invalid SQL error shows under the editor with Use 'service'", async () => {

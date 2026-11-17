@@ -1052,7 +1052,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-else>
           <div class="flex w-full flex-col gap-2 overflow-hidden">
             <!-- Editor area — position:relative shell owns the size; inner absolute never leaks -->
-            <div ref="sqlPromqlPreviewRef" class="relative h-80">
+            <div
+              ref="sqlPromqlPreviewRef"
+              class="relative motion-safe:transition-[height]"
+              :class="editorShellClass"
+            >
               <div class="absolute inset-0 flex overflow-hidden">
                 <!-- SQL/PromQL pane — with its own header -->
                 <div
@@ -1073,40 +1077,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : t("alerts.promqlEditor")
                       }}</span>
                     </div>
-                    <!-- fx toggle shown here only when VRL is not yet enabled -->
-                    <OSwitch
-                      v-if="localTab === 'sql' && !showVrl"
-                      v-model="showVrl"
-                      :label="t('alerts.queryConfig.vrlToggle')"
-                      label-position="left"
-                      off-tone="neutral"
-                      :aria-label="t('alerts.queryConfig.showVrlEditor')"
-                      data-test="alert-vrl-toggle"
-                    >
-                      <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" />
-                    </OSwitch>
-                    <OToggleGroup
-                      v-if="localTab === 'promql'"
-                      :model-value="isForecastMode ? 'forecast' : 'threshold'"
-                      type="single"
-                      data-test="alert-promql-mode"
-                      @update:model-value="onPromqlModeChange"
-                    >
-                      <OToggleGroupItem
-                        value="threshold"
-                        size="xs"
-                        data-test="alert-promql-mode-threshold"
-                      >
-                        {{ t("alerts.forecast.modeThreshold") }}
-                      </OToggleGroupItem>
-                      <OToggleGroupItem
-                        value="forecast"
-                        size="xs"
-                        data-test="alert-promql-mode-forecast"
-                      >
-                        {{ t("alerts.forecast.modeForecast") }}
-                      </OToggleGroupItem>
-                    </OToggleGroup>
                   </div>
                   <div class="relative min-h-0 flex-1">
                     <div class="absolute inset-0">
@@ -1136,6 +1106,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="query-editor-placeholder-typewriter">{{
                         inlineEditorPlaceholder
                       }}</span>
+                    </div>
+                    <div
+                      v-if="editorFolded"
+                      class="from-surface-base pointer-events-none absolute inset-x-0 bottom-0 z-2 flex h-12 items-end justify-end bg-linear-to-t from-40% to-transparent pe-2 pb-1.5"
+                    >
+                      <OButton
+                        variant="outline"
+                        size="xs"
+                        class="pointer-events-auto"
+                        data-test="add-alert-editor-fold"
+                        @click="unfoldEditor"
+                      >
+                        {{ t("alerts.form.editor.showAll", { count: foldedLines }) }}
+                      </OButton>
                     </div>
                   </div>
 
@@ -1175,6 +1159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="border-border-default flex w-1/2 shrink-0 flex-col overflow-hidden border-s"
                   v-if="showVrl && localTab === 'sql'"
+                  data-test="add-alert-vrl-pane"
                 >
                   <div
                     class="flex h-9 shrink-0 items-center justify-between px-2.5"
@@ -1210,12 +1195,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </OSelect>
                       <OSwitch
-                        v-model="showVrl"
+                        :model-value="showVrl"
                         :label="t('alerts.queryConfig.vrlToggle')"
                         label-position="left"
                         off-tone="neutral"
                         :aria-label="t('alerts.queryConfig.hideVrlEditor')"
                         data-test="alert-vrl-toggle"
+                        @update:model-value="onVrlSwitch"
                       >
                         <OTooltip :content="t('alerts.queryConfig.hideVrlEditor')" />
                       </OSwitch>
@@ -1650,7 +1636,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OSettingRow>
 
                   <div
-                    v-if="localTab === 'promql' && !isForecastMode"
+                    v-if="localTab === 'promql' && !isForecastMode && tierShows('ruleExpression')"
                     class="flex flex-col gap-1 px-3 py-2"
                   >
                     <OFormSwitch
@@ -1664,7 +1650,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("alerts.promRuleModeDescription") }}
                     </p>
                   </div>
-                  <ForecastAlertFields v-if="localTab === 'promql' && isForecastMode" />
+                  <ForecastAlertFields
+                    v-if="localTab === 'promql' && isForecastMode"
+                    @remove="onPromqlModeChange('threshold')"
+                  />
 
                   <!-- PromQL: Alert if the value is + Having series -->
                   <template
@@ -1676,6 +1665,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :info="t('alerts.queryConfig.alertIfValueIsTooltip')"
                       fill
                     >
+                      <template #description>
+                        <OButton
+                          variant="link"
+                          size="sm"
+                          class="h-auto! p-0! text-start whitespace-normal!"
+                          data-test="add-alert-add-forecast"
+                          @click="onPromqlModeChange('forecast')"
+                        >
+                          {{ t("alerts.tiers.add.forecast") }}
+                        </OButton>
+                      </template>
                       <div class="flex flex-col gap-1.5">
                         <div class="flex items-start gap-2">
                           <OFormSelect
@@ -1873,6 +1873,7 @@ import {
   nextTick,
   watch,
   inject,
+  onBeforeUnmount,
   type Ref,
 } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
@@ -1941,6 +1942,7 @@ import {
   ALERT_SETTING_TIERS_KEY,
   useTierVisibility,
 } from "@/composables/alerts/useAlertSettingTiers";
+import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
 import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
 
@@ -1962,6 +1964,8 @@ const withoutBlankRows = (group: FilterGroup): FilterGroup => ({
     return item.kind === "condition" && !item.field ? [] : [item];
   }),
 });
+
+const EDITOR_FOLD_LINES = 5;
 
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
@@ -2191,6 +2195,26 @@ export default defineComponent({
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
 
     const showVrl = ref(!!props.vrlFunction?.trim());
+    // More options reveals VRL; the pane's own switch is its Remove and clears the function.
+    watch(
+      () => localTab.value === "sql" && !!tiers?.isVisible("vrl"),
+      (shown) => {
+        if (shown) showVrl.value = true;
+      },
+      { immediate: true },
+    );
+    const onVrlSwitch = (on: unknown) => {
+      if (on) {
+        showVrl.value = true;
+        return;
+      }
+      showVrl.value = false;
+      tiers?.conceal("vrl");
+      if (vrlFunctionContent.value) {
+        vrlFunctionContent.value = "";
+        emit("update:vrlFunction", "");
+      }
+    };
     const filtersSectionRef = ref<HTMLElement | null>(null);
     const inlineQueryEditorRef = ref<any>(null);
 
@@ -2214,6 +2238,7 @@ export default defineComponent({
 
     const onQueryEditorFocus = () => {
       queryEditorPlaceholderFlag.value = false;
+      if (foldedLines.value > EDITOR_FOLD_LINES) editorUnfolded.value = true;
       _sqlOnFocus();
     };
 
@@ -2251,6 +2276,7 @@ export default defineComponent({
     // the query and feeds autocomplete context (same pattern as QueryEditorDialog)
     const handleInlineQueryUpdate = (newQuery: string) => {
       _sqlOnQueryChange();
+      if (newQuery.split("\n").length > EDITOR_FOLD_LINES) editorUnfolded.value = true;
       if (localTab.value === "sql") {
         updateSqlQuery(newQuery);
       } else {
@@ -2767,6 +2793,12 @@ export default defineComponent({
       },
       { immediate: true },
     );
+    const suggestions = inject(ALERT_SUGGESTIONS_KEY, null);
+    const stopRuleSuggestion = suggestions?.onApply("ruleExpression", () => {
+      setFV("query_condition.promql_rule_mode", true);
+      onPromRuleModeChange(true);
+    });
+    onBeforeUnmount(() => stopRuleSuggestion?.());
     const onPromRuleModeChange = (enabled: unknown) => {
       if (enabled) {
         setFV("query_condition.promql_condition", null);
@@ -2789,6 +2821,33 @@ export default defineComponent({
     const editorPromqlQuery = computed(() =>
       isForecastMode.value ? forecastExpression.value : localPromqlQuery.value,
     );
+
+    // A loaded query longer than the fold reads as its first lines; typing or focusing opens it.
+    const foldedLines = computed(
+      () =>
+        String(
+          (localTab.value === "sql" ? localSqlQuery.value : editorPromqlQuery.value) ?? "",
+        ).split("\n").length,
+    );
+    const editorUnfolded = ref(false);
+    const editorFolded = computed(
+      () =>
+        !!props.sectionTargets &&
+        foldedLines.value > EDITOR_FOLD_LINES &&
+        !editorUnfolded.value &&
+        !(showVrl.value && localTab.value === "sql"),
+    );
+    const unfoldEditor = () => {
+      editorUnfolded.value = true;
+    };
+    const editorShellClass = computed(() => {
+      const tall =
+        !props.sectionTargets ||
+        (showVrl.value && localTab.value === "sql") ||
+        (foldedLines.value > EDITOR_FOLD_LINES && !editorFolded.value);
+      if (tall) return "h-80";
+      return localTab.value === "promql" && promqlSamples.value.length ? "h-46" : "h-36";
+    });
     const onEditorPromqlUpdate = (query: string) => {
       if (isForecastMode.value) setFV("_ui.forecast.U", query);
       else updatePromqlQuery(query);
@@ -4201,6 +4260,11 @@ export default defineComponent({
       onConditionValueChange,
       filtersSectionRef,
       showVrl,
+      onVrlSwitch,
+      foldedLines,
+      editorFolded,
+      unfoldEditor,
+      editorShellClass,
       leafFilterCount,
       periodMinutes,
       tierShows,
