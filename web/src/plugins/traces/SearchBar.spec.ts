@@ -298,8 +298,16 @@ let searchObjInstance = makeSearchObj();
 
 const tracesParserRef = vi.hoisted(() => ({ value: { astify: (() => ({})) as any } }));
 
+// The real two-text state over each test's searchObj, shared like the module singleton it stands for.
+const sqlTextsByObj = new WeakMap<object, ReturnType<typeof createTracesSqlTexts>>();
+const sqlTextsOf = (obj: any) => {
+  if (!sqlTextsByObj.has(obj)) sqlTextsByObj.set(obj, createTracesSqlTexts(obj, tracesParserRef));
+  return sqlTextsByObj.get(obj)!;
+};
+
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
+    ...sqlTextsOf(searchObjInstance),
     get searchObj() {
       return searchObjInstance;
     },
@@ -343,6 +351,7 @@ import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import { placeCaret } from "@/test/unit/helpers/monacoCaret";
 import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
+import { createTracesSqlTexts } from "@/utils/traces/tracesSqlTexts";
 
 // ---------------------------------------------------------------------------
 // DOM anchor node required by attachTo
@@ -3552,15 +3561,20 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("searchdata")).toBeUndefined();
     });
 
-    it("pre-fills a trace selector from the filter in the Traces view", async () => {
+    it("moves the Traces view to Spans with the switch, which never shows on there", async () => {
       searchObjInstance.meta.searchMode = "traces";
       searchObjInstance.data.editorValue = "duration > '5ms'";
       wrapper = mountSearchBar();
       await flushPromises();
-      await (wrapper.vm as any).setSqlMode(true);
-      expect(searchObjInstance.data.editorValue).toBe(
-        `SELECT trace_id FROM "default" WHERE duration > 5000`,
-      );
+      const switchBtn = () => pinnedBtn().find('[role="switch"]');
+
+      await switchBtn().trigger("click");
+      await flushPromises();
+
+      expect(wrapper.emitted("open-spans-sql")).toHaveLength(1);
+      expect(searchObjInstance.meta.sqlMode).toBe(false);
+      expect(searchObjInstance.data.editorValue).toBe("duration > '5ms'");
+      expect(switchBtn().attributes("aria-checked")).toBe("false");
       expect(wrapper.emitted("searchdata")).toBeUndefined();
     });
 
@@ -3574,11 +3588,31 @@ describe("SearchBar", () => {
         `SELECT * FROM "default" WHERE duration > 5000 ORDER BY start_time DESC`,
       );
 
-      await (wrapper.vm as any).setSqlMode(false);
+      searchObjInstance.meta.sqlMode = false;
       searchObjInstance.data.editorValue = "";
+      sqlTextsOf(searchObjInstance).clearSqlText();
       await (wrapper.vm as any).setSqlMode(true);
       expect(searchObjInstance.meta.sqlMode).toBe(true);
       expect(searchObjInstance.data.editorValue).toBe("");
+    });
+
+    it("pre-fills only the first time, and brings the stored SQL text back after that", async () => {
+      searchObjInstance.data.editorValue = "service_name = 'api'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vm.setSqlMode(true);
+      const edited = `SELECT service_name, count(*) FROM "default" GROUP BY service_name`;
+      searchObjInstance.data.editorValue = edited;
+      vm.updateQueryValue(edited);
+
+      await vm.setSqlMode(false);
+      expect(searchObjInstance.data.editorValue).toBe("service_name = 'api'");
+      searchObjInstance.data.editorValue = "duration > 1";
+      await vm.setSqlMode(true);
+
+      expect(searchObjInstance.data.editorValue).toBe(edited);
+      expect(sqlTextsOf(searchObjInstance).sqlTexts.filter).toBe("duration > 1");
     });
 
     it("sets Group by back to None when SQL mode turns on", async () => {
@@ -3655,18 +3689,6 @@ describe("SearchBar", () => {
         expect(searchObjInstance.data.editorValue).toBe(typed);
         expect(searchObjInstance.meta.scope).toBe("root");
       });
-
-      it("writes no scope into the Traces view selector", async () => {
-        searchObjInstance.meta.searchMode = "traces";
-        searchObjInstance.meta.scope = "root";
-        searchObjInstance.data.editorValue = "service_name = 'api'";
-        wrapper = mountSearchBar();
-        await flushPromises();
-        await (wrapper.vm as any).setSqlMode(true);
-        expect(searchObjInstance.data.editorValue).toBe(
-          `SELECT trace_id FROM "default" WHERE service_name = 'api'`,
-        );
-      });
     });
 
     it("offers the view's templates under Examples once the editor has SQL, and fills it without running", async () => {
@@ -3712,94 +3734,62 @@ describe("SearchBar", () => {
       expect(searchObjInstance.data.editorValue).toBe(typed);
     });
 
-    it("turns a plain SELECT * back into its filter without asking", async () => {
-      searchObjInstance.meta.sqlMode = true;
-      searchObjInstance.data.editorValue = `SELECT * FROM "default" WHERE a = 1 ORDER BY start_time DESC`;
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      await (wrapper.vm as any).setSqlMode(false);
-
-      expect(mockConfirm).not.toHaveBeenCalled();
-      expect(searchObjInstance.meta.sqlMode).toBe(false);
-      expect(searchObjInstance.data.editorValue).toBe("a = 1");
-    });
-
-    it("asks before dropping grouping, with Cancel focused, and keeps SQL on when cancelled", async () => {
+    it("turns SQL off with no dialog: the shared filter shows and runs, and the SQL text is kept", async () => {
       const grouped = `SELECT service_name, count(*) AS n FROM "default" WHERE a = 1 GROUP BY service_name`;
-      searchObjInstance.meta.sqlMode = true;
+      searchObjInstance.data.editorValue = "b = 2";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vm.setSqlMode(true);
       searchObjInstance.data.editorValue = grouped;
-      mockConfirm.mockResolvedValueOnce(false);
-      wrapper = mountSearchBar();
+      vm.updateQueryValue(grouped);
+
+      await pinnedBtn().find('[role="switch"]').trigger("click");
       await flushPromises();
-
-      await (wrapper.vm as any).setSqlMode(false);
-
-      expect(mockConfirm).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "traces.sqlMode.switchOffTitle",
-          message: "traces.sqlMode.switchOffMessage",
-          focusCancel: true,
-        }),
-      );
-      expect(searchObjInstance.meta.sqlMode).toBe(true);
-      expect(searchObjInstance.data.editorValue).toBe(grouped);
-    });
-
-    it("shows the pinned switch on again after the switch off is cancelled", async () => {
-      searchObjInstance.meta.sqlMode = true;
-      searchObjInstance.data.editorValue = `SELECT service_name, count(*) AS n FROM "default" GROUP BY service_name`;
-      mockConfirm.mockResolvedValueOnce(false);
-      wrapper = mountSearchBar();
-      await flushPromises();
-      const switchBtn = () => pinnedBtn().find('[role="switch"]');
-      expect(switchBtn().attributes("aria-checked")).toBe("true");
-
-      await switchBtn().trigger("click");
-      await flushPromises();
-
-      expect(mockConfirm).toHaveBeenCalled();
-      expect(searchObjInstance.meta.sqlMode).toBe(true);
-      expect(switchBtn().attributes("aria-checked")).toBe("true");
-    });
-
-    it("keeps the top-level WHERE as the filter once the switch off is confirmed", async () => {
-      searchObjInstance.meta.sqlMode = true;
-      searchObjInstance.data.editorValue = `SELECT service_name, count(*) FROM "default" WHERE a = 1 GROUP BY service_name LIMIT 5`;
-      mockConfirm.mockResolvedValueOnce(true);
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      await (wrapper.vm as any).setSqlMode(false);
-
-      expect(searchObjInstance.meta.sqlMode).toBe(false);
-      expect(searchObjInstance.data.editorValue).toBe("a = 1");
-    });
-
-    it("turns the Traces view selector back into its filter without asking", async () => {
-      searchObjInstance.meta.searchMode = "traces";
-      searchObjInstance.data.editorValue = "duration > '5ms'";
-      wrapper = mountSearchBar();
-      await flushPromises();
-      await (wrapper.vm as any).setSqlMode(true);
-      await (wrapper.vm as any).setSqlMode(false);
 
       expect(mockConfirm).not.toHaveBeenCalled();
       expect(searchObjInstance.meta.sqlMode).toBe(false);
-      expect(searchObjInstance.data.editorValue).toBe("duration > 5000");
+      expect(searchObjInstance.data.editorValue).toBe("b = 2");
+      expect(sqlTextsOf(searchObjInstance).sqlTexts.sql).toBe(grouped);
+      expect(wrapper.emitted("searchdata")).toHaveLength(1);
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "traces.sqlMode.sqlKept" }),
+      );
     });
 
-    it("still asks before turning the same selector off in the Spans view", async () => {
-      searchObjInstance.meta.searchMode = "spans";
-      searchObjInstance.meta.sqlMode = true;
-      searchObjInstance.data.editorValue = `SELECT trace_id FROM "default" WHERE a = 1`;
-      mockConfirm.mockResolvedValueOnce(false);
+    it("drops an untouched pre-fill on the way off, with no SQL-kept toast", async () => {
+      searchObjInstance.data.editorValue = "b = 2";
       wrapper = mountSearchBar();
       await flushPromises();
-      await (wrapper.vm as any).setSqlMode(false);
-
-      expect(mockConfirm).toHaveBeenCalledTimes(1);
+      const vm = wrapper.vm as any;
+      await vm.setSqlMode(true);
       expect(searchObjInstance.meta.sqlMode).toBe(true);
+
+      await vm.setSqlMode(false);
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toBe("b = 2");
+      expect(sqlTextsOf(searchObjInstance).sqlTexts.sql).toBe("");
+      expect(wrapper.emitted("searchdata")).toHaveLength(1);
+      expect(toastMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: "traces.sqlMode.sqlKept" }),
+      );
+    });
+
+    it("never turns a plain SELECT * into a filter on the way off", async () => {
+      searchObjInstance.data.editorValue = "";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vm.setSqlMode(true);
+      const plain = `SELECT * FROM "default" WHERE a = 1 ORDER BY start_time DESC`;
+      searchObjInstance.data.editorValue = plain;
+      vm.updateQueryValue(plain);
+
+      await vm.setSqlMode(false);
+
+      expect(searchObjInstance.data.editorValue).toBe("");
+      expect(sqlTextsOf(searchObjInstance).sqlTexts.sql).toBe(plain);
     });
 
     it("shows an SQL indicator on More only while SQL mode is on and unpinned", async () => {
@@ -3822,12 +3812,16 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
       const vm = wrapper.vm as any;
+      vm.updateQueryValue("service_name = 'api'");
+      vm.updateQueryValue("SEL");
 
       vm.updateQueryValue(`SELECT * FROM "missing"`);
       expect(searchObjInstance.meta.sqlMode).toBe(false);
 
       vm.updateQueryValue(`SELECT * FROM "default" WHERE a = 1`);
       expect(searchObjInstance.meta.sqlMode).toBe(true);
+      // The typed text is the SQL text; the filter keeps its value from before the typing.
+      expect(sqlTextsOf(searchObjInstance).sqlTexts.filter).toBe("service_name = 'api'");
 
       searchObjInstance.data.editorValue = "a = 1";
       vm.updateQueryValue("a = 1");
@@ -3835,7 +3829,18 @@ describe("SearchBar", () => {
       expect(searchObjInstance.data.editorValue).toBe("a = 1");
     });
 
-    it.each(["traces", "spans"] as const)(
+    it("never turns SQL on while typing in the Traces view, which runs only a filter", async () => {
+      searchObjInstance.meta.searchMode = "traces";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const typed = `SELECT * FROM "default" WHERE a = 1`;
+      searchObjInstance.data.editorValue = typed;
+      (wrapper.vm as any).updateQueryValue(typed);
+      expect(searchObjInstance.meta.sqlMode).toBe(false);
+      expect(searchObjInstance.data.editorValue).toBe(typed);
+    });
+
+    it.each(["spans"] as const)(
       "keeps SQL mode on for a statement that starts with a comment in the %s view",
       async (mode) => {
         searchObjInstance.meta.searchMode = mode;

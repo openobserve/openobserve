@@ -19,11 +19,8 @@ import type { ParsedSQLResult } from "@/ts/interfaces";
 
 export type TracesSqlShape = "spans" | "traces" | "rows";
 
-/** Why the Traces view cannot run typed SQL as a trace selector. */
-export type TraceSelectorProblem = "quotedMarker" | "notSingleSelect" | "selectAll" | "noTraceId";
-
-export type SqlDroppedPart =
-  "columns" | "grouping" | "joins" | "limit" | "distinct" | "with" | "union" | "stream" | "other";
+/** Why Use WHERE from SQL is off: the text does not parse, or it has no WHERE the Traces view can run. */
+export type SqlWhereProblem = "unreadable" | "noWhere";
 
 export interface TracesSqlInfo {
   isStatement: boolean;
@@ -33,9 +30,6 @@ export interface TracesSqlInfo {
   /** FROM target and its alias as typed, so a count over the WHERE resolves the same names. */
   fromClause: string;
   selectAll: boolean;
-  plainSelectAll: boolean;
-  /** `SELECT trace_id FROM <stream> [WHERE ...]` and nothing else: the Traces view prefill's shape. */
-  plainTraceIdSelect: boolean;
   groupBy: boolean;
   aggregate: boolean;
   join: boolean;
@@ -49,12 +43,6 @@ export interface TracesSqlInfo {
   selectNames: string[];
   /** Every select item has a name and none is a star, so the result has exactly `selectNames`. */
   selectExplicit: boolean;
-}
-
-export interface TraceSelector {
-  /** The traces/latest filter, empty when a problem blocks the run. */
-  filter: string;
-  problem: TraceSelectorProblem | null;
 }
 
 interface Token {
@@ -203,22 +191,13 @@ export function analyzeTracesSql(sql: string, parser: any): TracesSqlInfo {
 
   const selectNames = selectNamesOf(columns);
 
-  const targetIdx = target ? top.indexOf(target) : -1;
-  const next = targetIdx >= 0 ? top[targetIdx + 1] : undefined;
-  const cleanAfterTarget =
-    !next ||
-    isWord(next, "where") ||
-    isWord(next, "order") ||
-    (next.kind === "punct" && next.text === ";");
   const join = hasTop("join");
-  const info: TracesSqlInfo = {
+  return {
     isStatement,
     where,
     stream: fromSubquery ? null : stream,
     fromClause: sliceFrom(text, top, fromIdx),
     selectAll,
-    plainSelectAll: false,
-    plainTraceIdSelect: false,
     groupBy: groupBy || having,
     aggregate,
     join,
@@ -232,17 +211,6 @@ export function analyzeTracesSql(sql: string, parser: any): TracesSqlInfo {
     selectNames,
     selectExplicit: !selectAll && columns.length > 0 && selectNames.length === columns.length,
   };
-  info.plainSelectAll =
-    firstWord === "select" && selectAll && stream !== null && cleanAfterTarget && isRowQuery(info);
-  info.plainTraceIdSelect =
-    firstWord === "select" &&
-    selectList.length === 1 &&
-    isWord(selectList[0], "trace_id") &&
-    stream !== null &&
-    (!next || isWord(next, "where") || (next.kind === "punct" && next.text === ";")) &&
-    !hasTop("order") &&
-    isRowQuery(info);
-  return info;
 }
 
 /** True when every result row is one span, so the WHERE count and paging describe the rows. */
@@ -284,35 +252,6 @@ export function buildTracesSql(stream: string, filter: string): string {
   return `SELECT * FROM "${stream.replaceAll('"', '""')}"${where} ORDER BY start_time DESC`;
 }
 
-/** The Traces view's starting statement: the trace_id of every span the filter matches. */
-export function buildTraceSelectorSql(stream: string, filter: string): string {
-  const where = filter.trim() ? ` WHERE ${filter.trim()}` : "";
-  return `SELECT trace_id FROM "${stream.replaceAll('"', '""')}"${where}`;
-}
-
-/** The filter text a statement turns into, and what filter mode cannot keep. */
-export function sqlToFilter(
-  info: TracesSqlInfo,
-  selectedStream: string,
-  tracesView = false,
-): { filter: string; dropped: SqlDroppedPart[] } {
-  const plain = info.plainSelectAll || (tracesView && info.plainTraceIdSelect);
-  if (plain && info.stream === selectedStream) {
-    return { filter: info.where, dropped: [] };
-  }
-  const dropped: SqlDroppedPart[] = [];
-  if (!info.selectAll) dropped.push("columns");
-  if (info.groupBy || info.aggregate) dropped.push("grouping");
-  if (info.join) dropped.push("joins");
-  if (info.hasLimit) dropped.push("limit");
-  if (info.distinct) dropped.push("distinct");
-  if (info.with) dropped.push("with");
-  if (info.union) dropped.push("union");
-  if (info.stream !== selectedStream) dropped.push("stream");
-  if (dropped.length === 0) dropped.push("other");
-  return { filter: info.where, dropped };
-}
-
 /** "Add trace_id" only makes sense where trace_id can sit next to the other columns. */
 export function canAddTraceId(info: TracesSqlInfo): boolean {
   return info.isStatement && !info.groupBy && !info.aggregate && !info.union && !info.distinct;
@@ -333,67 +272,29 @@ export function insertTraceIdColumn(sql: string): string | null {
   return `${sql.slice(0, anchor.end)} trace_id,${sql.slice(anchor.end)}`;
 }
 
-/** Typed SQL without comments or trailing semicolons; the streaming trace list deletes every -- and ; left, even quoted. */
-export function cleanTraceSelectorSql(sql: string): {
-  sql: string;
-  quotedMarker: boolean;
-  extraStatement: boolean;
-} {
-  const text = stripSqlComments(sql ?? "")
-    .trim()
-    .replace(/(\s*;)+$/, "")
-    .trim();
-  let quotedMarker = false;
-  let extraStatement = false;
-  let i = 0;
-  while (i < text.length) {
-    const end = maskedSpanEnd(text, i);
-    if (end === null) {
-      if (text[i] === ";") extraStatement = true;
-      i++;
-      continue;
-    }
-    const span = text.slice(i, end);
-    if (span.includes("--") || span.includes(";")) quotedMarker = true;
-    i = end;
+/** The top-level WHERE of SQL text as a Traces filter, sliced as typed, or why there is none to run. */
+export function tracesFilterFromSql(
+  sql: string,
+  parser: any,
+): { filter: string; problem: SqlWhereProblem | null } {
+  const none = (problem: SqlWhereProblem) => ({ filter: "", problem });
+  const info = analyzeTracesSql(sql, parser);
+  if (!info.isStatement || parseTracesSql(sql, parser).type !== "select") return none("unreadable");
+  if (!info.where || info.with || info.union || info.join || info.fromSubquery) {
+    return none("noWhere");
   }
-  return { sql: text, quotedMarker, extraStatement };
-}
-
-/** The Traces view filter for typed SQL: trace_id IN (the query), or why it cannot run. */
-export function traceSelector(sql: string, parser: any): TraceSelector {
-  const blocked = (problem: TraceSelectorProblem): TraceSelector => ({ filter: "", problem });
-  const cleaned = cleanTraceSelectorSql(sql);
-  if (cleaned.quotedMarker) return blocked("quotedMarker");
-  const info = analyzeTracesSql(cleaned.sql, parser);
-  if (!info.isStatement || info.with || info.explain || info.union || cleaned.extraStatement) {
-    return blocked("notSingleSelect");
-  }
-  if (info.selectAll) return blocked("selectAll");
-  const parsed = parseTracesSql(cleaned.sql, parser);
-  const columns: any[] = Array.isArray(parsed.columns) ? parsed.columns : [];
-  // Text the parser cannot read may still be valid DataFusion, so the server decides.
-  if (parsed.type !== "select" || columns.length === 0) {
-    return { filter: `trace_id IN (${cleaned.sql})`, problem: null };
-  }
-  if (!info.selectNames.includes("trace_id")) return blocked("noTraceId");
-  // An IN subquery must return one column, so a wider select list is read through a derived table.
-  const filter =
-    columns.length === 1
-      ? `trace_id IN (${cleaned.sql})`
-      : `trace_id IN (SELECT trace_id FROM (${cleaned.sql}))`;
-  return { filter, problem: null };
-}
-
-/** The SELECT line before and after trace_id goes first, for the suggested change. */
-export function traceIdSuggestion(sql: string): { before: string; after: string } | null {
-  const after = insertTraceIdColumn(sql);
-  const selectTok = tokenize(sql).find(
-    (tok) => tok.depth === 0 && tok.kind === "word" && tok.text.toLowerCase() === "select",
+  // A subquery would run once per partition on the trace list, and a qualified name means nothing on one stream.
+  const tokens = tokenize(info.where);
+  const subquery = tokens.some((tok) => tok.kind === "word" && tok.text.toLowerCase() === "select");
+  const qualified = tokens.some(
+    (tok, i) =>
+      tok.kind === "punct" &&
+      tok.text === "." &&
+      tokens[i - 1]?.end === tok.start &&
+      tokens[i + 1]?.start === tok.end,
   );
-  if (after === null || !selectTok) return null;
-  const line = sql.slice(0, selectTok.start).split("\n").length - 1;
-  return { before: sql.split("\n")[line], after: after.split("\n")[line] };
+  if (subquery || qualified) return none("noWhere");
+  return { filter: info.where, problem: null };
 }
 
 /** Result shape from the returned columns: span rows open a span, trace rows open a trace. */

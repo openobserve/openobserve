@@ -3976,10 +3976,6 @@ export class TracesPage {
     return this.page.locator('[data-test="confirm-dialog-provider"]');
   }
 
-  async cancelSqlModeSwitchOff() {
-    await this.getSqlModeConfirmDialog().locator('[data-test="o-dialog-secondary-btn"]').click();
-  }
-
   getSqlResultTable() {
     return this.page.locator('[data-test="traces-sql-result-table"]');
   }
@@ -4003,16 +3999,38 @@ export class TracesPage {
       .click();
   }
 
-  getSqlSelectorProblem() {
-    return this.page.locator('[data-test="traces-sql-selector-problem"]');
+  getSqlAwaitingRun() {
+    return this.page.locator('[data-test="traces-sql-awaiting-run"]');
   }
 
-  getSqlSuggestedChange() {
-    return this.page.locator('[data-test="traces-sql-suggested-change"]');
+  /** The Traces view line shown while the Spans view keeps SQL text. */
+  getSqlKeptLine() {
+    return this.page.locator('[data-test="traces-sql-kept-line"]');
   }
 
-  async addTraceIdAndRun() {
-    await this.page.locator('[data-test="traces-sql-add-trace-id-run-card"]').click();
+  getUseWhereFromSqlButton() {
+    return this.page.locator('[data-test="traces-sql-kept-line-use-where-btn"]');
+  }
+
+  async backToSql() {
+    await this.page.locator('[data-test="traces-sql-kept-line-back-to-sql-btn"]').click();
+  }
+
+  /** The card a Run shows for a SELECT typed in the Traces view filter. */
+  getStatementInTracesCard() {
+    return this.page.locator('[data-test="traces-statement-in-traces"]');
+  }
+
+  async openStatementInSpans() {
+    await this.getStatementInTracesCard().getByRole('button').click();
+  }
+
+  getToastMessage(text) {
+    return this.page.locator('[data-test="o-toast-message"]', { hasText: text });
+  }
+
+  async clickToastAction(label) {
+    await this.page.locator('[data-test="o-toast-action-btn"]', { hasText: label }).click();
   }
 
   getTraceResultRows() {

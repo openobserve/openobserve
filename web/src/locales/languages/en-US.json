@@ -17171,26 +17171,29 @@
     },
     "sqlMode": {
       "indicator": "SQL",
-      "switchOffTitle": "Switch to filter mode?",
-      "switchOffMessage": "Filter mode keeps only the WHERE condition. This drops {parts}.",
-      "switchOffConfirm": "Switch to filter mode",
-      "dropped": {
-        "columns": "the selected columns",
-        "grouping": "grouping and aggregates",
-        "joins": "joins",
-        "limit": "the LIMIT",
-        "distinct": "DISTINCT",
-        "with": "the WITH clause",
-        "union": "UNION",
-        "stream": "the stream in FROM",
-        "other": "the rest of the query"
-      },
       "actionUnavailable": "Not available in SQL mode yet",
       "putConditionInWhere": "In SQL mode, put the condition in your WHERE clause",
       "rowsCount": "{count} row | {count} rows",
       "redUnavailable": "RED charts are off for queries that group, aggregate, join, limit or use DISTINCT, WITH or UNION: they would not describe the rows in the table.",
       "openInSpans": "Open in Spans view",
-      "openInSpansDesc": "Runs the query as written and shows its rows",
+      "runsInSpans": "SQL runs in the Spans view",
+      "backToTraces": "Back to Traces",
+      "sqlKept": "Your SQL is kept. Turn SQL on to get it back.",
+      "statementInTraces": {
+        "title": "The Traces view takes a filter, not a SELECT",
+        "description": "SQL runs in the Spans view."
+      },
+      "keptLine": {
+        "noFilter": "SQL stays in Spans. No filter is set, so this shows every trace in the range.",
+        "otherFilter": "SQL stays in Spans. This filter is not from your SQL.",
+        "fromSql": "Using the WHERE from your SQL. It replaced your filter.",
+        "groupingNotApplied": "GROUP BY and HAVING are not applied.",
+        "otherStream": "Your SQL reads {stream}; this list uses the stream picker.",
+        "useWhere": "Use WHERE from SQL",
+        "backToSql": "Back to SQL",
+        "noWhere": "Your SQL has no WHERE that the Traces view can run.",
+        "unreadable": "Your SQL can't be read. Fix it in Spans first."
+      },
       "examples": "Examples",
       "gallery": {
         "tracesTitle": "Find traces with SQL",
@@ -17233,22 +17236,10 @@
         },
         "tokensByModel": { "name": "Tokens by model", "description": "Input tokens per model" }
       },
-      "selector": {
-        "title": "This Query Can't Be Shown as Traces",
-        "quotedMarkerTitle": "This Query Can't Run in the Traces View",
-        "noTraceId": "The Traces view groups spans by trace_id, and this query does not return it.",
-        "selectAll": "The Traces view needs trace_id named in the SELECT list. SELECT * returns every column, so it runs in the Spans view.",
-        "notSingleSelect": "The Traces view runs one SELECT that returns trace_id. WITH, UNION, EXPLAIN and several statements run in the Spans view.",
-        "quotedMarker": "The Traces view removes every -- and ; from the query, even inside quoted text. Take them out of the quoted text, or run the query in the Spans view.",
-        "suggestedChange": "Suggested change",
-        "addTraceIdAndRun": "Add trace_id and Run",
-        "addTraceIdAndRunDesc": "Applies the change above, then runs the query"
-      },
       "noTraceIdHint": "These rows have no trace_id, so they do not open a trace.",
       "addTraceId": "Add trace_id",
       "openTrace": "Open trace",
       "awaitingRun": {
-        "tracesTitle": "Run the query to see traces",
         "spansTitle": "Run the query to see results",
         "description": "Nothing has run yet. Run query sends the SQL in the editor."
       },

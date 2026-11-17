@@ -870,13 +870,7 @@ import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAler
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { activeScopePredicate, isTracesScope, withScope } from "@/utils/traces/tracesScope";
-import {
-  analyzeTracesSql,
-  buildTraceSelectorSql,
-  buildTracesSql,
-  sqlToFilter,
-  withFieldUnits,
-} from "@/utils/traces/tracesSql";
+import { analyzeTracesSql, withFieldUnits } from "@/utils/traces/tracesSql";
 import { offsetRange, tracesSqlGuards } from "@/utils/traces/tracesSqlErrors";
 import type { TracesSqlTemplate } from "@/utils/traces/tracesSqlTemplates";
 import { useTracesSqlTemplateText } from "@/plugins/traces/composables/useTracesSqlTemplates";
@@ -1021,6 +1015,7 @@ export default defineComponent({
     "drill-down",
     "recent-restore",
     "sql-stream-change",
+    "open-spans-sql",
   ],
   props: {
     fieldValues: {
@@ -1055,7 +1050,17 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
 
-    const { searchObj, tracesShareURL, tracesParser } = useTraces();
+    const {
+      searchObj,
+      tracesShareURL,
+      tracesParser,
+      sqlTexts,
+      noteFilterText,
+      clearSqlText,
+      leaveSql,
+      turnSqlOn,
+      takeTypedSql,
+    } = useTraces();
     const queryEditorRef = ref(null);
 
     const nlpMode = ref(false);
@@ -1299,14 +1304,25 @@ export default defineComponent({
     const updateQueryValue = (value: string) => {
       _sqlOnQueryChange();
       updateAutoComplete(value);
+      // Deleting the SELECT turns SQL off, and what is left becomes the filter.
       if (searchObj.meta.sqlMode && value.trim() !== "" && !isAuthoredStatement(value)) {
+        sqlTexts.filter = "";
+        clearSqlText();
         searchObj.meta.sqlMode = false;
         return;
       }
-      if (!searchObj.meta.sqlMode && looksLikeSqlStatement(value, sqlStreamLookup)) {
-        searchObj.meta.sqlMode = true;
+      // The Traces view takes no SQL, so a statement typed there waits for Run and its card.
+      if (
+        !searchObj.meta.sqlMode &&
+        searchObj.meta.searchMode === "spans" &&
+        looksLikeSqlStatement(value, sqlStreamLookup)
+      ) {
+        takeTypedSql(value);
       }
-      if (!searchObj.meta.sqlMode) return;
+      if (!searchObj.meta.sqlMode) {
+        noteFilterText(value);
+        return;
+      }
       const stream = analyzeTracesSql(value, tracesParser.value).stream;
       if (
         stream &&
@@ -1330,57 +1346,28 @@ export default defineComponent({
         props.sqlTemplates.length > 0,
     );
 
-    // OSwitch flips its own state on click, so a refused switch off remounts it to show the mode again.
+    // OSwitch flips its own state on click; in the Traces view SQL never shows on, so the switch remounts.
     const sqlSwitchKey = ref(0);
 
-    // Turning on keeps typed SQL; turning off keeps only the WHERE, and asks first when more is lost.
-    const setSqlMode = async (on: boolean) => {
+    // In the Traces view the switch moves to Spans; off keeps the SQL text and runs the filter at once.
+    const setSqlMode = (on: boolean) => {
       if (on === searchObj.meta.sqlMode) return;
-      const stream = searchObj.data.stream.selectedStream?.value ?? "";
-      const text = String(searchObj.data.editorValue ?? "").trim();
-      if (on) {
-        // Read before SQL mode turns on, which switches the scope off.
-        const scope = activeScopePredicate(searchObj);
-        searchObj.meta.sqlMode = true;
-        // An empty editor with no scope keeps SQL mode on with nothing typed, so the template gallery shows.
-        if (stream && (text || scope) && !isAuthoredStatement(text)) {
-          const filter = withScope(resolveTracesFilter(text, tracesParser.value, stream), scope);
-          writeEditor(
-            searchObj.meta.searchMode === "traces"
-              ? buildTraceSelectorSql(stream, filter)
-              : buildTracesSql(stream, filter),
-          );
-          // The condition now lives in the WHERE, so the select steps back instead of applying it twice.
-          if (scope) searchObj.meta.scope = "all";
-        }
-        return;
-      }
-      if (!isAuthoredStatement(text)) {
-        searchObj.meta.sqlMode = false;
-        return;
-      }
-      const { filter, dropped } = sqlToFilter(
-        analyzeTracesSql(text, tracesParser.value),
-        stream,
-        searchObj.meta.searchMode === "traces",
-      );
-      if (dropped.length) {
+      if (on && searchObj.meta.searchMode !== "spans") {
+        sqlSwitchKey.value++;
         moreMenuOpen.value = false;
-        const confirmed = await confirm({
-          title: t("traces.sqlMode.switchOffTitle"),
-          message: t("traces.sqlMode.switchOffMessage", {
-            parts: dropped.map((part) => t(`traces.sqlMode.dropped.${part}`)).join(", "),
-          }),
-          confirmLabel: t("traces.sqlMode.switchOffConfirm"),
-          focusCancel: true,
-        });
-        if (!confirmed) {
-          sqlSwitchKey.value++;
-          return;
-        }
+        emit("open-spans-sql");
+        return;
       }
-      searchObj.meta.sqlMode = false;
-      writeEditor(filter);
+      if (on) {
+        turnSqlOn();
+        setEditorValue(searchObj.data.editorValue);
+        return;
+      }
+      sqlTexts.spansSql = false;
+      leaveSql();
+      setEditorValue(searchObj.data.editorValue);
+      emit("searchdata");
+      if (sqlTexts.sql) toast({ message: t("traces.sqlMode.sqlKept"), variant: "info" });
     };
 
     // Typed SQL always waits for Run, so auto-run never fires in SQL mode.
@@ -1713,10 +1700,7 @@ export default defineComponent({
       _traceSqlMode,
       _traceNoStream,
       t,
-      {
-        excludeMatchAll: true,
-        sqlColumns: computed(() => (searchObj.meta.searchMode === "traces" ? "trace_id" : "*")),
-      },
+      { excludeMatchAll: true },
     );
 
     const orgId = useOrgId();

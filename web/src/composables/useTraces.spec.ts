@@ -2261,13 +2261,49 @@ describe("useTraces", () => {
       mockCurrentRoute.value = originalRoute;
     });
 
-    const sqlState = (sqlMode: boolean, editorValue: string) => {
+    const sqlState = (sqlMode: boolean, editorValue: string, view = "spans") => {
       const inst = useTraces();
       inst.resetSearchObj();
+      inst.searchObj.meta.searchMode = view as any;
       inst.searchObj.meta.sqlMode = sqlMode;
       inst.searchObj.data.editorValue = editorValue;
       return inst;
     };
+
+    it("writes sql_mode only in the Spans view, so a Traces link holds the filter only", () => {
+      expect(sqlState(true, `SELECT * FROM "a"`, "traces").getUrlQueryParams()).not.toHaveProperty(
+        "sql_mode",
+      );
+      const { searchObj, normalizeTracesView, getUrlQueryParams } = sqlState(
+        true,
+        `SELECT * FROM "a" WHERE b = 1`,
+      );
+      normalizeTracesView("traces", { kind: "move" });
+      const query = getUrlQueryParams();
+      expect(query).not.toHaveProperty("sql_mode");
+      expect(query.query).toBe("b64uni:");
+      expect(searchObj.data.editorValue).toBe("");
+    });
+
+    it.each(["service-graph", "services-catalog"])(
+      "keeps sql_mode in a %s URL with SQL on, so a reload brings the SQL back",
+      (view) => {
+        const query = sqlState(true, `SELECT * FROM "a"`, view).getUrlQueryParams();
+        expect(query.sql_mode).toBe("true");
+        expect(query.tab).toBe(view);
+      },
+    );
+
+    it("forgets the SQL text kept for Spans on an org change", () => {
+      const { sqlTexts, normalizeTracesView, resetSearchObj } = sqlState(
+        true,
+        `SELECT * FROM "a" WHERE b = 1`,
+      );
+      normalizeTracesView("traces", { kind: "move" });
+      expect(sqlTexts.sql).toBe(`SELECT * FROM "a" WHERE b = 1`);
+      resetSearchObj();
+      expect(sqlTexts.sql).toBe("");
+    });
 
     it("writes sql_mode only while SQL mode is on with a query", () => {
       expect(sqlState(true, `SELECT * FROM "a"`).getUrlQueryParams().sql_mode).toBe("true");

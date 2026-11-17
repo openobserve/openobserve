@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @drill-down="searchResultRef?.openComparison()"
               :sql-templates="sqlTemplates"
               @sql-stream-change="onSqlStreamChange"
+              @open-spans-sql="onOpenSpansSql"
             />
           </div>
         </template>
@@ -148,164 +149,180 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #after>
-                  <div class="h-full pb-2.5">
-                    <!-- No trace streams in org yet -->
-                    <FirstDataPanel
-                      v-if="
-                        !searchObj.loadingStream &&
-                        searchObj.data.stream.streamLists.length === 0 &&
-                        !searchObj.loading
-                      "
-                      v-slot="{ layout, statusLine }"
-                      signal="traces"
-                      variant="full"
-                      status-in-slot
-                      @detected="onFirstDataDetected"
-                    >
-                      <TracesNoDataState
-                        :ai-enabled="isAiEnabled"
-                        :alternatives-only="layout === 'panel'"
-                        data-test="traces-no-streams-in-org-text"
-                        @ask-ai="onAskAiSetupTracing"
-                      >
-                        <template v-if="layout === 'status'" #status>
-                          <component :is="statusLine" />
-                        </template>
-                      </TracesNoDataState>
-                    </FirstDataPanel>
-                    <TracesSqlTemplateGallery
-                      v-else-if="!searchObj.loadingStream && sqlEditorEmpty && isStreamSelected"
-                      :view="searchObj.meta.searchMode === 'spans' ? 'spans' : 'traces'"
-                      :templates="sqlTemplates"
-                      @use="onUseSqlTemplate"
+                  <div class="flex h-full flex-col pb-2.5">
+                    <TracesSqlKeptLine
+                      v-if="showSqlKeptLine"
+                      class="shrink-0"
+                      :sql="sqlTexts.sql"
+                      :filter="String(searchObj.data.editorValue ?? '')"
+                      :filter-from-sql="sqlTexts.filterFromSql"
+                      :stream="searchObj.data.stream.selectedStream.value"
+                      @use-where="onUseWhereFromSql"
+                      @back-to-sql="onBackToSql"
                     />
-                    <div
-                      v-else-if="searchObj.data.errorMsg !== '' && !searchObj.loading"
-                      data-test="traces-search-error-message"
-                      class="bg-card-glass-bg h-full"
-                    >
-                      <TracesSqlErrorState
-                        v-if="searchObj.meta.sqlMode"
-                        :error-code="searchObj.data.errorCode"
-                        :error-msg="searchObj.data.errorMsg"
-                        :error-detail="searchObj.data.errorDetail"
-                        :ai-enabled="isAiEnabled"
-                        :stream-name="searchObj.data.stream.selectedStream.value"
-                        :query="String(searchObj.data.editorValue ?? '')"
-                        :suggestions="sqlErrorSuggestions"
-                        :fields="searchObj.data.stream.selectedStreamFields.map((f: any) => f.name)"
-                        :range-us="
-                          searchObj.data.datetime.endTime - searchObj.data.datetime.startTime
+                    <div class="min-h-0 flex-1">
+                      <!-- No trace streams in org yet -->
+                      <FirstDataPanel
+                        v-if="
+                          !searchObj.loadingStream &&
+                          searchObj.data.stream.streamLists.length === 0 &&
+                          !searchObj.loading
                         "
-                        @ask-ai="onAskAiTracing"
-                        @run-sql="onSqlRewriteRun"
-                        @use-last-hour="onSqlUseLastHour"
-                        @configure-resource="onConfigureTracesStream"
+                        v-slot="{ layout, statusLine }"
+                        signal="traces"
+                        variant="full"
+                        status-in-slot
+                        @detected="onFirstDataDetected"
+                      >
+                        <TracesNoDataState
+                          :ai-enabled="isAiEnabled"
+                          :alternatives-only="layout === 'panel'"
+                          data-test="traces-no-streams-in-org-text"
+                          @ask-ai="onAskAiSetupTracing"
+                        >
+                          <template v-if="layout === 'status'" #status>
+                            <component :is="statusLine" />
+                          </template>
+                        </TracesNoDataState>
+                      </FirstDataPanel>
+                      <TracesSqlTemplateGallery
+                        v-else-if="!searchObj.loadingStream && sqlEditorEmpty && isStreamSelected"
+                        :view="searchObj.meta.searchMode === 'spans' ? 'spans' : 'traces'"
+                        :templates="sqlTemplates"
+                        @use="onUseSqlTemplate"
                       />
-                      <QueryErrorState
-                        v-else
-                        :error-code="tracesErrorCode"
-                        :error-msg="searchObj.data.errorMsg"
-                        :error-detail="searchObj.data.errorDetail"
-                        :ai-enabled="isAiEnabled"
-                        :resource-name="searchObj.data.stream.selectedStream.value"
-                        size="hero"
-                        @ask-ai="onAskAiTracing"
-                        @configure-resource="onConfigureTracesStream"
-                      />
-                    </div>
-                    <div
-                      v-else-if="!searchObj.loadingStream && !isStreamSelected"
-                      class="max-lg:h-full"
-                    >
-                      <TracesNoStreamState
-                        :org-id="store.state.selectedOrganization?.identifier"
-                        data-test="traces-no-stream-selected-text"
-                        @select-stream="onSelectTracesStream"
-                        @pick-stream="onPickTracesStream"
-                      />
-                    </div>
-                    <div
-                      v-else-if="traceSqlProblem && sqlInTracesView"
-                      class="bg-card-glass-bg h-full"
-                    >
-                      <TracesSqlSelectorProblem
-                        :problem="traceSqlProblem.problem"
-                        :suggestion="traceSqlProblem.suggestion"
-                        :ai-enabled="isAiEnabled"
-                        @add-trace-id="onSqlAddTraceId(traceSqlProblem.sql)"
-                        @open-spans="onSearchModeChange('spans')"
-                        @ask-ai="onAskAiTraceSql"
-                      />
-                    </div>
-                    <div
-                      v-else-if="sqlAwaitingRun"
-                      class="bg-card-glass-bg h-full"
-                      data-test="traces-sql-awaiting-run"
-                    >
-                      <OEmptyState
-                        illustration="query"
-                        variant="neutral"
-                        size="hero"
-                        :title="
-                          searchObj.meta.searchMode === 'spans'
-                            ? t('traces.sqlMode.awaitingRun.spansTitle')
-                            : t('traces.sqlMode.awaitingRun.tracesTitle')
+                      <div
+                        v-else-if="searchObj.data.errorMsg !== '' && !searchObj.loading"
+                        data-test="traces-search-error-message"
+                        class="bg-card-glass-bg h-full"
+                      >
+                        <TracesSqlErrorState
+                          v-if="searchObj.meta.sqlMode"
+                          :error-code="searchObj.data.errorCode"
+                          :error-msg="searchObj.data.errorMsg"
+                          :error-detail="searchObj.data.errorDetail"
+                          :ai-enabled="isAiEnabled"
+                          :stream-name="searchObj.data.stream.selectedStream.value"
+                          :query="String(searchObj.data.editorValue ?? '')"
+                          :suggestions="sqlErrorSuggestions"
+                          :fields="
+                            searchObj.data.stream.selectedStreamFields.map((f: any) => f.name)
+                          "
+                          :range-us="
+                            searchObj.data.datetime.endTime - searchObj.data.datetime.startTime
+                          "
+                          @ask-ai="onAskAiTracing"
+                          @run-sql="onSqlRewriteRun"
+                          @use-last-hour="onSqlUseLastHour"
+                          @configure-resource="onConfigureTracesStream"
+                        />
+                        <QueryErrorState
+                          v-else
+                          :error-code="tracesErrorCode"
+                          :error-msg="searchObj.data.errorMsg"
+                          :error-detail="searchObj.data.errorDetail"
+                          :ai-enabled="isAiEnabled"
+                          :resource-name="searchObj.data.stream.selectedStream.value"
+                          size="hero"
+                          @ask-ai="onAskAiTracing"
+                          @configure-resource="onConfigureTracesStream"
+                        />
+                      </div>
+                      <div
+                        v-else-if="!searchObj.loadingStream && !isStreamSelected"
+                        class="max-lg:h-full"
+                      >
+                        <TracesNoStreamState
+                          :org-id="store.state.selectedOrganization?.identifier"
+                          data-test="traces-no-stream-selected-text"
+                          @select-stream="onSelectTracesStream"
+                          @pick-stream="onPickTracesStream"
+                        />
+                      </div>
+                      <div
+                        v-else-if="
+                          !searchObj.loadingStream &&
+                          statementInTraces &&
+                          searchObj.meta.searchMode === 'traces'
                         "
-                        :description="t('traces.sqlMode.awaitingRun.description')"
-                        :action-label="t('emptyState.noQueryApplied.action')"
-                        action-icon="play-arrow"
-                        @action="() => searchData()"
-                      />
-                    </div>
-                    <div
-                      v-else-if="
-                        !searchObj.loadingStream &&
-                        isStreamSelected &&
-                        !searchObj.searchApplied &&
-                        !searchObj.data.queryResults?.hits?.length
-                      "
-                    >
-                      <OEmptyState
-                        preset="no-query-applied"
-                        size="hero"
-                        data-test="traces-search-not-started-text"
-                        @action="() => searchData()"
-                      />
-                    </div>
-                    <div v-else-if="searchCancelled && !searchObj.loading">
-                      <OEmptyState
-                        preset="search-cancelled"
-                        size="hero"
-                        data-test="traces-search-cancelled-state"
-                        @action="() => searchData()"
-                      />
-                    </div>
-                    <div v-else data-test="logs-search-search-result" class="h-full!">
-                      <SearchResult
-                        ref="searchResultRef"
-                        :pending="searchObj.loadingStream"
-                        :show-error-only="showErrorOnly"
-                        :ai-enabled="isAiEnabled"
-                        :stream-doc-time-range="streamDocTimeRange"
-                        :query-window-us="queryWindowUs"
-                        @update:datetime="setHistogramDate"
-                        @update:scroll="getMoreData"
-                        @update:sort="runQueryOnSort"
-                        @shareLink="(range: any) => copyTracesUrl(t, range)"
-                        @metrics:editor-filter-set="onMetricsEditorFilterSet"
-                        @metrics:editor-filter-run="onMetricsEditorFilterRun"
-                        @run-query="searchData()"
-                        @remove-filter="onRemoveTracesFilter"
-                        @jump-to-stream-data="onJumpToTracesStreamData"
-                        @error-only-toggled="onErrorOnlyToggled"
-                        @ask-ai="onAskAiTracing"
-                        @send-to-ai-chat="sendToAiChat"
-                        @open-mobile-fields="mobileFieldsOpen = true"
-                        @add-trace-id="onSqlAddTraceId"
-                        @run-sql="onSqlRewriteRun"
-                        @open-group="onOpenGroup"
-                      />
+                        class="bg-card-glass-bg h-full"
+                        data-test="traces-statement-in-traces"
+                      >
+                        <OEmptyState
+                          illustration="query"
+                          variant="neutral"
+                          size="hero"
+                          :title="t('traces.sqlMode.statementInTraces.title')"
+                          :description="t('traces.sqlMode.statementInTraces.description')"
+                          :action-label="t('traces.sqlMode.openInSpans')"
+                          @action="onOpenStatementInSpans"
+                        />
+                      </div>
+                      <div
+                        v-else-if="!searchObj.loadingStream && sqlAwaitingRun"
+                        class="bg-card-glass-bg h-full"
+                        data-test="traces-sql-awaiting-run"
+                      >
+                        <OEmptyState
+                          illustration="query"
+                          variant="neutral"
+                          size="hero"
+                          :title="t('traces.sqlMode.awaitingRun.spansTitle')"
+                          :description="t('traces.sqlMode.awaitingRun.description')"
+                          :action-label="t('emptyState.noQueryApplied.action')"
+                          action-icon="play-arrow"
+                          @action="() => searchData()"
+                        />
+                      </div>
+                      <div
+                        v-else-if="
+                          !searchObj.loadingStream &&
+                          isStreamSelected &&
+                          !searchObj.searchApplied &&
+                          !searchObj.data.queryResults?.hits?.length
+                        "
+                      >
+                        <OEmptyState
+                          preset="no-query-applied"
+                          size="hero"
+                          data-test="traces-search-not-started-text"
+                          @action="() => searchData()"
+                        />
+                      </div>
+                      <div v-else-if="searchCancelled && !searchObj.loading">
+                        <OEmptyState
+                          preset="search-cancelled"
+                          size="hero"
+                          data-test="traces-search-cancelled-state"
+                          @action="() => searchData()"
+                        />
+                      </div>
+                      <div v-else data-test="logs-search-search-result" class="h-full!">
+                        <SearchResult
+                          ref="searchResultRef"
+                          :pending="searchObj.loadingStream"
+                          :show-error-only="showErrorOnly"
+                          :ai-enabled="isAiEnabled"
+                          :stream-doc-time-range="streamDocTimeRange"
+                          :query-window-us="queryWindowUs"
+                          @update:datetime="setHistogramDate"
+                          @update:scroll="getMoreData"
+                          @update:sort="runQueryOnSort"
+                          @shareLink="(range: any) => copyTracesUrl(t, range)"
+                          @metrics:editor-filter-set="onMetricsEditorFilterSet"
+                          @metrics:editor-filter-run="onMetricsEditorFilterRun"
+                          @run-query="searchData()"
+                          @remove-filter="onRemoveTracesFilter"
+                          @jump-to-stream-data="onJumpToTracesStreamData"
+                          @error-only-toggled="onErrorOnlyToggled"
+                          @ask-ai="onAskAiTracing"
+                          @send-to-ai-chat="sendToAiChat"
+                          @open-mobile-fields="mobileFieldsOpen = true"
+                          @add-trace-id="onSqlAddTraceId"
+                          @run-sql="onSqlRewriteRun"
+                          @open-group="onOpenGroup"
+                        />
+                      </div>
                     </div>
                   </div>
                 </template>
@@ -410,17 +427,14 @@ import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { applyFilterTerm } from "@/utils/traces/filterUtils";
 import {
   analyzeTracesSql,
-  canAddTraceId,
   insertTraceIdColumn,
   isRowQuery,
   sqlPaging,
-  traceIdSuggestion,
-  traceSelector,
-  type TraceSelectorProblem,
+  tracesFilterFromSql,
 } from "@/utils/traces/tracesSql";
 import { useTracesSqlTemplates } from "./composables/useTracesSqlTemplates";
 import TracesSqlTemplateGallery from "./components/TracesSqlTemplateGallery.vue";
-import TracesSqlSelectorProblem from "./components/TracesSqlSelectorProblem.vue";
+import TracesSqlKeptLine from "./components/TracesSqlKeptLine.vue";
 import TracesSqlErrorState from "./components/TracesSqlErrorState.vue";
 import { ONE_HOUR_US } from "@/utils/traces/tracesSqlErrors";
 import {
@@ -516,6 +530,10 @@ const {
   updatedLocalLogFilterField,
   loadTracesParser,
   tracesParser,
+  sqlTexts,
+  noteFilterText,
+  clearSqlText,
+  normalizeTracesView,
 } = useTraces();
 const { fnParsedSQL } = logsUtils();
 
@@ -661,12 +679,8 @@ let submittedSql = "";
 let submittedScope = "";
 // Bumped per grouped run, so a Run with unchanged inputs still reloads the Groups table.
 let groupsRunId = 0;
-// The last Run's Traces view SQL that cannot pick traces, with the fix to offer.
-const traceSqlProblem = ref<{
-  sql: string;
-  problem: TraceSelectorProblem;
-  suggestion: { before: string; after: string } | null;
-} | null>(null);
+// A Run in the Traces view with a statement in the filter sends nothing and shows this instead.
+const statementInTraces = ref(false);
 // A link's page applies to the first search after it is read; any later Run starts at page 1.
 let pendingUrlPage: number | null = null;
 let stopUrlSync = syncUrlViewState();
@@ -855,12 +869,7 @@ function buildSearch(reuseLastWindow = false) {
     const queryFunctions = "";
     let whereClause = query.trim();
 
-    if (searchObj.meta.sqlMode && searchObj.meta.searchMode === "traces") {
-      // The count covers the traces the selector picks, over the selected stream.
-      builtWhereClause = traceSelector(query, tracesParser.value).filter;
-      builtFromClause = "";
-      req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", " WHERE " + builtWhereClause);
-    } else if (searchObj.meta.sqlMode) {
+    if (searchObj.meta.sqlMode) {
       // Typed SQL is sent as written, so the count reads its WHERE as typed.
       const typed = analyzeTracesSql(query, tracesParser.value);
       builtWhereClause = typed.where;
@@ -927,19 +936,16 @@ function dropKeptCount(results: any) {
   searchObj.meta.resultGrid.showPagination = false;
 }
 
-// Empty SQL waits for a template or typing; a Traces view query that cannot pick traces says why instead.
-function sqlRunBlocked(): boolean {
-  const sql = String(searchObj.data.editorValue ?? "").trim();
-  traceSqlProblem.value = null;
-  if (!sql) return true;
-  if (searchObj.meta.searchMode !== "traces") return false;
-  const { problem } = traceSelector(sql, tracesParser.value);
-  if (!problem) return false;
-  const addable =
-    problem === "noTraceId" && canAddTraceId(analyzeTracesSql(sql, tracesParser.value));
-  traceSqlProblem.value = { sql, problem, suggestion: addable ? traceIdSuggestion(sql) : null };
-  searchObj.data.errorMsg = "";
-  return true;
+// Empty SQL waits for a template or typing; a statement in the Traces view filter gets its card instead.
+function runBlocked(): boolean {
+  statementInTraces.value =
+    searchObj.meta.searchMode === "traces" &&
+    isAuthoredStatement(String(searchObj.data.editorValue ?? ""));
+  if (statementInTraces.value) {
+    searchObj.data.errorMsg = "";
+    return true;
+  }
+  return !!searchObj.meta.sqlMode && !String(searchObj.data.editorValue ?? "").trim();
 }
 
 // A query that groups or limits rows has no WHERE count; its rows are the count.
@@ -1110,7 +1116,7 @@ async function getQueryData(
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
     }
-    if (!isPagination && searchObj.meta.sqlMode && sqlRunBlocked()) {
+    if (!isPagination && runBlocked()) {
       // A blocked run answers with its reason, so the Run button no longer waits on it.
       cancelMainSearch();
       searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
@@ -1185,10 +1191,11 @@ async function getQueryData(
 
     // A search or sort reads the editor and the resolved window; a page fetch keeps page 1's, so its selection still holds.
     if (!isPagination) {
-      submittedFilter = sqlInTracesView.value
-        ? traceSelector(submittedSql, tracesParser.value).filter
-        : buildEditorFilter();
+      submittedFilter = buildEditorFilter();
       searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
+      // A run is the point after which a pre-fill counts as the user's SQL.
+      if (submittedSql) sqlTexts.prefill = null;
+      else noteFilterText(searchObj.data.appliedEditorValue, true);
       sqlRanView.value = searchObj.meta.sqlMode ? searchObj.meta.searchMode : null;
       dropStaleSelection();
       searchObj.meta.lastRunSignature = tracesSearchRunSignature(searchObj);
@@ -2139,13 +2146,19 @@ function restoreUrlQueryParams() {
     searchObj.data.datetime = date;
   }
 
+  const view = supportedTraceSearchMode(queryParams.tab);
   if (queryParams.query) {
-    searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-    searchObj.meta.sqlMode =
-      queryParams.sql_mode === "true" && !!searchObj.data.editorValue?.trim();
+    const text = b64DecodeUnicode(queryParams.query);
+    const sql = queryParams.sql_mode === "true" && !!text.trim();
+    // The page's own URL keeps the SQL text it set aside; any other text is new intent.
+    const own = text === searchObj.data.editorValue && sql === !!searchObj.meta.sqlMode;
+    normalizeTracesView(
+      view,
+      own ? { kind: "move", sql: sql ? text : undefined } : { kind: "open", text, sqlMode: sql },
+    );
+  } else {
+    normalizeTracesView(view, { kind: "move" });
   }
-
-  searchObj.meta.searchMode = supportedTraceSearchMode(queryParams.tab);
 
   if (queryParams.stream && searchObj.data.stream.selectedStream.value !== queryParams.stream) {
     searchObj.data.stream.selectedStream = {
@@ -2234,17 +2247,22 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
-const onSearchModeChange = (mode: TraceSearchMode) => {
-  searchObj.meta.searchMode = mode;
-  if (mode === "service-graph" || mode === "services-catalog") return;
-  if (
-    mode === "traces" &&
-    searchObj.meta.resultGrid.sortBy !== "start_time" &&
-    searchObj.meta.resultGrid.sortBy !== "duration"
-  ) {
-    searchObj.meta.resultGrid.sortBy = "start_time";
-  }
+// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog); `entrySql` is a history entry's own SQL.
+const onSearchModeChange = (mode: TraceSearchMode, entrySql?: string) => {
+  statementInTraces.value = false;
+  const { view, waitForRun } = normalizeTracesView(mode, { kind: "move", sql: entrySql });
+  if (view === "service-graph" || view === "services-catalog") return;
+  // SQL that stayed on through a graph or catalog view runs again only if it ran here unedited.
+  const edited =
+    searchObj.meta.sqlMode &&
+    String(searchObj.data.editorValue ?? "") !== searchObj.data.appliedEditorValue;
+  if (waitForRun || edited) sqlRanView.value = null;
+  showViewResults(!waitForRun && !sqlAwaitingRun.value);
+};
+
+// Rows from another view never fit this one; SQL back on screen waits for Run, anything else runs.
+const showViewResults = (run: boolean) => {
+  searchBarRef.value?.setEditorValue?.(searchObj.data.editorValue);
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.data.queryResults = {
     hits: [],
@@ -2255,9 +2273,46 @@ const onSearchModeChange = (mode: TraceSearchMode) => {
     errorCount: 0,
   };
   // The table skeleton must show the new mode's columns, not the old mode's until rows land.
-  loadLocalLogFilterField(mode);
+  loadLocalLogFilterField(searchObj.meta.searchMode);
   rebuildColumns();
-  getQueryData();
+  if (run) getQueryData();
+};
+
+// The SQL switch in the Traces view: Spans with SQL on, nothing runs, and a way back.
+const onOpenSpansSql = () => {
+  normalizeTracesView("spans", { kind: "sql" });
+  showViewResults(false);
+  toast({
+    variant: "info",
+    message: t("traces.sqlMode.runsInSpans"),
+    action: {
+      label: t("traces.sqlMode.backToTraces"),
+      handler: () => onSearchModeChange("traces"),
+    },
+  });
+};
+
+// Back to SQL from the kept line: the stored SQL text, waiting for Run.
+const onBackToSql = () => {
+  normalizeTracesView("spans", { kind: "sql" });
+  showViewResults(false);
+};
+
+// Open in Spans view from the statement card: the typed text becomes the SQL text, not run.
+const onOpenStatementInSpans = () => {
+  statementInTraces.value = false;
+  normalizeTracesView("spans", { kind: "sql", text: String(searchObj.data.editorValue ?? "") });
+  showViewResults(false);
+};
+
+// Use WHERE from SQL replaces the filter with the SQL's top-level WHERE and runs it.
+const onUseWhereFromSql = () => {
+  const { filter, problem } = tracesFilterFromSql(sqlTexts.sql, tracesParser.value);
+  if (problem) return;
+  sqlTexts.filterFromSql = filter;
+  searchObj.data.editorValue = filter;
+  searchBarRef.value?.setEditorValue?.(filter);
+  runQueryFn();
 };
 
 // Like the view switch, a new scope runs at once and starts from page 1.
@@ -2291,7 +2346,12 @@ watch(
     if (routeName !== "traces" || !pageActive.value) return;
     const mode = supportedTraceSearchMode(tab);
     if (mode !== searchObj.meta.searchMode) {
-      onSearchModeChange(mode);
+      const query = router.currentRoute.value.query;
+      const entrySql =
+        query.sql_mode === "true" && typeof query.query === "string"
+          ? b64DecodeUnicode(query.query)
+          : undefined;
+      onSearchModeChange(mode, entrySql);
       return;
     }
     if (tab !== mode) {
@@ -2311,10 +2371,6 @@ const onFiltersReset = () => {
   // SearchBar already cleared the map; a later baseline-only Drill down must use the current range.
   searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
-
-const sqlInTracesView = computed(
-  () => !!searchObj.meta.sqlMode && searchObj.meta.searchMode === "traces",
-);
 
 const sqlEditorEmpty = computed(
   () => !!searchObj.meta.sqlMode && !String(searchObj.data.editorValue ?? "").trim(),
@@ -2344,11 +2400,19 @@ watch(
   () => searchObj.meta.sqlMode,
   (on) => {
     if (on) return;
-    traceSqlProblem.value = null;
     if (!searchObj.data.queryResults?.sql) return;
     searchObj.data.queryResults = {};
     searchObj.data.sortedQueryResults = [];
   },
+);
+
+// The Traces view says where its filter came from while Spans keeps SQL text.
+const showSqlKeptLine = computed(
+  () =>
+    searchObj.meta.searchMode === "traces" &&
+    !!sqlTexts.sql.trim() &&
+    isStreamSelected.value &&
+    !searchObj.loadingStream,
 );
 
 const isStreamSelected = computed(() => {
@@ -2502,27 +2566,6 @@ const onAskAiTracing = () => {
     "sendToAiChat",
     raw(
       `${outcome} I am searching ${mode}. ${queryText} Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust ${ask} to get results?`,
-    ),
-    false,
-  );
-};
-
-// Model input, not screen copy: kept English, like the page's other Ask AI prompts.
-const TRACE_SQL_PROBLEM_PROMPTS: Record<TraceSelectorProblem, string> = {
-  noTraceId: "The query does not return a trace_id column.",
-  selectAll: "The query uses SELECT *, but it must name trace_id in its SELECT list.",
-  notSingleSelect: "The query must be a single SELECT, without WITH, UNION or EXPLAIN.",
-  quotedMarker: "The query has -- or ; inside quoted text, which the Traces view removes.",
-};
-
-const onAskAiTraceSql = () => {
-  const blocked = traceSqlProblem.value;
-  if (!blocked) return;
-  const stream = searchObj.data.stream.selectedStream?.value || "unknown";
-  emit(
-    "sendToAiChat",
-    raw(
-      `In the traces explorer's Traces view my SQL runs as the filter trace_id IN (<query>), so the query must be one SELECT that returns trace_id. ${TRACE_SQL_PROBLEM_PROMPTS[blocked.problem]} The SQL query is: ${blocked.sql}. Stream: ${stream}. Can you rewrite the query so it returns the trace_id of the traces I want?`,
     ),
     false,
   );
@@ -2723,6 +2766,8 @@ const loadSelectedStreamFields = async () => {
 };
 
 const onChangeStream = async () => {
+  // SQL kept for Spans read the old stream; SQL on screen stays the user's to edit.
+  if (!searchObj.meta.sqlMode) clearSqlText();
   await loadSelectedStreamFields();
   const groupBy = searchObj.meta.groupBy;
   if (groupBy && !searchObj.data.stream.selectedStreamFields.some((f: any) => f.name === groupBy)) {
@@ -2739,8 +2784,8 @@ const onSqlStreamChange = async (stream: string) => {
   await loadSelectedStreamFields();
 };
 
-const onSqlAddTraceId = (source?: string) => {
-  const sql = insertTraceIdColumn(String(source ?? searchObj.data.queryResults?.sql ?? ""));
+const onSqlAddTraceId = () => {
+  const sql = insertTraceIdColumn(String(searchObj.data.queryResults?.sql ?? ""));
   if (!sql) return;
   searchObj.data.editorValue = sql;
   searchBarRef.value?.setEditorValue?.(sql);
@@ -2830,12 +2875,16 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
     if (seq !== savedViewApplySeq) return;
   }
 
-  searchObj.meta.searchMode = view.searchMode;
   searchObj.data.datetime = { ...searchObj.data.datetime, ...view.datetime };
   await syncSavedViewDateTime(view.datetime);
   if (seq !== savedViewApplySeq) return;
-  // A recent search carries no mode, so the text itself says whether it is SQL.
-  searchObj.meta.sqlMode = view.sqlMode ?? isAuthoredStatement(view.editorValue ?? "");
+  // SQL opens in the Spans view whatever view it was saved from; a recent search's text says whether it is SQL.
+  const { view: searchMode } = normalizeTracesView(view.searchMode, {
+    kind: "open",
+    text: view.editorValue ?? "",
+    sqlMode: view.sqlMode,
+  });
+  statementInTraces.value = false;
   // A recent search records no scope, so it keeps the current one.
   if (view.scope) searchObj.meta.scope = view.scope;
   if (view.groupBy !== undefined) {
@@ -2843,24 +2892,30 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
     // A load without a run must not leave a table for another grouping on screen.
     if (searchObj.data.groupsRequest?.key !== view.groupBy) searchObj.data.groupsRequest = null;
   }
-  searchObj.data.editorValue = view.editorValue;
-  searchBarRef.value?.setEditorValue?.(view.editorValue);
-  searchObj.meta.resultGrid.sortBy = view.sortBy;
+  searchBarRef.value?.setEditorValue?.(searchObj.data.editorValue);
+  // The Traces list sorts by start time or duration only, which the normaliser already enforced.
+  if (searchMode !== "traces" || ["start_time", "duration"].includes(view.sortBy)) {
+    searchObj.meta.resultGrid.sortBy = view.sortBy;
+  }
   searchObj.meta.resultGrid.sortOrder = view.sortOrder;
 
   // A zero-hit search never rebuilds the columns, so the view's columns are applied here.
   searchObj.data.stream.selectedFields = [...(view.selectedFields ?? [])];
   rebuildColumns();
-  updatedLocalLogFilterField(view.searchMode);
+  updatedLocalLogFilterField(searchMode);
 
   // getUrlQueryParams copies trace_id/span_id from the route, which would reopen a trace.
-  const query = { ...router.currentRoute.value.query, tab: view.searchMode };
+  const query = { ...router.currentRoute.value.query, tab: searchMode };
   delete query.trace_id;
   delete query.span_id;
   if (canWriteTracesUrl()) await router.replace({ query });
   if (seq !== savedViewApplySeq) return;
 
-  if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
+  if (
+    !searchObj.meta.sqlMode &&
+    view.editorValue &&
+    searchObj.data.stream.selectedStreamFields.length
+  ) {
     restoreFilters(view.editorValue);
   }
   if (streamChanged) refreshOpenFieldValues();
@@ -2905,6 +2960,7 @@ const applyStreamChange = async (newStream: string) => {
     value: newStream,
   };
   searchObj.data.editorValue = "";
+  clearSqlText();
   streamChangeDialog.value.show = false;
   // With auto-run off no search writes the URL, and the catalog's Back and Forward follow the URL's stream.
   if (isAutoRunOff() && activeTab.value === "services-catalog" && canWriteTracesUrl()) {
@@ -3020,8 +3076,12 @@ watch(
 
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
-  // Switch to search tab
-  searchObj.meta.searchMode = data.mode;
+  // buildViewTracesFilter returns "" when the payload names no service, so the current filter stays.
+  const filterQuery = buildViewTracesFilter(data);
+  // The handoff writes filter text, never SQL, and its intent replaces any SQL text kept for Spans.
+  normalizeTracesView(data.mode, { kind: "handoff", filter: filterQuery || null });
+  statementInTraces.value = false;
+  searchBarRef.value?.setEditorValue?.(searchObj.data.editorValue);
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -3029,16 +3089,6 @@ const handleServiceGraphViewTraces = (data: any) => {
       label: data.stream,
       value: data.stream,
     };
-  }
-
-  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY).
-  // buildViewTracesFilter returns "" when the payload names no service, which
-  // preserves the pre-existing "only filter when a service is named" guard.
-  const filterQuery = buildViewTracesFilter(data);
-  if (filterQuery) {
-    searchObj.data.editorValue = filterQuery;
-    // The handoff writes filter text, not SQL.
-    searchObj.meta.sqlMode = false;
   }
 
   // Set the time range
@@ -3085,9 +3135,8 @@ const applyHandoffFilter = (): boolean => {
   const filter = router.currentRoute.value.query.filter;
   if (typeof filter !== "string") return false;
 
-  searchObj.data.editorValue = filter;
-  // The handoff writes filter text, not SQL.
-  searchObj.meta.sqlMode = false;
+  // The handoff writes filter text, never SQL, and its intent replaces any SQL text kept for Spans.
+  normalizeTracesView(searchObj.meta.searchMode, { kind: "handoff", filter });
   return true;
 };
 

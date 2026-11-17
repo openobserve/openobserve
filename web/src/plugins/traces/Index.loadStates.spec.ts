@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { createTracesSqlTexts } from "@/utils/traces/tracesSqlTexts";
 import { defineComponent, h, KeepAlive, nextTick, reactive, ref, watch } from "vue";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import Index from "@/plugins/traces/Index.vue";
@@ -143,8 +144,13 @@ vi.mock("@/composables/useTraces", () => ({
     updatedLocalLogFilterField: vi.fn(),
     loadTracesParser: mockLoadTracesParser,
     tracesParser: { value: { astify: vi.fn(() => ({ where: null })) } },
+    ...sqlTexts(),
   }),
 }));
+
+// The real two-text state over the mock searchObj, like the module singleton it stands for.
+let sharedSqlTexts: ReturnType<typeof createTracesSqlTexts> | null = null;
+const sqlTexts = () => (sharedSqlTexts ??= createTracesSqlTexts(searchObj as any, { value: null }));
 
 vi.mock("@/utils/streamPersist", () => ({
   saveTracesStream: vi.fn(),

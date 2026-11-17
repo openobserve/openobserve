@@ -17,7 +17,6 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   analyzeTracesSql,
   buildTracesSql,
-  buildTraceSelectorSql,
   canAddTraceId,
   insertTraceIdColumn,
   isRedEligible,
@@ -32,10 +31,7 @@ import {
   resultKeys,
   resultShape,
   sqlPaging,
-  sqlToFilter,
-  cleanTraceSelectorSql,
-  traceIdSuggestion,
-  traceSelector,
+  tracesFilterFromSql,
 } from "./tracesSql";
 
 let parser: unknown;
@@ -176,16 +172,6 @@ describe("analyzeTracesSql: query features", () => {
     expect(explicit(`SELECT service_name, count(*) FROM "a" GROUP BY service_name`)).toBe(false);
   });
 
-  it("flags a plain SELECT * with only WHERE and ORDER BY", () => {
-    expect(
-      info(`SELECT * FROM "default" WHERE a = 1 ORDER BY start_time DESC`).plainSelectAll,
-    ).toBe(true);
-    expect(info(`select * from "default"`).plainSelectAll).toBe(true);
-    expect(info(`SELECT trace_id FROM "default"`).plainSelectAll).toBe(false);
-    expect(info(`SELECT * FROM "default" LIMIT 1`).plainSelectAll).toBe(false);
-    expect(info(`SELECT * FROM "default" d WHERE a = 1`).plainSelectAll).toBe(false);
-  });
-
   it("is not a statement for filter text", () => {
     expect(info(`service_name = 'select'`).isStatement).toBe(false);
   });
@@ -283,85 +269,6 @@ describe("buildTracesSql", () => {
   });
 });
 
-describe("buildTraceSelectorSql", () => {
-  it("selects the trace_id of the spans the filter matches", () => {
-    expect(buildTraceSelectorSql('my"stream', "duration > 500000")).toBe(
-      `SELECT trace_id FROM "my""stream" WHERE duration > 500000`,
-    );
-  });
-
-  it("leaves out WHERE for an empty filter, and passes the selector check", () => {
-    const sql = buildTraceSelectorSql("default", "  ");
-    expect(sql).toBe(`SELECT trace_id FROM "default"`);
-    expect(traceSelector(sql, parser).problem).toBeNull();
-  });
-});
-
-describe("sqlToFilter", () => {
-  it("converts a plain SELECT * silently", () => {
-    expect(sqlToFilter(info(`SELECT * FROM "default" WHERE a = 1 ORDER BY b`), "default")).toEqual({
-      filter: "a = 1",
-      dropped: [],
-    });
-  });
-
-  it("converts the Traces view selector silently, in the Traces view only", () => {
-    const sql = `SELECT trace_id FROM "default" WHERE duration > 5000;`;
-    expect(sqlToFilter(info(sql), "default", true)).toEqual({
-      filter: "duration > 5000",
-      dropped: [],
-    });
-    expect(sqlToFilter(info(`SELECT trace_id FROM "default"`), "default", true)).toEqual({
-      filter: "",
-      dropped: [],
-    });
-    expect(sqlToFilter(info(sql), "default").dropped).toEqual(["columns"]);
-  });
-
-  it.each([
-    `SELECT trace_id FROM "default" WHERE a = 1 ORDER BY start_time`,
-    `SELECT trace_id FROM "default" WHERE a = 1 LIMIT 5`,
-    `SELECT trace_id, service_name FROM "default" WHERE a = 1`,
-    `SELECT span_id AS trace_id FROM "default"`,
-    `SELECT DISTINCT trace_id FROM "default"`,
-    `SELECT trace_id FROM "default" GROUP BY trace_id`,
-    `SELECT trace_id FROM "other" WHERE a = 1`,
-    `SELECT trace_id FROM "default" t WHERE t.a = 1`,
-  ])("still asks before dropping more than the selector from %s", (sql) => {
-    expect(sqlToFilter(info(sql), "default", true).dropped).not.toEqual([]);
-  });
-
-  it("names what a grouped query drops and keeps its WHERE", () => {
-    const result = sqlToFilter(
-      info(`SELECT x, count(*) AS n FROM "default" WHERE a = 1 GROUP BY x LIMIT 5`),
-      "default",
-    );
-    expect(result.filter).toBe("a = 1");
-    expect(result.dropped).toEqual(["columns", "grouping", "limit"]);
-  });
-
-  it("names joins, distinct, WITH, UNION and another stream", () => {
-    expect(sqlToFilter(info(`SELECT * FROM "a" JOIN "b" ON a.x = b.x`), "a").dropped).toEqual([
-      "joins",
-    ]);
-    expect(sqlToFilter(info(`SELECT DISTINCT x FROM "a"`), "a").dropped).toEqual([
-      "columns",
-      "distinct",
-    ]);
-    expect(sqlToFilter(info(`WITH t AS (SELECT * FROM "a") SELECT * FROM t`), "a").dropped).toEqual(
-      ["with", "stream"],
-    );
-    expect(sqlToFilter(info(`SELECT * FROM "b"`), "a").dropped).toEqual(["stream"]);
-  });
-
-  it("falls back to 'other' when nothing named explains the difference", () => {
-    expect(sqlToFilter(info(`SELECT * FROM "a" t WHERE x = 1`), "a")).toEqual({
-      filter: "x = 1",
-      dropped: ["other"],
-    });
-  });
-});
-
 describe("insertTraceIdColumn / canAddTraceId", () => {
   it("puts trace_id first in the select list", () => {
     expect(insertTraceIdColumn(`SELECT service_name, duration FROM "a"`)).toBe(
@@ -416,141 +323,6 @@ describe("resultShape / resultKeys", () => {
       "service_name",
       "n",
     ]);
-  });
-});
-
-describe("cleanTraceSelectorSql", () => {
-  it("removes line and block comments and the trailing semicolon", () => {
-    const sql = `-- big traces\nSELECT trace_id /* ids */ FROM "default" -- tail\nGROUP BY trace_id;`;
-    expect(cleanTraceSelectorSql(sql)).toEqual({
-      sql: `SELECT trace_id   FROM "default"  \nGROUP BY trace_id`,
-      quotedMarker: false,
-      extraStatement: false,
-    });
-  });
-
-  it("removes several trailing semicolons with spaces between them", () => {
-    expect(cleanTraceSelectorSql(`SELECT trace_id FROM "a" ; ;`).sql).toBe(
-      `SELECT trace_id FROM "a"`,
-    );
-  });
-
-  it("flags -- and ; inside a string literal and leaves the string as typed", () => {
-    const dashes = cleanTraceSelectorSql(`SELECT trace_id FROM "a" WHERE x = 'a--b'`);
-    expect(dashes.quotedMarker).toBe(true);
-    expect(dashes.sql).toBe(`SELECT trace_id FROM "a" WHERE x = 'a--b'`);
-    expect(cleanTraceSelectorSql(`SELECT trace_id FROM "a" WHERE x = 'a;b'`).quotedMarker).toBe(
-      true,
-    );
-    expect(cleanTraceSelectorSql(`SELECT trace_id FROM "a--b"`).quotedMarker).toBe(true);
-  });
-
-  it("reads an escaped quote as part of the string", () => {
-    const out = cleanTraceSelectorSql(`SELECT trace_id FROM "a" WHERE x = 'it''s -- here'`);
-    expect(out.quotedMarker).toBe(true);
-    const clean = cleanTraceSelectorSql(`SELECT trace_id FROM "a" WHERE x = 'it''s' -- note`);
-    expect(clean).toEqual({
-      sql: `SELECT trace_id FROM "a" WHERE x = 'it''s'`,
-      quotedMarker: false,
-      extraStatement: false,
-    });
-  });
-
-  it("keeps comment markers that sit inside a string out of the comment strip", () => {
-    const out = cleanTraceSelectorSql(`SELECT trace_id FROM "a" WHERE x = '/* not */'`);
-    expect(out.sql).toBe(`SELECT trace_id FROM "a" WHERE x = '/* not */'`);
-    expect(out.quotedMarker).toBe(false);
-  });
-
-  it("flags a semicolon between two statements", () => {
-    expect(
-      cleanTraceSelectorSql(`SELECT trace_id FROM "a"; SELECT trace_id FROM "b"`).extraStatement,
-    ).toBe(true);
-  });
-});
-
-describe("traceSelector", () => {
-  const select = (sql: string) => traceSelector(sql, parser);
-
-  it("wraps a single trace_id column as trace_id IN (...)", () => {
-    expect(
-      select(`SELECT trace_id FROM "default" GROUP BY trace_id HAVING count(*) > 200;`),
-    ).toEqual({
-      filter: `trace_id IN (SELECT trace_id FROM "default" GROUP BY trace_id HAVING count(*) > 200)`,
-      problem: null,
-    });
-  });
-
-  it("reads trace_id from a derived table when the query returns more columns", () => {
-    const sql = `SELECT trace_id, service_name FROM "default" WHERE duration > 2000`;
-    expect(select(sql).filter).toBe(`trace_id IN (SELECT trace_id FROM (${sql}))`);
-  });
-
-  it("accepts a table-qualified or aliased trace_id", () => {
-    expect(select(`SELECT t.trace_id FROM "default" t WHERE t.duration > 1`).problem).toBeNull();
-    expect(select(`SELECT "trace_id" FROM "default"`).problem).toBeNull();
-    const aliased = `SELECT t.trace_id AS trace_id, t.duration FROM "default" t`;
-    expect(select(aliased)).toEqual({
-      filter: `trace_id IN (SELECT trace_id FROM (${aliased}))`,
-      problem: null,
-    });
-  });
-
-  it("rejects SELECT *", () => {
-    expect(select(`SELECT * FROM "default" WHERE a = 1`)).toEqual({
-      filter: "",
-      problem: "selectAll",
-    });
-  });
-
-  it("rejects a query without a trace_id column", () => {
-    expect(select(`SELECT service_name, duration FROM "default"`).problem).toBe("noTraceId");
-    expect(select(`SELECT trace_id AS tid, duration FROM "default"`).problem).toBe("noTraceId");
-  });
-
-  it("rejects WITH, UNION, EXPLAIN, several statements and non-SELECT text", () => {
-    for (const sql of [
-      `WITH x AS (SELECT trace_id FROM "a") SELECT trace_id FROM x`,
-      `SELECT trace_id FROM "a" UNION SELECT trace_id FROM "b"`,
-      `EXPLAIN SELECT trace_id FROM "a"`,
-      `SELECT trace_id FROM "a"; SELECT trace_id FROM "b"`,
-      `service_name = 'api'`,
-    ]) {
-      expect(select(sql).problem).toBe("notSingleSelect");
-    }
-  });
-
-  it("blocks -- or ; inside a string before anything else", () => {
-    expect(select(`SELECT trace_id FROM "a" WHERE x = 'a;b'`)).toEqual({
-      filter: "",
-      problem: "quotedMarker",
-    });
-  });
-
-  it("sends text the parser cannot read and leaves the verdict to the server", () => {
-    const sql = `SELECT trace_id FROM "a" WHERE x = ANY_UNKNOWN_SYNTAX ((`;
-    expect(select(sql)).toEqual({ filter: `trace_id IN (${sql})`, problem: null });
-  });
-});
-
-describe("traceIdSuggestion", () => {
-  it("diffs the SELECT line with trace_id first", () => {
-    const sql = `SELECT service_name, operation_name, duration, start_time\nFROM "default"\nWHERE duration > 2000000`;
-    expect(traceIdSuggestion(sql)).toEqual({
-      before: "SELECT service_name, operation_name, duration, start_time",
-      after: "SELECT trace_id, service_name, operation_name, duration, start_time",
-    });
-  });
-
-  it("finds the SELECT line below a comment", () => {
-    expect(traceIdSuggestion(`-- spans\nselect duration from "a"`)).toEqual({
-      before: 'select duration from "a"',
-      after: 'select trace_id, duration from "a"',
-    });
-  });
-
-  it("returns null for text that is not a SELECT", () => {
-    expect(traceIdSuggestion("a = 1")).toBeNull();
   });
 });
 
@@ -682,5 +454,53 @@ describe("withFieldUnits", () => {
       { name: "end_time", type: "ns" },
       { name: "service_name", dataType: "Utf8" },
     ]);
+  });
+});
+
+describe("tracesFilterFromSql", () => {
+  const from = (sql: string) => tracesFilterFromSql(sql, parser);
+
+  it("copies the top-level WHERE as typed, without its comments", () => {
+    expect(
+      from(`SELECT service_name, count(*) FROM "default"
+WHERE duration > 500000 -- slow
+  AND service_name = 'a''b'
+GROUP BY service_name HAVING count(*) > 3`),
+    ).toEqual({ filter: "duration > 500000  \n  AND service_name = 'a''b'", problem: null });
+  });
+
+  it("skips a WHERE inside FILTER (...)", () => {
+    expect(
+      from(`SELECT count(*) FILTER (WHERE span_status = 'ERROR') FROM "default" WHERE a = 1`),
+    ).toEqual({ filter: "a = 1", problem: null });
+  });
+
+  it("has no usable WHERE without one, or with a subquery, CTE, FROM subquery, UNION, JOIN or alias", () => {
+    for (const sql of [
+      `SELECT trace_id, count(*) FROM "default" GROUP BY trace_id HAVING count(*) > 450`,
+      `SELECT * FROM "default" WHERE trace_id IN (SELECT trace_id FROM "default" WHERE a = 1)`,
+      `WITH t AS (SELECT * FROM "default" WHERE a = 1) SELECT * FROM t WHERE b = 2`,
+      `SELECT * FROM (SELECT * FROM "default" WHERE a = 1) WHERE b = 2`,
+      `SELECT * FROM "default" WHERE a = 1 UNION SELECT * FROM "default" WHERE b = 2`,
+      `SELECT * FROM "default" c JOIN "default" p ON c.parent = p.span_id WHERE c.a = 1`,
+      `SELECT * FROM "default" d WHERE d.service_name = 'api'`,
+    ]) {
+      expect(from(sql), sql).toEqual({ filter: "", problem: "noWhere" });
+    }
+  });
+
+  it("cannot read text the parser rejects, or text that is not a statement", () => {
+    expect(from(`SELECT * FROM "default" WHERE (a = 1`)).toEqual({
+      filter: "",
+      problem: "unreadable",
+    });
+    expect(from("service_name = 'api'")).toEqual({ filter: "", problem: "unreadable" });
+  });
+
+  it("keeps a decimal number and a string with a dot", () => {
+    expect(from(`SELECT * FROM "default" WHERE a > 1.5 AND b = 'x.y'`)).toEqual({
+      filter: "a > 1.5 AND b = 'x.y'",
+      problem: null,
+    });
   });
 });
