@@ -2625,6 +2625,18 @@ describe("QueryConfig.vue", () => {
       ]);
     });
 
+    it.each([
+      ["0 9 * * 1-5", true],
+      ["0 0 9 * * 1-5", false],
+    ])("the cron %s shows the six-field error: %s", async (cron, error) => {
+      remount({ ...sectioned });
+      await host.find('[data-test="add-alert-add-cron"]').trigger("click");
+      await host.find('[data-test="alert-cron-input"] input').setValue(cron);
+      await flushPromises();
+      expect(host.find('[data-test="alert-cron-error"]').exists()).toBe(error);
+      if (error) expect(wrapper.vm.cronError).toBe(t("common.invalidCronSixFields"));
+    });
+
     it("the unit select offers minutes and hours only", () => {
       expect(wrapper.vm.frequencyUnitOptions.map((o: any) => o.value)).toEqual([
         "minutes",

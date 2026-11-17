@@ -141,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-if="isEventBased">
                     <!-- Alert if row -->
                     <OSettingRow
+                      :class="denseRow"
                       data-test="alert-if-row-logs"
                       :label="t('alerts.plain.notifyMeWhen')"
                       fill
@@ -406,6 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ raw(groupLabelsText(groupByLabels, locale)) }}
                     </AlertSentenceRow>
                     <OSettingRow
+                      :class="denseRow"
                       v-else-if="selectedFunction !== 'total_events' && tierShows('groupBy')"
                       data-test="alert-group-by-row"
                       :label="t('alerts.plain.groupedBy')"
@@ -451,7 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- METRICS -->
                   <template v-else>
                     <!-- Alert if row -->
-                    <OSettingRow :label="t('alerts.plain.notifyMeWhen')" fill>
+                    <OSettingRow :class="denseRow" :label="t('alerts.plain.notifyMeWhen')" fill>
                       <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
                         <!-- Measurement sentence: WHAT to measure. Severity rows
                          below say WHEN it fires (mock: multi-alert-form.html). -->
@@ -738,6 +740,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ raw(groupLabelsText(groupByLabels, locale)) }}
                     </AlertSentenceRow>
                     <OSettingRow
+                      :class="denseRow"
                       v-else-if="
                         inputData.aggregation &&
                         selectedFunction !== 'total_events' &&
@@ -782,6 +785,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OSettingRow>
                   </template>
                   <OSettingRow
+                    :class="denseRow"
                     v-if="groupQuestion.offered"
                     :label="groupQuestionTitle"
                     :description="t('alerts.form.group.lookBack', { minutes: periodMinutes })"
@@ -799,7 +803,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <ORadio value="one" size="sm" data-test="add-alert-group-question-one">
                           <template #label>
                             <span
-                              class="text-text-body flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm"
+                              class="text-text-body flex flex-wrap items-start gap-x-1 gap-y-1 text-sm"
                             >
                               <template v-if="countOperatorShown">
                                 <span class="leading-8.5">{{ t("alerts.form.group.sqlOne") }}</span>
@@ -818,7 +822,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    class="w-14!"
+                                    class="w-16!"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -847,7 +851,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    class="w-14!"
+                                    class="w-16!"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -875,7 +879,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <ORadio value="each" size="sm" data-test="add-alert-group-question-each">
                           <template #label>
                             <span
-                              class="text-text-body flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm"
+                              class="text-text-body flex flex-wrap items-start gap-x-1 gap-y-1 text-sm"
                             >
                               <span class="leading-8.5">{{ groupEachLabel }}</span>
                             </span>
@@ -1215,6 +1219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </p>
                   </div>
                   <OSettingRow
+                    :class="denseRow"
                     v-if="
                       sqlPlainLimit ||
                       (groupQuestion.offered &&
@@ -1228,7 +1233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex min-w-0 flex-col gap-1.5">
                       <span
                         v-if="sqlPlainLimit"
-                        class="text-text-body flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm"
+                        class="text-text-body flex flex-wrap items-start gap-x-1 gap-y-1 text-sm"
                       >
                         <OFormSelect
                           :aria-label="t('common.operator')"
@@ -1244,7 +1249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :aria-label="t('alerts.alertIfNoOfEvents')"
                             name="trigger_condition.threshold"
                             type="number"
-                            class="w-14!"
+                            class="w-16!"
                             min="1"
                             data-test="alert-trigger-threshold-input"
                             @update:model-value="onTriggerThresholdChange($event)"
@@ -1274,7 +1279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <ORadio value="one" size="sm" data-test="add-alert-group-question-one">
                           <template #label>
                             <span
-                              class="text-text-body flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm"
+                              class="text-text-body flex flex-wrap items-start gap-x-1 gap-y-1 text-sm"
                             >
                               <span
                                 v-if="localTab === 'promql' && isPromRuleMode"
@@ -1298,7 +1303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    class="w-14!"
+                                    class="w-16!"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -1331,7 +1336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    class="w-14!"
+                                    class="w-16!"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -1359,7 +1364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <ORadio value="each" size="sm" data-test="add-alert-group-question-each">
                           <template #label>
                             <span
-                              class="text-text-body flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm"
+                              class="text-text-body flex flex-wrap items-start gap-x-1 gap-y-1 text-sm"
                             >
                               <span class="leading-8.5">{{ groupEachLabel }}</span>
                               <template v-if="localTab === 'sql'">
@@ -1368,7 +1373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   name="query_condition.aggregation.having.column"
                                   :options="sqlAggColumnOptions"
                                   searchable
-                                  class="w-28!"
+                                  class="w-22!"
                                   :disabled="groupAnswer === 'one'"
                                   data-test="alert-sql-agg-column-select"
                                   :placeholder="t('alerts.placeholders.selectColumn')"
@@ -1379,7 +1384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   name="query_condition.aggregation.having.operator"
                                   :options="numericOperators"
                                   :searchable="false"
-                                  class="w-23!"
+                                  class="w-16!"
                                   :disabled="groupAnswer === 'one'"
                                   data-test="alert-sql-agg-operator-select"
                                   @update:model-value="onConditionOperatorChange"
@@ -1389,7 +1394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('common.value')"
                                     name="query_condition.aggregation.having.value"
                                     type="number"
-                                    class="w-14!"
+                                    class="w-16!"
                                     :disabled="groupAnswer === 'one'"
                                     data-test="alert-sql-agg-value-input"
                                     :placeholder="t('alerts.placeholders.value')"
@@ -1535,6 +1540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else-if="localTab === 'promql' && (promqlCondition || isPromRuleMode)"
                   >
                     <OSettingRow
+                      :class="denseRow"
                       v-if="!isPromRuleMode"
                       :label="t('alerts.plain.valueIs')"
                       :info="t('alerts.queryConfig.alertIfValueIsTooltip')"
@@ -1663,7 +1669,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="_ui.checkEvery"
                 data-test="alert-check-every-input"
                 type="number"
-                class="max-w-25 min-w-25"
+                class="w-16!"
                 min="1"
                 @update:model-value="onCheckEveryChange($event)"
                 @blur="restoreDefaultFrequency"
@@ -1705,6 +1711,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSettingRow
             v-else
             :label="t('alerts.form.schedule.cronRow')"
+            :description="t('alerts.form.schedule.cronHint')"
+            :class="denseRow"
             fill
             data-test="add-alert-cron-row"
           >
@@ -3280,6 +3288,10 @@ export default defineComponent({
         cronError.value = t("alerts.queryConfig.cronExpressionTimezoneRequired");
         return;
       }
+      if (cronExpression.value.trim().split(/\s+/).length !== 6) {
+        cronError.value = t("common.invalidCronSixFields");
+        return;
+      }
       try {
         const intervalInSecs = getCronIntervalDifferenceInSeconds(cronExpression.value);
         if (
@@ -3441,6 +3453,7 @@ export default defineComponent({
     const tierShows = useTierVisibility();
     // tierAvailable("warning"): every scheduled alert can carry a warning, so its link is never hidden.
     const warningOffered = computed(() => !tiers || props.isRealTime === "false");
+    const denseRow = computed(() => (props.sectionTargets ? "py-1!" : ""));
 
     // Ensure at least one empty filter condition exists on mount (filters are always visible now)
     // Empty condition is now provided by default form data in useAlertForm.ts
@@ -4338,6 +4351,7 @@ export default defineComponent({
       groupQuestionTitle,
       sqlPlainLimit,
       warningOffered,
+      denseRow,
       groupEachLabel,
       groupAnswer,
       countErrorTest,
