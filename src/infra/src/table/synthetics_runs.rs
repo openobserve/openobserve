@@ -1706,7 +1706,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn two_resets_that_read_the_same_row_leave_it_signed() {
+    async fn a_reset_that_read_the_row_before_another_reset_moves_and_signs_it_again() {
         let db = db().await;
         with_notices(&db).await;
         let (cur, _) = check_row(&db).await;
@@ -1716,17 +1716,44 @@ mod tests {
                 .unwrap()
         );
         // Reset B reads the row, then reset A runs to the end before B writes.
-        let read_b = synthetics_checks::signed_failing_rows(&db).await.unwrap();
+        let read_b = synthetics_checks::read_stamp_row(&db, "mon-1")
+            .await
+            .unwrap();
         synthetics_checks::reset_false_alarm_holds(&db, 1_000)
             .await
             .unwrap();
         assert_eq!(check_row(&db).await.0.recovered_at, 1_001);
-        synthetics_checks::move_stamps_and_resign(&db, read_b, 1_100)
+        synthetics_checks::move_failing_row(&db, read_b, 1_100)
             .await
             .unwrap();
         let (row, _) = check_row(&db).await;
         assert_eq!(row.recovered_at, 1_101);
         assert!(row.signed, "the later reset signs the final stamp");
+    }
+
+    #[tokio::test]
+    async fn two_resets_with_clocks_behind_the_stamp_both_move_it_and_keep_it_signed() {
+        let db = db().await;
+        with_notices(&db).await;
+        let (cur, _) = check_row(&db).await;
+        assert!(
+            synthetics_checks::swap_status_streaks(&db, "mon-1", &cur, &failing(1_001))
+                .await
+                .unwrap()
+        );
+        let read_b = synthetics_checks::read_stamp_row(&db, "mon-1")
+            .await
+            .unwrap();
+        synthetics_checks::reset_false_alarm_holds(&db, 900)
+            .await
+            .unwrap();
+        assert_eq!(check_row(&db).await.0.recovered_at, 1_002);
+        synthetics_checks::move_failing_row(&db, read_b, 950)
+            .await
+            .unwrap();
+        let (row, _) = check_row(&db).await;
+        assert_eq!(row.recovered_at, 1_003);
+        assert!(row.signed);
     }
 
     #[tokio::test]
