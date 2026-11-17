@@ -42,6 +42,11 @@ describe("FolderIcon", () => {
     expect(wrapper.find(".text-current").exists()).toBe(false);
   });
 
+  it("should show a pseudo-folder's fixed icon instead of the folder fallback", () => {
+    wrapper = mount(FolderIcon, { props: { token: null, icon: "language" } });
+    expect(wrapper.findComponent({ name: "OIcon" }).props("name")).toBe("language");
+  });
+
   it("should let a chosen icon win over the favourite star", () => {
     wrapper = mount(FolderIcon, { props: { token: "⭐", favorite: true } });
     expect(wrapper.find('[data-test="glyph-emoji"]').text()).toBe("⭐");

@@ -10329,7 +10329,7 @@
       "dateEpochms": "Epoch milliseconds: {example}",
       "dateEpochus": "Epoch microseconds: {example}"
     },
-    "add": "Add Panel",
+    "add": "Add panel",
     "save": "Save",
     "cancel": "Cancel",
     "name": "Name of Panel",

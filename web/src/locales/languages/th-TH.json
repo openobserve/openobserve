@@ -10166,7 +10166,7 @@
       "dateEpochms": "มิลลิวินาทีแบบ Epoch: {example}",
       "dateEpochus": "ไมโครวินาทีแบบ Epoch: {example}"
     },
-    "add": "Add Panel",
+    "add": "เพิ่มพาเนล",
     "save": "บันทึก",
     "cancel": "ยกเลิก",
     "name": "Name of Panel",

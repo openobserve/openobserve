@@ -1915,7 +1915,7 @@ describe("ViewDashboard", () => {
       },
     };
 
-    const mountDashboard = async () => {
+    const mountDashboard = async (extraStubs: Record<string, unknown> = {}) => {
       vi.mocked(getDashboard).mockResolvedValueOnce({
         dashboardId: "test-dashboard-1",
         title: "Test Dashboard",
@@ -1943,6 +1943,7 @@ describe("ViewDashboard", () => {
               props: ["dataTest"],
               template: '<div :data-test="dataTest"><slot /><slot name="actions" /></div>',
             },
+            ...extraStubs,
           },
         },
       });
@@ -1976,6 +1977,63 @@ describe("ViewDashboard", () => {
       expect(has("dashboard-panel-add")).toBe(true);
       expect(has("dashboard-edit-save-btn")).toBe(false);
       expect(has("dashboard-edit-badge")).toBe(false);
+    });
+
+    const passThrough = { template: "<div><slot /></div>" };
+    const withSlots = { OButtonGroup: passThrough, OTooltip: passThrough };
+    const buttonProps = (dataTest: string) =>
+      wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b: any) => b.attributes("data-test") === dataTest)!
+        .props();
+
+    it("shows Add panel as a labelled outline button and keeps Refresh primary", async () => {
+      await mountDashboard(withSlots);
+
+      expect(buttonProps("dashboard-panel-add")).toMatchObject({
+        variant: "outline",
+        size: "sm-toolbar",
+        iconLeft: "add",
+      });
+      expect(buttonProps("dashboard-refresh-btn").variant).toBe("primary");
+      expect(buttonProps("dashboard-refresh-options-btn").variant).toBe("primary");
+
+      wrapper.vm.enterLayoutEdit();
+      await flushPromises();
+      expect(buttonProps("dashboard-refresh-btn").variant).toBe("outline");
+      expect(buttonProps("dashboard-refresh-options-btn").variant).toBe("outline");
+    });
+
+    it("keeps Refresh pending while changes wait to be applied", async () => {
+      await mountDashboard(withSlots);
+      await wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+      await flushPromises();
+
+      expect(wrapper.vm.isRefreshPending).toBe(true);
+      expect(buttonProps("dashboard-refresh-btn").variant).toBe("pending");
+      expect(buttonProps("dashboard-refresh-options-btn").variant).toBe("pending");
+      expect(buttonProps("dashboard-panel-add").variant).toBe("outline");
+    });
+
+    it("renders the Add panel label and draft dot inside the real button", async () => {
+      localStorage.clear();
+      writePanelDraft(
+        { userEmail: "", org: "test-org", dashboardId: "test-dashboard-1" },
+        {
+          tabId: "tab-1",
+          data: {},
+          layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+          sessionVariables: [],
+          variablesWithCurrentPanel: [],
+        },
+      );
+      await mountDashboard({ OButton: false, Primitive: false });
+
+      const addPanel = wrapper.find('[data-test="dashboard-panel-add"]');
+      expect(addPanel.element.tagName).toBe("BUTTON");
+      expect(addPanel.text()).toContain("panel.add");
+      expect(addPanel.find('[data-test="dashboard-panel-add-draft-dot"]').exists()).toBe(true);
+      localStorage.clear();
     });
 
     it("marks Add panel with a dot while this dashboard has a new-panel draft", async () => {
