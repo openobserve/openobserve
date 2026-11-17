@@ -54,6 +54,10 @@ STATE_FILENAME = ".translation_state.json"
 # Source locale: filename stem of the English source (web/.../languages/en-US.json).
 SOURCE_LOCALE = "en-US"
 
+# Top-level namespaces stored in their own per-locale file, languages/<subdir>/<locale>.json,
+# so the web entry chunk does not ship them. Every reader and writer here sees one merged tree.
+SPLIT_NAMESPACES = {"siem": "security"}
+
 # Human-readable target names used in the translation prompt, keyed by the target
 # locale's filename stem (BCP-47 style, matching web/src/locales/languages/*.json).
 LANGUAGE_NAMES = {
@@ -681,22 +685,46 @@ _locale_spans = {}
 # Batches are translated concurrently (see translate_pending), so the lazy client
 # construction below must be race-free.
 _client_lock = threading.Lock()
+# HTTP statuses that fail identically on every retry and for every string.
+FATAL_STATUS = {
+    401: "DeepSeek rejected DEEPSEEK_API_KEY (HTTP 401). Rotate the repository secret.",
+    402: "DeepSeek account has insufficient balance (HTTP 402). Top up the account behind DEEPSEEK_API_KEY.",
+    403: "DeepSeek refused DEEPSEEK_API_KEY (HTTP 403). Check the key's permissions.",
+    404: "DeepSeek returned HTTP 404. Check DEEPSEEK_MODEL and DEEPSEEK_BASE_URL.",
+}
 
 
 class TranslationError(Exception):
     """Raised when the translation backend fails for a batch."""
 
 
+class FatalTranslationError(Exception):
+    """Raised when retrying cannot help: the account or key is refused, or the service is down."""
+
+
 def _script_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def _languages_dir():
+    return os.path.join(_script_dir(), "..", "..", "web", "src", "locales", "languages")
+
+
 def get_language_file_path(locale):
-    """Absolute path to a language file (e.g. fr-FR.json)."""
-    languages_dir = os.path.join(
-        _script_dir(), "..", "..", "web", "src", "locales", "languages"
-    )
-    return os.path.join(languages_dir, f"{locale}.json")
+    """Absolute path to a locale's main language file (e.g. fr-FR.json)."""
+    return os.path.join(_languages_dir(), f"{locale}.json")
+
+
+def get_split_file_path(locale, namespace):
+    """Absolute path to the file holding one split-out namespace of a locale."""
+    return os.path.join(_languages_dir(), SPLIT_NAMESPACES[namespace], f"{locale}.json")
+
+
+def get_language_file_paths(locale):
+    """Every file that makes up a locale: the main file, then one per split namespace."""
+    return [get_language_file_path(locale)] + [
+        get_split_file_path(locale, namespace) for namespace in SPLIT_NAMESPACES
+    ]
 
 
 def get_state_file_path():
@@ -750,9 +778,34 @@ def find_duplicate_keys(path):
     return sorted(set(found))
 
 
+def load_locale(locale):
+    """Load a locale as one tree: the main file with each split namespace merged back in."""
+    tree = load_json(get_language_file_path(locale), {})
+    for namespace in SPLIT_NAMESPACES:
+        part = load_json(get_split_file_path(locale, namespace), {})
+        if namespace in part:
+            tree[namespace] = part[namespace]
+    return tree
+
+
+def write_locale(locale, tree):
+    """Write a merged locale tree back to its files, rewriting only the files whose content changed.
+
+    An unchanged file is left alone so its committed prettier formatting survives.
+    """
+    parts = [(get_language_file_path(locale), {k: v for k, v in tree.items() if k not in SPLIT_NAMESPACES})]
+    for namespace in SPLIT_NAMESPACES:
+        if namespace in tree:
+            parts.append((get_split_file_path(locale, namespace), {namespace: tree[namespace]}))
+    for path, data in parts:
+        if load_json(path, None) != data:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            write_json(path, data)
+
+
 def load_source():
-    """Load the English source (en-US.json)."""
-    return load_json(get_language_file_path(SOURCE_LOCALE), {})
+    """Load the English source (en-US.json plus its split namespaces)."""
+    return load_locale(SOURCE_LOCALE)
 
 
 def load_state():
@@ -1054,6 +1107,7 @@ def translate_batch(items, locale, prompt, max_retries=3, _depth=0):
         agent_key=locale,
         attributes={"ai.translations.locale": locale, "ai.translations.items": len(items)},
     )
+    service_failures = 0
     for attempt in range(max_retries):
         try:
             resp = call.create(
@@ -1091,8 +1145,21 @@ def translate_batch(items, locale, prompt, max_retries=3, _depth=0):
         except Exception as e:  # noqa: BLE001 — network / API / rate-limit errors
             last_err = e
             call.reject(e)
+            status = getattr(e, "status_code", None)
+            if status in FATAL_STATUS:
+                call.end()
+                raise FatalTranslationError(f"{FATAL_STATUS[status]} {e}") from e
+            if status is None or status in (408, 409, 429) or status >= 500:
+                service_failures += 1
             time.sleep(2 * (attempt + 1))
     call.end()
+
+    # Splitting multiplies the calls, so it only helps when the response was bad,
+    # not when the service never answered.
+    if service_failures == max_retries:
+        raise FatalTranslationError(
+            f"Translation service unavailable after {max_retries} attempts: {last_err}"
+        ) from last_err
 
     # Retries exhausted. Split to isolate the offending element so its neighbours
     # aren't lost with it. Recursion bottoms out naturally at a single string
@@ -1361,7 +1428,12 @@ def _translate_pending(pending, locale, module_terms):
             # misalign a translation with its source string.
             for fut in as_completed(futures):
                 i = futures[fut]
-                batch_results[i] = fut.result()
+                try:
+                    batch_results[i] = fut.result()
+                except FatalTranslationError:
+                    for other in futures:
+                        other.cancel()
+                    raise
                 done += len(chunks[i])
                 print(f"    {locale}: {done}/{total} strings translated", flush=True)
 

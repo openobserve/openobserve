@@ -19,8 +19,11 @@ use axum::{body::to_bytes, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::{metrics, utils::json};
 use http::StatusCode;
+use openobserve_core::ingestion::check_memory_circuit_breaker;
 use prost::Message;
-use tonic::{Code, Status, metadata::MetadataMap};
+use tonic::{Code, Request, Status, metadata::MetadataMap};
+
+use crate::handler::grpc::auth::check_otlp_auth;
 
 /// Converts an OTLP handler's HTTP reply to the gRPC reply, keeping its partial success and
 /// never acknowledging a rejected export.
@@ -33,6 +36,11 @@ pub(crate) async fn export_reply<T: Message + Default>(resp: Response) -> Result
         return T::decode(body).map_err(|e| Status::internal(e.to_string()));
     }
     Err(Status::new(grpc_code(status), error_message(status, &body)))
+}
+
+/// Authenticates an OTLP export, then refuses it on a tripped memory breaker before it is decoded.
+pub(crate) fn check_otlp_ingest(req: Request<()>) -> Result<Request<()>, Status> {
+    refuse_when_tripped(check_otlp_auth(req)?, check_memory_circuit_breaker)
 }
 
 pub(crate) fn error_status(e: &infra::errors::Error) -> Status {
@@ -63,6 +71,14 @@ pub(crate) fn observe_ok(endpoint: &str, start: Instant) {
     metrics::GRPC_INCOMING_REQUESTS
         .with_label_values(&labels)
         .inc();
+}
+
+fn refuse_when_tripped(
+    req: Request<()>,
+    check: impl FnOnce() -> infra::errors::Result<()>,
+) -> Result<Request<()>, Status> {
+    check().map_err(|e| error_status(&e))?;
+    Ok(req)
 }
 
 /// 502/503/504 become UNAVAILABLE, the code OTLP clients retry with backoff.
@@ -170,5 +186,33 @@ mod tests {
         ] {
             assert_eq!(grpc_code(http), grpc, "{http}");
         }
+    }
+
+    /// Sends a body that is not a gRPC frame, so reaching the decoder fails as Internal.
+    async fn export_garbage(check: fn() -> infra::errors::Result<()>) -> Code {
+        use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::LogsServiceServer;
+        use tonic::service::interceptor::InterceptedService;
+        use tower::ServiceExt;
+
+        let svc = InterceptedService::new(
+            LogsServiceServer::new(crate::handler::grpc::request::logs::LogsServer),
+            move |req| refuse_when_tripped(req, check),
+        );
+        let req = http::Request::builder()
+            .method("POST")
+            .uri("/opentelemetry.proto.collector.logs.v1.LogsService/Export")
+            .header("content-type", "application/grpc")
+            .body(axum::body::Body::from("not a grpc frame"))
+            .unwrap();
+        let resp = svc.oneshot(req).await.unwrap();
+        let status = Status::from_header_map(resp.headers()).expect("trailers-only status");
+        status.code()
+    }
+
+    #[tokio::test]
+    async fn test_tripped_breaker_refuses_an_export_before_decoding_it() {
+        let tripped = || Err(Error::ResourceError("tripped".to_string()));
+        assert_eq!(export_garbage(tripped).await, Code::Unavailable);
+        assert_eq!(export_garbage(|| Ok(())).await, Code::Internal);
     }
 }

@@ -45,7 +45,7 @@ const hit = (name: string, ts: number) => ({
 
 let wrapper: VueWrapper<any>;
 
-const mountHistory = async () => {
+const mountHistory = async (stubs: Record<string, unknown> = {}) => {
   wrapper = mount(AlertHistory, {
     attachTo: document.body,
     global: {
@@ -55,6 +55,7 @@ const mountHistory = async () => {
         DateTime: { template: "<div />" },
         OSelect: { template: "<div />" },
         NoData: { template: "<div />" },
+        ...stubs,
       },
     },
   });
@@ -326,6 +327,15 @@ describe("AlertHistory failed page read", { timeout: 30000 }, () => {
       response: { status: 503, data: { message: "History is unavailable" } },
     });
   const FAILED = '[data-test="alert-history-refresh-btn"][data-state="failed"]';
+  // Reads here render 20-50 rows whose real cell children cost seconds under CI load; no test here reads them.
+  const ROW_CHILD_STUBS = {
+    OTooltip: true,
+    OTimeCell: true,
+    OTag: true,
+    OIcon: true,
+    OTruncatedText: true,
+  };
+  const ROW_STUBS = { ...ROW_CHILD_STUBS, ODropdown: true };
   const range = () =>
     wrapper.find('[data-test="o2-table-pagination-info"]').text().replace(/\s+/g, " ");
   // The read Retry made, not the next-page prefetch that follows it.
@@ -341,7 +351,7 @@ describe("AlertHistory failed page read", { timeout: 30000 }, () => {
   });
 
   it("keeps the shown page's range over its rows when a later page fails, and Retry asks for that page", async () => {
-    await mountHistory();
+    await mountHistory(ROW_STUBS);
     expect(range()).toBe("Showing 1 - 20 of 60");
 
     failOnce();
@@ -360,7 +370,7 @@ describe("AlertHistory failed page read", { timeout: 30000 }, () => {
   });
 
   it("keeps the shown page size when a page-size change fails, and Retry asks for the new size", async () => {
-    await mountHistory();
+    await mountHistory(ROW_STUBS);
     failOnce();
     await wrapper.vm.onPaginationChange({ page: 1, size: 50 });
     await flushPromises();
@@ -373,7 +383,7 @@ describe("AlertHistory failed page read", { timeout: 30000 }, () => {
   });
 
   it("drops the shown page when a new time range fails, and the table's Retry asks for the new range", async () => {
-    await mountHistory();
+    await mountHistory(ROW_STUBS);
     await wrapper.vm.onPaginationChange({ page: 2, size: 20 });
     await flushPromises();
     expect(range()).toBe("Showing 21 - 40 of 60");
@@ -398,7 +408,7 @@ describe("AlertHistory failed page read", { timeout: 30000 }, () => {
   });
 
   it("lets an open row menu act on the kept row after the refresh fails", async () => {
-    await mountHistory();
+    await mountHistory(ROW_CHILD_STUBS);
     await wrapper.find('[data-test="alert-history-row-more-actions"]').trigger("click");
     await flushPromises();
     const item = () =>
@@ -420,7 +430,7 @@ describe("AlertHistory failed page read", { timeout: 30000 }, () => {
   });
 
   it("closes an open row menu whose row a successful read replaced", async () => {
-    await mountHistory();
+    await mountHistory(ROW_CHILD_STUBS);
     await wrapper.find('[data-test="alert-history-row-more-actions"]').trigger("click");
     await flushPromises();
     expect(document.querySelector('[data-test="alert-history-view-details-menu"]')).not.toBeNull();

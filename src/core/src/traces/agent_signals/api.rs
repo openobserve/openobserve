@@ -517,7 +517,8 @@ pub async fn compare_agent_versions(
     axum::Json(req): axum::Json<CompareRequest>,
 ) -> HttpResponse {
     use o2_enterprise::enterprise::agent_signals::compare::{
-        MetricDelta, error_class_diff, merge_sketches, quantile_delta_ci, welch_mean_diff_ci,
+        CiKind, MetricDelta, error_class_diff, merge_sketches, quantile_delta_ci,
+        welch_mean_diff_ci,
     };
 
     let agg_a = fetch_arm_aggregate(&org_id, &req.a).await;
@@ -535,6 +536,7 @@ pub async fn compare_agent_versions(
         hi: 0.0,
         straddles_zero: true,
         insufficient: true,
+        ci_kind: CiKind::Variance,
     };
 
     let merged_a = merge_sketches(&agg_a.sketches).unwrap_or(None);

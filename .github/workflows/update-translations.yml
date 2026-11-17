@@ -36,6 +36,7 @@ on:
     types: [auto_merge_enabled, ready_for_review, synchronize]
     paths:
       - 'web/src/locales/languages/en-US.json'
+      - 'web/src/locales/languages/security/en-US.json'
   workflow_dispatch:
     inputs:
       languages:
@@ -57,6 +58,8 @@ jobs:
   update-translations:
     name: Update translation files
     runs-on: ubuntu-latest
+    # Backstop only: the translation step has its own, shorter timeout.
+    timeout-minutes: 75
 
     # Only the main repo, and only same-repo PRs: a fork PR's branch lives in the
     # contributor's repo, which no token here can push to. Fork PRs that touch
@@ -215,6 +218,9 @@ jobs:
       - name: Run translation script
         id: run_translation
         if: steps.guard.outputs.skip == 'false'
+        # A step timeout fails the step instead of cancelling the job, so the
+        # `!cancelled()` steps below still commit finished locales or show a push error.
+        timeout-minutes: 45
         # Inputs are passed as environment variables (not interpolated into the
         # script body) so user-controlled text can never be injected into the
         # shell. The script itself validates language codes against the supported
@@ -243,6 +249,7 @@ jobs:
           O2_TRACE_STREAM: ${{ secrets.O2_TRACE_STREAM }}
           O2_TRACE_EXPORT_TIMEOUT_MS: ${{ vars.O2_TRACE_EXPORT_TIMEOUT_MS }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PYTHONUNBUFFERED: '1'
         run: |
           cd scripts/translations
           ARGS=()
@@ -326,7 +333,7 @@ jobs:
         # third-party code fetched on behalf of the PR.
         run: |
           npm ci --ignore-scripts
-          npx prettier --write "src/locales/languages/*.json"
+          npx prettier --write "src/locales/languages/*.json" "src/locales/languages/security/*.json"
 
       - name: Mint the translations App token
         id: app_token
@@ -361,6 +368,7 @@ jobs:
           git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           git add -- 'web/src/locales/languages/*.json' \
+                     'web/src/locales/languages/security/*.json' \
                      'scripts/translations/.translation_state.json'
           if git diff --cached --quiet; then
             echo "Nothing staged after filtering to translation paths."

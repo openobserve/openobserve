@@ -48,6 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end max-md:[&_.date-time-label]:hidden"
       >
+        <template v-if="versionsEnabled">
+          <DeployMarkersUnavailable @retry="refreshData" />
+          <RumCompareVersions
+            :app="versionScope.app"
+            :env="versionScope.env"
+            :version="versionScope.version"
+          />
+        </template>
         <DateTimePickerDashboard
           class="rum-date-time-picker"
           ref="dateTimePicker"
@@ -161,13 +169,14 @@ import {
   computed,
   onActivated,
   provide,
+  defineAsyncComponent,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
-import { overviewStateOnly } from "@/utils/rum/performanceOverview";
+import { overviewStateOnly, stateFromQuery } from "@/utils/rum/performanceOverview";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
@@ -176,6 +185,13 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import config from "@/aws-exports";
+import { single } from "@/composables/dashboard/deployMarkerScope";
+import {
+  drawerQuery,
+  rumHintContext,
+  rumTabApps,
+} from "@/enterprise/components/ServiceVersions/rumStrip";
 import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -202,6 +218,12 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     DateTimePickerDashboard,
+    DeployMarkersUnavailable: defineAsyncComponent(
+      () => import("@/enterprise/components/ServiceVersions/DeployMarkersUnavailable.vue"),
+    ),
+    RumCompareVersions: defineAsyncComponent(
+      () => import("@/enterprise/components/ServiceVersions/RumCompareVersions.vue"),
+    ),
     OButton,
     OButtonGroup,
     ODropdown,
@@ -332,6 +354,7 @@ export default defineComponent({
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
           ...(activePerformanceTab.value === "overview" ? overviewStateOnly(route.query) : {}),
+          ...drawerQuery(route.query),
         },
       });
     };
@@ -363,6 +386,28 @@ export default defineComponent({
       variablesManager.value = manager;
     };
 
+    const versionsEnabled = config.isEnterprise === "true" || config.isCloud === "true";
+    const versionScope = computed(() => {
+      // Overview has no dashboard variables, so its own Service filter is the one source there.
+      if (activePerformanceTab.value === "overview") {
+        const { filters } = stateFromQuery(route.query);
+        const one = (list: string[]) => (list.length === 1 ? list[0] : "");
+        return {
+          app: one(filters.service),
+          env: one(filters.env),
+          version: one(filters.version),
+        };
+      }
+      const values = variablesManager.value?.committedVariablesData?.global || [];
+      const value = (name: string) => single(values.find((row: any) => row.name === name)?.value);
+      return { app: value("service"), env: value("env"), version: value("version") };
+    });
+    watch(
+      () => versionScope.value.app,
+      (app) => (rumTabApps.performance = app),
+      { immediate: true },
+    );
+
     const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
     };
@@ -383,6 +428,14 @@ export default defineComponent({
 
     // holds the date picker v-modal
     const selectedDate = ref(getSelectedDateFromQueryParams(route.query));
+    watch(
+      () => [
+        versionScope.value.env,
+        selectedDate.value?.valueType === "relative" ? selectedDate.value.relativeTimePeriod : "",
+      ],
+      ([env, period]) => Object.assign(rumHintContext, { env, period }),
+      { immediate: true },
+    );
 
     provide(
       DASHBOARD_FRESH_PANEL_TIME,
@@ -506,6 +559,8 @@ export default defineComponent({
       refreshInterval,
       // ----------------
       refreshData,
+      versionsEnabled,
+      versionScope,
       onDataZoom,
       onDeletePanel,
       onVariablesManagerReady,

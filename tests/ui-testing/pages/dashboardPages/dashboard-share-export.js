@@ -197,6 +197,18 @@ export default class DashboardShareExportPage {
     return this.page.locator(SELECTORS.ROLE_OPTION).first();
   }
 
+  async selectFirstVariableValue(variableName, timeout = 30000) {
+    const dropdown = this.getVariableDropdownInner(variableName);
+    await dropdown.waitFor({ state: "visible", timeout });
+    await dropdown.click();
+    // The open list stays empty until the values query returns, which a busy shared org can hold for many seconds.
+    const option = this.page.locator(`[data-test="variable-selector-${variableName}-inner-option"]`).first();
+    await expect(option).toBeVisible({ timeout });
+    const value = (await option.getAttribute("data-test-label")) ?? (await option.textContent());
+    await option.click();
+    return value;
+  }
+
   //Navigate to a URL using a separate playwright page (new tab context)
   async openInNewPage(url) {
     const context = this.page.context();

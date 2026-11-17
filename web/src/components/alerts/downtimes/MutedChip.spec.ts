@@ -9,6 +9,11 @@ import announcements from "@/services/announcements";
 import { useAnnouncementBanners } from "@/composables/useAnnouncementBanners";
 import MutedChip from "./MutedChip.vue";
 
+const lookupRoute = vi.hoisted(() => ({ value: null as null | Record<string, unknown> }));
+vi.mock("@/composables/downtimes/useDowntimeLookup", () => ({
+  useDowntimeLookup: () => ({ detailRoute: () => lookupRoute.value }),
+}));
+
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual = await importOriginal<{ default: Record<string, unknown> }>();
   return { default: { ...actual.default, isEnterprise: "true" } };
@@ -199,5 +204,41 @@ describe("MutedChip", () => {
     });
     expect(wrapper.text()).toContain("Muted · ends in");
     expect(wrapper.find("a").exists()).toBe(false);
+  });
+});
+
+describe("MutedChip link", () => {
+  const router = () =>
+    createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: { template: "<div />" } },
+        { path: "/downtimes/:id", name: "downtimeDetail", component: { template: "<div />" } },
+      ],
+    });
+  const downtime = { id: "d1", name: "INC-231", ends_at: (Date.now() + 3_600_000) * 1000 };
+
+  afterEach(() => {
+    lookupRoute.value = null;
+  });
+
+  it("opens the downtime in its folder when the lookup has the row", async () => {
+    lookupRoute.value = {
+      name: "downtimeDetail",
+      params: { id: "d1" },
+      query: { org_identifier: "acme", folder: "ops" },
+    };
+    const r = router();
+    const wrapper = mount(MutedChip, { props: { downtime }, global: { plugins: [r] } });
+    const link = wrapper.get('[data-test="muted-chip-link"]');
+    expect(link.attributes("href")).toBe("/downtimes/d1?org_identifier=acme&folder=ops");
+    wrapper.unmount();
+  });
+
+  it("stays plain text when the lookup has no row", () => {
+    const wrapper = mount(MutedChip, { props: { downtime }, global: { plugins: [router()] } });
+    expect(wrapper.find('[data-test="muted-chip-link"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Muted");
+    wrapper.unmount();
   });
 });

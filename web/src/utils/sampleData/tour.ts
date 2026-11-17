@@ -21,6 +21,7 @@ import { sampleDataStateQuery } from "@/services/sample_data.queries";
 import type { SampleDataState } from "@/services/sample_data";
 import type { SampleWindow } from "./assets";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
   SAMPLE_DASHBOARD_TITLES,
   SAMPLE_FOLDER_NAME,
@@ -109,7 +110,11 @@ const stateToWindow = (state?: SampleDataState): SampleWindow | undefined =>
 
 const alertsTarget = async (org: string): Promise<RouteLocationRaw> => {
   const folder = await sampleFolderId(org, "alerts");
-  return { name: "alertList", query: { org_identifier: org, ...(folder ? { folder } : {}) } };
+  // Fresh sample rules have not run yet, so the list's Firing default would show none of them.
+  return {
+    name: "alertList",
+    query: { org_identifier: org, state: ALERT_LIST_ALL_STATES, ...(folder ? { folder } : {}) },
+  };
 };
 
 /** Where a chapter's "Show me" lands; resolved lazily because asset ids differ per org. */

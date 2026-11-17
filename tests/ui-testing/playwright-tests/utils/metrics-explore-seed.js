@@ -44,7 +44,21 @@ async function waitForInstantQuery(request, query, timeout = 60_000) {
     .toBeGreaterThan(0);
 }
 
-// Shift by minutes: a window ending past ~30m ago skips the WAL, and back-dated rows reach storage late.
+// Where 3×ZO_MAX_FILE_RETENTION_TIME is under 10m this window ends before PromQL's WAL floor, so its rows show only once flushed.
+async function waitForShiftedRange(request, query, timeout = 120_000) {
+  await expect
+    .poll(
+      () => {
+        const nowSec = Math.floor(Date.now() / 1000);
+        const range = `start=${nowSec - 25 * 60}&end=${nowSec - 10 * 60}&step=60s`;
+        return promql(request, `query_range?query=${encodeURIComponent(query)}&${range}`);
+      },
+      { timeout, intervals: [1000, 2000, 5000], message: `${query} never appeared in the 10m-shifted query_range window` },
+    )
+    .toBeGreaterThan(0);
+}
+
+// Shift by minutes: PromQL reads unflushed rows only for a window ending after now − 3×ZO_MAX_FILE_RETENTION_TIME (30m by default).
 async function seedTimeShiftMetric(request) {
   const now = Date.now();
   const rows = [];
@@ -59,6 +73,7 @@ async function seedTimeShiftMetric(request) {
   }
   await postRows(request, rows);
   await waitForInstantQuery(request, TIME_SHIFT_METRIC);
+  await waitForShiftedRange(request, TIME_SHIFT_METRIC);
 }
 
 // method has 2 values (a breakdown without topk); status pins "500" for Add-to-filter.

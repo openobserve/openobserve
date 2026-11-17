@@ -72,7 +72,11 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { DowntimeRequest, TargetModule } from "@/services/downtimes";
 import { currentOrNextWindow, formatWindow } from "@/utils/downtimes/schedule";
 import { incidentsLine, notifySentence, summarySentence } from "@/utils/downtimes/summary";
-import { MODULE_LABEL_KEYS, type FolderNameFn } from "@/utils/downtimes/targetSummary";
+import {
+  MODULE_LABEL_KEYS,
+  type FolderNameFn,
+  type ValueLabelFn,
+} from "@/utils/downtimes/targetSummary";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 const props = withDefaults(
@@ -82,13 +86,16 @@ const props = withDefaults(
     folderName?: FolderNameFn;
     /** Modules whose match is more than half of their items. */
     largeModules?: TargetModule[];
+    valueLabel?: ValueLabelFn;
   }>(),
-  { folderName: undefined, largeModules: () => [] },
+  { folderName: undefined, largeModules: () => [], valueLabel: undefined },
 );
 
 const { t } = useI18nTyped();
 
-const sentence = computed(() => summarySentence(props.request, t, props.folderName));
+const sentence = computed(() =>
+  summarySentence(props.request, t, props.folderName, undefined, props.valueLabel),
+);
 
 const notifyText = computed(() => notifySentence(props.request.notifications, t));
 

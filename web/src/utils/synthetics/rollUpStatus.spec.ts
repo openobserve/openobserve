@@ -39,16 +39,25 @@ describe("rollUpStatus", () => {
     expect(rollUpStatus(["warning", "warning"])).toBe("all-warning");
   });
 
-  it("should report all-fail when every execution failed or errored", () => {
+  it("should report all-fail when every execution that tested the site failed", () => {
     expect(rollUpStatus(["fail"])).toBe("all-fail");
     expect(rollUpStatus(["fail", "error"])).toBe("all-fail");
-    expect(rollUpStatus(["error", "error"])).toBe("all-fail");
+  });
+
+  it("should report not-measured when no execution tested the site", () => {
+    expect(rollUpStatus(["error"])).toBe("not-measured");
+    expect(rollUpStatus(["error", "error"])).toBe("not-measured");
+  });
+
+  it("should take the answer from the executions that tested the site", () => {
+    expect(rollUpStatus(["pass", "error"])).toBe("all-pass");
+    expect(rollUpStatus(["pass", "warning", "error"])).toBe("all-warning");
   });
 
   it("should report mixed when healthy and failed executions coexist", () => {
     expect(rollUpStatus(["pass", "fail"])).toBe("mixed");
     expect(rollUpStatus(["warning", "fail"])).toBe("mixed");
-    expect(rollUpStatus(["pass", "warning", "error"])).toBe("mixed");
+    expect(rollUpStatus(["pass", "fail", "error"])).toBe("mixed");
   });
 
   it("should not throw on an empty set", () => {
@@ -66,13 +75,13 @@ describe("tallyStatuses", () => {
   it("should place every execution in exactly one bucket", () => {
     const statuses: ExecutionStatus[] = ["pass", "fail", "error"];
     const tally = tallyStatuses(statuses);
-    expect(tally).toEqual({ passed: 1, warning: 0, failed: 2, total: 3 });
-    expect(tally.passed + tally.warning + tally.failed).toBe(tally.total);
+    expect(tally).toEqual({ passed: 1, warning: 0, failed: 1, notMeasured: 1, total: 3 });
+    expect(tally.passed + tally.warning + tally.failed + tally.notMeasured).toBe(tally.total);
   });
 
   it("should count warning separately from passed", () => {
     const tally = tallyStatuses(["pass", "warning", "warning"]);
-    expect(tally).toEqual({ passed: 1, warning: 2, failed: 0, total: 3 });
+    expect(tally).toEqual({ passed: 1, warning: 2, failed: 0, notMeasured: 0, total: 3 });
   });
 
   it.each([
@@ -81,6 +90,6 @@ describe("tallyStatuses", () => {
     [[] as ExecutionStatus[]],
   ])("should always sum to the total for %j", (statuses) => {
     const tally = tallyStatuses(statuses);
-    expect(tally.passed + tally.warning + tally.failed).toBe(statuses.length);
+    expect(tally.passed + tally.warning + tally.failed + tally.notMeasured).toBe(statuses.length);
   });
 });

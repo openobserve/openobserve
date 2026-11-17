@@ -5,6 +5,7 @@ const { isCloudEnvironment, resetCloudConfigCache } = require('./cloud-auth.js')
 const { performDexLogin, switchOrgViaDropdown, fetchCloudConfig } = require('./global-setup-alpha1.js');
 
 const AUTH_FILE = path.join(__dirname, 'auth', 'user.json');
+const LOGIN_URL = /\/dex\/|\/web\/login/;
 
 /**
  * Mid-run recovery for Alpha1 (cloud) when the shared session/passcode has expired or been
@@ -55,4 +56,28 @@ async function reauthenticateAlpha1(page) {
     }
 }
 
-module.exports = { reauthenticateAlpha1 };
+/** Goto `url` and wait for `readyLocator`, re-authenticating once if the Alpha1 session bounced it to Dex. */
+async function gotoWithAlpha1Reauth(page, url, readyLocator, options = {}) {
+    const { timeout = 30000, ...gotoOptions } = options;
+    await page.goto(url, gotoOptions);
+    if (!isCloudEnvironment()) {
+        await readyLocator.waitFor({ state: 'visible', timeout });
+        return;
+    }
+
+    // The SPA redirects to login only after it boots, so a one-shot page.url() check misses it.
+    const onLogin = page.waitForURL(LOGIN_URL, { timeout, waitUntil: 'commit' })
+        .then(() => true, () => new Promise(() => {}));
+    const onReady = readyLocator.waitFor({ state: 'visible', timeout }).then(() => false);
+    const sessionLost = await Promise.race([onReady, onLogin]);
+    if (!sessionLost) return;
+
+    testLogger.warn(`[reauth] ${url} redirected to login (${page.url()}) — re-authenticating`);
+    if (!(await reauthenticateAlpha1(page))) {
+        throw new Error(`[reauth] re-authentication failed while navigating to ${url}`);
+    }
+    await page.goto(url, gotoOptions);
+    await readyLocator.waitFor({ state: 'visible', timeout });
+}
+
+module.exports = { reauthenticateAlpha1, gotoWithAlpha1Reauth };

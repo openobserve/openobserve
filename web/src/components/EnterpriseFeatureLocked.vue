@@ -38,6 +38,7 @@ import {
   checkFeatureAccess,
   buildFeatureGateContext,
   isFeatureKey,
+  lockedMessage,
   type FeatureKey,
 } from "@/utils/enterpriseFeatures";
 
@@ -49,6 +50,7 @@ const title = computed(() => gt("enterpriseFeature.lockedTitle"));
 const description = computed(() => {
   const featureKey = route.query.feature as FeatureKey | undefined;
   if (!featureKey || !isFeatureKey(featureKey)) return title.value;
-  return checkFeatureAccess(featureKey, buildFeatureGateContext(store.state.zoConfig)).message;
+  const access = checkFeatureAccess(featureKey, buildFeatureGateContext(store.state.zoConfig));
+  return access.allowed ? lockedMessage(featureKey) : access.message;
 });
 </script>

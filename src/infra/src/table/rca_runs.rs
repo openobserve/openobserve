@@ -1465,6 +1465,7 @@ mod tests {
             rca_off_reason: Set(None),
             security_case: Set(false),
             historical: Set(false),
+            last_detection_at: Set(None),
         }
         .insert(db)
         .await

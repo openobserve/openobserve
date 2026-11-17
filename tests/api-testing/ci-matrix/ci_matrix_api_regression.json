@@ -4,7 +4,7 @@
     {
       "label": "default",
       "_comment": "Files that need no server env of their own.",
-      "target": "tests/regression/test_histogram_bucket_count_matches_total.py tests/regression/test_grpc_ingest_org_binding.py tests/regression/test_topk_aggregate_error_reported.py tests/regression/test_fractional_epoch_timestamp.py",
+      "target": "tests/regression/test_histogram_bucket_count_matches_total.py tests/regression/test_grpc_ingest_org_binding.py tests/regression/test_topk_aggregate_error_reported.py tests/regression/test_fractional_epoch_timestamp.py tests/regression/test_user_folder_default_name_refused.py tests/regression/test_sourcemap_upload_limits.py",
       "server_env": "",
       "category": "api_integration_tests"
     },
@@ -58,6 +58,13 @@
       "_comment": "openobserve#14407 needs a per-evaluation notification cap, which defaults to 0 (unlimited).",
       "target": "tests/regression/test_multialert_notify_cap.py",
       "server_env": "ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL=2",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "wal_month_boundary",
+      "_comment": "openobserve#16515 needs rows ~130 days old to stay in WAL parquet: quick memtable rotation, no upload for an hour.",
+      "target": "tests/regression/test_wal_month_boundary_search.py",
+      "server_env": "ZO_INGEST_ALLOWED_UPTO=3120 ZO_MAX_FILE_RETENTION_TIME=10 ZO_FILE_PUSH_INTERVAL=3600",
       "category": "api_integration_tests"
     }
   ]

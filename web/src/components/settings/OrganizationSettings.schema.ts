@@ -10,6 +10,7 @@
 // this file only describes WHAT is valid.
 
 import { z } from "zod";
+import { makeDataRetentionDefaultsSchema } from "./DataRetentionDefaults.schema";
 
 export const orgSettingsFieldNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
 
@@ -36,6 +37,8 @@ export const makeOrganizationSettingsSchema = (t: (_key: string) => string) => {
     // CrossLinkManager is a composite custom control — kept bare and merged at
     // submit; optional so it never blocks.
     crossLinks: z.array(z.any()).optional(),
+    // Data retention defaults: `default` and `types[]`, saved in the same request.
+    ...makeDataRetentionDefaultsSchema(t).shape,
   });
 };
 

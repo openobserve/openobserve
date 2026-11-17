@@ -61,6 +61,10 @@ pub struct Node {
     pub metrics: NodeMetrics,
     #[serde(default)]
     pub version: String,
+    /// Git commit of the build. `version` is only the release tag, so two builds of one tag
+    /// share it. Empty from an older node.
+    #[serde(default)]
+    pub commit: String,
 }
 
 impl Node {
@@ -79,6 +83,7 @@ impl Node {
             status: NodeStatus::Prepare,
             metrics: Default::default(),
             version: crate::VERSION.to_string(),
+            commit: crate::COMMIT_HASH.to_string(),
         }
     }
 

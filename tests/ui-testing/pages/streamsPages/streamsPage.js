@@ -245,6 +245,8 @@ export class StreamsPage {
         const response = await sendRequest(this.page, ingestionUrl, payload, headers);
         testLogger.info(`Ingested to ${streamName}:`, response);
         await this.page.waitForTimeout(2000);
+        // The server may rewrite the name (ZO_FORMAT_STREAM_NAME_TO_LOWERCASE), so callers need the name it stored.
+        return response?.status?.[0]?.name;
     }
 
     // Validation methods

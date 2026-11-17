@@ -452,7 +452,7 @@ describe("AddAiToolset drafts", () => {
     expect(readEditorDraft<{ name: string }>(newScope)?.data.name).toBe("kept_tool");
     const add = wrapper!.find('[data-test="ai-toolsets-add-btn"]');
     expect(add.find('[data-test="ai-toolsets-add-draft-dot"]').exists()).toBe(true);
-    expect(add.attributes("aria-label")).toBe("New AI Toolset · unsaved draft");
+    expect(add.attributes("aria-label")).toBe("New toolset · unsaved draft");
 
     await remount();
     click("editor-draft-continue");

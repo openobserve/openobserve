@@ -5,6 +5,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import DowntimeList from "./DowntimeList.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import downtimes, { type DowntimeListItem } from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
 import {
@@ -31,6 +32,9 @@ vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
   const { computed } = await import("vue");
   return { useDowntimesEnabled: () => computed(() => true) };
 });
+
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ useToast: () => ({ toast }) }));
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -215,6 +219,188 @@ describe("DowntimeList row actions", () => {
     wrapper.unmount();
   });
 
+  describe("recurring rows", () => {
+    const weekly = {
+      repeat: "weekly" as const,
+      starts_at: NOW - 10 * 24 * HOUR,
+      ends_at: null,
+      timezone: "UTC",
+      start_time_local: "02:00",
+      duration_secs: 3600,
+      weekdays: [1],
+    };
+    const withRecurring = () =>
+      ROWS.map((r) => (r.id === "active" || r.id === "scheduled" ? { ...r, schedule: weekly } : r));
+
+    beforeEach(() => {
+      vi.mocked(downtimes.list).mockResolvedValue({
+        data: {
+          items: withRecurring(),
+          total: ROWS.length,
+          counts: { active: 1, scheduled: 1, recurring: 2, ended: 1, cancelled: 1, ended_early: 1 },
+        },
+      } as any);
+    });
+
+    const confirmProps = (wrapper: ReturnType<typeof mount>, title: string) =>
+      wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.props("modelValue") && String(c.props("title")) === title)!;
+
+    it("says End now stops every future window, focused on Keep running", async () => {
+      const wrapper = await mountList();
+      await wrapper.get('[data-test="downtime-list-active-end-now"]').trigger("click");
+      await flushPromises();
+      expect(dialog()?.textContent).toContain(
+        "This downtime repeats. Ending it now also stops every future window and its extensions.",
+      );
+      const ok = dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!;
+      expect(ok.textContent).toContain("End now and stop future windows");
+      const props = confirmProps(wrapper, "End this downtime now?");
+      expect(props.props("okVariant")).toBe("destructive");
+      expect(props.props("focusCancel")).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("says Cancel of a scheduled series stops every future window", async () => {
+      const wrapper = await mountList();
+      await wrapper.get('[data-test="downtime-list-scheduled-cancel"]').trigger("click");
+      await flushPromises();
+      expect(dialog()?.textContent).toContain(
+        "This downtime repeats. Cancelling it stops every future window.",
+      );
+      wrapper.unmount();
+    });
+
+    it("adds the recurring note to a bulk cancel only when a selected row repeats", async () => {
+      const wrapper = await mountList();
+      wrapper.findComponent(OTable).vm.$emit("update:selectedIds", ["active", "scheduled"]);
+      await flushPromises();
+      await wrapper.get('[data-test="downtime-list-bulk-cancel"]').trigger("click");
+      await flushPromises();
+      expect(dialog()?.textContent).toContain("At least one selected downtime repeats.");
+      wrapper.unmount();
+    });
+  });
+
+  it("keeps the one-time End now and bulk cancel text", async () => {
+    const wrapper = await mountList();
+    await wrapper.get('[data-test="downtime-list-active-end-now"]').trigger("click");
+    await flushPromises();
+    expect(dialog()?.textContent).toContain("Notifications resume at once.");
+    expect(dialog()?.textContent).not.toContain("This downtime repeats.");
+    dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-secondary-btn"]')!.click();
+    await flushPromises();
+    wrapper.findComponent(OTable).vm.$emit("update:selectedIds", ["active", "scheduled"]);
+    await flushPromises();
+    await wrapper.get('[data-test="downtime-list-bulk-cancel"]').trigger("click");
+    await flushPromises();
+    expect(dialog()?.textContent).not.toContain("At least one selected downtime repeats.");
+    wrapper.unmount();
+  });
+
+  describe("errors and the bulk result", () => {
+    const refused = (message: string) => ({ response: { status: 409, data: { message } } });
+
+    it("shows the server reason when End now fails", async () => {
+      toast.mockClear();
+      vi.mocked(downtimes.cancel).mockRejectedValueOnce(refused("Downtime already ended"));
+      const wrapper = await mountList();
+      await wrapper.get('[data-test="downtime-list-active-end-now"]').trigger("click");
+      await flushPromises();
+      dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!.click();
+      await flushPromises();
+      expect(toast).toHaveBeenCalledWith({ variant: "error", message: "Downtime already ended" });
+      wrapper.unmount();
+    });
+
+    const bulk = async (wrapper: ReturnType<typeof mount>) => {
+      wrapper.findComponent(OTable).vm.$emit("update:selectedIds", ["active", "scheduled"]);
+      await flushPromises();
+      await wrapper.get('[data-test="downtime-list-bulk-cancel"]').trigger("click");
+      await flushPromises();
+      dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!.click();
+      await flushPromises();
+    };
+
+    it("cancels the rest after one failure, names the counts and the reason, and keeps only the failed row", async () => {
+      toast.mockClear();
+      vi.mocked(downtimes.cancel).mockImplementation(((_org: string, id: string) =>
+        id === "scheduled"
+          ? Promise.reject(refused("You may not cancel this downtime"))
+          : Promise.resolve({ data: {} })) as any);
+      const wrapper = await mountList();
+      await bulk(wrapper);
+      expect(downtimes.cancel).toHaveBeenCalledTimes(2);
+      expect(toast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "1 cancelled, 1 failed: You may not cancel this downtime",
+      });
+      const selected = wrapper.findComponent(OTable).props("selectedIds");
+      expect(selected).toEqual(["scheduled"]);
+      wrapper.unmount();
+    });
+
+    it("reports every failure and keeps every failed row selected", async () => {
+      toast.mockClear();
+      vi.mocked(downtimes.cancel).mockRejectedValue({ response: { status: 500 } });
+      const wrapper = await mountList();
+      await bulk(wrapper);
+      expect(toast).toHaveBeenCalledWith({ variant: "error", message: "0 cancelled, 2 failed." });
+      expect([...wrapper.findComponent(OTable).props("selectedIds")].sort()).toEqual([
+        "active",
+        "scheduled",
+      ]);
+      wrapper.unmount();
+    });
+
+    it("says how many were cancelled and clears the selection when all succeed", async () => {
+      toast.mockClear();
+      const wrapper = await mountList();
+      await bulk(wrapper);
+      expect(toast).toHaveBeenCalledWith({ variant: "success", message: "2 downtimes cancelled" });
+      expect(wrapper.findComponent(OTable).props("selectedIds")).toEqual([]);
+      wrapper.unmount();
+    });
+
+    it("shows a loading bulk button and blocks a second run while the batch runs", async () => {
+      let release: () => void = () => {};
+      vi.mocked(downtimes.cancel).mockImplementation(
+        () => new Promise((resolve) => (release = () => resolve({ data: {} } as any))) as any,
+      );
+      const wrapper = await mountList();
+      await bulk(wrapper);
+      const button = wrapper.get('[data-test="downtime-list-bulk-cancel"]');
+      expect(button.attributes("disabled")).toBeDefined();
+      release();
+      await flushPromises();
+      wrapper.unmount();
+    });
+
+    it("shows the server reason when Delete fails", async () => {
+      toast.mockClear();
+      vi.mocked(downtimes.remove).mockRejectedValueOnce(
+        refused("This downtime corrected SLO data, so it stays for history and cannot be deleted."),
+      );
+      const wrapper = await mountList({
+        ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+        ODropdownItem: {
+          emits: ["select"],
+          template: "<button @click='$emit(\"select\")'><slot /></button>",
+        },
+      });
+      await wrapper.get('[data-test="downtime-list-ended-delete"]').trigger("click");
+      await flushPromises();
+      dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!.click();
+      await flushPromises();
+      expect(toast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "This downtime corrected SLO data, so it stays for history and cannot be deleted.",
+      });
+      wrapper.unmount();
+    });
+  });
+
   it("names the downtime in the delete confirm and makes it destructive", async () => {
     const wrapper = await mountList({
       ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
@@ -231,6 +417,8 @@ describe("DowntimeList row actions", () => {
     expect(confirm!.props("modelValue")).toBe(true);
     expect(confirm!.props("messageName")).toBe("ended window");
     expect(confirm!.props("okVariant")).toBe("destructive");
+    expect(String(confirm!.props("okLabel"))).toBe("Delete downtime");
+    expect(String(confirm!.props("cancelLabel"))).toBe("Keep");
     wrapper.unmount();
   });
 

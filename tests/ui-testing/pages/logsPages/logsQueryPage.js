@@ -36,7 +36,7 @@ export class LogsQueryPage {
   async typeQuery(query) {
     const queryEditor = this.page.locator(this.queryEditor);
     await expect(queryEditor).toBeVisible();
-    await queryEditor.locator(".inputarea").fill(query);
+    await queryEditor.locator(".inputarea").fill(query, { force: true });
   }
 
   async clickRefresh() {

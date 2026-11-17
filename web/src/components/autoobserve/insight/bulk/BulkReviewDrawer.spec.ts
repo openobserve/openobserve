@@ -19,6 +19,7 @@ import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import { fieldRows, m12Rows } from "./bulkFixtures";
 import { dismissAll, toastRecords } from "@/lib/feedback/Toast/useToast";
 import {
@@ -47,6 +48,9 @@ vi.mock("@/services/alerts", () => ({
   },
 }));
 vi.mock("@/services/common", () => ({ default: { list_Folders: api.folders } }));
+vi.mock("@/services/autoobserveFolders", () => ({
+  default: { writable: async () => ({ data: { folders: {} } }) },
+}));
 vi.mock("@/services/alert_destination", () => ({ default: { list: api.destinations } }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: api.copy }));
 vi.mock("@/services/stream", () => ({ default: { schema: api.schema } }));
@@ -356,7 +360,7 @@ describe("BulkReviewDrawer — results", () => {
     await openWith();
     await click("bulk-review-create");
     expect(review.state.open).toBe(true);
-    expect(text("bulk-review-failures")).toContain("1 of 11 alerts wasn't created.");
+    expect(text("bulk-review-failures")).toContain("1 alert out of 11 wasn't created.");
     expect(text("bulk-review-failure-j")).toBe(
       "svc-j: You can't create alerts. Your role is missing the Create permission on Alerts. The alert was going to folder payments.",
     );
@@ -378,8 +382,17 @@ describe("BulkReviewDrawer — results", () => {
     expect(text("bulk-review-failure-a-j")).toBe(
       "svc-a · ns-j: an alert named svc-a-ns-j-no-data already exists in folder default.",
     );
-    expect(q("bulk-review-open-existing-a-j")).not.toBeNull();
     expect(q("bulk-review-retry-a-j")).toBeNull();
+    // Unfound, it opens the folder, where the list's Firing default could hide the quiet duplicate.
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    await click("bulk-review-open-existing-a-j");
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertList",
+        query: expect.objectContaining({ state: ALERT_LIST_ALL_STATES }),
+      }),
+    );
+    push.mockRestore();
   });
 
   it("offers Retry for a timeout and re-sends only that row", async () => {

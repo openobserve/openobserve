@@ -42,6 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="bg-badge-success-solid-bg h-[0.4375rem] w-[0.4375rem] rounded-full" />
         {{ passCount }} {{ t("synthetics.timeline.passed") }}
       </span>
+      <span
+        v-if="notMeasuredCount !== '0'"
+        class="text-text-secondary inline-flex items-center gap-1.5 text-xs"
+        data-test="synthetics-timeline-not-measured-count"
+      >
+        <span class="bg-badge-default-solid-bg h-[0.4375rem] w-[0.4375rem] rounded-full" />
+        {{ notMeasuredCount }} {{ t("synthetics.timeline.notMeasured") }}
+      </span>
     </div>
     <div class="border-border-default border-t" />
     <div class="flex flex-col gap-1 px-3.5 py-2">
@@ -121,6 +129,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="text-text-secondary">{{
                         t("synthetics.timeline.tooltipFailed", { count: cell.seg.tally.failed })
                       }}</span>
+                      <template v-if="cell.seg.tally.notMeasured > 0">
+                        <span class="bg-badge-default-solid-bg h-2 w-2 shrink-0 rounded-full" />
+                        <span class="text-text-secondary">{{
+                          t("synthetics.timeline.tooltipNotMeasured", {
+                            count: cell.seg.tally.notMeasured,
+                          })
+                        }}</span>
+                      </template>
+                    </div>
+                    <div
+                      v-if="cell.seg.status === 'not-measured'"
+                      class="text-text-secondary max-w-72 px-1 pb-1 text-xs whitespace-normal"
+                      data-test="synthetics-timeline-not-measured-note"
+                    >
+                      {{ t("synthetics.timeline.notMeasuredNote") }}
                     </div>
                     <template
                       v-for="(group, gIdx) in groupedByLocation(cell.seg.executions)"
@@ -134,11 +157,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             'bg-badge-warning-solid-bg':
                               group.status === 'mixed' || group.status === 'all-warning',
                             'bg-badge-error-solid-bg': group.status === 'all-fail',
+                            'bg-badge-default-solid-bg': group.status === 'not-measured',
                           }"
                         />
                         <span class="text-text-secondary text-xs font-semibold">
                           {{ group.location }}
                         </span>
+                      </div>
+                      <div
+                        v-for="(exec, cIdx) in group.executions.filter((e) => e.confirm)"
+                        :key="'c' + cIdx"
+                        class="text-text-secondary flex items-center gap-1.5 py-0.5 ps-4 text-xs"
+                        data-test="synthetics-timeline-confirm"
+                      >
+                        <OIcon name="arrow-right-alt" size="xs" />
+                        {{
+                          t("synthetics.timeline.confirmFrom", {
+                            location: exec.confirm!.location,
+                            result: confirmResult(exec.confirm!.status),
+                          })
+                        }}
                       </div>
                       <template v-if="isBrowser">
                         <div
@@ -151,8 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :class="{
                               'bg-badge-success-solid-bg': exec.status === 'pass',
                               'bg-badge-warning-solid-bg': exec.status === 'warning',
-                              'bg-badge-error-solid-bg':
-                                exec.status === 'fail' || exec.status === 'error',
+                              'bg-badge-error-solid-bg': exec.status === 'fail',
+                              'bg-badge-default-solid-bg': exec.status === 'error',
                             }"
                           />
                           <img
@@ -227,6 +265,8 @@ interface TimelineExecution {
   device: string;
   status: ExecutionStatus;
   errorSnippet: string | null;
+  /** The confirm job that re-tested this failure from a second location. */
+  confirm?: { location: string; status: ExecutionStatus } | null;
 }
 
 interface TimelineSegment {
@@ -254,6 +294,7 @@ interface Props {
   failCount: string;
   passCount: string;
   mixedCount: string;
+  notMeasuredCount?: string;
   startLabel: string;
   endLabel: string;
   isBrowser?: boolean;
@@ -263,6 +304,7 @@ interface Props {
 }
 const props = withDefaults(defineProps<Props>(), {
   lanes: null,
+  notMeasuredCount: "0",
   isBrowser: true,
   truncated: false,
 });
@@ -299,6 +341,12 @@ const browserIconUrl = (name: string): string => {
       return "";
   }
 };
+
+function confirmResult(status: ExecutionStatus): I18nText {
+  if (status === "pass" || status === "warning") return t("synthetics.timeline.confirmPassed");
+  if (status === "error") return t("synthetics.timeline.confirmNotMeasured");
+  return t("synthetics.timeline.confirmFailed");
+}
 
 interface ExecGroup {
   location: string;

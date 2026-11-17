@@ -48,6 +48,7 @@ use crate::{
             ingest::Ingester,
             logs::LogsServer,
             metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
+            otlp::check_otlp_ingest,
             profiles::ProfilesServer,
             query_cache::QueryCacheServerImpl,
             stream::StreamServiceImpl,
@@ -182,10 +183,10 @@ fn common_routes() -> Routes {
     let event_svc = internal_authenticated(event_svc);
     let search_svc = internal_authenticated(search_svc);
     let metrics_svc = internal_authenticated(metrics_svc);
-    let metrics_ingest_svc = otlp_authenticated(metrics_ingest_svc);
-    let trace_svc = otlp_authenticated(trace_svc);
-    let profiles_svc = otlp_authenticated(profiles_svc);
-    let logs_svc = otlp_authenticated(logs_svc);
+    let metrics_ingest_svc = otlp_authenticated_ingest(metrics_ingest_svc);
+    let trace_svc = otlp_authenticated_ingest(trace_svc);
+    let profiles_svc = otlp_authenticated_ingest(profiles_svc);
+    let logs_svc = otlp_authenticated_ingest(logs_svc);
     let query_cache_svc = internal_authenticated(query_cache_svc);
     let ingest_svc = ingest_authenticated(ingest_svc);
     let streams_svc = authenticated(streams_svc);
@@ -281,6 +282,11 @@ fn otlp_authenticated<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
     InterceptedService::new(service, check_otlp_auth)
 }
 
+/// A router's breaker never trips, so only the ingest node's OTLP services check it.
+fn otlp_authenticated_ingest<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
+    InterceptedService::new(service, check_otlp_ingest)
+}
+
 fn internal_authenticated<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
     InterceptedService::new(service, check_internal_auth)
 }
@@ -352,6 +358,12 @@ mod tests {
             _: Request<cluster_rpc::MetricsQueryRequest>,
         ) -> Result<Response<Self::DataStream>, Status> {
             Ok(Response::new(futures::stream::empty()))
+        }
+        async fn wal_min_ts(
+            &self,
+            _: Request<cluster_rpc::WalMinTsRequest>,
+        ) -> Result<Response<cluster_rpc::WalMinTsResponse>, Status> {
+            Err(Status::unimplemented("wal_min_ts"))
         }
     }
 

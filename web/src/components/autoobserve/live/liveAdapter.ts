@@ -34,8 +34,8 @@ import {
   type EngineMonitor,
   type LiveCheck,
   type Signal,
-} from "../fixtures";
-import { say, type Msg, type Request, type RequestCopy } from "../v2/fixtures";
+} from "../aoTypes";
+import { say, type Msg, type Request, type RequestCopy } from "../v2/requestTypes";
 import type { LookKind } from "../v2/changes";
 import { TIER_HINT, TIER_LABEL } from "@/components/alert_calibration/format";
 import { isAlertFindingKind } from "@/components/alert_calibration/dismissals";
@@ -46,9 +46,11 @@ import {
   placeLabels,
   placeOf,
   whereText,
+  type LiveCoverageState,
   type LiveFailure,
   type LiveStale,
 } from "./liveCopy";
+import { serviceLearning, type LearningStream } from "./LiveCoverageLearning";
 import { alertFindingBody, alertFindingHeadline, analysedText } from "./alertFindingCopy";
 import {
   gapGroupInsight,
@@ -65,6 +67,7 @@ export interface CoverageTotals {
   learning: number;
   gaps: number;
   fullyWatched: number;
+  partial: number;
   added: number;
   detectors: number;
 }
@@ -255,6 +258,7 @@ const EMPTY_TOTALS: CoverageTotals = {
   learning: 0,
   gaps: 0,
   fullyWatched: 0,
+  partial: 0,
   added: 0,
   detectors: 0,
 };
@@ -347,6 +351,7 @@ const toRow = (
   service: string,
   minutes: number | null,
   locale: string,
+  nowMs: number,
 ): CoverageRow => {
   const cells = Object.fromEntries(
     SIGNALS.map((signal) => {
@@ -357,7 +362,11 @@ const toRow = (
       return [signal, cell];
     }),
   ) as Record<Signal, CoverageCell>;
-  const watched = GAP_CLASSES.some((cls) => row.cells[cls]?.state === "covered");
+  const covered = GAP_CLASSES.filter((cls) => row.cells[cls]?.state === "covered").length;
+  const state = serviceStateOf(
+    covered,
+    serviceLearning((row.streams ?? []) as LearningStream[], nowMs),
+  );
   const checks = Object.fromEntries(
     GAP_CLASSES.map((cls) => [cls, toCell(t, row.cells[cls], t(CLASS_LABEL[cls]), locale)]),
   ) as Record<LiveCheck, CoverageCell>;
@@ -378,9 +387,7 @@ const toRow = (
       namespace: row.namespace,
       streams: row.streams ?? [],
     },
-    status: watched
-      ? { state: "watched", label: coverageWord(t, "watched") }
-      : { state: "gap", label: coverageWord(t, "gap") },
+    status: { state, label: coverageWord(t, state) },
     extra: EXTRA_CLASSES.map((cls) => {
       const label = t(CLASS_LABEL[cls]);
       return { key: cls, label, cell: toCell(t, row.cells[cls], label, locale) };
@@ -388,14 +395,29 @@ const toRow = (
   };
 };
 
+// Watched needs every check; a service still learning its baseline is not yet a gap.
+const serviceStateOf = (covered: number, learning: boolean): LiveCoverageState => {
+  if (covered >= GAP_CLASSES.length) return "watched";
+  if (covered > 0) return "partial";
+  return learning ? "learning" : "gap";
+};
+
 // Closest engine match for the design's "can't watch": a monitor exists but can't see or reach the service.
 const cannotWatch = (row: AutoObserveCoverageRow) =>
   Object.values(row.cells).some((cell) => cell?.state === "blind" || cell?.state === "unmapped");
 
 const totalsOf = (data: AutoObserveCoverage, rows: CoverageRow[]): CoverageTotals => {
-  const gaps = rows.filter((r) => r.status?.state === "gap").length;
+  const count = (state: LiveCoverageState) => rows.filter((r) => r.status?.state === state).length;
   const detectors = new Set(data.rows.flatMap(coveringMonitors)).size;
-  return { ...EMPTY_TOTALS, total: rows.length, gaps, fullyWatched: rows.length - gaps, detectors };
+  return {
+    ...EMPTY_TOTALS,
+    total: rows.length,
+    gaps: count("gap"),
+    partial: count("partial"),
+    learning: count("learning"),
+    fullyWatched: count("watched"),
+    detectors,
+  };
 };
 
 export const toCoverageSource = (
@@ -417,7 +439,7 @@ export const toCoverageSource = (
     };
   const names = placeLabels(t, data.rows.map(placeOf));
   const minutes = minutesSince(data.pass_at, now);
-  const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale));
+  const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale, now));
   const planned = new Set(data.rows.flatMap((row, i) => (cannotWatch(row) ? [names[i]] : [])));
   return {
     ...base,

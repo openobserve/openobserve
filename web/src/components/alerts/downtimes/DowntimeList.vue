@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-          <div class="bg-card-glass-bg flex h-full flex-col">
+          <div class="bg-card-glass-bg @container/downtime-toolbar flex h-full flex-col">
             <OTable
               v-model:selected-ids="selectedIds"
               class="min-h-0 flex-1"
@@ -85,19 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :get-row-style="rowStyle"
               @row-click="openDetail"
             >
-              <template #subheader>
-                <div data-test="downtime-list-summary">
-                  <OStatStrip
-                    :items="summaryStats"
-                    :loading="loading"
-                    selectable
-                    :selected-key="statFilter"
-                    default-key="total"
-                    @select="onStatSelect"
-                  />
+              <template v-if="truncatedNotice" #subheader>
+                <div class="px-page-edge border-table-row-divider border-b py-1.5">
                   <OBanner
-                    v-if="truncatedNotice"
-                    class="mt-1.5"
                     variant="info"
                     dense
                     :content="truncatedNotice"
@@ -107,9 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #toolbar>
-                <div
-                  class="@container/downtime-toolbar flex min-w-0 flex-1 items-center gap-2 max-md:contents"
-                >
+                <div class="contents">
                   <OToggleGroup
                     mobile-dropdown
                     :model-value="typeFilter"
@@ -124,10 +112,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :icon-left="option.icon"
                       :data-test="`downtime-list-type-${option.value}`"
                     >
-                      <span class="@max-[38rem]/downtime-toolbar:hidden">{{ option.label }}</span>
+                      <span class="@max-[48rem]/downtime-toolbar:hidden">{{ option.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1 max-md:min-w-40">
+                  <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
                     <OInput
                       v-model="search"
                       :placeholder="
@@ -155,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :title="t('alerts.downtimes.thisFolderTooltip')"
                             data-test="downtime-list-scope-this"
                           >
-                            <span class="max-md:hidden @max-[34rem]/downtime-toolbar:hidden">{{
+                            <span class="max-md:hidden @max-[52rem]/downtime-toolbar:hidden">{{
                               t("alerts.downtimes.thisFolder")
                             }}</span>
                           </OToggleGroupItem>
@@ -166,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :title="t('alerts.downtimes.allFoldersTooltip')"
                             data-test="downtime-list-scope-all"
                           >
-                            <span class="max-md:hidden @max-[34rem]/downtime-toolbar:hidden">{{
+                            <span class="max-md:hidden @max-[52rem]/downtime-toolbar:hidden">{{
                               t("alerts.downtimes.allFolders")
                             }}</span>
                           </OToggleGroupItem>
@@ -174,6 +162,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </OInput>
                   </div>
+                  <OStatStrip
+                    :items="summaryStats"
+                    :loading="loading"
+                    selectable
+                    :row="false"
+                    multiple
+                    :selected-keys="statFilters"
+                    default-key="total"
+                    class="max-md:order-last"
+                    data-test="downtime-list-summary"
+                    @update:selected-keys="onStatKeys"
+                  />
                 </div>
               </template>
 
@@ -242,6 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :targets="row.targets"
                   :alert-groups="row.alert_groups"
                   :folder-name="targetFolderName"
+                  :value-label="valueLabel"
                   :max-chips="2"
                   :data-test="`downtime-list-${row.id}-targets`"
                 />
@@ -338,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="row.status === 'scheduled'"
                       variant="ghost-destructive"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       icon-left="cancel"
                       :data-test="`downtime-list-${row.id}-cancel`"
                       @click.stop="askCancel([row.id])"
@@ -348,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-else
                       variant="ghost-destructive"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       icon-left="stop-circle"
                       :disabled="row.status !== 'active'"
                       :aria-label="t('alerts.downtimes.actions.endNow')"
@@ -366,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="isEditable(row)"
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       icon-left="edit"
                       :data-test="`downtime-list-${row.id}-edit`"
                       @click.stop="editDowntime(row)"
@@ -377,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="inline-flex size-8 max-md:hidden">
                     <OButton
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       icon-left="content-copy"
                       :data-test="`downtime-list-${row.id}-duplicate`"
                       :aria-label="
@@ -412,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #trigger>
                       <OButton
                         variant="ghost"
-                        size="icon-sm"
+                        size="icon-xs-sq"
                         icon-left="more-vert"
                         :aria-label="moreActionsLabel(row)"
                         :data-test="`downtime-list-${row.id}-more`"
@@ -482,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("alerts.downtimes.actions.moveToFolder") }}
                     </ODropdownItem>
-                    <template v-if="isFinished(row)">
+                    <template v-if="isDeletable(row)">
                       <ODropdownSeparator />
                       <ODropdownItem
                         variant="destructive"
@@ -526,7 +527,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline-destructive"
                   size="sm"
                   icon-left="cancel"
-                  :disabled="cancellableSelection.length === 0"
+                  :disabled="cancellableSelection.length === 0 || cancelling"
+                  :loading="cancelling"
                   data-test="downtime-list-bulk-cancel"
                   @click="askCancel(cancellableSelection)"
                 >
@@ -551,15 +553,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="cancelOpen"
       :title="t('alerts.downtimes.confirmCancel.title')"
-      :message="
-        pendingCancel.length > 1
-          ? t(
-              'alerts.downtimes.confirmCancel.bulkMessage',
-              { count: pendingCancel.length },
-              pendingCancel.length,
-            )
-          : t('alerts.downtimes.confirmCancel.message')
-      "
+      :message="cancelMessage"
+      ok-variant="destructive"
+      focus-cancel
       :ok-label="
         t(
           'alerts.downtimes.confirmCancel.confirm',
@@ -581,10 +577,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="endNowOpen"
       :title="t('alerts.downtimes.confirmEndNow.title')"
-      :message="t('alerts.downtimes.confirmEndNow.message')"
-      :ok-label="t('alerts.downtimes.confirmEndNow.ok')"
+      :message="
+        endNowRepeats
+          ? t('alerts.downtimes.confirmEndNow.recurringMessage')
+          : t('alerts.downtimes.confirmEndNow.message')
+      "
+      :ok-label="
+        endNowRepeats
+          ? t('alerts.downtimes.confirmEndNow.recurringOk')
+          : t('alerts.downtimes.confirmEndNow.ok')
+      "
       :cancel-label="t('alerts.downtimes.confirmEndNow.keep')"
-      ok-color="destructive"
+      ok-variant="destructive"
+      focus-cancel
       @update:ok="confirmEndNow"
       @update:cancel="endNowOpen = false"
     />
@@ -600,6 +605,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.downtimes.confirmDelete.title')"
       message-keypath="alerts.downtimes.confirmDelete.message"
       :message-name="pendingDeleteName"
+      :ok-label="t('alerts.downtimes.confirmDelete.ok')"
+      :cancel-label="t('alerts.downtimes.confirmDelete.keep')"
       ok-variant="destructive"
       @update:ok="confirmDelete"
       @update:cancel="deleteOpen = false"
@@ -664,6 +671,7 @@ import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { DEFAULT_DOWNTIME_FOLDER } from "@/utils/downtimes/folderDefault";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryRefetch";
+import { useDowntimeValueLabels } from "@/composables/downtimes/useDowntimeValueLabels";
 import DowntimeTargetsCell from "./DowntimeTargetsCell.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
@@ -676,12 +684,13 @@ import MuteMenuItems from "./MuteMenuItems.vue";
 import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
 import { isExtendable } from "@/utils/downtimes/extend";
 import {
+  isDeletable,
   isEditable,
-  isFinished,
   sortDowntimeRows,
   statKeyOf,
   type StatKey,
 } from "@/utils/downtimes/listOrder";
+import { filterKeysToQuery, matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
 
 type TypeFilter = "all" | "once" | "recurring";
 
@@ -795,15 +804,16 @@ const searchAcrossFolders = ref(route.query.scope === "all");
 const typeFilter = ref<TypeFilter>(
   (["once", "recurring"] as const).find((v) => v === route.query.repeat) ?? "all",
 );
-const statFilter = ref<StatKey | null>(statKeyOf(route.query.status));
+const isStatKey = (key: string): key is StatKey => statKeyOf(key) !== null;
+const statFilters = ref<StatKey[]>(readFilterKeys(route.query.status, isStatKey));
 const selectedIds = ref<string[]>([]);
 
 // The banner link can land here while the page is open, so each URL value drives its filter on change.
 watch(
   () => route.query.status,
   (status) => {
-    const fromUrl = statKeyOf(status);
-    if (fromUrl) statFilter.value = fromUrl;
+    const fromUrl = readFilterKeys(status, isStatKey);
+    if (fromUrl.length) statFilters.value = fromUrl;
   },
 );
 watch(
@@ -818,12 +828,12 @@ watch(searchAcrossFolders, (across) => {
   void router.replace({ query: { ...route.query, scope: across ? "all" : undefined } });
 });
 
-watch([typeFilter, statFilter], ([repeat, status]) => {
+watch([typeFilter, statFilters], ([repeat, status]) => {
   router.replace({
     query: {
       ...route.query,
       repeat: repeat === "all" ? undefined : repeat,
-      status: status ?? undefined,
+      status: filterKeysToQuery(status),
     },
   });
 });
@@ -845,16 +855,16 @@ const onFolderChange = (folderId: string) => {
   selectedIds.value = [];
 };
 
+// The same fields as the server search: name, reason and creator.
 const searchText = (row: DowntimeListItem) =>
-  [row.name, row.created_by, JSON.stringify(row.condition ?? "")].join(" ").toLowerCase();
+  [row.name, row.reason ?? "", row.created_by].join(" ").toLowerCase();
 
 const folderRows = computed(() => {
   const term = search.value.trim().toLowerCase();
-  // The org banner links here with every folder and a status filter, and no search term.
-  const scoped =
-    searchAcrossFolders.value && (term || statFilter.value)
-      ? allRows.value
-      : allRows.value.filter((r) => (r.folder_id || "default") === activeFolderId.value);
+  // "All folders" lists every folder, with or without a search term or a status filter.
+  const scoped = searchAcrossFolders.value
+    ? allRows.value
+    : allRows.value.filter((r) => (r.folder_id || "default") === activeFolderId.value);
   const byType = scoped.filter((r) =>
     typeFilter.value === "all"
       ? true
@@ -866,27 +876,29 @@ const folderRows = computed(() => {
 });
 
 const displayedRows = computed(() => {
-  const f = statFilter.value;
-  const rows = !f
-    ? folderRows.value
-    : f === "recurring"
-      ? folderRows.value.filter((r) => r.schedule.repeat !== "none")
-      : folderRows.value.filter((r) => r.status === f);
+  const rows = folderRows.value.filter((row) =>
+    matchesAnyKey(statFilters.value, row, (r, key) =>
+      key === "recurring" ? r.schedule.repeat !== "none" : r.status === key,
+    ),
+  );
   return sortDowntimeRows(rows);
 });
 
+// One lookup for every listed service, so the Targets column names it as the detail page does.
+const valueLabel = useDowntimeValueLabels(orgId, activeFolderId, () => ({
+  type: "group",
+  op: "and",
+  items: displayedRows.value.flatMap((row) => (row.condition ? [row.condition] : [])),
+}));
+
 const isFiltered = computed(
-  () => !!search.value.trim() || typeFilter.value !== "all" || statFilter.value !== null,
+  () => !!search.value.trim() || typeFilter.value !== "all" || statFilters.value.length > 0,
 );
 
 // ── Summary strip ───────────────────────────────────────────────────────────
-// The tiles count `folderRows`, which holds every listed row unfiltered only on the banner's all-folders status link.
+// The tiles count `folderRows`, which holds every listed row unfiltered in "All folders" with no search or type filter.
 const orgWideTiles = computed(
-  () =>
-    searchAcrossFolders.value &&
-    statFilter.value !== null &&
-    !search.value.trim() &&
-    typeFilter.value === "all",
+  () => searchAcrossFolders.value && !search.value.trim() && typeFilter.value === "all",
 );
 
 // The server counts the whole org, so a cut list takes them only where the tiles cover the whole org too.
@@ -966,7 +978,7 @@ const summaryStats = computed<StatItem[]>(() => {
     },
     {
       key: "total",
-      label: t("alerts.downtimes.stats.total"),
+      label: t("common.allStatuses"),
       value: hasData ? total : "—",
       icon: "format-list-bulleted",
       tone: "primary",
@@ -975,16 +987,19 @@ const summaryStats = computed<StatItem[]>(() => {
   ];
 });
 
-const onStatSelect = (key: string) => {
-  statFilter.value = key === "total" || statFilter.value === key ? null : (key as StatKey);
-  analytics.track("downtime_list_filtered", { filter: "status", value: statFilter.value ?? "all" });
+const onStatKeys = (keys: string[]) => {
+  statFilters.value = keys.filter(isStatKey);
+  analytics.track("downtime_list_filtered", {
+    filter: "status",
+    value: filterKeysToQuery(statFilters.value) ?? "all",
+  });
 };
 
 const onEmptyAction = (id?: string) => {
   if (id === "clear-filters") {
     search.value = "";
     typeFilter.value = "all";
-    statFilter.value = null;
+    statFilters.value = [];
     return;
   }
   createDowntime();
@@ -1139,24 +1154,79 @@ const cancellableSelection = computed(() =>
     .map((r) => r.id),
 );
 
+const serverReason = (err: any): string | undefined => err?.response?.data?.message || undefined;
+
+// Each row is its own request, so one failure no longer stops the rest; only failed rows stay selected.
+const cancelling = ref(false);
 const cancelIds = async (ids: string[]) => {
+  if (cancelling.value || ids.length === 0) return;
+  cancelling.value = true;
   try {
-    for (const id of ids) await cancelMutation.mutateAsync({ id, folder: folderOf(id) });
-    toast({
-      variant: "success",
-      message:
-        ids.length > 1
-          ? t("toastMessages.downtimes.cancelledMany", { count: ids.length }, ids.length)
-          : t("toastMessages.downtimes.cancelled"),
-    });
-    selectedIds.value = [];
-  } catch {
-    toast({ variant: "error", message: t("toastMessages.downtimes.cancelFailed") });
+    const results = await Promise.allSettled(
+      ids.map((id) => cancelMutation.mutateAsync({ id, folder: folderOf(id) })),
+    );
+    const failed = ids.filter((_, i) => results[i].status === "rejected");
+    const firstFailure = results.find((r) => r.status === "rejected") as
+      PromiseRejectedResult | undefined;
+    const reason = serverReason(firstFailure?.reason);
+    const done = ids.length - failed.length;
+    if (failed.length === 0) {
+      toast({
+        variant: "success",
+        message:
+          ids.length > 1
+            ? t("toastMessages.downtimes.cancelledMany", { count: ids.length }, ids.length)
+            : t("toastMessages.downtimes.cancelled"),
+      });
+    } else if (ids.length === 1) {
+      toast({
+        variant: "error",
+        message: raw(reason) || t("toastMessages.downtimes.cancelFailed"),
+      });
+    } else {
+      toast({
+        variant: "error",
+        message: reason
+          ? t("toastMessages.downtimes.cancelPartial", {
+              cancelled: done,
+              failed: failed.length,
+              reason,
+            })
+          : t("toastMessages.downtimes.cancelPartialNoReason", {
+              cancelled: done,
+              failed: failed.length,
+            }),
+      });
+    }
+    // Rows outside this cancel keep their tick; of the cancelled ones, only the failed stay.
+    selectedIds.value = selectedIds.value.filter((id) => !ids.includes(id) || failed.includes(id));
+  } finally {
+    cancelling.value = false;
   }
 };
 
 const endNowOpen = ref(false);
 const pendingEndNow = ref("");
+
+// A cancel of a recurring row stops every future window, so its dialogs say so.
+const repeatsById = (id: string) => {
+  const row = allRows.value.find((r) => r.id === id);
+  return !!row && row.schedule.repeat !== "none";
+};
+const endNowRepeats = computed(() => repeatsById(pendingEndNow.value));
+const cancelMessage = computed<I18nText>(() => {
+  const count = pendingCancel.value.length;
+  const anyRepeats = pendingCancel.value.some(repeatsById);
+  if (count > 1) {
+    const bulk = t("alerts.downtimes.confirmCancel.bulkMessage", { count }, count);
+    return anyRepeats
+      ? raw(`${bulk} ${t("alerts.downtimes.confirmCancel.bulkRecurringNote")}`)
+      : bulk;
+  }
+  return anyRepeats
+    ? t("alerts.downtimes.confirmCancel.recurringMessage")
+    : t("alerts.downtimes.confirmCancel.message");
+});
 
 const askEndNow = (row: DowntimeListItem) => {
   pendingEndNow.value = row.id;
@@ -1205,8 +1275,11 @@ const confirmDelete = async () => {
       variant: `clone:${id}`,
     });
     toast({ variant: "success", message: t("toastMessages.downtimes.deleted") });
-  } catch {
-    toast({ variant: "error", message: t("toastMessages.downtimes.deleteFailed") });
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(serverReason(err)) || t("toastMessages.downtimes.deleteFailed"),
+    });
   }
 };
 

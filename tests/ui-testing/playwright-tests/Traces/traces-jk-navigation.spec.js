@@ -19,12 +19,12 @@ const {
   expect,
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
-const { getAuthHeaders } = require("../utils/cloud-auth.js");
+const { getAuthHeaders, getOrgIdentifier } = require("../utils/cloud-auth.js");
 const PageManager = require("../../pages/page-manager.js");
 const { ingestBase } = require('../utils/ingest-url.js');
 
-const ORG = `jktraces${Date.now()}`;
-const STREAM = "jk_traces";
+const ORG = getOrgIdentifier() || "default";
+const STREAM = `e2e_jk_traces_${Math.random().toString(36).slice(2, 7)}`;
 const LIST_TRACES = 30;
 
 const list = '[data-test="traces-search-result-list"]';
@@ -134,6 +134,7 @@ async function openList(page) {
   await expect(page.locator(listRow(24))).toBeAttached({ timeout: 60000 });
   // Rows render before the search settles; J pressed while loading is dropped.
   await new PageManager(page).tracesPage.expectTraceListIdle();
+  await new PageManager(page).tracesPage.expectTraceListPageCountAtLeast(2);
   await page.evaluate(
     () =>
       document.activeElement instanceof HTMLElement &&

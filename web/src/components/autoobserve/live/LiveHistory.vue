@@ -50,6 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </li>
     </ul>
     <LiveSurfaceEmpty v-else-if="!rows.length" surface="history" @action="emit('see-issues')" />
+    <p
+      v-else-if="!shownRows.length"
+      class="text-text-secondary py-3 text-sm"
+      data-test="autoobserve-live-history-filter-empty"
+    >
+      {{ t("autoobserve.activityLive.history.filterEmpty") }}
+    </p>
     <template v-else>
       <p
         v-if="partial"
@@ -59,51 +66,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="lock" size="xs" class="shrink-0" />
         {{ partial }}
       </p>
-      <ul class="flex flex-col" data-test="autoobserve-live-history-list">
-        <li
-          v-for="row in rows"
-          :key="row.id"
-          class="border-border-subtle flex gap-3 border-b py-3 last:border-b-0"
-          :data-test="`autoobserve-live-history-${row.id}`"
+      <div class="flex flex-col gap-4" data-test="autoobserve-live-history-list">
+        <section
+          v-for="day in days"
+          :key="day.key"
+          class="flex flex-col"
+          :data-test="`autoobserve-live-history-day-${day.key}`"
         >
-          <span class="flex h-5 w-3 shrink-0 items-center justify-center">
-            <span v-if="row.status" class="bg-border-strong size-2 rounded-full" />
-            <OIcon v-else name="person" size="xs" class="text-text-secondary" />
-          </span>
-          <span class="flex min-w-0 flex-col gap-1">
-            <span class="text-text-secondary text-xs tabular-nums">{{ row.when }}</span>
-            <p class="text-text-body text-sm leading-relaxed text-pretty">
-              {{ row.text }}
-              <OTag
-                v-if="row.status"
-                type="incidentStatus"
-                :value="row.status.value"
-                :label="row.status.label"
-                size="sm"
-                class="ms-1 align-middle"
-              />
-              <OTag
-                v-if="row.undone"
-                variant="default-soft"
-                size="sm"
-                class="ms-1 align-middle"
-                :label="t('insight.decisions.applied.undone')"
-              />
-            </p>
-            <OButton
-              v-if="row.incidentId"
-              variant="ghost-primary"
-              size="xs"
-              icon-right="arrow-forward"
-              class="-ms-2 self-start"
-              :data-test="`autoobserve-live-history-open-${row.incidentId}`"
-              @click="router.push(incidentLink(org, row.incidentId))"
+          <h3 class="text-text-secondary pb-1 text-xs font-semibold">{{ day.label }}</h3>
+          <ul class="flex flex-col">
+            <li
+              v-for="row in day.rows"
+              :key="row.id"
+              class="border-border-subtle flex gap-3 border-b py-3 last:border-b-0"
+              :data-test="`autoobserve-live-history-${row.id}`"
             >
-              {{ t("autoobserveLive.history.openIncident") }}
-            </OButton>
-          </span>
-        </li>
-      </ul>
+              <span class="flex h-5 w-3 shrink-0 items-center justify-center">
+                <OIcon v-if="row.byPerson" name="person" size="xs" class="text-text-secondary" />
+                <span v-else class="size-2 rounded-full" :class="dotClass(row)" />
+              </span>
+              <span class="flex min-w-0 flex-col gap-1">
+                <span class="text-text-secondary text-xs tabular-nums">{{ row.time }}</span>
+                <p class="text-text-body text-sm leading-relaxed text-pretty">
+                  {{ row.text }}
+                  <OTag
+                    v-if="row.status"
+                    type="incidentStatus"
+                    :value="row.status.value"
+                    :label="row.status.label"
+                    size="sm"
+                    class="ms-1 align-middle"
+                  />
+                </p>
+                <span
+                  v-if="row.reason || row.undone"
+                  class="text-text-secondary text-xs"
+                  :data-test="`autoobserve-live-history-meta-${row.id}`"
+                  >{{ [row.reason, row.undone].filter(Boolean).join(" · ") }}</span
+                >
+                <OButton
+                  v-if="row.incidentId"
+                  variant="ghost-primary"
+                  size="xs"
+                  icon-right="arrow-forward"
+                  class="-ms-2 self-start"
+                  :data-test="`autoobserve-live-history-open-${row.incidentId}`"
+                  @click="emit('open-issue', row.incidentId)"
+                >
+                  {{ t("autoobserve.activityLive.history.openIssue") }}
+                </OButton>
+                <OButton
+                  v-else-if="row.changeId"
+                  variant="ghost-primary"
+                  size="xs"
+                  icon-right="arrow-forward"
+                  class="-ms-2 self-start"
+                  :data-test="`autoobserve-live-history-change-${row.changeId}`"
+                  @click="emit('see-change', row.changeId)"
+                >
+                  {{ t("autoobserve.activityLive.history.seeChange") }}
+                </OButton>
+              </span>
+            </li>
+          </ul>
+        </section>
+      </div>
       <p
         v-if="truncated"
         class="text-text-secondary text-xs"
@@ -117,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import config from "@/aws-exports";
@@ -131,20 +157,32 @@ import { autoobserveIncidentsPageQuery } from "@/services/autoobserve.queries";
 import { decisionsPageQuery } from "@/composables/autoobserve/useDecisionRoute";
 import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveSurfaceEmpty from "./LiveSurfaceEmpty.vue";
-import { HISTORY_PAGE, toHistoryRows } from "./historyFeed";
-import { incidentLink } from "./incidentsCopy";
+import {
+  HISTORY_PAGE,
+  historyDays,
+  toHistoryRows,
+  type LiveHistoryKind,
+  type LiveHistoryRow,
+} from "./historyFeed";
 import { liveFailureOf, liveLoadText, liveNotice } from "./liveCopy";
+import { useNow } from "@/composables/useNow";
 import { stateOf, useHeldSkeleton, useLiveZone, useLoadPhase } from "./liveModel";
 
-const emit = defineEmits<{ "see-issues": [] }>();
+const props = withDefaults(defineProps<{ filter?: "all" | LiveHistoryKind }>(), { filter: "all" });
+const emit = defineEmits<{
+  "see-issues": [];
+  "open-issue": [id: string];
+  "see-change": [decisionId: string];
+}>();
 
 const SKELETON_ROWS = 4;
 
 const { t } = useI18nTyped();
-const router = useRouter();
 const store = useStore();
 const zone = useLiveZone();
+const now = useNow();
 
+const me = computed<string | undefined>(() => store.state.userInfo?.email);
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const enterprise = config.isEnterprise === "true";
 
@@ -209,8 +247,22 @@ const loadPhase = useLoadPhase(() => (pending.value ? "loading" : "ready"), load
 const loadText = computed(() => liveLoadText(t, "history", loadPhase.value));
 
 const rows = computed(() =>
-  pending.value ? [] : toHistoryRows(t, zone.value, incidentItems.value, decisionItems.value),
+  pending.value
+    ? []
+    : toHistoryRows(t, zone.value, incidentItems.value, decisionItems.value, me.value, now.value),
 );
+const shownRows = computed(() =>
+  props.filter === "all" ? rows.value : rows.value.filter((row) => row.kind === props.filter),
+);
+const days = computed(() => historyDays(t, zone.value, shownRows.value, now.value));
+
+// Open problems read red, resolved ones green, the rest neutral, as on the Issues list.
+const dotClass = (row: LiveHistoryRow) => {
+  if (row.status?.value === "open") return "bg-status-error-text";
+  if (row.status?.value === "resolved") return "bg-status-success-text";
+  return "bg-border-strong";
+};
+
 const truncated = computed(
   () =>
     !!incidents.data.value?.has_more ||

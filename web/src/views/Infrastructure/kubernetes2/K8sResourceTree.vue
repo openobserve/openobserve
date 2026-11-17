@@ -134,7 +134,7 @@ const setOpen = (id: string, open: boolean) => {
       />
     </div>
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3">
+    <div class="min-h-0 flex-1 overflow-y-auto px-1 pb-3">
       <OTabs
         :model-value="active"
         orientation="vertical"

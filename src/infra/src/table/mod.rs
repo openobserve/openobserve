@@ -104,7 +104,13 @@ pub mod score_configs;
 pub mod scorers;
 pub mod search_job;
 pub mod search_queue;
+pub mod service_identity_rules;
+pub mod service_name_aliases;
 pub mod service_streams;
+pub mod service_version_deploys;
+pub mod service_version_verdicts;
+pub mod service_versions;
+pub mod service_where_summary;
 pub mod sessions;
 pub mod short_urls;
 #[cfg(any(test, feature = "test-utils"))]

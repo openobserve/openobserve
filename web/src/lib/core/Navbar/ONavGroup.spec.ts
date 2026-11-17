@@ -6,6 +6,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ONavGroup from "./ONavGroup.vue";
+import buildConfig from "@/aws-exports";
 import type { SubnavChild } from "./ONavbar.types";
 import { NAV_GROUPS } from "./navGroups";
 import { AIM_IDLE, aim } from "./hoverIntent";
@@ -85,6 +86,12 @@ const i18n = createI18n({
         pipeline: "Pipelines",
         trialFlyoutNote: "Your trial has ended. Pages with a lock need a plan.",
         trialPageNeedsPlan: "{page} needs a plan",
+        serviceGraph: "Service Graph",
+        onCall: "On-Call",
+        pages: "Pages",
+      },
+      featureLock: {
+        availableInEnterprise: "{feature} is available in OpenObserve Enterprise",
       },
     },
   },
@@ -113,7 +120,7 @@ const menuLinkStub = {
 
 const oIconStub = { template: "<span />", props: ["name", "size"] };
 
-// VTU's trigger cannot set the read-only `detail`; detail 0 is a keyboard activation, 1 a pointer click.
+// VTU's trigger cannot set the read-only `detail`; Chromium sends 0 for a keyboard click, Firefox sends 1.
 function click(el: Element, detail: number) {
   el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail }));
 }
@@ -1351,6 +1358,7 @@ describe("ONavGroup", () => {
         tab: "service-graph",
         gate: "enterprise",
       },
+      { titleKey: "menu.pages", icon: "bell", name: "traces", tab: "pages", gate: "oncall" },
     ];
 
     async function mountLocked(path: string) {
@@ -1395,6 +1403,39 @@ describe("ONavGroup", () => {
       wrapper = w;
     });
 
+    it("explains the edition lock with a tooltip on the locked child", async () => {
+      const { wrapper: w } = await mountLocked("/traces");
+      const row = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
+      const tooltip = row.findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      expect(String(tooltip.props("content"))).toBe(
+        "Service Graph is available in OpenObserve Enterprise",
+      );
+      wrapper = w;
+    });
+
+    it("names the feature, not the row title, in the tooltip and the accessible name", async () => {
+      const { wrapper: w } = await mountLocked("/traces");
+      const row = w.get('[data-test="nav-group-item-traces-pages-locked"]');
+      expect(String(row.findComponent({ name: "OTooltip" }).props("content"))).toBe(
+        "On-Call is available in OpenObserve Enterprise",
+      );
+      expect(row.text()).toContain("On-Call is available in OpenObserve Enterprise");
+      wrapper = w;
+    });
+
+    it("shows the same tooltip on the inline rows in the mobile menu", async () => {
+      mobile.set(true);
+      const { wrapper: w } = await mountLocked("/traces");
+      await w.get('[data-test="tile"]').trigger("click");
+      await flushPromises();
+      const row = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
+      expect(String(row.findComponent({ name: "OTooltip" }).props("content"))).toBe(
+        "Service Graph is available in OpenObserve Enterprise",
+      );
+      wrapper = w;
+    });
+
     // Clicking a locked item must never navigate to its real destination
     // (Service Graph) — it redirects to the Enterprise Features page instead.
     it("redirects to the Enterprise Features page, not the real destination, when the locked child is clicked", async () => {
@@ -1406,6 +1447,24 @@ describe("ONavGroup", () => {
 
       expect(router.currentRoute.value.name).toBe("enterpriseFeatures");
       wrapper = w;
+    });
+
+    it("a stale Enter on a locked item does not turn a later mouse click on the tile into a keyboard choice", async () => {
+      const { wrapper: w } = await mountLocked("/");
+      wrapper = w;
+      const flyoutEl = () => w.find('[data-test="nav-group-flyout-traces"]');
+      await w.get('[data-test="nav-group-item-traces-service-graph-locked"]').trigger("keydown", {
+        key: "Enter",
+      });
+      await w.trigger("mouseleave");
+      vi.advanceTimersByTime(CLOSE_DELAY * 10);
+      await flushPromises();
+      expect(flyoutEl().exists()).toBe(false);
+      const tileEl = w.get('[data-test="tile"]');
+      await tileEl.trigger("pointerdown");
+      click(tileEl.element, 1);
+      await flushPromises();
+      expect(flyoutEl().exists()).toBe(true);
     });
 
     it("still lets the UNLOCKED sibling child navigate normally", async () => {
@@ -1594,6 +1653,13 @@ describe("ONavGroup", () => {
   });
 
   describe("license feature state of a child", () => {
+    beforeEach(() => {
+      buildConfig.isEnterprise = "true";
+    });
+    afterEach(() => {
+      buildConfig.isEnterprise = "false";
+    });
+
     const workflowsChild: SubnavChild = {
       titleKey: "menu.workflows",
       icon: "schema",
@@ -1642,6 +1708,16 @@ describe("ONavGroup", () => {
       await hoverOpen();
       return router;
     }
+
+    it("on an OSS build names the missing edition, not a licence, in the tooltip and screen-reader text", async () => {
+      buildConfig.isEnterprise = "false";
+      await mountWithFeature("locked");
+      const item = flyout().get('[data-test="nav-group-item-workflows-license-lock"]');
+      expect(item.find(".sr-only").text()).toBe("workflows is available in OpenObserve Enterprise");
+      expect(String(item.findComponent({ name: "OTooltip" }).props("content"))).toBe(
+        "workflows is available in OpenObserve Enterprise",
+      );
+    });
 
     it("shows a locked child as a real link with a gold lock and screen-reader text", async () => {
       const router = await mountWithFeature("locked");
@@ -2004,6 +2080,106 @@ describe("ONavGroup", () => {
       expect(document.activeElement).toBe(tile());
     });
 
+    it("Enter on an item returns focus to the tile when the click has detail 1 (Firefox)", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      await item.trigger("keydown", { key: "Enter" });
+      click(item.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).toBe(tile());
+    });
+
+    it("Enter on the group tile leaves no flyout open when the click has detail 1 (Firefox)", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const tileEl = wrapper.find('[data-test="tile"]');
+      await tileEl.trigger("keydown", { key: "Enter" });
+      click(tileEl.element, 1);
+      await flushPromises();
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+    });
+
+    it("a later non-activating key drops an earlier Enter, so the next click is a mouse choice", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      await item.trigger("keydown", { key: "Enter" });
+      await item.trigger("keydown", { key: "ArrowDown" });
+      click(item.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).not.toBe(tile());
+    });
+
+    it("Space on the link tile clicks nothing, so a later programmatic item click is a mouse choice", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const tileEl = wrapper.find('[data-test="tile"]');
+      await tileEl.trigger("keydown", { key: " " });
+      await tileEl.trigger("keyup", { key: " " });
+      vi.advanceTimersByTime(0);
+      click(firstItem().element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).not.toBe(tile());
+    });
+
+    it("Space on the link tile clicks nothing, so a later programmatic tile click keeps the flyout open", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const tileEl = wrapper.find('[data-test="tile"]');
+      await tileEl.trigger("keydown", { key: " " });
+      await tileEl.trigger("keyup", { key: " " });
+      vi.advanceTimersByTime(0);
+      click(tileEl.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(true);
+    });
+
+    it("an Enter whose keyup lands elsewhere without a click does not mark the next click as keyboard", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      await item.trigger("keydown", { key: "Enter" });
+      document.body.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+      vi.advanceTimersByTime(0);
+      click(item.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).not.toBe(tile());
+    });
+
+    it("a click dispatched by the key release itself still counts as keyboard", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      await item.trigger("keydown", { key: "Enter" });
+      await item.trigger("keyup", { key: "Enter" });
+      click(item.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).toBe(tile());
+    });
+
+    it("a mouse click after an arrow-key move is still a mouse choice", async () => {
+      wrapper = mountGroup(true);
+      await hoverOpen();
+      const item = firstItem();
+      (item.element as HTMLElement).focus();
+      await item.trigger("keydown", { key: "ArrowDown" });
+      click(item.element, 1);
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+      expect(document.activeElement).not.toBe(tile());
+    });
+
     it("a mouse choice closes the flyout but never moves focus to the tile", async () => {
       wrapper = mountGroup(true);
       await hoverOpen();
@@ -2056,6 +2232,34 @@ describe("ONavGroup", () => {
       await settle();
       expect(docFlyout()).toBeNull();
       expect(document.activeElement).toBe(tile().element);
+    });
+
+    it("Enter on a teleported item returns focus to the tile when the click has detail 1 (Firefox)", async () => {
+      document.documentElement.dir = "ltr";
+      wrapper = mountTeleported();
+      await tile().trigger("keydown", { key: "ArrowRight" });
+      await settle();
+      const item = firstItem()!;
+      expect(document.activeElement).toBe(item);
+      item.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      click(item, 1);
+      await settle();
+      expect(docFlyout()).toBeNull();
+      expect(document.activeElement).toBe(tile().element);
+    });
+
+    it("a pointer press in the teleported flyout turns a stale Enter back into a mouse choice", async () => {
+      document.documentElement.dir = "ltr";
+      wrapper = mountTeleported();
+      await tile().trigger("keydown", { key: "ArrowRight" });
+      await settle();
+      const item = firstItem()!;
+      item.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      item.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+      click(item, 1);
+      await settle();
+      expect(docFlyout()).toBeNull();
+      expect(document.activeElement).not.toBe(tile().element);
     });
 
     it("in LTR, ArrowRight opens and ArrowLeft closes, and ArrowLeft on the tile does nothing", async () => {

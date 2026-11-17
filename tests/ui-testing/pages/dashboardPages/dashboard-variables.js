@@ -1,3 +1,4 @@
+import MonacoEditorHelper from "../../playwright-tests/utils/MonacoEditorHelper.js";
 //dashboard variables page object
 //methods: addDashboardVariable, selectValueFromVariableDropDown
 //addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
@@ -105,7 +106,7 @@ export default class DashboardVariables {
    * @param {string} content - HTML content to enter
    */
   async fillHtmlEditor(content) {
-    await this.htmlEditor.locator(".inputarea").fill(content);
+    await new MonacoEditorHelper(this.page).fillInputArea(this.htmlEditor, content);
   }
 
   // Method to add a dashboard variable

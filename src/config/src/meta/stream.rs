@@ -1588,6 +1588,9 @@ pub struct SecuritySourceSetting {
     pub verdict: Option<SecurityVerdict>,
     #[serde(default)]
     pub confidence: f64,
+    /// Who chose `source_type`; the classifier never replaces a manual or pack type.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<SecurityTypeOrigin>,
     /// Set by the server on every write; client values are ignored.
     #[serde(default)]
     pub updated_by: String,
@@ -1631,6 +1634,24 @@ impl SecurityVerdict {
             Self::Auto => "auto",
             Self::Suggested => "suggested",
             Self::Ignored => "ignored",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum SecurityTypeOrigin {
+    Auto,
+    Manual,
+    Pack,
+}
+
+impl SecurityTypeOrigin {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Manual => "manual",
+            Self::Pack => "pack",
         }
     }
 }
@@ -2789,6 +2810,7 @@ mod tests {
             included: Some(false),
             verdict: Some(SecurityVerdict::Auto),
             confidence: 0.75,
+            origin: Some(SecurityTypeOrigin::Manual),
             updated_by: "a@b.io".to_string(),
             updated_at: 7,
             changes: vec![SecuritySettingChange {

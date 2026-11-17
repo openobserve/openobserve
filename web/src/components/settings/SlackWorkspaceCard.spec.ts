@@ -15,9 +15,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { defineComponent } from "vue";
+import { defineComponent, type Component } from "vue";
 import i18n from "@/locales";
 import slack from "@/services/slack";
+import users from "@/services/users";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import SlackWorkspaceCard from "./SlackWorkspaceCard.vue";
 import {
   OTableStub,
@@ -30,6 +32,7 @@ import {
   ok,
   postCallback,
   selfHostedSettingsExchange,
+  withSlackSaveBar,
 } from "@/test/unit/helpers/slack";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { InstallationView } from "@/types/slack";
@@ -45,6 +48,8 @@ vi.mock("@/services/slack", () => ({
     installExchange: vi.fn(),
   },
 }));
+
+vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
 
 vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
@@ -83,8 +88,12 @@ const NamedConfirmDialogStub = defineComponent({
     </div>`,
 });
 
-const mountCard = (installation: InstallationView = installationView(), isCloud = false) =>
-  mount(SlackWorkspaceCard, {
+const mountCard = (
+  installation: InstallationView = installationView(),
+  isCloud = false,
+  component: Component = SlackWorkspaceCard,
+) =>
+  mount(component as typeof SlackWorkspaceCard, {
     props: { installation, isCloud },
     attachTo: document.body,
     global: {
@@ -127,9 +136,9 @@ afterEach(() => {
 describe("SlackWorkspaceCard (A3)", () => {
   it("AC-12.4 shows the workspace with its slackInstallStatus badge", () => {
     const w = mountCard(installationView({ status: "degraded" }));
-    expect(w.find('[data-test="slack-workspace-name"]').text()).toBe("Acme Corp");
+    expect(w.find('[data-test="slack-workspace-card"] h2').text()).toBe("Acme Corp");
     expect(w.find('[data-test="slack-workspace-status"]').text()).toBe("Degraded");
-    expect(w.find('[data-test="slack-workspace-meta"]').text()).toContain(
+    expect(w.find('[data-test="slack-workspace-card-description"]').text()).toContain(
       "Connected by ana@acme.example",
     );
   });
@@ -138,7 +147,9 @@ describe("SlackWorkspaceCard (A3)", () => {
     const w = mountCard();
     expect(w.find('[data-test="slack-workspace-sockets"]').text()).toContain("Connected to Slack");
     expect(w.find('[data-test="slack-workspace-sockets"]').text()).not.toContain("Socket Mode");
-    expect(w.find('[data-test="slack-workspace-meta"]').text()).not.toContain("Socket Mode");
+    expect(w.find('[data-test="slack-workspace-card-description"]').text()).not.toContain(
+      "Socket Mode",
+    );
     expect(w.find('[data-test="slack-workspace-connection-info"]').exists()).toBe(true);
     expect(
       mountCard(installationView({ mode: "http" }))
@@ -256,21 +267,33 @@ describe("SlackWorkspaceCard (A3)", () => {
     },
   );
 
-  it("AC-12.1 help contact loads row 23 and saves it", async () => {
-    const w = mountCard();
+  it("AC-12.1 help contact loads row 23 and is saved by the page's Save", async () => {
+    const w = mountCard(installationView(), false, withSlackSaveBar(SlackWorkspaceCard));
     await flushPromises();
     const input = w.find('[data-test="slack-help-contact"] input');
     expect((input.element as HTMLInputElement).value).toBe("#o2-help");
     await input.setValue("#ops");
-    await w.find('[data-test="slack-help-contact-form"]').trigger("submit");
+    expect(slack.putHelpContact).not.toHaveBeenCalled();
+    expect((w.vm as any).bar.changeCount.value).toBe(1);
+    let answer: (value: unknown) => void = () => {};
+    vi.mocked(slack.putHelpContact).mockReturnValue(new Promise((r) => (answer = r)) as any);
+    const saving = (w.vm as any).bar.save();
     await vi.waitFor(() =>
       expect(slack.putHelpContact).toHaveBeenCalledWith("acme", "inst-1", { help_contact: "#ops" }),
     );
+    // The old value typed back while the request is open: it stays, as the one unsaved change.
+    await input.setValue("#o2-help");
+    vi.mocked(slack.getHelpContact).mockReturnValue(ok({ help_contact: "#ops" }) as any);
+    answer({ data: { help_contact: "#ops" } });
+    await saving;
     await vi.waitFor(() =>
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "success", message: "Help contact saved" }),
       ),
     );
+    await flushPromises();
+    expect((input.element as HTMLInputElement).value).toBe("#o2-help");
+    expect((w.vm as any).bar.changeCount.value).toBe(1);
   });
 
   it("AC-12.2 lists this org and only a count of other connected orgs", () => {
@@ -299,6 +322,20 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(w.find('[data-test="slack-connected-orgs"]').text()).toContain("Acme Inc (this org)");
     expect(w.text()).toContain("Stops Slack for Acme Inc only");
     w.unmount();
+  });
+
+  it("names who connected the workspace and keeps their email on hover", async () => {
+    vi.mocked(users.orgUsers).mockResolvedValue({
+      data: { data: [{ email: "ana@acme.example", first_name: "Ana", last_name: "Smith" }] },
+    } as any);
+    const w = mountCard();
+    await flushPromises();
+
+    const meta = w.find('[data-test="slack-workspace-card-description"]');
+    expect(meta.text()).toContain("Ana Smith");
+    expect(meta.text()).not.toContain("ana@acme.example");
+    const hover = meta.findAllComponents(OTooltip).map((tip) => String(tip.props("content")));
+    expect(hover.some((content) => content.includes("ana@acme.example"))).toBe(true);
   });
 
   it("renders the on-call slot right under the workspace card, above connected orgs", () => {
@@ -489,7 +526,7 @@ describe("SlackWorkspaceCard (A3)", () => {
       "slack-reinstall",
       "slack-update-credentials",
       "slack-forget-token",
-      "slack-help-contact-save",
+      "slack-help-contact-field",
     ]) {
       expect(w.find(`[data-test="${test}"]`).attributes("disabled"), test).toBeDefined();
     }
@@ -503,7 +540,7 @@ describe("SlackWorkspaceCard (A3)", () => {
       "Credentials, linking and which organizations use Acme Corp are set in _meta.",
     );
     expect(banner.text()).toContain("Questions: #o2-platform");
-    expect(w.find('[data-test="slack-workspace-meta"]').text()).toBe(
+    expect(w.find('[data-test="slack-workspace-card-description"]').text()).toBe(
       "Managed by your instance admin",
     );
     expect(mountCard().find('[data-test="slack-managed-banner"]').exists()).toBe(false);

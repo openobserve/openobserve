@@ -63,6 +63,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import serviceStreamsService from "@/services/service_streams";
 import { axiosReply } from "@/test/unit/helpers/mockService";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 const service = vi.mocked(oncallService);
 const correlation = vi.mocked(serviceStreamsService);
@@ -278,6 +279,30 @@ describe("OnCallRouting", () => {
     render();
     await flushPromises();
     expect(service.ownershipStats).toHaveBeenCalledWith({ org_identifier: ORG });
+  });
+
+  it("hands the editor discovered services with their display fields, one row per key", async () => {
+    queryClient.removeQueries();
+    const row = labelRows.ambiguous;
+    correlation.getServicesList.mockResolvedValue({
+      data: [
+        { ...row, set_id: "kubernetes", disambiguation: { "k8s-cluster": "c1" } },
+        { ...row, set_id: "kubernetes", disambiguation: {} },
+      ],
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(editor(wrapper).props("services")).toEqual([
+      {
+        name: row.service_name,
+        setId: "kubernetes",
+        identity: { "k8s-cluster": "c1" },
+        display_name: row.display_name,
+        display_source: row.display_source,
+        display_candidates: row.display_candidates,
+      },
+    ]);
   });
 
   it("hosts the shared rules list org-wide, with the catch-all team pinned", async () => {

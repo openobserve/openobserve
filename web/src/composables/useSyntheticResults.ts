@@ -462,6 +462,7 @@ export function useSyntheticResults(t: TranslateFn) {
           hasStatusReasonField,
           environment,
           split,
+          schemaFields.has("trigger_type"),
         ),
         startTime,
         endTime,

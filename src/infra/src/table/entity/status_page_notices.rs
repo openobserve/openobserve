@@ -37,6 +37,13 @@ pub struct Model {
     pub auto_check_id: Option<String>,
     pub auto_recovery_streak: i32,
     pub owner: Option<String>,
+    /// Who marked this auto-incident as a false alarm. All three are None when it is not one.
+    pub false_alarm_by: Option<String>,
+    pub false_alarm_at: Option<i64>,
+    pub false_alarm_reason: Option<String>,
+    /// `status_recovered_at` of the check at the mark. Set only while the check was failing, so
+    /// only then does the mark hold the failure. None = the mark holds nothing.
+    pub false_alarm_recovered_at: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
 }

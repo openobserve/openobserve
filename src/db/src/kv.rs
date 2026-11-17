@@ -29,21 +29,27 @@ fn mk_cache_key(org_id: &str, key: &str) -> String {
 }
 
 pub async fn get(org_id: &str, key: &str) -> Result<Bytes, anyhow::Error> {
+    get_optional(org_id, key)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Key not found"))
+}
+
+pub async fn get_optional(org_id: &str, key: &str) -> Result<Option<Bytes>, anyhow::Error> {
     let cache_key = mk_cache_key(org_id, key);
     if cacheable(key)
         && let Some(it) = KVS.get(&cache_key)
     {
-        return Ok(it.value().clone());
+        return Ok(Some(it.value().clone()));
     }
 
     // Get from database table
     let val = match infra::table::kv_store::get(org_id, key).await? {
         Some(model) => Bytes::from(model.value),
-        None => return Err(anyhow::anyhow!("Key not found")),
+        None => return Ok(None),
     };
 
     cache(cache_key, key, val.clone());
-    Ok(val)
+    Ok(Some(val))
 }
 
 pub async fn set(org_id: &str, key: &str, val: Bytes) -> Result<(), anyhow::Error> {
@@ -242,8 +248,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let (org_id, kv_key) = (parts[0], parts[1]);
 
-                // Fetch actual value from kv_store table (primary storage)
-                let item_value = match infra::table::kv_store::get(org_id, kv_key).await {
+                // The notice follows a commit a lagging replica may not have yet.
+                let item_value = match infra::table::kv_store::get_primary(org_id, kv_key).await {
                     Ok(Some(model)) => Bytes::from(model.value),
                     Ok(None) => {
                         log::error!("KV key not found in table: {}", item_key);

@@ -411,6 +411,7 @@ import {
 } from "./bulkCopy";
 import { useBulkCreate } from "./useBulkCreate";
 import { existingAlertRoute, type ExistingAlert } from "./existingAlerts";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
   DEFAULT_FOLDER,
   asksThreshold,
@@ -633,7 +634,11 @@ const openExisting = async (row: ReviewRow) => {
   } catch {
     alertId = "";
   }
-  const query: Record<string, string> = { folder: row.folder.id, org_identifier: org() };
+  const query: Record<string, string> = {
+    folder: row.folder.id,
+    org_identifier: org(),
+    state: ALERT_LIST_ALL_STATES,
+  };
   if (alertId) Object.assign(query, { action: "update", alert_id: alertId });
   closeBulkReview();
   router.push({ name: "alertList", query });

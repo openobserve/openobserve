@@ -132,7 +132,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
-          @click="onPanelClick"
+          @click="
+            (event: any) =>
+              event.componentType === 'markLine' &&
+              event.data?.deployKey &&
+              panelSchema.config?.chart_mark_line_click
+                ? panelSchema.config.chart_mark_line_click(event.data)
+                : onPanelClick(event)
+          "
           @contextmenu="(event) => !store.state.kioskMode && onChartContextMenu(event)"
           @domcontextmenu="(event) => !store.state.kioskMode && onChartDomContextMenu(event)"
           :find-line-on-context-menu="findsLineOnContextMenu"
@@ -2302,7 +2309,37 @@ export default defineComponent({
         return { source, place, colors, data };
       },
     );
-    const withExemplars = (value: any) => {
+    // Deploy marker labels sit above the plot, so a marked chart needs headroom for them.
+    const markerRoom = (grid: any) =>
+      grid && !Array.isArray(grid) && (grid.top === undefined || typeof grid.top === "number")
+        ? { ...grid, top: Math.max(grid.top ?? 0, 24) }
+        : grid;
+    const withExemplars = (input: any) => {
+      const lines = panelSchema.value.config?.chart_mark_lines;
+      const value =
+        lines?.length && input?.options?.series?.length
+          ? {
+              ...input,
+              options: {
+                ...input.options,
+                grid: markerRoom(input.options.grid),
+                series: input.options.series.map((series: any, index: number) =>
+                  index === 0
+                    ? {
+                        ...series,
+                        markLine: {
+                          ...series.markLine,
+                          symbol: ["none", "none"],
+                          lineStyle: { ...series.markLine?.lineStyle, type: "dashed", width: 1 },
+                          silent: false,
+                          data: [...(series.markLine?.data || []), ...lines],
+                        },
+                      }
+                    : series,
+                ),
+              },
+            }
+          : input;
       if (!exemplarMarkers.value.length || !value?.options) return value;
       if (!exemplarsEligible.value && !injectedExemplars.value) return value;
       if (panelSchema.value?.type === "heatmap") return heatmapExemplarData.value.data;

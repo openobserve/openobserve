@@ -977,7 +977,7 @@ pub(crate) async fn queue_service_streams_if_needed(
     }
 }
 
-/// Internal streams such as `_o2_db_stats` never feed service discovery.
+/// Streams O2 writes or derives itself, such as `triggers`, never feed service discovery.
 #[cfg(any(feature = "enterprise", test))]
 fn is_service_discovery_candidate(
     org_id: &str,
@@ -985,11 +985,7 @@ fn is_service_discovery_candidate(
     stream_name: &str,
 ) -> bool {
     org_id != config::META_ORG_ID
-        && matches!(
-            stream_type,
-            StreamType::Logs | StreamType::Metrics | StreamType::Traces
-        )
-        && !config::meta::self_reporting::usage::is_internal_stream(stream_name)
+        && infra::schema::is_service_source_stream(stream_type, stream_name)
 }
 
 /// Deletes the file, then its directory chain if the hour is old enough that late data is unlikely.
@@ -1247,6 +1243,16 @@ mod tests {
             StreamType::Metrics,
             "_agent_signals"
         ));
+        for (stream_type, name) in [
+            (StreamType::Logs, "triggers"),
+            (StreamType::Traces, "_evaluator"),
+            (StreamType::Metrics, "traces_service_graph_request_total"),
+        ] {
+            assert!(
+                !is_service_discovery_candidate("default", stream_type, name),
+                "{name}"
+            );
+        }
         // A user stream may legitimately start with `_`.
         assert!(is_service_discovery_candidate(
             "default",

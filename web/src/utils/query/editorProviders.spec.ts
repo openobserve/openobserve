@@ -979,6 +979,64 @@ describe("orderValues — the same order every run", () => {
   });
 });
 
+describe("buildValueEntries — a value matched mid-text in the flat menu", () => {
+  const JOB = "deploy-ft-k8s-meg-rd-5041-leader-open-close-emails-119768";
+
+  const LOOSE = "deploy-ft-k8s-meg-rd-1042-leader-open-close-emails-119768";
+  const CARET = { startLineNumber: 1, endLineNumber: 1, startColumn: 30, endColumn: 34 };
+
+  it("ranks prefix matches first and keeps every kept row through Monaco's filter", () => {
+    const entries = buildValueEntries([JOB, "5041-a"], { hasOpenQuote: false, typed: "5041" });
+    expect(entries.map((e) => e.name)).toEqual(["5041-a", JOB]);
+    expect(entries.map((e) => e.filterText)).toEqual(["5041", "5041"]);
+    expect(entries.map((e) => e.insertText)).toEqual(["'5041-a'", `'${JOB}'`]);
+  });
+
+  it("drops a value that does not contain the typed text, which Monaco would fuzzy-match", () => {
+    const entries = buildValueEntries([LOOSE, JOB], { hasOpenQuote: false, typed: "5041" });
+    expect(entries.map((e) => e.name)).toEqual([JOB]);
+  });
+
+  it("puts prefix and `_` segment matches ahead of mid-text ones, in sortText order too", () => {
+    const entries = buildValueEntries(["x-deploy", "app_deploy", LOOSE, "deploy-1"], {
+      hasOpenQuote: false,
+      typed: "deploy",
+    });
+    expect(entries.map((e) => e.name)).toEqual(["app_deploy", LOOSE, "deploy-1", "x-deploy"]);
+    const sorts = entries.map((e) => String(e.sortText));
+    expect([...sorts].sort()).toEqual(sorts);
+  });
+
+  it("does the same inside an open quote, keeping the insert text and range", () => {
+    const entries = buildValueEntries([LOOSE, JOB], {
+      hasOpenQuote: true,
+      closingQuoteAhead: true,
+      range: CARET,
+      typed: "5041",
+    });
+    expect(entries.map((e) => e.name)).toEqual([JOB]);
+    expect(entries[0].filterText).toBe("5041");
+    expect(entries[0].insertText).toBe(`${JOB}'`);
+    expect(entries[0].range).toEqual({ ...CARET, endColumn: 35 });
+  });
+
+  it("matches case-insensitively and ignores LIKE wildcards", () => {
+    const entries = buildValueEntries(["Deploy-A", "other"], {
+      hasOpenQuote: true,
+      pattern: true,
+      typed: "%DEP",
+    });
+    expect(entries.map((e) => e.name)).toEqual(["Deploy-A"]);
+    expect(entries[0].filterText).toBe("%DEP");
+  });
+
+  it("leaves the list and its filterText alone when nothing is typed", () => {
+    const entries = buildValueEntries(["b", "a"], { hasOpenQuote: false, typed: "" });
+    expect(entries.map((e) => e.name)).toEqual(["b", "a"]);
+    expect(entries.map((e) => e.filterText)).toEqual(["'b'", "'a'"]);
+  });
+});
+
 describe("buildValueEntries — the label shows what goes in", () => {
   it("quotes text values in the label and leaves numbers bare", () => {
     expect(buildValueEntries(["200"], { hasOpenQuote: false, fieldType: "Utf8" })[0].label).toBe(
@@ -1650,6 +1708,35 @@ describe("groupEntries — header rows over provider-filtered groups", () => {
     expect(matchesTyped({ name: "warn", label: "warn" } as any, "%wa")).toBe(true);
     expect(matchesTyped({ name: "kubernetes_pod_name", label: "x" } as any, "pod")).toBe(true);
     expect(matchesTyped({ name: "level", label: "level" } as any, "ev")).toBe(false);
+  });
+
+  const JOB = "deploy-ft-k8s-meg-rd-5041-leader-open-close-emails-119768";
+
+  it("keeps a value that holds the typed text mid-way, as the server's keyword match does", () => {
+    expect(matchesTyped(value(JOB) as any, "5041")).toBe(true);
+    expect(matchesTyped(value(JOB) as any, "LEADER")).toBe(true);
+    expect(matchesTyped(field("otto_job_id") as any, "job_i")).toBe(false);
+    expect(names(build("5041", false, ["other-1", JOB]))).toEqual([
+      "H:Values · recent",
+      `'${JOB}'`,
+    ]);
+  });
+
+  it("ranks values starting with the typed text ahead of those that only contain it", () => {
+    const rows = build("err", false, ["no-error-here", "error", "an_err_x", "errand"]);
+    expect(names(rows).slice(0, 5)).toEqual([
+      "H:Values · recent",
+      "'error'",
+      "'an_err_x'",
+      "'errand'",
+      "'no-error-here'",
+    ]);
+    expect(rows.slice(1, 5).map((r) => r.sortText)).toEqual([
+      "0b0000",
+      "0b0001",
+      "0b0002",
+      "0b0003",
+    ]);
   });
 });
 

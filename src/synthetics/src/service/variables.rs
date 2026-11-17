@@ -2922,6 +2922,15 @@ mod tests {
             "status_down_runs",
             "status_up_runs",
             "status_run_ts",
+            "last_run_class",
+            "last_run_class_at",
+            "last_tested_at",
+            "status_recovered_at",
+            "status_streak_sig",
+            "gap_since",
+            "gap_runs",
+            "gap_notified_at",
+            "gap_resumed_at",
         ] {
             let start = checks.find(&format!("\"{col}\"")).unwrap();
             let at = start + checks[start..].find("NOT NULL").unwrap() + "NOT NULL".len();

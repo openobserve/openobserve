@@ -18,7 +18,9 @@ import type { Downtime, DowntimeRequest, DowntimeTarget, TargetModule } from "@/
 import type { AlertGroup, AlertGroupLabel, MuteAlertRequest } from "@/ts/interfaces/alert";
 import { formatInTimeZone } from "date-fns-tz";
 import { formatInZone } from "@/utils/oncall";
+import { getIntlLocale } from "@/locales";
 import { DEFAULT_DOWNTIME_FOLDER } from "./folderDefault";
+import { MAX_IDS_PER_TARGET } from "./downtimeForm";
 
 export type QuickMutePreset = "30m" | "1h" | "4h" | "24h";
 
@@ -63,6 +65,13 @@ export interface QuickMuteAlertContext {
   groups?: QuickMuteGroupOption[];
   groupKey?: string;
 }
+
+/** The server refuses more ids per target than this, so a larger selection is stopped before the request. */
+export const MAX_QUICK_MUTE_IDS = MAX_IDS_PER_TARGET;
+
+/** Whether any module of the selection names more ids than one downtime target holds. */
+export const overIdCap = (selection: QuickMuteSelection[]): boolean =>
+  selection.some((s) => s.ids.length > MAX_QUICK_MUTE_IDS);
 
 /** One target per module, all folders, the named ids, from now, filed in `folderId`, no banner. */
 export function buildQuickMuteRequest(
@@ -186,10 +195,21 @@ export function endTimeText(
   t: TranslateFn,
 ): I18nText {
   const day = (micros: number) => formatInTimeZone(new Date(micros / 1000), tz, "yyyy-MM-dd");
-  const time = raw(formatInZone(endsAtMicros, tz, { timeStyle: "short" }));
+  // The app's language and a 24-hour clock, as every downtime time reads.
+  const locale = getIntlLocale();
+  const time = raw(
+    formatInZone(endsAtMicros, tz, { timeStyle: "short", hourCycle: "h23" }, locale),
+  );
   if (day(endsAtMicros) === day(nowMicros)) return time;
   if (tomorrowEndTime(endsAtMicros, nowMicros, tz)) {
     return t("toastMessages.downtimes.timeTomorrow", { time });
   }
-  return raw(formatInZone(endsAtMicros, tz, { dateStyle: "medium", timeStyle: "short" }));
+  return raw(
+    formatInZone(
+      endsAtMicros,
+      tz,
+      { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" },
+      locale,
+    ),
+  );
 }

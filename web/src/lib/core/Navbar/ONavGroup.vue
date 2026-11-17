@@ -50,6 +50,7 @@ import { useTheme } from "@/composables/useTheme";
 import { useRouter, type LocationQueryRaw } from "vue-router";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import { isGateOpen, useNavGateContext } from "./useNavGateContext";
@@ -73,6 +74,7 @@ import { useFeatureNames } from "@/composables/useFeatureLock";
 import {
   checkFeatureAccess,
   buildFeatureGateContext,
+  featureGateLabelKey,
   isFeatureKey,
 } from "@/utils/enterpriseFeatures";
 
@@ -385,6 +387,17 @@ function childLockedLabel(child: SubnavChild): I18nText {
   return t("featureLock.headerLocked", { feature: raw(feature) });
 }
 
+function childLockTip(child: SubnavChild): I18nText | undefined {
+  if (child.locked && child.gate && isFeatureKey(child.gate)) {
+    return t("featureLock.availableInEnterprise", { feature: t(featureGateLabelKey(child.gate)) });
+  }
+  if (!child.licenseLocked) return undefined;
+  const { isEnterprise, isCloud } = buildFeatureGateContext(store.state.zoConfig);
+  if (isEnterprise || isCloud) return childLockedLabel(child);
+  const feature = child.feature ? (featureName(child.feature) ?? child.feature) : "";
+  return t("featureLock.availableInEnterprise", { feature: raw(feature) });
+}
+
 function tileElement(): HTMLElement | null {
   return wrapperRef.value?.querySelector<HTMLElement>("a, button") ?? null;
 }
@@ -526,7 +539,41 @@ function scheduleClose(event?: MouseEvent) {
   closeTimer = setTimeout(tryClose, CLOSE_DELAY);
 }
 
+// Firefox reports Enter on a link as a click with detail 1, so the keydown is the reliable signal.
+let activatedByKey = false;
+let activationKeyTimer: ReturnType<typeof setTimeout> | undefined;
+
+function clearActivationKey() {
+  activatedByKey = false;
+  clearTimeout(activationKeyTimer);
+  document.removeEventListener("keyup", onActivationKeyup, true);
+}
+
+// Space clicks a button in the keyup default action, after every keyup listener, so clear one task later.
+function onActivationKeyup() {
+  document.removeEventListener("keyup", onActivationKeyup, true);
+  activationKeyTimer = setTimeout(clearActivationKey, 0);
+}
+
+function noteActivationKey(event: KeyboardEvent) {
+  if (event.key !== "Enter" && event.key !== " ") {
+    clearActivationKey();
+    return;
+  }
+  clearTimeout(activationKeyTimer);
+  activatedByKey = true;
+  // Capture on document: focus may have left the group before the key is released.
+  document.addEventListener("keyup", onActivationKeyup, true);
+}
+
+function isKeyboardActivation(event?: MouseEvent): boolean {
+  const byKey = activatedByKey || event?.detail === 0;
+  clearActivationKey();
+  return byKey;
+}
+
 function onTriggerClick() {
+  clearActivationKey();
   if (isPinned.value) {
     close();
   } else {
@@ -535,9 +582,9 @@ function onTriggerClick() {
   }
 }
 
-// detail 0 is a keyboard activation: Enter navigates, so nothing should stay open.
+// A keyboard activation navigates, so nothing should stay open.
 function onLinkClick(event?: MouseEvent) {
-  if (event?.detail === 0) {
+  if (isKeyboardActivation(event)) {
     close();
     return;
   }
@@ -574,6 +621,7 @@ watch(openGroupKey, (key) => {
 });
 
 function onDocumentPointerDown(event: PointerEvent) {
+  clearActivationKey();
   const target = event.target as Node;
   if (wrapperRef.value?.contains(target) || flyoutRef.value?.contains(target)) {
     return;
@@ -624,6 +672,7 @@ watch(isOpen, (open) => {
 
 onBeforeUnmount(() => {
   clearTimers();
+  clearActivationKey();
   removeOpenListeners();
   if (openGroupKey.value === props.groupKey) openGroupKey.value = null;
 });
@@ -640,11 +689,12 @@ function onFlyoutTab(event: KeyboardEvent) {
 }
 
 function onFlyoutKeydown(event: KeyboardEvent) {
+  noteActivationKey(event);
   if (event.key === "Tab") {
     onFlyoutTab(event);
     return;
   }
-  // Links do not activate on Space natively; route it through click so detail stays 0.
+  // Links do not activate on Space natively, so route it through click like Enter.
   if (event.key === " ") {
     event.preventDefault();
     (event.target as HTMLElement | null)
@@ -680,8 +730,9 @@ function onFlyoutKeydown(event: KeyboardEvent) {
 // The flyout is teleported, so the rail's capture listener never sees this click.
 const markRailNavigation = inject(RailNavigationMarkKey, null);
 
-// Keyboard choice (detail 0) returns focus to the tile; a mouse choice leaves it to the page.
+// A keyboard choice returns focus to the tile; a mouse choice leaves it to the page.
 function onChildClick(event: MouseEvent, child: SubnavChild) {
+  const byKey = isKeyboardActivation(event);
   if (child.locked) {
     event.preventDefault();
     close();
@@ -690,7 +741,7 @@ function onChildClick(event: MouseEvent, child: SubnavChild) {
   }
   markRailNavigation?.(event);
   close();
-  if (event.detail === 0) nextTick(() => focusTile());
+  if (byKey) nextTick(() => focusTile());
 }
 
 // Focus the hovered item so Enter activates it natively — but never yank
@@ -710,6 +761,8 @@ function onChildMouseenter(event: MouseEvent) {
     @mouseenter="scheduleOpen"
     @mouseleave="scheduleClose"
     @mousemove="onTileMousemove"
+    @keydown="noteActivationKey"
+    @pointerdown="clearActivationKey"
   >
     <!-- Link mode: a navigating MenuLink that also reveals sub-pages on hover.
          `active` is driven by "is any child active" so a group tile (e.g. Data,
@@ -789,7 +842,7 @@ function onChildMouseenter(event: MouseEvent) {
               class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
               :class="[
                 flyoutTextClass,
-                isChildActive(child) ? 'bg-select-item-selected-bg font-medium' : '',
+                isChildActive(child) ? 'bg-nav-flyout-item-selected-bg font-medium' : '',
               ]"
               :aria-current="isChildActive(child) ? 'page' : undefined"
               :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
@@ -815,7 +868,8 @@ function onChildMouseenter(event: MouseEvent) {
                 :data-test="`${childDataTest(child)}-lock`"
                 aria-hidden="true"
               />
-              <span v-if="child.licenseLocked" class="sr-only">{{ childLockedLabel(child) }}</span>
+              <span v-if="childLockTip(child)" class="sr-only">{{ childLockTip(child) }}</span>
+              <OTooltip v-if="childLockTip(child)" side="right" :content="childLockTip(child)" />
               <span
                 v-if="isChildPaywalled(child)"
                 :id="itemDescriptionId(child, 'inline-')"
@@ -837,7 +891,7 @@ function onChildMouseenter(event: MouseEvent) {
             :class="[
               flyoutTextClass,
               block.spaced ? 'mt-2' : '',
-              isChildActive(block.child) ? 'bg-select-item-selected-bg font-medium' : '',
+              isChildActive(block.child) ? 'bg-nav-flyout-item-selected-bg font-medium' : '',
             ]"
             :aria-current="isChildActive(block.child) ? 'page' : undefined"
             :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
@@ -869,9 +923,14 @@ function onChildMouseenter(event: MouseEvent) {
               :data-test="`${childDataTest(block.child)}-lock`"
               aria-hidden="true"
             />
-            <span v-if="block.child.licenseLocked" class="sr-only">{{
-              childLockedLabel(block.child)
+            <span v-if="childLockTip(block.child)" class="sr-only">{{
+              childLockTip(block.child)
             }}</span>
+            <OTooltip
+              v-if="childLockTip(block.child)"
+              side="right"
+              :content="childLockTip(block.child)"
+            />
             <span
               v-if="isChildPaywalled(block.child)"
               :id="itemDescriptionId(block.child, 'inline-')"
@@ -963,8 +1022,8 @@ function onChildMouseenter(event: MouseEvent) {
                       flyoutTextClass,
                       childIndex > 0 ? 'mt-0.5' : '',
                       isChildActive(child)
-                        ? 'bg-select-item-selected-bg font-medium'
-                        : 'hover:bg-dropdown-item-hover-bg',
+                        ? 'bg-nav-flyout-item-selected-bg font-medium'
+                        : 'hover:bg-nav-flyout-item-hover-bg',
                     ]"
                     :aria-current="isChildActive(child) ? 'page' : undefined"
                     :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
@@ -995,9 +1054,14 @@ function onChildMouseenter(event: MouseEvent) {
                       :data-test="`${childDataTest(child)}-lock`"
                       aria-hidden="true"
                     />
-                    <span v-if="child.licenseLocked" class="sr-only">{{
-                      childLockedLabel(child)
+                    <span v-if="childLockTip(child)" class="sr-only">{{
+                      childLockTip(child)
                     }}</span>
+                    <OTooltip
+                      v-if="childLockTip(child)"
+                      side="right"
+                      :content="childLockTip(child)"
+                    />
                     <span
                       v-if="isChildPaywalled(child)"
                       :id="itemDescriptionId(child)"
@@ -1022,8 +1086,8 @@ function onChildMouseenter(event: MouseEvent) {
                     // one look like the same size of break.
                     block.spaced ? 'mt-3' : '',
                     isChildActive(block.child)
-                      ? 'bg-select-item-selected-bg font-medium'
-                      : 'hover:bg-dropdown-item-hover-bg',
+                      ? 'bg-nav-flyout-item-selected-bg font-medium'
+                      : 'hover:bg-nav-flyout-item-hover-bg',
                   ]"
                   :aria-current="isChildActive(block.child) ? 'page' : undefined"
                   :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
@@ -1060,9 +1124,14 @@ function onChildMouseenter(event: MouseEvent) {
                     :data-test="`${childDataTest(block.child)}-lock`"
                     aria-hidden="true"
                   />
-                  <span v-if="block.child.licenseLocked" class="sr-only">{{
-                    childLockedLabel(block.child)
+                  <span v-if="childLockTip(block.child)" class="sr-only">{{
+                    childLockTip(block.child)
                   }}</span>
+                  <OTooltip
+                    v-if="childLockTip(block.child)"
+                    side="right"
+                    :content="childLockTip(block.child)"
+                  />
                   <span
                     v-if="isChildPaywalled(block.child)"
                     :id="itemDescriptionId(block.child)"

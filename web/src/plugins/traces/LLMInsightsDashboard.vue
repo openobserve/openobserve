@@ -496,6 +496,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { isLeavingRoute, trackPendingNavigation } from "@/utils/pendingNavigation";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import { splitNumberWithUnit, splitDuration, splitCost } from "./llmInsightsDashboard.utils";
@@ -572,6 +573,7 @@ import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseF
 const { t } = useI18nTyped();
 const { getStreams } = useStreams(t);
 const router = useRouter();
+trackPendingNavigation(router);
 const route = useRoute();
 const store = useStore();
 
@@ -1078,6 +1080,8 @@ watch(panelCacheDashboardId, (id) => ensurePanelCacheStub(id), {
 // keep readable values (not the internal agent key) and preserve other params
 // (e.g. the time range owned by the parent).
 function syncFilterUrl() {
+  // A late write after the user navigated away would cancel or pollute the new route.
+  if (route.name !== "aiLLMInsights" || isLeavingRoute("aiLLMInsights")) return;
   const agent = selectedAgent.value
     ? {
         name: selectedAgent.value.name,

@@ -8,6 +8,7 @@ interface AnnotationMark {
   start_time?: number | null;
   end_time?: number | null;
   source?: QueryAnnotationMarker["source"];
+  deploy_marker?: Omit<MarkLineEntry, "type" | "annotationDetails">;
 }
 
 /** The label ECharts renders on a mark; `formatter`/`distance` are absent once `label.show` is false. */
@@ -38,7 +39,8 @@ interface MarkLineEntry extends Partial<Omit<MarkLineStyle, "label" | "symbol">>
   symbol?: string[];
   name?: string;
   type: "xAxis";
-  xAxis: Date;
+  /** A deploy marker carries epoch milliseconds rather than a zoned date. */
+  xAxis: Date | number;
   label: MarkLabel;
   annotationDetails: AnnotationMark;
 }
@@ -150,6 +152,8 @@ export const getAnnotationsData = (
           annotationDetails: annotation,
         },
       ]);
+    } else if (annotation.deploy_marker) {
+      markLines.push({ ...annotation.deploy_marker, type: "xAxis", annotationDetails: annotation });
     } else if (annotation.start_time) {
       markLines.push({
         symbol: ["circle", "triangle"],

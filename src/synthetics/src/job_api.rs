@@ -93,6 +93,8 @@ pub(crate) mod billing {
         pub now_us: i64,
         /// See the call site in [`super::ack`].
         pub region: Option<String>,
+        /// A confirm job re-tests a failure; it is our cost of a correct answer, so never billed.
+        pub confirm: bool,
     }
 
     /// What one ack bills, and which of the two guards fired.
@@ -294,6 +296,7 @@ pub(crate) mod billing {
             retries: live_retries,
             now_us,
             region,
+            confirm: super::is_confirm_job(row),
         }
     }
 
@@ -371,9 +374,10 @@ pub(crate) mod billing {
         // e. Clamp + zero fallback.
         let steps = resolve_billable(flags, &i);
 
-        // Queue, control plane and config errors never ran: nothing billed, no zero-fallback
-        // warning.
-        if i.error_source == "queue"
+        // Queue, control plane and config errors never ran, and confirm jobs are ours: nothing
+        // billed, no zero-fallback warning.
+        if i.confirm
+            || i.error_source == "queue"
             || i.error_source == crate::alerting::ERROR_SOURCE_CONTROL_PLANE
             || i.error_source == crate::alerting::ERROR_SOURCE_CONFIG
         {
@@ -1042,6 +1046,13 @@ pub struct AckResponse {
     /// The downtime that muted this run; server-side only, since the ack body goes to a probe.
     #[serde(skip)]
     pub suppressed_by: Option<String>,
+    /// "Failing in 1 of 2 locations (aws-us-east-1)" on a firing partial or down run.
+    #[serde(skip)]
+    pub coverage: Option<String>,
+    /// The "Monitoring gap" or "Monitoring resumed" notice this run owes, sent apart from
+    /// `alert`. `None` when muted.
+    #[serde(skip)]
+    pub gap_notice: Option<crate::alerting::GapNotice>,
     /// The check's template override; server-side only.
     #[serde(skip)]
     pub template: Option<String>,
@@ -1256,7 +1267,12 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         })
         .collect();
 
-    let trigger_type = run_trigger_type(conn, &check.run_id).await;
+    // The probe writes this to the result row, the only marker a confirm job has there.
+    let trigger_type = if is_confirm_job(&check) {
+        synthetics_runs::TRIGGER_CONFIRM.to_string()
+    } else {
+        run_trigger_type(conn, &check.run_id).await
+    };
 
     let mut metadata: serde_json::Value =
         serde_json::from_str(&check.metadata).unwrap_or(serde_json::json!({}));
@@ -1656,6 +1672,274 @@ fn stale_lease_response(
         usage_events: Vec::new(),
         suppressed_by: None,
         template: None,
+        coverage: None,
+        gap_notice: None,
+    }
+}
+
+/// Whether a leased job is a confirm job, which re-tests another job's failure.
+pub(crate) fn is_confirm_job(row: &synthetics_jobs::LeasedRow) -> bool {
+    serde_json::from_str::<synthetics_jobs::JobMetadata>(&row.metadata)
+        .is_ok_and(|m| m.confirm_of.is_some())
+}
+
+/// Whether a failed ack earns a confirm job: a target-side failure of a scheduled job that is not
+/// itself a confirm job, on a check that confirms failures.
+pub(crate) fn wants_confirm_job(
+    status_db: i32,
+    error_source: &str,
+    status_reason: Option<&str>,
+    probe_trigger_type: &str,
+    run_trigger_type: &str,
+    confirm_failures: bool,
+    is_confirm: bool,
+) -> bool {
+    status_db == config::meta::synthetics::SyntheticStatus::Failed.to_db()
+        && confirm_failures
+        && !is_confirm
+        && probe_trigger_type != "manual"
+        && (run_trigger_type == synthetics_runs::TRIGGER_SCHEDULE
+            || run_trigger_type == synthetics_runs::TRIGGER_GAP_RETRY)
+        && error_source != crate::alerting::ERROR_SOURCE_CONFIG
+        && !synthetics_runs::is_not_measured_source(error_source, status_reason)
+}
+
+/// Sends the notification for a run that finalized outside an ack; the server registers it, as
+/// notification delivery lives above this crate.
+pub type RunNotifier = fn(AckResponse) -> crate::alerting::BoxFuture<'static, ()>;
+
+static RUN_NOTIFIER: std::sync::OnceLock<RunNotifier> = std::sync::OnceLock::new();
+
+pub fn register_run_notifier(f: RunNotifier) {
+    let _ = RUN_NOTIFIER.set(f);
+}
+
+/// The alert inputs of a run that held a confirm job: `(status, status_reason, error_source)`
+/// from the merged vote, so neither the worst raw job nor the last ack decides the alert.
+pub(crate) fn merged_alert_input(
+    class: config::meta::synthetics::RunClass,
+    confirmed_flaky: bool,
+) -> (&'static str, Option<&'static str>, &'static str) {
+    use config::meta::synthetics::RunClass as C;
+    match class {
+        C::Up if confirmed_flaky => ("warning", Some(crate::alerting::REASON_FLAKY), ""),
+        C::Up => ("passed", None, ""),
+        C::Partial | C::Down => ("failed", None, ""),
+        C::NotMeasured => ("error", None, crate::alerting::ERROR_SOURCE_CONTROL_PLANE),
+        C::Misconfigured => ("error", None, crate::alerting::ERROR_SOURCE_CONFIG),
+        C::Unknown => ("error", None, ""),
+    }
+}
+
+/// An up run with a warning and no confirm job keeps its flaky or degraded reason only on the ack,
+/// so the merged vote would read it as passed and close an open incident. Any other up run, such
+/// as one with a Not measured location, goes on: it can close a gap or an incident.
+fn swept_run_keeps_its_warning(
+    had_confirm: bool,
+    run_class: config::meta::synthetics::RunClass,
+    run_result: i32,
+) -> bool {
+    !had_confirm
+        && run_class == config::meta::synthetics::RunClass::Up
+        && run_result == config::meta::synthetics::SyntheticStatus::Warning.to_db()
+}
+
+/// Decides and sends the alert of a run that finalized outside an ack: a dead letter, a failed
+/// dispatch or the stuck-run sweep. No ack runs the alert for it, and a Not measured run must
+/// still count toward its gap notice.
+pub(crate) async fn alert_for_swept_run(done: &synthetics_runs::RunFinalized) {
+    if swept_run_keeps_its_warning(done.had_confirm, done.run_class, done.run_result) {
+        return;
+    }
+    let conn = get_orm_client_rw().await;
+    let Ok(Some(synthetic)) =
+        synthetics_checks::get_cached(conn, &done.org_id, &done.synthetics_id).await
+    else {
+        return;
+    };
+    let (status, status_reason, error_source) =
+        merged_alert_input(done.run_class, done.confirmed_flaky);
+    let now_us = config::utils::time::now_micros();
+    let resolved = resolve_alert(
+        conn,
+        RunOutcome {
+            status: Some(status),
+            attempts: 1,
+            status_reason,
+            error_source,
+        },
+        done,
+        &synthetic,
+        now_us,
+    )
+    .await;
+    let alert = if resolved.suppressed_by.is_some() {
+        AlertDecision::Silent
+    } else {
+        resolved.decision
+    };
+    if matches!(alert, AlertDecision::Silent) && resolved.gap_notice.is_none() {
+        return;
+    }
+    let Some(notify) = RUN_NOTIFIER.get() else {
+        return;
+    };
+    let outcomes = synthetics_jobs::run_location_outcomes(conn, &done.run_id)
+        .await
+        .unwrap_or_default();
+    let failing_environments = environment_names(&done.org_id, &done.run_id).await;
+    let synthetic_type = serde_json::to_value(&synthetic.check_type)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_default();
+    notify(AckResponse {
+        run_complete: true,
+        run_status: Some(status.to_string()),
+        job_count: done.job_count,
+        org_id: done.org_id.clone(),
+        job_id: String::new(),
+        run_id: done.run_id.clone(),
+        synthetics_id: done.synthetics_id.clone(),
+        synthetics_name: synthetic.name,
+        synthetic_type,
+        target: synthetic.target,
+        destinations: synthetic.destinations,
+        location: String::new(),
+        pool: String::new(),
+        trigger_type: "scheduled".to_string(),
+        alert,
+        status_reason: status_reason.map(str::to_owned),
+        consecutive_failures: resolved.consecutive_failures,
+        failing_locations: outcomes.failing,
+        passing_locations: outcomes.passing,
+        usage_events: Vec::new(),
+        failing_environments,
+        suppressed_by: None,
+        coverage: resolved.coverage,
+        gap_notice: resolved.gap_notice,
+        template: synthetic.template,
+    })
+    .await;
+}
+
+/// Sends the "Monitoring gap" notice of every gap that passed the 15-minute rule without a run
+/// to send it, for example on an hourly check, and retries a gap or resumed notice whose send
+/// failed. The reaper calls it on each sweep. A notice is marked only after delivery
+/// (`core::synthetics::notify_gap`).
+pub(crate) async fn send_due_gap_notices(now_us: i64) {
+    use crate::alerting::{
+        GAP_NOTICE_AFTER_US, GAP_RESUMED_GIVE_UP_US, GAP_RESUMED_RETRY_AFTER_US, GapNotice,
+    };
+
+    if RUN_NOTIFIER.get().is_none() {
+        return;
+    }
+    let conn = get_orm_client_rw().await;
+    match synthetics_checks::list_due_gap_notices(conn, now_us - GAP_NOTICE_AFTER_US).await {
+        Ok(due) => {
+            for (org_id, synthetics_id, since) in due {
+                send_gap_notice(&org_id, &synthetics_id, GapNotice::Opened { since }).await;
+            }
+        }
+        Err(e) => tracing::error!("[synthetics reaper] list_due_gap_notices: {e}"),
+    }
+    match synthetics_checks::list_due_resumed_notices(conn, now_us - GAP_RESUMED_RETRY_AFTER_US)
+        .await
+    {
+        Ok(due) => {
+            for (org_id, synthetics_id, since, until) in due {
+                if now_us - until >= GAP_RESUMED_GIVE_UP_US {
+                    tracing::warn!(
+                        %synthetics_id,
+                        "[synthetics reaper] gave up on a resumed notice"
+                    );
+                    if let Err(e) =
+                        synthetics_checks::clear_resumed_gap(conn, &synthetics_id, since).await
+                    {
+                        tracing::error!("[synthetics reaper] clear_resumed_gap: {e}");
+                    }
+                    continue;
+                }
+                send_gap_notice(&org_id, &synthetics_id, GapNotice::Resumed { since, until }).await;
+            }
+        }
+        Err(e) => tracing::error!("[synthetics reaper] list_due_resumed_notices: {e}"),
+    }
+}
+
+/// Sends one gap notice outside a run, unless the check has no destination or is muted.
+async fn send_gap_notice(org_id: &str, synthetics_id: &str, notice: crate::alerting::GapNotice) {
+    let Some(notify) = RUN_NOTIFIER.get() else {
+        return;
+    };
+    let conn = get_orm_client_rw().await;
+    let Ok(Some(synthetic)) = synthetics_checks::get_cached(conn, org_id, synthetics_id).await
+    else {
+        return;
+    };
+    if synthetic.destinations.is_empty()
+        || crate::alerting::muted_by(org_id, &synthetic.id, &synthetic.folder_id, &synthetic.tags)
+            .await
+            .is_some()
+    {
+        return;
+    }
+    notify(AckResponse {
+        run_complete: true,
+        run_status: None,
+        job_count: 0,
+        org_id: org_id.to_string(),
+        job_id: String::new(),
+        run_id: String::new(),
+        synthetics_id: synthetics_id.to_string(),
+        synthetics_name: synthetic.name,
+        synthetic_type: String::new(),
+        target: synthetic.target,
+        destinations: synthetic.destinations,
+        location: String::new(),
+        pool: String::new(),
+        trigger_type: "scheduled".to_string(),
+        alert: AlertDecision::Silent,
+        status_reason: None,
+        consecutive_failures: 0,
+        failing_locations: Vec::new(),
+        passing_locations: Vec::new(),
+        usage_events: Vec::new(),
+        failing_environments: Vec::new(),
+        suppressed_by: None,
+        coverage: None,
+        gap_notice: Some(notice),
+        template: None,
+    })
+    .await;
+}
+
+/// Delay before the one extra run that fills a Not measured gap.
+const GAP_RETRY_DELAY_US: i64 = 60_000_000;
+
+/// Everything a finalized run owes: the replicated check row, and the one extra run after a Not
+/// measured gap.
+pub(crate) async fn after_run_finalized(done: &synthetics_runs::RunFinalized) {
+    let run_id = done.run_id.as_str();
+    publish_check_status(done).await;
+    if !done.gap_retry {
+        return;
+    }
+    let conn = get_orm_client_rw().await;
+    let now_us = config::utils::time::now_micros();
+    match synthetics_runs::add_gap_retry_run(conn, run_id, now_us, GAP_RETRY_DELAY_US).await {
+        Ok(Some(new_run)) => tracing::info!(
+            synthetics_id = %done.synthetics_id,
+            run_id = %run_id,
+            new_run_id = %new_run,
+            "[synthetics] Not measured run: one extra run scheduled"
+        ),
+        Ok(None) => {}
+        Err(e) => tracing::warn!(
+            synthetics_id = %done.synthetics_id,
+            run_id = %run_id,
+            "[synthetics] gap retry run: {e}"
+        ),
     }
 }
 
@@ -1688,6 +1972,11 @@ pub(crate) async fn publish_check_status(done: &synthetics_runs::RunFinalized) {
                 _streaks.down_runs,
                 _streaks.up_runs,
                 _streaks.run_ts,
+                _streaks.run_class,
+                _streaks.run_class_at,
+                _streaks.tested_at,
+                _streaks.recovered_at,
+                true,
             )
             .await
     {
@@ -1736,6 +2025,16 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
 
     let now_us = config::utils::time::now_micros();
 
+    // An error records where it came from, so finalization can tell "not measured" from a
+    // config error.
+    let result_json = (job_status == 6).then(|| {
+        serde_json::json!({
+            "error_source": req.error_source,
+            "status_reason": req.status_reason,
+        })
+        .to_string()
+    });
+
     // Mark job complete. `None` means the ack did not apply: the job was no longer
     // Claimed (a duplicate ack), or it is claimed by a different agent now (a late
     // ack from a holder the reaper already evicted).
@@ -1743,7 +2042,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         conn,
         &req.job_id,
         job_status,
-        None,
+        result_json.as_deref(),
         now_us,
         req.claimed_by.as_deref(),
     )
@@ -1765,12 +2064,55 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         return Ok(stale_lease_response(req.job_id, req.trigger_type, check));
     }
 
+    // A failure waits for one confirm job from the same location before it counts. The confirm
+    // job joins the run before this job is counted, so the run cannot complete without it.
+    if status_db == config::meta::synthetics::SyntheticStatus::Failed.to_db() {
+        let confirm_failures =
+            synthetics_checks::get_cached(conn, &check.org_id, &check.synthetics_id)
+                .await
+                .ok()
+                .flatten()
+                .is_some_and(|c| c.confirms_failures());
+        let run_trigger = run_trigger_type(conn, &check.run_id).await;
+        if wants_confirm_job(
+            status_db,
+            &req.error_source,
+            req.status_reason.as_deref(),
+            &req.trigger_type,
+            &run_trigger,
+            confirm_failures,
+            is_confirm_job(&check),
+        ) {
+            match synthetics_runs::add_confirm_job(conn, &req.job_id, now_us).await {
+                Ok(Some(confirm_id)) => tracing::info!(
+                    synthetics_id = %check.synthetics_id,
+                    run_id = %check.run_id,
+                    job_id = %req.job_id,
+                    confirm_job_id = %confirm_id,
+                    "[synthetics] failure: confirm job enqueued"
+                ),
+                Ok(None) => {}
+                // The failure still counts without its confirm job.
+                Err(e) => tracing::warn!(
+                    run_id = %check.run_id,
+                    job_id = %req.job_id,
+                    "[synthetics] add_confirm_job: {e}"
+                ),
+            }
+        }
+    }
+
     // Some only for the ack that completed the run; the check row is already written by then.
     let run_completion = synthetics_runs::finalize_run(conn, &check.run_id, status_db, now_us)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     let run_complete = run_completion.is_some();
+    let merged = run_completion
+        .as_ref()
+        .filter(|d| d.had_confirm)
+        .map(|d| merged_alert_input(d.run_class, d.confirmed_flaky));
     let (run_status, job_count) = match &run_completion {
+        Some(done) if merged.is_some() => (merged.map(|m| m.0.to_string()), done.job_count),
         Some(done) => {
             let status =
                 match config::meta::synthetics::SyntheticStatus::from_db(done.run_result) {
@@ -1785,7 +2127,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         None => (None, 1),
     };
     if let Some(done) = &run_completion {
-        publish_check_status(done).await;
+        after_run_finalized(done).await;
     }
 
     // Fetch synthetic for type, target, and destinations — all definition
@@ -1834,23 +2176,32 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
     // Decide the notification, once per RUN. Per-job would alert once per
     // location for the same outage, and would advance the failure streak by the
     // fan-out factor rather than by one.
-    let (alert, consecutive_failures, suppressed_by) = if run_complete {
+    let resolved = if let Some(done) = &run_completion {
+        // A run that held a confirm job answers with its merged vote, so neither its worst raw
+        // job nor the last ack's error source decides the alert.
         resolve_alert(
             conn,
-            &check.synthetics_id,
             RunOutcome {
                 status: run_status.as_deref(),
                 attempts: req.attempts,
-                status_reason: req.status_reason.as_deref(),
-                error_source: &req.error_source,
+                status_reason: merged.map_or(req.status_reason.as_deref(), |m| m.1),
+                error_source: merged.map_or(req.error_source.as_str(), |m| m.2),
             },
+            done,
             &synthetic,
             now_us,
         )
         .await
     } else {
-        (AlertDecision::Silent, 0, None)
+        AlertResolution::default()
     };
+    let AlertResolution {
+        decision: alert,
+        consecutive_failures,
+        suppressed_by,
+        coverage,
+        gap_notice,
+    } = resolved;
 
     // Which locations broke and which came back. Only worth a query when the run
     // finished and we are going to say something about it. Both sides are needed:
@@ -1890,13 +2241,15 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         trigger_type: req.trigger_type,
         alert,
         // Echoed straight back so the notification can name the condition.
-        status_reason: req.status_reason.clone(),
+        status_reason: merged.map_or(req.status_reason.clone(), |m| m.1.map(str::to_owned)),
         consecutive_failures,
         failing_locations,
         passing_locations,
         usage_events,
         failing_environments,
         suppressed_by,
+        coverage,
+        gap_notice,
         template: synthetic.template.clone(),
     })
 }
@@ -2019,30 +2372,66 @@ struct RunOutcome<'a> {
     error_source: &'a str,
 }
 
+/// What `resolve_alert` decided for one finalized run.
+#[derive(Debug, Default)]
+struct AlertResolution {
+    decision: AlertDecision,
+    consecutive_failures: i32,
+    suppressed_by: Option<String>,
+    /// Set only when `decision` is `Firing` on a partial or down run.
+    coverage: Option<String>,
+    /// `None` when muted.
+    gap_notice: Option<crate::alerting::GapNotice>,
+}
+
+/// The gap follows the stored class where there is one: a run is Not measured only when no
+/// location tested the site. A Misconfigured run did not test it either, so it neither grows nor
+/// closes the gap: "Monitoring resumed" needs a run that tested the site.
+fn gap_step(
+    next: infra::table::synthetics_checks::AlertState,
+    run_class: config::meta::synthetics::RunClass,
+    not_measured: bool,
+    now_us: i64,
+) -> (
+    Option<crate::alerting::GapNotice>,
+    infra::table::synthetics_checks::AlertState,
+) {
+    if run_class == config::meta::synthetics::RunClass::Misconfigured {
+        return (None, next);
+    }
+    crate::alerting::decide_gap(next, not_measured, now_us)
+}
+
 async fn resolve_alert<C: sea_orm::ConnectionTrait>(
     conn: &C,
-    synthetics_id: &str,
     outcome: RunOutcome<'_>,
+    done: &synthetics_runs::RunFinalized,
     check: &config::meta::synthetics::Synthetic,
     now_us: i64,
-) -> (AlertDecision, i32, Option<String>) {
+) -> AlertResolution {
+    let synthetics_id = done.synthetics_id.as_str();
     // See `alerting::classify`. Four outcomes, not two: an outage accumulates and
     // drives the streak, a degradation does not (a certificate is not "more
     // expired" on the twentieth check), and `error` is an outage rather than a
-    // reason for silence.
-    let class = crate::alerting::classify(
-        outcome.status,
-        outcome.attempts,
-        outcome.error_source,
-        outcome.status_reason,
+    // reason for silence. The stored run class then corrects what one ack cannot
+    // know, and applies the check's "any location" rule.
+    let class = crate::alerting::class_for_run(
+        done.run_class,
+        check.alerts_on_partial(),
+        crate::alerting::classify(
+            outcome.status,
+            outcome.attempts,
+            outcome.error_source,
+            outcome.status_reason,
+        ),
     );
 
     let prior = match infra::table::synthetics_checks::get_alert_state(conn, synthetics_id).await {
         Ok(Some(state)) => state,
-        Ok(None) => return (AlertDecision::Silent, 0, None), // deleted mid-run
+        Ok(None) => return AlertResolution::default(), // deleted mid-run
         Err(e) => {
             tracing::warn!(%synthetics_id, "[synthetics] get_alert_state: {e}");
-            return (AlertDecision::Silent, 0, None);
+            return AlertResolution::default();
         }
     };
 
@@ -2071,7 +2460,7 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
         {
             tracing::warn!(%synthetics_id, "[synthetics] clear_alert_state: {e}");
         }
-        return (AlertDecision::Silent, 0, None);
+        return AlertResolution::default();
     }
 
     let (outcome, next) = crate::alerting::decide(
@@ -2081,7 +2470,14 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
         check.cooldown_mins,
         now_us,
     );
-    let suppressed_by = if outcome == crate::alerting::AlertOutcome::Silent {
+    let (gap_notice, next) = gap_step(
+        next,
+        done.run_class,
+        class == crate::alerting::RunClass::NotMeasured,
+        now_us,
+    );
+    let suppressed_by = if outcome == crate::alerting::AlertOutcome::Silent && gap_notice.is_none()
+    {
         None
     } else {
         crate::alerting::muted_by(&check.org_id, &check.id, &check.folder_id, &check.tags).await
@@ -2114,7 +2510,10 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
                     %synthetics_id,
                     "[synthetics] alert state changed under us; another run decided this one"
                 );
-                return (AlertDecision::Silent, next.consecutive_failures, None);
+                return AlertResolution {
+                    consecutive_failures: next.consecutive_failures,
+                    ..Default::default()
+                };
             }
             Err(e) => tracing::warn!(%synthetics_id, "[synthetics] update_alert_state: {e}"),
         }
@@ -2127,7 +2526,18 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
         crate::alerting::AlertOutcome::Degraded => AlertDecision::Degraded,
         crate::alerting::AlertOutcome::Recovered => AlertDecision::Recovered,
     };
-    (decision, next.consecutive_failures, suppressed_by)
+    let coverage = (decision == AlertDecision::Firing)
+        .then(|| {
+            crate::alerting::coverage_line(done.run_class, &done.failed_locations, done.voters)
+        })
+        .flatten();
+    AlertResolution {
+        decision,
+        consecutive_failures: next.consecutive_failures,
+        gap_notice: gap_notice.filter(|_| suppressed_by.is_none()),
+        suppressed_by,
+        coverage,
+    }
 }
 
 #[cfg(test)]
@@ -2250,6 +2660,119 @@ mod tests {
     }
 
     // Step billing. Every guard is a pure function, so these need no database.
+    #[test]
+    fn a_misconfigured_run_neither_closes_nor_grows_a_gap() {
+        use config::meta::synthetics::RunClass as C;
+        let open = infra::table::synthetics_checks::AlertState {
+            gap_since: 100,
+            gap_runs: 3,
+            gap_notified_at: 200,
+            ..Default::default()
+        };
+        assert_eq!(gap_step(open, C::Misconfigured, false, 300), (None, open));
+        let (resumed, closed) = gap_step(open, C::Up, false, 300);
+        assert!(matches!(
+            resumed,
+            Some(crate::alerting::GapNotice::Resumed { .. })
+        ));
+        assert_eq!(closed.gap_since, 100, "only a delivery closes the gap");
+        assert_eq!(closed.gap_resumed_at, 300);
+    }
+
+    #[test]
+    fn a_swept_up_run_with_a_not_measured_location_still_resolves_its_alert() {
+        use config::meta::synthetics::{RunClass as C, SyntheticStatus as S};
+        assert!(!swept_run_keeps_its_warning(false, C::Up, S::Error.to_db()));
+        assert!(!swept_run_keeps_its_warning(
+            false,
+            C::Up,
+            S::Passed.to_db()
+        ));
+        assert!(swept_run_keeps_its_warning(
+            false,
+            C::Up,
+            S::Warning.to_db()
+        ));
+        assert!(!swept_run_keeps_its_warning(
+            true,
+            C::Up,
+            S::Warning.to_db()
+        ));
+    }
+
+    #[test]
+    fn a_confirm_run_alerts_on_its_merged_vote() {
+        use config::meta::synthetics::RunClass as C;
+        let classify = |class, flaky| {
+            let (status, reason, source) = super::merged_alert_input(class, flaky);
+            crate::alerting::classify(Some(status), 1, source, reason)
+        };
+        use crate::alerting::RunClass as A;
+        assert_eq!(classify(C::Up, true), A::Flaky);
+        assert_eq!(classify(C::Up, false), A::Healthy);
+        // A not measured location beside a confirmed pass must not page the owner.
+        assert_eq!(classify(C::Up, false), A::Healthy);
+        assert_eq!(classify(C::Down, false), A::Failing);
+        assert_eq!(classify(C::Partial, false), A::Failing);
+        assert_eq!(classify(C::NotMeasured, false), A::NotMeasured);
+        assert_eq!(classify(C::Misconfigured, false), A::Failing);
+    }
+
+    #[test]
+    fn only_a_scheduled_target_failure_gets_a_confirm_job() {
+        let want = |status, source: &str, reason, probe, run, on, confirm| {
+            super::wants_confirm_job(status, source, reason, probe, run, on, confirm)
+        };
+        assert!(want(3, "", None, "scheduled", "schedule", true, false));
+        assert!(want(
+            3,
+            "probe",
+            None,
+            "scheduled",
+            "gap_retry",
+            true,
+            false
+        ));
+        assert!(
+            !want(1, "", None, "scheduled", "schedule", true, false),
+            "a pass"
+        );
+        assert!(
+            !want(4, "", None, "scheduled", "schedule", true, false),
+            "an error"
+        );
+        assert!(
+            !want(3, "", None, "manual", "schedule", true, false),
+            "a manual run"
+        );
+        assert!(
+            !want(3, "", None, "scheduled", "schedule", false, false),
+            "setting off"
+        );
+        assert!(
+            !want(3, "", None, "scheduled", "schedule", true, true),
+            "a confirm job"
+        );
+        assert!(!want(
+            3,
+            "config",
+            None,
+            "scheduled",
+            "schedule",
+            true,
+            false
+        ));
+        assert!(!want(
+            3,
+            "control_plane",
+            None,
+            "scheduled",
+            "schedule",
+            true,
+            false
+        ));
+    }
+
     #[cfg(feature = "cloud")]
     mod billing {
         use config::meta::{
@@ -2297,6 +2820,7 @@ mod tests {
                 retries,
                 now_us: NOW_US,
                 region: None,
+                confirm: false,
             }
         }
 
@@ -2673,6 +3197,22 @@ mod tests {
                 },
             );
             assert!(events.is_empty());
+        }
+
+        #[test]
+        fn a_confirm_job_is_not_billed() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    confirm: true,
+                    ..browser(14, 1, 0, 14)
+                },
+            );
+            assert!(events.is_empty());
+            let mut row = leased_row();
+            row.metadata = r#"{"confirm_of":"job-1"}"#.to_string();
+            assert!(super::super::is_confirm_job(&row));
+            assert!(!super::super::is_confirm_job(&leased_row()));
         }
 
         /// A Lambda invoke failure DOES bill — the invocation cost us money.

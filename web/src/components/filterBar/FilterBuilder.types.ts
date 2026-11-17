@@ -16,6 +16,7 @@
 import type { I18nText } from "@/types/i18n";
 import type { FilterField } from "@/utils/query/filterBar";
 import type { FilterIssue, FilterLayout, FilterProfileName } from "./filterProfiles";
+import type { FilterValueLabel } from "./QueryFilterBar.types";
 
 export interface FilterBuilderProps {
   /** Which page's rules apply: operators, layout, depth, connectors, limits and the saved format. */
@@ -29,6 +30,8 @@ export interface FilterBuilderProps {
   extraValueSuggestions?: (field: string) => string[];
   /** A soft warning for a chip's value, e.g. one not seen in recent data. */
   valueHint?: (field: string, values: string[]) => I18nText | undefined;
+  /** A display name for a stored value: its value row reads as the label, and a vertical row shows it beside the chip. */
+  valueLabel?: (field: string, value: string) => FilterValueLabel | undefined;
   /** Overrides the profile's layout. */
   layout?: FilterLayout;
   fieldsLoading?: boolean;

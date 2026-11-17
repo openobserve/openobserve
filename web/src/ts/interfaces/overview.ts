@@ -92,3 +92,5 @@ export interface OrgOverview {
   generated_at: number;
   cached: boolean;
 }
+
+export type IncidentsTile = "ok" | "loading" | "error" | "locked" | "unavailable" | "forbidden";

@@ -17,6 +17,7 @@
 
 import { z } from "zod";
 
+import type { FormFieldPath } from "@/lib/forms/Form/useOForm";
 import type { LockoutPolicy, PasswordPolicy } from "@/services/passwordPolicy";
 import type { TranslateFn } from "@/types/i18n";
 import { DEFAULT_COMPLEXITY } from "@/utils/passwordComplexity";
@@ -69,24 +70,38 @@ export const policyBaseSchema = z.object({
 
 export type PolicyForm = z.infer<typeof policyBaseSchema>;
 
+/** Field groups checked together; the last member of each prints the shared message. */
+export const POLICY_COUPLED_FIELDS = [
+  ["min_length", "max_length"],
+  ["rotation_days", "rotation_warning_days"],
+  ["history_count", "history_max_retained"],
+  ["lockout.max_secs", "lockout.start_secs"],
+] satisfies FormFieldPath<PolicyForm>[][];
+
 export const makePolicySchema = (t: TranslateFn) =>
   policyBaseSchema.superRefine((val, zctx) => {
-    const issue = (path: string[], message: string) =>
-      zctx.addIssue({ code: z.ZodIssueCode.custom, path, message });
+    // A cross-field issue lands on every member of its group, so each control is marked.
+    const issue = (group: readonly string[], message: string) =>
+      group.forEach((field) =>
+        zctx.addIssue({ code: z.ZodIssueCode.custom, path: field.split("."), message }),
+      );
+    const [length, rotation, history, lockout] = POLICY_COUPLED_FIELDS;
 
-    if (val.max_length < val.min_length || val.max_length > MAX_PASSWORD_LENGTH) {
+    if (val.max_length < val.min_length) {
+      issue(length, t("passwordPolicy.maxLengthBelowMin", { min: val.min_length }));
+    } else if (val.max_length > MAX_PASSWORD_LENGTH) {
       issue(["max_length"], t("passwordPolicy.maxLengthTooSmall"));
     }
     // Equal is valid (warn from the first sign-in); only a LONGER window describes a deadline that never exists.
     if (val.rotation_days !== 0 && val.rotation_warning_days > val.rotation_days) {
-      issue(["rotation_warning_days"], t("passwordPolicy.warningDaysTooLong"));
+      issue(rotation, t("passwordPolicy.warningDaysTooLong"));
     }
     if (val.history_max_retained < val.history_count) {
-      issue(["history_max_retained"], t("passwordPolicy.historyRetainedTooSmall"));
+      issue(history, t("passwordPolicy.historyRetainedTooSmall"));
     }
     // Threshold 0 switches lockout off, so the durations are inert; the rule fires again once it is re-enabled.
     if (val.lockout.threshold !== 0 && val.lockout.start_secs > val.lockout.max_secs) {
-      issue(["lockout", "start_secs"], t("passwordPolicy.lockoutStartTooLong"));
+      issue(lockout, t("passwordPolicy.lockoutStartTooLong"));
     }
   });
 
@@ -136,6 +151,20 @@ export const buildPolicyPayload = (
   cookie_max_age_secs: Number(values.cookie_max_age_secs),
   apply_to_root: values.apply_to_root,
 });
+
+/** How many settings differ from the saved policy, compared as the payload so "15" equals 15. */
+export const countPolicyChanges = (loadedPolicy: PasswordPolicy, values: PolicyForm): number => {
+  const flat = ({ lockout, ...rest }: PolicyForm): Record<string, unknown> => ({
+    ...rest,
+    ...lockout,
+  });
+  const saved = flat(policyDefaults(loadedPolicy));
+  const next = flat(policyDefaults(buildPolicyPayload(loadedPolicy, values)));
+  // The special set is cleared by the payload while its switch is off; that is the switch's change.
+  return Object.keys(saved).filter(
+    (key) => (key !== "special_char_set" || next.require_special) && saved[key] !== next[key],
+  ).length;
+};
 
 /** The lockout durations an account would serve, level by level, capped so a far ceiling still renders as one line. */
 export const lockoutLadder = (lockout: LockoutPolicy, maxLevels = 6): number[] => {

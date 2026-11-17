@@ -1,0 +1,283 @@
+{
+  "switched_canary": {
+    "service": "switch-api",
+    "where_key": "k8s:ushots/web",
+    "env": "prod",
+    "mode": "sequential",
+    "aliases_applied": [],
+    "arms": {
+      "a": {
+        "version": "2.0",
+        "image": null,
+        "first_seen": 1794251350082644,
+        "last_seen": 1794251999968847,
+        "start_time": 1794251350000000,
+        "end_time": 1794251950000000,
+        "coverage": "ok",
+        "image_ref": null,
+        "signals": {
+          "traces": true,
+          "rum": false
+        },
+        "traffic_share": null,
+        "version_key": "vk-15",
+        "deploy_key": "dk-11",
+        "has_rollup": true
+      },
+      "b": {
+        "version": "1.0",
+        "image": null,
+        "start_time": 1794250930033222,
+        "end_time": 1794251350000000,
+        "coverage": "ok",
+        "image_ref": null,
+        "signals": {
+          "traces": true,
+          "rum": false
+        },
+        "traffic_share": null,
+        "where_key": "k8s:ushots/web",
+        "has_rollup": true,
+        "first_seen": 1794250930033222,
+        "last_seen": 1794251829756097
+      }
+    },
+    "baseline_rule": "previous",
+    "baseline_reason": {
+      "deploy_key": "dk-11"
+    },
+    "traces": {
+      "insufficient": false,
+      "reason": null,
+      "requests": {
+        "a": 9600,
+        "b": 9900,
+        "rate_a": 16,
+        "rate_b": 23.57329321892219
+      },
+      "status": "complete",
+      "endpoint_detail": {
+        "status": "ok",
+        "reason": null
+      }
+    },
+    "rum": {
+      "insufficient": true,
+      "reason": "below_min_count",
+      "views": {
+        "a": 0,
+        "b": 0
+      },
+      "session_windows": {
+        "a": 0,
+        "b": 0
+      },
+      "errors": {
+        "a": 0,
+        "b": 0
+      },
+      "inp_p75": {
+        "a": 0,
+        "b": 0,
+        "delta": 0,
+        "lo": 0,
+        "hi": 0,
+        "straddles_zero": true,
+        "insufficient": true,
+        "ci_kind": "variance",
+        "band_a": null,
+        "band_b": null,
+        "band_crossed": false
+      },
+      "error_types": {
+        "introduced": [],
+        "fixed": [],
+        "shared": [],
+        "insufficient": true,
+        "early": true
+      },
+      "status": "complete",
+      "error_detail": {
+        "status": "ok",
+        "reason": null
+      }
+    },
+    "notes": [],
+    "deploy_key": "dk-11",
+    "stored_verdict": {
+      "verdict_key": "vd-10",
+      "version_key": "vk-15",
+      "service": "switch-api",
+      "where_key": "k8s:ushots/web",
+      "version": "2.0",
+      "image": null,
+      "verdict": "ok",
+      "state": "evaluating",
+      "reason": null,
+      "reason_code": "below_min_effect",
+      "signal": "traces",
+      "headline": {
+        "metric": "error_rate",
+        "new": 0.00625,
+        "base": 0.00411764705882353,
+        "lo": 0.00045397073157179505,
+        "hi": 0.0038656398050002294,
+        "ci_kind": "variance",
+        "unit": "ratio"
+      },
+      "second": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "unit": "count"
+      },
+      "new_error_types": 0,
+      "new_error_sample": null,
+      "sample": {
+        "n_new": 9600,
+        "n_base": 10200,
+        "since": 1794251350000000
+      },
+      "baseline": {
+        "version": "1.0",
+        "image": null,
+        "rule": "previous",
+        "initial_rule": "canary",
+        "initial_version": "1.5",
+        "initial_image": null,
+        "switched_at": 1794251900000000,
+        "where_key": "k8s:ushots/web",
+        "env": "prod",
+        "traffic_share": null,
+        "version_images": 0
+      },
+      "checks_done": 11,
+      "frozen_at": null,
+      "recheck": {
+        "verdict": null,
+        "at": null
+      },
+      "regions": [
+        {
+          "cluster": "svcver-r4b-s9",
+          "verdict": "ok"
+        }
+      ],
+      "deploy_key": "dk-11",
+      "deploy": {
+        "kind": "deploy",
+        "at": 1794251350000000,
+        "from_version": "1.0",
+        "from_image": null
+      },
+      "rollback_outcome": null,
+      "restricted": false,
+      "needs": {
+        "metric": null,
+        "have": null,
+        "need": null
+      },
+      "env": "prod",
+      "env_source": "attribute",
+      "version_images": 0
+    },
+    "live_verdict": {
+      "verdict_key": "live",
+      "version_key": "vk-15",
+      "service": "switch-api",
+      "where_key": "k8s:ushots/web",
+      "version": "2.0",
+      "image": null,
+      "verdict": "ok",
+      "state": "evaluating",
+      "reason": null,
+      "reason_code": "below_min_effect",
+      "signal": "traces",
+      "headline": {
+        "metric": "error_rate",
+        "new": 0.00625,
+        "base": 0.004141414141414141,
+        "lo": 0.000413888237019286,
+        "hi": 0.0038499253212292625,
+        "ci_kind": "variance",
+        "unit": "ratio"
+      },
+      "second": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "unit": "count"
+      },
+      "new_error_types": 0,
+      "new_error_sample": null,
+      "sample": {
+        "n_new": 9600,
+        "n_base": 9900,
+        "since": 1794251350000000
+      },
+      "baseline": {
+        "version": "1.0",
+        "image": null,
+        "rule": "previous",
+        "initial_rule": "none",
+        "initial_version": null,
+        "initial_image": null,
+        "switched_at": null,
+        "where_key": "k8s:ushots/web",
+        "env": null,
+        "traffic_share": null,
+        "version_images": 0
+      },
+      "checks_done": 12,
+      "frozen_at": null,
+      "recheck": {
+        "verdict": null,
+        "at": null
+      },
+      "regions": [
+        {
+          "cluster": "svcver-r4b-s9",
+          "verdict": "ok"
+        }
+      ],
+      "deploy_key": "dk-11",
+      "deploy": {
+        "kind": "deploy",
+        "at": 1794251350000000,
+        "from_version": "1.0",
+        "from_image": null
+      },
+      "rollback_outcome": null,
+      "restricted": false,
+      "windows": {
+        "a": {
+          "start_time": 1794251350000000,
+          "end_time": 1794251995057389
+        },
+        "b": null
+      },
+      "needs": {
+        "metric": null,
+        "have": null,
+        "need": null
+      },
+      "env": "prod",
+      "env_source": "attribute",
+      "version_images": 0
+    },
+    "inp_targets": {
+      "status": "insufficient",
+      "reason": "sdk_no_inp_target",
+      "error": null,
+      "rows": [],
+      "truncated": false
+    },
+    "pages": {
+      "status": "insufficient",
+      "reason": "detail_coarse",
+      "error": null,
+      "rows": []
+    },
+    "no_env": false
+  }
+}

@@ -9,6 +9,8 @@ import { queryClient } from "@/composables/query/queryClient";
 import type { DimensionCondition } from "@/services/downtimes";
 import DowntimeResourcePicker from "./DowntimeResourcePicker.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 vi.mock("@/services/downtimes", () => ({ default: { values: vi.fn(), resources: vi.fn() } }));
 
@@ -140,6 +142,43 @@ describe("DowntimeResourcePicker", () => {
     expect(table.text()).toContain("node-9");
     expect(table.text()).toContain("logs/app_logs");
   });
+  it("shows service values by display name and applies the selected keys", async () => {
+    const row = labelRows.differs;
+    vi.mocked(serviceStreams.getSemanticGroups).mockResolvedValue({
+      data: [group("service")],
+    } as any);
+    vi.mocked(serviceStreams.getDimensionAnalytics).mockResolvedValue({
+      data: { recommended_priority_dimensions: ["service"] },
+    } as any);
+    vi.mocked(downtimes.values).mockResolvedValue({
+      data: {
+        values: [
+          { value: row.service_name, label: row.display_name, source: "registry", items: 3 },
+          { value: "unknown_service:node", source: "registry", items: 1 },
+        ],
+        partial: false,
+      },
+    } as any);
+    const wrapper = await mountPicker();
+
+    const cell = wrapper.get(`[data-test="downtime-resource-picker-label-${row.service_name}"]`);
+    expect(cell.text()).toContain(row.display_name);
+    expect(cell.get('[data-test="svcver-service-name-detected"]').text()).toContain(
+      row.service_name,
+    );
+    expect(
+      wrapper
+        .get('[data-test="downtime-resource-picker-label-unknown_service:node"]')
+        .find('[data-test="svcver-service-name-placeholder"]')
+        .exists(),
+    ).toBe(true);
+
+    wrapper.findComponent(OTable).vm.$emit("update:selectedIds", [row.service_name]);
+    await flushPromises();
+    await wrapper.get('[data-test="downtime-resource-picker-apply"]').trigger("click");
+    expect(wrapper.emitted("apply")?.[0]).toEqual(["service", [row.service_name]]);
+  });
+
   it("never offers host rows under service while the service values are still loading", async () => {
     vi.mocked(serviceStreams.getSemanticGroups).mockResolvedValue({
       data: [group("service"), group("host")],

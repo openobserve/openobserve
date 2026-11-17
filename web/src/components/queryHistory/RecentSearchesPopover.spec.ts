@@ -981,7 +981,7 @@ describe("keyboard: arrows then Enter or Shift+Enter", () => {
     expect(row("e1").hasAttribute("data-highlighted")).toBe(true);
     expect(row("e0").getAttribute("aria-selected")).toBe("false");
     expect(row("e0").hasAttribute("data-highlighted")).toBe(false);
-    expect(row("e1").className).toContain("data-[highlighted]:bg-select-item-selected-bg");
+    expect(row("e1").className).toContain("data-[highlighted]:bg-surface-accent-active");
     expect(row("e1").className).toContain("data-[highlighted]:border-accent");
 
     row("e0").dispatchEvent(new PointerEvent("pointerenter"));

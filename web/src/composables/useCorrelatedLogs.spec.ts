@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { gt } from "@/types/i18n";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import { useCorrelatedLogs } from "./useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "./useCorrelatedLogs";
 
@@ -312,6 +312,34 @@ describe("useCorrelatedLogs", () => {
     });
   });
 
+  describe("Service spellings", () => {
+    it("queries a log stream on every spelling of the service key", async () => {
+      const composable = useCorrelatedLogs(
+        {
+          ...props,
+          matchedDimensions: { service: "checkout" },
+          additionalDimensions: {},
+          logStreams: [
+            {
+              stream_name: "app-logs",
+              stream_type: "logs",
+              filters: { service: "checkout" },
+              filter_spellings: { service: ["checkout", "checkout.service"] },
+            },
+          ],
+        },
+        gt,
+      );
+
+      await composable.fetchCorrelatedLogs();
+
+      const sql = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.query.sql;
+      expect(sql.join(" ")).toContain(
+        "lower(trim(\"service\")) IN ('checkout', 'checkout.service')",
+      );
+    });
+  });
+
   describe("Search Execution", () => {
     it("should set loading state during search", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(async (_params: any, callbacks: any) => {
@@ -414,15 +442,55 @@ describe("useCorrelatedLogs", () => {
       expect(composable.logStreamsCount.value).toBe(0);
     });
 
-    it("should show the no-log-stream message without logging an error", async () => {
+    it("should report no log stream as an empty result, not an error", async () => {
       const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
       const composable = useCorrelatedLogs({ ...props, logStreams: [] }, gt);
 
       await composable.fetchCorrelatedLogs();
 
-      expect(composable.error.value).toBeTruthy();
+      expect(composable.error.value).toBeNull();
+      expect(composable.hasError.value).toBe(false);
+      expect(composable.noLogStreams.value).toBe(true);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();
       consoleError.mockRestore();
+    });
+
+    it("should clear the spinner and stale rows when the streams drop to none mid-fetch", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_params: any, callbacks: any) => {
+        callbacks.data(null, {
+          type: "search_response_metadata",
+          content: { results: { total: 1, took: 5 } },
+        });
+        callbacks.data(null, {
+          type: "search_response_hits",
+          content: { results: { hits: [{ _timestamp: 1 }] } },
+        });
+        return new Promise(() => {});
+      });
+      const mutableProps = reactive({ ...props });
+      const composable = useCorrelatedLogs(mutableProps, gt);
+      composable.fetchCorrelatedLogs();
+      composable.currentPage.value = 2;
+      expect(composable.loading.value).toBe(true);
+
+      mutableProps.logStreams = [];
+      await composable.fetchCorrelatedLogs();
+
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledTimes(1);
+      expect(composable.loading.value).toBe(false);
+      expect(composable.searchResults.value).toEqual([]);
+      expect(composable.totalHits.value).toBe(0);
+      expect(composable.took.value).toBe(0);
+      expect(composable.currentPage.value).toBe(1);
+
+      await composable.fetchCorrelatedLogs();
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledTimes(1);
+    });
+
+    it("should not flag no log stream when streams exist", () => {
+      const composable = useCorrelatedLogs(props, gt);
+      expect(composable.noLogStreams.value).toBe(false);
     });
 
     it("should handle missing ftsFields", () => {

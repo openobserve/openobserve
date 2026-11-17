@@ -476,6 +476,7 @@ export function usePrebuiltDestinations() {
           timestamp: Date.now(),
           error: testResult.data.error,
           responseBody: testResult.data.responseBody,
+          genericSample: !template,
         };
         return publishTestResult(requestVersion, result);
       }
@@ -497,6 +498,7 @@ export function usePrebuiltDestinations() {
         error: testResult.data.error,
         statusCode: testResult.data.statusCode,
         responseBody: testResult.data.responseBody,
+        genericSample: !template,
       };
       return publishTestResult(requestVersion, result);
     } catch (error: unknown) {

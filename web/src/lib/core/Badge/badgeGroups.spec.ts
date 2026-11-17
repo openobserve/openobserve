@@ -5,6 +5,21 @@ import { resolveBadge, normalizeKey, BADGE_GROUPS } from "./badgeGroups";
 import enUS from "@/locales/languages/en-US.json";
 
 describe("badgeGroups", () => {
+  it("resolves cwvBand wire values to the compare band labels", () => {
+    expect(resolveBadge("cwvBand", "good")).toMatchObject({
+      variant: "success-soft",
+      labelKey: "serviceVersions.compare.cwv.good",
+    });
+    expect(resolveBadge("cwvBand", "needs_improvement")).toMatchObject({
+      variant: "warning-soft",
+      labelKey: "serviceVersions.compare.cwv.ni",
+    });
+    expect(resolveBadge("cwvBand", "poor")).toMatchObject({
+      variant: "error-soft",
+      labelKey: "serviceVersions.compare.cwv.poor",
+    });
+  });
+
   it("normalizes separators and case", () => {
     expect(normalizeKey("Real-Time")).toBe("realtime");
     expect(normalizeKey("real_time")).toBe("realtime");

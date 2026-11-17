@@ -2,7 +2,7 @@
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -11,7 +11,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import type { OTableColumnDef, OTablePaginationParams } from "@/lib/core/Table/OTable.types";
 import SecurityPanel from "@/components/security/SecurityPanel.vue";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { securityAuditQuery } from "@/services/security.queries";
@@ -21,10 +22,24 @@ import { forbiddenState } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const org = useOrgId();
-const query = useQuery(() => ({ ...securityAuditQuery(org.value), enabled: !!org.value }));
+const PAGE_SIZE = 50;
+const pageNo = ref(1);
+const includeReads = ref(false);
+watch([org, includeReads], () => (pageNo.value = 1));
+const query = useQuery(() => ({
+  ...securityAuditQuery(org.value, {
+    from: (pageNo.value - 1) * PAGE_SIZE,
+    size: PAGE_SIZE,
+    includeReads: includeReads.value,
+  }),
+  enabled: !!org.value,
+  placeholderData: (previous) => previous,
+}));
 
 const page = computed(() => query.data.value);
 const events = computed(() => page.value?.events ?? []);
+const total = computed(() => page.value?.total ?? events.value.length);
+const onPage = ({ page: next }: OTablePaginationParams) => (pageNo.value = next);
 const rows = computed(() =>
   events.value.map((e: SecurityAuditEvent, i: number) => ({
     id: `${e.timestamp}:${i}`,
@@ -53,13 +68,19 @@ const forbidden = computed(() => (query.error.value ? forbiddenState(query.error
   <SecurityPanel
     :title="t('siem.audit.title')"
     :hint="t('siem.audit.hint')"
-    :count="events.length"
+    :count="total"
     icon="history"
     tone="neutral"
     class="h-96"
     data-test="security-audit-panel"
   >
     <template #actions>
+      <OSwitch
+        v-model="includeReads"
+        size="sm"
+        :label="t('siem.audit.includeReads')"
+        data-test="security-audit-include-reads"
+      />
       <ORefreshButton
         :loading="query.isFetching.value"
         data-test="security-audit-refresh"
@@ -81,11 +102,16 @@ const forbidden = computed(() => (query.error.value ? forbiddenState(query.error
       row-key="id"
       :loading="query.isPending.value && !!org"
       :forbidden="forbidden"
-      pagination="none"
+      pagination="server"
+      :current-page="pageNo"
+      :page-size="PAGE_SIZE"
+      :page-size-options="[PAGE_SIZE]"
+      :total-count="total"
       sorting="none"
       :show-global-filter="false"
       class="min-h-0 flex-1"
       data-test="security-audit-table"
+      @pagination-change="onPage"
     >
       <template #cell-timestamp="{ row }">
         <OTimeCell :value="row.timestamp" unit="us" />

@@ -30,7 +30,7 @@
 
 }
 .log-separator {
-  color: #9ca3af;
+  color: #6b7280;
 
 }
 /* `.log-key`/`.log-separator` are applied to generated log HTML injected via
@@ -41,7 +41,7 @@
   font-weight: normal;
 }
 .log-object-brace {
-  color: #9ca3af;
+  color: #6b7280;
 
 }
 
@@ -100,7 +100,8 @@
   color: #6EE7B7; /* Soft mint green */
 
 }
-.dark .log-separator {
+.dark .log-separator,
+.dark .log-object-brace {
   color: #999;
 }
 .dark .log-number {

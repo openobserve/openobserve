@@ -52,7 +52,7 @@ const folderIds = async (org: string): Promise<FolderIds> => {
   return Object.fromEntries((res.data?.list ?? []).map((f: any) => [f.name, f.folderId]));
 };
 
-// `?locked=payments` stands in for the per-folder write rights the server does not serve yet.
+// `?locked=payments` replaces the server's per-folder write rights, to show a locked folder.
 const lockedNames = () =>
   String(route.query.locked ?? "")
     .split(",")

@@ -26,8 +26,12 @@ import "../../__mocks__/index";
 // NOTE: this preloads @/locales' import graph (utils/cookies, constants/key, js-cookie,
 // vue-i18n) into the module cache before every spec, so specs cannot vi.mock() those
 // modules — vi.spyOn() the shared instance instead (see utils/cookies.spec.ts).
-import i18n from "@/locales";
+import i18n, { loadLazyLocaleBlocks } from "@/locales";
+import enSecurityMessages from "@/locales/languages/security/en-US.json";
+// The app lazy-loads the Security namespace on navigation; specs resolve it synchronously.
+i18n.global.mergeLocaleMessage("en-us", enSecurityMessages);
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
+await loadLazyLocaleBlocks();
 
 // Mirrors main.ts: components call `useQuery`/`useMutation` with no explicit
 // client, so the plugin has to provide one. It is the app's own client — the
@@ -48,9 +52,10 @@ import { restHandlers } from "./handlers";
 import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
 import enMessages from "@/locales/languages/en-US.json";
 import { purgeAllPersisted } from "@/composables/query/persisters";
+const badgeMessages = { ...enMessages, ...enSecurityMessages };
 setBadgeTranslator(
   (key: string) =>
-    key.split(".").reduce<any>((o, k) => (o == null ? undefined : o[k]), enMessages) ?? key,
+    key.split(".").reduce<any>((o, k) => (o == null ? undefined : o[k]), badgeMessages) ?? key,
 );
 
 const server = setupServer(...restHandlers);
@@ -261,11 +266,6 @@ Object.defineProperty(navigator, "clipboard", {
   value: mockClipboard,
   writable: true,
 });
-
-// Loaded before any spec module runs, since some specs stub globals such as URL at import time.
-await (
-  await import("@/components/autoobserve/data/facts")
-).factsReady;
 
 beforeAll(() => {
   server.listen();

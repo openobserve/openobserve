@@ -18,6 +18,8 @@ pub mod audit;
 #[cfg(feature = "enterprise")]
 pub mod cases;
 #[cfg(feature = "enterprise")]
+pub mod detections;
+#[cfg(feature = "enterprise")]
 pub mod intel;
 #[cfg(feature = "enterprise")]
 pub mod investigate;
@@ -27,6 +29,10 @@ pub mod sigma;
 pub mod sources;
 #[cfg(feature = "enterprise")]
 pub mod streams;
+#[cfg(feature = "enterprise")]
+pub mod triage;
+#[cfg(feature = "enterprise")]
+pub mod tuning;
 
 use std::collections::HashSet;
 
@@ -133,37 +139,17 @@ pub async fn guard_siem_ids<'a>(
     guard_siem(org_id, user_id, method, touches_siem).await
 }
 
-/// True when the incident is a security case: its durable marker, else a live detection's firing.
+/// True when the incident carries the durable case marker; a failed read counts as a case.
 #[cfg(feature = "enterprise")]
 pub async fn incident_touches_siem(org_id: &str, incident_id: &str) -> bool {
-    use infra::table::alert_incidents;
-
-    match alert_incidents::security_case_of(org_id, incident_id).await {
-        Ok(Some(true)) => return true,
-        Ok(None) => return false,
-        Ok(Some(false)) => {}
+    // A converted alert's old firings predate its detection, so the alert's kind cannot decide.
+    match infra::table::alert_incidents::security_case_of(org_id, incident_id).await {
+        Ok(marked) => marked.unwrap_or(false),
         Err(e) => {
             log::error!("[SECURITY] reading the case marker of {org_id}/{incident_id}: {e}");
-            return true;
+            true
         }
     }
-    let fired_by_detection = match alert_incidents::get_incident_alerts(incident_id).await {
-        Ok(links) => {
-            db::alerts::alert::any_siem_alert(org_id, links.iter().map(|l| l.alert_id.as_str()))
-                .await
-        }
-        Err(e) => {
-            log::error!("[SECURITY] reading the firings of {org_id}/{incident_id}: {e}");
-            return true;
-        }
-    };
-    // Heals a case whose marker write was lost, so lists and the stale sweep agree with it.
-    if fired_by_detection
-        && let Err(e) = alert_incidents::mark_security_case(org_id, incident_id).await
-    {
-        log::error!("[SECURITY] marking {org_id}/{incident_id} a security case: {e}");
-    }
-    fired_by_detection
 }
 
 /// Which incidents a user may list: security cases need the Security read grant.
@@ -222,7 +208,7 @@ pub async fn guard_case_or_incidents(
 }
 
 /// Refuses unless the caller may read every named logs stream, since the search service checks
-/// none.
+/// none; Security read covers the org's Security sources.
 #[cfg(feature = "enterprise")]
 pub async fn guard_stream_reads<'a>(
     org_id: &str,
@@ -239,7 +225,28 @@ pub async fn guard_stream_reads<'a>(
             name: name.to_string(),
         })
         .collect();
-    authorize_query_sources(user_id, &sources)
+    let admitted = match authorize_query_sources(user_id, &sources).await {
+        Ok(()) => Ok(()),
+        Err(denied) => openobserve_core::security::admit_security_sources(user_id, denied).await,
+    };
+    admitted.map_err(|denied| stream_access_forbidden(org_id, &denied))
+}
+
+/// Refuses unless stream RBAC alone, without Security-source admission, lets the caller read it.
+#[cfg(feature = "enterprise")]
+pub async fn guard_own_stream_read(
+    org_id: &str,
+    user_id: &str,
+    stream: &str,
+) -> Result<(), Response> {
+    use openobserve_core::authz::{QuerySource, authorize_query_sources, stream_access_forbidden};
+
+    let source = QuerySource::Stream {
+        org_id: org_id.to_string(),
+        stream_type: config::meta::stream::StreamType::Logs,
+        name: stream.to_string(),
+    };
+    authorize_query_sources(user_id, std::slice::from_ref(&source))
         .await
         .map_err(|denied| stream_access_forbidden(org_id, &denied))
 }
@@ -261,7 +268,11 @@ pub async fn unreadable_streams<'a>(
             name: name.to_string(),
         })
         .collect();
-    match authorize_query_sources(user_id, &sources).await {
+    let admitted = match authorize_query_sources(user_id, &sources).await {
+        Ok(()) => Ok(()),
+        Err(denied) => openobserve_core::security::admit_security_sources(user_id, denied).await,
+    };
+    match admitted {
         Ok(()) => HashSet::new(),
         Err(denied) => denied
             .denials
@@ -358,6 +369,45 @@ pub async fn validate_detection(
     openobserve_core::alerts::alert::plan_sql(org_id, alert.stream_type, sql)
         .await
         .map_err(|e| MetaHttpResponse::bad_request(format!("The detection's SQL cannot run: {e}")))
+}
+
+/// Refuses a core alerts edit to what a detection runs, so its SQL never drifts from its Sigma.
+#[cfg(feature = "enterprise")]
+pub async fn guard_detection_definition(
+    org_id: &str,
+    user_id: &str,
+    alert_id: svix_ksuid::Ksuid,
+    edited: &config::meta::alerts::alert::Alert,
+) -> Result<(), Response> {
+    let conn = infra::db::get_orm_client_ro().await;
+    let Ok(Some((folder, stored))) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await
+    else {
+        return Ok(());
+    };
+    // The edit right is checked first, so a refusal never reveals that the alert is a detection.
+    if !openobserve_core::auth::check_permissions(
+        &alert_id.to_string(),
+        org_id,
+        user_id,
+        "alerts",
+        "PUT",
+        Some(&folder.folder_id),
+        false,
+        true,
+        false,
+    )
+    .await
+    {
+        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
+    }
+    if marks_siem(stored.context_attributes.as_ref())
+        && o2_enterprise::enterprise::security::authoring::edits_definition(&stored, edited)
+    {
+        return Err(MetaHttpResponse::conflict(
+            "This alert is a Security detection: its query is compiled from its Sigma rule. Edit the rule, stream or schedule in Security > Detections.",
+        ));
+    }
+    Ok(())
 }
 
 /// SIEM detection ids a user may not see, so alert lists and histories can drop them.
@@ -688,6 +738,10 @@ pub(crate) mod tests {
             let org = format!("gate_{}", config::ider::uuid());
             let id = plant_siem_detection(&org).await;
             let case = unmarked_case(&org, &id).await;
+            // The case's insert, or the migration for an older one, sets the marker.
+            infra::table::alert_incidents::mark_security_case(&org, &case)
+                .await
+                .unwrap();
             assert!(incident_touches_siem(&org, &case).await);
             forget_detection(&org, &id).await;
 
@@ -799,6 +853,30 @@ pub(crate) mod tests {
             Headers(UserEmail {
                 user_id: user.to_string(),
             })
+        }
+
+        #[tokio::test]
+        async fn test_a_definition_refusal_names_no_detection_to_a_stranger() {
+            let org = format!("gate_{}", config::ider::uuid());
+            let (id, root) = stored_siem_detection(&org).await;
+            let ksuid: Ksuid = id.parse().unwrap();
+            let conn = infra::db::get_orm_client_ro().await;
+            let (_, mut edited) = db::alerts::alert::get_by_id(conn, &org, ksuid)
+                .await
+                .unwrap()
+                .unwrap();
+            edited.query_condition.sql = Some("SELECT * FROM \"web\"".to_string());
+
+            let refused = guard_detection_definition(&org, &root, ksuid, &edited)
+                .await
+                .unwrap_err();
+            assert_eq!(refused.status(), StatusCode::CONFLICT);
+            let stranger = stranger();
+            let refused = guard_detection_definition(&org, &stranger.0.user_id, ksuid, &edited)
+                .await
+                .unwrap_err();
+            assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+            assert!(!refusal_message(refused).await.contains("Security"));
         }
 
         #[tokio::test]
@@ -977,11 +1055,15 @@ pub(crate) mod tests {
             );
         }
 
+        // A converted detection's old incident holds only ops firings, so only the marker decides.
         #[tokio::test]
-        async fn test_an_incident_no_detection_fired_into_is_no_case() {
+        async fn test_an_unmarked_incident_is_no_case() {
             let org = format!("gate_{}", config::ider::uuid());
-            let incident = unmarked_case(&org, "2ops").await;
+            let id = plant_siem_detection(&org).await;
+            let incident = unmarked_case(&org, &id).await;
             assert!(!incident_touches_siem(&org, &incident).await);
+            let marked = infra::table::alert_incidents::security_case_of(&org, &incident).await;
+            assert_eq!(marked.unwrap(), Some(false), "a read never marks");
             assert!(!incident_touches_siem(&org, "missing").await);
         }
     }

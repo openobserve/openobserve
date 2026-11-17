@@ -362,7 +362,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
       <div
         ref="tablistRef"
         :class="[
-          'o-tabs relative flex flex-col gap-0.5 p-1',
+          'o-tabs relative flex flex-col gap-0.5 py-1',
           alignClasses[align],
           { 'border-card-glass-border border-b border-solid': bordered },
         ]"

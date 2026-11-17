@@ -260,6 +260,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
               </ODropdownGroup>
               <template v-else-if="drilldownMenu.kind === 'streams'">
+                <ODropdownGroup :label="t('metrics.explorer.detail.drilldown.service')">
+                  <div
+                    v-if="drilldownService"
+                    class="px-3 py-1.5 text-sm"
+                    data-test="metrics-detail-drilldown-service"
+                  >
+                    <ServiceNameLabel v-bind="drilldownService.label" />
+                  </div>
+                </ODropdownGroup>
                 <ODropdownGroup
                   v-for="signal in DRILLDOWN_SIGNALS"
                   :key="signal"
@@ -284,14 +293,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="truncate">{{ raw(item.name) }}</span>
                   </ODropdownItem>
                   <ODropdownItem v-if="!drilldownMenu[signal].length" disabled>
-                    {{
-                      t(
-                        signal === "logs"
-                          ? "metrics.explorer.detail.drilldown.noLogsStream"
-                          : "metrics.explorer.detail.drilldown.noTracesStream",
-                        { service: drilldownMenu.service },
-                      )
-                    }}
+                    <span
+                      class="text-text-secondary"
+                      :data-test="`metrics-detail-drilldown-empty-${signal}`"
+                      >{{
+                        t(
+                          signal === "logs"
+                            ? "metrics.explorer.detail.drilldown.noLogsStream"
+                            : "metrics.explorer.detail.drilldown.noTracesStream",
+                          { service: drilldownService?.name ?? drilldownMenu.service },
+                        )
+                      }}</span
+                    >
                   </ODropdownItem>
                 </ODropdownGroup>
               </template>
@@ -718,6 +731,8 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
+import { labelPropsForKey, serviceOptionParts } from "@/types/serviceRef";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -834,6 +849,7 @@ export default defineComponent({
     ODropdownGroup,
     OSelect,
     CreateAlertAction,
+    ServiceNameLabel,
   },
   props: {
     /** `null` while loading, or when the URL names a metric that does not exist. */
@@ -1036,6 +1052,14 @@ export default defineComponent({
         }),
     });
     const drilldownMenu = computed(() => drilldown.menu.value);
+    const drilldownService = computed(() => {
+      const menu = drilldownMenu.value;
+      if (menu.kind !== "streams") return null;
+      return {
+        label: labelPropsForKey(menu.service, menu),
+        name: serviceOptionParts(menu.service, menu).display,
+      };
+    });
     const drilldownBlockedReason = computed(() => {
       const state = drilldown.availability.value;
       if (state === "oss") return t("metrics.explorer.detail.drilldown.enterprise");
@@ -1505,6 +1529,7 @@ export default defineComponent({
       buildOverviewAlertPrefill,
       drilldown,
       drilldownMenu,
+      drilldownService,
       drilldownBlockedReason,
       isSignalLocked,
       signalLockedReason,

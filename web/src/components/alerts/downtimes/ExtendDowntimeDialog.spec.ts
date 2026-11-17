@@ -125,7 +125,7 @@ describe("ExtendDowntimeDialog", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       await flushPromises();
       const success = toastRecords.find((r) => r.variant === "success");
-      expect(String(success?.message)).toBe("Extended until 17 Sep 17:00 UTC");
+      expect(String(success?.message)).toBe("Extended until Sep 17, 17:00 UTC");
       wrapper.unmount();
     } finally {
       spy.mockRestore();

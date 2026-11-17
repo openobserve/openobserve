@@ -18,8 +18,8 @@ use config::{get_config, meta::stream::StreamType};
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 use openobserve_api_management::request::{
-    gen_ai, keys, kv, rum_analytics, service_accounts, service_streams, short_url, status, stream,
-    synthetics,
+    gen_ai, keys, kv, rum_analytics, service_accounts, service_identity, service_streams,
+    service_versions, short_url, status, stream, synthetics,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
@@ -190,6 +190,7 @@ use crate::{
         openobserve_api_management::request::alerts::history::get_alert_history,
         openobserve_api_management::request::alerts::auto_investigate::list_auto_investigate_decisions,
         openobserve_api_management::request::alerts::incidents::list_incidents,
+        openobserve_api_management::request::alerts::incidents::create_incident,
         openobserve_api_management::request::alerts::incidents::get_incident,
         openobserve_api_management::request::alerts::incidents::update_incident,
         openobserve_api_management::request::alerts::incidents::get_incident_stats,
@@ -311,6 +312,23 @@ use crate::{
         openobserve_api_management::request::db_monitoring::handler::get_dbm_instances,
         openobserve_api_management::request::db_monitoring::handler::get_dbm_instance_metrics,
         openobserve_api_management::request::db_monitoring::handler::get_dbm_badges,
+        service_versions::list,
+        service_versions::deploys,
+        service_versions::verdicts,
+        service_versions::services,
+        service_versions::compare,
+        service_versions::delete,
+        service_identity::envs,
+        service_identity::unresolved,
+        service_identity::overrides,
+        service_identity::put_override,
+        service_identity::delete_override,
+        service_identity::list_aliases,
+        service_identity::create_alias,
+        service_identity::update_alias,
+        service_identity::delete_alias,
+        service_identity::bulk_aliases,
+        service_identity::undo_aliases,
         service_streams::list_services,
         service_streams::get_dimension_analytics,
         service_streams::correlate_streams,
@@ -554,6 +572,7 @@ use crate::{
         openobserve_api_management::request::status_pages::admin::list_page_notices,
         openobserve_api_management::request::status_pages::admin::list_pages,
         openobserve_api_management::request::status_pages::admin::mark_false_positive,
+        openobserve_api_management::request::status_pages::admin::undo_false_positive,
         openobserve_api_management::request::status_pages::admin::preview,
         openobserve_api_management::request::status_pages::admin::rotate_slug,
         openobserve_api_management::request::status_pages::admin::set_components,
@@ -872,6 +891,7 @@ use crate::{
             openobserve_api_management::request::query_history::QueryHistoryListResponse,
             openobserve_api_management::request::query_history::QueryHistoryClearResponse,
             meta::user::UpdateUser,
+            meta::user::UpdateUserRole,
             meta::user::UserRoleRequest,
             meta::user::PostUserRequest,
             meta::user::UserOrgRole,
@@ -1058,6 +1078,7 @@ use crate::{
         (name = "Product Analytics", description = "RUM Product Analytics named events and saved funnels"),
         (name = "Metrics", description = "Metrics data ingestion operations"),
         (name = "Traces", description = "Traces data ingestion operations"),
+        (name = "Service Versions", description = "Service identity, versions, deploys and verdicts"),
         (name = "Profiles", description = "Profiles query and discovery operations"),
         (name = "Clusters", description = "Super cluster operations"),
         (name = "Short Url", description = "Short Url Service"),
@@ -1128,6 +1149,19 @@ pub struct ApiDoc;
     openobserve_api_management::request::security::cases::update_case_settings,
     openobserve_api_management::request::security::cases::lookup_cases,
     openobserve_api_management::request::security::cases::promote_to_case,
+    openobserve_api_management::request::security::triage::search_cases,
+    openobserve_api_management::request::security::triage::bulk_update,
+    openobserve_api_management::request::security::triage::merge_cases,
+    openobserve_api_management::request::security::tuning::list_exceptions,
+    openobserve_api_management::request::security::tuning::create_exception,
+    openobserve_api_management::request::security::tuning::update_exception,
+    openobserve_api_management::request::security::tuning::delete_exception,
+    openobserve_api_management::request::security::tuning::list_allowlists,
+    openobserve_api_management::request::security::tuning::put_allowlist,
+    openobserve_api_management::request::security::tuning::delete_allowlist,
+    openobserve_api_management::request::security::tuning::list_suppressions,
+    openobserve_api_management::request::security::tuning::create_suppression,
+    openobserve_api_management::request::security::tuning::delete_suppression,
     openobserve_api_management::request::security::audit::list_security_audit,
     openobserve_api_management::request::security::investigate::list_entities,
     openobserve_api_management::request::security::investigate::get_entity_graph,
@@ -1144,12 +1178,17 @@ pub struct ApiDoc;
     openobserve_api_management::request::security::sources::classify_sources,
     openobserve_api_management::request::security::sources::attach_pack,
     openobserve_api_management::request::security::sources::detach_pack,
+    openobserve_api_management::request::security::sources::set_inclusion,
+    openobserve_api_management::request::security::sources::set_source_type,
+    openobserve_api_management::request::security::sources::get_source_schema,
     openobserve_api_management::request::security::sigma::get_catalog,
     openobserve_api_management::request::security::sigma::compile,
     openobserve_api_management::request::security::sigma::get_mitre_coverage,
     openobserve_api_management::request::security::sigma::get_detection_evidence,
     openobserve_api_management::request::slack::insights::get_insights_settings,
     openobserve_api_management::request::slack::insights::put_insights_settings,
+    openobserve_api_management::request::security::detections::update_detection,
+    openobserve_api_management::request::security::detections::preview_detection,
     openobserve_api_management::request::prompts::list_prompts,
     openobserve_api_management::request::prompts::create_prompt,
     openobserve_api_management::request::prompts::match_prompts,
@@ -1440,6 +1479,8 @@ pub struct ApiDoc;
     openobserve_api_management::request::autoobserve::entity_types,
     openobserve_api_management::request::autoobserve::coverage,
     openobserve_api_management::request::autoobserve::coverage_history,
+    openobserve_api_management::request::autoobserve::writable_folders,
+    openobserve_api_management::request::autoobserve::stream_volume,
     openobserve_api_management::request::autoobserve::suggestions,
     openobserve_api_management::request::autoobserve::decisions::preview_decision,
     openobserve_api_management::request::autoobserve::decisions::decide,
@@ -2273,6 +2314,7 @@ mod tests {
             (format!("{base}/coverage"), "get", "get"),
             (format!("{base}/coverage/history"), "get", "list"),
             (format!("{base}/suggestions"), "get", "list"),
+            (format!("{base}/streams/volume"), "get", "get"),
             (format!("{base}/incidents"), "get", "list"),
             (format!("{base}/marks"), "get", "list"),
             (mark.to_string(), "put", "update"),
@@ -2431,6 +2473,125 @@ mod tests {
         }
     }
 
+    /// The schema with every object closed, so an undeclared key, a missing required key or a
+    /// wrong type fails.
+    fn closed(mut schema: serde_json::Value) -> serde_json::Value {
+        if let Some(object) = schema.as_object_mut() {
+            let object_type = |kind: &serde_json::Value| {
+                kind == "object"
+                    || kind
+                        .as_array()
+                        .is_some_and(|kinds| kinds.contains(&"object".into()))
+            };
+            let is_object =
+                object.contains_key("properties") || object.get("type").is_some_and(object_type);
+            if is_object && !object.contains_key("additionalProperties") {
+                object.insert("additionalProperties".into(), false.into());
+            }
+            for value in object.values_mut() {
+                *value = closed(value.take());
+            }
+        } else if let Some(items) = schema.as_array_mut() {
+            for value in items {
+                *value = closed(value.take());
+            }
+        }
+        schema
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn compare_payload() -> serde_json::Value {
+        let user = openobserve_api_common::extractors::Headers(openobserve_core::auth::UserEmail {
+            user_id: "reader@example.com".into(),
+        });
+        let request = serde_json::json!({"signals": ["traces", "rum"]});
+        let response = super::service_versions::compare(
+            axum::extract::Path("org".into()),
+            user,
+            axum::Json(request),
+        )
+        .await;
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn compare_payload() -> serde_json::Value {
+        openobserve_core::service_identity::signals::api::representative_compare()
+    }
+
+    #[tokio::test]
+    async fn service_version_paths_document_their_inputs_and_results() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let params = spec["paths"]["/api/{org_id}/service_versions"]["get"]["parameters"].clone();
+        let service = params
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == "service");
+        assert_eq!(service.unwrap()["required"], true, "{params}");
+        let schemas = &spec["components"]["schemas"];
+        assert_eq!(
+            schemas["VersionCompareRequest"]["required"],
+            serde_json::json!(["service", "where", "a", "signals"])
+        );
+        assert_eq!(
+            schemas["VersionCompareArm"]["required"],
+            serde_json::json!(["version"])
+        );
+        for (schema, field, refers_to) in [
+            ("CompareResponse", "arms", "VersionCompareArms"),
+            ("CompareResponse", "live_verdict", "VersionVerdict"),
+            ("VersionCompareArms", "b", "VersionBaselineArmResult"),
+            ("VersionCompareArmResult", "coverage", "ArmCoverage"),
+            ("DeployList", "deploys", "DeployMarker"),
+            ("DeployMarker", "verdict", "VersionVerdict"),
+            ("VerdictList", "verdicts", "VersionVerdict"),
+            ("VersionVerdict", "metrics", "VerdictMetric"),
+            ("CatalogService", "where", "CatalogWhere"),
+            ("CatalogService", "newest_verdict", "VersionVerdict"),
+        ] {
+            let property = schemas[schema]["properties"][field].to_string();
+            let target = format!("#/components/schemas/{refers_to}");
+            assert!(property.contains(&target), "{schema}.{field}: {property}");
+        }
+        for field in [
+            "where_key",
+            "env",
+            "no_env",
+            "current_version",
+            "tracking_started",
+        ] {
+            let catalog = &schemas["CatalogService"]["properties"];
+            assert!(catalog.get(field).is_some(), "CatalogService.{field}");
+        }
+        let versions = serde_json::json!({
+            "$ref": "#/components/schemas/ServiceVersionList",
+            "components": closed(spec["components"].clone()),
+        });
+        let validator = jsonschema::draft202012::new(&versions).unwrap();
+        for count in [0, 3] {
+            let payload = serde_json::json!({"service":"checkout", "aliases_applied":[],
+                "versions":[], "total":0, "purged_versions":count,
+                "tracking":{"epoch":null,"warmup_ends_at":null}});
+            assert!(validator.is_valid(&payload), "{payload}");
+        }
+        // Every key a compare emits must be declared, so the schema cannot drift from its builders.
+        let root = serde_json::json!({
+            "$ref": "#/components/schemas/CompareResponse",
+            "components": closed(spec["components"].clone()),
+        });
+        let payload = compare_payload().await;
+        let errors: Vec<_> = jsonschema::draft202012::new(&root)
+            .unwrap()
+            .iter_errors(&payload)
+            .map(|error| format!("{error} at {}", error.instance_path()))
+            .collect();
+        assert!(errors.is_empty(), "{errors:#?}");
+    }
+
     #[cfg(not(feature = "enterprise"))]
     #[test]
     fn siem_filters_are_not_advertised_in_oss() {
@@ -2501,6 +2662,11 @@ mod tests {
                 "post",
                 "DetachSecuritySourcePack",
             ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/source_type",
+                "post",
+                "SetSecuritySourceType",
+            ),
         ] {
             assert_eq!(spec["paths"][path][method]["operationId"], id, "{path}");
         }
@@ -2513,6 +2679,8 @@ mod tests {
             "AttachError",
             "AttachPlan",
             "DetachSkip",
+            "SourceTypeRequest",
+            "SecurityTypeOrigin",
         ] {
             assert!(schemas.contains_key(name), "schema {name} missing");
         }
@@ -2609,6 +2777,18 @@ mod tests {
                 "get",
                 "GetDetectionEvidence",
                 "DetectionEvidence",
+            ),
+            (
+                "/api/{org_id}/security/detections/{alert_id}",
+                "put",
+                "UpdateSecurityDetection",
+                "UpdatedDetection",
+            ),
+            (
+                "/api/{org_id}/security/detections/preview",
+                "post",
+                "PreviewSecurityDetection",
+                "DetectionPreviewResponse",
             ),
         ] {
             let op = &spec["paths"][path][method];

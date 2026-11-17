@@ -287,6 +287,11 @@ async fn ownership_supervisor() {
                     generation,
                     "[synthetics] ownership acquired — starting workers"
                 );
+                // Not started until the holds are safe: the next poll tries again.
+                if !reset_holds_on_start(generation).await {
+                    tokio::time::sleep(JOB_CLUSTER_POLL).await;
+                    continue;
+                }
                 let (tx, token) = StopToken::new();
                 running = Some((tx, spawn_workers(token)));
             }
@@ -313,6 +318,28 @@ async fn ownership_supervisor() {
         }
         tokio::time::sleep(JOB_CLUSTER_POLL).await;
     }
+}
+
+/// Run before the workers start, on every start. This cluster's copy of the check rows can miss a
+/// recovery that another cluster saw while it held the claim, so a false alarm hold could hide a
+/// new outage. The job cluster claim is advisory (no compare-and-swap, no epoch), so no marker can
+/// prove that nobody else ran in between. The reset disarms every hold and moves every recovery
+/// stamp, which only fails open. A deploy resets the holds anyway (see `holds_ready`), so this
+/// costs only a same-build restart. Returns false when the reset failed: the workers must not
+/// start then, because a stale hold could apply.
+#[cfg(feature = "enterprise")]
+async fn reset_holds_on_start(generation: u64) -> bool {
+    let conn = infra::db::get_orm_client_rw().await;
+    let now = config::utils::time::now_micros();
+    if let Err(e) = infra::table::synthetics_checks::reset_false_alarm_holds(conn, now).await {
+        tracing::error!(
+            generation,
+            "[synthetics] false alarm hold reset failed: {e}"
+        );
+        return false;
+    }
+    tracing::info!(generation, "[synthetics] false alarm holds reset");
+    true
 }
 
 #[cfg(feature = "enterprise")]

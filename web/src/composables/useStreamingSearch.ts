@@ -123,6 +123,7 @@ const useHttpStreaming = () => {
       searchType?: string;
       meta?: any;
       clear_cache?: boolean;
+      use_cache?: boolean;
     },
     handlers: {
       data: (data: any, response: any) => void;
@@ -176,6 +177,7 @@ const useHttpStreaming = () => {
     searchType?: string;
     meta?: any;
     clear_cache?: boolean;
+    use_cache?: boolean;
   }) => {
     const { traceId, org_id, type, queryReq, searchType, pageType, meta, clear_cache } = data;
     const abortController = new AbortController();
@@ -186,7 +188,9 @@ const useHttpStreaming = () => {
 
     // Construct URL based on search type
     let url = "";
-    const use_cache = (window as any).use_cache !== undefined ? (window as any).use_cache : true;
+    const use_cache =
+      data.use_cache ??
+      ((window as any).use_cache !== undefined ? (window as any).use_cache : true);
 
     // Check if this is a multi-stream request (similar to search.ts logic)
     const isMultiStream = typeof queryReq.query?.sql !== "string";
@@ -209,6 +213,7 @@ const useHttpStreaming = () => {
       if (meta?.fallback_order_by_col)
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
       if (clear_cache) url += `&clear_cache=${clear_cache}`;
+      if (meta?.security_scope) url += `&security_scope=true`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
     } else if (type === "values") {
       url = `/_values_stream`;

@@ -16,6 +16,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { queryClient } from "@/composables/query/queryClient";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import { resolveTourTarget, SAMPLE_TOUR_STEPS, windowParams } from "./tour";
 
 const fetchQuery = vi.spyOn(queryClient, "fetchQuery");
@@ -97,7 +98,7 @@ describe("resolveTourTarget", () => {
     expect(res.query).toMatchObject({ dashboard: "d1", folder: "sf" });
   });
 
-  it("opens the alert list on the sample alerts folder", async () => {
+  it("opens the alert list on every sample alert in their folder", async () => {
     const { SAMPLE_FOLDER_NAME } = await import("./catalog");
     fetchQuery.mockImplementation(async (opts: any) =>
       opts.queryKey.includes("sampleData")
@@ -106,7 +107,7 @@ describe("resolveTourTarget", () => {
     );
     const res = await target("alert");
     expect(res.name).toBe("alertList");
-    expect(res.query.folder).toBe("af1");
+    expect(res.query).toMatchObject({ folder: "af1", state: ALERT_LIST_ALL_STATES });
     expect(SAMPLE_TOUR_STEPS.find((s) => s.id === "alert")?.route).toBe("alertList");
   });
 });

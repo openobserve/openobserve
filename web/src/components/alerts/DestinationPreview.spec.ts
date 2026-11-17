@@ -435,4 +435,14 @@ describe("DestinationPreview", () => {
     wrapper = mountComponent({ type: "custom" });
     expect(wrapper.findComponent(ODialogStub).props("title")).toContain("Web Hook");
   });
+
+  it("notes a generic sample only when asked", () => {
+    wrapper = mountComponent({ genericSample: true });
+    expect(wrapper.get('[data-test="destination-preview-generic-note"]').text()).toContain(
+      "not your template",
+    );
+    wrapper.unmount();
+    wrapper = mountComponent();
+    expect(wrapper.find('[data-test="destination-preview-generic-note"]').exists()).toBe(false);
+  });
 });

@@ -55,7 +55,7 @@ pub async fn search_partition_mode(
 
     // partition scan direction follows the query's ORDER BY
     let sql = crate::sql::Sql::new(
-        &req.query.clone().into(),
+        &req.query.clone().try_into()?,
         org_id,
         stream_type,
         req.search_type,

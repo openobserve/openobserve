@@ -1,0 +1,626 @@
+{
+  "accept_one": {
+    "accepted_at": 1793361763976776,
+    "accepted_by": "admin@example.com",
+    "alias": "stock-svc",
+    "alias_key": "ak-2",
+    "batch_id": null,
+    "canonical": "InventoryService",
+    "confidence": "high",
+    "created_at": 1793361610000000,
+    "created_by": "system",
+    "deleted_at": null,
+    "evidence": {
+      "from": "stock-svc",
+      "from_last_seen": 1793361599523809,
+      "to": "InventoryService",
+      "to_first_seen": 1793361600476190,
+      "workload": "inventory"
+    },
+    "first_seen": 1793361600476190,
+    "kind": "rename",
+    "last_seen": 1793361609523809,
+    "org_id": "stage8_org",
+    "origin": "manual",
+    "prev_status": null,
+    "scope": "shop",
+    "status": "active",
+    "updated_at": 1793361763976776,
+    "writer_cluster": "node-2"
+  },
+  "aliases_list": {
+    "aliases": [
+      {
+        "accepted_at": 1793361730625264,
+        "accepted_by": "admin@example.com",
+        "alias": "legacy-cart",
+        "alias_key": "ak-3",
+        "batch_id": null,
+        "canonical": "CartService",
+        "confidence": "high",
+        "created_at": 1793361730625264,
+        "created_by": "admin@example.com",
+        "deleted_at": null,
+        "evidence": null,
+        "first_seen": null,
+        "kind": "rename",
+        "last_seen": null,
+        "org_id": "stage8_org",
+        "origin": "manual",
+        "prev_status": null,
+        "scope": "",
+        "status": "active",
+        "updated_at": 1793361730625264,
+        "writer_cluster": "node-2"
+      },
+      {
+        "accepted_at": null,
+        "accepted_by": null,
+        "alias": "worker",
+        "alias_key": "ak-5",
+        "batch_id": null,
+        "canonical": "billing-worker",
+        "confidence": "low",
+        "created_at": 1793361490000000,
+        "created_by": "system",
+        "deleted_at": null,
+        "evidence": {
+          "pods": ["worker-0", "worker-1"],
+          "services": ["billing-worker", "report-worker"]
+        },
+        "first_seen": 1793361480476190,
+        "kind": "k8s_workload",
+        "last_seen": 1793361719523809,
+        "org_id": "stage8_org",
+        "origin": "learned",
+        "prev_status": null,
+        "scope": "batch",
+        "status": "proposed",
+        "updated_at": 1793361720000000,
+        "writer_cluster": "node-2"
+      },
+      {
+        "accepted_at": null,
+        "accepted_by": null,
+        "alias": "alertquerier",
+        "alias_key": "ak-6",
+        "batch_id": null,
+        "canonical": "querier",
+        "confidence": "medium",
+        "created_at": 1793361490000000,
+        "created_by": "system",
+        "deleted_at": null,
+        "evidence": {
+          "pods": ["alertquerier-0", "alertquerier-1"],
+          "services": ["alertmanager", "querier"]
+        },
+        "first_seen": 1793361480476190,
+        "kind": "k8s_workload",
+        "last_seen": 1793361719523809,
+        "org_id": "stage8_org",
+        "origin": "learned",
+        "prev_status": null,
+        "scope": "pentest",
+        "status": "proposed",
+        "updated_at": 1793361720000000,
+        "writer_cluster": "node-2"
+      },
+      {
+        "accepted_at": null,
+        "accepted_by": null,
+        "alias": "stock-svc",
+        "alias_key": "ak-2",
+        "batch_id": null,
+        "canonical": "InventoryService",
+        "confidence": "high",
+        "created_at": 1793361610000000,
+        "created_by": "system",
+        "deleted_at": null,
+        "evidence": {
+          "from": "stock-svc",
+          "from_last_seen": 1793361599523809,
+          "to": "InventoryService",
+          "to_first_seen": 1793361600476190,
+          "workload": "inventory"
+        },
+        "first_seen": 1793361600476190,
+        "kind": "rename",
+        "last_seen": 1793361609523809,
+        "org_id": "stage8_org",
+        "origin": "learned",
+        "prev_status": null,
+        "scope": "shop",
+        "status": "proposed",
+        "updated_at": 1793361610000000,
+        "writer_cluster": "node-2"
+      }
+    ],
+    "total": 11
+  },
+  "analytics_value_display": {
+    "alertmanager": "alertmanager",
+    "billing-worker": "billing-worker",
+    "cartservice": "CartService",
+    "checkoutservice": "CheckoutService",
+    "compactor": "compactor",
+    "ingester": "ingester",
+    "inventoryservice": "InventoryService",
+    "legacy-cart": "CartService",
+    "nats": "nats",
+    "openobserve": "openobserve",
+    "payments-api": "PaymentService",
+    "paymentservice": "PaymentService",
+    "pentest-openobserve-alertquerier": "pentest-openobserve-alertquerier",
+    "querier": "querier",
+    "report-worker": "report-worker",
+    "stock-svc": "stock-svc",
+    "traces_service_graph_processed_timestamp": "traces_service_graph_processed_timestamp",
+    "traces_service_graph_request_server_failed_total": "traces_service_graph_request_server_failed_total",
+    "traces_service_graph_request_server_seconds_bucket": "traces_service_graph_request_server_seconds_bucket",
+    "traces_service_graph_request_server_seconds_count": "traces_service_graph_request_server_seconds_count",
+    "traces_service_graph_request_server_seconds_sum": "traces_service_graph_request_server_seconds_sum",
+    "unknown_service:node": "unknown_service:node"
+  },
+  "bulk_accept_high": {
+    "batch_id": "3LPhlmOKNgdrsb0kGFwhEQlxKwh",
+    "changed": 1,
+    "collisions": [],
+    "env_separation": true,
+    "skipped_collisions": 0,
+    "truncated": false
+  },
+  "collision_409": {
+    "collisions": [
+      {
+        "alias_key": "ak-6",
+        "display_name": "querier",
+        "existing": [
+          {
+            "env": "prod",
+            "scope": "o2",
+            "service_key": "querier"
+          }
+        ],
+        "suggested_qualifier": "pentest"
+      }
+    ],
+    "error": "alias_collision"
+  },
+  "create_201": {
+    "accepted_at": 1793361764076177,
+    "accepted_by": "admin@example.com",
+    "alias": "legacy-cart",
+    "alias_key": "ak-3",
+    "batch_id": null,
+    "canonical": "CartService",
+    "confidence": "high",
+    "created_at": 1793361764076177,
+    "created_by": "admin@example.com",
+    "deleted_at": null,
+    "evidence": null,
+    "first_seen": null,
+    "kind": "rename",
+    "last_seen": null,
+    "org_id": "stage8_org",
+    "origin": "manual",
+    "prev_status": null,
+    "scope": "",
+    "status": "active",
+    "updated_at": 1793361764076177,
+    "writer_cluster": "node-2"
+  },
+  "downtime_values": {
+    "partial": false,
+    "values": [
+      {
+        "items": 0,
+        "label": "traces_service_graph_request_server_seconds_bucket",
+        "last_seen": 1793361736925990,
+        "source": "registry",
+        "value": "traces_service_graph_request_server_seconds_bucket"
+      },
+      {
+        "items": 0,
+        "label": "traces_service_graph_request_server_seconds_count",
+        "last_seen": 1793361736914435,
+        "source": "registry",
+        "value": "traces_service_graph_request_server_seconds_count"
+      },
+      {
+        "items": 0,
+        "label": "traces_service_graph_request_server_seconds_sum",
+        "last_seen": 1793361736913977,
+        "source": "registry",
+        "value": "traces_service_graph_request_server_seconds_sum"
+      },
+      {
+        "items": 0,
+        "label": "traces_service_graph_processed_timestamp",
+        "last_seen": 1793361736913386,
+        "source": "registry",
+        "value": "traces_service_graph_processed_timestamp"
+      },
+      {
+        "items": 0,
+        "label": "traces_service_graph_request_server_failed_total",
+        "last_seen": 1793361726909084,
+        "source": "registry",
+        "value": "traces_service_graph_request_server_failed_total"
+      },
+      {
+        "items": 0,
+        "label": "triggers",
+        "last_seen": 1793361557317485,
+        "source": "registry",
+        "value": "triggers"
+      },
+      {
+        "items": 0,
+        "label": "PaymentService",
+        "last_seen": 1793361498792047,
+        "source": "registry",
+        "value": "payments-api"
+      },
+      {
+        "items": 0,
+        "label": "CartService",
+        "last_seen": 1793361498791995,
+        "source": "registry",
+        "value": "legacy-cart"
+      },
+      {
+        "items": 0,
+        "label": "nats",
+        "last_seen": 1793361498791939,
+        "source": "registry",
+        "value": "nats"
+      },
+      {
+        "items": 0,
+        "label": "pentest-openobserve-alertquerier",
+        "last_seen": 1793361498791859,
+        "source": "registry",
+        "value": "pentest-openobserve-alertquerier"
+      },
+      {
+        "items": 0,
+        "label": "openobserve",
+        "last_seen": 1793361498791748,
+        "source": "registry",
+        "value": "openobserve"
+      },
+      {
+        "items": 0,
+        "label": "alertmanager",
+        "last_seen": 1793361498784828,
+        "source": "registry",
+        "value": "alertmanager"
+      },
+      {
+        "items": 0,
+        "label": "PaymentService",
+        "last_seen": 1793361496729564,
+        "source": "registry",
+        "value": "paymentservice"
+      },
+      {
+        "items": 0,
+        "label": "CheckoutService",
+        "last_seen": 1793361496729503,
+        "source": "registry",
+        "value": "checkoutservice"
+      },
+      {
+        "items": 0,
+        "label": "billing-worker",
+        "last_seen": 1793361496702824,
+        "source": "registry",
+        "value": "billing-worker"
+      },
+      {
+        "items": 0,
+        "label": "querier",
+        "last_seen": 1793361496696650,
+        "source": "registry",
+        "value": "querier"
+      },
+      {
+        "items": 0,
+        "label": "compactor",
+        "last_seen": 1793361496696583,
+        "source": "registry",
+        "value": "compactor"
+      },
+      {
+        "items": 0,
+        "label": "CartService",
+        "last_seen": 1793361496696261,
+        "source": "registry",
+        "value": "cartservice"
+      },
+      {
+        "items": 0,
+        "label": "InventoryService",
+        "last_seen": 1793361496690621,
+        "source": "registry",
+        "value": "inventoryservice"
+      },
+      {
+        "items": 0,
+        "label": "unknown_service:node",
+        "last_seen": 1793361496690430,
+        "source": "registry",
+        "value": "unknown_service:node"
+      },
+      {
+        "items": 0,
+        "label": "ingester",
+        "last_seen": 1793361496672283,
+        "source": "registry",
+        "value": "ingester"
+      },
+      {
+        "items": 0,
+        "label": "report-worker",
+        "last_seen": 1793361496656438,
+        "source": "registry",
+        "value": "report-worker"
+      },
+      {
+        "items": 0,
+        "label": "stock-svc",
+        "last_seen": 1793361496649360,
+        "source": "registry",
+        "value": "stock-svc"
+      }
+    ]
+  },
+  "proposed_high_total": 1,
+  "service_streams": [
+    {
+      "all_dimensions": {
+        "k8s-cluster": "stage8",
+        "k8s-namespace": "batch",
+        "service": "billing-worker"
+      },
+      "disambiguation": {
+        "k8s-cluster": "stage8",
+        "k8s-namespace": "batch"
+      },
+      "display_name": "billing-worker",
+      "display_source": "trace",
+      "field_name_mapping": {
+        "k8s-cluster": "service_k8s_cluster_name",
+        "k8s-namespace": "service_k8s_namespace_name",
+        "service": "service_name"
+      },
+      "id": "3LPhEtxbqJBfIFJub8NvDFMpPzP",
+      "last_seen": 1793361496702824,
+      "logs_streams": [],
+      "metrics_streams": [],
+      "org_id": "stage8_org",
+      "profiles_streams": [],
+      "service_name": "billing-worker",
+      "set_id": "kubernetes",
+      "traces_streams": ["default"]
+    },
+    {
+      "all_dimensions": {
+        "k8s-cluster": "stage8",
+        "k8s-deployment": "checkout",
+        "k8s-namespace": "shop",
+        "service": "checkoutservice"
+      },
+      "disambiguation": {
+        "k8s-cluster": "stage8",
+        "k8s-deployment": "checkout",
+        "k8s-namespace": "shop"
+      },
+      "display_name": "CheckoutService",
+      "display_source": "trace",
+      "field_name_mapping": {
+        "k8s-cluster": "service_k8s_cluster_name",
+        "k8s-deployment": "service_k8s_deployment_name",
+        "k8s-namespace": "service_k8s_namespace_name",
+        "service": "service_name"
+      },
+      "id": "3LPhEw9sM6PKIlsxSdLpMuxMLcX",
+      "last_seen": 1793361496729503,
+      "logs_streams": [],
+      "metrics_streams": [],
+      "org_id": "stage8_org",
+      "profiles_streams": [],
+      "service_name": "checkoutservice",
+      "set_id": "kubernetes",
+      "traces_streams": ["default"]
+    },
+    {
+      "all_dimensions": {
+        "service": "legacy-cart"
+      },
+      "disambiguation": {},
+      "display_name": "CartService",
+      "display_source": "alias:rename",
+      "field_name_mapping": {
+        "service": "app"
+      },
+      "id": "3LPhEqJZR2z0Xste8oOEmFn3RuA",
+      "last_seen": 1793361498791995,
+      "logs_streams": ["app_logs"],
+      "metrics_streams": [],
+      "org_id": "stage8_org",
+      "profiles_streams": [],
+      "service_name": "legacy-cart",
+      "set_id": "default",
+      "traces_streams": []
+    },
+    {
+      "all_dimensions": {
+        "service": "nats"
+      },
+      "disambiguation": {},
+      "display_name": "nats",
+      "display_source": "detection",
+      "field_name_mapping": {
+        "service": "app"
+      },
+      "id": "3LPhEt3akfg24CzZ2ZYjaZ62crk",
+      "last_seen": 1793361498791939,
+      "logs_streams": ["app_logs"],
+      "metrics_streams": [],
+      "org_id": "stage8_org",
+      "profiles_streams": [],
+      "service_name": "nats",
+      "set_id": "default",
+      "traces_streams": []
+    },
+    {
+      "all_dimensions": {
+        "k8s-namespace": "o2",
+        "service": "openobserve"
+      },
+      "disambiguation": {
+        "k8s-namespace": "o2"
+      },
+      "display_candidates": ["compactor", "ingester", "querier"],
+      "display_name": "openobserve",
+      "display_source": "detection_ambiguous",
+      "field_name_mapping": {
+        "k8s-namespace": "kubernetes_namespace_name",
+        "service": "app"
+      },
+      "id": "3LPhEvjLp2WBR6cHKxaBirIZgu9",
+      "last_seen": 1793361498791748,
+      "logs_streams": ["app_logs"],
+      "metrics_streams": [],
+      "org_id": "stage8_org",
+      "profiles_streams": [],
+      "service_name": "openobserve",
+      "set_id": "kubernetes",
+      "traces_streams": []
+    },
+    {
+      "all_dimensions": {
+        "k8s-deployment": "payments",
+        "k8s-namespace": "shop",
+        "service": "payments-api"
+      },
+      "disambiguation": {
+        "k8s-deployment": "payments",
+        "k8s-namespace": "shop"
+      },
+      "display_name": "PaymentService",
+      "display_source": "alias:k8s_workload",
+      "field_name_mapping": {
+        "k8s-deployment": "kubernetes_deployment_name",
+        "k8s-namespace": "kubernetes_namespace_name",
+        "service": "app"
+      },
+      "id": "3LPhEpj1EDzqlIGSzB3relKledN",
+      "last_seen": 1793361498792047,
+      "logs_streams": ["app_logs"],
+      "metrics_streams": ["payments_requests_total"],
+      "org_id": "stage8_org",
+      "profiles_streams": [],
+      "service_name": "payments-api",
+      "set_id": "kubernetes",
+      "traces_streams": []
+    },
+    {
+      "all_dimensions": {
+        "k8s-cluster": "stage8",
+        "k8s-deployment": "payments",
+        "k8s-namespace": "shop",
+        "service": "paymentservice"
+      },
+      "disambiguation": {
+        "k8s-cluster": "stage8",
+        "k8s-deployment": "payments",
+        "k8s-namespace": "shop"
+      },
+      "display_name": "PaymentService",
+      "display_source": "trace",
+      "field_name_mapping": {
+        "k8s-cluster": "service_k8s_cluster_name",
+        "k8s-deployment": "service_k8s_deployment_name",
+        "k8s-namespace": "service_k8s_namespace_name",
+        "service": "service_name"
+      },
+      "id": "3LPhEuXmW2bczhN90hjxxm0vaTp",
+      "last_seen": 1793361496729564,
+      "logs_streams": [],
+      "metrics_streams": [],
+      "org_id": "stage8_org",
+      "profiles_streams": [],
+      "service_name": "paymentservice",
+      "set_id": "kubernetes",
+      "traces_streams": ["default"]
+    },
+    {
+      "all_dimensions": {
+        "k8s-cluster": "stage8",
+        "k8s-deployment": "querier",
+        "k8s-namespace": "o2",
+        "service": "querier"
+      },
+      "disambiguation": {
+        "k8s-cluster": "stage8",
+        "k8s-deployment": "querier",
+        "k8s-namespace": "o2"
+      },
+      "display_name": "querier",
+      "display_source": "trace",
+      "field_name_mapping": {
+        "k8s-cluster": "service_k8s_cluster_name",
+        "k8s-deployment": "service_k8s_deployment_name",
+        "k8s-namespace": "service_k8s_namespace_name",
+        "service": "service_name"
+      },
+      "id": "3LPhEui31yjdIXk6OhxRwdMFM8c",
+      "last_seen": 1793361496696650,
+      "logs_streams": [],
+      "metrics_streams": [],
+      "org_id": "stage8_org",
+      "profiles_streams": [],
+      "service_name": "querier",
+      "set_id": "kubernetes",
+      "traces_streams": ["default"]
+    }
+  ],
+  "traces_latest_hit": {
+    "duration": 25000,
+    "end_time": 1793361719548809000,
+    "first_event": {
+      "o2_service_version": "v1.0.0",
+      "operation_name": "GET /",
+      "service_name": "CheckoutService"
+    },
+    "gen_ai_input_messages": null,
+    "gen_ai_usage_cost": 0,
+    "gen_ai_usage_input_tokens": 0,
+    "gen_ai_usage_output_tokens": 0,
+    "gen_ai_usage_total_tokens": 0,
+    "models": [],
+    "service_name": [
+      {
+        "count": 1,
+        "duration": 25000,
+        "service_name": "CheckoutService"
+      }
+    ],
+    "spans": [1, 0],
+    "start_time": 1793361719523809000,
+    "trace_id": "96f4e9b795744cc8cffc8970f00af200"
+  },
+  "undo": {
+    "restored": 1
+  },
+  "unresolved": {
+    "placeholder_names": [
+      {
+        "last_seen": 1793361718333333,
+        "service": "unknown_service:node"
+      }
+    ]
+  }
+}

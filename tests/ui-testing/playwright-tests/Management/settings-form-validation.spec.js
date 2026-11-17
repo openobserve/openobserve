@@ -63,7 +63,7 @@ test.describe("Settings OrganizationSettings form validation", () => {
 
         const traceError = pm.settingsFormValidation.getTraceIdErrorLocator();
         await expect(traceError).toBeVisible({ timeout: 5000 });
-        await expect(traceError).toContainText("Use alphanumeric and '+=,.@-_' characters only, without spaces.");
+        await expect(traceError).toContainText("Letters, numbers and + = , . @ - _ only.");
 
         testLogger.info('Format error correctly shown for invalid trace ID characters');
     });
@@ -90,7 +90,11 @@ test.describe("Settings OrganizationSettings form validation", () => {
         testLogger.info('Testing successful save with valid trace and span IDs');
 
         // Fill both fields with valid alphanumeric identifiers
-        await pm.settingsFormValidation.fillTraceIdField('trace_id_fv_001');
+        // Save is enabled only when a value differs from the saved one, so a rerun alternates the trace ID.
+        const savedTraceId = await pm.settingsFormValidation.getTraceIdValue();
+        await pm.settingsFormValidation.fillTraceIdField(
+            savedTraceId === 'trace_id_fv_001' ? 'trace_id_fv_002' : 'trace_id_fv_001'
+        );
         await pm.settingsFormValidation.fillSpanIdField('span_id_fv_001');
         await pm.settingsFormValidation.clickOrgSettingsSave();
 

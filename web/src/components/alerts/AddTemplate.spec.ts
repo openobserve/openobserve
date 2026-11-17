@@ -1295,6 +1295,10 @@ describe("AddTemplate - forms QA (B1, B25, B27, B31)", () => {
 
   beforeEach(() => vi.clearAllMocks());
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("B1: marks Applies to in error so the server reason shows", async () => {
     vi.mocked(templateService.create).mockRejectedValueOnce({
       response: {
@@ -1352,6 +1356,8 @@ describe("AddTemplate - forms QA (B1, B25, B27, B31)", () => {
   });
 
   it("B31: drops group.<label> from the chips and keeps the episode_id and rows notes", async () => {
+    // The panel's 300ms debounced mount preview would otherwise overwrite the emitted groups on a slow run.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const w = await mountComp();
     await w.findComponent({ name: "TemplatePreviewPanel" }).vm.$emit("variable-groups", [
       { name: "common", variables: ["alert_name", "group.<label>"] },

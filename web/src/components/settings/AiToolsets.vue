@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-  <div class="p-0" style="min-height: inherit; height: calc(100vh - 88px)">
+  <div class="flex h-full flex-col p-0">
     <OPageLayout
       v-if="!showAddDialog"
       :title="t('aiToolset.header')"
@@ -29,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="ai-toolsets-add-btn"
           variant="primary"
-          size="sm-action"
+          size="sm"
           :aria-label="
             toolsetDrafts.hasNew
               ? t('common.editorDraft.newDot', { label: t('aiToolset.add') })
@@ -45,15 +44,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         /></OButton>
       </template>
 
-      <!-- Table -->
-      <div class="bg-card-glass-bg mt-2.5 overflow-hidden">
+      <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           ref="oTableRef"
           :forbidden="forbidden"
           :frame="false"
           :data="visibleRows"
           :columns="columns"
+          :row-actions="rowActions"
+          row-actions-more-data-test="ai-toolsets-row-more-actions"
           row-key="id"
+          :loading="loading"
           pagination="client"
           :page-size="pageSize"
           :page-size-options="[20, 50, 100]"
@@ -75,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <OSearchInput
               v-model="filterQuery"
-              class="no-border o2-search-input w-64 max-md:w-auto max-md:flex-1"
+              class="flex-1"
               :placeholder="t('aiToolset.search')"
             />
           </template>
@@ -101,7 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-name="{ row }">
             <div class="flex min-w-0 items-center gap-2">
-              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <ONameLinkCell :to="() => editToolset(row)" data-test="ai-toolsets-list-name-link">{{
+                row.name
+              }}</ONameLinkCell>
               <EditorDraftDot
                 v-if="toolsetDrafts.ids.has(row.id)"
                 :saved-at="toolsetDrafts.savedAt(row.id)"
@@ -112,59 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-kind="{ row }">
             <OTag type="aiToolsetKind" :value="row.kind" />
-          </template>
-
-          <template #cell-actions="{ row }">
-            <OButton
-              :data-test="`ai-toolset-${row.name}-edit`"
-              data-row-action="edit"
-              variant="ghost"
-              size="icon-sm"
-              class="max-md:hidden"
-              :title="t('common.edit')"
-              @click="editToolset(row)"
-              icon-left="edit"
-            />
-            <OButton
-              :data-test="`ai-toolset-${row.name}-delete`"
-              data-row-action="delete"
-              variant="ghost-destructive"
-              size="icon-sm"
-              class="max-md:hidden"
-              :title="t('common.delete')"
-              @click="confirmDeleteToolset(row)"
-              icon-left="delete"
-            />
-            <ODropdown side="bottom" align="end">
-              <template #trigger>
-                <OButton
-                  :aria-label="t('common.moreActions')"
-                  icon-left="more-vert"
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  class="md:hidden"
-                  data-test="ai-toolsets-row-more-actions"
-                  @click.stop
-                />
-              </template>
-              <ODropdownItem
-                icon-left="edit"
-                class="md:hidden"
-                :data-test="`ai-toolset-${row.name}-edit-menu`"
-                @select="editToolset(row)"
-              >
-                <span>{{ t("common.edit") }}</span>
-              </ODropdownItem>
-              <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
-                class="md:hidden"
-                :data-test="`ai-toolset-${row.name}-delete-menu`"
-                @select="confirmDeleteToolset(row)"
-              >
-                <span>{{ t("common.delete") }}</span>
-              </ODropdownItem>
-            </ODropdown>
           </template>
         </OTable>
       </div>
@@ -199,15 +149,14 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
+import { COL, type OTableColumnDef, type OTableRowAction } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
@@ -216,7 +165,6 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 import aiToolsetsService from "@/services/ai_toolsets";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
@@ -230,13 +178,11 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     OButton,
-    ODropdown,
-    ODropdownItem,
     ORefreshButton,
     OTag,
     OSearchInput,
     OTable,
-    OTruncatedText,
+    ONameLinkCell,
     EditorDraftDot,
   },
   setup() {
@@ -347,8 +293,22 @@ export default defineComponent({
         header: t("aiToolset.actions"),
         isAction: true,
         pinned: "right",
-        size: 80,
-        meta: { align: "center" },
+      },
+    ];
+    const rowActions: OTableRowAction[] = [
+      {
+        id: "edit",
+        label: t("common.edit"),
+        icon: "edit",
+        onSelect: (row) => editToolset(row),
+        dataTest: (row) => `ai-toolset-${row.name}-edit`,
+      },
+      {
+        id: "delete",
+        label: t("common.delete"),
+        icon: "delete",
+        onSelect: (row) => confirmDeleteToolset(row),
+        dataTest: (row) => `ai-toolset-${row.name}-delete`,
       },
     ];
 
@@ -548,6 +508,7 @@ export default defineComponent({
       toolsetsLocked,
       tabledata,
       columns,
+      rowActions,
       showAddDialog,
       resultTotal,
       filterQuery,

@@ -121,7 +121,8 @@ import type { I18nText } from "@/types/i18n";
 import OText from "@/lib/core/Typography/OText.vue";
 import { LINE_HEIGHT, canLabel, fitLabels, type MeasureText } from "./hexLabel";
 
-export type HexClass = "watched" | "learning" | "gap" | "none" | "s1" | "s2" | "s3" | "s4" | "s5";
+export type HexClass =
+  "watched" | "partial" | "learning" | "gap" | "none" | "s1" | "s2" | "s3" | "s4" | "s5";
 
 export interface HexItem {
   key: string;
@@ -145,8 +146,9 @@ const emit = defineEmits<{ select: [key: string] }>();
 
 const FILL: Record<HexClass, string> = {
   watched: "fill-badge-success-soft-text/15 stroke-badge-success-soft-text/30",
+  partial: "fill-ingest-accent-amber/25 stroke-ingest-accent-amber",
   learning: "stroke-status-neutral-text/60",
-  gap: "fill-badge-amber-soft-text stroke-badge-amber-soft-text",
+  gap: "fill-ingest-accent-amber stroke-ingest-accent-amber",
   none: "fill-status-neutral-text stroke-transparent",
   s1: "fill-map-seq-1 stroke-transparent",
   s2: "fill-map-seq-2 stroke-transparent",
@@ -157,8 +159,9 @@ const FILL: Record<HexClass, string> = {
 
 const SWATCH: Record<HexClass, string> = {
   watched: "bg-badge-success-soft-text/15 border border-badge-success-soft-text/60",
+  partial: "bg-ingest-accent-amber/25 border border-ingest-accent-amber",
   learning: "bg-badge-default-soft-bg border border-dashed border-status-neutral-text",
-  gap: "bg-badge-amber-soft-text",
+  gap: "bg-ingest-accent-amber",
   none: "bg-status-neutral-text",
   s1: "bg-map-seq-1",
   s2: "bg-map-seq-2",
@@ -169,6 +172,7 @@ const SWATCH: Record<HexClass, string> = {
 
 const LABEL: Record<HexClass, string> = {
   watched: "fill-banner-success-text",
+  partial: "fill-text-heading",
   learning: "fill-text-heading",
   gap: "fill-text-inverse",
   none: "fill-text-inverse",

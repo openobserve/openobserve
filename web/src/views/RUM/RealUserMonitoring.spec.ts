@@ -33,6 +33,20 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
+// The async loader unwraps default only from an ES module; mounted components get no template compiler.
+vi.mock("@/enterprise/components/ServiceVersions/RumVersionStrip.vue", async () => {
+  const { h } = await import("vue");
+  return {
+    __esModule: true,
+    default: {
+      props: ["app", "noVersionHint"],
+      setup: (props: { noVersionHint?: boolean }) => () =>
+        h("div", { "data-test": "svcver-rum-strip", "data-hint": String(props.noVersionHint) }),
+    },
+  };
+});
+
+import config from "@/aws-exports";
 import RealUserMonitoring from "./RealUserMonitoring.vue";
 
 const Stub = { template: "<div />" };
@@ -98,6 +112,23 @@ describe("RealUserMonitoring tabs", () => {
     wrapper = null;
   });
 
+  it("lets the version strip show the no-version hint on Performance only", async () => {
+    const edition = config.isEnterprise;
+    config.isEnterprise = "true";
+    try {
+      await mountAt("/rum/performance/overview");
+      await vi.waitFor(() =>
+        expect(wrapper!.find('[data-test="svcver-rum-strip"]').exists()).toBe(true),
+      );
+      expect(wrapper!.get('[data-test="svcver-rum-strip"]').attributes("data-hint")).toBe("true");
+      await router.push("/rum/errors");
+      await flushPromises();
+      expect(wrapper!.get('[data-test="svcver-rum-strip"]').attributes("data-hint")).toBe("false");
+    } finally {
+      config.isEnterprise = edition;
+    }
+  });
+
   it("no longer carries a Product Analytics tab: it has its own menu", async () => {
     await mountAt("/rum/sessions");
     const tabs = wrapper!.findAll('[role="tab"]').map((t) => t.text());
@@ -119,6 +150,19 @@ describe("RealUserMonitoring tabs", () => {
     const tabs = wrapper.findAll('[role="tab"]');
     expect(tabs.length).toBeGreaterThan(0);
     expect(tabs.filter((t) => t.attributes("aria-disabled") === "true")).toHaveLength(0);
+  });
+
+  it("a copied compare-drawer link keeps its keys through the Performance redirect", async () => {
+    await mountAt(
+      "/rum/performance/overview?org_identifier=org1&cmp=0.0.2..0.0.1&cmpSvc=storefront&cmpWhere=env%3Aprod&cmpDeploy=k1",
+    );
+    expect(router.currentRoute.value.name).toBe("rumPerformanceSummary");
+    expect(router.currentRoute.value.query).toMatchObject({
+      cmp: "0.0.2..0.0.1",
+      cmpSvc: "storefront",
+      cmpWhere: "env:prod",
+      cmpDeploy: "k1",
+    });
   });
 
   it("keeps Performance as the default landing tab", async () => {

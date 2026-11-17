@@ -914,6 +914,12 @@ mod tests {
         {
             failed.push("e2e_two_workers_never_run_one_step_twice");
         }
+        if tokio::spawn(e2e_snapshot_written_during_org_deletion_is_deleted())
+            .await
+            .is_err()
+        {
+            failed.push("e2e_snapshot_written_during_org_deletion_is_deleted");
+        }
         config::CONFIG.store(saved_config);
         assert!(failed.is_empty(), "org deletion e2e failed: {failed:?}");
     }
@@ -3049,6 +3055,66 @@ mod tests {
         .await
         .unwrap();
         slug
+    }
+
+    /// The rebuilder's tick writes a page's first snapshot while the org's deletion runs.
+    async fn e2e_snapshot_written_during_org_deletion_is_deleted() {
+        use sea_orm::{ConnectionTrait, TransactionTrait};
+
+        let conn = infra::db::get_orm_client_rw().await;
+        // The interleaving needs row locks, which only Postgres takes.
+        if conn.get_database_backend() != sea_orm::DatabaseBackend::Postgres {
+            return;
+        }
+        let org = format!("spdel{}", run_suffix());
+        let slug = insert_public_status_page(&org).await;
+        let page = infra::table::status_pages::get_page_by_slug_any(&slug)
+            .await
+            .unwrap()
+            .unwrap();
+        conn.execute_unprepared(&format!(
+            "DELETE FROM status_page_snapshots WHERE status_page_id = '{}'",
+            page.id
+        ))
+        .await
+        .unwrap();
+
+        let tick = conn.begin().await.unwrap();
+        infra::table::status_pages::upsert_snapshot(&tick, &page.id, &org, Some("[]"), None, 1)
+            .await
+            .unwrap();
+        let deletion = tokio::spawn({
+            let org = org.clone();
+            async move { infra::table::status_pages::delete_by_org(&org).await }
+        });
+        let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(60);
+        while !deletion.is_finished() && !status_page_delete_waits_on_a_lock().await {
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "the deletion neither finished nor waited"
+            );
+            tokio::task::yield_now().await;
+        }
+        tick.commit().await.unwrap();
+        deletion.await.unwrap().unwrap();
+
+        assert_eq!(count_org_rows("status_page_snapshots", &org).await, 0);
+    }
+
+    async fn status_page_delete_waits_on_a_lock() -> bool {
+        use sea_orm::{ConnectionTrait, Statement};
+
+        let conn = infra::db::get_orm_client_rw().await;
+        let row = conn
+            .query_one(Statement::from_string(
+                conn.get_database_backend(),
+                "SELECT COUNT(*) AS n FROM pg_stat_activity WHERE datname = current_database() \
+                 AND wait_event_type = 'Lock' AND query LIKE 'DELETE FROM \"status_page%'",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        row.try_get::<i64>("", "n").unwrap() > 0
     }
 
     async fn e2e_file_list_step_moves_every_stream_to_deleted() {
@@ -8120,18 +8186,9 @@ mod tests {
         let id = "rename_during_run_pl";
         let (mut pipeline, row) = e2e_create_scheduled(id, "running_old", false).await;
         let seeded = e2e_seed_trigger(&row, 555, E2E_PIPELINE_FAR_RUN).await;
-        db::scheduler::update_status(
-            "e2e",
-            TriggerModule::DerivedStream,
-            &seeded.module_key,
-            TriggerStatus::Processing,
-            0,
-            None,
-            false,
-            "",
-        )
-        .await
-        .unwrap();
+        e2e_claim_until(&seeded, E2E_PIPELINE_FAR_RUN).await;
+        // The server's own watch_timeout job ticks every 30s and may land anywhere in this case.
+        infra::scheduler::watch_timeout().await.unwrap();
 
         let version = pipeline.version;
         pipeline.name = "running_new".to_string();
@@ -8150,6 +8207,19 @@ mod tests {
         assert_eq!(stored.name, "running_old");
         assert_eq!(stored.version, version);
         e2e_delete_scheduled(id).await;
+    }
+
+    /// A worker's pull sets the row's end_time, and watch_timeout frees only rows past theirs.
+    async fn e2e_claim_until(trigger: &Trigger, end_time: i64) {
+        let claimed = Trigger {
+            status: TriggerStatus::Processing,
+            start_time: Some(Utc::now().timestamp_micros()),
+            end_time: Some(end_time),
+            ..trigger.clone()
+        };
+        infra::scheduler::update_trigger(claimed, true)
+            .await
+            .unwrap();
     }
 
     /// The reported defect: after a rename every result row arrived twice.

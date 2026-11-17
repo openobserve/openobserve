@@ -24,7 +24,7 @@ pub mod resources;
 pub mod values;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     sync::{Arc, LazyLock, RwLock},
     time::{Duration, Instant},
 };
@@ -32,12 +32,12 @@ use std::{
 use config::{
     meta::{
         downtimes::{
-            AffectedItems, DimensionCondition, Downtime, DowntimeDetail, DowntimeListItem,
-            DowntimeNotifications, DowntimeRequest, DowntimeSchedule, DowntimeStatus,
-            DowntimeTarget, DowntimeWindow, EndOnClear, ExtendDowntimeRequest,
+            AffectedItems, AlertGroupRef, DimensionCondition, Downtime, DowntimeDetail,
+            DowntimeListItem, DowntimeNotifications, DowntimeRequest, DowntimeSchedule,
+            DowntimeStatus, DowntimeTarget, DowntimeWindow, EndOnClear, ExtendDowntimeRequest,
             ExtendDowntimeResponse, MoveDowntimesRequest, MuteSource, NotificationEvent,
             PreviewMatch, PreviewRequest, PreviewResponse, Repeat, ResourcesRequest,
-            ResourcesResponse, TargetModule, ValuesRequest, ValuesResponse,
+            ResourcesResponse, TargetModule, ValuesRequest, ValuesResponse, same_alert_groups,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
@@ -95,6 +95,11 @@ pub enum DowntimeError {
     Forbidden(String),
     Conflict(String),
     Internal(String),
+    /// Too many test sends by one user; retry after the given seconds.
+    RateLimited {
+        message: String,
+        retry_after_secs: i64,
+    },
 }
 
 impl std::fmt::Display for DowntimeError {
@@ -105,6 +110,7 @@ impl std::fmt::Display for DowntimeError {
             Self::BadRequest(m) | Self::Forbidden(m) | Self::Conflict(m) | Self::Internal(m) => {
                 f.write_str(m)
             }
+            Self::RateLimited { message, .. } => f.write_str(message),
         }
     }
 }
@@ -163,6 +169,7 @@ pub async fn list(
     query: &ListQuery,
 ) -> Result<ListResponse, DowntimeError> {
     ensure_enabled()?;
+    listing::check_query(query).map_err(DowntimeError::BadRequest)?;
     let folders = access::listable_downtime_folders(org, user_id).await?;
     let now = now_micros();
     let inventory = inventory::cached(org).await?;
@@ -255,8 +262,11 @@ pub async fn update(
     ensure_enabled()?;
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
+    require_version(req.version)?;
     check_version(req.version, &before)?;
+    check_editable(&before, now_micros())?;
     let req = checked_request(org, user_id, req, Some(&before), true).await?;
+    check_started_edit(&before, &req, now_micros())?;
     let continues = before
         .notifications
         .as_ref()
@@ -324,6 +334,9 @@ pub async fn cancel_on_clear(org: &str, id: &str, cleared_at: i64) -> Result<boo
         log::info!(
             "[downtimes] audit: {SYSTEM_ACTOR} cancelled {org}/{id} at {cleared_at}, reason end_on_clear"
         );
+        // After the successful write only, so a retry or an early return writes no event.
+        #[cfg(feature = "enterprise")]
+        audit::audit(cancel_on_clear_audit(org, id, cleared_at)).await;
         if let Some(window) = cancelled_window(&before, cleared_at) {
             notify::deliver_in_background(
                 after.clone(),
@@ -334,6 +347,36 @@ pub async fn cancel_on_clear(org: &str, id: &str, cleared_at: i64) -> Result<boo
         return Ok(true);
     }
     Err(changed_meanwhile())
+}
+
+/// The audit middleware records only HTTP calls, so a system auto-cancel writes its own event.
+#[cfg(feature = "enterprise")]
+fn cancel_on_clear_audit(
+    org: &str,
+    id: &str,
+    at: i64,
+) -> o2_enterprise::enterprise::common::auditor::AuditMessage {
+    use o2_enterprise::enterprise::common::auditor;
+    auditor::AuditMessage {
+        login_ip: None,
+        user_agent: None,
+        user_email: SYSTEM_ACTOR.to_string(),
+        org_id: org.to_string(),
+        _timestamp: at,
+        protocol: auditor::Protocol::Http,
+        delegated: None,
+        fleet_id: None,
+        target: None,
+        response_meta: auditor::ResponseMeta {
+            http_method: "POST".to_string(),
+            http_path: format!("/api/v2/{org}/downtimes/{id}/cancel"),
+            http_query_params: String::new(),
+            http_body: r#"{"reason":"cancel_on_clear"}"#.to_string(),
+            http_response_code: 200,
+            error_msg: None,
+            trace_id: None,
+        },
+    }
 }
 
 /// Moves the end of a quick mute; `end_on_clear` is what the row ends on from now.
@@ -382,7 +425,17 @@ pub async fn send_test(
             start: row.schedule.starts_at,
             end: row.schedule.ends_at.unwrap_or(row.schedule.starts_at),
         });
-    Ok(notify::send_test(&row, window, &req.destinations, now).await)
+    notify::send_test(&row, user_id, window, &req.destinations, now)
+        .await
+        .map_err(|e| match e {
+            crate::alerts::notifications::TestSendError::RateLimited { retry_after_secs } => {
+                DowntimeError::RateLimited {
+                    message: e.to_string(),
+                    retry_after_secs,
+                }
+            }
+            e => DowntimeError::Internal(e.to_string()),
+        })
 }
 
 /// Lengthens the active window; a recurring row gets a one-time follow-up instead.
@@ -437,7 +490,9 @@ pub async fn extend(
     }
     let follow_up = follow_up(&before, window.end, new_end, user_id, now);
     checked_request(org, user_id, request_of(&follow_up), Some(&before), false).await?;
-    check_room(org, now)?;
+    if extend_needs_room(&before) {
+        check_room(org, now)?;
+    }
     let plan = remeasure_plan(None, &follow_up).await?;
     if !db::downtimes::set_if_parent_unchanged(
         &follow_up,
@@ -473,7 +528,11 @@ pub async fn delete(org: &str, user_id: &str, id: &str) -> Result<(), DowntimeEr
     ensure_enabled()?;
     let row = load(org, id).await?;
     access::authorize_row(org, user_id, &row, "DELETE").await?;
-    check_deletable(&row, now_micros())?;
+    let now = now_micros();
+    check_deletable(&row, now)?;
+    if row.schedule.repeat != Repeat::None {
+        check_no_live_follow_up(&primary_rows(org).await?, &row.id, now)?;
+    }
     let read = infra::table::downtimes::RowVersion {
         version: row.version,
         updated_at: row.updated_at,
@@ -982,11 +1041,17 @@ async fn checked_request(
     stored: Option<&Downtime>,
     check_destinations: bool,
 ) -> Result<DowntimeRequest, DowntimeError> {
+    if let Some(stored) = stored {
+        req.keep_omitted(stored);
+    }
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     validate(&req, &groups).map_err(DowntimeError::BadRequest)?;
     req.check_alert_targets()
         .map_err(DowntimeError::BadRequest)?;
     span_as_duration(&mut req.schedule);
+    req.schedule.timezone = canonical_timezone(&req.schedule.timezone);
+    let has_slo = scope::target_for(&req.targets, TargetModule::Slos).is_some();
+    check_not_past(&req.schedule, has_slo, stored, now_micros())?;
     if let Some(notifications) = &req.notifications {
         check_notifications(org, notifications, &req.schedule, check_destinations).await?;
     }
@@ -995,7 +1060,7 @@ async fn checked_request(
         target.tags = config::meta::alerts::tags::normalize_tags(&target.tags)
             .map_err(|e| DowntimeError::BadRequest(format!("{e}.")))?;
     }
-    if scope_changed(stored, &req.targets, req.condition.as_ref()) {
+    if scope_changed(stored, &req.targets, req.condition.as_ref(), req.groups()) {
         let inventory = inventory::load(org).await?;
         access::check_targets(org, user_id, &req.targets, &inventory).await?;
     }
@@ -1020,13 +1085,19 @@ async fn check_notifications(
     .map_err(DowntimeError::BadRequest)
 }
 
-/// Unchanged stored targets and condition were checked when written; dropping a condition widens.
+/// Unchanged stored targets, condition and groups were checked when written; dropping a condition
+/// or a group limit widens.
 fn scope_changed(
     stored: Option<&Downtime>,
     targets: &[DowntimeTarget],
     condition: Option<&DimensionCondition>,
+    alert_groups: Option<&[AlertGroupRef]>,
 ) -> bool {
-    stored.is_none_or(|stored| stored.targets != targets || stored.condition.as_ref() != condition)
+    stored.is_none_or(|stored| {
+        stored.targets != targets
+            || stored.condition.as_ref() != condition
+            || !same_alert_groups(stored.alert_groups.as_deref(), alert_groups)
+    })
 }
 
 /// A request that names the version it was loaded at fails when the row moved on since.
@@ -1036,6 +1107,200 @@ fn check_version(requested: Option<i64>, row: &Downtime) -> Result<(), DowntimeE
             "Someone changed this downtime since you loaded it. Reload and try again.".to_string(),
         )),
         _ => Ok(()),
+    }
+}
+
+const FINISHED: &str = "This downtime is finished. Duplicate it to mute again.";
+const VERSION_REQUIRED: &str = "Send the version you loaded. Reload the downtime and try again.";
+const STARTED: &str =
+    "This downtime already started. Only its end can change. Duplicate it to change the schedule.";
+const END_BEFORE_NOW: &str = "The new end cannot be before now. Past windows already took effect.";
+const SLO_HISTORY: &str =
+    "This downtime corrected SLO data, so it stays for history and cannot be deleted.";
+
+/// An edit must name the version it loaded, so an old script cannot undo a newer edit.
+fn require_version(version: Option<i64>) -> Result<(), DowntimeError> {
+    if version.is_none() {
+        return Err(DowntimeError::BadRequest(VERSION_REQUIRED.to_string()));
+    }
+    Ok(())
+}
+
+/// A finished row stays as history; Duplicate is the path to reuse it (D3).
+fn check_editable(row: &Downtime, now: i64) -> Result<(), DowntimeError> {
+    match schedule::status(&row.schedule, row.cancelled_at, now) {
+        DowntimeStatus::Ended | DowntimeStatus::EndedEarly | DowntimeStatus::Cancelled => {
+            Err(DowntimeError::Conflict(FINISHED.to_string()))
+        }
+        DowntimeStatus::Active | DowntimeStatus::Scheduled => Ok(()),
+    }
+}
+
+/// The recurring follow-up of an extend takes no new place: its parent already holds one.
+fn extend_needs_room(before: &Downtime) -> bool {
+    before.schedule.repeat == Repeat::None
+}
+
+/// The SLO target with its default mode spelled out, so a stored `None` equals a sent `exclude`.
+fn slo_target_of(targets: &[DowntimeTarget]) -> Option<DowntimeTarget> {
+    let sorted = |v: &[String]| {
+        v.iter()
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    };
+    scope::target_for(targets, TargetModule::Slos).map(|t| DowntimeTarget {
+        slo_mode: Some(t.slo_mode.unwrap_or_default()),
+        tags: sorted(&t.tags),
+        ids: sorted(&t.ids),
+        ..t.clone()
+    })
+}
+
+/// After the first window started, past windows are history the SLO re-measure cannot rebuild,
+/// so only the end and the non-schedule fields change (D4).
+fn check_started_edit(
+    before: &Downtime,
+    req: &DowntimeRequest,
+    now: i64,
+) -> Result<(), DowntimeError> {
+    if !first_window_started(&before.schedule, now) {
+        return Ok(());
+    }
+    let (b, r) = (&before.schedule, &req.schedule);
+    let weekdays = |s: &DowntimeSchedule| s.weekdays.iter().copied().collect::<BTreeSet<u8>>();
+    let schedule_locked = b.starts_at != r.starts_at
+        || b.repeat != r.repeat
+        || b.start_time_local != r.start_time_local
+        || canonical_timezone(&b.timezone) != canonical_timezone(&r.timezone)
+        || weekdays(b) != weekdays(r)
+        || (b.repeat != Repeat::None && b.duration_secs != r.duration_secs);
+    let has_slo = |t: &[DowntimeTarget]| scope::target_for(t, TargetModule::Slos).is_some();
+    let slo_locked = (has_slo(&before.targets) || has_slo(&req.targets))
+        && (before.condition != req.condition
+            || slo_target_of(&before.targets) != slo_target_of(&req.targets));
+    if schedule_locked || slo_locked {
+        return Err(DowntimeError::Conflict(STARTED.to_string()));
+    }
+    // An unchanged end keeps the coverage it has, so a reason edit in the overnight tail of the
+    // last window, after the "until" day, still passes.
+    let day = |at| config::meta::downtimes::local_date(at, &r.timezone);
+    let end_kept = match (r.repeat, r.ends_at) {
+        _ if r.ends_at == b.ends_at => true,
+        (_, None) => true,
+        (Repeat::None, Some(end)) => end >= now,
+        (_, Some(until)) => {
+            b.ends_at
+                .is_some_and(|stored| day(stored).is_some() && day(stored) == day(until))
+                || day(until)
+                    .zip(day(now))
+                    .is_none_or(|(until, today)| until >= today)
+        }
+    };
+    if !end_kept {
+        return Err(DowntimeError::Conflict(END_BEFORE_NOW.to_string()));
+    }
+    Ok(())
+}
+
+const END_IN_PAST: &str = "The end time is in the past. Pick an end time after now.";
+
+/// A new or changed schedule must still have a window ahead (D7: an SLO target may correct the
+/// past). A row whose first window started is left to the started-edit rule.
+fn check_not_past(
+    req: &DowntimeSchedule,
+    has_slo: bool,
+    stored: Option<&Downtime>,
+    now: i64,
+) -> Result<(), DowntimeError> {
+    if has_slo {
+        return Ok(());
+    }
+    if let Some(stored) = stored
+        && (same_schedule(&stored.schedule, req) || first_window_started(&stored.schedule, now))
+    {
+        return Ok(());
+    }
+    if matches!(schedule::status(req, None, now), DowntimeStatus::Ended) {
+        return Err(DowntimeError::BadRequest(END_IN_PAST.to_string()));
+    }
+    Ok(())
+}
+
+/// The first occurrence starts at or before `now`; a recurring row between two windows counts.
+fn first_window_started(s: &DowntimeSchedule, now: i64) -> bool {
+    if s.repeat == Repeat::None {
+        return s.starts_at <= now;
+    }
+    schedule::next_window(s, s.starts_at.saturating_sub(1)).is_some_and(|w| w.start <= now)
+}
+
+/// Legacy IANA links mapped to the current name, the same map as
+/// `web/src/utils/timezoneAliases.ts`.
+const TIMEZONE_ALIASES: &[(&str, &str)] = &[
+    ("Africa/Asmera", "Africa/Asmara"),
+    ("America/Buenos_Aires", "America/Argentina/Buenos_Aires"),
+    ("America/Catamarca", "America/Argentina/Catamarca"),
+    ("America/Coral_Harbour", "America/Atikokan"),
+    ("America/Cordoba", "America/Argentina/Cordoba"),
+    ("America/Fort_Wayne", "America/Indiana/Indianapolis"),
+    ("America/Godthab", "America/Nuuk"),
+    ("America/Indianapolis", "America/Indiana/Indianapolis"),
+    ("America/Jujuy", "America/Argentina/Jujuy"),
+    ("America/Louisville", "America/Kentucky/Louisville"),
+    ("America/Mendoza", "America/Argentina/Mendoza"),
+    ("Asia/Calcutta", "Asia/Kolkata"),
+    ("Asia/Dacca", "Asia/Dhaka"),
+    ("Asia/Katmandu", "Asia/Kathmandu"),
+    ("Asia/Rangoon", "Asia/Yangon"),
+    ("Asia/Saigon", "Asia/Ho_Chi_Minh"),
+    ("Asia/Thimbu", "Asia/Thimphu"),
+    ("Asia/Ujung_Pandang", "Asia/Makassar"),
+    ("Asia/Ulan_Bator", "Asia/Ulaanbaatar"),
+    ("Atlantic/Faeroe", "Atlantic/Faroe"),
+    ("Europe/Kiev", "Europe/Kyiv"),
+    ("Etc/UCT", "UTC"),
+    ("Etc/Universal", "UTC"),
+    ("Etc/UTC", "UTC"),
+    ("Etc/Zulu", "UTC"),
+    ("Pacific/Enderbury", "Pacific/Kanton"),
+    ("Pacific/Ponape", "Pacific/Pohnpei"),
+    ("Pacific/Truk", "Pacific/Chuuk"),
+    ("UCT", "UTC"),
+    ("Universal", "UTC"),
+    ("Zulu", "UTC"),
+];
+
+/// The current tz-database name, so one zone is never stored under two names.
+pub fn canonical_timezone(zone: &str) -> String {
+    TIMEZONE_ALIASES
+        .iter()
+        .find(|(legacy, _)| *legacy == zone)
+        .map_or(zone, |(_, current)| current)
+        .to_string()
+}
+
+/// Two schedules give the same windows: zones compare canonically and weekdays as a set.
+pub fn same_schedule(a: &DowntimeSchedule, b: &DowntimeSchedule) -> bool {
+    let weekdays = |s: &DowntimeSchedule| s.weekdays.iter().copied().collect::<BTreeSet<u8>>();
+    a.repeat == b.repeat
+        && a.starts_at == b.starts_at
+        && a.ends_at == b.ends_at
+        && a.start_time_local == b.start_time_local
+        && a.duration_secs == b.duration_secs
+        && canonical_timezone(&a.timezone) == canonical_timezone(&b.timezone)
+        && weekdays(a) == weekdays(b)
+}
+
+const EXTENSION_RUNNING: &str = "An extension of this downtime is still running. End it first.";
+
+/// A parent with a live extension is not deleted, so the extension never outlives its link.
+fn check_no_live_follow_up(rows: &[Downtime], id: &str, now: i64) -> Result<(), DowntimeError> {
+    if follow_ups_to_cancel(rows, id, now).is_empty() {
+        Ok(())
+    } else {
+        Err(DowntimeError::Conflict(EXTENSION_RUNNING.to_string()))
     }
 }
 
@@ -1110,8 +1375,8 @@ fn created(
         reason: req.reason.clone(),
         condition: req.condition.clone(),
         targets: req.targets.clone(),
-        alert_groups: req.alert_groups.clone(),
-        end_on_clear: req.end_on_clear.clone(),
+        alert_groups: req.groups().map(<[_]>::to_vec),
+        end_on_clear: req.end().cloned(),
         source: None,
         schedule: req.schedule.clone(),
         cancelled_at: None,
@@ -1133,8 +1398,8 @@ fn edited(before: &Downtime, req: DowntimeRequest, user_id: &str, now: i64) -> D
         reason: req.reason,
         condition: req.condition,
         targets: req.targets,
-        alert_groups: req.alert_groups,
-        end_on_clear: req.end_on_clear,
+        alert_groups: req.alert_groups.flatten(),
+        end_on_clear: req.end_on_clear.flatten(),
         schedule: req.schedule,
         show_banner: req.show_banner,
         version: before.version + 1,
@@ -1186,8 +1451,8 @@ fn request_of(row: &Downtime) -> DowntimeRequest {
         show_banner: row.show_banner,
         notifications: row.notifications.clone(),
         version: None,
-        alert_groups: row.alert_groups.clone(),
-        end_on_clear: row.end_on_clear.clone(),
+        alert_groups: Some(row.alert_groups.clone()),
+        end_on_clear: Some(row.end_on_clear.clone()),
     }
 }
 
@@ -1384,6 +1649,7 @@ fn extended_once(before: &Downtime, new_end: i64, user_id: &str, now: i64) -> Do
         schedule: DowntimeSchedule {
             ends_at: Some(new_end),
             duration_secs: (new_end - before.schedule.starts_at) / MICROS_PER_SEC,
+            timezone: canonical_timezone(&before.schedule.timezone),
             ..before.schedule.clone()
         },
         version: before.version + 1,
@@ -1411,7 +1677,7 @@ fn follow_up(parent: &Downtime, start: i64, end: i64, user_id: &str, now: i64) -
             repeat: Repeat::None,
             starts_at: start,
             ends_at: Some(end),
-            timezone: parent.schedule.timezone.clone(),
+            timezone: canonical_timezone(&parent.schedule.timezone),
             start_time_local: None,
             duration_secs: (end - start) / MICROS_PER_SEC,
             weekdays: vec![],
@@ -1447,10 +1713,7 @@ fn check_deletable(row: &Downtime, now: i64) -> Result<(), DowntimeError> {
     let corrected = scope::target_for(&row.targets, TargetModule::Slos).is_some()
         && !schedule::windows_between(&row.schedule, row.cancelled_at, 0, now).is_empty();
     if corrected {
-        return Err(DowntimeError::Conflict(
-            "This downtime corrected SLO slices. Cancel it instead. Retention removes it after the SLO window has passed."
-                .to_string(),
-        ));
+        return Err(DowntimeError::Conflict(SLO_HISTORY.to_string()));
     }
     Ok(())
 }
@@ -1776,6 +2039,404 @@ mod tests {
         }
     }
 
+    fn alerts_daily(start_time: &str, duration_secs: i64, starts_at: i64) -> Downtime {
+        let mut d = row(vec![TargetModule::Alerts], 0, 0);
+        d.schedule = DowntimeSchedule {
+            repeat: Repeat::Daily,
+            starts_at,
+            ends_at: None,
+            timezone: "UTC".to_string(),
+            start_time_local: Some(start_time.to_string()),
+            duration_secs,
+            weekdays: vec![],
+        };
+        d
+    }
+
+    fn is_end_in_past(r: Result<(), DowntimeError>) -> bool {
+        matches!(r, Err(DowntimeError::BadRequest(m)) if m == END_IN_PAST)
+    }
+
+    #[test]
+    fn a_new_one_time_window_must_end_after_now() {
+        let now = 20 * HOUR;
+        let past = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR).schedule;
+        assert!(is_end_in_past(check_not_past(&past, false, None, now)));
+        let at_now = row(vec![TargetModule::Alerts], 10 * HOUR, now).schedule;
+        assert!(is_end_in_past(check_not_past(&at_now, false, None, now)));
+        let future = row(vec![TargetModule::Alerts], 19 * HOUR, 21 * HOUR).schedule;
+        assert!(check_not_past(&future, false, None, now).is_ok());
+    }
+
+    #[test]
+    fn a_past_window_with_an_slo_target_corrects_slo_data() {
+        let past = row(vec![TargetModule::Slos], 10 * HOUR, 12 * HOUR).schedule;
+        assert!(check_not_past(&past, true, None, 20 * HOUR).is_ok());
+    }
+
+    #[test]
+    fn a_recurring_until_day_in_the_past_is_refused_and_no_until_passes() {
+        let day = 24 * HOUR;
+        let now = 10 * day + 12 * HOUR;
+        let mut ended = alerts_daily("02:00", 3_600, 0).schedule;
+        ended.ends_at = Some(5 * day + 23 * HOUR + 59 * 60_000_000);
+        assert!(is_end_in_past(check_not_past(&ended, false, None, now)));
+        let open = alerts_daily("02:00", 3_600, 0).schedule;
+        assert!(check_not_past(&open, false, None, now).is_ok());
+        // The until day is today, sent as 23:59, and tonight's 22:00 window is still ahead.
+        let mut tonight = alerts_daily("22:00", 3_600, 0).schedule;
+        tonight.ends_at = Some(10 * day + 23 * HOUR + 59 * 60_000_000);
+        assert!(check_not_past(&tonight, false, None, now).is_ok());
+        // A window whose tail runs into the day after the until day is still active.
+        let mut tail = alerts_daily("23:00", 3 * 3_600, 0).schedule;
+        tail.ends_at = Some(9 * day + 23 * HOUR + 59 * 60_000_000);
+        assert!(check_not_past(&tail, false, None, 10 * day + HOUR).is_ok());
+    }
+
+    #[test]
+    fn an_unchanged_or_started_stored_schedule_skips_the_past_rule() {
+        let now = 20 * HOUR;
+        let stored = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        assert!(check_not_past(&stored.schedule, false, Some(&stored), now).is_ok());
+        let mut aliased = stored.schedule.clone();
+        aliased.timezone = "Etc/UTC".to_string();
+        assert!(check_not_past(&aliased, false, Some(&stored), now).is_ok());
+        let not_started = row(vec![TargetModule::Alerts], 30 * HOUR, 32 * HOUR);
+        let moved_back = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR).schedule;
+        assert!(is_end_in_past(check_not_past(
+            &moved_back,
+            false,
+            Some(&not_started),
+            now
+        )));
+        // An active row whose end moves to exactly now passes; the started-edit rule owns it.
+        let active = row(vec![TargetModule::Alerts], 10 * HOUR, 22 * HOUR);
+        let to_now = row(vec![TargetModule::Alerts], 10 * HOUR, now).schedule;
+        assert!(check_not_past(&to_now, false, Some(&active), now).is_ok());
+    }
+
+    #[test]
+    fn a_recurring_row_between_two_windows_has_started() {
+        let d = alerts_daily("02:00", 3_600, 0);
+        assert!(!first_window_started(&d.schedule, HOUR));
+        assert!(first_window_started(&d.schedule, 2 * HOUR));
+        assert!(first_window_started(&d.schedule, 12 * HOUR));
+        let one_time = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        assert!(!first_window_started(&one_time.schedule, 10 * HOUR - 1));
+        assert!(first_window_started(&one_time.schedule, 10 * HOUR));
+    }
+
+    #[test]
+    fn timezone_names_are_stored_canonically() {
+        assert_eq!(canonical_timezone("Asia/Calcutta"), "Asia/Kolkata");
+        assert_eq!(canonical_timezone("Etc/UTC"), "UTC");
+        assert_eq!(canonical_timezone("Asia/Kolkata"), "Asia/Kolkata");
+        assert_eq!(canonical_timezone("Nope/Zone"), "Nope/Zone");
+        let groups: Vec<config::meta::correlation::FieldAlias> = vec![];
+        let mut bad = request_of(&row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR));
+        bad.schedule.timezone = canonical_timezone("Nope/Zone");
+        assert!(
+            validate(&bad, &groups).is_err(),
+            "an invalid zone is still refused"
+        );
+    }
+
+    #[test]
+    fn same_schedule_compares_zones_canonically_and_weekdays_as_a_set() {
+        let mut a = alerts_daily("02:00", 3_600, 0).schedule;
+        a.repeat = Repeat::Weekly;
+        a.weekdays = vec![5, 1, 3];
+        a.timezone = "Asia/Calcutta".to_string();
+        let mut b = a.clone();
+        b.weekdays = vec![1, 3, 5];
+        b.timezone = "Asia/Kolkata".to_string();
+        assert!(same_schedule(&a, &b));
+        let mut moved = b.clone();
+        moved.starts_at += HOUR;
+        assert!(!same_schedule(&a, &moved));
+        let mut other_day = b.clone();
+        other_day.weekdays = vec![1, 3];
+        assert!(!same_schedule(&a, &other_day));
+    }
+
+    #[test]
+    fn extensions_store_the_canonical_zone() {
+        let mut parent = alerts_daily("10:00", 2 * 3_600, 0);
+        parent.schedule.timezone = "Asia/Calcutta".to_string();
+        let follow = follow_up(&parent, 12 * HOUR, 13 * HOUR, "ops", 11 * HOUR);
+        assert_eq!(follow.schedule.timezone, "Asia/Kolkata");
+        let mut once = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        once.schedule.timezone = "Asia/Calcutta".to_string();
+        let extended = extended_once(&once, 13 * HOUR, "ops", 11 * HOUR);
+        assert_eq!(extended.schedule.timezone, "Asia/Kolkata");
+    }
+
+    #[test]
+    fn a_parent_with_a_live_extension_is_not_deleted() {
+        let day = 24 * HOUR;
+        let mut parent = alerts_daily("10:00", 2 * 3_600, 0);
+        parent.schedule.ends_at = Some(23 * HOUR + 59 * 60_000_000);
+        let live = follow_up(&parent, 12 * HOUR, 14 * HOUR, "ops", 11 * HOUR);
+        let now = 13 * HOUR;
+        assert!(matches!(
+            schedule::status(&parent.schedule, None, now),
+            DowntimeStatus::Ended
+        ));
+        let rows = [parent.clone(), live.clone()];
+        assert!(matches!(
+            check_no_live_follow_up(&rows, &parent.id, now),
+            Err(DowntimeError::Conflict(m)) if m == EXTENSION_RUNNING
+        ));
+        assert!(check_deletable(&parent, now).is_ok());
+        let ended = cancelled(&live, "ops", now);
+        assert!(check_no_live_follow_up(&[parent.clone(), ended], &parent.id, now).is_ok());
+        assert!(check_no_live_follow_up(&rows, &parent.id, 14 * HOUR).is_ok());
+        assert!(
+            check_cancellable(&live, now).is_ok(),
+            "End now on the extension works"
+        );
+        let _ = day;
+    }
+
+    #[test]
+    fn an_exhausted_series_is_deletable_unless_it_corrected_slo_data() {
+        let mut plain = alerts_daily("02:00", 3_600, 0);
+        plain.schedule.ends_at = Some(23 * HOUR + 59 * 60_000_000);
+        assert!(check_deletable(&plain, 10 * HOUR).is_ok());
+        let mut slo = plain.clone();
+        slo.targets = row(vec![TargetModule::Slos], 0, 0).targets;
+        assert!(matches!(
+            check_deletable(&slo, 10 * HOUR),
+            Err(DowntimeError::Conflict(_))
+        ));
+        let mut never_ran = slo.clone();
+        never_ran.cancelled_at = Some(HOUR);
+        assert!(check_deletable(&never_ran, 10 * HOUR).is_ok());
+    }
+
+    #[test]
+    fn a_finished_row_cannot_be_edited() {
+        let now = 20 * HOUR;
+        let ended = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        let mut early = row(vec![TargetModule::Alerts], 10 * HOUR, 22 * HOUR);
+        early.cancelled_at = Some(11 * HOUR);
+        let mut cancelled = row(vec![TargetModule::Alerts], 30 * HOUR, 32 * HOUR);
+        cancelled.cancelled_at = Some(11 * HOUR);
+        for finished in [&ended, &early, &cancelled] {
+            assert!(matches!(
+                check_editable(finished, now),
+                Err(DowntimeError::Conflict(m)) if m == FINISHED
+            ));
+        }
+        let active = row(vec![TargetModule::Alerts], 10 * HOUR, 22 * HOUR);
+        let scheduled = row(vec![TargetModule::Alerts], 30 * HOUR, 32 * HOUR);
+        assert!(check_editable(&active, now).is_ok());
+        assert!(check_editable(&scheduled, now).is_ok());
+    }
+
+    #[test]
+    fn an_update_must_send_its_version() {
+        assert!(matches!(
+            require_version(None),
+            Err(DowntimeError::BadRequest(m)) if m == VERSION_REQUIRED
+        ));
+        assert!(require_version(Some(3)).is_ok());
+    }
+
+    #[test]
+    fn the_recurring_extend_follow_up_takes_no_place() {
+        assert!(!extend_needs_room(&alerts_daily("02:00", 3_600, 0)));
+        assert!(extend_needs_room(&row(vec![TargetModule::Alerts], 0, HOUR)));
+    }
+
+    fn started_slo_daily() -> Downtime {
+        let mut d = alerts_daily("10:00", 2 * 3_600, 0);
+        d.targets = row(vec![TargetModule::Alerts, TargetModule::Slos], 0, 0).targets;
+        d
+    }
+
+    fn is_started_refusal(r: Result<(), DowntimeError>) -> bool {
+        matches!(r, Err(DowntimeError::Conflict(m)) if m == STARTED)
+    }
+
+    #[test]
+    fn every_locked_field_is_refused_after_the_first_window() {
+        let before = started_slo_daily();
+        let now = 24 * HOUR + 11 * HOUR;
+        let edit = |f: &dyn Fn(&mut DowntimeRequest)| {
+            let mut req = request_of(&before);
+            f(&mut req);
+            check_started_edit(&before, &req, now)
+        };
+        assert!(edit(&|_| {}).is_ok(), "an unchanged request passes");
+        assert!(is_started_refusal(edit(&|r| r.schedule.starts_at += HOUR)));
+        assert!(is_started_refusal(edit(
+            &|r| r.schedule.repeat = Repeat::Weekly
+        )));
+        assert!(is_started_refusal(edit(
+            &|r| r.schedule.start_time_local = Some("10:45".into())
+        )));
+        assert!(is_started_refusal(edit(
+            &|r| r.schedule.timezone = "Asia/Kolkata".into()
+        )));
+        assert!(is_started_refusal(edit(&|r| r.schedule.weekdays = vec![1])));
+        assert!(is_started_refusal(edit(
+            &|r| r.schedule.duration_secs = 3_600
+        )));
+        assert!(is_started_refusal(edit(
+            &|r| r.schedule.duration_secs = 3 * 3_600
+        )));
+        assert!(is_started_refusal(edit(&|r| {
+            r.condition = Some(serde_json::from_value(serde_json::json!({"type": "pair", "key": "service", "operator": "=", "value": "api"})).unwrap());
+        })));
+        assert!(is_started_refusal(edit(&|r| r
+            .targets
+            .retain(|t| t.module != TargetModule::Slos))));
+        assert!(is_started_refusal(edit(&|r| {
+            for t in &mut r.targets {
+                if t.module == TargetModule::Slos {
+                    t.slo_mode = Some(config::meta::downtimes::SloCorrectionMode::CountAsGood);
+                }
+            }
+        })));
+        assert!(edit(&|r| r.reason = Some("new reason".into())).is_ok());
+        assert!(edit(&|r| r.name = Some("renamed".into())).is_ok());
+    }
+
+    #[test]
+    fn adding_an_slo_target_after_the_first_window_is_refused() {
+        let before = alerts_daily("10:00", 2 * 3_600, 0);
+        let mut req = request_of(&before);
+        req.targets = row(vec![TargetModule::Alerts, TargetModule::Slos], 0, 0).targets;
+        assert!(is_started_refusal(check_started_edit(
+            &before,
+            &req,
+            11 * HOUR
+        )));
+        let mut condition = request_of(&before);
+        condition.condition = Some(serde_json::from_value(serde_json::json!({"type": "pair", "key": "service", "operator": "=", "value": "api"})).unwrap());
+        assert!(
+            check_started_edit(&before, &condition, 11 * HOUR).is_ok(),
+            "a row without an SLO target may change its condition"
+        );
+    }
+
+    #[test]
+    fn the_same_edits_pass_before_the_first_window() {
+        let before = started_slo_daily();
+        let start = 10 * HOUR;
+        let mut req = request_of(&before);
+        req.schedule.start_time_local = Some("10:45".into());
+        req.schedule.duration_secs = 3_600;
+        assert!(check_started_edit(&before, &req, start - 1).is_ok());
+        assert!(is_started_refusal(check_started_edit(&before, &req, start)));
+    }
+
+    #[test]
+    fn a_recurring_row_between_two_windows_is_locked() {
+        let before = started_slo_daily();
+        let mut req = request_of(&before);
+        req.schedule.duration_secs = 3_600;
+        assert!(is_started_refusal(check_started_edit(
+            &before,
+            &req,
+            12 * HOUR + HOUR
+        )));
+    }
+
+    #[test]
+    fn a_started_edit_keeps_the_end_at_or_after_now() {
+        let before = row(vec![TargetModule::Slos], 10 * HOUR, 12 * HOUR);
+        let now = 11 * HOUR;
+        let to = |end: i64| {
+            let mut req = request_of(&before);
+            req.schedule.ends_at = Some(end);
+            req.schedule.duration_secs = (end - before.schedule.starts_at) / 1_000_000;
+            check_started_edit(&before, &req, now)
+        };
+        assert!(
+            matches!(to(10 * HOUR + HOUR / 2), Err(DowntimeError::Conflict(m)) if m == END_BEFORE_NOW)
+        );
+        assert!(to(now).is_ok());
+        assert!(to(13 * HOUR).is_ok());
+        let day = 24 * HOUR;
+        let mut series = started_slo_daily();
+        series.schedule.ends_at = Some(5 * day + 23 * HOUR + 59 * 60_000_000);
+        let mut yesterday = request_of(&series);
+        yesterday.schedule.ends_at = Some(2 * day + 23 * HOUR + 59 * 60_000_000);
+        assert!(matches!(
+            check_started_edit(&series, &yesterday, 3 * day + 12 * HOUR),
+            Err(DowntimeError::Conflict(m)) if m == END_BEFORE_NOW
+        ));
+        let mut today = request_of(&series);
+        today.schedule.ends_at = Some(3 * day);
+        assert!(
+            check_started_edit(&series, &today, 3 * day + 12 * HOUR).is_ok(),
+            "until today, sent as midnight"
+        );
+    }
+
+    #[test]
+    fn a_reason_edit_keeps_an_until_day_that_already_passed() {
+        let day = 24 * HOUR;
+        let mut tail = alerts_daily("23:00", 3 * 3_600, 0);
+        tail.schedule.ends_at = Some(9 * day + 23 * HOUR + 59 * 60_000_000);
+        let now = 10 * day + HOUR;
+        let mut reason = request_of(&tail);
+        reason.reason = Some("still in the last window".into());
+        assert!(check_started_edit(&tail, &reason, now).is_ok());
+        let mut same_day = request_of(&tail);
+        same_day.schedule.ends_at = Some(9 * day + 23 * HOUR);
+        assert!(
+            check_started_edit(&tail, &same_day, now).is_ok(),
+            "the same until day sent at another time"
+        );
+        let mut earlier = request_of(&tail);
+        earlier.schedule.ends_at = Some(8 * day + 23 * HOUR + 59 * 60_000_000);
+        assert!(matches!(
+            check_started_edit(&tail, &earlier, now),
+            Err(DowntimeError::Conflict(m)) if m == END_BEFORE_NOW
+        ));
+    }
+
+    #[test]
+    fn reason_edits_of_started_rows_compare_semantically() {
+        let mut stored = started_slo_daily();
+        stored.schedule.timezone = "Asia/Calcutta".to_string();
+        stored.schedule.repeat = Repeat::Weekly;
+        stored.schedule.weekdays = vec![5, 1, 3];
+        for t in &mut stored.targets {
+            t.slo_mode = None;
+        }
+        let mut req = request_of(&stored);
+        req.schedule.timezone = "Asia/Kolkata".to_string();
+        req.schedule.weekdays = vec![1, 3, 5];
+        for t in &mut req.targets {
+            if t.module == TargetModule::Slos {
+                t.slo_mode = Some(config::meta::downtimes::SloCorrectionMode::Exclude);
+            }
+        }
+        req.reason = Some("only the reason".to_string());
+        assert!(check_started_edit(&stored, &req, 30 * 24 * HOUR).is_ok());
+    }
+
+    #[test]
+    fn the_cancel_on_clear_audit_event_names_the_system_cancel() {
+        let msg = cancel_on_clear_audit("acme", "d1", 42);
+        assert_eq!(msg.user_email, SYSTEM_ACTOR);
+        assert_eq!(msg.org_id, "acme");
+        assert_eq!(msg._timestamp, 42);
+        assert_eq!(msg.response_meta.http_method, "POST");
+        assert_eq!(
+            msg.response_meta.http_path,
+            "/api/v2/acme/downtimes/d1/cancel"
+        );
+        assert_eq!(
+            msg.response_meta.http_body,
+            r#"{"reason":"cancel_on_clear"}"#
+        );
+    }
+
     #[test]
     fn banner_counts_come_from_the_cache_until_the_row_changes() {
         let mut d = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
@@ -1854,7 +2515,7 @@ mod tests {
     fn a_row_that_corrected_slices_cannot_be_deleted_but_one_cancelled_before_its_window_can() {
         let ran = row(vec![TargetModule::Slos], 10 * HOUR, 12 * HOUR);
         let err = check_deletable(&ran, 13 * HOUR).unwrap_err();
-        assert!(err.to_string().contains("corrected SLO slices"));
+        assert!(err.to_string().contains(SLO_HISTORY));
 
         let mut never_ran = row(vec![TargetModule::Slos], 10 * HOUR, 12 * HOUR);
         never_ran.cancelled_at = Some(9 * HOUR);
@@ -2865,35 +3526,151 @@ mod tests {
     fn an_edit_or_extend_checks_the_scope_only_when_it_changed() {
         let all = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
         assert!(
-            scope_changed(None, &all.targets, None),
+            scope_changed(None, &all.targets, None, None),
             "a create checks it"
         );
         assert!(
-            !scope_changed(Some(&all), &all.targets, all.condition.as_ref()),
+            !scope_changed(Some(&all), &all.targets, all.condition.as_ref(), None),
             "a rename or extend"
         );
         let extended = extended_once(&all, 13 * HOUR, "ops", 11 * HOUR);
         assert!(!scope_changed(
             Some(&all),
             &extended.targets,
-            extended.condition.as_ref()
+            extended.condition.as_ref(),
+            extended.alert_groups.as_deref()
         ));
         let mut some = all.clone();
         some.targets[0].folders = TargetFolders::Some {
             folder_ids: vec!["ops".to_string()],
         };
         assert!(
-            scope_changed(Some(&some), &all.targets, None),
+            scope_changed(Some(&some), &all.targets, None, None),
             "widened to All"
         );
         let mut with_id = some.targets.clone();
         with_id[0].ids = vec!["a1".to_string()];
-        assert!(scope_changed(Some(&some), &with_id, None));
+        assert!(scope_changed(Some(&some), &with_id, None, None));
         let mut narrowed = all.clone();
         narrowed.condition = Some(serde_json::from_value(serde_json::json!({"type": "pair", "key": "service", "operator": "=", "value": "api"})).unwrap());
         assert!(
-            scope_changed(Some(&narrowed), &narrowed.targets, None),
+            scope_changed(Some(&narrowed), &narrowed.targets, None, None),
             "dropping the condition widens to every alert"
+        );
+    }
+
+    fn group_of(alert_id: &str, key: &str, label: Option<&str>) -> AlertGroupRef {
+        AlertGroupRef {
+            alert_id: alert_id.to_string(),
+            group_key: key.to_string(),
+            group_labels: label.map(|v| [("region".to_string(), v.to_string())].into()),
+        }
+    }
+
+    /// A group-scoped "until it clears" mute of alert a1, which also names a2.
+    fn group_scoped_row() -> Downtime {
+        let mut stored = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        stored.targets[0].ids = vec!["a1".to_string(), "a2".to_string()];
+        stored.alert_groups = Some(vec![group_of("a1", "k1", Some("pune"))]);
+        stored.end_on_clear = Some(EndOnClear {
+            alert_id: "a1".to_string(),
+            group_key: Some("k1".to_string()),
+        });
+        stored
+    }
+
+    /// What `checked_request` does before it compares the scope (D8).
+    fn merged(stored: &Downtime, mut req: DowntimeRequest) -> DowntimeRequest {
+        req.keep_omitted(stored);
+        req
+    }
+
+    fn changes_scope(stored: &Downtime, req: &DowntimeRequest) -> bool {
+        scope_changed(
+            Some(stored),
+            &req.targets,
+            req.condition.as_ref(),
+            req.groups(),
+        )
+    }
+
+    #[test]
+    fn an_edit_that_omits_the_group_fields_keeps_them() {
+        let stored = group_scoped_row();
+        let mut older = request_of(&stored);
+        older.alert_groups = None;
+        older.end_on_clear = None;
+        older.reason = Some("Deploy of v2.3".to_string());
+        let req = merged(&stored, older);
+        assert!(
+            !changes_scope(&stored, &req),
+            "a reason edit keeps the scope"
+        );
+        assert!(req.check_alert_targets().is_ok());
+        let after = edited(&stored, req, "ops", 11 * HOUR);
+        assert_eq!(after.alert_groups, stored.alert_groups);
+        assert_eq!(after.end_on_clear, stored.end_on_clear);
+    }
+
+    #[test]
+    fn an_explicit_null_clears_the_group_fields_and_checks_the_scope() {
+        let stored = group_scoped_row();
+        let mut cleared = request_of(&stored);
+        cleared.alert_groups = Some(None);
+        cleared.end_on_clear = Some(None);
+        let req = merged(&stored, cleared);
+        assert!(changes_scope(&stored, &req), "mute all groups widens");
+        let after = edited(&stored, req, "ops", 11 * HOUR);
+        assert!(after.alert_groups.is_none() && after.end_on_clear.is_none());
+    }
+
+    #[test]
+    fn only_the_group_keys_decide_a_group_scope_change() {
+        let mut stored = group_scoped_row();
+        stored.alert_groups = Some(vec![
+            group_of("a1", "k1", Some("pune")),
+            group_of("a1", "k2", None),
+        ]);
+        let mut reordered = request_of(&stored);
+        reordered.alert_groups = Some(Some(vec![
+            group_of("a1", "k2", Some("delhi")),
+            group_of("a1", "k1", None),
+        ]));
+        assert!(!changes_scope(&stored, &merged(&stored, reordered)));
+        let mut other_key = request_of(&stored);
+        other_key.alert_groups = Some(Some(vec![group_of("a1", "k3", None)]));
+        assert!(changes_scope(&stored, &merged(&stored, other_key)));
+        let mut other_alert = request_of(&stored);
+        other_alert.alert_groups = Some(Some(vec![
+            group_of("a2", "k1", None),
+            group_of("a1", "k2", None),
+        ]));
+        assert!(changes_scope(&stored, &merged(&stored, other_alert)));
+        let mut none = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        none.alert_groups = None;
+        let mut empty = request_of(&none);
+        empty.alert_groups = Some(Some(vec![]));
+        assert!(
+            !changes_scope(&none, &merged(&none, empty)),
+            "none equals empty"
+        );
+    }
+
+    #[test]
+    fn an_omitted_group_field_still_must_name_a_targeted_alert() {
+        let stored = group_scoped_row();
+        let mut removed = request_of(&stored);
+        removed.alert_groups = None;
+        removed.end_on_clear = None;
+        removed.targets[0].ids = vec!["a2".to_string()];
+        let req = merged(&stored, removed);
+        assert!(req.check_alert_targets().is_err());
+        let mut dropped_end = request_of(&stored);
+        dropped_end.targets[0].ids = vec!["a2".to_string()];
+        dropped_end.alert_groups = Some(None);
+        assert!(
+            merged(&stored, dropped_end).check_alert_targets().is_err(),
+            "until it clears still names a1"
         );
     }
 
@@ -2910,7 +3687,7 @@ mod tests {
         assert!(check_version(Some(3), &stored).is_ok());
         assert!(
             check_version(None, &stored).is_ok(),
-            "a request without it keeps today's rule"
+            "an extend without it keeps today's rule; update refuses it in require_version"
         );
         let body: DowntimeRequest = serde_json::from_value(serde_json::json!({
             "targets": [],

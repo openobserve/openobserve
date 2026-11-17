@@ -179,8 +179,10 @@ export interface DowntimeRequest {
   notifications?: DowntimeNotifications;
   /** The loaded row's version; a newer stored row answers 409. */
   version?: number;
-  alert_groups?: AlertGroupRef[];
-  end_on_clear?: EndOnClear;
+  /** Omitted keeps the stored value on an edit; null clears it. */
+  alert_groups?: AlertGroupRef[] | null;
+  /** Omitted keeps the stored value on an edit; null clears it. */
+  end_on_clear?: EndOnClear | null;
 }
 
 /** Exactly one of the two, with the loaded row's version when known. */
@@ -218,6 +220,8 @@ export interface ResourcesRequest {
 
 export interface ResourceValue {
   value: string;
+  /** Display name for a `service` value; conditions always store `value`. */
+  label?: string;
   last_seen: number;
   streams: string[];
 }
@@ -239,6 +243,8 @@ export interface ValuesRequest {
 
 export interface ValueSuggestion {
   value: string;
+  /** Display name for a `service` value; conditions always store `value`. */
+  label?: string;
   source: "inventory" | "registry" | "search";
   /** Alerts, anomaly detections and SLOs whose identity carries this value. */
   items: number;

@@ -68,6 +68,7 @@ async fn cache_and_announce(stored: &SystemSetting) {
         .write()
         .await
         .insert(cache_k.clone(), stored.clone());
+    refresh_dependents(stored.org_id.as_deref(), &stored.setting_key).await;
 
     let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
     if let Err(e) = infra::coordinator::emit_put(&event_key).await {
@@ -84,6 +85,7 @@ async fn uncache_and_announce(
 ) {
     let cache_k = cache_key(scope, org_id, user_id, key);
     SYSTEM_SETTINGS.write().await.remove(&cache_k);
+    refresh_dependents(org_id, key).await;
 
     let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
     if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
@@ -743,6 +745,18 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
     }
 }
 
+/// Rebuilds what is parsed from a setting once its cached row changed.
+async fn refresh_dependents(org_id: Option<&str>, key: &str) {
+    #[cfg(feature = "enterprise")]
+    if key == config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS
+        && let Some(org_id) = org_id
+    {
+        super::service_identity::refresh_fields(org_id).await;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, key);
+}
+
 /// Caches what an org's semantic-groups miss means and returns it; `None` when left uncached.
 async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting> {
     use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
@@ -844,6 +858,7 @@ async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>
                             .write()
                             .await
                             .insert(cache_k.to_string(), setting);
+                        refresh_dependents(org_id, key).await;
                         log::debug!("Updated system setting in cache: {}", cache_k);
                     }
                     Ok(None) => {
@@ -863,6 +878,9 @@ async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>
                     }
                 };
                 SYSTEM_SETTINGS.write().await.remove(cache_k);
+                if let [_, org, _, key] = cache_k.split(':').collect::<Vec<_>>()[..] {
+                    refresh_dependents((org != "_").then_some(org), key).await;
+                }
                 log::debug!("Removed system setting from cache: {}", cache_k);
             }
             super::Event::Empty => {}
@@ -1209,6 +1227,75 @@ mod tests {
             get_default_gen_ai_agent_mapping_config()
         );
         SYSTEM_SETTINGS.write().await.remove(&key);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn semantic_group_changes_rebuild_the_cached_identity_fields() {
+        use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
+        use o2_enterprise::enterprise::service_identity::fields::{IdentityFields, Need};
+
+        use super::super::service_identity::get_cached_fields;
+
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let org = "s10-identity-fields";
+        let _ = delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
+        // admin fields follow the standard environment keys, which are always read first (D249)
+        let admin_env =
+            |fields: &Arc<IdentityFields>| fields.fields(Need::Env).last().map(|f| f.flat.clone());
+        let defaults = admin_env(&get_cached_fields(org).await);
+        assert_ne!(defaults.as_deref(), Some("service_app_stage"));
+
+        let groups = vec![FieldAlias::new(
+            "environment",
+            "Environment",
+            &["service_app.stage"],
+        )];
+        set(&SystemSetting::new_org(
+            org,
+            SEMANTIC_FIELD_GROUPS,
+            json!(groups),
+        ))
+        .await
+        .unwrap();
+        let saved = admin_env(&get_cached_fields(org).await);
+        assert_eq!(saved.as_deref(), Some("service_app_stage"));
+
+        // Another node's save arrives as a watch event after the row is in the database.
+        let other = vec![FieldAlias::new(
+            "environment",
+            "Environment",
+            &["service_tier"],
+        )];
+        db::set(&SystemSetting::new_org(
+            org,
+            SEMANTIC_FIELD_GROUPS,
+            json!(other),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(admin_env(&get_cached_fields(org).await), saved);
+        let key = cache_key(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS);
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
+        tx.send(infra::db::Event::Put(infra::db::EventData {
+            key: format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{key}"),
+            value: None,
+            start_dt: None,
+        }))
+        .await
+        .unwrap();
+        drop(tx);
+        watch_events(Arc::new(rx)).await.unwrap();
+        assert_eq!(
+            admin_env(&get_cached_fields(org).await).as_deref(),
+            Some("service_tier")
+        );
+
+        delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+            .await
+            .unwrap();
+        assert_eq!(admin_env(&get_cached_fields(org).await), defaults);
     }
 
     #[test]

@@ -879,6 +879,41 @@ describe("AppErrors", () => {
       // Default from useErrorTracking: relativeTimePeriod "15m"
       expect(errorTrackingState.data.datetime.relativeTimePeriod).toBe("15m");
     });
+
+    const drawerLink = {
+      cmp: "0.0.2..0.0.1",
+      cmpSvc: "storefront",
+      cmpWhere: "env:prod",
+      cmpDeploy: "deploy-1",
+    };
+
+    it("keeps a copied compare-drawer link open when the page rewrites its URL on load", async () => {
+      ({ wrapper, router } = await mountAppErrors({
+        routeQuery: { period: "15m", ...drawerLink },
+      }));
+      await flushPromises();
+
+      expect(router.currentRoute.value.query).toMatchObject({
+        period: "15m",
+        org_identifier: "default",
+        ...drawerLink,
+      });
+    });
+
+    it("keeps the open compare drawer when a query refresh or filter change rewrites the URL", async () => {
+      ({ wrapper, router } = await mountAppErrors({
+        routeQuery: { period: "15m", ...drawerLink },
+      }));
+      await flushPromises();
+
+      await wrapper.find('[data-test="errors-run-query-button"]').trigger("click");
+      await flushPromises();
+      expect(router.currentRoute.value.query).toMatchObject(drawerLink);
+
+      await wrapper.findComponent({ name: "ErrorsFilterBar" }).vm.$emit("update:status", "new");
+      await flushPromises();
+      expect(router.currentRoute.value.query).toMatchObject({ status: "new", ...drawerLink });
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────

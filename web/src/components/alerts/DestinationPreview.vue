@@ -21,6 +21,13 @@ limitations under the License.
     data-test="destination-preview-dialog"
   >
     <div data-test="destination-preview-card" class="w-full">
+      <p
+        v-if="genericSample"
+        data-test="destination-preview-generic-note"
+        class="text-text-secondary m-0 mb-3 text-xs"
+      >
+        {{ t("alert_destinations.previewGenericSampleNote") }}
+      </p>
       <!-- Mock preview of the server-rendered alert, which is not localised: every string here is deliberately raw. -->
       <!-- Slack Preview -->
       <div
@@ -450,6 +457,8 @@ interface Props {
   templateContent?: string;
   recipients?: string[];
   showBody?: boolean;
+  /** The preview is a fixed sample, not the destination's template. */
+  genericSample?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -457,6 +466,7 @@ const props = withDefaults(defineProps<Props>(), {
   templateContent: "",
   recipients: () => [],
   showBody: false,
+  genericSample: false,
 });
 
 // The mockups show fixed sample content, so a picked template shows its own body instead.

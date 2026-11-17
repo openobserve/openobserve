@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { liveQuery } from "@/components/autoobserve/v2/autoobserveRoute";
 import type { RouteLocationRaw } from "vue-router";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type {
@@ -203,7 +204,7 @@ const serviceRoute = (s: AutoObserveSuggestion): InsightTarget => ({
   type: "route",
   to: {
     name: "autoobserve",
-    query: { org_identifier: s.org, page: "coverage", service: serviceOf(s) },
+    query: liveQuery({ org_identifier: s.org, page: "coverage", service: serviceOf(s) }),
   },
 });
 
@@ -862,7 +863,10 @@ export const gapGroupCopy = (
   const unique = [...new Map(rows.map((r) => [r.key, r])).values()];
   const review = ctaOf(t, "reviewServices", {
     type: "route",
-    to: { name: "autoobserve", query: { org_identifier: gaps[0]?.org, page: "coverage" } },
+    to: {
+      name: "autoobserve",
+      query: liveQuery({ org_identifier: gaps[0]?.org, page: "coverage" }),
+    },
   });
   const cta = unique.length
     ? ctaOf(

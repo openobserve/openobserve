@@ -175,6 +175,11 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "SC 1.4.3 exempts text and boundaries that belong to a disabled, inactive control",
   },
   {
+    fg: "--color-switch-border-off-neutral",
+    category: "non-text",
+    why: "SC 1.4.11: the solid grey outline is what identifies an Off switch on the page surface",
+  },
+  {
     fg: "--color-switch-disabled-border",
     category: "exempt",
     why: "SC 1.4.3 exempts text and boundaries that belong to a disabled, inactive control",
@@ -224,6 +229,11 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     fg: "--color-toast-warning-border",
     category: "exempt",
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
+  },
+  {
+    fg: "--color-toggle-item-active-border",
+    category: "exempt",
+    why: "SC 1.4.11 decorative: the selected segment is identified by its fill and text colour; the hairline is a quiet edge on that fill, not the state cue",
   },
   {
     fg: "--color-tooltip-border",
@@ -284,8 +294,20 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   {
     fg: "--color-timeline-dot-fg",
     bg: "--color-timeline-dot-primary",
-    category: "non-text",
-    why: "the glyph is drawn inside the timeline dot",
+    category: "text",
+    why: "a timeline label pill draws its time inside the dot",
+  },
+  {
+    fg: "--color-timeline-dot-fg",
+    bg: "--color-timeline-dot-success",
+    category: "text",
+    why: "a timeline label pill draws its time inside the dot",
+  },
+  {
+    fg: "--color-timeline-dot-fg",
+    bg: "--color-timeline-dot-info",
+    category: "text",
+    why: "a timeline label pill draws its time inside the dot",
   },
   {
     fg: "--color-badge-amber-ol-border",
@@ -508,14 +530,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
-    fg: "--color-checkbox-checked-fg",
-    bg: "--color-checkbox-checked-bg",
-    category: "pending",
-    why: "the tick is drawn inside the checked box",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
-  },
-  {
     fg: "--color-checkbox-hover-border",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
@@ -579,22 +593,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
-    fg: "--color-datepicker-clock-selected-text",
-    bg: "--color-datepicker-clock-selected-bg",
-    category: "pending",
-    why: "a selected clock number sits on the selection fill",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
-  },
-  {
-    fg: "--color-datepicker-day-selected-text",
-    bg: "--color-datepicker-day-selected-bg",
-    category: "pending",
-    why: "a selected day sits on the selection fill",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
-  },
-  {
     fg: "--color-datepicker-day-today-border",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
@@ -614,14 +612,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "fails the threshold against the page surface it is painted on",
     issue: "WCAG-AA colour remediation (follow-up PR)",
     themes: ["light"],
-  },
-  {
-    fg: "--color-datepicker-relative-btn-selected-text",
-    bg: "--color-datepicker-relative-btn-selected-bg",
-    category: "pending",
-    why: "a selected preset sits on the selection fill",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
   },
   {
     fg: "--color-datepicker-segment-focus-text",
@@ -791,14 +781,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["dark"],
   },
   {
-    fg: "--color-pagination-item-active-text",
-    bg: "--color-pagination-item-active-bg",
-    category: "pending",
-    why: "the current page number sits on the active fill",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
-  },
-  {
     fg: "--color-progress-bar-label",
     bg: "--color-progress-bar-track",
     category: "pending",
@@ -891,18 +873,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["dark"],
   },
   {
-    fg: "--color-text-label",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-  },
-  {
-    fg: "--color-text-muted",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-  },
-  {
     fg: "--color-thread-tool-link",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
@@ -911,13 +881,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   },
   {
     fg: "--color-timeline-dot-muted",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["light"],
-  },
-  {
-    fg: "--color-timeline-dot-success",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
     issue: "WCAG-AA colour remediation (follow-up PR)",
@@ -1073,7 +1036,8 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     fg: "--color-checkbox-checked-fg",
     bg: "--color-checkbox-checked-bg",
     category: "text",
-    why: "the tick is drawn inside the checked box",
+    why: "the tick is drawn inside the checked box; in dark it is the primary button's foreground, judged on the button",
+    themes: ["light"],
   },
   {
     fg: "--color-copy-confirm-text",
@@ -1169,19 +1133,22 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     fg: "--color-datepicker-clock-selected-text",
     bg: "--color-datepicker-clock-selected-bg",
     category: "text",
-    why: "a selected clock number sits on the selection fill",
+    why: "a selected clock number sits on the selection fill; in dark it is the primary button's foreground, judged on the button",
+    themes: ["light"],
   },
   {
     fg: "--color-datepicker-day-selected-text",
     bg: "--color-datepicker-day-selected-bg",
     category: "text",
-    why: "a selected day sits on the selection fill",
+    why: "a selected day sits on the selection fill; in dark it is the primary button's foreground, judged on the button",
+    themes: ["light"],
   },
   {
     fg: "--color-datepicker-relative-btn-selected-text",
     bg: "--color-datepicker-relative-btn-selected-bg",
     category: "text",
-    why: "a selected preset sits on the selection fill",
+    why: "a selected preset sits on the selection fill; in dark it is the primary button's foreground, judged on the button",
+    themes: ["light"],
   },
   {
     fg: "--color-datepicker-segment-focus-text",
@@ -1376,7 +1343,8 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     fg: "--color-pagination-item-active-text",
     bg: "--color-pagination-item-active-bg",
     category: "text",
-    why: "the current page number sits on the active fill",
+    why: "the current page number sits on the active fill; in dark it is the primary button's foreground, judged on the button",
+    themes: ["light"],
   },
   {
     fg: "--color-progress-bar-label",

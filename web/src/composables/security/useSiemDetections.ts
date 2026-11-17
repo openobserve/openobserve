@@ -103,10 +103,10 @@ export function useSiemDetections() {
     }
   }
 
-  /** Fetches one alert in full (rule YAML included) and merges it into the list. */
-  async function loadFull(orgId: string, id: string) {
+  /** Fetches one alert in full (rule YAML included) and merges it into the list; `force` after an edit. */
+  async function loadFull(orgId: string, id: string, force = false) {
     const current = alerts.value.find((row) => row.id === id);
-    if (!orgId || !current || current.context_attributes?.sigma_yaml) return;
+    if (!orgId || !current || (current.context_attributes?.sigma_yaml && !force)) return;
     try {
       const res = await alertsService.get_by_alert_id(orgId, id);
       const full = { ...current, ...(res.data ?? {}), id };

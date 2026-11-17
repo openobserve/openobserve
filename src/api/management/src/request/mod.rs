@@ -84,7 +84,9 @@ pub mod score_configs;
 pub mod scorers;
 pub mod security;
 pub mod service_accounts;
+pub mod service_identity;
 pub mod service_streams;
+pub mod service_versions;
 pub mod short_url;
 pub mod slack;
 pub mod slos;
@@ -112,6 +114,7 @@ pub(super) enum LoginFailure {
     InvalidLoginLink,
     LoginLinkExpired,
     InvalidLoginState,
+    LoginStateStoreFailed,
     TokenExchangeFailed,
     TokenValidationFailed,
     LoginPolicyDenied,
@@ -131,6 +134,7 @@ impl LoginFailure {
             Self::InvalidLoginLink => "invalid_login_link",
             Self::LoginLinkExpired => "login_link_expired",
             Self::InvalidLoginState => "invalid_login_state",
+            Self::LoginStateStoreFailed => "login_state_store_failed",
             Self::TokenExchangeFailed => "token_exchange_failed",
             Self::TokenValidationFailed => "token_validation_failed",
             Self::LoginPolicyDenied => "login_policy_denied",

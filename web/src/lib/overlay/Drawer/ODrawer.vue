@@ -183,6 +183,7 @@ const overlayZIndex = computed(() => 5999 + drawerDepth * 1000);
 const contentZIndex = computed(() => 6000 + drawerDepth * 1000);
 
 // Header renders when there is a header slot, a title, any sub-slot, OR a visible close button.
+const subtitleInHeader = computed(() => hasHeader.value && !slots.header);
 const hasHeader = computed(
   () =>
     !!slots.header ||
@@ -431,7 +432,7 @@ watch(shown, (open) => {
           seamless ? 'pointer-events-none bg-transparent' : 'bg-dialog-overlay',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          'data-[state=closed]:duration-120 data-[state=open]:duration-120',
+          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=open]:duration-(--duration-dialog-in)',
         ]"
         :style="overlayStyle"
       />
@@ -439,6 +440,7 @@ watch(shown, (open) => {
       <!-- Drawer panel -->
       <DialogContent
         :force-mount="inline ? true : undefined"
+        v-bind="subTitle && subtitleInHeader ? {} : { 'aria-describedby': undefined }"
         data-o2-drawer
         :data-test="parentDataTest || 'o-drawer-panel'"
         :style="contentStyle"
@@ -456,11 +458,9 @@ watch(shown, (open) => {
           isRight
             ? 'border-dialog-border border-s border-t'
             : 'border-dialog-border border-e border-t',
-          'shadow-lg',
+          'shadow-dialog',
           // Focus ring
           'focus-visible:ring-dialog-focus-ring outline-none focus-visible:ring-2',
-          // Slide-in animation — direction matches side.
-          // Strong decel curve so it shoots in (170ms) and settles; exit is quicker (120ms).
           isRight
             ? [
                 'data-[state=open]:animate-in data-[state=open]:slide-in-from-right',
@@ -470,8 +470,8 @@ watch(shown, (open) => {
                 'data-[state=open]:animate-in data-[state=open]:slide-in-from-left',
                 'data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left',
               ],
-          'data-[state=open]:duration-170 data-[state=open]:ease-[cubic-bezier(0.32,0.72,0,1)]',
-          'data-[state=closed]:duration-120 data-[state=closed]:ease-in',
+          'data-[state=open]:duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
+          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
@@ -482,9 +482,6 @@ watch(shown, (open) => {
         <DialogTitle class="sr-only absolute">
           {{ ariaLabel ?? title ?? t("common.drawer") }}
         </DialogTitle>
-        <DialogDescription class="sr-only absolute">
-          {{ ariaLabel ?? title ?? t("common.drawer") }}
-        </DialogDescription>
 
         <!-- ── Header ───────────────────────────────────────── -->
         <div
@@ -512,13 +509,15 @@ watch(shown, (open) => {
               >
                 {{ title }}
               </OTruncatedText>
-              <OTruncatedText
-                v-if="subTitle"
-                class="text-dialog-content-text mt-0.5 block text-xs opacity-70"
-                :data-test="subTitleDataTest"
-              >
-                {{ subTitle }}
-              </OTruncatedText>
+              <!-- The visible subtitle is the description, so screen readers and text queries meet it once. -->
+              <DialogDescription v-if="subTitle" as-child>
+                <OTruncatedText
+                  class="text-dialog-content-text mt-0.5 block text-xs opacity-70"
+                  :data-test="subTitleDataTest"
+                >
+                  {{ subTitle }}
+                </OTruncatedText>
+              </DialogDescription>
             </div>
 
             <!-- #header-left sub-slot — grows to fill space if present -->

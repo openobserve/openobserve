@@ -6,6 +6,7 @@ import downtimes from "@/services/downtimes";
 import type { DimensionCondition } from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
 import { useDowntimeValueSuggest } from "./useDowntimeValueSuggest";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 vi.mock("@/services/downtimes", () => ({ default: { values: vi.fn() } }));
 
@@ -105,5 +106,56 @@ describe("useDowntimeValueSuggest", () => {
     await expect(make(null, "").loadValues("host", "")).resolves.toEqual([]);
     await expect(make(null).loadValues("", "")).resolves.toEqual([]);
     expect(downtimes.values).not.toHaveBeenCalled();
+  });
+
+  it("names a loaded service value by its display name and keeps the key as the value", async () => {
+    const row = labelRows.differs;
+    vi.mocked(downtimes.values).mockResolvedValue({
+      data: {
+        values: [
+          { value: row.service_name, label: row.display_name, source: "registry", items: 2 },
+          { value: "nats", source: "registry", items: 1 },
+        ],
+        partial: false,
+      },
+    } as any);
+    const { loadValues, labelOf } = make(null);
+    await expect(loadValues("service", "")).resolves.toEqual([row.service_name, "nats"]);
+    expect(labelOf("service", row.service_name)).toBe(row.display_name);
+    expect(labelOf("service", "nats")).toBeUndefined();
+  });
+
+  it("drops a slow answer from the org the user switched away from", async () => {
+    let finishA: (v: unknown) => void = () => {};
+    vi.mocked(downtimes.values).mockImplementation((org: string) =>
+      org === "org-a"
+        ? (new Promise((resolve) => (finishA = resolve)) as any)
+        : Promise.resolve({
+            data: {
+              values: [{ value: "svc-b", label: "Service B", source: "registry", items: 1 }],
+              partial: false,
+            },
+          } as any),
+    );
+    const org = ref("org-a");
+    const scope = effectScope();
+    scopes.push(scope);
+    const suggest = scope.run(() =>
+      useDowntimeValueSuggest(queryClient, org, ref("planned"), ref(null)),
+    )!;
+    const slow = suggest.loadValues("service", "");
+    org.value = "org-b";
+    await nextTick();
+    await suggest.loadValues("service", "");
+    finishA({
+      data: {
+        values: [{ value: "svc-a", label: "Service A", source: "registry", items: 1 }],
+        partial: true,
+      },
+    });
+    await slow;
+    expect(suggest.labelOf("service", "svc-a")).toBeUndefined();
+    expect(suggest.labelOf("service", "svc-b")).toBe("Service B");
+    expect(suggest.partial.value).toBe(false);
   });
 });

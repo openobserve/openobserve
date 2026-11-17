@@ -330,6 +330,23 @@ describe("MemberSubscription.vue", () => {
       expect(wrapper.vm.error).toBe("Subscription failed with http://localhost:3000 error");
     });
 
+    it.each([
+      ["no response at all", new Error("Network Error")],
+      ["a response without a message", { response: { data: {} } }],
+    ])("keeps the error state when the failure has %s", async (_label, mockError) => {
+      mockOrganizationsService.process_subscription.mockRejectedValue(mockError);
+
+      const processSubscriptionSpy = vi.spyOn(wrapper.vm, "ProcessSubscription");
+      processSubscriptionSpy.mockRestore();
+
+      await expect(
+        wrapper.vm.ProcessSubscription("test-token", "confirm"),
+      ).resolves.toBeUndefined();
+
+      expect(wrapper.vm.status).toBe("error");
+      expect(wrapper.vm.error).toBe("");
+    });
+
     it("should replace [BASE_URL] placeholder in error message", async () => {
       const mockError = {
         response: {

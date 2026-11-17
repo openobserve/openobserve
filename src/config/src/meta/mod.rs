@@ -49,6 +49,7 @@ pub mod ratelimit;
 pub mod search;
 pub mod self_reporting;
 pub mod service_graph;
+pub mod service_identity;
 pub mod service_streams;
 pub mod session;
 pub mod short_url;

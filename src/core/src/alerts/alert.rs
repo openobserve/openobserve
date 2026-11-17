@@ -4436,7 +4436,17 @@ async fn build_notification_context(
     } else {
         "".to_owned()
     };
-    let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
+    let detail_url = alert_detail_url(&cfg, alert);
+    // A composite has no stream or query, so its only page is its own.
+    let qc = &alert.query_condition;
+    let opens_itself = alert.stream_name.is_empty()
+        && qc.query_type != QueryType::Slo
+        && qc.sql.is_none()
+        && qc.promql.is_none()
+        && qc.conditions.is_none();
+    let alert_url = if opens_itself {
+        String::new()
+    } else if alert.query_condition.query_type == QueryType::PromQL {
         if let Some(promql) = &alert.query_condition.promql {
             if alert.query_condition.promql_rule_mode {
                 alert_query = promql.clone();
@@ -4528,13 +4538,22 @@ async fn build_notification_context(
         )
     };
 
-    // Shorten the alert url
-    let alert_url = match short_url::shorten(&alert.org_id, &alert_url).await {
-        Ok(short_url) => short_url,
-        Err(e) => {
-            log::error!("Error shortening alert url: {e}");
-            alert_url
-        }
+    let (alert_url, alert_url_label, alert_detail_url, alert_detail_label) = if opens_itself {
+        (detail_url, "Open alert", String::new(), "")
+    } else {
+        let alert_url = match short_url::shorten(&alert.org_id, &alert_url).await {
+            Ok(short_url) => short_url,
+            Err(e) => {
+                log::error!("Error shortening alert url: {e}");
+                alert_url
+            }
+        };
+        let detail_label = if detail_url.is_empty() {
+            ""
+        } else {
+            "Open alert"
+        };
+        (alert_url, data_link_label(alert), detail_url, detail_label)
     };
 
     NotificationContext {
@@ -4590,6 +4609,9 @@ async fn build_notification_context(
         alert_start_time_millis: epoch_millis_or_na(alert_start_time),
         alert_end_time_millis: epoch_millis_or_na(alert_end_time),
         alert_url,
+        alert_url_label: alert_url_label.to_string(),
+        alert_detail_url,
+        alert_detail_label: alert_detail_label.to_string(),
         alert_trigger_time: evaluation_timestamp,
         alert_trigger_time_str: evaluation_timestamp_str,
         alert_description: alert.description.clone(),
@@ -4624,6 +4646,26 @@ async fn build_notification_context(
         chart_png: None,
         cluster_name: config::get_cluster_name(),
         ..Default::default()
+    }
+}
+
+fn alert_detail_url(cfg: &config::Config, alert: &Alert) -> String {
+    crate::alerts::notifications::context::alert_detail_url(
+        &cfg.common.web_url,
+        &cfg.common.base_uri,
+        &alert.org_id,
+        &alert.id.map(|id| id.to_string()).unwrap_or_default(),
+    )
+}
+
+/// The data button label, from the same branches that pick `alert_url`.
+fn data_link_label(alert: &Alert) -> &'static str {
+    match alert.query_condition.query_type {
+        QueryType::Slo => "Open SLO",
+        QueryType::PromQL => "View metrics",
+        _ if alert.stream_type == StreamType::Traces => "View traces",
+        _ if alert.stream_type == StreamType::Metrics => "View metrics",
+        _ => "View logs",
     }
 }
 
@@ -10473,6 +10515,69 @@ mod rule_notification_tests {
             let ctx = build_notification_context("org", &alert, &[], &[], options, None).await;
             assert_eq!(ctx.event, want);
         }
+    }
+
+    fn link_options() -> ProcessTemplateOptions {
+        ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+            episode_id: None,
+            resolved: false,
+        }
+    }
+
+    #[test]
+    fn the_data_label_names_the_page_the_data_link_opens() {
+        let label = |query_type, stream_type| {
+            let mut alert = Alert::default();
+            alert.query_condition.query_type = query_type;
+            alert.stream_type = stream_type;
+            data_link_label(&alert)
+        };
+        assert_eq!(label(QueryType::SQL, StreamType::Logs), "View logs");
+        assert_eq!(label(QueryType::Custom, StreamType::Logs), "View logs");
+        assert_eq!(label(QueryType::SQL, StreamType::Metrics), "View metrics");
+        assert_eq!(
+            label(QueryType::PromQL, StreamType::Metrics),
+            "View metrics"
+        );
+        assert_eq!(label(QueryType::SQL, StreamType::Traces), "View traces");
+        assert_eq!(label(QueryType::Slo, StreamType::Logs), "Open SLO");
+    }
+
+    #[tokio::test]
+    async fn an_alert_gets_the_object_link_and_a_composite_opens_itself() {
+        use svix_ksuid::KsuidLike as _;
+        let id = svix_ksuid::Ksuid::new(None, None);
+        let mut alert = Alert::default();
+        alert.id = Some(id);
+        alert.org_id = "org".into();
+        alert.stream_name = "default".into();
+        alert.query_condition.sql = Some("SELECT * FROM \"default\"".into());
+        let cfg = get_config();
+        let want = crate::alerts::notifications::context::alert_detail_url(
+            &cfg.common.web_url,
+            &cfg.common.base_uri,
+            "org",
+            &id.to_string(),
+        );
+        let ctx = build_notification_context("org", &alert, &[], &[], link_options(), None).await;
+        assert_eq!(ctx.alert_url_label, "View logs");
+        assert_eq!(ctx.alert_detail_url, want);
+        assert_eq!(ctx.alert_detail_label.is_empty(), want.is_empty());
+
+        let mut composite = Alert::default();
+        composite.id = Some(id);
+        composite.org_id = "org".into();
+        let ctx =
+            build_notification_context("org", &composite, &[], &[], link_options(), None).await;
+        assert_eq!(ctx.alert_url, want, "no empty log search");
+        assert_eq!(ctx.alert_url_label, "Open alert");
+        assert!(ctx.alert_detail_url.is_empty());
     }
 
     #[tokio::test]

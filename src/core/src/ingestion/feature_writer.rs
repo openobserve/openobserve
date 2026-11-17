@@ -21,7 +21,7 @@ use config::{
     META_ORG_ID, get_config,
     meta::{
         alerts::alert_calibration::DIGEST_STREAM, autoobserve::AUTOOBSERVE_STREAM_PREFIX,
-        stream::StreamType,
+        service_identity::SERVICE_SIGNALS_STREAM_PREFIX, stream::StreamType,
     },
     utils::base64,
 };
@@ -63,10 +63,15 @@ const ROTATION_FAILED: &str = "The ingestion token was not rotated because the {
 pub enum FeatureWriter {
     AlertCalibration,
     AutoObserve,
+    ServiceSignals,
 }
 
 impl FeatureWriter {
-    pub const ALL: [Self; 2] = [Self::AlertCalibration, Self::AutoObserve];
+    pub const ALL: [Self; 3] = [
+        Self::AlertCalibration,
+        Self::AutoObserve,
+        Self::ServiceSignals,
+    ];
 
     pub fn from_token_name(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|w| w.token_name() == name)
@@ -76,13 +81,14 @@ impl FeatureWriter {
         match self {
             Self::AlertCalibration => "_o2_alert_calibration",
             Self::AutoObserve => "_o2_autoobserve",
+            Self::ServiceSignals => "_o2_service_signals",
         }
     }
 
     /// AutoObserve rows land in `_meta` whatever org they describe, so its token lives there.
     pub fn token_org(self, org: &str) -> &str {
         match self {
-            Self::AlertCalibration => org,
+            Self::AlertCalibration | Self::ServiceSignals => org,
             Self::AutoObserve => META_ORG_ID,
         }
     }
@@ -91,13 +97,22 @@ impl FeatureWriter {
         match self {
             Self::AlertCalibration => stream == DIGEST_STREAM,
             Self::AutoObserve => stream.starts_with(AUTOOBSERVE_STREAM_PREFIX),
+            Self::ServiceSignals => stream.starts_with(SERVICE_SIGNALS_STREAM_PREFIX),
+        }
+    }
+
+    /// Service signals write verdict events as logs and their rollups as metrics.
+    pub fn stream_types(self) -> &'static [StreamType] {
+        match self {
+            Self::AlertCalibration | Self::AutoObserve => &[StreamType::Logs],
+            Self::ServiceSignals => &[StreamType::Logs, StreamType::Metrics],
         }
     }
 
     /// What each writer sent before it had a token: AutoObserve's `Usage` keeps `_meta` unbilled.
     pub fn ingestion_type(self) -> cluster_rpc::IngestionType {
         match self {
-            Self::AlertCalibration => cluster_rpc::IngestionType::Json,
+            Self::AlertCalibration | Self::ServiceSignals => cluster_rpc::IngestionType::Json,
             Self::AutoObserve => cluster_rpc::IngestionType::Usage,
         }
     }
@@ -106,6 +121,7 @@ impl FeatureWriter {
         match self {
             Self::AlertCalibration => SystemJobType::AlertCalibration,
             Self::AutoObserve => SystemJobType::AutoObserve,
+            Self::ServiceSignals => SystemJobType::ServiceSignals,
         }
     }
 
@@ -131,6 +147,7 @@ impl FeatureWriter {
         match self {
             Self::AlertCalibration => "Alert Calibration",
             Self::AutoObserve => "AutoObserve",
+            Self::ServiceSignals => "Service Versions",
         }
     }
 
@@ -258,20 +275,40 @@ pub async fn token(writer: FeatureWriter, org: &str) -> Result<WriterToken, Writ
     })
 }
 
-/// Sends one chunk of JSON rows to `stream` as the token's writer.
+/// Sends one chunk of JSON rows to the log stream `stream` as the token's writer.
 pub async fn write(
     transport: &dyn WriterTransport,
     token: &WriterToken,
     stream: &str,
     data: Vec<u8>,
 ) -> Result<(), WriteError> {
+    send(transport, token, StreamType::Logs, stream, data).await
+}
+
+/// Sends one chunk of JSON metric records, all of them filed under the metric stream `stream`.
+pub async fn write_metrics(
+    transport: &dyn WriterTransport,
+    token: &WriterToken,
+    stream: &str,
+    data: Vec<u8>,
+) -> Result<(), WriteError> {
+    send(transport, token, StreamType::Metrics, stream, data).await
+}
+
+async fn send(
+    transport: &dyn WriterTransport,
+    token: &WriterToken,
+    stream_type: StreamType,
+    stream: &str,
+    data: Vec<u8>,
+) -> Result<(), WriteError> {
     let writer = token.writer;
-    if !writer.allows(stream) {
+    if !writer.allows(stream) || !writer.stream_types().contains(&stream_type) {
         return Err(WriteError::OutOfScope(writer.out_of_scope_message(stream)));
     }
     let mut request = Request::new(IngestionRequest {
         org_id: token.org.clone(),
-        stream_type: StreamType::Logs.as_str().to_string(),
+        stream_type: stream_type.as_str().to_string(),
         stream_name: stream.to_string(),
         data: Some(cluster_rpc::IngestionData { data }),
         ingestion_type: Some(writer.ingestion_type() as i32),
@@ -457,6 +494,11 @@ pub(crate) mod tests {
         assert!(AutoObserve.allows("_o2_autoobserve_stream_silence_decisions"));
         assert!(!AutoObserve.allows(DIGEST_STREAM));
         assert!(!AutoObserve.allows("_o2_dbm_server"));
+        assert!(ServiceSignals.allows("_o2_service_verdicts"));
+        assert!(ServiceSignals.allows("_o2_service_requests_total"));
+        assert!(!ServiceSignals.allows(DIGEST_STREAM));
+        assert!(!ServiceSignals.allows(""));
+        assert_eq!(ServiceSignals.token_org("demo-org"), "demo-org");
         assert_eq!(AlertCalibration.token_org("demo-org"), "demo-org");
         assert_eq!(AutoObserve.token_org("demo-org"), META_ORG_ID);
         for writer in FeatureWriter::ALL {

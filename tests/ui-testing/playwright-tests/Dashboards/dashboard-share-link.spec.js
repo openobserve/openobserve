@@ -339,28 +339,8 @@ test.describe("dashboard share URL button testcases", () => {
       .getVariableSelectorLocator(variableName)
       .waitFor({ state: "visible", timeout: 15000 });
 
-    // Wait for variable loading to complete
-    await pm.dashboardShareExport
-      .getVariableLoadingIndicatorLocator(variableName)
-      .waitFor({ state: "hidden", timeout: 10000 })
-      .catch(() => {});
-
-    // Click the variable dropdown (inner select element)
-    const variableDropdown =
-      pm.dashboardShareExport.getVariableDropdownInner(variableName);
-    await variableDropdown.waitFor({ state: "visible", timeout: 10000 });
-    await variableDropdown.click();
-
-    // Wait for dropdown menu to open
-    await pm.dashboardShareExport
-      .getMenu()
-      .waitFor({ state: "visible", timeout: 5000 });
-
-    // Select the first option
-    const firstOption = pm.dashboardShareExport.getFirstRoleOption();
-    await firstOption.waitFor({ state: "visible", timeout: 5000 });
-    const selectedValue = await firstOption.textContent();
-    await firstOption.click();
+    const selectedValue =
+      await pm.dashboardShareExport.selectFirstVariableValue(variableName);
 
     testLogger.info("Selected variable value:", { selectedValue });
 
@@ -567,23 +547,7 @@ test.describe("dashboard share URL button testcases", () => {
       .getVariableSelectorLocator(variableName)
       .waitFor({ state: "visible", timeout: 15000 });
 
-    // Wait for variable loading to complete
-    await pm.dashboardShareExport
-      .getVariableLoadingIndicatorLocator(variableName)
-      .waitFor({ state: "hidden", timeout: 10000 })
-      .catch(() => {});
-
-    // Click the variable dropdown (inner select element)
-    const variableDropdown =
-      pm.dashboardShareExport.getVariableDropdownInner(variableName);
-    await variableDropdown.waitFor({ state: "visible", timeout: 10000 });
-    await variableDropdown.click();
-
-    // Wait for dropdown menu to open and select first option
-    await pm.dashboardShareExport
-      .getMenu()
-      .waitFor({ state: "visible", timeout: 5000 });
-    await pm.dashboardShareExport.getFirstRoleOption().click();
+    await pm.dashboardShareExport.selectFirstVariableValue(variableName);
 
     // Wait for dropdown to close and selection to apply
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });

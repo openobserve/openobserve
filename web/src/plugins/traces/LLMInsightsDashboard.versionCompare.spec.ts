@@ -134,7 +134,7 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockRouterPush, replace: vi.fn(() => Promise.resolve()) }),
-  useRoute: () => ({ query: {} }),
+  useRoute: () => ({ name: "aiLLMInsights", query: {} }),
 }));
 
 vi.mock("vuex", async (importOriginal) => {

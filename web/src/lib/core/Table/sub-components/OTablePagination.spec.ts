@@ -292,3 +292,35 @@ describe("OTablePagination loading and stale states", () => {
     expect(wrapper.find(INFO).classes()).not.toContain("opacity-60");
   });
 });
+
+const PAGER = [
+  FIRST,
+  '[data-test="o2-table-prev-page-btn"]',
+  NEXT,
+  '[data-test="o2-table-last-page-btn"]',
+];
+
+function heightOf(classes: string[]): string | undefined {
+  return classes.find((name) => /^(h|size)-/.test(name))?.replace(/^size-/, "h-");
+}
+
+describe("OTablePagination footer", () => {
+  afterEach(() => wrapper?.unmount());
+
+  it("gives the pager buttons and the page-size select one height", () => {
+    mountPager({ isFirstPage: false, currentPage: 2 });
+    const select = wrapper.find('[data-test="o2-table-page-size-select-trigger"]');
+    const selectHeight = heightOf(select.classes());
+    expect(selectHeight).toBe("h-7");
+    for (const selector of PAGER) {
+      expect(heightOf(wrapper.find(selector).classes()), selector).toBe(selectHeight);
+    }
+  });
+
+  it("sets the range count in fixed-width secondary digits", () => {
+    mountPager();
+    const info = wrapper.find(INFO);
+    expect(info.classes()).toEqual(expect.arrayContaining(["tabular-nums", "text-text-secondary"]));
+    expect(wrapper.html()).not.toMatch(/\btext-primary\b/);
+  });
+});

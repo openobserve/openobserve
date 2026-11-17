@@ -15,7 +15,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import http from "@/services/http";
-import securityCases, { MAX_LOOKUP_IDS } from "@/services/securityCases";
+import securityCases, {
+  MAX_BULK_IDS,
+  MAX_LOOKUP_IDS,
+  searchQueryOf,
+} from "@/services/securityCases";
 
 vi.mock("@/services/http", () => ({ default: vi.fn() }));
 
@@ -28,6 +32,7 @@ describe("securityCases service", () => {
       post: vi.fn().mockResolvedValue({ data: {} }),
       put: vi.fn().mockResolvedValue({ data: {} }),
       patch: vi.fn().mockResolvedValue({ data: {} }),
+      delete: vi.fn().mockResolvedValue({ data: {} }),
     };
     vi.mocked(http).mockReturnValue(client as any);
   });
@@ -72,5 +77,82 @@ describe("securityCases service", () => {
     const settings = { auto_close_days: 30, group_window_minutes: 60 };
     await securityCases.updateSettings("acme", settings);
     expect(client.put).toHaveBeenCalledWith("/api/acme/security/cases/settings", settings);
+  });
+
+  it("searches cases with list filters comma-joined and empty filters left out", async () => {
+    await securityCases.searchCases("acme", {
+      status: ["open", "acknowledged"],
+      priority: ["P1", "P2"],
+      alert_id: ["a1", "a2"],
+      entity: " 10.0.0.5 ",
+      assignee: "none",
+      q: "",
+      limit: 50,
+      offset: 100,
+    });
+    expect(client.get).toHaveBeenCalledWith("/api/acme/security/cases/search", {
+      params: {
+        status: "open,acknowledged",
+        priority: "P1,P2",
+        alert_id: "a1,a2",
+        entity: "10.0.0.5",
+        assignee: "none",
+        limit: 50,
+        offset: 100,
+      },
+    });
+  });
+
+  it("asks for every matching id only on select all", () => {
+    expect(searchQueryOf({ status: [], select_all: false })).toEqual({});
+    expect(searchQueryOf({ select_all: true, limit: 1 })).toEqual({ select_all: true, limit: 1 });
+  });
+
+  it("caps a bulk update at the ids the server accepts", async () => {
+    const ids = Array.from({ length: MAX_BULK_IDS + 5 }, (_, i) => `c${i}`);
+    await securityCases.bulkUpdate("acme", {
+      ids,
+      action: "close",
+      verdict: "benign",
+      reason: "x",
+    });
+    const [url, body] = client.post.mock.calls[0];
+    expect(url).toBe("/api/acme/security/cases/bulk");
+    expect(body).toMatchObject({ action: "close", verdict: "benign", reason: "x" });
+    expect(body.ids).toHaveLength(MAX_BULK_IDS);
+  });
+
+  it("sends the high-priority opt-in and the suppression length with a bulk close", async () => {
+    await securityCases.bulkUpdate("acme", {
+      ids: ["c1"],
+      action: "close",
+      verdict: "benign",
+      reason: "noise",
+      include_high: true,
+      suppress_minutes: 1440,
+    });
+    expect(client.post.mock.calls[0][1]).toMatchObject({
+      include_high: true,
+      suppress_minutes: 1440,
+    });
+  });
+
+  it("merges sources into a target", async () => {
+    const body = { target_id: "c1", source_ids: ["c2", "c3"], reason: "same host" };
+    await securityCases.mergeCases("acme", body);
+    expect(client.post).toHaveBeenCalledWith("/api/acme/security/cases/merge", body);
+  });
+
+  it("suppresses similar alerts from a case", async () => {
+    const body = { case_id: "c1", duration_minutes: 1440, reason: "scanner", close_case: true };
+    await securityCases.suppress("acme", body);
+    expect(client.post).toHaveBeenCalledWith("/api/acme/security/suppressions", body);
+  });
+
+  it("lists suppressions and ends one by id", async () => {
+    await securityCases.listSuppressions("acme");
+    expect(client.get).toHaveBeenCalledWith("/api/acme/security/suppressions");
+    await securityCases.deleteSuppression("acme", "s/1");
+    expect(client.delete).toHaveBeenCalledWith("/api/acme/security/suppressions/s%2F1");
   });
 });

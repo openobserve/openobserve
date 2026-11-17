@@ -51,7 +51,9 @@ describe("SearchBar — Drill down mode toggle", () => {
       vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
         this: HTMLElement,
       ) {
-        const isToolbarBar = this.classList.contains("border-b-card-glass-border");
+        const isToolbarBar =
+          this.classList.contains("border-border-default") &&
+          this.classList.contains("overflow-hidden");
         return { width: isToolbarBar ? toolbarWidth : 0 } as DOMRect;
       });
     }

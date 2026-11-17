@@ -287,6 +287,7 @@ pub async fn remote_write(
     // every deduction below is of items counted once in `total`, so none can underflow
     let mut written = total;
     let mut rejection: Option<String> = None;
+    let window = ingest::IngestWindow::now();
 
     let mut preload_pipeline_time = 0u128;
     let mut preload_uds_time = 0u128;
@@ -393,7 +394,7 @@ pub async fn remote_write(
             Vec::with_capacity(event.labels.len());
         // allocated only for a series wide enough that `push_label`'s scan would go quadratic
         let mut label_index: HashMap<String, usize> = HashMap::new();
-        for (name, value) in event.labels {
+        for (name, value) in std::mem::take(&mut event.labels) {
             if name == cfg.prom.ha_replica_label {
                 replica_label = value;
                 continue;
@@ -447,6 +448,10 @@ pub async fn remote_write(
         if is_deleting {
             skipped_records += 1;
             continue;
+        }
+
+        if let Some(discard) = drop_out_of_window(&mut event, window, &mut written) {
+            rejection.get_or_insert_with(|| discard.message());
         }
 
         if let Some(reason) = stream_key_checks.violation(org_id, &metric_name) {
@@ -1285,6 +1290,35 @@ fn created_streams_with_entries<T>(
         .filter(|name| entries_by_stream.get(*name).is_some_and(|e| !e.is_empty()))
         .cloned()
         .collect()
+}
+
+/// Removes a series' samples, histograms and exemplars outside the ingest window, uncounting
+/// them from `written`; returns why the first one was dropped.
+fn drop_out_of_window(
+    event: &mut prom_decode::TimeSeries<'_>,
+    window: ingest::IngestWindow,
+    written: &mut WrittenCounts,
+) -> Option<ingest::WindowDiscard> {
+    let mut first = None;
+    let mut keep = |timestamp: i64| match window.discard(parse_i64_to_timestamp_micros(timestamp)) {
+        Some(discard) => {
+            first.get_or_insert(discard);
+            false
+        }
+        None => true,
+    };
+    let before = (
+        event.samples.len(),
+        event.histograms.len(),
+        event.exemplars.len(),
+    );
+    event.samples.retain(|s| keep(s.timestamp));
+    event.histograms.retain(|h| keep(h.timestamp));
+    event.exemplars.retain(|e| keep(e.timestamp));
+    written.samples -= before.0 - event.samples.len();
+    written.histograms -= before.1 - event.histograms.len();
+    written.exemplars -= before.2 - event.exemplars.len();
+    first
 }
 
 /// A sample's `value` cell, `None` for no row; a marker needs the `value` column samples create.
@@ -2638,6 +2672,189 @@ mod tests {
         for (name, created) in expected {
             let exists = infra::schema::exists(org_id, StreamType::Metrics, &name).await;
             assert_eq!(exists, created, "{name}");
+        }
+    }
+
+    /// Millisecond timestamps now, just past the oldest allowed and just past the newest allowed.
+    fn window_edges_millis() -> (i64, i64, i64) {
+        let limit = &get_config().limit;
+        let now = Utc::now().timestamp_millis();
+        let too_old = now - limit.ingest_allowed_upto_micro / 1000 - 60_000;
+        let too_new = now + limit.ingest_allowed_in_future_micro / 1000 + 60_000;
+        (now, too_old, too_new)
+    }
+
+    fn decoded_series(
+        sample_ts: &[i64],
+        histogram_ts: &[i64],
+        exemplar_ts: &[i64],
+    ) -> prom_decode::TimeSeries<'static> {
+        prom_decode::TimeSeries {
+            labels: vec![(NAME_LABEL, "m")],
+            samples: sample_ts
+                .iter()
+                .map(|&timestamp| prom_decode::Sample {
+                    value: 1.0,
+                    timestamp,
+                })
+                .collect(),
+            histograms: histogram_ts
+                .iter()
+                .map(|&timestamp| prometheus_rpc::Histogram {
+                    timestamp,
+                    ..Default::default()
+                })
+                .collect(),
+            exemplars: exemplar_ts
+                .iter()
+                .map(|&timestamp| prom_decode::Exemplar {
+                    labels: vec![],
+                    value: 1.0,
+                    timestamp,
+                })
+                .collect(),
+        }
+    }
+
+    fn counts_of(event: &prom_decode::TimeSeries<'_>) -> WrittenCounts {
+        WrittenCounts {
+            samples: event.samples.len(),
+            histograms: event.histograms.len(),
+            exemplars: event.exemplars.len(),
+        }
+    }
+
+    #[test]
+    fn an_in_window_series_is_kept_whole() {
+        let (now, ..) = window_edges_millis();
+        let mut event = decoded_series(&[now, now - 1], &[now], &[now]);
+        let mut written = counts_of(&event);
+        let discard = drop_out_of_window(&mut event, ingest::IngestWindow::now(), &mut written);
+        assert_eq!(discard, None);
+        assert_eq!(written, counts_of(&event));
+        assert_eq!(event.samples.len(), 2);
+    }
+
+    #[test]
+    fn a_too_old_series_is_dropped_and_uncounted() {
+        let (_, too_old, _) = window_edges_millis();
+        let mut event = decoded_series(&[too_old], &[too_old], &[too_old]);
+        let mut written = counts_of(&event);
+        let discard = drop_out_of_window(&mut event, ingest::IngestWindow::now(), &mut written);
+        assert_eq!(discard, Some(ingest::WindowDiscard::TooOld));
+        assert_eq!(written, WrittenCounts::default());
+        assert_eq!(counts_of(&event), WrittenCounts::default());
+    }
+
+    #[test]
+    fn a_too_new_series_is_dropped_and_uncounted() {
+        let (_, _, too_new) = window_edges_millis();
+        let mut event = decoded_series(&[too_new], &[too_new], &[too_new]);
+        let mut written = counts_of(&event);
+        let discard = drop_out_of_window(&mut event, ingest::IngestWindow::now(), &mut written);
+        assert_eq!(discard, Some(ingest::WindowDiscard::TooNew));
+        assert_eq!(written, WrittenCounts::default());
+    }
+
+    #[test]
+    fn a_mixed_series_keeps_only_its_in_window_items() {
+        let (now, too_old, too_new) = window_edges_millis();
+        let mut event = decoded_series(&[too_new, now, too_old], &[now, too_old], &[too_new]);
+        let mut written = counts_of(&event);
+        let discard = drop_out_of_window(&mut event, ingest::IngestWindow::now(), &mut written);
+        // the first out-of-window item names the reason
+        assert_eq!(discard, Some(ingest::WindowDiscard::TooNew));
+        let kept = WrittenCounts {
+            samples: 1,
+            histograms: 1,
+            exemplars: 0,
+        };
+        assert_eq!(counts_of(&event), kept);
+        assert_eq!(written, kept);
+        assert_eq!(event.samples[0].timestamp, now);
+        assert_eq!(event.histograms[0].timestamp, now);
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn remote_write_drops_out_of_window_samples_as_a_partial_write() {
+        use prost::Message;
+
+        let org_id = "test_org_id";
+        let (now, too_old, too_new) = window_edges_millis();
+        let sample = |timestamp| prometheus_rpc::Sample {
+            value: 1.0,
+            timestamp,
+        };
+        let series = |name: &str, samples| prometheus_rpc::TimeSeries {
+            labels: vec![prometheus_rpc::Label {
+                name: NAME_LABEL.to_string(),
+                value: name.to_string(),
+            }],
+            samples,
+            ..Default::default()
+        };
+        let mixed = prometheus_rpc::TimeSeries {
+            exemplars: vec![prometheus_rpc::Exemplar {
+                labels: vec![],
+                value: 1.0,
+                timestamp: too_new,
+            }],
+            histograms: vec![prometheus_rpc::Histogram {
+                sum: 1.0,
+                count: Some(prometheus_rpc::histogram::Count::CountInt(1)),
+                zero_count: Some(prometheus_rpc::histogram::ZeroCount::ZeroCountInt(1)),
+                timestamp: too_old,
+                ..Default::default()
+            }],
+            ..series(
+                "test_prom_window_mixed",
+                vec![sample(too_old), sample(now), sample(too_new)],
+            )
+        };
+        let request = prometheus_rpc::WriteRequest {
+            timeseries: vec![
+                mixed,
+                series("test_prom_window_all_old", vec![sample(too_old)]),
+            ],
+            metadata: vec![],
+        };
+        let body = snap::raw::Encoder::new()
+            .compress_vec(&request.encode_to_vec())
+            .unwrap();
+        let outcome = remote_write(
+            org_id,
+            Bytes::from(body),
+            IngestUser::User("root@example.com".to_string()),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            outcome.written,
+            WrittenCounts {
+                samples: 1,
+                histograms: 0,
+                exemplars: 0,
+            }
+        );
+        let reason = outcome.rejected.unwrap();
+        let expected = format!(
+            "not written (samples: 3, histograms: 1, exemplars: 1): {}",
+            schema::get_upto_discard_error()
+        );
+        assert_eq!(reason, expected);
+        assert!(infra::schema::exists(org_id, StreamType::Metrics, "test_prom_window_mixed").await);
+        for name in [
+            "test_prom_window_all_old".to_string(),
+            "test_prom_window_mixed_sum".to_string(),
+            exemplars_stream_name("test_prom_window_mixed"),
+        ] {
+            assert!(
+                !infra::schema::exists(org_id, StreamType::Metrics, &name).await,
+                "{name}"
+            );
         }
     }
 

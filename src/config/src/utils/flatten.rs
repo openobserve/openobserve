@@ -163,14 +163,7 @@ pub fn format_key(key: &mut String) {
 
     while i < bytes.len() {
         if bytes[i].is_ascii() {
-            if bytes[i].is_ascii_uppercase() {
-                bytes[i] = bytes[i].to_ascii_lowercase();
-            } else if !bytes[i].is_ascii_lowercase()
-                && !bytes[i].is_ascii_digit()
-                && bytes[i] != b'_'
-            {
-                bytes[i] = b'_';
-            }
+            bytes[i] = format_key_byte(bytes[i]);
         } else {
             *key = key.chars().map(format_key_char).collect();
             return;
@@ -186,6 +179,24 @@ pub fn push_formatted_key(out: &mut String, key: &str) {
     } else {
         out.extend(key.chars().map(format_key_char));
     }
+}
+
+/// True when `format_key` would rewrite `key` to exactly `flat`, without allocating.
+pub fn formats_to(key: &str, flat: &str) -> bool {
+    let (k, f) = (key.as_bytes(), flat.as_bytes());
+    let (mut i, mut j) = (k.len(), f.len());
+    // From the end, where keys sharing a prefix (`service_`) differ; ASCII maps byte for byte.
+    while i > 0 && j > 0 && k[i - 1].is_ascii() {
+        if format_key_byte(k[i - 1]) != f[j - 1] {
+            return false;
+        }
+        i -= 1;
+        j -= 1;
+    }
+    if i > 0 && !k[i - 1].is_ascii() {
+        return key[..i].chars().map(format_key_char).eq(flat[..j].chars());
+    }
+    i == 0 && j == 0
 }
 
 pub fn format_label_name(label_name: &str) -> String {
@@ -204,6 +215,17 @@ pub fn format_label_name_cow(label_name: &str) -> Cow<'_, str> {
         Cow::Borrowed(label_name)
     } else {
         Cow::Owned(format_label_name(label_name))
+    }
+}
+
+/// The byte `format_key` writes for an ASCII byte.
+pub fn format_key_byte(b: u8) -> u8 {
+    if b.is_ascii_lowercase() || b.is_ascii_digit() {
+        b
+    } else if b.is_ascii_uppercase() {
+        b.to_ascii_lowercase()
+    } else {
+        b'_'
     }
 }
 
@@ -252,6 +274,26 @@ mod tests {
             push_formatted_key(&mut out, key);
             assert_eq!(out, format!("prefix_{expected}"), "{key}");
         }
+    }
+
+    #[test]
+    fn test_formats_to_agrees_with_format_key() {
+        for key in [
+            "plain_key",
+            "Mixed.Case-Key",
+            "service_k8s.cluster.name",
+            "kubectl.kubernetes.io/restartedAt",
+            "NAÏVE",
+            "İstanbul.x",
+            "a b",
+            "",
+        ] {
+            let mut flat = key.to_string();
+            format_key(&mut flat);
+            assert!(formats_to(key, &flat), "{key}");
+            assert!(!formats_to(key, &format!("{flat}_")), "{key}");
+        }
+        assert!(!formats_to("service_k8s.cluster", "service_k8s_clustex"));
     }
 
     #[test]

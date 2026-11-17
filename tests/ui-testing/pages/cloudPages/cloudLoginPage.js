@@ -5,6 +5,7 @@
 // that auth state is valid rather than performing a login flow.
 const { expect } = require('@playwright/test');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 class CloudLoginPage {
     constructor(page) {
@@ -85,6 +86,25 @@ class CloudLoginPage {
 
     async loginSC() {
         await this.page.waitForLoadState('domcontentloaded');
+    }
+
+    async openOrgHome(baseUrl = process.env["ZO_BASE_URL"]) {
+        await this.page.goto(`${baseUrl}/web/?org_identifier=${encodeURIComponent(getOrgIdentifier())}`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 30000
+        });
+        await this.expectHomePageMenuVisible(30000);
+    }
+
+    // Aborts dashboard/report/folder writes to the shared default org, so a lost org context fails the test instead of leaking objects there.
+    async blockDefaultOrgWrites() {
+        const org = getOrgIdentifier();
+        if (!org || org === 'default') return;
+        await this.page.route(/\/api\/(v2\/)?default\/(dashboards|reports|folders)(\/|\?|$)/, async (route) => {
+            if (route.request().method() === 'GET') return route.continue();
+            testLogger.error('Blocked write to the default org', { method: route.request().method(), url: route.request().url() });
+            return route.abort('blockedbyclient');
+        });
     }
 }
 

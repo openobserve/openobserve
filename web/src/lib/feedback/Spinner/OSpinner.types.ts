@@ -9,4 +9,6 @@ export interface SpinnerProps {
   variant?: SpinnerVariant;
   /** Component size. Default: "md" */
   size?: SpinnerSize;
+  /** Shows at once instead of after the 300 ms loader wait, for a host that already waited. Default: false */
+  instant?: boolean;
 }

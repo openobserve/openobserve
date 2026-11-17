@@ -1,7 +1,7 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from './draftSignOut.js';
-import { openNavFlyoutChild, gotoMetricsVisualize, clickNavUntilRoute } from '../commonActions.js';
+import { openNavFlyoutChild, gotoMetricsVisualize, clickNavUntilRoute, showAllAlertStates } from '../commonActions.js';
 
 export class HomePage {
     constructor(page) {
@@ -117,6 +117,7 @@ export class HomePage {
         await this.alertsMenu.waitFor({ state: 'visible', timeout: 10000 });
         await clickNavUntilRoute(this.page, '[data-test="menu-link-\\/alerts-item"]', '/alerts');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await showAllAlertStates(this.page);
     }
 
     async navigateToIngestion() {

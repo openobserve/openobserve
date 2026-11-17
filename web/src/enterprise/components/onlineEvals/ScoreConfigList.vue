@@ -25,11 +25,23 @@
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
             data-test="score-config-list-search-input"
             clearable
             @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            :row="false"
+            multiple
+            :selected-keys="typeFilters"
+            default-key="all"
+            class="max-md:order-last"
+            data-test="score-config-list-summary"
+            @update:selected-keys="typeFilters = $event as DataType[]"
           />
         </template>
 
@@ -43,21 +55,6 @@
             data-test="score-config-list-refresh-btn"
             @click="emit('refresh')"
           />
-        </template>
-
-        <!-- Data-type breakdown (catalog signal) — doubles as a filter synced to
-             the type dropdown; Total last, never itself the active tile. -->
-        <template #subheader>
-          <div data-test="score-config-list-summary">
-            <OStatStrip
-              :items="summaryStats"
-              :loading="loading"
-              selectable
-              :selected-key="selectedStatKey"
-              default-key="all"
-              @select="onStatSelect"
-            />
-          </div>
         </template>
 
         <template #empty>
@@ -220,6 +217,7 @@ import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import EvalListShell from "./EvalListShell.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 import type { ForbiddenState } from "@/utils/featureGate";
+import { matchesAnyKey } from "@/utils/filterKeys";
 
 type DataType = "numeric" | "categorical" | "boolean";
 
@@ -251,7 +249,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const typeFilter = ref<DataType | null>(null);
+const typeFilters = ref<DataType[]>([]);
 const selectedIds = ref<string[]>([]);
 
 function handleBulkExport() {
@@ -355,13 +353,15 @@ const columns = computed(() =>
 );
 
 const filteredRows = computed(() =>
-  typeFilter.value ? props.rows.filter((row) => dataTypeOf(row) === typeFilter.value) : props.rows,
+  props.rows.filter((row) =>
+    matchesAnyKey(typeFilters.value, row, (r, key) => dataTypeOf(r) === key),
+  ),
 );
 
 const numberedRows = useNumberedRows(filteredRows);
 
 // Data-type breakdown for the summary strip (over all configs, so the counts
-// stay stable as you filter). Tiles double as filters wired to `typeFilter`.
+// stay stable as you filter). Tiles double as filters wired to `typeFilters`.
 const typeCounts = computed(() => {
   const rows = props.rows || [];
   let numeric = 0;
@@ -418,26 +418,19 @@ const summaryStats = computed<StatItem[]>(() => {
     },
   ];
 });
-// Nothing is highlighted while viewing all rows (like the Incidents/Alerts strip);
-// the "All" tile clears the facet but is never itself the active tile.
-const selectedStatKey = computed(() => typeFilter.value);
-function onStatSelect(key: string) {
-  // Re-clicking the active tile clears the filter (toggle), matching the Alerts strip.
-  typeFilter.value = key === "all" || typeFilter.value === key ? null : (key as DataType);
-}
 
 // Drives OEmptyState's `:filtered` — true whenever the user has narrowed
 // the list (search or type filter). The filtered case auto-renders the
 // "No score configs match these filters" + Clear-filters card; the
 // first-run case shows the preset's "Create score config" CTA.
-const hasFilters = computed(() => !!props.search?.trim() || !!typeFilter.value);
+const hasFilters = computed(() => !!props.search?.trim() || typeFilters.value.length > 0);
 
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
   else if (id === "import") emit("import-custom");
   else if (id === "clear-filters") {
     emit("update:search", "");
-    typeFilter.value = null;
+    typeFilters.value = [];
   }
 }
 

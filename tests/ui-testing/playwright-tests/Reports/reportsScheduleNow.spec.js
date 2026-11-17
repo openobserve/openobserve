@@ -25,9 +25,11 @@ test.describe("Report test cases Updated", () => {
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         pageManager = new PageManager(page);
+        await pageManager.loginPage.blockDefaultOrgWrites();
         await pageManager.loginPage.gotoLoginPage();
         await pageManager.loginPage.loginAsInternalUser();
         await pageManager.loginPage.login();
+        await pageManager.loginPage.openOrgHome();
         await pageManager.ingestionPage.ingestion();
     });
     
@@ -53,6 +55,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUserSC();
         await pageManager.loginPage.loginSC();
+        await pageManager.loginPage.openOrgHome(process.env["ZO_BASE_URL_SC_UI"]);
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
@@ -68,6 +71,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUser();
         await pageManager.loginPage.login();
+        await pageManager.loginPage.openOrgHome();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
         await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
@@ -98,6 +102,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUserSC();
         await pageManager.loginPage.loginSC();
+        await pageManager.loginPage.openOrgHome(process.env["ZO_BASE_URL_SC_UI"]);
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
@@ -113,6 +118,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUser();
         await pageManager.loginPage.login();
+        await pageManager.loginPage.openOrgHome();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
         await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
@@ -143,6 +149,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUserSC();
         await pageManager.loginPage.loginSC();
+        await pageManager.loginPage.openOrgHome(process.env["ZO_BASE_URL_SC_UI"]);
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
@@ -158,6 +165,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUser();
         await pageManager.loginPage.login();
+        await pageManager.loginPage.openOrgHome();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
         await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
@@ -188,6 +196,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUserSC();
         await pageManager.loginPage.loginSC();
+        await pageManager.loginPage.openOrgHome(process.env["ZO_BASE_URL_SC_UI"]);
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
@@ -203,6 +212,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUser();
         await pageManager.loginPage.login();
+        await pageManager.loginPage.openOrgHome();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
         await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
@@ -233,6 +243,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUserSC();
         await pageManager.loginPage.loginSC();
+        await pageManager.loginPage.openOrgHome(process.env["ZO_BASE_URL_SC_UI"]);
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
@@ -248,6 +259,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUser();
         await pageManager.loginPage.login();
+        await pageManager.loginPage.openOrgHome();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
         await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
@@ -278,6 +290,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUserSC();
         await pageManager.loginPage.loginSC();
+        await pageManager.loginPage.openOrgHome(process.env["ZO_BASE_URL_SC_UI"]);
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
@@ -293,6 +306,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUser();
         await pageManager.loginPage.login();
+        await pageManager.loginPage.openOrgHome();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
         await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
@@ -323,6 +337,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUserSC();
         await pageManager.loginPage.loginSC();
+        await pageManager.loginPage.openOrgHome(process.env["ZO_BASE_URL_SC_UI"]);
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.pauseReport(TEST_REPORT_NAME);
         await pageManager.reportsPage.updateReport(TEST_REPORT_NAME);
@@ -338,6 +353,7 @@ test.describe("Report test cases Updated", () => {
         await waitUtils.smartWait(page, 10000, 'login sequence wait');
         await pageManager.loginPage.loginAsInternalUser();
         await pageManager.loginPage.login();
+        await pageManager.loginPage.openOrgHome();
         await pageManager.reportsPage.navigateToReports();
         await pageManager.reportsPage.notAvailableReport(TEST_REPORT_NAME);
         await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=" + process.env["ORGNAME"]);
