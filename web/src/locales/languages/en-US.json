@@ -15392,8 +15392,6 @@
       "fireBody": "Runs “{name}” once, right now, and sends its notifications as if it had fired.",
       "fireConfirm": "Fire now",
       "more": "More…",
-      "enable": "Enable",
-      "disable": "Disable",
       "clone": "Clone",
       "cloneName": "Name of the copy",
       "cloneDefaultName": "{name} copy",
