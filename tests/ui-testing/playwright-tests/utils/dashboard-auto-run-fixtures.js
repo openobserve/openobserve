@@ -117,8 +117,10 @@ async function setHomePin(value) {
 
 // The pin is org-wide, so the previous value is put back rather than deleted.
 async function restoreHomePin(previous) {
-  if (previous) await setHomePin(previous);
-  else await settingsApi('DELETE', `/${HOME_PIN_KEY}`);
+  if (previous) return setHomePin(previous);
+  const { status } = await settingsApi('DELETE', `/${HOME_PIN_KEY}`);
+  // 404 is the clean end state: deleting the pinned dashboard already cleared the pin on the server.
+  if (status >= 400 && status !== 404) throw new Error(`unpin home dashboard -> ${status}`);
 }
 
 // An unreadable pin must stop the test, or the restore in `finally` would delete the org's real pin.
