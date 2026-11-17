@@ -286,6 +286,22 @@ describe("anomalyDetectionFunctionPayload", () => {
     ).toEqual({ detection_function: "count", detection_function_field: undefined });
   });
 
+  it("a stored custom_sql row keeps a quoted, dotted or non-ASCII value column", () => {
+    for (const column of ["p99.ms", "latência"]) {
+      expect(
+        anomalyDetectionFunctionPayload(
+          {
+            query_mode: "custom_sql",
+            custom_sql: `SELECT max(latency) AS "${column}" FROM app WHERE status >= 500`,
+            detection_function: "max",
+            detection_function_field: column,
+          },
+          { detection_function: `max(${column})`, detection_function_field: null },
+        ),
+      ).toEqual({ detection_function: `max(${column})`, detection_function_field: undefined });
+    }
+  });
+
   it("a stored custom_sql count row round-trips with any query", () => {
     expect(
       anomalyDetectionFunctionPayload(

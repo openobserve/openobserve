@@ -274,7 +274,9 @@ const sqlMentionsDeclaredColumn = (
     ""
   ).trim();
   if (!declared || declared === "*") return true;
-  return (sql ?? "").split(/\W+/).includes(declared);
+  // A plain substring test on purpose: a quoted or dotted alias ("p99.ms") has no word
+  // boundary to split on, and a wrong drop silently rewrites a valid row to `count`.
+  return (sql ?? "").includes(declared);
 };
 
 /**
