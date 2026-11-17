@@ -29,7 +29,7 @@ use chrono::{TimeZone, Utc};
 #[cfg(feature = "enterprise")]
 use config::meta::promql::DownsamplingRule;
 use config::{
-    Config,
+    get_config,
     meta::stream::{
         FileKey, MergeStrategy, PartitionTimeLevel, StreamParams, StreamSettings, StreamType,
     },
@@ -45,8 +45,8 @@ use super::job::{job_range_end, scheduling_level};
 pub(super) type PlannedBatch = (Vec<FileKey>, MergeMode);
 
 /// The size rules one merge round batches files under.
-pub(super) struct BatchLimits<'a> {
-    pub strategy: &'a MergeStrategy,
+pub(super) struct BatchLimits {
+    pub strategy: MergeStrategy,
     pub max_file_size: usize,
     pub max_group_files: usize,
     /// The hour is still open: an unfilled trailing group waits for more files.
@@ -57,14 +57,11 @@ pub(super) struct BatchLimits<'a> {
     pub max_merge_groups: usize,
 }
 
-impl<'a> BatchLimits<'a> {
-    pub(super) fn from_config(
-        cfg: &Config,
-        strategy: &'a MergeStrategy,
-        is_incremental: bool,
-    ) -> Self {
+impl BatchLimits {
+    pub(super) fn from_config(is_incremental: bool) -> Self {
+        let cfg = get_config();
         Self {
-            strategy,
+            strategy: MergeStrategy::from(&cfg.compact.strategy),
             max_file_size: cfg.compact.max_file_size,
             max_group_files: cfg.compact.max_group_files,
             is_incremental,
@@ -127,7 +124,7 @@ impl MergePolicy {
     pub(super) async fn plan(
         &self,
         files: Vec<FileKey>,
-        limits: &BatchLimits<'_>,
+        limits: &BatchLimits,
         schema: &Arc<Schema>,
     ) -> RoundPlan {
         let mut plan = match &self.rule {
@@ -277,7 +274,7 @@ fn split_legacy_metrics(files: Vec<FileKey>) -> (Vec<FileKey>, Vec<FileKey>) {
 }
 
 /// The classic size-bounded merges the legacy files of a metrics-index hour keep.
-fn legacy_batches(mut files: Vec<FileKey>, limits: &BatchLimits<'_>) -> Vec<PlannedBatch> {
+fn legacy_batches(mut files: Vec<FileKey>, limits: &BatchLimits) -> Vec<PlannedBatch> {
     // a whole-hour query lists every file; the classic merge never rewrites the full-sized ones
     files.retain(|f| f.meta.original_size <= limits.merge_max_original_size);
     size_bounded::plan(&files, limits, &MergeMode::Classic).batches
@@ -336,9 +333,9 @@ mod tests {
         strategy: &MergeStrategy,
         max_group_files: usize,
         is_incremental: bool,
-    ) -> BatchLimits<'_> {
+    ) -> BatchLimits {
         BatchLimits {
-            strategy,
+            strategy: strategy.clone(),
             max_file_size: 1000,
             max_group_files,
             is_incremental,

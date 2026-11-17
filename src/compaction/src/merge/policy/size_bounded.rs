@@ -23,7 +23,7 @@ use super::{BatchLimits, RoundPlan};
 /// Files already at the size target are left alone, so the window query skips them.
 pub(super) const READS_WHOLE_WINDOW: bool = false;
 
-pub(super) fn plan(files: &[FileKey], limits: &BatchLimits<'_>, mode: &MergeMode) -> RoundPlan {
+pub(super) fn plan(files: &[FileKey], limits: &BatchLimits, mode: &MergeMode) -> RoundPlan {
     RoundPlan::new(
         size_bounded_groups(files, limits)
             .into_iter()
@@ -33,7 +33,7 @@ pub(super) fn plan(files: &[FileKey], limits: &BatchLimits<'_>, mode: &MergeMode
 }
 
 /// Size-bounded merge groups in the planner's file order.
-fn size_bounded_groups(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Vec<FileKey>> {
+fn size_bounded_groups(files: &[FileKey], limits: &BatchLimits) -> Vec<Vec<FileKey>> {
     let max_file_size = limits.max_file_size as i64;
     let max_group_files = limits.max_group_files;
     let mut groups = Vec::new();
@@ -45,10 +45,11 @@ fn size_bounded_groups(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Vec<F
         // FileSize order guarantees later files cannot form a smaller original-size pair.
         if exceeds_original_size
             && current_group.len() <= 1
-            && *limits.strategy == MergeStrategy::FileSize
+            && limits.strategy == MergeStrategy::FileSize
         {
             break;
         }
+
         if exceeds_original_size
             || compressed_size + file.meta.compressed_size > max_file_size
             || (max_group_files > 0 && current_group.len() >= max_group_files)
@@ -61,13 +62,16 @@ fn size_bounded_groups(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Vec<F
             original_size = 0;
             compressed_size = 0;
         }
+
         if file.meta.original_size > max_file_size || file.meta.compressed_size > max_file_size {
             continue;
         }
+
         original_size += file.meta.original_size;
         compressed_size += file.meta.compressed_size;
         current_group.push(file.clone());
     }
+
     // Open hours keep the remainder for later arrivals to avoid rewriting it repeatedly.
     if current_group.len() > 1 && !limits.is_incremental {
         groups.push(current_group);

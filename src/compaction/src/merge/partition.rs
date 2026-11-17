@@ -97,10 +97,8 @@ async fn merge_partition(
     files: Vec<FileKey>,
 ) -> anyhow::Result<RoundOutcome> {
     let window = policy.window();
-    let cfg = get_config();
-    let strategy = MergeStrategy::from(&cfg.compact.strategy);
-    let limits = BatchLimits::from_config(&cfg, &strategy, window.is_incremental);
-    let files = sort_for_strategy(files, &strategy);
+    let limits = BatchLimits::from_config(window.is_incremental);
+    let files = sort_for_strategy(files, &limits.strategy);
     let plan = policy.plan(files, &limits, scan_schema).await;
     let batches: Vec<MergeBatch> = plan
         .batches
