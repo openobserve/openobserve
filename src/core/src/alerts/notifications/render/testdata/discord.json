@@ -2,7 +2,7 @@
   "embeds": [
     {
       "title": "CPU \"high\" & <fire> on web-1",
-      "description": "Value **92.5** exceeded `80` — see [runbook](https://rb.example/x)\n\n<script>alert(1)</script>\n\n[View in OpenObserve](https://o2.example/short/abc)",
+      "description": "Value **92.5** exceeded `80` — see [runbook](https://rb.example/x)\n\n<script>alert(1)</script>\n\n[Runbook](https://rb.example/x)",
       "fields": [
         {
           "name": "host",
@@ -20,7 +20,7 @@
           "inline": false
         }
       ],
-      "url": "https://rb.example/x"
+      "url": "https://o2.example/short/abc"
     }
   ]
 }

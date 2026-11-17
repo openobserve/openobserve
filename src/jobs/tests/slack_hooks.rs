@@ -338,7 +338,7 @@ fn alert_message_view_reads_a_deleted_alert_as_gone_and_a_malformed_id_as_none()
         );
         assert!(
             gone.open_url
-                .ends_with("alert_id=2i4WBnxsiDiRR1dh7O4qcIfUyBW"),
+                .ends_with("/web/alerts/detail/2i4WBnxsiDiRR1dh7O4qcIfUyBW?org_identifier=acme"),
             "{}",
             gone.open_url
         );
