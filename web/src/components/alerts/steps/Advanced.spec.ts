@@ -415,4 +415,42 @@ describe("Advanced — in the sectioned editor", () => {
     expect(has(targets.advancedMessage, "advanced-template-override-select")).toBe(false);
     expect(has(targets.advancedMessage, "advanced-variables-info-btn")).toBe(false);
   });
+
+  it("description starts as + Description, grows on focus, and Remove clears it", async () => {
+    const hidden = mountSectioned();
+    expect(hidden.has(hidden.targets.advancedDetails, "add-alert-description-textarea")).toBe(
+      false,
+    );
+    hidden.host.unmount();
+
+    const { host, targets, has } = mountSectioned({}, ["description"]);
+    const box = () => targets.advancedDetails.querySelector("textarea") as HTMLTextAreaElement;
+    box().value = "page the payments team";
+    box().dispatchEvent(new Event("input"));
+    await flushPromises();
+    expect(hostForm(host).state.values.description).toBe("page the payments team");
+    expect(box().rows).toBe(3);
+    box().dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    await nextTick();
+    expect(box().rows).toBeGreaterThan(3);
+
+    (
+      targets.advancedDetails.querySelector(
+        '[data-test="add-alert-description-row-remove"]',
+      ) as HTMLElement
+    ).click();
+    await flushPromises();
+    expect(hostForm(host).state.values.description).toBe("");
+    expect(has(targets.advancedDetails, "add-alert-description-textarea")).toBe(false);
+  });
+
+  it.each([
+    ["alert-tags-input", {}, false],
+    ["alert-tags-input", { tags: ["a"] }, true],
+    ["alert-priority-select", {}, false],
+    ["alert-priority-select", { priority: 2 }, true],
+  ])("%s with %o shows: %s", (dt, values, shown) => {
+    const { host } = mountSectioned(values);
+    expect(host.find(`[data-test="${dt}"]`).exists()).toBe(shown);
+  });
 });
