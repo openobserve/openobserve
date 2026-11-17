@@ -144,8 +144,12 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             if timestamp_filters.len() == 2
                 && (other_filters.is_empty()
                     || (other_filters.len() == 1
-                        && is_simple_str_match(other_filters[0])
-                            .is_some_and(|column| self.index_fields.contains(&column))))
+                        // the needle is matched against the distinct field's own terms
+                        && is_simple_str_match(other_filters[0]).is_some_and(|column| {
+                            self.simple_distinct
+                                .as_ref()
+                                .is_some_and(|(field, ..)| *field == column)
+                        })))
             {
                 return Ok(TreeNodeRecursion::Continue);
             }
@@ -233,6 +237,11 @@ mod tests {
                     10,
                     false,
                 )),
+            ),
+            // str_match on another index field filters rows, not the distinct field's terms
+            (
+                "select name from t where str_match(id, 'a') and _timestamp >= 175256100000000 and _timestamp < 17525610000000000 group by name order by name asc limit 10",
+                None,
             ),
             (
                 "select id from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000 group by id order by id asc limit 10",

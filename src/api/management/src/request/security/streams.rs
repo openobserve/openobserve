@@ -53,15 +53,27 @@ pub async fn guard_settings_update(
     let source = current
         .as_ref()
         .is_some_and(|s| is_security_source(s.security.as_ref()));
-    let weakens = current.as_ref().is_some_and(|current| {
-        weakens_security_source(
-            current,
-            update,
-            config::get_config().compact.data_retention_days,
-        )
-    });
+    // what `data_retention: 0` resolves to for this stream (org per-type, org default, global)
+    let inherited =
+        db::organization::stream_retention_days(org_id, stream_type, stream_name, 0).await;
+    let weakens = current
+        .as_ref()
+        .is_some_and(|current| weakens_security_source(current, update, inherited_days(inherited)));
     refuse_unless_admin(org_id, user_id, weakens).await?;
     Ok(source || update.security.is_some())
+}
+
+/// The days a stream with no value of its own keeps data. 0 keeps it forever, and a failed read
+/// counts as the shortest retention, so the guard refuses instead of guessing.
+fn inherited_days(resolved: Result<i64, infra::errors::Error>) -> i64 {
+    match resolved {
+        Ok(0) => i64::MAX,
+        Ok(days) => days,
+        Err(e) => {
+            log::error!("[SECURITY] inherited retention read failed: {e}");
+            1
+        }
+    }
 }
 
 /// A `security` change is audited by its summary row, so its request row is not stamped too.
@@ -92,6 +104,31 @@ mod tests {
             .unwrap_err();
         assert_eq!(refused.status(), axum::http::StatusCode::FORBIDDEN);
         assert!(refuse_unless_admin("org", &stranger, false).await.is_ok());
+    }
+
+    #[test]
+    fn test_retention_zero_is_judged_by_what_the_stream_inherits() {
+        let source = config::meta::stream::StreamSettings {
+            data_retention: 30,
+            security: Some(config::meta::stream::SecuritySourceSetting {
+                included: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let to_default = UpdateStreamSettings {
+            data_retention: Some(0),
+            ..Default::default()
+        };
+        let weakens =
+            |resolved| weakens_security_source(&source, &to_default, inherited_days(resolved));
+        assert!(weakens(Ok(3)), "the org default is shorter than 30 days");
+        assert!(!weakens(Ok(90)));
+        assert!(!weakens(Ok(0)), "0 keeps the data forever");
+        assert!(
+            weakens(Err(infra::errors::Error::Message("down".to_string()))),
+            "an unknown default is refused"
+        );
     }
 
     #[test]

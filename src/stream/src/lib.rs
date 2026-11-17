@@ -1105,6 +1105,17 @@ fn apply_partition_level_settings(
     Ok(())
 }
 
+/// Whether a delete of `time_range` on this stream must cover whole days.
+pub async fn delete_range_needs_whole_days(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: &TimeRange,
+) -> bool {
+    let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    delete_needs_whole_days(stream_type, settings.as_deref(), time_range)
+}
+
 /// A delete must cover whole days when a day of the range is stored by day.
 fn delete_needs_whole_days(
     stream_type: StreamType,

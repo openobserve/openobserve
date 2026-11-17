@@ -162,6 +162,35 @@ fn validate_time_alignment_daily(start_time: i64, end_time: i64) -> Result<(), a
     Ok(())
 }
 
+/// True when the delete must be sent as whole days: a day of the range is stored as one daily
+/// file. Such a delete is refused unless it is day aligned, because the file goes as a whole.
+pub(crate) async fn delete_covers_daily_days(
+    stream: &config::meta::stream::StreamParams,
+    start_time: i64,
+    end_time: i64,
+) -> Result<bool, anyhow::Error> {
+    let range = config::meta::stream::TimeRange::new(start_time, end_time);
+    let needs_whole_days = stream::delete_range_needs_whole_days(
+        &stream.org_id,
+        stream.stream_type,
+        &stream.stream_name,
+        &range,
+    )
+    .await;
+    if needs_whole_days && !is_day_aligned(start_time, end_time) {
+        return Err(anyhow::anyhow!(
+            "Stream {} stores a day of this range as one daily file, so delete_before_backfill must cover whole days: start_time and end_time must be aligned to day boundary (e.g., 2024-01-15T00:00:00Z)",
+            stream.stream_name
+        ));
+    }
+    Ok(needs_whole_days)
+}
+
+fn is_day_aligned(start_time: i64, end_time: i64) -> bool {
+    let day = config::utils::time::day_micros(1);
+    start_time % day == 0 && end_time % day == 0
+}
+
 /// Every check [`create_backfill_job`] makes before it writes, so a caller can answer them first.
 pub async fn check_backfill_job(
     pipeline_id: &str,
@@ -229,6 +258,9 @@ pub async fn check_backfill_job(
         }
         if requires_daily_alignment {
             validate_time_alignment_daily(start_time, end_time)?;
+        }
+        for stream in &destination_streams {
+            delete_covers_daily_days(stream, start_time, end_time).await?;
         }
     }
     Ok(())
@@ -738,6 +770,14 @@ mod tests {
     #[test]
     fn test_hourly_alignment_day_boundary_is_valid() {
         assert!(validate_time_alignment_hourly(DAY_ALIGNED_START, DAY_ALIGNED_END).is_ok());
+    }
+
+    #[test]
+    fn test_is_day_aligned() {
+        assert!(is_day_aligned(DAY_ALIGNED_START, DAY_ALIGNED_END));
+        assert!(!is_day_aligned(HOUR_ALIGNED_START, DAY_ALIGNED_END));
+        assert!(!is_day_aligned(DAY_ALIGNED_START, HOUR_ALIGNED_END));
+        assert!(!is_day_aligned(NOT_HOUR_ALIGNED, DAY_ALIGNED_END));
     }
 
     // ── validate_time_alignment_daily ─────────────────────────────────────────
