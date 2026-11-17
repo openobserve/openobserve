@@ -1625,6 +1625,8 @@ mod tests {
                 true,
             ),
             (format!("{histogram} ORDER BY ts DESC"), "ts", true),
+            (format!("{histogram} ORDER BY ts ASC, c DESC"), "ts", true),
+            (format!("{histogram} ORDER BY 1 ASC, 2 DESC"), "ts", true),
         ];
         for (sql, ts_column, eligible) in cases {
             for use_cache in [false, true] {
