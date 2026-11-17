@@ -188,4 +188,43 @@ test.describe("Traces SQL mode testcases", () => {
     await expect(pm.tracesPage.getSqlErrorState()).toHaveCount(0);
     await expect(pm.tracesPage.getSqlResultTable()).toBeVisible({ timeout: 20000 });
   });
+
+  test("P1: A trace question from the gallery shows one row per trace, opens it, and Back re-runs nothing", {
+    tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
+  }, async ({ page }) => {
+    await pm.tracesPage.toggleSqlModeFromToolbar();
+    await pm.tracesPage.expectSqlMode(true);
+    await pm.tracesPage.setQueryEditorValue('');
+
+    await expect(pm.tracesPage.getSqlTemplateGroupTitles()).toHaveText(
+      ['Trace questions', 'Span summaries'],
+      { timeout: 10000 },
+    );
+    await pm.tracesPage.useSqlTemplate('Big traces');
+    const template = await pm.tracesPage.getQueryEditorContent();
+    expect(template).toContain('min(_timestamp) AS first_seen');
+    expect(template).toContain('LIMIT 100');
+
+    // The seeded traces are small, so the span threshold comes down to find them.
+    await pm.tracesPage.setQueryEditorValue(template.replace('count(*) > 200', 'count(*) > 0'));
+    await pm.tracesPage.setTimeRange('15m');
+    await pm.tracesPage.runSearch();
+
+    const table = pm.tracesPage.getSqlResultTable();
+    await expect(table).toBeVisible({ timeout: 20000 });
+    for (const column of ['trace_id', 'first_seen', 'spans', 'errors', 'duration_ms']) {
+      await expect(table).toContainText(column);
+    }
+
+    await pm.tracesPage.openFirstSqlResultRow();
+    await pm.tracesPage.expectTraceDetailsVisible();
+
+    let searches = 0;
+    page.on('request', (request) => {
+      if (request.url().includes('_search_stream')) searches++;
+    });
+    await pm.tracesPage.navigateBackFromTraceDetails();
+    await expect(table).toBeVisible({ timeout: 10000 });
+    expect(searches).toBe(0);
+  });
 });

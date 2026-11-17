@@ -129,9 +129,14 @@ const mockSearchObj = reactive({
   organizationIdentifier: "test-org",
 });
 
-const { mockPatchUrlViewState, mockTracesParser } = vi.hoisted(() => ({
+const { mockPatchUrlViewState, mockTracesParser, mockTraceTimeRanges } = vi.hoisted(() => ({
   mockPatchUrlViewState: vi.fn(() => Promise.resolve()),
   mockTracesParser: { value: null as unknown },
+  mockTraceTimeRanges: vi.fn(),
+}));
+
+vi.mock("@/services/search", () => ({
+  default: { get_trace_time_ranges: mockTraceTimeRanges },
 }));
 
 vi.mock("@/composables/useTraces", () => ({
@@ -183,8 +188,18 @@ const globalOptions = {
     TracesSqlResultTable: {
       name: "TracesSqlResultTable",
       template: '<div data-test="traces-sql-result"></div>',
-      props: ["hits", "columns", "shape", "loading", "wrap", "offerAddTraceId", "traceHref"],
-      emits: ["open-trace", "add-trace-id"],
+      props: [
+        "hits",
+        "columns",
+        "shape",
+        "loading",
+        "wrap",
+        "offerAddTraceId",
+        "traceHref",
+        "capNote",
+        "openingTraceId",
+      ],
+      emits: ["open-trace", "add-trace-id", "locate-trace"],
     },
     TracesMetricsDashboard: {
       template: '<div data-test="traces-metrics-dashboard"></div>',
@@ -973,28 +988,182 @@ describe("SearchResult in a kept-alive page", () => {
       expect(lossWarning().exists()).toBe(false);
     });
 
-    it("opens a trace row by trace_id inside the page time range", async () => {
+    const BIG_TRACES = `SELECT trace_id, min(_timestamp) AS first_seen, count(*) AS spans FROM "default" GROUP BY trace_id ORDER BY spans DESC LIMIT 2`;
+
+    it("opens a trace row where the trace ran, located from first_seen, after saving the list state", async () => {
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
-      await showResults(`SELECT trace_id, max(duration) AS d FROM "default" GROUP BY trace_id`, [
-        { trace_id: "t-1", d: 3 },
+      mockPatchUrlViewState.mockClear();
+      mockTraceTimeRanges.mockResolvedValue({
+        data: {
+          results: [
+            {
+              trace_id: "t-1",
+              status: "found",
+              stream: "default",
+              range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_005_000_000 },
+            },
+          ],
+          partial_coverage: false,
+        },
+      });
+      await showResults(BIG_TRACES, [
+        { trace_id: "t-1", first_seen: 1_700_000_000_123_000, spans: 9 },
       ]);
       expect(sqlTable().props("shape")).toBe("traces");
 
-      await sqlTable().vm.$emit("open-trace", { trace_id: "t-1", d: 3 });
+      await sqlTable().vm.$emit("open-trace", {
+        trace_id: "t-1",
+        first_seen: 1_700_000_000_123_000,
+      });
       await flushPromises();
 
+      expect(mockTraceTimeRanges).toHaveBeenCalledWith(
+        expect.objectContaining({ trace_ids: ["t-1"], hint_ts: 1_700_000_000_123_000 }),
+      );
       expect(push).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "traceDetails",
           query: expect.objectContaining({
             trace_id: "t-1",
-            from: mockSearchObj.data.datetime.startTime,
-            to: mockSearchObj.data.datetime.endTime,
+            from: 1_700_000_000_000_000 - 60_000_000,
+            to: 1_700_000_005_000_000 + 60_000_000,
           }),
         }),
       );
       expect(push.mock.calls[0][0]).not.toHaveProperty("query.span_id");
+      expect(mockPatchUrlViewState.mock.invocationCallOrder[0]).toBeLessThan(
+        push.mock.invocationCallOrder[0],
+      );
       push.mockRestore();
+      mockTraceTimeRanges.mockReset();
+    });
+
+    it.each([
+      ["the lookup finds nothing", () => ({ data: { results: [], partial_coverage: false } })],
+      [
+        "the trace sits in another stream",
+        () => ({
+          data: {
+            results: [
+              {
+                trace_id: "t-2",
+                status: "found",
+                stream: "other",
+                range: { start_time: 5, end_time: 6 },
+              },
+            ],
+            partial_coverage: false,
+          },
+        }),
+      ],
+    ])("falls back to the page range when %s", async (_, answer) => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      mockTraceTimeRanges.mockResolvedValue(answer());
+      await showResults(BIG_TRACES, [{ trace_id: "t-2", first_seen: 1_000_000_100, spans: 1 }]);
+      await sqlTable().vm.$emit("open-trace", { trace_id: "t-2", first_seen: 1_000_000_100 });
+      await flushPromises();
+      expect(push.mock.calls[0][0]).toMatchObject({
+        query: {
+          trace_id: "t-2",
+          from: mockSearchObj.data.datetime.startTime,
+          to: mockSearchObj.data.datetime.endTime,
+        },
+      });
+      push.mockRestore();
+      mockTraceTimeRanges.mockReset();
+    });
+
+    it("locates a trace when its link is hovered, so a new-tab open lands where the trace ran", async () => {
+      mockTraceTimeRanges.mockResolvedValue({
+        data: {
+          results: [
+            {
+              trace_id: "t-1",
+              status: "found",
+              stream: "default",
+              range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_005_000_000 },
+            },
+          ],
+          partial_coverage: false,
+        },
+      });
+      const row = { trace_id: "t-1", first_seen: 1_700_000_000_123_000, spans: 9 };
+      await showResults(BIG_TRACES, [row]);
+      const hrefFrom = () =>
+        new URL(sqlTable().props("traceHref")(row), "http://o2.test").searchParams.get("from");
+      expect(hrefFrom()).toBe(String(mockSearchObj.data.datetime.startTime));
+
+      await sqlTable().vm.$emit("locate-trace", row);
+      await flushPromises();
+
+      expect(mockTraceTimeRanges).toHaveBeenCalledWith(
+        expect.objectContaining({ trace_ids: ["t-1"], hint_ts: 1_700_000_000_123_000 }),
+      );
+      expect(hrefFrom()).toBe(String(1_700_000_000_000_000 - 60_000_000));
+      mockTraceTimeRanges.mockReset();
+    });
+
+    it("marks the trace row as opening while its lookup runs", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      let answer: (value: unknown) => void = () => {};
+      mockTraceTimeRanges.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+      const row = { trace_id: "t-1", first_seen: 1_700_000_000_123_000, spans: 9 };
+      await showResults(BIG_TRACES, [row]);
+
+      await sqlTable().vm.$emit("open-trace", row);
+      await flushPromises();
+      expect(sqlTable().props("openingTraceId")).toBe("t-1");
+      expect(push).not.toHaveBeenCalled();
+
+      answer({ data: { results: [], partial_coverage: false } });
+      await flushPromises();
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(sqlTable().props("openingTraceId")).toBe("");
+      push.mockRestore();
+      mockTraceTimeRanges.mockReset();
+    });
+
+    it("opens in the page range without a lookup when the row has no first_seen", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      await showResults(`SELECT trace_id, max(duration) AS d FROM "default" GROUP BY trace_id`, [
+        { trace_id: "t-1", d: 3 },
+      ]);
+      await sqlTable().vm.$emit("open-trace", { trace_id: "t-1", d: 3 });
+      await flushPromises();
+      expect(mockTraceTimeRanges).not.toHaveBeenCalled();
+      expect(push.mock.calls[0][0]).toMatchObject({
+        query: {
+          trace_id: "t-1",
+          from: mockSearchObj.data.datetime.startTime,
+          to: mockSearchObj.data.datetime.endTime,
+        },
+      });
+      push.mockRestore();
+    });
+
+    it("says First N traces when a per-trace query reaches its LIMIT", async () => {
+      await showResults(BIG_TRACES, [
+        { trace_id: "a", first_seen: 1, spans: 2 },
+        { trace_id: "b", first_seen: 1, spans: 1 },
+      ]);
+      expect(sqlTable().props("capNote")).toBe("First 2 traces");
+    });
+
+    it("says First N rows when the rows are per parent, as in N+1", async () => {
+      await showResults(
+        `SELECT trace_id, count(*) AS spans FROM "default" WHERE span_kind = '3' GROUP BY trace_id, reference_parent_span_id LIMIT 1`,
+        [{ trace_id: "a", spans: 60 }],
+      );
+      expect(sqlTable().props("capNote")).toBe("First 1 row");
+    });
+
+    it("states no cap below the LIMIT, without one, or while loading", async () => {
+      await showResults(BIG_TRACES, [{ trace_id: "a", first_seen: 1, spans: 2 }]);
+      expect(sqlTable().props("capNote")).toBe("");
+      await showResults(`SELECT trace_id, count(*) AS n FROM "default" GROUP BY trace_id`, [
+        { trace_id: "a", n: 1 },
+      ]);
+      expect(sqlTable().props("capNote")).toBe("");
     });
 
     it("offers Add trace_id for plain rows without GROUP BY and relays it", async () => {

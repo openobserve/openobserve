@@ -91,7 +91,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :theme="store.state.theme"
                 :show-visibility-toggle="row.enableVisibility"
                 :show-filter-icon="!searchObj.meta.sqlMode"
-                :show-multi-select="!searchObj.meta.sqlMode"
                 :show-quick-mode="false"
                 :default-values-count="defaultValuesCount"
                 :value-mapper="getValueMapper(field.name)"
@@ -113,13 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="traces-field-values-count-caption"
                   >
                     {{ t("traces.results.fieldValueCountsCaption") }}
-                    <span
-                      v-if="searchObj.meta.sqlMode"
-                      class="block"
-                      data-test="traces-field-values-sql-hint"
-                    >
-                      {{ t("traces.sqlMode.putConditionInWhere") }}
-                    </span>
                   </div>
                 </template>
                 <template v-if="field.name === 'duration'" #body>
@@ -626,7 +618,24 @@ export default defineComponent({
       }
     };
 
+    // The ticked set replaces the field's typed conditions, so a second value is ORed rather than ANDed.
+    const sqlValuesCondition = (fieldName: string, values: string[], action: string) => {
+      const include = action === "include";
+      const parts = values.map((v) =>
+        v === "null"
+          ? `${fieldName} IS ${include ? "" : "NOT "}NULL`
+          : `${fieldName} ${include ? "=" : "!="} '${escapeSingleQuotes(v)}'`,
+      );
+      if (parts.length < 2) return parts[0] ?? "";
+      return include ? `(${parts.join(" OR ")})` : parts.join(" AND ");
+    };
+
     const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
+      if (searchObj.meta.sqlMode) {
+        const condition = sqlValuesCondition(fieldName, values, action);
+        if (condition) searchObj.data.stream.sqlFieldFilter = { field: fieldName, condition };
+        return;
+      }
       const joinOp = action === "include" ? " or " : " and ";
       // useFieldValuesStream keys the row of missing values "null".
       const condition = (v: string) => {

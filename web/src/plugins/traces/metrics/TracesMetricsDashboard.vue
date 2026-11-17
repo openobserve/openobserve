@@ -233,7 +233,6 @@ export interface TimeRange {
 defineProps<{
   streamName: string;
   show?: boolean;
-  streamFields?: any[];
   aiEnabled?: boolean;
 }>();
 

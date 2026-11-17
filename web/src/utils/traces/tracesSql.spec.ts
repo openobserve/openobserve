@@ -20,9 +20,13 @@ import {
   canAddTraceId,
   deriveSpanSet,
   histogramLosesSpans,
+  groupsByTraceIdOnly,
   insertTraceIdColumn,
+  insertWhereCondition,
   matchAllToStrMatch,
+  withAllFieldRefs,
   missingStreamAfterFrom,
+  replaceFieldConditions,
   replaceSqlIdentifier,
   sqlJoinKeyword,
   strayKeywordBeforeWhere,
@@ -749,5 +753,245 @@ GROUP BY service_name HAVING count(*) > 3`),
       filter: "a > 1.5 AND b = 'x.y'",
       problem: null,
     });
+  });
+});
+
+describe("insertWhereCondition", () => {
+  const cond = "service_name = 'api'";
+
+  it("creates a WHERE after FROM when there is none", () => {
+    expect(insertWhereCondition(`SELECT * FROM "default"`, cond)).toBe(
+      `SELECT * FROM "default" WHERE service_name = 'api'`,
+    );
+    expect(insertWhereCondition(`SELECT * FROM "default";`, cond)).toBe(
+      `SELECT * FROM "default" WHERE service_name = 'api';`,
+    );
+  });
+
+  it("adds to a plain WHERE", () => {
+    expect(insertWhereCondition(`SELECT * FROM "default" WHERE duration > 5`, cond)).toBe(
+      `SELECT * FROM "default" WHERE duration > 5 AND service_name = 'api'`,
+    );
+  });
+
+  it("wraps a WHERE with a top-level OR so the new condition narrows all of it", () => {
+    expect(insertWhereCondition(`SELECT * FROM "default" WHERE a = 1 OR b = 2`, cond)).toBe(
+      `SELECT * FROM "default" WHERE (a = 1 OR b = 2) AND service_name = 'api'`,
+    );
+    expect(insertWhereCondition(`SELECT * FROM "default" WHERE (a = 1 OR b = 2)`, cond)).toBe(
+      `SELECT * FROM "default" WHERE (a = 1 OR b = 2) AND service_name = 'api'`,
+    );
+  });
+
+  it("puts the condition before GROUP BY, ORDER BY and LIMIT, with or without a WHERE", () => {
+    const grouped = `SELECT service_name, count(*) AS n FROM "default"\nWHERE duration > 5\nGROUP BY service_name\nORDER BY n DESC\nLIMIT 10`;
+    expect(insertWhereCondition(grouped, cond)).toBe(
+      `SELECT service_name, count(*) AS n FROM "default"\nWHERE duration > 5 AND service_name = 'api'\nGROUP BY service_name\nORDER BY n DESC\nLIMIT 10`,
+    );
+    const bare = `SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200\nORDER BY trace_id\nLIMIT 100`;
+    expect(insertWhereCondition(bare, cond)).toBe(
+      `SELECT trace_id FROM "default" WHERE service_name = 'api'\nGROUP BY trace_id\nHAVING count(*) > 200\nORDER BY trace_id\nLIMIT 100`,
+    );
+  });
+
+  it("leaves a subquery in the WHERE alone", () => {
+    const sql = `SELECT * FROM "default" WHERE trace_id IN (SELECT trace_id FROM "default" WHERE span_status = 'ERROR') ORDER BY start_time`;
+    expect(insertWhereCondition(sql, cond)).toBe(
+      `SELECT * FROM "default" WHERE trace_id IN (SELECT trace_id FROM "default" WHERE span_status = 'ERROR') AND service_name = 'api' ORDER BY start_time`,
+    );
+  });
+
+  it("adds to the main statement of a CTE, not to the CTE body", () => {
+    const sql = `WITH slow AS (SELECT * FROM "default" WHERE duration > 5) SELECT * FROM slow LIMIT 10`;
+    expect(insertWhereCondition(sql, cond)).toBe(
+      `WITH slow AS (SELECT * FROM "default" WHERE duration > 5) SELECT * FROM slow WHERE service_name = 'api' LIMIT 10`,
+    );
+  });
+
+  it("never touches a CASE WHEN on the same field", () => {
+    const sql = `SELECT sum(CASE WHEN service_name = 'db' THEN 1 ELSE 0 END) AS db FROM "default" WHERE span_status = 'ERROR'`;
+    expect(insertWhereCondition(sql, cond)).toBe(
+      `SELECT sum(CASE WHEN service_name = 'db' THEN 1 ELSE 0 END) AS db FROM "default" WHERE span_status = 'ERROR' AND service_name = 'api'`,
+    );
+  });
+
+  it("reads a where inside a string or a comment as text", () => {
+    const sql = `SELECT * FROM "default" WHERE operation_name = 'where to go' -- where else\nORDER BY start_time`;
+    expect(insertWhereCondition(sql, "service_name != 'api'")).toBe(
+      `SELECT * FROM "default" WHERE operation_name = 'where to go' AND service_name != 'api' -- where else\nORDER BY start_time`,
+    );
+    expect(insertWhereCondition(`SELECT 'where' AS w FROM "default"`, cond)).toBe(
+      `SELECT 'where' AS w FROM "default" WHERE service_name = 'api'`,
+    );
+  });
+
+  it("returns null where there is no single top-level WHERE to add to", () => {
+    expect(insertWhereCondition("", cond)).toBeNull();
+    expect(insertWhereCondition("service_name = 'a'", cond)).toBeNull();
+    expect(insertWhereCondition(`SELECT 1`, cond)).toBeNull();
+    expect(insertWhereCondition(`SELECT a FROM "x" UNION ALL SELECT a FROM "y"`, cond)).toBeNull();
+  });
+});
+
+describe("replaceFieldConditions", () => {
+  const from = `SELECT * FROM "t"`;
+  const both = "(service_name = 'api' OR service_name = 'db')";
+
+  it("replaces the field's equality with the condition for every ticked value", () => {
+    expect(
+      replaceFieldConditions(`${from} WHERE service_name = 'api' ORDER BY x`, "service_name", both),
+    ).toBe(`${from} WHERE ${both} ORDER BY x`);
+  });
+
+  it("keeps the other conditions and adds the new one after them", () => {
+    expect(
+      replaceFieldConditions(
+        `${from} WHERE a = 1 AND service_name = 'api' AND b = 2`,
+        "service_name",
+        "service_name != 'api'",
+      ),
+    ).toBe(`${from} WHERE a = 1 AND b = 2 AND service_name != 'api'`);
+  });
+
+  it("replaces a group of the field's values, a quoted name and IS NULL", () => {
+    expect(
+      replaceFieldConditions(
+        `${from} WHERE ("service_name" = 'a' OR service_name = 'b') AND service_name IS NULL AND a = 1`,
+        "service_name",
+        "service_name = 'c'",
+      ),
+    ).toBe(`${from} WHERE a = 1 AND service_name = 'c'`);
+  });
+
+  it("drops the WHERE when its only conditions were on the field and none is left", () => {
+    expect(
+      replaceFieldConditions(`${from} WHERE service_name = 'api' LIMIT 10`, "service_name", ""),
+    ).toBe(`${from} LIMIT 10`);
+    expect(replaceFieldConditions(`${from} WHERE service_name != 'api';`, "service_name", "")).toBe(
+      `${from};`,
+    );
+  });
+
+  it("leaves other comparisons, BETWEEN and subqueries on the field alone", () => {
+    const typed = `${from} WHERE duration BETWEEN 1 AND 5 AND service_name LIKE 'a%' AND trace_id IN (SELECT trace_id FROM "t" WHERE service_name = 'a') AND service_name = 'a'`;
+    expect(replaceFieldConditions(typed, "service_name", "service_name = 'b'")).toBe(
+      `${from} WHERE duration BETWEEN 1 AND 5 AND service_name LIKE 'a%' AND trace_id IN (SELECT trace_id FROM "t" WHERE service_name = 'a') AND service_name = 'b'`,
+    );
+  });
+
+  it("reads a field stored in _all through its json_get expression", () => {
+    const ref = "json_get_str(_all, 'http_route')";
+    expect(
+      replaceFieldConditions(
+        `${from} WHERE json_get_str(_all,'http_route') = '/a'`,
+        "http_route",
+        `${ref} = '/b'`,
+        ref,
+      ),
+    ).toBe(`${from} WHERE ${ref} = '/b'`);
+  });
+
+  it("adds the condition when the field has no top-level condition, or the WHERE has a top-level OR", () => {
+    expect(
+      replaceFieldConditions(`${from} WHERE a = 1`, "service_name", "service_name = 'x'"),
+    ).toBe(`${from} WHERE a = 1 AND service_name = 'x'`);
+    expect(
+      replaceFieldConditions(
+        `${from} WHERE service_name = 'a' OR b = 1`,
+        "service_name",
+        "service_name = 'x'",
+      ),
+    ).toBe(`${from} WHERE (service_name = 'a' OR b = 1) AND service_name = 'x'`);
+  });
+
+  it("matches a function name in any case and a table-qualified field", () => {
+    const ref = "json_get_str(_all, 'http_route')";
+    expect(
+      replaceFieldConditions(
+        `${from} WHERE JSON_GET_STR(_all, 'http_route') = '/a'`,
+        "http_route",
+        `${ref} = '/b'`,
+        ref,
+      ),
+    ).toBe(`${from} WHERE ${ref} = '/b'`);
+    expect(
+      replaceFieldConditions(
+        `SELECT * FROM "t" s WHERE s.service_name = 'api' AND "s"."service_name" = 'x'`,
+        "service_name",
+        "service_name = 'b'",
+      ),
+    ).toBe(`SELECT * FROM "t" s WHERE service_name = 'b'`);
+  });
+
+  it("leaves a typed mix of included and excluded values alone, so a tick never flips one", () => {
+    expect(
+      replaceFieldConditions(
+        `${from} WHERE service_name = 'api' AND service_name != 'db'`,
+        "service_name",
+        "service_name != 'api' AND service_name != 'db' AND service_name != 'web'",
+      ),
+    ).toBeNull();
+  });
+
+  it("keeps comments and the text between the conditions it keeps", () => {
+    expect(
+      replaceFieldConditions(
+        `${from} WHERE a = 1 /* prod only */ AND service_name = 'api' and b = 2 -- temp`,
+        "service_name",
+        "service_name = 'db'",
+      ),
+    ).toBe(`${from} WHERE a = 1 /* prod only */ and b = 2 AND service_name = 'db' -- temp`);
+    expect(
+      replaceFieldConditions(
+        `${from} WHERE service_name = 'api' AND /* keep */ a = 1`,
+        "service_name",
+        "",
+      ),
+    ).toBe(`${from} WHERE /* keep */ a = 1`);
+  });
+
+  it("is null when there is nothing to remove", () => {
+    expect(replaceFieldConditions(`${from} WHERE a = 1`, "service_name", "")).toBeNull();
+    expect(
+      replaceFieldConditions(`${from} WHERE service_name = 'a' OR b = 1`, "service_name", ""),
+    ).toBeNull();
+    expect(replaceFieldConditions(`${from}`, "service_name", "")).toBeNull();
+  });
+});
+
+describe("groupsByTraceIdOnly", () => {
+  it("is true only when the top-level GROUP BY is trace_id alone", () => {
+    expect(
+      groupsByTraceIdOnly(`SELECT trace_id FROM "a" GROUP BY trace_id HAVING count(*) > 1`),
+    ).toBe(true);
+    expect(groupsByTraceIdOnly(`SELECT trace_id FROM "a" GROUP BY "trace_id" LIMIT 5`)).toBe(true);
+    expect(
+      groupsByTraceIdOnly(`SELECT trace_id FROM "a" GROUP BY trace_id, reference_parent_span_id`),
+    ).toBe(false);
+    expect(groupsByTraceIdOnly(`SELECT trace_id FROM "a"`)).toBe(false);
+    expect(
+      groupsByTraceIdOnly(
+        `SELECT * FROM "a" WHERE trace_id IN (SELECT trace_id FROM "a" GROUP BY trace_id)`,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("withAllFieldRefs", () => {
+  const refs = new Map([["http_status_code", "json_get_int(_all, 'http_status_code')"]]);
+
+  it("reads an _all field through its json_get expression, keeping strings and other names", () => {
+    expect(withAllFieldRefs("http_status_code = '500'", refs)).toBe(
+      "json_get_int(_all, 'http_status_code') = '500'",
+    );
+    expect(withAllFieldRefs("(http_status_code='1' or http_status_code='2')", refs)).toBe(
+      "(json_get_int(_all, 'http_status_code')='1' or json_get_int(_all, 'http_status_code')='2')",
+    );
+    expect(withAllFieldRefs("service_name = 'http_status_code'", refs)).toBe(
+      "service_name = 'http_status_code'",
+    );
+    expect(withAllFieldRefs("http_status_code is null", new Map())).toBe(
+      "http_status_code is null",
+    );
   });
 });

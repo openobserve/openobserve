@@ -20,13 +20,19 @@ const ids = (list: { id: string }[]) => list.map((tpl) => tpl.id);
 const byId = (list: { id: string; sql: string }[], id: string) =>
   list.find((tpl) => tpl.id === id)!;
 
-describe("tracesSqlTemplates: Traces view", () => {
-  const list = tracesSqlTemplates("traces", "otel_demo", {
+const HEAD =
+  "SELECT trace_id, min(_timestamp) AS first_seen,\n" +
+  "  count(*) AS spans,\n" +
+  "  sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errors,\n" +
+  "  (max(end_time) - min(start_time)) / 1000000 AS duration_ms";
+
+describe("tracesSqlTemplates: Trace questions", () => {
+  const list = tracesSqlTemplates("otel_demo", {
     services: ["frontend", "cart", "checkout"],
     fields: [],
   });
 
-  it("lists the six trace templates in order", () => {
+  it("lists Trace questions first, then Span summaries", () => {
     expect(ids(list)).toEqual([
       "slowTraces",
       "bigTraces",
@@ -34,59 +40,73 @@ describe("tracesSqlTemplates: Traces view", () => {
       "nPlusOne",
       "missingSpan",
       "manyServices",
+      "p95ByVersion",
+      "p95ByOperation",
+      "spansPerMinute",
+      "nullAudit",
+    ]);
+    expect(list.map((tpl) => tpl.group)).toEqual([
+      ...Array(6).fill("traceQuestions"),
+      ...Array(4).fill("spanSummaries"),
     ]);
   });
 
-  it("reads FROM the current stream", () => {
-    for (const tpl of list) expect(tpl.sql).toContain(`FROM "otel_demo"`);
+  it("returns one summary row per trace, sorted, capped at 100", () => {
     expect(byId(list, "slowTraces").sql).toBe(
-      `SELECT trace_id FROM "otel_demo"\nGROUP BY trace_id\nHAVING max(end_time) - min(start_time) > 2000000000`,
+      `${HEAD}\nFROM "otel_demo"\nGROUP BY trace_id\nHAVING max(end_time) - min(start_time) > 2000000000\nORDER BY duration_ms DESC\nLIMIT 100`,
     );
     expect(byId(list, "bigTraces").sql).toBe(
-      `SELECT trace_id FROM "otel_demo"\nGROUP BY trace_id\nHAVING count(*) > 200`,
+      `${HEAD}\nFROM "otel_demo"\nGROUP BY trace_id\nHAVING count(*) > 200\nORDER BY spans DESC\nLIMIT 100`,
     );
     expect(byId(list, "nPlusOne").sql).toBe(
-      `SELECT trace_id FROM "otel_demo"\nWHERE span_kind = '3'\nGROUP BY trace_id, reference_parent_span_id\nHAVING count(*) > 50`,
+      `${HEAD}\nFROM "otel_demo"\nWHERE span_kind = '3'\nGROUP BY trace_id, reference_parent_span_id\nHAVING count(*) > 50\nORDER BY spans DESC\nLIMIT 100`,
     );
     expect(byId(list, "manyServices").sql).toBe(
-      `SELECT trace_id FROM "otel_demo"\nGROUP BY trace_id\nHAVING count(DISTINCT service_name) >= 5`,
+      `${HEAD},\n  count(DISTINCT service_name) AS services\nFROM "otel_demo"\nGROUP BY trace_id\nHAVING count(DISTINCT service_name) >= 5\nORDER BY services DESC\nLIMIT 100`,
     );
+  });
+
+  it("counts DISTINCT services only in Crosses 5+ services", () => {
+    for (const tpl of list.filter((t) => t.group === "traceQuestions" && t.id !== "manyServices")) {
+      expect(tpl.sql).not.toContain("DISTINCT");
+      expect(tpl.sql).not.toContain("AS services");
+    }
   });
 
   it("fills the first two services of the stream and marks them", () => {
     const errors = byId(list, "errorsInTwoServices");
     expect(errors.sql).toBe(
-      `SELECT trace_id FROM "otel_demo"\nGROUP BY trace_id\nHAVING sum(CASE WHEN service_name = 'frontend'\n  AND span_status = 'ERROR' THEN 1 ELSE 0 END) > 0\n  AND sum(CASE WHEN service_name = 'cart'\n  THEN 1 ELSE 0 END) > 0`,
+      `${HEAD}\nFROM "otel_demo"\nGROUP BY trace_id\nHAVING sum(CASE WHEN service_name = 'frontend'\n  AND span_status = 'ERROR' THEN 1 ELSE 0 END) > 0\n  AND sum(CASE WHEN service_name = 'cart'\n  THEN 1 ELSE 0 END) > 0\nORDER BY errors DESC\nLIMIT 100`,
     );
     expect(errors.services).toEqual(["frontend", "cart"]);
     const missing = byId(list, "missingSpan");
     expect(missing.sql).toBe(
-      `SELECT trace_id FROM "otel_demo"\nGROUP BY trace_id\nHAVING sum(CASE WHEN service_name = 'frontend'\n  THEN 1 ELSE 0 END) > 0\n  AND sum(CASE WHEN service_name = 'cart'\n  THEN 1 ELSE 0 END) = 0`,
+      `${HEAD}\nFROM "otel_demo"\nGROUP BY trace_id\nHAVING sum(CASE WHEN service_name = 'frontend'\n  THEN 1 ELSE 0 END) > 0\n  AND sum(CASE WHEN service_name = 'cart'\n  THEN 1 ELSE 0 END) = 0\nORDER BY spans DESC\nLIMIT 100`,
     );
     expect(missing.services).toEqual(["frontend", "cart"]);
     expect(byId(list, "bigTraces").services).toEqual([]);
   });
 
   it("escapes quotes in stream and service names", () => {
-    const odd = tracesSqlTemplates("traces", 'we"ird', { services: ["o'neil", "b"], fields: [] });
+    const odd = tracesSqlTemplates('we"ird', { services: ["o'neil", "b"], fields: [] });
     expect(byId(odd, "bigTraces").sql).toContain(`FROM "we""ird"`);
     expect(byId(odd, "missingSpan").sql).toContain(`service_name = 'o''neil'`);
   });
 
   it("falls back to placeholder names when the stream has fewer than two services", () => {
-    const one = tracesSqlTemplates("traces", "a", { services: ["api"], fields: [] });
+    const one = tracesSqlTemplates("a", { services: ["api"], fields: [] });
     expect(byId(one, "errorsInTwoServices").services).toEqual(["api", "service-b"]);
-    const none = tracesSqlTemplates("traces", "a", { services: [], fields: [] });
+    const none = tracesSqlTemplates("a", { services: [], fields: [] });
     expect(byId(none, "missingSpan").services).toEqual(["service-a", "service-b"]);
   });
 });
 
-describe("tracesSqlTemplates: Spans view", () => {
+describe("tracesSqlTemplates: Span summaries", () => {
   it("lists the four aggregate templates without gen_ai or llm fields", () => {
-    const list = tracesSqlTemplates("spans", "otel_demo", {
+    const list = tracesSqlTemplates("otel_demo", {
       services: [],
       fields: ["duration", "service_name"],
-    });
+    }).filter((tpl) => tpl.group === "spanSummaries");
     expect(ids(list)).toEqual(["p95ByVersion", "p95ByOperation", "spansPerMinute", "nullAudit"]);
     expect(byId(list, "p95ByVersion").sql).toBe(
       `SELECT service_service_version,\n  approx_percentile_cont(duration, 0.95) AS p95\nFROM "otel_demo" GROUP BY service_service_version`,
@@ -103,7 +123,7 @@ describe("tracesSqlTemplates: Spans view", () => {
   });
 
   it("adds Tokens by model only when the schema has the fields its SQL reads", () => {
-    const genAi = tracesSqlTemplates("spans", "default", {
+    const genAi = tracesSqlTemplates("default", {
       services: [],
       fields: ["gen_ai_request_model", "gen_ai_usage_input_tokens"],
     });
@@ -111,14 +131,14 @@ describe("tracesSqlTemplates: Spans view", () => {
     expect(byId(genAi, "tokensByModel").sql).toBe(
       `SELECT gen_ai_request_model,\n  sum(gen_ai_usage_input_tokens) AS input_tokens\nFROM "default" GROUP BY gen_ai_request_model`,
     );
-    const llm = tracesSqlTemplates("spans", "default", { services: [], fields: ["llm_model"] });
+    const llm = tracesSqlTemplates("default", { services: [], fields: ["llm_model"] });
     expect(ids(llm)).not.toContain("tokensByModel");
-    const modelOnly = tracesSqlTemplates("spans", "default", {
+    const modelOnly = tracesSqlTemplates("default", {
       services: [],
       fields: ["gen_ai_request_model", "gen_ai_usage_output_tokens"],
     });
     expect(ids(modelOnly)).not.toContain("tokensByModel");
-    const neither = tracesSqlTemplates("spans", "default", {
+    const neither = tracesSqlTemplates("default", {
       services: [],
       fields: ["my_gen_ai_note"],
     });

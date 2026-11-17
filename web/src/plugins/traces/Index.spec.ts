@@ -421,6 +421,7 @@ const { mockSqlTemplates } = vi.hoisted(() => ({
   mockSqlTemplates: [
     {
       id: "bigTraces",
+      group: "traceQuestions",
       sql: `SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`,
       services: [],
     },
@@ -5439,8 +5440,78 @@ describe("Index.vue (Main Traces Page)", () => {
 
     afterEach(() => {
       mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.showHistogram = true;
       mockSearchObj.data.editorValue = "";
       mockSearchObj.data.queryPayload = null;
+    });
+
+    const batch = async (handlers: any, hits: any[]) => {
+      handlers.data({}, { type: "search_response_hits", content: { results: { hits } } });
+      await flushPromises();
+    };
+
+    it("shows aggregate rows only when the stream ends, as early groups can still change", async () => {
+      await mountSql();
+      const { handlers } = await runSql(grouped);
+      await batch(handlers, [{ service_name: "api", n: 3 }]);
+      expect(mockSearchObj.data.queryResults.hits).toEqual([]);
+      expect(mockSearchObj.loading).toBe(true);
+      await batch(handlers, [{ service_name: "db", n: 1 }]);
+      expect(mockSearchObj.data.queryResults.hits).toEqual([]);
+      handlers.complete({});
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.hits).toEqual([
+        { service_name: "api", n: 3 },
+        { service_name: "db", n: 1 },
+      ]);
+      expect(mockSearchObj.loading).toBe(false);
+    });
+
+    it("still shows span rows as they stream in", async () => {
+      await mountSql();
+      const { handlers } = await runSql(`SELECT * FROM "default" WHERE a = 1`);
+      await batch(handlers, [{ trace_id: "t", span_id: "s" }]);
+      expect(mockSearchObj.data.queryResults.hits).toEqual([{ trace_id: "t", span_id: "s" }]);
+    });
+
+    it.each([
+      ["an aggregate", grouped],
+      ["a row query", `SELECT * FROM "default" WHERE a = 1`],
+    ])("shows the error state, not the rows, when %s fails after some rows", async (_, sql) => {
+      await mountSql();
+      const { handlers } = await runSql(sql);
+      await batch(handlers, [{ trace_id: "t", span_id: "s", service_name: "api", n: 3 }]);
+      handlers.error({}, { content: { code: 20009, message: "querier went away" } });
+      handlers.complete({});
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      expect(wrapper.find('[data-test="traces-search-error-message"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-search-result"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "TracesSqlErrorState" }).props("errorMsg")).toBe(
+        "querier went away",
+      );
+    });
+
+    it("keeps the out-of-memory card with Use last 1 hour for a trace question", async () => {
+      await mountSql();
+      const range = { ...mockSearchObj.data.datetime };
+      Object.assign(mockSearchObj.data.datetime, {
+        type: "relative",
+        relativeTimePeriod: "6h",
+      });
+      try {
+        const { handlers } = await runSql(mockSqlTemplates[0].sql);
+        handlers.error({}, { content: { code: 20008, message: "Resources exhausted" } });
+        await flushPromises();
+        for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+        await nextTick();
+        const state = wrapper.findComponent({ name: "TracesSqlErrorState" });
+        expect(state.props("errorCode")).toBe(20008);
+        expect(state.find('[data-test="traces-sql-fix-last-hour-card"]').exists()).toBe(true);
+      } finally {
+        Object.assign(mockSearchObj.data.datetime, range);
+      }
     });
 
     it("sends the typed SQL as written to the spans search", async () => {
@@ -5531,6 +5602,16 @@ describe("Index.vue (Main Traces Page)", () => {
         created.astify.mockImplementation((sql: string) => real.astify(sql));
       }
     };
+
+    it("ticks sidebar values of a field stored in _all from its json_get condition", async () => {
+      await useRealParser();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "default" WHERE (json_get_str(_all, 'http_route') = '/a' OR json_get_str(_all, 'http_route') = '/b') AND json_get_int(_all, 'http_status_code') != 500 AND json_get_str(_all, 'peer') IS NOT NULL AND json_get_str(other, 'x') = 'y'`;
+      await mountSql();
+      const vm = wrapper.vm as any;
+      expect(vm.activeIncludeFilterValues).toEqual({ http_route: ["/a", "/b"] });
+      expect(vm.activeExcludeFilterValues).toEqual({ http_status_code: ["500"], peer: ["null"] });
+    });
 
     const runTracesSql = async (sql: string) => {
       await mountSql();
@@ -5900,7 +5981,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
     it("shows the template gallery for an empty SQL editor, and a template fills it without running", async () => {
       await mountSql();
-      mockSearchObj.meta.searchMode = "traces";
       mockSearchObj.meta.sqlMode = true;
       mockSearchObj.data.editorValue = "";
       wrapper.vm.searchData();
@@ -5910,7 +5990,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await nextTick();
 
       const gallery = wrapper.findComponent({ name: "TracesSqlTemplateGallery" });
-      expect(gallery.props("view")).toBe("traces");
+      expect(gallery.props()).not.toHaveProperty("view");
       expect(gallery.props("templates")).toEqual(mockSqlTemplates);
 
       gallery.vm.$emit("use", mockSqlTemplates[0].sql);
@@ -6074,7 +6154,16 @@ describe("Index.vue (Main Traces Page)", () => {
       const hidden = wrapper.findComponent({ name: "TracesMetricsDashboard" });
       expect(hidden.vm).toBe(dashboard.vm);
       expect(hidden.isVisible()).toBe(false);
-      mockSearchObj.meta.showHistogram = true;
+    });
+
+    it("binds no stream fields to the RED strip, which reads none", async () => {
+      await mountSql();
+      await failRun(`SELECT servce_name FROM "default"`, { code: 20004, message: "x" });
+      await vi.waitFor(() =>
+        expect(wrapper.findComponent({ name: "TracesMetricsDashboard" }).exists()).toBe(true),
+      );
+      const dashboard = wrapper.findComponent({ name: "TracesMetricsDashboard" });
+      expect(dashboard.vm.$.vnode.props).not.toHaveProperty("stream-fields");
     });
 
     it("keeps the filter-mode error as it was", async () => {

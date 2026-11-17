@@ -53,4 +53,14 @@ describe("TracesRedSqlPanel", () => {
     const wrapper = mountPanel([]);
     expect(wrapper.findComponent({ name: "PanelSchemaRenderer" }).exists()).toBe(false);
   });
+
+  it("says there is no data when a ready panel has no buckets, instead of a blank body", () => {
+    const wrapper = mountPanel([]);
+    expect(wrapper.find('[data-test="traces-red-sql-panel-rate-no-data"]').text()).toBe("No data");
+    expect(
+      mountPanel([{ time_bucket: "t", max_rate: 1 }])
+        .find('[data-test="traces-red-sql-panel-rate-no-data"]')
+        .exists(),
+    ).toBe(false);
+  });
 });
