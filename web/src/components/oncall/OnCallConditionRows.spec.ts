@@ -19,6 +19,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import OnCallConditionRows from "@/components/oncall/OnCallConditionRows.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import i18n from "@/locales";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
+import { displayFieldsOf } from "@/types/serviceRef";
 
 const PREFIX = "rows";
 
@@ -239,5 +241,51 @@ describe("OnCallConditionRows without starts with", () => {
     ).toBe(false);
     expect(w.find(`[data-test="${PREFIX}-op-0"]`).text()).toBe("is");
     expect(w.emitted("update:modelValue")?.at(-1)?.[0]).toEqual({ service: "pay" });
+  });
+});
+
+describe("OnCallConditionRows service display names", () => {
+  const row = labelRows.differs;
+  const ambiguous = labelRows.ambiguous;
+  const services = [row, ambiguous].map((r) => ({
+    name: r.service_name,
+    setId: "kubernetes",
+    identity: {},
+    ...displayFieldsOf(r),
+  }));
+
+  function mountWith() {
+    return mount(OnCallConditionRows, {
+      props: {
+        testPrefix: PREFIX,
+        services,
+        catalogue: {
+          present: ["service"],
+          values: { service: { [row.service_name]: 2, [ambiguous.service_name]: 1 } },
+        },
+      },
+      global: { plugins: [i18n] },
+    });
+  }
+  const valueSelect = (w: ReturnType<typeof mountWith>) =>
+    w.findAllComponents(OSelect).find((c) => c.attributes("data-test") === `${PREFIX}-value-0`)!;
+
+  it("offers service values by trace name with the key as the value", () => {
+    const options = valueSelect(mountWith()).props("options") as Record<string, unknown>[];
+    expect(options.find((option) => option.value === row.service_name)).toMatchObject({
+      label: row.display_name,
+      subLabel: `detected as ${row.service_name}`,
+      searchText: row.service_name,
+    });
+    expect(options.find((option) => option.value === ambiguous.service_name)).toMatchObject({
+      label: ambiguous.display_name,
+      subLabel: `covers ${ambiguous.display_candidates.length} trace services`,
+    });
+  });
+
+  it("writes the key when a display-labelled service option is picked", async () => {
+    const w = mountWith();
+    await valueSelect(w).vm.$emit("update:modelValue", row.service_name);
+    expect(w.emitted("update:modelValue")?.at(-1)?.[0]).toEqual({ service: row.service_name });
   });
 });

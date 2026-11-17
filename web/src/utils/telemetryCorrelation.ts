@@ -309,7 +309,11 @@ export function quoteSqlLiteral(value: string): string {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-export function buildSqlCondition(field: string, value: string): string {
+/** An exact match, or a case-insensitive match on every spelling when the value is one of them. */
+export function buildSqlCondition(field: string, value: string, spellings?: string[]): string {
+  if (spellings?.includes(String(value).trim().toLowerCase())) {
+    return `lower(trim(${quoteSqlIdentifier(field)})) IN (${spellings.map(quoteSqlLiteral).join(", ")})`;
+  }
   return `${quoteSqlIdentifier(field)} = ${quoteSqlLiteral(value)}`;
 }
 

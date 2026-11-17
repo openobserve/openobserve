@@ -155,3 +155,16 @@ export type ChannelDefaultForm = {
   channel_id: string;
   answer_mode: SlackAnswerMode;
 };
+
+const DIGEST_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** The AutoObserve section: only the digest time can be entered wrong, so only it is checked here. */
+export const makeInsightsSchema = (t: Translate) =>
+  z.object({
+    installation_id: z.string(),
+    channel_id: z.string().nullable(),
+    digest_time: z.string().regex(DIGEST_TIME, t("slackApp.insights.timeInvalid")),
+    digest_time_zone: z.string(),
+    post_trial_findings: z.boolean(),
+    allow_changes_from_slack: z.boolean(),
+  });

@@ -52,10 +52,13 @@
         :envs="envs"
         :agent-names="agentNames"
         :versions="versions"
+        :agent-streams="agentStreams"
+        :selected-agent-stream="effectiveStream"
         :selected-stream-count="selectedStreamCount"
         :streams-loaded="true"
         :agents-loaded="agentsLoaded"
         @filter-mode-change="onFilterModeChange"
+        @update:selected-agent-stream="selectedAgentStream = $event"
         @agent-pick="modeExplicit = true"
       />
     </template>
@@ -86,10 +89,11 @@
         :scope-ready="scopeReady"
         :source-stream="scopeReady ? effectiveStream : ''"
         :agent-filter="agentFilter"
-        :agent-env="filterMode === 'agent' ? selectedAgent?.env : null"
-        :agent-version="filterMode === 'agent' ? selectedAgent?.version : null"
+        :agent-env="panelScope.env"
+        :agent-version="panelScope.version"
         :start-time="timeRange.startTime"
         :end-time="timeRange.endTime"
+        @send-to-ai-chat="(value: unknown, append?: boolean) => emit('sendToAiChat', value, append)"
       />
     </div>
   </AiPageShell>
@@ -115,10 +119,14 @@ import {
   scopeUrlQuery,
   type ScopeMode,
 } from "@/enterprise/composables/useAgentScope";
+import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
 import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
+import { selectedAgentScope } from "./agentScope";
 
 defineOptions({ name: "AgentBehaviorPage" });
+// "Explain with O2 AI" in the drill-down drawer; the AI shell forwards it to the chat panel.
+const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
 
 const { t } = useI18nTyped();
 const { getStreams } = useStreams(t);
@@ -126,17 +134,14 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-// Shared with LLM Insights / Sessions / Quality — see useAiDateRange.ts.
-// Agent Behavior has no from/to/period URL sync (urlSync:false), matching its
-// prior behavior of resolving from shared state only.
+// Range kept in the URL so a shared link opens it.
 const {
   dateState,
   timeRange,
   applyRelative,
   onDateChange: onDateStateChange,
-  mountResolve,
   DEFAULT_RELATIVE,
-} = useAiDateController({ urlSync: false });
+} = useAiDateController();
 
 // The scope in the URL (`type`, `stream`, `agent`, `env`, `version`) wins over
 // the defaults, so a link shared from any Monitor page opens the same agent
@@ -177,6 +182,8 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  agentStreams,
+  selectedAgentStream,
   selectAgentByScope,
 } = useAgentScope({
   filterMode,
@@ -197,17 +204,35 @@ const agentFilter = computed(() =>
   filterMode.value === "agent" ? (selectedAgent.value?.name ?? "") : "",
 );
 
+const panelScope = computed(
+  () =>
+    (filterMode.value === "agent" && selectedAgentScope(selectedAgent.value, agents.value)) || {
+      env: null,
+      version: null,
+    },
+);
+
 function syncScopeUrl() {
   const agent = selectedAgent.value
-    ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
+    ? {
+        name: selectedAgent.value.name,
+        env: selectedEnv.value,
+        version: selectedVersion.value,
+        stream: selectedAgentStream.value,
+      }
     : null;
-  const query = scopeUrlQuery(route.query, {
-    mode: filterMode.value,
-    explicit: modeExplicit.value,
-    stream: activeStream.value,
-    agent,
+  void replaceRouteQuery(router, route, (current) => {
+    const next = scopeUrlQuery(current, {
+      mode: filterMode.value,
+      explicit: modeExplicit.value,
+      stream: activeStream.value,
+      agent,
+    });
+    // The store gets the new org before the route; the route alone would write the previous org back.
+    const org = store.state.selectedOrganization?.identifier;
+    if (org && next.org_identifier != null) next.org_identifier = org;
+    return next;
   });
-  router.replace({ query }).catch(() => {});
 }
 
 // A toggle click is an explicit choice: kept in the URL and remembered for the
@@ -220,7 +245,7 @@ function onFilterModeChange(mode: unknown) {
   syncScopeUrl();
 }
 
-watch([activeStream, selectedEnv, selectedAgentName, selectedVersion], () => {
+watch([activeStream, selectedEnv, selectedAgentName, selectedVersion, selectedAgentStream], () => {
   if (scopeReady.value) syncScopeUrl();
 });
 
@@ -272,7 +297,12 @@ async function settleScope(force = false) {
     filterMode.value = resolveScopeMode(null, agents.value.length, agentsError.value);
   }
   if (pendingUrlScope && agents.value.length) {
-    selectAgentByScope(pendingUrlScope.env, pendingUrlScope.agent, pendingUrlScope.version);
+    selectAgentByScope(
+      pendingUrlScope.env,
+      pendingUrlScope.agent,
+      pendingUrlScope.version,
+      pendingUrlScope.agentStream,
+    );
     pendingUrlScope = null;
   }
   scopeReady.value = true;
@@ -287,8 +317,5 @@ function onDateChange(value: unknown) {
   if ((value as { userChangedValue?: boolean } | null)?.userChangedValue === true) settleScope();
 }
 
-onMounted(() => {
-  mountResolve();
-  settleScope();
-});
+onMounted(settleScope);
 </script>

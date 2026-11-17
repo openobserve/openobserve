@@ -63,3 +63,23 @@ describe("loadLogsData — a search the user sent while the stream metadata load
     wrapper.unmount();
   });
 });
+
+describe("loadLogsData — Cancel pressed while the stream metadata loaded", () => {
+  it("does not start the landing search afterwards", async () => {
+    const wrapper: any = mount(Host, { global: { plugins: [store, i18n, router] } });
+    const { searchObj } = wrapper.vm;
+    searchObj.meta.jobId = "";
+    const autoRun = useLogsAutoRun();
+    const request = vi.spyOn(autoRun, "request");
+    searchObj.loading = true;
+    const loaded = wrapper.vm.loadLogsData();
+    searchObj.data.stream.selectedStream = ["default"];
+    autoRun.engine.cancelGeneration(null, { cause: "user" });
+    finishStreams({ list: [] });
+    await loaded;
+    expect(request).not.toHaveBeenCalled();
+    expect(searchObj.loading).toBe(false);
+    request.mockRestore();
+    wrapper.unmount();
+  });
+});

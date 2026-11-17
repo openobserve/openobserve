@@ -143,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             format24
             :label="t('oncall.stopTime')"
             :data-test="`oncall-schedule-rule-stop-time-${ruleIndex}`"
+            @invalid="pickedTimeRefused = $event"
           />
         </div>
         <p
@@ -265,11 +266,14 @@ watch(renameOpen, (open) => {
 const choice = ref<string | undefined>(undefined);
 const pickedDate = ref("");
 const pickedTime = ref("");
+// A refused typed time leaves the previous one in pickedTime, which must not become the stop.
+const pickedTimeRefused = ref(false);
 
 function openStop() {
   choice.value = undefined;
   pickedDate.value = "";
   pickedTime.value = "";
+  pickedTimeRefused.value = false;
   chosen.value = "stop";
 }
 
@@ -282,7 +286,8 @@ const pickedInPast = computed(() => {
 
 const stopAt = computed<number | null>(() => {
   if (choice.value === "pick") {
-    if (!pickedDate.value || !pickedTime.value || pickedInPast.value) return null;
+    if (!pickedDate.value || !pickedTime.value || pickedTimeRefused.value || pickedInPast.value)
+      return null;
     return fromZonedInputValue(`${pickedDate.value}T${pickedTime.value}`, props.timezone);
   }
   const index = choice.value?.startsWith("end-") ? Number(choice.value.slice(4)) : -1;

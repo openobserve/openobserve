@@ -222,7 +222,7 @@ describe("ONavbar", () => {
         "alertList,alertDestinations,alertTemplates,alertLibrary,alertCalibration,onCallResponses,onCallTeams,onCallRouting,onCallMine",
       );
       expect(reliability.attributes("data-filtered")).toBe(
-        "sloList,incidentList,downtimes,alertSources",
+        "alertSources,sloList,incidentList,downtimes",
       );
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
     });

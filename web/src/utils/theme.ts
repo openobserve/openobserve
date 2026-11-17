@@ -240,6 +240,8 @@ const syncO2LibraryTokens = (themeColor: string): void => {
   // resting background (the 600 shade) — see pickButtonForeground for why this
   // can't be hardcoded to white.
   root.style.setProperty("--color-button-primary-foreground", pickButtonForeground(palette["600"]));
+  // Timeline pills carry small text, so they take the strict AA pick, not the button floor.
+  root.style.setProperty("--color-timeline-dot-primary-fg", pickReadableForeground(palette["600"]));
 };
 
 /**
@@ -271,6 +273,7 @@ export const applyThemeColors = (
       },
     );
     root.style.removeProperty("--color-button-primary-foreground");
+    root.style.removeProperty("--color-timeline-dot-primary-fg");
   } else {
     syncO2LibraryTokens(themeColor);
   }

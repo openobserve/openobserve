@@ -328,17 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :read-only="!editTable"
         />
       </div>
-      <div
-        v-if="
-          (activeTab == 'api-limits' || activeTab == 'role-limits') &&
-          loading &&
-          !apiLimitsRows.length
-        "
-        class="flex items-center justify-center"
-      >
-        <OSpinner size="md" />
-      </div>
-      <div v-else-if="activeTab == 'api-limits' && !loading && !selectedOrganization">
+      <div v-if="activeTab == 'api-limits' && !loading && !selectedOrganization">
         <NoOrganizationSelected />
       </div>
       <div v-else-if="activeTab == 'role-limits' && !loading && !selectedOrganization">
@@ -1142,16 +1132,8 @@ export default defineComponent({
       );
     };
 
-    const generateColumns = () => {
-      if (
-        Object.prototype.hasOwnProperty.call(selectedOrganization.value ?? {}, "value") &&
-        selectedOrganization.value.value != ""
-      ) {
-        return apiLimitsColumns.value;
-      } else {
-        return [];
-      }
-    };
+    // The header is drawn before an organization is chosen, so the table never mounts without columns.
+    const generateColumns = () => apiLimitsColumns.value;
 
     const downloadTemplate = async () => {
       try {

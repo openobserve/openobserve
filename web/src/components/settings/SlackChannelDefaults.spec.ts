@@ -33,6 +33,8 @@ import {
   orgAccessView,
 } from "@/test/unit/helpers/slack";
 import type { InstallationView, SlackChannelDefaultRow } from "@/types/slack";
+import { SLACK_READ_ONLY } from "./slackReadOnly";
+import { computed } from "vue";
 
 vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
 
@@ -106,11 +108,12 @@ const mountOn = async (
   return w;
 };
 
-const mountWith = async (realTable = false) => {
+const mountWith = async (realTable = false, readOnly = false) => {
   const w = mount(SlackChannelDefaults, {
     props: { installationId: "inst-1" },
     attachTo: document.body,
     global: {
+      provide: { [SLACK_READ_ONLY as symbol]: computed(() => readOnly) },
       plugins: [i18n, makeSlackStore()],
       stubs: realTable
         ? { ConfirmDialog: ConfirmDialogStub }
@@ -152,6 +155,18 @@ afterEach(() => {
 });
 
 describe("SlackChannelDefaults (rows 21-22)", () => {
+  it("a_reader_without_manage_slack_can_neither_set_nor_change_a_default", async () => {
+    vi.mocked(slack.listChannelDefaults).mockReturnValue(ok({ defaults: rows }) as any);
+    await mountWith(true, true);
+    expect(
+      document.body
+        .querySelector('[data-test="slack-channel-set-default"]')
+        ?.hasAttribute("disabled"),
+    ).toBe(true);
+    expect(document.body.querySelector('[data-test^="slack-channel-edit-"]')).toBeNull();
+    expect(document.body.querySelector('[data-test^="slack-channel-remove-"]')).toBeNull();
+  });
+
   it("lists each channel with its answer mode, who set it and a dash when no alert routes", async () => {
     const w = await mountDefaults();
     expect(slack.listChannelDefaults).toHaveBeenCalledWith("acme", "inst-1");

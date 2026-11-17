@@ -35,6 +35,15 @@ describe("OSegmentedBar", () => {
     expect(find(w, "o-segmented-bar-segment-b").classes()).toContain("bg-accent");
   });
 
+  it("paints a series segment with its chart series token instead of a variant", () => {
+    const w = mount(OSegmentedBar, {
+      props: { segments: [{ id: "a", pct: 30, variant: "danger", series: 3 }] },
+    });
+    const seg = find(w, "o-segmented-bar-segment-a");
+    expect(seg.attributes("style")).toContain("background-color: var(--color-chart-series-3)");
+    expect(seg.classes()).not.toContain("bg-status-negative");
+  });
+
   it("clamps out-of-range percentages", () => {
     const w = mount(OSegmentedBar, {
       props: {

@@ -15,7 +15,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import config from "@/aws-exports";
-import { onboardingFlowOn, sampleDataFlowOn } from "./firstRunFlow";
+import { onboardingFlowOn, sampleDataFlowOn, sampleDataOffered } from "./firstRunFlow";
 
 const CLOUD = config.isCloud;
 
@@ -60,5 +60,20 @@ describe("first-run flow switches", () => {
     for (const cfg of [undefined, {}, { sample_data_onboarding_enabled: true }]) {
       expect([onboardingFlowOn(cfg), sampleDataFlowOn(cfg)]).toEqual([false, false]);
     }
+  });
+});
+
+describe("sampleDataOffered", () => {
+  const on = { version: "v0.0.0", sample_data_onboarding_enabled: true };
+  const DAY_MICROS = 24 * 60 * 60 * 1000 * 1000;
+  const now = () => Date.now() * 1000;
+
+  it.each([
+    ["no expiry", undefined, on, true],
+    ["a future expiry", now() + 5 * DAY_MICROS, on, true],
+    ["a past expiry", now() - 5 * DAY_MICROS, on, false],
+    ["the switch off", undefined, { ...on, sample_data_onboarding_enabled: false }, false],
+  ])("with %s -> offered %s", (_name, expiry, cfg, offered) => {
+    expect(sampleDataOffered(cfg, expiry)).toBe(offered);
   });
 });

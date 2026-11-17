@@ -200,8 +200,8 @@ describe("ORefreshButton", () => {
       expect(wrapper.find("[data-stub-tooltip]").text()).toBe("Not yet refreshed");
     });
 
-    it("is 32px by default and 34px at the header size", () => {
-      expect(inline().find("button").classes()).toContain("h-8!");
+    it("keeps the toolbar size by default and is 34px at the header size", () => {
+      expect(inline().find("button").classes()).not.toContain("h-8!");
       const header = inline({ size: "header" }).find("button");
       expect(header.classes()).toContain("h-8.5!");
       expect(header.classes()).not.toContain("h-8!");

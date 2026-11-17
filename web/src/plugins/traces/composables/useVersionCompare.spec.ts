@@ -186,6 +186,17 @@ describe("useVersionCompare — run", () => {
     expect(vc.errorA.value).toBeFalsy();
   });
 
+  it("asks the compare endpoint for the env-less variant of an env-less arm, not any env", async () => {
+    const vc = useVersionCompare();
+    const a = makeAgent({ env: null, version: "1.0", first_seen: 1000 * H - 200 * H });
+    const b = makeAgent({ env: "prod", version: "2.0" });
+    vc.setPair(a, b);
+    await vc.run("traces_stream");
+    const [armA, armB] = mockCompareAgentVersions.mock.calls[0].slice(1);
+    expect(armA.env).toBe("");
+    expect(armB.env).toBe("prod");
+  });
+
   it("A==B (same env+version) sets sameVariant and short-circuits (no fetch)", async () => {
     const vc = useVersionCompare();
     const a = makeAgent({ env: "prod", version: "1.5.0" });

@@ -18,5 +18,8 @@ import { orgKey } from "@/composables/query/keys";
 export const securityKeys = {
   all: (org: string) => orgKey(org, "security"),
   access: (org: string) => orgKey(org, "security", "access"),
-  audit: (org: string) => orgKey(org, "security", "audit"),
+  audit: (org: string, params?: unknown) =>
+    params === undefined
+      ? orgKey(org, "security", "audit")
+      : orgKey(org, "security", "audit", params),
 };

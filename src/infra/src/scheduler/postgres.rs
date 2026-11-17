@@ -88,6 +88,20 @@ FROM timed_out_jobs
 WHERE jobs.id = timed_out_jobs.id;
 "#;
 
+const WATCH_TIMEOUT_MODULE_QUERY: &str = r#"
+WITH timed_out_jobs AS (
+    SELECT id
+    FROM scheduled_jobs
+    WHERE status = $2 AND end_time <= $3 AND module = $4
+    ORDER BY id
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE scheduled_jobs AS jobs
+SET status = $1, retries = jobs.retries + 1
+FROM timed_out_jobs
+WHERE jobs.id = timed_out_jobs.id;
+"#;
+
 const KEEP_ALIVE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
 SET end_time = CASE WHEN module = $1 THEN $2 ELSE $3 END
 WHERE id = $4 AND claim_epoch = $5 AND status = $6;"#;
@@ -850,6 +864,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         } else {
             PULL_QUERY
         };
+        let (skip_realtime, skip_silenced) = super::pull_skip_binds(module.as_ref());
 
         let mut tx = pool.begin().await?;
 
@@ -888,8 +903,8 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .bind(alert_max_time)
             .bind(TriggerStatus::Waiting)
             .bind(now)
-            .bind(true)
-            .bind(false);
+            .bind(skip_realtime)
+            .bind(skip_silenced);
         if let Some(m) = module {
             q = q.bind(m);
         }
@@ -1059,6 +1074,21 @@ AND EXISTS (SELECT 1 FROM organizations WHERE identifier = $1 AND status = 'acti
             "[SCHEDULER] watch_timeout for scheduler updated {} rows",
             res.rows_affected()
         );
+        Ok(())
+    }
+
+    async fn watch_timeout_module(&self, module: TriggerModule) -> Result<()> {
+        let pool = CLIENT_RW.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
+        sqlx::query(WATCH_TIMEOUT_MODULE_QUERY)
+            .bind(TriggerStatus::Waiting)
+            .bind(TriggerStatus::Processing)
+            .bind(now_micros())
+            .bind(module)
+            .execute(&pool)
+            .await?;
         Ok(())
     }
 
@@ -1304,7 +1334,7 @@ mod tests {
     }
     use super::{
         COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, PULL_QUERY_BY_MODULE,
-        PostgresScheduler, WATCH_TIMEOUT_QUERY,
+        PostgresScheduler, WATCH_TIMEOUT_MODULE_QUERY, WATCH_TIMEOUT_QUERY,
     };
 
     #[test]
@@ -1325,6 +1355,13 @@ mod tests {
         assert!(PULL_QUERY_BY_MODULE.contains("FOR UPDATE SKIP LOCKED"));
         assert!(WATCH_TIMEOUT_QUERY.contains("ORDER BY id"));
         assert!(WATCH_TIMEOUT_QUERY.contains("FOR UPDATE SKIP LOCKED"));
+    }
+
+    #[test]
+    fn a_module_timeout_watch_locks_like_the_global_one_and_keeps_to_its_module() {
+        assert!(WATCH_TIMEOUT_MODULE_QUERY.contains("AND module = $4"));
+        assert!(WATCH_TIMEOUT_MODULE_QUERY.contains("ORDER BY id"));
+        assert!(WATCH_TIMEOUT_MODULE_QUERY.contains("FOR UPDATE SKIP LOCKED"));
     }
 
     #[test]

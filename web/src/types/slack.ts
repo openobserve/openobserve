@@ -312,6 +312,11 @@ export interface SlackCredentialsRequest {
 export interface SlackAvailableInstallation {
   installation_id: string;
   team_name: string;
+  app_id?: string;
+  /** The Slack app's display name its admin chose; empty when unknown. */
+  app_name?: string;
+  /** Install time, Unix microseconds. */
+  created_at?: number;
 }
 
 export interface SlackUpgradeCandidate {
@@ -533,6 +538,51 @@ export interface SlackChannelDefaultRequest {
 
 export interface SlackHelpContact {
   help_contact: string | null;
+}
+
+/** The slice of `SlackAppTarget` the AutoObserve digest posts through; the server fills the rest. */
+export interface SlackInsightsChannel {
+  installation_id: string;
+  channel_id: string;
+  channel_name: string;
+}
+
+export interface SlackInsightsDigestCounts {
+  needs_attention: number;
+  suggestions: number;
+  calibration_runs: number;
+  /** Findings the digest posted; absent on servers that only counted runs. */
+  calibration_findings?: number;
+}
+
+export interface SlackInsightsLastDigest {
+  time_us: number;
+  counts: SlackInsightsDigestCounts;
+  link: string;
+}
+
+/** `GET /api/{org}/slack/insights-settings`; an absent optional field reads as off or unknown. */
+export interface SlackInsightsSettings {
+  channel: SlackInsightsChannel | null;
+  /** `HH:MM` in `digest_time_zone`. */
+  digest_time: string;
+  /** IANA zone; null until an admin first saves. */
+  digest_time_zone: string | null;
+  post_trial_findings: boolean;
+  allow_changes_from_slack?: boolean;
+  revision: number;
+  last_digest?: SlackInsightsLastDigest | null;
+  /** False for a reader without the Manage Slack permission; absent means the server lets them try. */
+  can_edit?: boolean;
+}
+
+export interface SlackInsightsSettingsRequest {
+  channel: SlackInsightsChannel | null;
+  digest_time: string;
+  digest_time_zone: string;
+  post_trial_findings: boolean;
+  allow_changes_from_slack: boolean;
+  revision: number;
 }
 
 export interface SlackSignedRequest {

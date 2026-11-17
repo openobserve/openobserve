@@ -8,6 +8,7 @@
 // the dashboard does not need to resolve matching trace ids with a subquery.
 
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 /** Sentinel option value for the "All Agents" selection (no filter). */
 export const ALL_AGENTS_VALUE = "__all__";
@@ -24,10 +25,6 @@ export function agentOptionKey(agent: GenAiAgentListItem): string {
   return `${agent.source_stream_type}/${agent.source_stream}/${
     agent.id ?? agent.name
   }/${agent.env ?? ""}/${agent.version ?? ""}`;
-}
-
-function sqlQuote(value: string): string {
-  return value.replace(/'/g, "''");
 }
 
 /**
@@ -49,13 +46,16 @@ export function buildAgentTraceFilter(
   // every discovered span (gen_ai_agent_env / gen_ai_agent_version) — stable
   // regardless of which source attribute the value came from, mirroring how the
   // agent identity filters on canonical gen_ai_agent_name/id above.
-  const clauses = [`${field} = '${sqlQuote(String(value))}'`];
+  const clauses = [`${field} = ${sqlLiteral(value)}`];
   if (agent.version) {
-    clauses.push(`gen_ai_agent_version = '${sqlQuote(String(agent.version))}'`);
+    clauses.push(`gen_ai_agent_version = ${sqlLiteral(agent.version)}`);
   }
-  if (agent.env) {
-    clauses.push(`gen_ai_agent_env = '${sqlQuote(String(agent.env))}'`);
-  }
+  // An env-less registry row is its own variant, separate from the same version's env'd rows.
+  clauses.push(
+    agent.env
+      ? `gen_ai_agent_env = ${sqlLiteral(agent.env)}`
+      : "(gen_ai_agent_env IS NULL OR gen_ai_agent_env = '')",
+  );
   return clauses.join(" AND ");
 }
 

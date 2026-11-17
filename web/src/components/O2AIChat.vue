@@ -572,6 +572,7 @@ export default defineComponent({
         chipName?: string;
         newChat?: boolean;
         context?: Record<string, unknown> | null;
+        prompt?: string;
       } | null,
       default: null,
     },
@@ -841,6 +842,8 @@ export default defineComponent({
     // Ask hand-off (J5): once its chip lands, the caret goes before it, so the question leads
     // the message and the chat title is taken from the question, not from the record.
     let caretBeforeChips = false;
+    // A hand-off's prefilled request, written into the input once its chip is in; never sent.
+    let pendingPrompt = "";
 
     const processPendingChips = () => {
       if (pendingChips.value.length > 0) {
@@ -867,7 +870,11 @@ export default defineComponent({
               chatInput.value.insertChip(chip);
             });
             pendingChips.value = [];
-            if (caretBeforeChips) {
+            if (pendingPrompt && typeof chatInput.value.prependText === "function") {
+              chatInput.value.prependText(pendingPrompt);
+              pendingPrompt = "";
+              caretBeforeChips = false;
+            } else if (caretBeforeChips) {
               caretBeforeChips = false;
               focusInputBeforeChips();
             }
@@ -921,6 +928,7 @@ export default defineComponent({
           const chipName = payload.chipName;
           const context = payload.context ?? null;
           const freshChat = payload.newChat === true;
+          const prompt = typeof payload.prompt === "string" ? payload.prompt : "";
           // Deferred past addNewChat's chatUpdated re-entry, which would clear the pin set any sooner.
           nextTick(() => {
             setTimeout(() => {
@@ -946,6 +954,7 @@ export default defineComponent({
                 pendingChips.value.push(chip);
               }
               caretBeforeChips = true;
+              pendingPrompt = prompt;
               if (componentReady.value) processPendingChips();
             }, 50);
           });

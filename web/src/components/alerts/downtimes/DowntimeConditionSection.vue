@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :fields="fields"
         :load-values="loadValues"
         :value-hint="valueHint"
+        :value-label="valueLabel"
         data-test="downtime-condition-builder"
         @update:model-value="onChange"
       />
@@ -91,7 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, inject, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { showsDetectedAs } from "@/types/serviceRef";
 import { useOrgId } from "@/composables/query";
 import { queryClient } from "@/composables/query/queryClient";
 import { semanticGroupsQuery } from "@/services/service_streams.queries";
@@ -102,6 +104,7 @@ import { conditionError } from "@/utils/downtimes/conditionRules";
 import type { DowntimeFormValues } from "@/utils/downtimes/downtimeForm";
 import type { FilterField } from "@/utils/query/filterBar";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import type { FilterValueLabel } from "@/components/filterBar/QueryFilterBar.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -142,7 +145,7 @@ const chipError = computed(() => {
   return key && CHIP_RULES.includes(key) ? t(key) : null;
 });
 
-const { loadValues, partial, isNotSeen } = useDowntimeValueSuggest(
+const { loadValues, partial, isNotSeen, labelOf } = useDowntimeValueSuggest(
   queryClient,
   orgId,
   computed(() => downtimeFolder.value || undefined),
@@ -151,6 +154,15 @@ const { loadValues, partial, isNotSeen } = useDowntimeValueSuggest(
 
 const valueHint = (key: string, values: string[]) =>
   isNotSeen(key, values) ? t("alerts.downtimes.resources.notSeen") : undefined;
+
+// A service reads as its display name; the key stays the saved value and the chip text.
+const valueLabel = (key: string, value: string): FilterValueLabel | undefined => {
+  const label = labelOf(key, value);
+  if (!label) return undefined;
+  return showsDetectedAs(value, label)
+    ? { label, detail: t("serviceVersions.names.detectedAs", { name: raw(value) }) }
+    : { label };
+};
 
 const semanticGroups = useQuery(() =>
   Object.assign(semanticGroupsQuery(orgId.value), { enabled: !!orgId.value }),

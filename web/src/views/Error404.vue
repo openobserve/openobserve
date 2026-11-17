@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
 
-      <p class="text-compact text-text-secondary m-0 opacity-70">
+      <p class="text-compact text-text-secondary m-0">
         {{ t("common.redirectingHome", { countdown }) }}
       </p>
     </div>

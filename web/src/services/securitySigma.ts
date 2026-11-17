@@ -187,6 +187,127 @@ export interface MitreCoverage {
   };
 }
 
+/** An installed detection's edited rule, stream and schedule; the server recompiles the SQL. */
+export interface UpdateDetectionRequest {
+  rule_yaml: string;
+  stream: string;
+  source_type?: string;
+  period: number;
+  frequency: number;
+  silence: number;
+  destinations?: string[];
+}
+
+export interface UpdatedDetection {
+  id: string;
+  name: string;
+  stream: string;
+  sql: string;
+  period: number;
+  frequency: number;
+  silence: number;
+}
+
+/** History a preview evaluates, in minutes: 1 hour, 24 hours or 7 days. */
+export type PreviewRangeMinutes = 60 | 1440 | 10080;
+
+export interface DetectionPreviewRequest {
+  rule_yaml?: string;
+  rule_id?: string;
+  source_type?: string;
+  stream: string;
+  range_minutes: PreviewRangeMinutes;
+  period?: number;
+  frequency?: number;
+  /** A saved detection's id, so the preview applies its own exceptions too. */
+  alert_id?: string;
+}
+
+export interface PreviewWindow {
+  start: number;
+  end: number;
+  firings: number;
+}
+
+export interface PreviewFiring {
+  window_start: number;
+  window_end: number;
+  row: Record<string, unknown>;
+}
+
+/** A rule run over history the way the scheduler runs it; times are microseconds. */
+export interface DetectionPreview {
+  range_start: number;
+  range_end: number;
+  requested_minutes: number;
+  correlation: boolean;
+  window_minutes: number;
+  stride_minutes: number;
+  windows_evaluated: number;
+  windows_failed: number;
+  firings: number;
+  windows: PreviewWindow[];
+  sample: PreviewFiring[];
+  sql: string;
+  error?: string;
+}
+
+export type ExceptionOperator =
+  "equals" | "contains" | "starts_with" | "ends_with" | "in_cidr" | "in_list";
+
+export interface NewDetectionException {
+  field: string;
+  operator: ExceptionOperator;
+  values: string[];
+  comment: string;
+  /** Microseconds; absent or null never expires. */
+  expires_at?: number | null;
+}
+
+export interface DetectionException extends NewDetectionException {
+  id: string;
+  alert_id: string;
+  created_by: string;
+  created_at: number;
+  updated_by?: string;
+  updated_at?: number;
+  /** Listed, but no longer applied. */
+  expired: boolean;
+  /** Detections whose query cannot carry the exception, so it is only partly applied there. */
+  not_enforced?: UnenforcedDetection[];
+}
+
+export interface UnenforcedDetection {
+  alert_id: string;
+  name: string;
+  reason: string;
+}
+
+export const ALLOWLIST_PURPOSES = [
+  "known_egress",
+  "scanner",
+  "service_account",
+  "privileged_account",
+  "critical_host",
+  "other",
+] as const;
+export type AllowListPurpose = (typeof ALLOWLIST_PURPOSES)[number];
+
+export interface AllowListInput {
+  name: string;
+  purpose: AllowListPurpose;
+  /** IPs, CIDRs, accounts or hosts. */
+  values: string[];
+  description?: string;
+}
+
+export interface AllowList extends Required<AllowListInput> {
+  id: string;
+  updated_by: string;
+  /** Microseconds. */
+  updated_at: number;
+}
+
 const securitySigma = {
   catalog: (org: string) => http().get<SigmaCatalog>(`/api/${org}/security/sigma/catalog`),
   compile: (org: string, body: SigmaCompileRequest) =>
@@ -197,6 +318,32 @@ const securitySigma = {
       `/api/${org}/security/detections/${encodeURIComponent(alertId)}/evidence`,
       { params },
     ),
+  updateDetection: (org: string, alertId: string, body: UpdateDetectionRequest) =>
+    http().put<UpdatedDetection>(
+      `/api/${org}/security/detections/${encodeURIComponent(alertId)}`,
+      body,
+    ),
+  previewDetection: (org: string, body: DetectionPreviewRequest) =>
+    http().post<DetectionPreview>(`/api/${org}/security/detections/preview`, body),
+  listExceptions: (org: string, alertId: string) =>
+    http().get<{ exceptions: DetectionException[] }>(
+      `/api/${org}/security/detections/${encodeURIComponent(alertId)}/exceptions`,
+    ),
+  addException: (org: string, alertId: string, body: NewDetectionException) =>
+    http().post<DetectionException>(
+      `/api/${org}/security/detections/${encodeURIComponent(alertId)}/exceptions`,
+      body,
+    ),
+  deleteException: (org: string, alertId: string, exceptionId: string) =>
+    http().delete(
+      `/api/${org}/security/detections/${encodeURIComponent(alertId)}/exceptions/${encodeURIComponent(exceptionId)}`,
+    ),
+  listAllowlists: (org: string) =>
+    http().get<{ lists: AllowList[] }>(`/api/${org}/security/allowlists`),
+  putAllowlist: (org: string, listId: string, body: AllowListInput) =>
+    http().put<AllowList>(`/api/${org}/security/allowlists/${encodeURIComponent(listId)}`, body),
+  deleteAllowlist: (org: string, listId: string) =>
+    http().delete(`/api/${org}/security/allowlists/${encodeURIComponent(listId)}`),
   /** Creates columns a detection reads before any event carries them, so its query plans. */
   addColumns: (org: string, stream: string, fields: UnseenField[]) =>
     http().put(`/api/${org}/streams/${encodeURIComponent(stream)}/settings?type=logs`, {

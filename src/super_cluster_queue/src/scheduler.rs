@@ -221,6 +221,13 @@ async fn update(msg: Message) -> Result<()> {
                 trigger.module_key
             );
         }
+        // Each region's engine reads only that region's data, so each region keeps its own row.
+        TriggerModule::AutoObserve => {
+            log::debug!(
+                "[SUPER_CLUSTER:sync] autoobserve engine jobs are region-local: {}",
+                trigger.module_key
+            );
+        }
         // Keyed on the response record. Pushing a timer for a record this
         // region has not synced yet would create a job that escalates
         // nothing; the handler drops such a job, but not creating it is

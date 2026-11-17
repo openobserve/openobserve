@@ -27,6 +27,18 @@ pub use calibration::{LastRun, last_run};
 
 // The main function that creates and runs the scheduler
 pub async fn run() -> Result<(), anyhow::Error> {
+    worker::Scheduler::new(scheduler_config()).run().await
+}
+
+/// A region the job election passed over claims only its own AutoObserve row.
+pub async fn run_region_local() -> Result<(), anyhow::Error> {
+    match worker::Scheduler::region_local(scheduler_config()) {
+        Some(scheduler) => scheduler.run().await,
+        None => Ok(()),
+    }
+}
+
+fn scheduler_config() -> worker::SchedulerConfig {
     // Get configuration
     let cfg = get_config();
 
@@ -38,15 +50,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
             cfg.limit.report_schedule_timeout,
         ) / 4,
     ) as u64;
-    let scheduler_config = worker::SchedulerConfig {
+    worker::SchedulerConfig {
         alert_schedule_concurrency: cfg.limit.alert_schedule_concurrency,
         alert_schedule_timeout: cfg.limit.alert_schedule_timeout,
         report_schedule_timeout: cfg.limit.report_schedule_timeout,
         poll_interval_secs: cfg.limit.alert_schedule_interval as u64, // Can be configurable
         keep_alive_interval_secs,
-    };
-
-    // Create and run scheduler
-    let scheduler = worker::Scheduler::new(scheduler_config);
-    scheduler.run().await
+    }
 }

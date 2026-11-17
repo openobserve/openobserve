@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex h-full min-h-30 flex-col items-center justify-center gap-2 p-4"
       >
         <OIcon name="article" size="lg" class="opacity-20" />
-        <span class="text-compact text-center font-medium opacity-50">{{
+        <span class="text-compact text-text-secondary text-center font-medium">{{
           t("alerts.summary.configureAlert")
         }}</span>
       </div>

@@ -114,7 +114,7 @@ pub async fn get_enrichment_table_data(
     #[cfg(not(feature = "enterprise"))]
     let regions = vec![];
 
-    let search_query: proto::cluster_rpc::SearchQuery = query.clone().into();
+    let search_query: proto::cluster_rpc::SearchQuery = query.clone().try_into()?;
     let trace_id = ider::generate_trace_id();
     let mut request = config::datafusion::request::Request::new(
         trace_id.clone(),

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { escapeSqlString } from "./scoreThreshold";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { latestScoresFromSql } from "./latestScoreSql";
 
 export type TraceScoreScope = "span" | "trace";
@@ -21,7 +21,7 @@ export type TraceScoreScope = "span" | "trace";
 /** The same `_llm_scores` records Quality aggregates, narrowed to one span or trace. */
 export function buildTargetScoresSql(scope: TraceScoreScope, targetId: string): string {
   const column = scope === "span" ? "span_id" : "trace_id";
-  const where = `CAST(${column} AS VARCHAR) = '${escapeSqlString(targetId)}'`;
+  const where = `CAST(${column} AS VARCHAR) = ${sqlLiteral(targetId)}`;
   return [
     "SELECT",
     "  scorer_id, score_config_id, value_numeric, value_categorical, value_boolean,",

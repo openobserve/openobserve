@@ -1,0 +1,954 @@
+{
+  "regressed": {
+    "stored_verdict": {
+      "verdict_key": "vd-7",
+      "version_key": "vk-10",
+      "service": "checkout-service",
+      "where_key": "k8s:prod-eu-a/shop",
+      "version": "1.5.0",
+      "image": null,
+      "verdict": "regressed",
+      "state": "evaluating",
+      "reason": null,
+      "reason_code": "new_error_types",
+      "signal": "traces",
+      "headline": {
+        "metric": "error_rate",
+        "new": 0.07072543981023918,
+        "base": 0.0040477636106051405,
+        "lo": 0.06381104410059647,
+        "hi": 0.06952888714406699,
+        "ci_kind": "variance",
+        "unit": "ratio"
+      },
+      "second": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "unit": "count"
+      },
+      "new_error_types": 0,
+      "new_error_sample": null,
+      "sample": {
+        "n_new": 25295,
+        "n_base": 9882,
+        "since": 1794247980000000
+      },
+      "baseline": {
+        "version": "1.4.0",
+        "image": null,
+        "rule": "previous",
+        "initial_rule": "canary",
+        "initial_version": "1.4.0",
+        "initial_image": null,
+        "switched_at": null,
+        "where_key": "k8s:prod-eu-a/shop",
+        "env": "prod",
+        "traffic_share": null,
+        "version_images": 0
+      },
+      "checks_done": 12,
+      "frozen_at": null,
+      "recheck": {
+        "verdict": null,
+        "at": null
+      },
+      "regions": [
+        {
+          "cluster": "fsv-s8wgold-r4bgold11092332",
+          "verdict": "regressed"
+        }
+      ],
+      "deploy_key": "dk-8",
+      "deploy": {
+        "kind": "deploy",
+        "at": 1794247980000000,
+        "from_version": "1.4.0",
+        "from_image": null
+      },
+      "rollback_outcome": null,
+      "restricted": false,
+      "windows": {
+        "a": {
+          "start_time": 1794247980000000,
+          "end_time": 1794248880000000
+        },
+        "b": {
+          "start_time": 1794247080000000,
+          "end_time": 1794247980000000
+        }
+      },
+      "needs": {
+        "metric": null,
+        "have": null,
+        "need": null
+      },
+      "env": "prod",
+      "env_source": "attribute",
+      "version_images": 0
+    },
+    "live_verdict": {
+      "verdict_key": "live",
+      "version_key": "vk-10",
+      "service": "checkout-service",
+      "where_key": "k8s:prod-eu-a/shop",
+      "version": "1.5.0",
+      "image": null,
+      "verdict": "regressed",
+      "state": "evaluating",
+      "reason": null,
+      "reason_code": "new_error_types",
+      "signal": "traces",
+      "headline": {
+        "metric": "error_rate",
+        "new": 0.07072543981023918,
+        "base": 0.0041279669762641896,
+        "lo": 0.06372092132720598,
+        "hi": 0.0694546537442107,
+        "ci_kind": "variance",
+        "unit": "ratio"
+      },
+      "second": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "unit": "count"
+      },
+      "new_error_types": 0,
+      "new_error_sample": null,
+      "sample": {
+        "n_new": 25295,
+        "n_base": 9690,
+        "since": 1794247980000000
+      },
+      "baseline": {
+        "version": "1.4.0",
+        "image": null,
+        "rule": "previous",
+        "initial_rule": "none",
+        "initial_version": null,
+        "initial_image": null,
+        "switched_at": null,
+        "where_key": "k8s:prod-eu-a/shop",
+        "env": null,
+        "traffic_share": null,
+        "version_images": 0
+      },
+      "checks_done": 13,
+      "frozen_at": null,
+      "recheck": {
+        "verdict": null,
+        "at": null
+      },
+      "regions": [
+        {
+          "cluster": "fsv-s8wgold-r4bgold11092332",
+          "verdict": "regressed"
+        }
+      ],
+      "deploy_key": "dk-8",
+      "deploy": {
+        "kind": "deploy",
+        "at": 1794247980000000,
+        "from_version": "1.4.0",
+        "from_image": null
+      },
+      "rollback_outcome": null,
+      "restricted": false,
+      "windows": {
+        "a": {
+          "start_time": 1794247980000000,
+          "end_time": 1794248991244912
+        },
+        "b": null
+      },
+      "needs": {
+        "metric": null,
+        "have": null,
+        "need": null
+      },
+      "env": "prod",
+      "env_source": "attribute",
+      "version_images": 0
+    },
+    "compare": {
+      "service": "checkout-service",
+      "where_key": "k8s:prod-eu-a/shop",
+      "env": "prod",
+      "mode": "sequential",
+      "baseline_rule": "previous",
+      "arms": {
+        "a": {
+          "version": "1.5.0",
+          "image": null,
+          "first_seen": 1794248030385228,
+          "last_seen": 1794248987769599,
+          "start_time": 1794247980000000,
+          "end_time": 1794248880000000,
+          "coverage": "ok",
+          "image_ref": null,
+          "signals": {
+            "traces": true,
+            "rum": false
+          },
+          "traffic_share": null,
+          "version_key": "vk-10",
+          "deploy_key": "dk-8",
+          "has_rollup": true
+        },
+        "b": {
+          "version": "1.4.0",
+          "image": null,
+          "start_time": 1794247368151505,
+          "end_time": 1794247980000000,
+          "coverage": "ok",
+          "image_ref": null,
+          "signals": {
+            "traces": true,
+            "rum": false
+          },
+          "traffic_share": null,
+          "where_key": "k8s:prod-eu-a/shop",
+          "has_rollup": true,
+          "first_seen": 1794247368151505,
+          "last_seen": 1794248030208675
+        }
+      },
+      "deploy_key": "dk-8"
+    }
+  },
+  "promo_endpoint": {
+    "operation": "POST /api/checkout/promo",
+    "source_stream": "default",
+    "status": "a_only",
+    "requests_a": 3976,
+    "requests_b": 0,
+    "errors_a": 980,
+    "errors_b": 0,
+    "introduced": true,
+    "early": false,
+    "error_rate": {
+      "a": 0.24647887323943662,
+      "b": 0,
+      "delta": 0,
+      "lo": 0,
+      "hi": 0,
+      "straddles_zero": true,
+      "insufficient": true,
+      "ci_kind": "variance"
+    },
+    "p95": {
+      "a": 145851.80553484376,
+      "b": 0,
+      "delta": 0,
+      "lo": 0,
+      "hi": 0,
+      "straddles_zero": true,
+      "insufficient": true,
+      "ci_kind": "variance"
+    },
+    "baseline_p95_us": null
+  },
+  "first_version": {
+    "baseline_rule": "none",
+    "notes": ["no_previous_version"],
+    "arms": {
+      "a": {
+        "version": "2.2.0",
+        "image": null,
+        "first_seen": 1794248030428765,
+        "last_seen": 1794248987678278,
+        "start_time": 1794247980000000,
+        "end_time": 1794248880000000,
+        "coverage": "ok",
+        "image_ref": null,
+        "signals": {
+          "traces": true,
+          "rum": false
+        },
+        "traffic_share": null,
+        "version_key": "vk-11",
+        "deploy_key": "dk-9",
+        "has_rollup": true
+      },
+      "b": {
+        "version": "",
+        "image": null,
+        "start_time": 1794247980000000,
+        "end_time": 1794248880000000,
+        "coverage": "ok",
+        "image_ref": null,
+        "signals": {
+          "traces": false,
+          "rum": false
+        },
+        "traffic_share": null,
+        "where_key": "k8s:prod-eu-a/shop",
+        "has_rollup": null,
+        "first_seen": null,
+        "last_seen": null
+      }
+    },
+    "stored_verdict": {
+      "verdict_key": "vd-8",
+      "version_key": "vk-11",
+      "service": "recommendation-service",
+      "where_key": "k8s:prod-eu-a/shop",
+      "version": "2.2.0",
+      "image": null,
+      "verdict": "insufficient",
+      "state": "evaluating",
+      "reason": "no_previous_version",
+      "reason_code": "no_previous_version",
+      "signal": "traces",
+      "headline": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "lo": null,
+        "hi": null,
+        "ci_kind": null,
+        "unit": "count"
+      },
+      "second": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "unit": "count"
+      },
+      "new_error_types": 0,
+      "new_error_sample": null,
+      "sample": {
+        "n_new": 0,
+        "n_base": 0,
+        "since": 1794247980000000
+      },
+      "baseline": {
+        "version": null,
+        "image": null,
+        "rule": "none",
+        "initial_rule": "none",
+        "initial_version": null,
+        "initial_image": null,
+        "switched_at": null,
+        "where_key": null,
+        "env": null,
+        "traffic_share": null,
+        "version_images": 0
+      },
+      "checks_done": 12,
+      "frozen_at": null,
+      "recheck": {
+        "verdict": null,
+        "at": null
+      },
+      "regions": [
+        {
+          "cluster": "fsv-s8wgold-r4bgold11092332",
+          "verdict": "insufficient"
+        }
+      ],
+      "deploy_key": "dk-9",
+      "deploy": {
+        "kind": "deploy",
+        "at": 1794247980000000,
+        "from_version": null,
+        "from_image": null
+      },
+      "rollback_outcome": null,
+      "restricted": false,
+      "windows": {
+        "a": {
+          "start_time": 1794247980000000,
+          "end_time": 1794248880000000
+        },
+        "b": null
+      },
+      "needs": {
+        "metric": null,
+        "have": null,
+        "need": null
+      },
+      "env": "prod",
+      "env_source": "attribute",
+      "version_images": 0
+    },
+    "live_verdict": {
+      "verdict_key": "live",
+      "version_key": "vk-11",
+      "service": "recommendation-service",
+      "where_key": "k8s:prod-eu-a/shop",
+      "version": "2.2.0",
+      "image": null,
+      "verdict": "insufficient",
+      "state": "evaluating",
+      "reason": "no_previous_version",
+      "reason_code": "no_previous_version",
+      "signal": "traces",
+      "headline": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "lo": null,
+        "hi": null,
+        "ci_kind": null,
+        "unit": "count"
+      },
+      "second": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "unit": "count"
+      },
+      "new_error_types": 0,
+      "new_error_sample": null,
+      "sample": {
+        "n_new": 0,
+        "n_base": 0,
+        "since": 1794247980000000
+      },
+      "baseline": {
+        "version": null,
+        "image": null,
+        "rule": "none",
+        "initial_rule": "none",
+        "initial_version": null,
+        "initial_image": null,
+        "switched_at": null,
+        "where_key": "k8s:prod-eu-a/shop",
+        "env": null,
+        "traffic_share": null,
+        "version_images": 0
+      },
+      "checks_done": 13,
+      "frozen_at": null,
+      "recheck": {
+        "verdict": null,
+        "at": null
+      },
+      "regions": [
+        {
+          "cluster": "fsv-s8wgold-r4bgold11092332",
+          "verdict": "insufficient"
+        }
+      ],
+      "deploy_key": "dk-9",
+      "deploy": {
+        "kind": "deploy",
+        "at": 1794247980000000,
+        "from_version": null,
+        "from_image": null
+      },
+      "rollback_outcome": null,
+      "restricted": false,
+      "windows": {
+        "a": {
+          "start_time": 1794247980000000,
+          "end_time": 1794248995069936
+        },
+        "b": null
+      },
+      "needs": {
+        "metric": null,
+        "have": null,
+        "need": null
+      },
+      "env": "prod",
+      "env_source": "attribute",
+      "version_images": 0
+    },
+    "service": "recommendation-service",
+    "where_key": "k8s:prod-eu-a/shop",
+    "env": "prod",
+    "mode": "sequential",
+    "traces": {
+      "insufficient": true,
+      "reason": "below_min_count",
+      "requests": {
+        "a": 13307,
+        "b": 0,
+        "rate_a": 14.785555555555556,
+        "rate_b": 0
+      },
+      "error_rate": {
+        "a": 0.004809498760051101,
+        "b": 0,
+        "delta": 0,
+        "lo": 0,
+        "hi": 0,
+        "straddles_zero": true,
+        "insufficient": true,
+        "ci_kind": "variance"
+      },
+      "p95": {
+        "a": 148798.30665675984,
+        "b": 0,
+        "delta": 0,
+        "lo": 0,
+        "hi": 0,
+        "straddles_zero": true,
+        "insufficient": true,
+        "ci_kind": "variance"
+      },
+      "p99": {
+        "a": 174617.36179287464,
+        "b": 0,
+        "delta": 0,
+        "lo": 0,
+        "hi": 0,
+        "straddles_zero": true,
+        "insufficient": true,
+        "ci_kind": "variance"
+      },
+      "endpoints": [
+        {
+          "operation": "GET /api/recommendations",
+          "source_stream": "default",
+          "status": "a_only",
+          "requests_a": 13307,
+          "requests_b": 0,
+          "errors_a": 64,
+          "errors_b": 0,
+          "introduced": true,
+          "early": false,
+          "error_rate": {
+            "a": 0.004809498760051101,
+            "b": 0,
+            "delta": 0,
+            "lo": 0,
+            "hi": 0,
+            "straddles_zero": true,
+            "insufficient": true,
+            "ci_kind": "variance"
+          },
+          "p95": {
+            "a": 148798.30665675984,
+            "b": 0,
+            "delta": 0,
+            "lo": 0,
+            "hi": 0,
+            "straddles_zero": true,
+            "insufficient": true,
+            "ci_kind": "variance"
+          },
+          "baseline_p95_us": null
+        }
+      ],
+      "status": "complete",
+      "endpoint_detail": {
+        "status": "ok",
+        "reason": null
+      }
+    }
+  },
+  "services_tracking": {
+    "epoch": 1794247320000000,
+    "warmup_ends_at": 1794247800000000
+  },
+  "versions_tracking": {
+    "epoch": 1794247320000000,
+    "warmup_ends_at": 1794247800000000
+  },
+  "manual_live": {
+    "baseline_rule": "manual",
+    "stored_verdict": null,
+    "live_verdict": {
+      "verdict_key": "live",
+      "version_key": "vk-12",
+      "service": "pair-api",
+      "where_key": "k8s:ushots/web",
+      "version": "2.0",
+      "verdict": "insufficient",
+      "state": "evaluating",
+      "reason": "no_previous_version",
+      "reason_code": "no_previous_version",
+      "signal": "traces",
+      "headline": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "lo": null,
+        "hi": null,
+        "ci_kind": null,
+        "unit": "count"
+      },
+      "second": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "unit": "count"
+      },
+      "new_error_types": 0,
+      "new_error_sample": null,
+      "sample": {
+        "n_new": 0,
+        "n_base": 0,
+        "since": 1793491440000000
+      },
+      "baseline": {
+        "version": "1.0",
+        "rule": "none",
+        "initial_rule": "none",
+        "switched_at": null,
+        "where_key": "k8s:ushots/web",
+        "env": null,
+        "traffic_share": null
+      },
+      "checks_done": 1,
+      "frozen_at": null,
+      "recheck": {
+        "verdict": null,
+        "at": null
+      },
+      "regions": [
+        {
+          "cluster": "c1",
+          "verdict": "insufficient"
+        }
+      ],
+      "deploy_key": "",
+      "deploy": null,
+      "rollback_outcome": null,
+      "restricted": false,
+      "needs": {
+        "metric": null,
+        "have": null,
+        "need": null
+      },
+      "env": "prod",
+      "env_source": "attribute"
+    }
+  },
+  "two_env": {
+    "services": {
+      "services": [
+        {
+          "where_key": "k8s:c5-cluster/shop",
+          "where": {
+            "kind": "k8s",
+            "k8s_cluster": "c5-cluster",
+            "k8s_namespace": "shop"
+          },
+          "env": "prod",
+          "env_source": "attribute",
+          "env_source_value": "deployment.environment=prod",
+          "env_inferred": "prod",
+          "env_inferred_source": "attribute",
+          "override_key": null,
+          "envs": ["prod", "staging"],
+          "service": "c5-orders",
+          "scope_key": "sk-4",
+          "newest_version": "2.0.0",
+          "newest_version_key": "vk-13",
+          "newest_first_seen": 1793482535000000,
+          "signals": ["traces"],
+          "current_version": "2.0.0",
+          "previous_version": null,
+          "last_good_version": null,
+          "verdict_counts": {},
+          "newest_verdict": null,
+          "active_version_keys": {
+            "2.0.0": "vk-13"
+          },
+          "active_versions": ["2.0.0"]
+        }
+      ],
+      "envs": [
+        {
+          "env": "prod",
+          "where_keys": ["k8s:c5-cluster/shop", "k8s:prod-eu-a/shop"]
+        },
+        {
+          "env": "staging",
+          "where_keys": ["k8s:c5-cluster/shop"]
+        }
+      ],
+      "tracking": {
+        "epoch": 1793481240000000,
+        "warmup_ends_at": 1793481720000000
+      }
+    },
+    "version": {
+      "version_key": "vk-13",
+      "org_id": "default",
+      "service_name": "c5-orders",
+      "where_key": "k8s:c5-cluster/shop",
+      "where_kind": "k8s",
+      "k8s_cluster": "c5-cluster",
+      "k8s_namespace": "shop",
+      "scope_key": "sk-4",
+      "env": "prod",
+      "version": "2.0.0",
+      "raw_version": "2.0.0",
+      "version_source": "service.version",
+      "env_source": "attribute",
+      "env_source_value": "deployment.environment=prod",
+      "first_seen": 1793482535000000,
+      "last_seen": 1793482585019000,
+      "traces_first_seen": 1793482535000000,
+      "traces_last_seen": 1793482585019000,
+      "rum_first_seen": null,
+      "rum_last_seen": null,
+      "deleted_at": null,
+      "created_at": 1793482535627212,
+      "updated_at": 1793482585776082,
+      "where": {
+        "kind": "k8s",
+        "k8s_cluster": "c5-cluster",
+        "k8s_namespace": "shop"
+      },
+      "env_inferred": "prod",
+      "env_inferred_source": "attribute",
+      "override_key": null,
+      "envs": ["prod", "staging"],
+      "active": true,
+      "status": "active",
+      "signals": {
+        "traces": {
+          "first_seen": 1793482535000000,
+          "last_seen": 1793482585019000
+        },
+        "rum": null
+      },
+      "previous_version": null,
+      "overlaps": [],
+      "as_name": null,
+      "deploys": [],
+      "restricted": false
+    }
+  },
+  "manual_picked": {
+    "baseline_rule": "manual",
+    "stored_verdict": {
+      "verdict_key": "vd-9",
+      "version_key": "vk-14",
+      "service": "orders-api",
+      "where_key": "k8s:ushots/web",
+      "version": "2.0",
+      "verdict": "regressed",
+      "state": "evaluating",
+      "reason": null,
+      "reason_code": "new_error_types",
+      "signal": "traces",
+      "headline": {
+        "metric": "error_rate",
+        "new": 0.28125,
+        "base": 0,
+        "lo": 0.2699929252489328,
+        "hi": 0.29263598823983206,
+        "ci_kind": "variance",
+        "unit": "ratio"
+      },
+      "second": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "unit": "count"
+      },
+      "new_error_types": 0,
+      "new_error_sample": null,
+      "sample": {
+        "n_new": 4320,
+        "n_base": 1500,
+        "since": 1793515760000000
+      },
+      "baseline": {
+        "version": "1.0",
+        "rule": "previous",
+        "initial_rule": "previous",
+        "switched_at": null,
+        "where_key": "k8s:ushots/web",
+        "env": "prod",
+        "traffic_share": null
+      },
+      "checks_done": 26,
+      "frozen_at": null,
+      "recheck": {
+        "verdict": null,
+        "at": null
+      },
+      "regions": [
+        {
+          "cluster": "c1",
+          "verdict": "regressed"
+        }
+      ],
+      "deploy_key": "dk-10",
+      "deploy": {
+        "kind": "deploy",
+        "at": 1793515760000000,
+        "from_version": "1.0"
+      },
+      "rollback_outcome": null,
+      "restricted": false,
+      "needs": {
+        "metric": null,
+        "have": null,
+        "need": null
+      },
+      "env": "prod",
+      "env_source": "attribute"
+    },
+    "live_verdict": {
+      "verdict_key": "live",
+      "version_key": "vk-14",
+      "service": "orders-api",
+      "where_key": "k8s:ushots/web",
+      "version": "2.0",
+      "verdict": "regressed",
+      "state": "frozen",
+      "reason": null,
+      "reason_code": "new_error_types",
+      "signal": "traces",
+      "headline": {
+        "metric": "error_rate",
+        "new": 0.28125,
+        "base": 0,
+        "lo": 0.26305337129562145,
+        "hi": 0.30009588598954484,
+        "ci_kind": "variance",
+        "unit": "ratio"
+      },
+      "second": {
+        "metric": null,
+        "new": null,
+        "base": null,
+        "unit": "count"
+      },
+      "new_error_types": 0,
+      "new_error_sample": null,
+      "sample": {
+        "n_new": 1600,
+        "n_base": 1500,
+        "since": 1793515930000000
+      },
+      "baseline": {
+        "version": "1.0",
+        "rule": "manual",
+        "initial_rule": "manual",
+        "switched_at": null,
+        "where_key": "k8s:ushots/web",
+        "env": null,
+        "traffic_share": null
+      },
+      "checks_done": 1,
+      "frozen_at": 1793539130193042,
+      "recheck": {
+        "verdict": null,
+        "at": null
+      },
+      "regions": [
+        {
+          "cluster": "c1",
+          "verdict": "regressed"
+        }
+      ],
+      "deploy_key": "dk-10",
+      "deploy": {
+        "kind": "deploy",
+        "at": 1793515760000000,
+        "from_version": "1.0"
+      },
+      "rollback_outcome": null,
+      "restricted": false,
+      "needs": {
+        "metric": null,
+        "have": null,
+        "need": null
+      },
+      "env": "prod",
+      "env_source": "attribute"
+    }
+  },
+  "stored_verdicts": {
+    "verdicts": [
+      {
+        "verdict_key": "vd-7",
+        "version_key": "vk-10",
+        "service": "checkout-service",
+        "where_key": "k8s:prod-eu-a/shop",
+        "version": "1.5.0",
+        "image": null,
+        "verdict": "regressed",
+        "state": "evaluating",
+        "reason": null,
+        "reason_code": "new_error_types",
+        "signal": "traces",
+        "headline": {
+          "metric": "error_rate",
+          "new": 0.07072543981023918,
+          "base": 0.0040477636106051405,
+          "lo": 0.06381104410059647,
+          "hi": 0.06952888714406699,
+          "ci_kind": "variance",
+          "unit": "ratio"
+        },
+        "second": {
+          "metric": null,
+          "new": null,
+          "base": null,
+          "unit": "count"
+        },
+        "new_error_types": 0,
+        "new_error_sample": null,
+        "sample": {
+          "n_new": 25295,
+          "n_base": 9882,
+          "since": 1794247980000000
+        },
+        "baseline": {
+          "version": "1.4.0",
+          "image": null,
+          "rule": "previous",
+          "initial_rule": "canary",
+          "initial_version": "1.4.0",
+          "initial_image": null,
+          "switched_at": null,
+          "where_key": "k8s:prod-eu-a/shop",
+          "env": "prod",
+          "traffic_share": null,
+          "version_images": 0
+        },
+        "checks_done": 12,
+        "frozen_at": null,
+        "recheck": {
+          "verdict": null,
+          "at": null
+        },
+        "regions": [
+          {
+            "cluster": "fsv-s8wgold-r4bgold11092332",
+            "verdict": "regressed"
+          }
+        ],
+        "deploy_key": "dk-8",
+        "deploy": {
+          "kind": "deploy",
+          "at": 1794247980000000,
+          "from_version": "1.4.0",
+          "from_image": null
+        },
+        "rollback_outcome": null,
+        "restricted": false,
+        "windows": {
+          "a": {
+            "start_time": 1794247980000000,
+            "end_time": 1794248880000000
+          },
+          "b": {
+            "start_time": 1794247080000000,
+            "end_time": 1794247980000000
+          }
+        },
+        "needs": {
+          "metric": null,
+          "have": null,
+          "need": null
+        },
+        "env": "prod",
+        "env_source": "attribute",
+        "version_images": 0
+      }
+    ]
+  }
+}

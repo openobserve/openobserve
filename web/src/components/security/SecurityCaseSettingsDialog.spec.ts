@@ -96,8 +96,33 @@ describe("SecurityCaseSettingsDialog", () => {
     expect(securityCases.updateSettings).toHaveBeenCalledWith(expect.any(String), {
       auto_close_days: 30,
       group_window_minutes: 60,
+      roll_up_low_priority: true,
     });
     expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+  });
+
+  it("keeps a turned-off roll-up through the round trip, and saves it when turned back on", async () => {
+    vi.mocked(securityCases.getSettings).mockResolvedValue(
+      okResponse({
+        auto_close_days: 7,
+        group_window_minutes: 1440,
+        roll_up_low_priority: false,
+      }) as never,
+    );
+    const w = await mountDialog();
+    const toggle = w.find('[data-test="security-case-settings-roll-up"] [role="switch"]');
+    expect(toggle.attributes("aria-checked")).toBe("false");
+    await submit(w);
+    await vi.waitFor(() => expect(securityCases.updateSettings).toHaveBeenCalled());
+    expect(vi.mocked(securityCases.updateSettings).mock.calls[0][1]).toMatchObject({
+      roll_up_low_priority: false,
+    });
+    await toggle.trigger("click");
+    await submit(w);
+    await vi.waitFor(() => expect(securityCases.updateSettings).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(securityCases.updateSettings).mock.calls[1][1]).toMatchObject({
+      roll_up_low_priority: true,
+    });
   });
 
   it("refuses values the server would refuse", async () => {

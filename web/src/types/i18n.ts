@@ -25,7 +25,9 @@ import { useI18n } from "vue-i18n";
 
 import i18nInstance from "@/locales";
 
+import type mockLocale from "@/components/autoobserve/mock/locale/en-US.json";
 import type enLocale from "@/locales/languages/en-US.json";
+import type enSecurityLocale from "@/locales/languages/security/en-US.json";
 
 /**
  * Every dotted leaf path in en-US.json, e.g. `"common.save"`. Derived, never
@@ -35,7 +37,10 @@ import type enLocale from "@/locales/languages/en-US.json";
  * library's exactly. Caveat: for the one array-valued message it also admits array
  * members (`…Aliases.length`); that key is read via `tm()`, so nothing is affected.
  */
-export type I18nKey = JsonPaths<typeof enLocale>;
+export type I18nKey = JsonPaths<typeof enLocale & typeof enSecurityLocale> | MockI18nKey;
+
+/** Keys of the AutoObserve sample screens, registered only while those screens are loaded. */
+type MockI18nKey = JsonPaths<typeof mockLocale>;
 
 declare const i18nTextBrand: unique symbol;
 

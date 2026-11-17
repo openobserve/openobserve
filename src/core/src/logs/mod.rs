@@ -552,9 +552,8 @@ async fn write_logs(
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    // Chat history never reaches a realtime alert, even one stored before alerts there were
-    // refused.
-    if !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream_name) {
+    // No realtime alert sees a protected stream, even one saved before alert save refused it.
+    if !config::meta::self_reporting::protected_streams::is_read_protected_stream(stream_name) {
         crate::ingestion::get_stream_alerts(
             &[StreamParams {
                 org_id: org_id.to_owned().into(),
@@ -587,7 +586,11 @@ async fn write_logs(
     )
     .await?;
     // the check that turned the UDS on projected the schema, which would drop unpacked columns
-    if let Some(fields) = newly_enabled_uds_fields(has_uds, stream_schema_map.get(stream_name)) {
+    if let Some(fields) = newly_enabled_uds_fields(
+        StreamType::Logs,
+        has_uds,
+        stream_schema_map.get(stream_name),
+    ) {
         repack_records(json_data.iter_mut().map(|(_, record)| record), &fields);
         (schema_evolution, infer_schema) = resolve_batch_schema(
             org_id,

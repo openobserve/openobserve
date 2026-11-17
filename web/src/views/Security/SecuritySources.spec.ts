@@ -33,7 +33,12 @@ const sources = vi.hoisted(() => ({
   load: vi.fn(),
   migrateIncludes: vi.fn(),
 }));
-const api = vi.hoisted(() => ({ attach: vi.fn(), detach: vi.fn(), plan: vi.fn() }));
+const api = vi.hoisted(() => ({
+  attach: vi.fn(),
+  detach: vi.fn(),
+  plan: vi.fn(),
+  setType: vi.fn(),
+}));
 
 const rowsRef = shallowRef<unknown[]>([]);
 const noticesRef = ref<unknown[]>([]);
@@ -62,9 +67,24 @@ vi.mock("@/services/securitySources.queries", () => ({
   attachPackMutation: () => ({ mutationFn: (vars: unknown) => api.attach(vars) }),
   attachPlanMutation: () => ({ mutationFn: (stream: string) => api.plan(stream) }),
   detachPackMutation: () => ({ mutationFn: (stream: string) => api.detach(stream) }),
+  setSourceTypeMutation: () => ({ mutationFn: (vars: unknown) => api.setType(vars) }),
+  sourceTypesQuery: (org: string) => ({
+    queryKey: ["source-types", org],
+    queryFn: async () => [
+      { id: "windows_security", label: "Windows Security log", map: {} },
+      {
+        id: "windows_sysmon_process",
+        label: "Sysmon process creation",
+        supersededBy: "windows_sysmon",
+        map: {},
+      },
+      { id: "windows_sysmon", label: "Sysmon", map: {} },
+    ],
+  }),
 }));
 
 import SecuritySources from "./SecuritySources.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 const pack = (id: string) => ({ id, version: 2, label: id });
 
@@ -154,6 +174,7 @@ beforeEach(() => {
   });
   api.detach.mockResolvedValue({ setting: null, skipped: null });
   api.plan.mockResolvedValue({ plan: entityPlan, dry_run: true });
+  api.setType.mockResolvedValue({ setting: { source_type: "windows_security" } });
 });
 
 afterEach(() => {
@@ -219,6 +240,29 @@ describe("SecuritySources", () => {
       kind: "entity",
       pipeline_created: true,
     });
+  });
+
+  it("shows the attach running on the row and in the preview until the server answers", async () => {
+    let finish: (v: unknown) => void = () => {};
+    api.attach.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const w = await mountView();
+    await rowOf(w, "linux_auth").find('[data-test="security-sources-attach"]').trigger("click");
+    await flushPromises();
+    confirmButton()!.click();
+    await flushPromises();
+    expect(rowOf(w, "linux_auth").find('[data-test="security-sources-attaching"]').exists()).toBe(
+      true,
+    );
+    expect(document.querySelector('[data-test="security-sources-attach-progress"]')).not.toBeNull();
+    finish({
+      setting: { source_type: "linux_auth", pack_id: "entity", pack_version: 2 },
+      pipeline_created: true,
+    });
+    await flushPromises();
+    expect(rowOf(w, "linux_auth").find('[data-test="security-sources-attaching"]').exists()).toBe(
+      false,
+    );
+    expect(document.querySelector('[data-test="security-sources-attach-progress"]')).toBeNull();
   });
 
   it("records no attach when the attach is refused", async () => {
@@ -315,13 +359,11 @@ describe("SecuritySources", () => {
     expect(w.find('[data-test="security-sources-exclude"]').exists()).toBe(false);
   });
 
-  it("lets a triage-only analyst include but not attach, detach or exclude", async () => {
+  it("gives a triage-only analyst no source controls, since triage is case work", async () => {
     triageOnly();
     const w = await mountView();
     expect(w.find('[data-test="security-sources-attach"]').exists()).toBe(false);
-    expect(rowOf(w, "linux_auth").find('[data-test="security-sources-include"]').exists()).toBe(
-      true,
-    );
+    expect(w.find('[data-test="security-sources-include"]').exists()).toBe(false);
     expect(w.find('[data-test="security-sources-detach"]').exists()).toBe(false);
     expect(w.find('[data-test="security-sources-exclude"]').exists()).toBe(false);
   });
@@ -334,6 +376,9 @@ describe("SecuritySources", () => {
     confirmButton()!.click();
     await flushPromises();
     expect(api.attach).toHaveBeenCalledWith(expect.objectContaining({ stream: "linux_auth" }));
+    expect(rowOf(w, "linux_auth").find('[data-test="security-sources-include"]').exists()).toBe(
+      true,
+    );
     expect(w.find('[data-test="security-sources-detach"]').exists()).toBe(false);
     expect(w.find('[data-test="security-sources-exclude"]').exists()).toBe(false);
   });
@@ -346,5 +391,78 @@ describe("SecuritySources", () => {
     expect(rowOf(w, "okta_auth").find('[data-test="security-sources-exclude"]').exists()).toBe(
       true,
     );
+  });
+
+  it("lets an author set a stream's source type by hand", async () => {
+    authorOnly();
+    const w = await mountView();
+    const picker = rowOf(w, "linux_auth").findComponent(OSelect);
+    expect(picker.props("modelValue")).toBe("auto");
+    const offered = (picker.props("options") as { value: string }[]).map((o) => o.value);
+    expect(offered).toContain("windows_sysmon");
+    expect(offered).not.toContain("windows_sysmon_process");
+    picker.vm.$emit("update:modelValue", "windows_security");
+    await flushPromises();
+    expect(api.setType).toHaveBeenCalledWith({
+      stream: "linux_auth",
+      sourceType: "windows_security",
+    });
+    expect(w.find('[data-test="security-sources-notices"]').text()).toContain(
+      "The classifier will not change it",
+    );
+  });
+
+  it("shows a hand-picked type as such and a classifier change as the classifier's", async () => {
+    rowsRef.value = [
+      {
+        ...sourceRow("win_security"),
+        source_type: "windows_security",
+        verdict: {
+          decision: "auto",
+          source_id: "windows_security",
+          label: "Windows Security log",
+          confidence: 1,
+        },
+        setting: { source_type: "windows_security", origin: "manual" },
+        last_change: {
+          at: 1_794_034_387_000_000,
+          by: "system:classifier",
+          summary: "verdict: none -> auto",
+        },
+      },
+    ];
+    const w = await mountView();
+    const row = rowOf(w, "win_security");
+    expect(row.text()).toContain("Windows Security log (set by hand)");
+    expect(row.findComponent(OSelect).props("modelValue")).toBe("windows_security");
+    row.findComponent(OSelect).vm.$emit("update:modelValue", "auto");
+    await flushPromises();
+    expect(api.setType).toHaveBeenCalledWith({ stream: "win_security", sourceType: "" });
+    expect(w.html()).not.toContain("by system:classifier");
+  });
+
+  it("keeps a pack attached before a version bump mapped and says an update is available", async () => {
+    rowsRef.value = [
+      {
+        ...sourceRow("win_security"),
+        state: "mapped",
+        reason: "pack",
+        source_type: "windows_security",
+        detach_pack: { id: "windows_security", version: 1, label: "Windows Security" },
+        update_available: { id: "windows_security", version: 2, label: "Windows Security" },
+        setting: { pack_id: "windows_security", pack_version: 1 },
+      },
+    ];
+    const w = await mountView();
+    const row = rowOf(w, "win_security");
+    expect(row.text()).toContain("windows_security@2 is available");
+    expect(row.find('[data-test="security-sources-detach"]').exists()).toBe(true);
+  });
+
+  it("gives a reader no source-type picker", async () => {
+    readOnly();
+    const w = await mountView();
+    expect(w.find('[data-test="security-sources-type-picker"]').exists()).toBe(false);
+    expect(rowOf(w, "linux_auth").text()).toContain("(60%)");
   });
 });

@@ -28,7 +28,19 @@ import {
 import type { ProtocolCheck } from "@/types/synthetics";
 import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
 import { fillField } from "@/test/unit/helpers/fillField";
+import { SYNTHETIC_PREFILL_KEY } from "@/components/synthetics/prefill/syntheticPrefillContract";
+import { internalPrefill, prefillLocations } from "@/test/unit/mockData/syntheticPrefill";
 import CreateProtocolCheck from "./CreateProtocolCheck.vue";
+
+const edition = vi.hoisted(() => ({ isEnterprise: "false" }));
+vi.mock("@/aws-exports", async (importOriginal) => {
+  const actual = (await importOriginal()) as { default: Record<string, unknown> };
+  return {
+    default: new Proxy(actual.default, {
+      get: (target, key) => (key === "isEnterprise" ? edition.isEnterprise : target[key as string]),
+    }),
+  };
+});
 
 vi.mock("@/services/synthetics", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -94,6 +106,7 @@ const EditorRoute = defineComponent({
 const mountEditor = async (
   props: typeof routeProps = { checkType: "http" },
   stubs: Record<string, unknown> = {},
+  path = "/synthetics/add",
 ) => {
   routeProps = props;
   router = createRouter({
@@ -102,9 +115,10 @@ const mountEditor = async (
       { path: "/synthetics/add", name: "syntheticsAdd", component: EditorRoute },
       { path: "/synthetics", name: "synthetics", component: { render: () => h("div") } },
       { path: "/logs", name: "logs", component: { render: () => h("div") } },
+      { path: "/autoobserve", name: "autoobserve", component: { render: () => h("div") } },
     ],
   });
-  await router.push("/synthetics/add");
+  await router.push(path);
   wrapper = mount(
     { render: () => h(RouterView) },
     {
@@ -478,5 +492,60 @@ describe("CreateProtocolCheck drafts", () => {
     expect(syntheticsService.create).toHaveBeenCalledTimes(1);
     expect(readEditorDraft(httpScope)).toBeNull();
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
+  });
+});
+
+describe("CreateProtocolCheck drafts after an AutoObserve prefill", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    edition.isEnterprise = "true";
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    edition.isEnterprise = "false";
+    sessionStorage.clear();
+  });
+
+  it("drafts only the check, so a restored draft opens without the banner", async () => {
+    sessionStorage.setItem(SYNTHETIC_PREFILL_KEY, JSON.stringify(internalPrefill));
+    await mountEditor({ checkType: "http" }, {}, "/synthetics/add?type=http&prefill=autoobserve");
+    expect(byTest("synthetics-prefill-banner")).not.toBeNull();
+    await edit({ name: "svc-c health, edited" });
+    window.dispatchEvent(new Event("pagehide"));
+
+    const draft = readEditorDraft<ProtocolCheck>(httpScope);
+    expect(draft?.data.name).toBe("svc-c health, edited");
+    expect(JSON.stringify(draft)).not.toMatch(/sourceLabel|suggested|evidence|autoobserve/);
+    wrapper!.unmount();
+
+    await mountEditor();
+    click("editor-draft-continue");
+    await flushPromises();
+    expect(byTest("synthetics-prefill-banner")).toBeNull();
+    expect((configure().props("check") as ProtocolCheck).name).toBe("svc-c health, edited");
+  });
+
+  it("keeps a restored draft's locations when the location list lands after the restore", async () => {
+    await mountEditor();
+    await edit({ name: "my draft", locations: ["eu-west"] });
+    window.dispatchEvent(new Event("pagehide"));
+    wrapper!.unmount();
+
+    let resolve!: (v: unknown) => void;
+    vi.mocked(syntheticsService.getLocations).mockReturnValueOnce(
+      new Promise((r) => (resolve = r)) as never,
+    );
+    sessionStorage.setItem(SYNTHETIC_PREFILL_KEY, JSON.stringify(internalPrefill));
+    await mountEditor({ checkType: "http" }, {}, "/synthetics/add?type=http&prefill=autoobserve");
+    click("editor-draft-continue");
+    await flushPromises();
+    expect((configure().props("check") as ProtocolCheck).locations).toEqual(["eu-west"]);
+
+    resolve({ data: { locations: prefillLocations } });
+    await flushPromises();
+    expect((configure().props("check") as ProtocolCheck).locations).toEqual(["eu-west"]);
   });
 });

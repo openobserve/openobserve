@@ -98,6 +98,9 @@ export interface DrawerProps {
    */
   subTitle?: I18nText;
 
+  /** Optional data-test attribute rendered on the structured subtitle element. */
+  subTitleDataTest?: string;
+
   // ── Inbuilt footer buttons ──────────────────────────────────────────────
 
   /**

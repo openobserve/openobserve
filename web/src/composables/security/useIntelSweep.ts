@@ -3,7 +3,7 @@
 // Coverage is returned with matches, so an empty result is told apart from "nothing could have matched".
 
 import { ref, shallowRef } from "vue";
-import streamService from "@/services/stream";
+import securitySources from "@/services/securitySources";
 import securityIntel, {
   type SweepCoverage,
   type SweepStreamTarget,
@@ -25,7 +25,7 @@ const MAPPED_FIELDS: Partial<
 
 /** Columns the stream's detected source maps to each type, for the server to search too. */
 async function mappedColumns(orgId: string, stream: string): Promise<SweepStreamTarget> {
-  const res = await streamService.schema(orgId, stream, "logs");
+  const res = await securitySources.schema(orgId, stream);
   const fields: string[] = (res.data?.schema ?? res.data?.fields ?? []).map((f: any) =>
     String(f.name),
   );

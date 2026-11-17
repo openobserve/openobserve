@@ -33,6 +33,7 @@ use crate::{
 pub mod ack;
 pub mod aggregation_level;
 pub mod alert;
+pub mod alert_calibration;
 pub mod auto_investigate;
 pub mod composite;
 pub mod condition_ops;

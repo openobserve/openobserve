@@ -199,8 +199,14 @@ export default class DashboardVariablesScoped {
     // Capture selected value text if needed
     let selectedValue = null;
     if (returnSelectedValue) {
-      selectedValue = await targetOption.textContent();
-      selectedValue = selectedValue?.trim() || null;
+      // The option row can render before its label text arrives, and an empty capture leaves callers nothing to assert on.
+      await expect
+        .poll(async () => ((await targetOption.textContent()) ?? "").trim(), {
+          timeout: optionTimeout,
+          message: `Option ${optionText ?? optionIndex} of variable ${variableName} never showed its text`,
+        })
+        .not.toBe("");
+      selectedValue = ((await targetOption.textContent()) ?? "").trim();
     }
 
     // Nothing may be mid-load when the value commits, or the dependent's reload is

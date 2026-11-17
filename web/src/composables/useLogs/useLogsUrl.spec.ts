@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { flushPromises } from "@vue/test-utils";
 import { ref } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import {
@@ -351,6 +352,45 @@ describe("useLogsUrl (4c C7b)", () => {
       await router.push({ path: "/logs", query: { ...normalized, stream: "web" } });
       const next = { ...normalized, stream: "web", period: "1h" };
       expect(urlWriteMode(router.currentRoute.value.query, next)).toBe("push");
+    });
+  });
+
+  describe("leaving Logs", () => {
+    const makeLeavingRouter = () =>
+      createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/logs", name: "logs", component: { template: "<div />" } },
+          { path: "/traces", name: "traces", component: { template: "<div />" } },
+        ],
+      });
+
+    it("skips a write during a pending navigation away, and lets the navigation land", async () => {
+      const router = makeLeavingRouter();
+      await router.push("/logs");
+      bindLogsUrlRouter(router);
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      router.beforeEach(() => gate);
+      const leaving = router.push("/traces");
+      await flushPromises();
+      await writeLogsUrl("replace", { stream: "app" });
+      release();
+      await leaving;
+      expect(router.currentRoute.value.fullPath).toBe("/traces");
+    });
+
+    it("writes again after a guard threw on the way out", async () => {
+      const router = makeLeavingRouter();
+      await router.push("/logs");
+      bindLogsUrlRouter(router);
+      const stop = router.beforeEach(() => {
+        throw new Error("guard failed");
+      });
+      await expect(router.push("/traces")).rejects.toThrow("guard failed");
+      stop();
+      await writeLogsUrl("replace", { stream: "app" });
+      expect(router.currentRoute.value.query.stream).toBe("app");
     });
   });
 });

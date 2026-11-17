@@ -37,6 +37,8 @@ pub enum DestinationError {
         "Destination name cannot contain ':', '#', '?', '&', '%', '/', quotes and space characters"
     )]
     InvalidName,
+    #[error("Destination name cannot be longer than {0} characters")]
+    NameTooLong(usize),
     #[error("HTTP destination must have a url")]
     EmptyUrl,
     #[error("Destination URL blocked by SSRF guard: {0}")]
@@ -51,6 +53,8 @@ pub enum DestinationError {
     SMTPUnavailable,
     #[error("Alert destination must have a template")]
     TemplateNotFound,
+    #[error("template '{0}' does not exist")]
+    UnknownTemplate(String),
     #[error("Pipeline destination must have a pipeline id")]
     EmptyPipelineId,
     #[error("Destination with the same name already exists")]

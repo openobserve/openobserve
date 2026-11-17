@@ -106,9 +106,11 @@
           </div>
           <span class="text-2xs text-text-secondary shrink-0 font-semibold">
             {{
-              t("onlineEvals.job.inputMapping.variableCount", {
-                count: variablesFor(scorer).length,
-              })
+              t(
+                "onlineEvals.job.inputMapping.variableCount",
+                { count: variablesFor(scorer).length },
+                variablesFor(scorer).length,
+              )
             }}
           </span>
         </div>

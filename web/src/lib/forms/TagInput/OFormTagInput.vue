@@ -18,7 +18,7 @@
 import { inject } from "vue";
 import OTagInput from "./OTagInput.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { leaveOnFocusOut, useVisibleFieldError } from "@/lib/forms/Form/fieldError";
 import type { FormTagInputProps } from "./OFormTagInput.types";
 
 defineOptions({ inheritAttrs: false });
@@ -26,6 +26,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormTagInputProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormTagInput] must be rendered inside <OForm>. No form context found.");
@@ -39,11 +40,13 @@ if (import.meta.env.DEV && !form) {
         v-bind="$attrs"
         :placeholder="props.placeholder"
         :label="props.label"
+        :aria-invalid="shown(field).invalid ? 'true' : undefined"
         :model-value="field.state.value ?? []"
         @update:model-value="field.handleChange"
+        @focusout="leaveOnFocusOut(field, $event)"
       />
-      <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text mt-1 text-xs">
-        {{ firstFieldError(field.state.meta.errors) }}
+      <div v-if="shown(field).message !== undefined" class="text-input-error-text mt-1 text-xs">
+        {{ shown(field).message }}
       </div>
     </template>
   </component>

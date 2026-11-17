@@ -138,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :notifies-nobody="notifiesNobody"
             :oncall-team="formData?.oncall_team"
             :locked-target-names="formData?._ui?.lockedTargetNames"
+            :target-required="destinationRequired"
             show-status
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
@@ -309,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :notifies-nobody="notifiesNobody"
             :oncall-team="formData?.oncall_team"
             :locked-target-names="formData?._ui?.lockedTargetNames"
+            :target-required="destinationRequired"
             show-status
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
@@ -425,7 +427,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- The hold delays on-call and incident closure too, not only the message. -->
-          <div class="mb-4! flex items-start max-md:flex-col max-md:gap-1">
+          <div
+            ref="keepFiringForFieldRef"
+            class="mb-4! flex items-start max-md:flex-col max-md:gap-1"
+          >
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.alertSettings.keepFiringFor") }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
@@ -526,6 +531,11 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    // The parent refuses to save without a target (an AutoObserve draft), so the hint must not call it optional.
+    destinationRequired: {
+      type: Boolean,
+      default: false,
+    },
     formattedDestinations: {
       type: Array as PropType<any[]>,
       default: () => [],
@@ -573,6 +583,7 @@ export default defineComponent({
     const silenceFieldRef = ref<any>(null);
     const destinationsFieldRef = ref<any>(null);
     const pendingPeriodFieldRef = ref<any>(null);
+    const keepFiringForFieldRef = ref<HTMLElement | null>(null);
 
     // Period / silence are composite "number + Minutes addon" fields: a 5.4rem
     // OFormInput glued to a unit block. OFormInput renders its message INSIDE
@@ -843,6 +854,7 @@ export default defineComponent({
       silenceFieldRef,
       destinationsFieldRef,
       pendingPeriodFieldRef,
+      keepFiringForFieldRef,
       periodError,
       isForecastMode,
       silenceError,

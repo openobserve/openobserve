@@ -22,6 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OFormSection :title="t('alertCalibration.settings.schedule')">
       <div class="flex flex-col gap-4">
+        <p
+          v-if="readOnly"
+          class="text-text-secondary flex items-start gap-1.5 text-xs"
+          data-test="alert-calibration-settings-read-only"
+        >
+          <OIcon name="lock" size="xs" class="mt-0.5 shrink-0" />
+          <span>{{ t("alertCalibration.settings.readOnly") }}</span>
+        </p>
         <div class="flex flex-col gap-1">
           <OFormSwitch
             name="enabled"
@@ -29,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label-position="left"
             :label="t('alertCalibration.settings.enabled')"
             class="w-full justify-between"
+            :disabled="readOnly"
             data-test="alert-calibration-settings-enabled"
           />
           <OText variant="meta" as="span">{{ t("alertCalibration.settings.enabledHelp") }}</OText>
@@ -42,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alertCalibration.settings.frequency')"
             :options="frequencyOptions"
             :searchable="false"
+            :disabled="readOnly"
             :help-text="t('alertCalibration.settings.frequencyHelp')"
             data-test="alert-calibration-settings-frequency"
           />
@@ -50,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alertCalibration.settings.window')"
             :options="windowOptions"
             :searchable="false"
+            :disabled="readOnly"
             :help-text="t('alertCalibration.settings.windowHelp')"
             data-test="alert-calibration-settings-window"
           />
@@ -66,26 +77,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OBanner>
 
         <div class="flex flex-wrap items-center gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            :disabled="!dirty || isSubmitting"
-            data-test="alert-calibration-settings-discard"
-            @click="discard"
-          >
-            {{ t("alertCalibration.settings.discard") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            :loading="isSubmitting"
-            :disabled="!dirty"
-            data-test="alert-calibration-settings-save"
-          >
-            {{ t("alertCalibration.settings.save") }}
-          </OButton>
-          <OText v-if="config" variant="meta" as="span" class="ms-2">
+          <template v-if="!readOnly">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              :disabled="!dirty || isSubmitting"
+              data-test="alert-calibration-settings-discard"
+              @click="discard"
+            >
+              {{ t("alertCalibration.settings.discard") }}
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
+              type="submit"
+              :loading="isSubmitting"
+              :disabled="!dirty"
+              data-test="alert-calibration-settings-save"
+            >
+              {{ t("alertCalibration.settings.save") }}
+            </OButton>
+          </template>
+          <OText v-if="config" variant="meta" as="span" :class="{ 'ms-2': !readOnly }">
             {{ t("alertCalibration.settings.lastSaved", { time: lastSaved }) }}
           </OText>
         </div>
@@ -107,10 +120,16 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { errorMessage, type AlertCalibrationConfig } from "@/services/alert_calibration";
+import {
+  errorMessage,
+  httpStatus,
+  type AlertCalibrationConfig,
+} from "@/services/alert_calibration";
+import { markConfigDenied } from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
 import { updateAlertCalibrationConfigMutation } from "@/services/alert_calibration.queries";
 import { formatMinutes } from "./format";
 import {
@@ -120,7 +139,7 @@ import {
 } from "./AlertCalibrationSettings.schema";
 import { changedFields, scheduleWarnings } from "./alertCalibrationSettings";
 
-const props = defineProps<{ config: AlertCalibrationConfig | null }>();
+const props = defineProps<{ config: AlertCalibrationConfig | null; readOnly?: boolean }>();
 
 const FREQUENCY_PRESETS = [60, 360, 720, 1440, 10_080, 43_200];
 const WINDOW_PRESETS = [1440, 10_080, 20_160, 43_200, 129_600];
@@ -178,6 +197,11 @@ async function save() {
     const saved = await update.mutateAsync(patch.value);
     toast({ message: savedMessage(saved), variant: "success" });
   } catch (error) {
+    if (httpStatus(error) === 403) {
+      markConfigDenied(orgId.value);
+      toast({ message: t("alertCalibration.settings.saveDenied"), variant: "error" });
+      return;
+    }
     toast({
       message: t("alertCalibration.settings.saveFailed", { message: errorMessage(error) }),
       variant: "error",

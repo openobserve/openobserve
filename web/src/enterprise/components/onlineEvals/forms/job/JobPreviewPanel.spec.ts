@@ -14,6 +14,7 @@ vi.mock("../../composables/useJobMatchedTargets", () => ({
     count: ref(37),
     isLoading: ref(false),
     error: ref(false),
+    noSessionColumn: ref(false),
   }),
 }));
 
@@ -33,6 +34,7 @@ function mountPreview(targetScope: EvalTargetScope) {
       stream: "default",
       filterWhere: "",
       filterReady: true,
+      streamFields: [],
     },
     global: { plugins: [i18n] },
   });

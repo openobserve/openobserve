@@ -87,7 +87,11 @@ const filteredOptions = computed<ComboboxOption[]>(() => {
   }
 
   const lower = needle.toLowerCase();
-  return (props.items ?? []).filter((opt) => opt.label.toLowerCase().includes(lower));
+  return (props.items ?? []).filter(
+    (opt) =>
+      opt.label.toLowerCase().includes(lower) ||
+      (opt.searchText !== undefined && opt.searchText.toLowerCase().includes(lower)),
+  );
 });
 
 // ── Imperative reset ────────────────────────────────────────────────────────
@@ -274,11 +278,11 @@ const hasInsideLabel = computed(
             'p-1',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
-            // ease-out-expo in (200ms), quick wipe out (140ms).
-            'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-            'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            // ease-out-expo in, quick wipe out.
+            'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
+            'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
+            'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
+            'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
           ]"
         >
           <ComboboxViewport
@@ -306,7 +310,15 @@ const hasInsideLabel = computed(
               ]"
               :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
             >
-              <span class="min-w-0 flex-1 wrap-break-word whitespace-normal">{{
+              <span v-if="option.description" class="flex min-w-0 flex-1 flex-col">
+                <span class="wrap-break-word whitespace-normal">{{ option.label }}</span>
+                <span
+                  class="text-text-secondary text-xs wrap-break-word whitespace-normal"
+                  :data-test="parentDataTest ? `${parentDataTest}-option-description` : undefined"
+                  >{{ option.description }}</span
+                >
+              </span>
+              <span v-else class="min-w-0 flex-1 wrap-break-word whitespace-normal">{{
                 option.label
               }}</span>
               <ComboboxItemIndicator
@@ -335,13 +347,13 @@ const hasInsideLabel = computed(
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
-      class="text-input-error-text text-xs leading-none"
+      class="text-input-error-text text-xs leading-snug"
       role="alert"
     >
       {{ effectiveError }}
     </span>
     <!-- Help text -->
-    <span v-else-if="helpText" class="text-input-help-text text-xs leading-none">
+    <span v-else-if="helpText" class="text-input-help-text text-xs leading-snug">
       {{ helpText }}
     </span>
   </div>

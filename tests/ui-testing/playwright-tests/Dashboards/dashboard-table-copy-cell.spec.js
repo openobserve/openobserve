@@ -42,6 +42,8 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
 
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
+    // Where auto_query_enabled, a live-preview run can start as Apply is clicked and turn that click into Cancel.
+    await new PageManager(page).dashboardAutoRun.setStoredAutoRun("false");
     await ingestion(page);
   });
 

@@ -15,6 +15,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { computed } from "vue";
+import { SLACK_READ_ONLY } from "./slackReadOnly";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackLinkedPeople from "./SlackLinkedPeople.vue";
@@ -47,11 +49,12 @@ const ODrawerStub = {
   template: '<div v-if="open" data-test-stub="drawer"><slot /></div>',
 };
 
-const mountPeople = (realTable = false) =>
+const mountPeople = (realTable = false, readOnly = false) =>
   mount(SlackLinkedPeople, {
     props: { open: true, installationId: "inst-1" },
     global: {
       plugins: [i18n, makeSlackStore()],
+      provide: { [SLACK_READ_ONLY as symbol]: computed(() => readOnly) },
       stubs: realTable
         ? { ODrawer: ODrawerStub, ConfirmDialog: ConfirmDialogStub }
         : { OTable: OTableStub, ODrawer: ODrawerStub, ConfirmDialog: ConfirmDialogStub },
@@ -101,6 +104,22 @@ describe("SlackLinkedPeople", () => {
     await flushPromises();
     const cells = w.findAll('[data-col="default_org"]').map((c) => c.text());
     expect(cells).toEqual(["This org", "Another org"]);
+  });
+
+  it("turns Unlink off for a reader who may not change Slack, with the same hint as the other write buttons (T4-10)", async () => {
+    vi.mocked(slack.listLinks).mockReturnValue(ok({ links: [link()], next_cursor: null }) as any);
+    const w = mountPeople(false, true);
+    await flushPromises();
+    const button = w.get('[data-test="slack-people-unlink-link-1"]');
+    expect(button.attributes("disabled")).toBeDefined();
+    await button.trigger("click");
+    await flushPromises();
+    expect(w.find('[data-test-stub="confirm-title"]').exists()).toBe(false);
+    expect(slack.deleteLink).not.toHaveBeenCalled();
+    const tip = button.findComponent({ name: "OTooltip" });
+    expect(tip.props("content")).toBe(
+      "Needs the Manage Slack permission · org Admins have it by default",
+    );
   });
 
   it("pages with Load more while the server returns a cursor", async () => {

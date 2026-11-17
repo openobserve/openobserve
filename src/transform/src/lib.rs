@@ -63,11 +63,11 @@ pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =
 static GLOBAL_ENRICHMENT_TABLES: LazyLock<RwHashMap<String, Box<dyn Table + Send + Sync>>> =
     LazyLock::new(Default::default);
 
-/// VRL functions that reach the network, the environment or host files.
+/// VRL functions that reach the network; allowed only when `ZO_SKIP_SSRF_CHECKS` is set.
+const NETWORK_VRL_FUNCTIONS: &[&str] = &["http_request", "dns_lookup", "reverse_dns"];
+
+/// VRL functions that reach the environment or host files; denied regardless of SSRF settings.
 const DENIED_VRL_FUNCTIONS: &[&str] = &[
-    "http_request",
-    "dns_lookup",
-    "reverse_dns",
     "get_env_var",
     "get_hostname",
     "parse_proto",
@@ -401,9 +401,16 @@ fn org_enrichment_tables(org_id: &str) -> HashMap<String, enrichment::StreamTabl
 }
 
 fn vrl_stdlib_functions() -> Vec<Box<dyn Function>> {
+    vrl_stdlib_functions_inner(config::get_config().common.skip_ssrf_checks)
+}
+
+fn vrl_stdlib_functions_inner(skip_ssrf: bool) -> Vec<Box<dyn Function>> {
     vrl::stdlib::all()
         .into_iter()
-        .filter(|f| !DENIED_VRL_FUNCTIONS.contains(&f.identifier()))
+        .filter(|f| {
+            !DENIED_VRL_FUNCTIONS.contains(&f.identifier())
+                && (skip_ssrf || !NETWORK_VRL_FUNCTIONS.contains(&f.identifier()))
+        })
         .map(|f| {
             match DENIED_VRL_FILE_ARGUMENTS
                 .iter()
@@ -427,6 +434,20 @@ mod tests {
         enrichment::{ENRICHMENT_TABLES, StreamTable},
         *,
     };
+
+    const NETWORK_SOURCES: [&str; 3] = [
+        ".x = http_request!(\"http://127.0.0.1/\")",
+        ".x = dns_lookup!(\"localhost\")",
+        ".x = reverse_dns!(\"127.0.0.1\")",
+    ];
+
+    const HOST_SOURCES: [&str; 5] = [
+        ".x = get_env_var!(\"HOME\")",
+        ".x = get_hostname!()",
+        ".x = parse_proto!(.m, \"/etc/hosts\", \"a.B\")",
+        ".x = encode_proto!(.m, \"/etc/hosts\", \"a.B\")",
+        ".x = validate_json_schema!(.m, \"/etc/hosts\")",
+    ];
 
     #[test]
     fn creates_vrl_compiler_config_with_org_enrichment_tables() {
@@ -614,30 +635,53 @@ mod tests {
     }
 
     #[test]
+    fn default_config_rejects_network_functions() {
+        if config::get_config().common.skip_ssrf_checks {
+            return;
+        }
+        for source in NETWORK_SOURCES {
+            let error = compile_error(source);
+            assert!(error.contains("call to undefined function"), "{error}");
+        }
+    }
+
+    fn is_undefined_function(source: &str, skip_ssrf: bool) -> bool {
+        let external = vrl::prelude::state::ExternalEnv::default();
+        let functions = vrl_stdlib_functions_inner(skip_ssrf);
+        let config = vrl::compiler::CompileConfig::default();
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            vrl::compiler::compile_with_external(source, &functions, &external, config)
+        }))
+        .ok()
+        .and_then(|res| res.err())
+        .is_some_and(|e| {
+            vrl::diagnostic::Formatter::new(source, e)
+                .to_string()
+                .contains("call to undefined function")
+        })
+    }
+
+    #[test]
     fn rejects_network_and_host_functions() {
-        let sources = [
-            ".x = http_request!(\"http://127.0.0.1/\")",
-            ".x = dns_lookup!(\"localhost\")",
-            ".x = reverse_dns!(\"127.0.0.1\")",
-            ".x = get_env_var!(\"HOME\")",
-            ".x = get_hostname!()",
-            ".x = parse_proto!(.m, \"/etc/hosts\", \"a.B\")",
-            ".x = encode_proto!(.m, \"/etc/hosts\", \"a.B\")",
-            ".x = validate_json_schema!(.m, \"/etc/hosts\")",
-        ];
-        let allowed: Vec<&str> =
-            sources
-                .into_iter()
-                .filter(|source| {
-                    std::panic::catch_unwind(|| compile_vrl_function(source, "vrl_crate_test"))
-                        .map_or(true, |res| {
-                            res.map_or_else(
-                                |e| !e.to_string().contains("call to undefined function"),
-                                |_| true,
-                            )
-                        })
-                })
-                .collect();
+        let allowed: Vec<&str> = NETWORK_SOURCES
+            .into_iter()
+            .chain(HOST_SOURCES)
+            .filter(|source| !is_undefined_function(source, false))
+            .collect();
+        assert!(allowed.is_empty(), "still callable: {allowed:?}");
+    }
+
+    #[test]
+    fn skip_ssrf_checks_allows_only_network_functions() {
+        let denied: Vec<&str> = NETWORK_SOURCES
+            .into_iter()
+            .filter(|source| is_undefined_function(source, true))
+            .collect();
+        assert!(denied.is_empty(), "still denied: {denied:?}");
+        let allowed: Vec<&str> = HOST_SOURCES
+            .into_iter()
+            .filter(|source| !is_undefined_function(source, true))
+            .collect();
         assert!(allowed.is_empty(), "still callable: {allowed:?}");
     }
 

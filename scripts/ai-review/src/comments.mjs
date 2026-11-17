@@ -2,6 +2,8 @@ import { isSettledConfidenceLine, mergeConfidenceLine, notRunConfidenceLine, rev
 import { scrubReviewBody } from "./scrub.mjs";
 
 export const REVIEW_PASS_TAG = "<!--\\s*o2-review-pass:(\\d+)\\s*-->";
+// Hand-started reviews, which the pass tag also counts, and the key the latest one read; the cap counts only the others.
+export const REVIEW_MANUAL_TAG = "<!--\\s*o2-review-manual:(\\d+)(?::([^\\s<>]+))?\\s*-->";
 // The value class excludes `<` and `>` so a tag can neither cross into the next one nor backtrack across it.
 export const REVIEW_SHA_TAG = "<!--\\s*o2-review-sha:([^\\s<>]+)\\s*-->";
 // The verdict a later head's line replaced, kept in case the head returns to the reviewed commit.
@@ -28,7 +30,7 @@ const AUTO_APPROVE_LINE_RE = /^(?:[^\w\n`]|<\/?[a-z]+>)*(?:auto[- ]?approved|nee
 const FORGED_LINE_RE = /mergeconfidence|autoapproved|needshumanreview|reviewedcommit/;
 // The fixed head of a finding line, glyph and location then category, which leaves no room for a status phrase ahead of the category.
 const FINDING_LINE_RE = /^\s*- (?:[^\w\s`*<]+\s+)?(?:`[^`\n]+`\s+)?\*\*\[[^\]\n]+\]\*\*/;
-const TRAILING_TAGS_RE = /(?:\s*<!--\s*o2-review-(?:(?:sha|held|diff):[^\s<>]+|pass:\d+)\s*-->)+\s*$/i;
+const TRAILING_TAGS_RE = /(?:\s*<!--\s*o2-review-(?:(?:sha|held|diff|manual):[^\s<>]+|pass:\d+)\s*-->)+\s*$/i;
 const HTML_COMMENT_RE = /<!--[\s\S]*?--!?>/g;
 const MARKUP_RE = /<!--[\s\S]*?--!?>|<[^>]*>|&[a-z]+;/gi;
 // "summary" stays out: it would strip the <summary> of the findings fold, and a leaked finding field sits inside a stripped <finding> block.
@@ -65,6 +67,25 @@ export function reviewPassTag(count) {
 
 export function withPassTag(body, count) {
   return `${withoutTag(body, REVIEW_PASS_TAG)}\n${reviewPassTag(count)}`;
+}
+
+export function manualReviews(body) {
+  const m = String(body ?? "").match(new RegExp(REVIEW_MANUAL_TAG, "i"));
+  return m ? { count: Number(m[1]), key: m[2] ?? "" } : { count: 0, key: "" };
+}
+
+export function reviewManualTag({ count, key = "" }) {
+  return `<!-- o2-review-manual:${count}${key ? `:${key}` : ""} -->`;
+}
+
+// No tag at zero, so a PR never reviewed by hand keeps the comment it had before the counter.
+export function withManualTag(body, manual) {
+  const bare = withoutTag(body, REVIEW_MANUAL_TAG);
+  return manual?.count > 0 ? `${bare}\n${reviewManualTag(manual)}` : bare;
+}
+
+export function automaticPassCount(passes, manualCount) {
+  return Math.max(0, passes - manualCount);
 }
 
 // A new commit on either side of a paired review is a new key.
@@ -137,20 +158,29 @@ function shortKey(key) {
   return key.split("+").map(sha => sha.slice(0, 7)).join("+");
 }
 
+function reviewCountText(review, maxPasses, manualCount) {
+  if (manualCount <= 0) return `review ${review}${maxPasses > 0 ? ` of ${maxPasses}` : ""}`;
+  const automatic = maxPasses > 0 ? ` · ${automaticPassCount(review, manualCount)} of ${maxPasses} automatic` : "";
+  return `review ${review}${automatic} · ${manualCount} manual`;
+}
+
 // With a pair, HEAD_SHA is the enterprise PR and PAIRED_HEAD_SHA the OSS one.
-export function reviewedCommitLine(key, review, maxPasses) {
+export function reviewedCommitLine(key, review, maxPasses, manualCount = 0) {
   const [head, paired] = key.split("+").map(shortKey);
   const commits = paired
     ? `Reviewed commits \`${head}\` and \`${paired}\` (paired OSS PR)`
     : `Reviewed commit \`${head}\``;
-  return `<sub>${commits} · review ${review}${maxPasses > 0 ? ` of ${maxPasses}` : ""}</sub>`;
+  return `<sub>${commits} · ${reviewCountText(review, maxPasses, manualCount)}</sub>`;
 }
 
-export function passLimitNote(maxPasses, reviewed = "", head = "") {
+// Kept on the note's one line, which is what PASS_LIMIT_NOTE_RE replaces and strips.
+export function passLimitNote(maxPasses, reviewed = "", head = "", manual = { count: 0, key: "" }) {
   const scope = reviewed && head && reviewed !== head
     ? `. This review covers \`${shortKey(reviewed)}\`; \`${shortKey(head)}\` and later pushes are not reviewed.`
     : "; later pushes are not reviewed.";
-  return `> [!NOTE]\n> This PR has used its ${maxPasses} automatic reviews${scope} Run the AI Code Review workflow by hand with \`ignore_pass_limit\` to review it again.`;
+  const latest = manual.key ? ` (latest on \`${shortKey(manual.key)}\`)` : "";
+  const manualText = manual.count > 0 ? ` Manual reviews so far: ${manual.count}${latest}.` : "";
+  return `> [!NOTE]\n> This PR has used its ${maxPasses} automatic reviews${scope} Run the AI Code Review workflow by hand with \`ignore_pass_limit\` to review it again.${manualText}`;
 }
 
 // Replaces any earlier note and stays above the hidden tags, so repeat skips neither stack notes nor lose tags.
@@ -203,10 +233,10 @@ function withHeldVerdict(body) {
 }
 
 // The old verdict must not read as the new head's while the run works, legacy reviews with no confidence line included; a cancelled run leaving "Reviewing" behind is still true.
-export function claimedReviewBody(body, count, key) {
+export function claimedReviewBody(body, count, key, manual = manualReviews(body)) {
   const bare = withoutAutoApproveLine(body);
   const newHead = key && reviewedKey(body) !== key && (bare.search(MERGE_CONFIDENCE_LINE_RE) !== -1 || !isPlaceholderComment(bare));
-  return withPassTag(newHead ? withConfidenceLine(withHeldVerdict(bare), reviewingConfidenceLine(shortKey(key))) : bare, count);
+  return withManualTag(withPassTag(newHead ? withConfidenceLine(withHeldVerdict(bare), reviewingConfidenceLine(shortKey(key))) : bare, count), manual);
 }
 
 // A head the review did not cover must not keep showing that review's confidence; an untagged review covers no head, only a placeholder claims none.
@@ -223,12 +253,13 @@ export function bodyAtReviewedHead(body, maxPasses) {
   const settled = !held && (!line || isSettledConfidenceLine(line));
   const restored = settled ? body : withConfidenceLine(withoutTag(body, REVIEW_HELD_TAG), heldLine(body));
   if (body.search(PASS_LIMIT_NOTE_RE) === -1) return restored;
-  if (!passLimitReached(reviewPassCount(body), maxPasses)) return restored.replace(PASS_LIMIT_NOTE_RE, "");
-  return settled ? body : withPassLimitNote(restored, passLimitNote(maxPasses));
+  const manual = manualReviews(body);
+  if (!passLimitReached(automaticPassCount(reviewPassCount(body), manual.count), maxPasses)) return restored.replace(PASS_LIMIT_NOTE_RE, "");
+  return settled ? body : withPassLimitNote(restored, passLimitNote(maxPasses, "", "", manual));
 }
 
 export function bodyAtPassLimit(body, maxPasses, head) {
-  return bodyAtUnreviewedHead(withPassLimitNote(body, passLimitNote(maxPasses, reviewedKey(body), head)), head);
+  return bodyAtUnreviewedHead(withPassLimitNote(body, passLimitNote(maxPasses, reviewedKey(body), head, manualReviews(body))), head);
 }
 
 // Even on the covered commit: the run already dismissed the approval, so the old verdict and gate line must not read as current.
@@ -237,19 +268,19 @@ export function bodyAtFailedRun(body, head) {
 }
 
 // The sha tag says that exact commit was read and stops it being reviewed again, so a run that cannot prove that leaves it off.
-export function finishReviewBody(body, { key, passes, maxPasses, reviewed, confidence, gateLine = "", diffFingerprint = "" }) {
+export function finishReviewBody(body, { key, passes, maxPasses, reviewed, confidence, gateLine = "", diffFingerprint = "", manual = { count: 0, key: "" } }) {
   const stamped = reviewed && key;
   const lines = [confidence ? mergeConfidenceLine(confidence) : "", gateLine].filter(Boolean);
   let out = insertAfterCallout(body, lines.join("\n\n"));
-  if (stamped) out += `\n\n${reviewedCommitLine(key, passes, maxPasses)}`;
-  if (passLimitReached(passes, maxPasses)) out += `\n\n${passLimitNote(maxPasses)}`;
+  if (stamped) out += `\n\n${reviewedCommitLine(key, passes, maxPasses, manual.count)}`;
+  if (passLimitReached(automaticPassCount(passes, manual.count), maxPasses)) out += `\n\n${passLimitNote(maxPasses, "", "", manual)}`;
   if (stamped) out = withReviewDiffTag(withReviewShaTag(out, key), diffFingerprint);
-  return withPassTag(out, passes);
+  return withManualTag(withPassTag(out, passes), manual);
 }
 
 // What the reviewers see as <previous_review>: the review alone, none of the runner's bookkeeping.
 export function previousReviewText(body) {
-  return [REVIEW_SHA_TAG, REVIEW_PASS_TAG, REVIEW_HELD_TAG, REVIEW_DIFF_TAG].reduce(withoutTag, stripRunnerLines(String(body ?? "")));
+  return [REVIEW_SHA_TAG, REVIEW_PASS_TAG, REVIEW_MANUAL_TAG, REVIEW_HELD_TAG, REVIEW_DIFF_TAG].reduce(withoutTag, stripRunnerLines(String(body ?? "")));
 }
 
 // Yields the text after each pass, last the first that changed nothing: a removal can splice a new match out of what surrounds it.
@@ -332,7 +363,7 @@ function unwrapJsonBody(body) {
 export function sanitizeReviewBody(body, { marker, providerId, modelId, env }) {
   if (!body) return { text: "", secretHits: 0 };
   const anyMarker = new RegExp(ANY_REVIEW_MARKER, "gi");
-  const runnerTags = new RegExp(`${ANY_REVIEW_MARKER}|${REVIEW_PASS_TAG}|${REVIEW_SHA_TAG}|${REVIEW_HELD_TAG}|${REVIEW_DIFF_TAG}`, "gi");
+  const runnerTags = new RegExp(`${ANY_REVIEW_MARKER}|${REVIEW_PASS_TAG}|${REVIEW_MANUAL_TAG}|${REVIEW_SHA_TAG}|${REVIEW_HELD_TAG}|${REVIEW_DIFF_TAG}`, "gi");
 
   let cleaned = unwrapJsonBody(body)
     .replace(/\\n/g, "\n")

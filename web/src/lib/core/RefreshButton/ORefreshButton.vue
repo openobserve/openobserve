@@ -141,7 +141,7 @@ function handleClick(e: MouseEvent) {
         ? 'border-status-error-text! bg-status-error-bg! h-6! max-w-full pe-0! sm:min-w-0'
         : size === 'header'
           ? 'h-8.5!'
-          : 'h-8!'
+          : undefined
     "
     :icon-left="ownsTooltip ? undefined : 'refresh'"
     :loading="loading"

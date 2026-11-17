@@ -214,6 +214,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSpinner size="lg" />
         <span>{{ t("logs.rowNav.loadingPage", { page: pageLoadingPage }) }}</span>
       </div>
+      <CorrelationServiceHeader
+        v-if="showCorrelationHeader"
+        class="px-page-edge border-card-glass-border shrink-0 border-b border-solid py-2"
+        :service-name="correlationProps.serviceName"
+        :display-service-name="correlationProps.displayServiceName"
+        :service-display="correlationProps.serviceDisplay"
+        :scope="correlationScope"
+        :by-pod="correlationByPod"
+        :time-range="correlationProps.timeRange"
+        @close="closeTable"
+      />
       <OTabPanels
         data-test="log-detail-tab-container"
         v-model="tab"
@@ -468,6 +479,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             mode="embedded-tabs"
             external-active-tab="metrics"
             :service-name="correlationProps.serviceName"
+            :display-service-name="correlationProps.displayServiceName"
+            :service-display="correlationProps.serviceDisplay"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
             :matched-set-id="correlationProps.matchedSetId"
@@ -512,6 +525,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             external-active-tab="traces"
             :shortcuts-active="tab === 'correlated-traces'"
             :service-name="correlationProps.serviceName"
+            :display-service-name="correlationProps.displayServiceName"
+            :service-display="correlationProps.serviceDisplay"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
             :matched-set-id="correlationProps.matchedSetId"
@@ -672,6 +687,10 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
+import CorrelationServiceHeader from "@/plugins/correlation/CorrelationServiceHeader.vue";
+import { useCorrelationScope } from "@/plugins/correlation/useCorrelationVersions";
+import { enrichStreamsWithOverlap, sortStreamsByOverlap } from "@/utils/streamTimeOverlap";
+import { placeFromDimensions } from "@/plugins/correlation/correlationVersions";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
@@ -727,6 +746,7 @@ export default defineComponent({
     TelemetryCorrelationDashboard,
     CorrelatedLogsTable,
     LicenseDeniedState,
+    CorrelationServiceHeader,
     OButton,
     OSelect,
     ODropdown,
@@ -874,6 +894,43 @@ export default defineComponent({
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
     const { locked: correlationLicenseLocked, lockedReason: correlationLockedReason } =
       useLicenseLock("correlation");
+    const showCorrelationHeader = computed(
+      () => !!props.correlationProps && tab.value.startsWith("correlated-"),
+    );
+    // The pod read uses the trace stream the correlated Traces tab opens first.
+    const correlationTraceStream = computed(() => {
+      const streams = props.correlationProps?.traceStreams ?? [];
+      const range = props.correlationProps?.timeRange;
+      const sorted = range
+        ? sortStreamsByOverlap(
+            enrichStreamsWithOverlap(streams, "traces", range, store.state.streams),
+          )
+        : streams;
+      return sorted[0]?.stream_name as string | undefined;
+    });
+    const { scope: correlationScope, byPod: correlationByPod } = useCorrelationScope({
+      org: computed(() => store.state.selectedOrganization?.identifier || ""),
+      user: computed(() => store.state.userInfo?.email || ""),
+      displayName: computed(() => props.correlationProps?.displayServiceName),
+      displaySource: computed(() => props.correlationProps?.serviceDisplay?.display_source),
+      place: computed(() =>
+        placeFromDimensions(
+          [
+            props.correlationProps?.chipDimensions,
+            props.correlationProps?.matchedDimensions,
+            props.correlationProps?.additionalDimensions,
+            props.correlationProps?.availableDimensions,
+          ],
+          props.correlationProps?.semanticGroups ?? [],
+        ),
+      ),
+      enabled: showCorrelationHeader,
+      traceStream: correlationTraceStream,
+      logTime: computed(() => {
+        const at = Number(props.correlationProps?.sourceEvent?.timestamp);
+        return Number.isFinite(at) && at > 0 ? at : undefined;
+      }),
+    });
 
     const selectedRelativeValue = ref<number>(10);
     const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
@@ -1462,6 +1519,9 @@ export default defineComponent({
       addSearchTerm,
       closeTable,
       showCorrelation,
+      showCorrelationHeader,
+      correlationScope,
+      correlationByPod,
       severity,
       severityTagLabel,
       severityFieldValue,

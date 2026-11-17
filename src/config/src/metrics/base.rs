@@ -413,6 +413,21 @@ pub static O2_SERVICE_GRAPH_RESOLVED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+/// Registry keys refused by the daily new-version guard or too long for a column.
+pub static SERVICE_VERSIONS_DROPPED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_versions_dropped_total",
+            "Service versions dropped before reaching the registry, by org and reason.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org", "reason"],
+    )
+    .expect("Metric created")
+});
+
 pub static O2_SERVICE_GRAPH_RETAINED_EDGES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -1557,6 +1572,30 @@ pub static NODE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
         Opts::new("node_memory_usage", "Memory usage")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static MEMORY_CIRCUIT_BREAKER_TRIPPED: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "memory_circuit_breaker_tripped",
+            "1 while the memory circuit breaker rejects requests, else 0",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static MEMORY_CIRCUIT_BREAKER_TRIPS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "memory_circuit_breaker_trips_total",
+            "Times the memory circuit breaker tripped",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
         &[],
     )
     .expect("Metric created")
@@ -3213,6 +3252,9 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(O2_SERVICE_GRAPH_RESOLVED_TOTAL.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(SERVICE_VERSIONS_DROPPED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(O2_SERVICE_GRAPH_RETAINED_EDGES.clone()))
         .expect("Metric registered");
     registry
@@ -3505,6 +3547,12 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(MEMORY_CIRCUIT_BREAKER_TRIPPED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(MEMORY_CIRCUIT_BREAKER_TRIPS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_DISK_TOTAL.clone()))
@@ -3850,6 +3898,7 @@ mod tests {
         let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
         let _ = SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone();
         let _ = O2_SERVICE_GRAPH_RESOLVED_TOTAL.clone();
+        let _ = SERVICE_VERSIONS_DROPPED_TOTAL.clone();
         let _ = O2_SERVICE_GRAPH_RETAINED_EDGES.clone();
         let _ = O2_SERVICE_GRAPH_RETAINED_NODES.clone();
         let _ = O2_SERVICE_GRAPH_EVICTED_EDGES_TOTAL.clone();
@@ -3979,6 +4028,8 @@ mod tests {
         let _ = NODE_CPU_USAGE.clone();
         let _ = NODE_MEMORY_TOTAL.clone();
         let _ = NODE_MEMORY_USAGE.clone();
+        let _ = MEMORY_CIRCUIT_BREAKER_TRIPPED.clone();
+        let _ = MEMORY_CIRCUIT_BREAKER_TRIPS.clone();
         let _ = NODE_DISK_TOTAL.clone();
         let _ = NODE_DISK_USAGE.clone();
         let _ = NODE_TCP_CONNECTIONS.clone();

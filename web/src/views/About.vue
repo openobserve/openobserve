@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-text-body rounded-default border-info/28 bg-card-glass-tint-info-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm whitespace-nowrap max-md:min-w-0"
               >
                 <OIcon name="code" size="sm" class="text-info shrink-0" />
-                <span class="text-info text-xs font-semibold tracking-wide uppercase">{{
+                <span class="text-text-body text-xs font-semibold">{{
                   t("about.commit_lbl")
                 }}</span>
                 <OText variant="mono" class="max-md:max-w-28 max-md:truncate">{{
@@ -77,9 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-text-body rounded-default border-warning/28 bg-card-glass-tint-warning inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm whitespace-nowrap"
               >
                 <OIcon name="event" size="sm" class="text-warning shrink-0" />
-                <span class="text-warning text-xs font-semibold tracking-wide uppercase">{{
-                  t("about.build_lbl")
-                }}</span>
+                <span class="text-text-body text-xs font-semibold">{{ t("about.build_lbl") }}</span>
                 {{
                   store.state.zoConfig.build_date ? formatDate(store.state.zoConfig.build_date) : ""
                 }}
@@ -137,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 target="_blank"
                 class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
               >
-                <OIcon name="javascript" size="md" class="text-accent shrink-0" />
+                <OIcon name="data-object" size="md" class="text-accent shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
                   <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">{{
                     t("about.npmjsCom")
@@ -258,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="workspace-premium" size="md" />
               </div>
               <div>
-                <OText variant="label" class="text-accent m-0 mb-1 tracking-widest uppercase">{{
+                <OText variant="label" class="text-accent m-0 mb-1">{{
                   t("about.licenseAndUsage")
                 }}</OText>
                 <h2 class="text-text-heading m-0 text-xl font-semibold">
@@ -270,10 +268,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("about.manage_license") }}
             </OButton>
           </div>
-          <OText variant="body" class="m-0 mb-5 leading-relaxed">{{
-            t("about.license_info_msg")
-          }}</OText>
-
           <div v-if="loadingLicense" class="py-8 text-center">
             <OSpinner size="md" />
             <div class="text-text-muted mt-3 text-sm">{{ t("about.loading_license_info") }}</div>

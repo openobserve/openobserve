@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :run-suggestion="runSuggestion ?? undefined"
     :query="filterMode ? undefined : query"
     size="hero"
-    illustration="broken-panel"
     @ask-ai="emit('ask-ai')"
     @fix-query="emit('fix-query')"
     @configure-resource="emit('configure-stream')"

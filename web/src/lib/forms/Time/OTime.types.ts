@@ -52,6 +52,8 @@ export interface TimeEmits {
   (_e: "update:modelValue", _value: string): void;
   (_e: "change", _value: string): void;
   (_e: "clear"): void;
+  /** True while a typed entry can't be read (24-hour field only); false once it is fixed or replaced. */
+  (_e: "invalid", _invalid: boolean): void;
   (_e: "blur", _event: FocusEvent): void;
   (_e: "focus", _event: FocusEvent): void;
 }

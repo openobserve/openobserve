@@ -5,6 +5,7 @@ import DateTimeHelper from "./dashboard-time.js";
 import { selectLogsViewMode } from "../commonActions.js";
 import { LogsPage } from "../logsPages/logsPage.js";
 import testLogger from "../../playwright-tests/utils/test-logger.js";
+import MonacoEditorHelper from "../../playwright-tests/utils/MonacoEditorHelper.js";
 
 // Long enough for the empty-state overlay to reappear if the panel is genuinely empty.
 const quietPeriodProbeMs = 3000;
@@ -371,16 +372,28 @@ export default class LogsVisualise {
     const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
     await queryEditor.waitFor({ state: "visible", timeout: 5000 });
     await queryEditor.getByRole('code').click();
-    await queryEditor.locator('.inputarea').fill(sqlQuery);
+    await new MonacoEditorHelper(this.page).fillInputArea(queryEditor, sqlQuery);
   }
 
   //fill logs query editor with SQL query
   async fillLogsQueryEditor(sqlQuery) {
     await this.logsQueryEditor.waitFor({ state: "visible", timeout: 5000 });
     await this.logsQueryEditor.getByRole('code').click();
-    await this.logsQueryEditor.locator('.inputarea').fill(sqlQuery);
+    await new MonacoEditorHelper(this.page).fillInputArea(this.logsQueryEditor, sqlQuery);
     // An edit made while the stream is still loading never reaches searchObj, so Visualize and Add-to-dashboard would use an empty query.
     await new LogsPage(this.page).waitForSearchQueryCommitted(sqlQuery);
+  }
+
+  async clearFunctionEditor() {
+    await new MonacoEditorHelper(this.page).fillInputArea(this.functionEditor.first(), "");
+  }
+
+  async expectFunctionEditorReady() {
+    await new MonacoEditorHelper(this.page).waitForReady(this.functionEditor.first());
+  }
+
+  async expectFunctionEditorContains(text) {
+    await expect(this.functionEditor.first().locator(".view-lines")).toContainText(text);
   }
 
   // Open the first VRL Function Editor
@@ -392,7 +405,7 @@ export default class LogsVisualise {
       const shown = ((await editorLines.textContent().catch(() => "")) || "").replace(/\s+/g, "");
       if (!shown.includes(firstLine.replace(/\s+/g, ""))) {
         await this.functionEditor.first().click();
-        await this.queryEditor.fill(vrl);
+        await new MonacoEditorHelper(this.page).fillInputArea(this.functionEditor.first(), vrl);
       }
       await expect(editorLines).toContainText(firstLine, { timeout: 2000 });
     }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });

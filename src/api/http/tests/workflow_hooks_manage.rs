@@ -28,6 +28,7 @@ use infra::{
     table::{workflow_http_trigger_requests::HookRunStatus, workflow_http_triggers as triggers},
 };
 use openobserve_core::workflows::http_trigger::credentials::sha256_hex;
+use sea_orm::{IntoActiveModel, Set};
 use serde_json::{Value, json};
 use support::*;
 
@@ -481,6 +482,83 @@ fn a_revived_endpoint_cannot_read_runs_from_before_its_tombstone() {
         assert_eq!(after.status, StatusCode::NOT_FOUND, "{:?}", after.json());
         assert_eq!(after.json()["error_detail"], "run_not_found");
     });
+}
+
+#[test]
+fn a_revived_endpoint_starts_a_new_run_for_a_key_used_before_its_tombstone() {
+    run(
+        ENV,
+        reuse_a_key_across_a_revive("wf-revive-key", "203.0.113.96", false),
+    );
+}
+
+#[test]
+fn reviving_an_endpoint_tombstoned_with_its_keys_still_held_frees_them() {
+    run(
+        ENV,
+        reuse_a_key_across_a_revive("wf-revive-legacy", "203.0.113.97", true),
+    );
+}
+
+/// `keys_held` tombstones the row directly, keeping its keys as a delete before this change did.
+async fn reuse_a_key_across_a_revive(workflow_id: &'static str, ip: &'static str, keys_held: bool) {
+    write_heartbeat().await;
+    let created = create(workflow_id).await.json();
+    let mut endpoint = Seeded {
+        org: ORG.to_string(),
+        trigger_id: created["id"].as_str().unwrap().to_string(),
+        workflow_id: workflow_id.to_string(),
+        secret: created["secret"].as_str().unwrap().to_string(),
+    };
+    let (key, body) = ([("idempotency-key", "deploy-77")], b"{}");
+    let invoke =
+        |endpoint: &Seeded| post_token(&endpoint.invoke_path(), ip, &endpoint.secret, &key, body);
+    let first = send(invoke(&endpoint)).await;
+    assert_eq!(first.status, StatusCode::ACCEPTED, "{:?}", first.json());
+    let first_run = first.json()["run_id"].as_str().unwrap().to_string();
+    finish_queued_run(&endpoint.trigger_id, &first_run, HookRunStatus::Succeeded).await;
+    let url = base(workflow_id);
+    if keys_held {
+        let db = infra::db::get_orm_client_rw().await;
+        let mut row = triggers::get(db, &endpoint.trigger_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .into_active_model();
+        row.deleted_at = Set(Some(config::utils::time::now_micros()));
+        triggers::update_trigger(db, row).await.unwrap();
+        let held = run_row(&endpoint.trigger_id, &first_run).await.unwrap();
+        assert_eq!(held.idem_key.as_deref(), Some("deploy-77"));
+    } else {
+        assert_eq!(
+            call(Method::DELETE, &url, ADMIN, None).await.status,
+            StatusCode::NO_CONTENT
+        );
+    }
+    let again = call(
+        Method::PUT,
+        &url,
+        ADMIN,
+        Some(json!({"enabled": true, "auth_mode": "token"})),
+    )
+    .await
+    .json();
+    assert_eq!(again["id"], endpoint.trigger_id.as_str());
+    endpoint.secret = again["secret"].as_str().unwrap().to_string();
+    let revived = send(invoke(&endpoint)).await;
+    assert_eq!(revived.status, StatusCode::ACCEPTED, "{:?}", revived.json());
+    let revived_run = revived.json()["run_id"].as_str().unwrap().to_string();
+    assert_ne!(revived_run, first_run);
+    let retry = send(invoke(&endpoint)).await;
+    assert_eq!(retry.status, StatusCode::OK, "{:?}", retry.json());
+    assert_eq!(retry.json()["run_id"], revived_run.as_str());
+    assert_eq!(retry.header("idempotent-replayed"), Some("true"));
+    let old = run_row(&endpoint.trigger_id, &first_run).await.unwrap();
+    assert_eq!(
+        (old.status.as_str(), old.idem_key),
+        ("succeeded", None),
+        "the old run stays in history without its key"
+    );
 }
 
 #[test]

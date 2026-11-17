@@ -56,6 +56,14 @@ describe("runReasonOf", () => {
     ).toBe("worker_lost");
     expect(runReasonOf({ status: "failed", error: "workflow_disabled" })).toBe("workflow_disabled");
     expect(runReasonOf({ status: "failed", error: "run_timeout" })).toBe("run_timeout");
+    expect(runReasonOf({ status: "failed", error: "endpoint_disabled" })).toBe("endpoint_disabled");
+    expect(
+      runReasonOf({
+        status: "failed",
+        error: "step text",
+        http_request: facts({ error: "credential_revoked" }),
+      }),
+    ).toBe("credential_revoked");
   });
 
   it("has no reason for an ordinary step failure or a non-failed run", () => {
@@ -75,6 +83,8 @@ describe("hasStoredRunData", () => {
       expect(hasStoredRunData({ status, error: null })).toBe(false);
     expect(hasStoredRunData({ status: "failed", error: "worker_lost" })).toBe(false);
     expect(hasStoredRunData({ status: "failed", error: "workflow_disabled" })).toBe(false);
+    expect(hasStoredRunData({ status: "failed", error: "endpoint_disabled" })).toBe(false);
+    expect(hasStoredRunData({ status: "failed", error: "credential_revoked" })).toBe(false);
   });
 
   it("is false for failed runs that ended before any step result was stored", () => {

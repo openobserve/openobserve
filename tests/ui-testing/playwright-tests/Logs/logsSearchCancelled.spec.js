@@ -15,10 +15,10 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const { trackSearches, ingestRows } = require('../utils/auto-run-helpers.js');
-const { getAuthHeaders } = require('../utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
-const ORG = `srchcancel${Date.now()}`;
-const STREAM = 'cancel_logs';
+const ORG = getOrgIdentifier() || 'default';
+const STREAM = `e2e_cancel_logs_${Math.random().toString(36).slice(2, 7)}`;
 const TOTAL = 120;
 const BASE_US = (Date.now() - 10 * 60 * 1000) * 1000;
 

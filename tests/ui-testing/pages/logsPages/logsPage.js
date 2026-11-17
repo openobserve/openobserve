@@ -132,6 +132,7 @@ export class LogsPage {
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
         this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
+        this.streamNameCell = '[data-test^="log-stream-name-cell-"]';
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
@@ -1560,9 +1561,7 @@ export class LogsPage {
 
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
-        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 30000 });
-        await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        await this.getMonacoEditorHelper().fillInputArea(this.page.locator(this.queryEditor), query);
     }
 
     async executeQueryWithKeyboardShortcut() {
@@ -3028,7 +3027,7 @@ export class LogsPage {
 
         if (!set) {
             // Fallback to DOM fill
-            return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
+            return await this.getMonacoEditorHelper().fillInputArea(this.page.locator(this.queryEditor), query);
         }
     }
 
@@ -3623,6 +3622,18 @@ export class LogsPage {
         return await this.page.locator(this.exploreButtonSelector).first().click({ force: true });
     }
 
+    async expectStreamListFilteredBy(keyword) {
+        const matching = `[data-test*="${keyword}" i]`;
+        await expect(this.page.locator(`${this.streamNameCell}${matching}`).first()).toBeVisible();
+        // OTable keeps the previous rows inert during a slow filter fetch, and a click on them is silently dropped.
+        await expect(this.page.locator(`[data-test-stale] ${this.streamNameCell}, ${this.streamNameCell}:not(${matching})`)).toHaveCount(0);
+    }
+
+    async exploreFirstStreamAndExpectLogs() {
+        await this.page.locator(this.exploreButtonSelector).first().click();
+        await expect(this.page).toHaveURL(/\/logs(\?|$)/);
+    }
+
     async waitForSavedViewsButton() {
         return await this.page.waitForSelector(this.savedViewsButton);
     }
@@ -3652,6 +3663,21 @@ export class LogsPage {
         } catch (e) {
             return false;
         }
+    }
+
+    async waitForSavedViewViaApi(org, viewName, timeout = 30000) {
+        let view;
+        await expect.poll(async () => {
+            const response = await this.page.request.get(`${process.env.ZO_BASE_URL}/api/${org}/savedviews`, { headers: getAuthHeaders() });
+            view = response.ok() ? ((await response.json()).views ?? []).find((v) => v.view_name === viewName) : undefined;
+            return Boolean(view);
+        }, { timeout }).toBe(true);
+        return view;
+    }
+
+    async fetchSavedViewViaApi(org, viewId) {
+        const response = await this.page.request.get(`${process.env.ZO_BASE_URL}/api/${org}/savedviews/${viewId}`, { headers: getAuthHeaders() });
+        return response.json();
     }
 
     async clickDeleteSavedViewButton(savedViewName) {
@@ -3685,7 +3711,7 @@ export class LogsPage {
     }
 
     async waitForQueryEditorTextbox() {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: "visible" });
+        return await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.queryEditor));
     }
 
     async getQueryEditorText() {
@@ -4279,6 +4305,11 @@ export class LogsPage {
         return await expect(this.page.locator(this.errorMessage)).not.toBeVisible({ timeout });
     }
 
+    /** Stricter than expectSqlErrorStateNotVisible: the error state must not be rendered at all, hidden or not. */
+    async expectNoQueryError(message) {
+        await expect(this.page.locator(this.errorMessage), message).toHaveCount(0);
+    }
+
     /**
      * Assert the error state element, if visible, does NOT contain the given text.
      * Passes trivially when no error element is shown (intended for edge-case queries
@@ -4839,7 +4870,7 @@ export class LogsPage {
     }
 
     async isVrlEditorInputVisible() {
-        return await this.page.locator(this.fnEditor).locator('.inputarea').isVisible().catch(() => false);
+        return await this.page.locator(this.fnEditor).locator('.monaco-editor').first().isVisible().catch(() => false);
     }
 
     async clickPast6DaysButton() {
@@ -4883,7 +4914,7 @@ export class LogsPage {
      */
     async expectVrlEditorReady() {
         await this.page.locator(this.vrlEditor).first().waitFor({ state: 'visible', timeout: 15000 });
-        await this.page.locator(`${this.vrlEditor} .inputarea`).first().waitFor({ state: 'visible', timeout: 15000 });
+        await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.vrlEditor).first(), 15000);
     }
 
     /**
@@ -5047,7 +5078,7 @@ export class LogsPage {
         // initialised (setupEditor() async load completes). This prevents the
         // waitForFunction below from timing out on page reloads where window.monaco
         // is not yet set when domcontentloaded fires.
-        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 20000 });
+        await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.queryEditor), 20000);
         // Assert against Monaco's model value (not DOM view-lines which render
         // line numbers when empty — AGENT_RULES §5).
         await this.page.waitForFunction(
@@ -6173,9 +6204,48 @@ export class LogsPage {
         return buttonCount;
     }
 
+    async waitForSearchStreamQuiet({ quietMs = 1500, timeout = 30000 } = {}) {
+        const isSearch = (request) => request.url().includes('/_search_stream') && request.method() === 'POST';
+        let inFlight = 0;
+        let lastActivity = Date.now();
+        const onStart = (request) => {
+            if (!isSearch(request)) return;
+            inFlight++;
+            lastActivity = Date.now();
+        };
+        const onEnd = (request) => {
+            if (!isSearch(request)) return;
+            inFlight = Math.max(0, inFlight - 1);
+            lastActivity = Date.now();
+        };
+        this.page.on('request', onStart);
+        this.page.on('requestfinished', onEnd);
+        this.page.on('requestfailed', onEnd);
+        try {
+            const deadline = Date.now() + timeout;
+            while (Date.now() < deadline) {
+                if (inFlight === 0 && Date.now() - lastActivity >= quietMs) return true;
+                await this.page.waitForTimeout(100);
+            }
+            return false;
+        } finally {
+            this.page.off('request', onStart);
+            this.page.off('requestfinished', onEnd);
+            this.page.off('requestfailed', onEnd);
+        }
+    }
+
+    // J on a page's last row crosses only once the page-count query has given the pager its next page.
+    async expectResultPageCountAtLeast(pageNumber, timeout = 60000) {
+        await expect(this.page.locator(this.resultPaginationPageBtn(pageNumber)).first()).toBeVisible({ timeout });
+    }
+
     async setupAPICallTracking() {
+        // A search the SQL or histogram toggle set off can land after the tracked shortcut and be counted as its own.
+        await this.waitForRunQueryReady();
+        await this.waitForSearchStreamQuiet();
         const allRequests = [];
-        
+
         const requestHandler = (request) => {
             if (request.url().includes('/_search_stream') && request.method() === 'POST') {
                 let postData = null;
@@ -10512,6 +10582,10 @@ export class LogsPage {
         await expect(this.page.locator(this.qPageContainer)).toBeVisible({ timeout: 30000 });
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
         await this.expectNoToastContaining(this.multiStreamPatternsToastText);
+    }
+
+    async isAutoQueryEnabledOnInstance() {
+        return await this.logsQueryPage._isAutoQueryEnabled();
     }
 
     /**

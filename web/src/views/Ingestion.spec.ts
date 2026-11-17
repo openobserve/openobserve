@@ -192,6 +192,8 @@ describe("Ingestion", () => {
       wrapper.unmount();
       wrapper = null;
     }
+    // A dispatch spy on the shared store outlives its test and would record the next mount's dispatches.
+    vi.restoreAllMocks();
   });
 
   describe("Component Initialization", () => {

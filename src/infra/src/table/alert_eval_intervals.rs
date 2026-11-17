@@ -285,7 +285,7 @@ pub async fn earliest_from_us_many_with<C: sea_orm::ConnectionTrait>(
     Ok(earliest)
 }
 
-/// Retention, mirroring `alert_states::delete_transitions_before`.
+/// Retention, mirroring `alert_states::delete_transitions_batch_before_with`.
 ///
 /// Keyed on `to_us` so a run that is still open — or one that ended after the
 /// cutoff but began long before it — survives. Deleting on `from_us` would

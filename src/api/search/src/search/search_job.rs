@@ -174,11 +174,9 @@ pub async fn submit_job(
         }
 
         // get stream name
-        let stream_names = match resolve_stream_names(&req.query.sql) {
-            Ok(v) => v.clone(),
-            Err(e) => {
-                return map_error_to_http_response(&e.into(), Some(trace_id));
-            }
+        let stream_names = match job_stream_names(&req.query.sql, &trace_id) {
+            Ok(v) => v,
+            Err(res) => return res,
         };
 
         if let Some(res) = crate::search::check_sql_stream_permissions(
@@ -787,4 +785,46 @@ async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Optio
         }
     }
     None
+}
+
+/// The job's streams, refused now when one is protected, as its querier would refuse it.
+#[cfg(feature = "enterprise")]
+fn job_stream_names(sql: &str, trace_id: &str) -> Result<Vec<String>, Response> {
+    let stream_names = resolve_stream_names(sql)
+        .map_err(|e| map_error_to_http_response(&e.into(), Some(trace_id.to_string())))?;
+    match search::sql::protected_stream_refusal(stream_names.iter().map(String::as_str), None) {
+        Some(code) => Err(map_error_to_http_response(
+            &infra::errors::Error::ErrorCode(code),
+            Some(trace_id.to_string()),
+        )),
+        None => Ok(stream_names),
+    }
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::*;
+    use crate::common::meta::http::ERROR_HEADER;
+
+    fn refusal(sql: &str) -> (StatusCode, String) {
+        let res = job_stream_names(sql, "t").expect_err("refused");
+        let code = res.headers().get(ERROR_HEADER).unwrap().to_str().unwrap();
+        (res.status(), code.to_string())
+    }
+
+    #[test]
+    fn a_search_job_on_a_protected_stream_is_refused_before_it_is_queued() {
+        assert_eq!(
+            refusal(r#"SELECT * FROM "_o2_alert_calibration_digests""#),
+            (StatusCode::FORBIDDEN, "20014".to_string())
+        );
+        assert_eq!(
+            refusal(r#"SELECT * FROM "_o2_ai_chat_events""#),
+            (StatusCode::BAD_REQUEST, "20002".to_string())
+        );
+        assert_eq!(
+            job_stream_names(r#"SELECT * FROM "default""#, "t").ok(),
+            Some(vec!["default".to_string()])
+        );
+    }
 }

@@ -3,7 +3,8 @@
 
 import { provide, inject, onBeforeUnmount, watch } from "vue";
 import { FORM_CONTEXT_KEY, FORM_SUBMIT_STATE_KEY } from "./OForm.types";
-import { useOForm } from "./useOForm";
+import { revealFieldErrors, useOForm, type FormFieldPath } from "./useOForm";
+import type { FormValidateOn } from "./OForm.types";
 
 const props = defineProps<{
   /**
@@ -47,6 +48,10 @@ const props = defineProps<{
    * `defaultValues`/`schema`/`onSubmit`.
    */
   form?: ReturnType<typeof useOForm<T>>;
+  /** `"leave"` shows a changed field's error on leave; default `"submit"`. Ignored when `form` is passed. */
+  validateOn?: FormValidateOn;
+  /** Groups of fields checked together in leave mode. Ignored when `form` is passed. */
+  coupled?: FormFieldPath<T>[][];
 }>();
 
 const emit = defineEmits<{
@@ -63,6 +68,8 @@ const form =
     defaultValues: (props.defaultValues ?? {}) as T,
     schema: props.schema,
     onSubmit: props.onSubmit,
+    validateOn: props.validateOn,
+    coupled: props.coupled,
   });
 
 provide(FORM_CONTEXT_KEY, form);
@@ -127,13 +134,17 @@ async function validate(): Promise<boolean> {
   // TanStack form's validateAllFields runs every field's validators
   // concurrently. Without `greedy`, run them sequentially and stop at the
   // first failure to match the legacy form semantics.
+  const names = registeredFieldPaths();
   if (props.greedy) {
     await form.validateAllFields("submit");
+    revealFieldErrors(form, names);
   } else {
-    for (const name of registeredFieldPaths()) {
+    for (const [index, name] of names.entries()) {
       await form.validateField(name, "submit");
       const err = form.getFieldMeta(name)?.errors ?? [];
-      if (err.length > 0) return false;
+      if (err.length === 0) continue;
+      revealFieldErrors(form, names.slice(0, index + 1));
+      return false;
     }
   }
   // After all validations, check the canonical isValid flag.

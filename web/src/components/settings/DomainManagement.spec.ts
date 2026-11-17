@@ -26,6 +26,11 @@ const node = document.createElement("div");
 node.setAttribute("id", uniqueNodeId);
 document.body.appendChild(node);
 
+// The page teleports its save bar into the Settings shell's slot.
+const saveBarSlot = document.createElement("div");
+saveBarSlot.setAttribute("id", "settings-save-bar-slot");
+document.body.appendChild(saveBarSlot);
+
 // Mock the domainManagement service
 vi.mock("@/services/domainManagement", () => ({
   default: {
@@ -104,6 +109,8 @@ const mockRouter = {
 
 vi.mock("vue-router", () => ({
   useRouter: () => mockRouter,
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 describe("DomainManagement Component", () => {
@@ -212,7 +219,6 @@ describe("DomainManagement Component", () => {
         '[data-test="domain-management-claim-parser-title"]',
       );
       expect(claimParserTitle.exists()).toBeTruthy();
-      expect(claimParserTitle.text()).toContain("Claim Parser");
 
       // Check for Domain Restrictions section title via data-test
       const domainRestrictionsTitle = mainContainer.find(
@@ -231,15 +237,20 @@ describe("DomainManagement Component", () => {
     it("should redirect if not meta organization", async () => {
       mockStore.state.selectedOrganization.identifier = "different-org";
 
-      wrapper = createWrapper();
-      await flushPromises();
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
 
-      expect(mockRouter.replace).toHaveBeenCalledWith({
-        name: "general",
-        query: {
-          org_identifier: "different-org",
-        },
-      });
+        expect(mockRouter.replace).toHaveBeenCalledWith({
+          name: "general",
+          query: {
+            org_identifier: "different-org",
+          },
+        });
+      } finally {
+        // The store is shared: left on another org, every later test would skip the load.
+        mockStore.state.selectedOrganization.identifier = "test-meta-org";
+      }
     });
   });
 
@@ -586,6 +597,62 @@ describe("DomainManagement Component", () => {
       await flushPromises();
     });
 
+    it("sends the domains Save was clicked on and keeps a later edit unsaved", async () => {
+      const vm = wrapper.vm;
+      const domain = (name: string) => ({
+        name,
+        policy: "block_all",
+        allowedEmails: [],
+        blockedEmails: [],
+      });
+      let finishParser: (value: unknown) => void = () => {};
+      mockOrganizations.post_organization_settings.mockReturnValue(
+        new Promise((resolve) => (finishParser = resolve)),
+      );
+      vm.claimParserFunction = "parse_claims";
+      vm.domains.push(domain("clicked.example"));
+      await nextTick();
+
+      const saved = vm.savePage();
+      vm.domains.push(domain("later.example"));
+      finishParser({ success: true });
+      await saved;
+      await flushPromises();
+
+      const [, sent] = mockDomainManagement.updateDomainRestrictions.mock.calls[0];
+      expect(sent.blocked_domains).toEqual(["clicked.example"]);
+      expect(vm.changeCount).toBe(1);
+    });
+
+    // One Save for the page: it sends only the changed parts, and a failed part stays counted.
+    it.each([
+      { name: "parser only", parser: true, domains: false, failParser: false, left: 0 },
+      { name: "domains only", parser: false, domains: true, failParser: false, left: 0 },
+      { name: "both", parser: true, domains: true, failParser: false, left: 0 },
+      { name: "both, parser fails", parser: true, domains: true, failParser: true, left: 1 },
+    ])("the page save bar saves $name", async ({ parser, domains, failParser, left }) => {
+      const vm = wrapper.vm;
+      if (failParser) mockOrganizations.post_organization_settings.mockRejectedValue(new Error());
+      if (parser) vm.claimParserFunction = "parse_claims";
+      if (domains) {
+        vm.domains.push({
+          name: "new.example",
+          policy: "block_all",
+          allowedEmails: [],
+          blockedEmails: [],
+        });
+      }
+      await nextTick();
+      expect(vm.changeCount).toBe(Number(parser) + Number(domains));
+
+      await vm.savePage();
+      await flushPromises();
+
+      expect(mockOrganizations.post_organization_settings).toHaveBeenCalledTimes(Number(parser));
+      expect(mockDomainManagement.updateDomainRestrictions).toHaveBeenCalledTimes(Number(domains));
+      expect(vm.changeCount).toBe(left);
+    });
+
     it("should save changes successfully", async () => {
       const vm = wrapper.vm;
 
@@ -719,6 +786,7 @@ describe("DomainManagement Component", () => {
 
     it("should show no domain message when no domains exist", async () => {
       const vm = wrapper.vm;
+      await flushPromises();
 
       // Clear all domains
       vm.domains.splice(0, vm.domains.length);

@@ -1,0 +1,168 @@
+{
+  "start": 1730000000000000,
+  "end": 1732419200000000,
+  "truncated": false,
+  "kinds": [
+    {
+      "decision_kind": "stream_silence",
+      "cohorts": 2,
+      "reviewed": 1,
+      "confirmed": 1,
+      "false_alarm": 0,
+      "unclear": 0,
+      "precision": 1.0,
+      "status": "needs_review"
+    },
+    {
+      "decision_kind": "stream_drop",
+      "cohorts": 1,
+      "reviewed": 1,
+      "confirmed": 0,
+      "false_alarm": 1,
+      "unclear": 0,
+      "precision": 0.0,
+      "status": "below_bar"
+    },
+    {
+      "decision_kind": "stream_rise",
+      "cohorts": 0,
+      "reviewed": 0,
+      "confirmed": 0,
+      "false_alarm": 0,
+      "unclear": 0,
+      "precision": null,
+      "status": "no_findings"
+    },
+    {
+      "decision_kind": "source_silence",
+      "cohorts": 1,
+      "reviewed": 0,
+      "confirmed": 0,
+      "false_alarm": 0,
+      "unclear": 0,
+      "precision": null,
+      "status": "needs_review"
+    }
+  ],
+  "cohorts": [
+    {
+      "decision_kind": "stream_silence",
+      "cohort_id": "1732010400",
+      "started_at": 1732010400000000,
+      "first_signal_at": 1732010700000000,
+      "members_total": 1,
+      "members": [
+        {
+          "stream_type": "logs",
+          "stream_name": "orders",
+          "signal_at": 1732010700000000,
+          "reason": "budget",
+          "rows_per_day": 5200.0,
+          "ratio": null,
+          "width_secs": 3600,
+          "incident_id": null,
+          "source_field": null,
+          "source_value": null
+        }
+      ],
+      "quieted": {},
+      "verdict": null
+    },
+    {
+      "decision_kind": "source_silence",
+      "cohort_id": "1731700800-c3f5e04bc4c1d36e",
+      "started_at": 1731700800000000,
+      "first_signal_at": 1731701100000000,
+      "members_total": 1,
+      "members": [
+        {
+          "stream_type": "logs",
+          "stream_name": "checkout",
+          "signal_at": 1731701100000000,
+          "reason": "eligible",
+          "rows_per_day": 4800.0,
+          "ratio": null,
+          "width_secs": 3600,
+          "incident_id": null,
+          "source_field": "host_name",
+          "source_value": "node-4"
+        }
+      ],
+      "quieted": {
+        "low_volume": 1
+      },
+      "verdict": null
+    },
+    {
+      "decision_kind": "stream_drop",
+      "cohort_id": "1731405600",
+      "started_at": 1731405600000000,
+      "first_signal_at": 1731405600000000,
+      "members_total": 1,
+      "members": [
+        {
+          "stream_type": "logs",
+          "stream_name": "payments",
+          "signal_at": 1731405600000000,
+          "reason": "eligible",
+          "rows_per_day": 120000.0,
+          "ratio": 0.1,
+          "width_secs": 900,
+          "incident_id": "inc-0001",
+          "source_field": null,
+          "source_value": null
+        }
+      ],
+      "quieted": {},
+      "verdict": {
+        "verdict": "false_alarm",
+        "note": null,
+        "decided_by": "reviewer@example.com",
+        "decided_at": 1731500000000000
+      }
+    },
+    {
+      "decision_kind": "stream_silence",
+      "cohort_id": "1730800800",
+      "started_at": 1730800800000000,
+      "first_signal_at": 1730801100000000,
+      "members_total": 2,
+      "members": [
+        {
+          "stream_type": "logs",
+          "stream_name": "checkout",
+          "signal_at": 1730801100000000,
+          "reason": "eligible",
+          "rows_per_day": 48000.0,
+          "ratio": null,
+          "width_secs": 900,
+          "incident_id": null,
+          "source_field": null,
+          "source_value": null
+        },
+        {
+          "stream_type": "logs",
+          "stream_name": "payments",
+          "signal_at": 1730801400000000,
+          "reason": "eligible",
+          "rows_per_day": 96000.0,
+          "ratio": null,
+          "width_secs": 900,
+          "incident_id": null,
+          "source_field": null,
+          "source_value": null
+        }
+      ],
+      "quieted": {
+        "low_volume": 3,
+        "vetoed_by_stats": 1
+      },
+      "verdict": {
+        "verdict": "confirmed",
+        "note": "collector OOM",
+        "decided_by": "reviewer@example.com",
+        "decided_at": 1730900000000000
+      }
+    }
+  ]
+}

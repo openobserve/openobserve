@@ -314,6 +314,7 @@
                 :time-range="sidePanelTimeRange"
                 :visible="showSidePanel"
                 :stream-filter="selectedStreamFilter"
+                :agent-scope="agentScope"
                 :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
@@ -398,6 +399,7 @@ import ServiceGraphNoDataState from "./ServiceGraphNoDataState.vue";
 import ChartZoomControls from "@/components/traces/ChartZoomControls.vue";
 import useChartZoom from "@/composables/traces/useChartZoom";
 import { getEffectiveTimeRange } from "@/utils/date";
+import { useServicePanelRoute } from "./composables/useServicePanelRoute";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -483,6 +485,15 @@ export default defineComponent({
       type: String as PropType<string | null>,
       default: null,
     },
+    // env/version may be UNSET (not set); null outside Agent mode.
+    agentScope: {
+      type: Object as PropType<{
+        name: string;
+        env: string | null;
+        version: string | null;
+      } | null>,
+      default: null,
+    },
     // Optional external time window (Agent Graph page owns its own date picker
     // via useAiDateController). When set it drives the topology query instead of
     // the shared traces store's `searchObj.data.datetime` — otherwise the page's
@@ -528,11 +539,19 @@ export default defineComponent({
     // Node side panel state
     const selectedNode = ref<any>(null);
     const showSidePanel = ref(false);
-    // Stored relative start/end go stale, so the panel resolves "now" when it opens or the range changes.
-    const sidePanelTimeRange = ref(getEffectiveTimeRange(searchObj.data.datetime));
+    const panelRoute = useServicePanelRoute();
+    // Stored relative start/end go stale, so "now" is resolved on each call.
+    const effectiveTimeRange = () =>
+      props.timeRange && props.timeRange.startTime && props.timeRange.endTime
+        ? { startTime: props.timeRange.startTime, endTime: props.timeRange.endTime }
+        : getEffectiveTimeRange(searchObj.data.datetime);
+    // The panel resolves its window when it opens or the range changes.
+    const sidePanelTimeRange = ref(effectiveTimeRange());
     watch(
       () => [
         selectedNode.value,
+        props.timeRange?.startTime,
+        props.timeRange?.endTime,
         searchObj.data.datetime.type,
         searchObj.data.datetime.relativeTimePeriod,
         searchObj.data.datetime.startTime,
@@ -540,7 +559,7 @@ export default defineComponent({
       ],
       () => {
         if (selectedNode.value) {
-          sidePanelTimeRange.value = getEffectiveTimeRange(searchObj.data.datetime);
+          sidePanelTimeRange.value = effectiveTimeRange();
         }
       },
     );
@@ -593,6 +612,23 @@ export default defineComponent({
       nodes: [],
       edges: [],
     });
+
+    // A refreshed deep link arrives before the graph nodes load, so the panel opens once its node appears.
+    watch(
+      () => [panelRoute.state.value, graphData.value.nodes] as const,
+      ([state, nodes]) => {
+        if (!state.open) {
+          showSidePanel.value = false;
+          return;
+        }
+        const node = panelRoute.find(nodes);
+        if (node && (!showSidePanel.value || selectedNode.value?.id !== node.id)) {
+          selectedNode.value = node;
+          showSidePanel.value = true;
+        }
+      },
+      { immediate: true },
+    );
 
     // Adaptive-collapse state: when the graph is large, inferred dependency kinds
     // (database/queue/external/rpc) collapse into per-kind boundary nodes so the
@@ -1569,12 +1605,7 @@ export default defineComponent({
           throw new Error(t("traces.serviceGraph.noOrganizationSelected"));
         }
 
-        // Prefer the parent-supplied window (Agent Graph page's date picker); fall
-        // back to the shared traces datetime (Traces Service Graph tab).
-        const { startTime, endTime } =
-          props.timeRange && props.timeRange.startTime && props.timeRange.endTime
-            ? props.timeRange
-            : getEffectiveTimeRange(searchObj.data.datetime);
+        const { startTime, endTime } = effectiveTimeRange();
 
         // /topology/current reads the rollup metrics, so a load never re-scans raw traces.
         const streamName =
@@ -1817,11 +1848,18 @@ export default defineComponent({
       if (params.dataType === "node" && params.data) {
         // Check if clicking the same node - if so, close the panel
         if (selectedNode.value && selectedNode.value.id === params.data.id) {
+          if (panelRoute.state.value.open) void panelRoute.close();
           showSidePanel.value = false;
           selectedNode.value = null;
         } else {
           selectedNode.value = params.data;
           showSidePanel.value = true;
+          void panelRoute.open(
+            params.data.name || params.data.label || params.data.id,
+            params.data.where_key || "",
+            "operations",
+            params.data.service_type || "",
+          );
         }
       }
       // For tree visualization, check if it's a tree node
@@ -1834,11 +1872,18 @@ export default defineComponent({
         if (nodeData) {
           // Check if clicking the same node - if so, close the panel
           if (selectedNode.value && selectedNode.value.id === nodeData.id) {
+            if (panelRoute.state.value.open) void panelRoute.close();
             showSidePanel.value = false;
             selectedNode.value = null;
           } else {
             selectedNode.value = nodeData;
             showSidePanel.value = true;
+            void panelRoute.open(
+              nodeData.name || nodeData.label || nodeData.id,
+              nodeData.where_key || "",
+              "operations",
+              nodeData.service_type || "",
+            );
           }
         } else {
           console.warn("[ServiceGraph] Could not find node data for:", params.data.name);
@@ -1847,6 +1892,7 @@ export default defineComponent({
     };
 
     const handleCloseSidePanel = () => {
+      if (panelRoute.state.value.open) void panelRoute.close();
       showSidePanel.value = false;
       // Don't clear selectedNode immediately to allow smooth close animation
       setTimeout(() => {

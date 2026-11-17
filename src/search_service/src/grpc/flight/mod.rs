@@ -21,17 +21,21 @@ use std::sync::Arc;
 
 use ::datafusion::{physical_plan::ExecutionPlan, prelude::SessionContext};
 use config::{
+    cluster::LOCAL_NODE,
     datafusion::request::FlightSearchRequest,
     meta::{search::ScanStats, sql::TableReferenceExt},
 };
 use infra::errors::Error;
 
 use self::{
-    index::optimizer_physical_plan,
-    plan::{decode_plan, finalize_plan},
-    scan::{StreamSearchSettings, route_files, search_tables},
+    index::apply_index_rules,
+    plan::{apply_pushdown_rules, decode_plan, replace_table_scan},
+    scan::{StreamSearchSettings, collect_table_providers, split_scan_files},
 };
-use crate::grpc::QueryParams;
+use crate::{
+    grpc::QueryParams,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+};
 
 #[tracing::instrument(name = "service:search:grpc:flight:do_get::search", skip_all, fields(org_id = req.query_identifier.org_id))]
 pub async fn search(
@@ -43,7 +47,7 @@ pub async fn search(
     let settings = StreamSearchSettings::load(req, &source).await;
 
     let time_range = (req.search_info.start_time, req.search_info.end_time);
-    let (physical_plan, index) = optimizer_physical_plan(
+    let (physical_plan, index) = apply_index_rules(
         physical_plan,
         &ctx,
         &source.schema,
@@ -72,9 +76,9 @@ pub async fn search(
 
     let mut scan_stats = ScanStats::new();
     let (aggregates, scan_files) =
-        route_files(&query, req, &settings, &index, &mut scan_stats).await?;
+        split_scan_files(&query, req, &settings, &index, &mut scan_stats).await?;
     // Moved in so the file list is freed right after the storage load, before the WAL.
-    let tables = search_tables(
+    let tables = collect_table_providers(
         &query,
         &ctx,
         &source,
@@ -85,15 +89,25 @@ pub async fn search(
     )
     .await?;
 
-    let physical_plan = finalize_plan(
-        &query,
-        req,
-        &ctx,
-        physical_plan,
-        tables,
-        aggregates,
-        &mut scan_stats,
-    )
-    .await?;
+    let start = std::time::Instant::now();
+    let physical_plan = replace_table_scan(&query, req, &ctx, physical_plan, tables).await?;
+    let physical_plan =
+        apply_pushdown_rules(trace_id, &ctx, physical_plan, aggregates, &mut scan_stats)?;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:do_get::search generated physical plan".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
     Ok((ctx, physical_plan, scan_stats))
 }

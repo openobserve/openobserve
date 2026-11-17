@@ -184,7 +184,7 @@ import billings from "@/services/billings";
 import analytics from "@/services/product_analytics";
 import { markSlackInviteOffered } from "@/utils/slackCommunityInvite";
 import { isFirstLoginOf, redirectPending } from "@/components/onboarding/onboardingFlow";
-import { flowsKnown, sampleDataFlowOn } from "@/utils/firstRunFlow";
+import { flowsKnown, sampleDataOffered } from "@/utils/firstRunFlow";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -312,7 +312,11 @@ const browseAll = () => {
   }
 };
 
-const flowOn = () => sampleDataFlowOn(store.state.zoConfig);
+const flowOn = () =>
+  sampleDataOffered(
+    store.state.zoConfig,
+    store.state.organizationData?.organizationSettings?.free_trial_expiry,
+  );
 
 // the switches come only with the full org config; unmounting also ends the wait for it
 let configArrived!: () => void;

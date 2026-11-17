@@ -254,6 +254,14 @@ fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, SendE
 
 /// The subject of a Custom template; alerts never set a fallback, so their subjects are unchanged.
 fn custom_title(template: &Template, ctx: &NotificationContext, is_email: bool) -> String {
+    let title = custom_title_unmarked(template, ctx, is_email);
+    if ctx.render_hints.test_marker {
+        return format!("{}{title}", super::TEST_MARKER);
+    }
+    title
+}
+
+fn custom_title_unmarked(template: &Template, ctx: &NotificationContext, is_email: bool) -> String {
     let fallback = ctx.render_hints.fallback_subject.as_ref();
     match &template.template_type {
         TemplateType::Email { title } if !(title.is_empty() && fallback.is_some()) => {
@@ -287,6 +295,34 @@ mod tests {
         assert_eq!(
             custom_title(&template, &ctx, true),
             "API \"edge\" & Bob's worker is down"
+        );
+    }
+
+    #[test]
+    fn a_test_send_marks_a_custom_email_subject_and_its_fallback() {
+        let titled = Template {
+            name: "check-mail".into(),
+            template_type: TemplateType::Email {
+                title: "{check_name} is down".into(),
+            },
+            ..Default::default()
+        };
+        let untitled = Template {
+            name: "plain".into(),
+            ..Default::default()
+        };
+        let mut ctx = NotificationContext {
+            context_attributes: vec![("check_name".into(), "api".into())],
+            ..Default::default()
+        };
+        ctx.render_hints.fallback_subject = Some("Nightly started".into());
+        assert_eq!(custom_title(&titled, &ctx, true), "api is down");
+        assert_eq!(custom_title(&untitled, &ctx, false), "Nightly started");
+        ctx.render_hints.test_marker = true;
+        assert_eq!(custom_title(&titled, &ctx, true), "[TEST] api is down");
+        assert_eq!(
+            custom_title(&untitled, &ctx, false),
+            "[TEST] Nightly started"
         );
     }
 

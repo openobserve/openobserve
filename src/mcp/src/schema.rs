@@ -248,6 +248,7 @@ fn cleanup_schema_metadata(value: &mut Value) {
                         {
                             // Replace the entire object with the non-null variant
                             let mut replacement = non_null.clone();
+                            carry_sibling_properties(map, &mut replacement);
                             cleanup_schema_metadata(&mut replacement);
                             *value = replacement;
                             return;
@@ -259,6 +260,7 @@ fn cleanup_schema_metadata(value: &mut Value) {
                 if variants_clone.len() == 1 {
                     // Replace the entire object with the single variant
                     let mut replacement = variants_clone[0].clone();
+                    carry_sibling_properties(map, &mut replacement);
                     cleanup_schema_metadata(&mut replacement);
                     *value = replacement;
                     return;
@@ -276,6 +278,37 @@ fn cleanup_schema_metadata(value: &mut Value) {
             }
         }
         _ => {}
+    }
+}
+
+/// A `oneOf` variant replaces its parent, so what is declared beside the `oneOf` moves into it.
+fn carry_sibling_properties(parent: &serde_json::Map<String, Value>, variant: &mut Value) {
+    let Some(variant) = variant.as_object_mut() else {
+        return;
+    };
+    if let Some(Value::Object(siblings)) = parent.get("properties")
+        && let Some(properties) = variant
+            .entry("properties")
+            .or_insert_with(|| Value::Object(serde_json::Map::new()))
+            .as_object_mut()
+    {
+        for (name, schema) in siblings {
+            properties
+                .entry(name.clone())
+                .or_insert_with(|| schema.clone());
+        }
+    }
+    if let Some(Value::Array(siblings)) = parent.get("required")
+        && let Some(required) = variant
+            .entry("required")
+            .or_insert_with(|| Value::Array(Vec::new()))
+            .as_array_mut()
+    {
+        for name in siblings {
+            if !required.contains(name) {
+                required.push(name.clone());
+            }
+        }
     }
 }
 
@@ -472,6 +505,44 @@ mod tests {
         assert_eq!(variants[0]["type"], "object");
         assert_eq!(variants[1]["type"], "object");
         assert_eq!(variants[2]["type"], "object");
+    }
+
+    #[test]
+    fn test_single_variant_oneof_keeps_sibling_properties() {
+        let mut schema = json!({
+            "type": "object",
+            "properties": {"folder_id": {"type": "string"}},
+            "required": ["folder_id"],
+            "oneOf": [{
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"]
+            }]
+        });
+
+        cleanup_schema_metadata(&mut schema);
+
+        assert!(schema.get("oneOf").is_none());
+        assert_eq!(schema["properties"]["name"]["type"], "string");
+        assert_eq!(schema["properties"]["folder_id"]["type"], "string");
+        assert_eq!(schema["required"], json!(["name", "folder_id"]));
+    }
+
+    #[test]
+    fn test_nullable_oneof_keeps_sibling_properties() {
+        let mut schema = json!({
+            "properties": {"folder_id": {"type": "string"}},
+            "oneOf": [
+                {"type": "null"},
+                {"type": "object", "properties": {"name": {"type": "string"}}}
+            ]
+        });
+
+        cleanup_schema_metadata(&mut schema);
+
+        assert!(schema.get("oneOf").is_none());
+        assert_eq!(schema["properties"]["name"]["type"], "string");
+        assert_eq!(schema["properties"]["folder_id"]["type"], "string");
     }
 
     #[test]

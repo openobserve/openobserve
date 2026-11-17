@@ -52,15 +52,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("common.retry") }}</OButton
         >
       </span>
-      <span
-        v-if="modelValue"
-        class="text-text-secondary text-sm"
-        data-test="template-override-stored"
-        >{{ modelValue }}</span
-      >
     </template>
+    <span
+      v-if="(state === 'empty' || state === 'error') && modelValue"
+      class="text-text-secondary flex min-w-0 items-center gap-1 text-sm"
+      data-test="template-override-stored-row"
+    >
+      <span class="min-w-0 wrap-anywhere" data-test="template-override-stored">{{
+        modelValue
+      }}</span>
+      <OButton
+        variant="ghost-primary"
+        size="xs"
+        :disabled="disabled"
+        data-test="template-override-clear"
+        @click="onSelect(null)"
+        >{{ t("alerts.templateOverride.clear") }}</OButton
+      >
+    </span>
     <OSelect
-      v-else
+      v-if="state !== 'empty' && state !== 'error'"
       :model-value="modelValue"
       :options="options"
       labelKey="label"
@@ -75,14 +86,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? t('alerts.templateOverride.forbidden')
           : t('alerts.templateOverride.help', { kind: kindLabel })
       "
-      :error-message="serverError ? raw(serverError) : undefined"
+      :error="!!serverError"
       class="max-w-105"
       data-test="template-override-select"
       @update:model-value="onSelect"
     />
+    <!-- Shown in every state: the empty and error states have no select to carry it. -->
+    <span
+      v-if="serverError"
+      class="text-input-error-text text-xs wrap-anywhere"
+      role="alert"
+      data-test="template-override-server-error"
+      >{{ serverError }}</span
+    >
     <span
       v-if="isStale"
-      class="text-status-warning-text text-xs"
+      class="text-status-warning-text text-xs wrap-anywhere"
       role="status"
       data-test="template-override-stale"
     >
@@ -90,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
     <span
       v-if="mismatched.length"
-      class="text-status-warning-text text-xs"
+      class="text-status-warning-text text-xs wrap-anywhere"
       role="status"
       data-test="template-override-mismatch"
     >
@@ -103,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
     <div
       v-if="willUse.length"
-      class="text-text-secondary flex flex-col text-xs"
+      class="text-text-secondary flex min-w-0 flex-col text-xs wrap-anywhere"
       role="status"
       data-test="template-override-will-use"
     >
@@ -223,17 +242,18 @@ const options = computed<SelectOption[]>(() => {
 });
 
 const selected = computed(() => templates.value.find((tpl) => tpl.name === props.modelValue));
-// A deleted or renamed template would be re-sent under its old name until the server refused it.
+// The list is filtered by kind, so a missing name may exist but not apply to this kind.
 const isStale = computed(() => state.value === "ready" && !!props.modelValue && !selected.value);
 
 // What the effective-template line needs beyond the picker's own list.
 const allTemplates = ref<ResolvableTemplate[] | null>(null);
-const orgDestinations = ref<FormDestination[]>([]);
+// null while unread or when the read failed (often a 403): the line is then left out.
+const orgDestinations = ref<FormDestination[] | null>(null);
 
 const formDestinations = computed<FormDestination[]>(() =>
   props.destinations.map((d) => {
     const given = typeof d === "string" ? { name: d } : d;
-    const known = orgDestinations.value.find((o) => o.name === given.name);
+    const known = orgDestinations.value?.find((o) => o.name === given.name);
     return {
       name: given.name,
       type: given.type ?? known?.type,
@@ -261,7 +281,8 @@ const SOURCE_KEYS = {
 
 const willUseByDestination = computed(() => {
   const templatesList = allTemplates.value;
-  if (!templatesList) return [];
+  // Without the org's destinations the type, template and payload format are guesses.
+  if (!templatesList || !orgDestinations.value) return [];
   return formDestinations.value.map((d) => {
     const { name, source } = resolveEffectiveTemplate({
       kind: props.kind,
@@ -300,10 +321,14 @@ const loadResolution = async (fresh = false) => {
   const templatesOptions = fresh ? { ...templatesQuery(org), staleTime: 0 } : templatesQuery(org);
   const [templatesList, destinationList] = await Promise.all([
     queryClient.fetchQuery(templatesOptions).catch(() => null),
-    queryClient.fetchQuery(destinationsQuery(org, "alert")).catch(() => []),
+    queryClient.fetchQuery(destinationsQuery(org, "alert")).catch(() => null),
   ]);
   allTemplates.value = Array.isArray(templatesList) ? templatesList : null;
-  orgDestinations.value = (Array.isArray(destinationList) ? destinationList : []).map((d: any) => ({
+  if (!Array.isArray(destinationList)) {
+    orgDestinations.value = null;
+    return;
+  }
+  orgDestinations.value = destinationList.map((d: any) => ({
     name: d.name,
     type: d.type,
     template: d.template ?? null,

@@ -8,7 +8,12 @@ import { defaultTestValue, extractTemplateVariables } from "../utils/evalFormat"
 
 export type ScorerTestState = "idle" | "running" | "success" | "error";
 
-export function useScorerTest(template: Ref<string>, t: TranslateFn) {
+/** `variablesOf` reads the variables from the template; a Code scorer's are its `score` parameters. */
+export function useScorerTest(
+  template: Ref<string>,
+  t: TranslateFn,
+  variablesOf: (template: string) => string[] = extractTemplateVariables,
+) {
   const scorerTestInputs = ref<Record<string, string>>({
     input: t("onlineEvals.scorerTestSampleInput"),
     output: t("onlineEvals.scorerTestSampleOutput"),
@@ -22,7 +27,7 @@ export function useScorerTest(template: Ref<string>, t: TranslateFn) {
   watch(
     template,
     (value) => {
-      const variables = extractTemplateVariables(value || "");
+      const variables = variablesOf(value || "");
       scorerTestVariables.value = variables;
 
       const next = { ...scorerTestInputs.value };

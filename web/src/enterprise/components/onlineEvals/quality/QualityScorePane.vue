@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="xs"
           data-test="quality-score-pane-open-target"
-          @click="navigate(targetLocation)"
+          @click="openTarget"
         >
           {{ t(`onlineEvals.quality.pane.open.${score?.targetScope}`) }}
         </OButton>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="xs"
           data-test="quality-score-pane-open-evaluator"
-          @click="navigate(evaluatorLocation)"
+          @click="openTraceDrawer('evaluator')"
         >
           {{ t("onlineEvals.quality.pane.evaluatorTrace") }}
         </OButton>
@@ -246,6 +246,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </footer>
     </template>
+    <!-- A drawer keeps the scope and selected score in place while traces open. -->
+    <AiTraceDrawer
+      v-model:open="traceDrawerOpen"
+      v-model:view="traceDrawerView"
+      :trace="drawerTrace"
+      :evaluator="drawerEvaluator"
+    >
+      <template #footer>
+        <div class="flex w-full items-center justify-end gap-2">
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="chevron-left"
+            :disabled="!canPrev"
+            data-test="quality-trace-drawer-prev"
+            @click="emit('prev')"
+          >
+            {{ t("aiTraceDrawer.previousScore") }}
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-right="chevron-right"
+            :disabled="!canNext"
+            data-test="quality-trace-drawer-next"
+            @click="emit('next')"
+          >
+            {{ t("aiTraceDrawer.nextScore") }}
+          </OButton>
+        </div>
+      </template>
+    </AiTraceDrawer>
     <AddToDatasetDrawer
       v-if="drawerTarget"
       :open="drawerOpen"
@@ -274,8 +306,14 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ReviewContentBox from "@/enterprise/views/AIObservability/ReviewContentBox.vue";
 import AddToDatasetDrawer from "@/enterprise/components/AIObservability/AddToDatasetDrawer.vue";
+import AiTraceDrawer from "@/plugins/traces/AiTraceDrawer.vue";
 import type { QualityScore } from "@/services/online-evals.service";
-import { evaluatorTraceLink, targetLink } from "../utils/qualityFormat";
+import {
+  evaluatorDrawerTrace,
+  evaluatorTraceLink,
+  targetDrawerTrace,
+  targetLink,
+} from "../utils/qualityFormat";
 import { useScoreFullText } from "../composables/useScoreFullText";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 
@@ -364,6 +402,23 @@ const outputText = computed(() => fullText.value.output || props.score?.outputPr
 // Same tab: browser Back returns to this score through the page and score in the URL.
 function navigate(location: RouteLocationRaw) {
   router.push(location).catch(() => {});
+}
+
+// The trace drawer follows the selected score, so Previous / Next step it too.
+const traceDrawerOpen = ref(false);
+const traceDrawerView = ref<"trace" | "evaluator">("trace");
+const drawerTrace = computed(() => (props.score ? targetDrawerTrace(props.score) : null));
+const drawerEvaluator = computed(() => (props.score ? evaluatorDrawerTrace(props.score) : null));
+
+function openTraceDrawer(view: "trace" | "evaluator") {
+  traceDrawerView.value = view;
+  traceDrawerOpen.value = true;
+}
+
+// Sessions (and scores without a stream) have no trace to show: open the page.
+function openTarget() {
+  if (drawerTrace.value) openTraceDrawer("trace");
+  else if (targetLocation.value) navigate(targetLocation.value);
 }
 
 const ioContainer = ref<HTMLElement | null>(null);

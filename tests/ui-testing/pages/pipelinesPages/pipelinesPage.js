@@ -5,6 +5,7 @@ const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { gotoWithAlpha1Reauth } = require('../../playwright-tests/utils/reauth-alpha1.js');
 import { openNavFlyoutChild } from '../commonActions.js';
 import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 const { FilterBuilderDriver, operatorId } = require('../generalPages/filterBuilderPage.js');
@@ -376,16 +377,14 @@ export class PipelinesPage {
         // (validated against alpha at --workers=5). The flyout adds no coverage here — we
         // only need to land on the pipeline list page — so skip it. goto is already the
         // proven fallback path; promoting it to primary removes the flake source.
-        // (Auth is safe: with the stored session, a goto to a list route boots the SPA
-        // with the existing token — unlike a reload of the unsaved /pipelines/add editor,
-        // which re-triggers the Dex callback.)
         if (!(await this.page.locator('[data-test="pipeline-list-page"]')
             .isVisible({ timeout: 3000 }).catch(() => false))) {
-            await this.page.goto(
-                `${process.env.ZO_BASE_URL}/web/pipeline/pipelines?org_identifier=${process.env["ORGNAME"]}`
+            await gotoWithAlpha1Reauth(
+                this.page,
+                `${process.env.ZO_BASE_URL}/web/pipeline/pipelines?org_identifier=${process.env["ORGNAME"]}`,
+                this.page.locator('[data-test="pipeline-list-page"]'),
+                { timeout: 30000 }
             );
-            await this.page.locator('[data-test="pipeline-list-page"]')
-                .waitFor({ state: 'visible', timeout: 30000 });
         }
         // Ensure the Stream Pipelines section tab is selected. Wait for it to render
         // before clicking so the click never races the page mount.

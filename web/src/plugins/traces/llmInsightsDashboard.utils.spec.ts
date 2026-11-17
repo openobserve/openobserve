@@ -225,6 +225,10 @@ describe("splitCost", () => {
     [12.34, { value: "$12.34", unit: "" }],
     [0.5, { value: "$0.50", unit: "" }],
     [0, { value: "$0.00", unit: "" }],
+    // Sub-cent spend is not a free $0.00.
+    [0.00021, { value: "$0.0002", unit: "" }],
+    [0.00004, { value: "$<0.0001", unit: "" }],
+    [0.01, { value: "$0.01", unit: "" }],
   ])("splits %d → %j", (input, expected) => {
     expect(splitCost(input)).toEqual(expected);
   });

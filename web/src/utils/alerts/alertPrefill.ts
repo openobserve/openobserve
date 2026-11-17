@@ -328,6 +328,10 @@ export const normalizePrefill = (input: AlertPrefill): AlertPrefill => {
   };
 };
 
+/** True while the prefill asks for a threshold the user has not set, so its alert could never fire; the builder already ruled out an unusable value. */
+export const needsThreshold = (prefill: AlertPrefill): boolean =>
+  !!prefill.thresholdInput && prefill.thresholdInput.value === null;
+
 /** True when the prefill cannot be taken to the form. */
 export const isPrefillBlocked = (prefill: AlertPrefill): boolean =>
   prefill.warnings.some((w) => w.level === "blocking");

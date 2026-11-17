@@ -269,6 +269,10 @@ pub async fn search_multi(
         if let Err(e) = req.decode() {
             return MetaHttpResponse::bad_request(e);
         }
+        // Each query runs inside the loop below, so a later refusal would follow earlier results.
+        if let Some(res) = super::digest_query_refusal(&req.query.sql, stream_type, &trace_id) {
+            return res;
+        }
     }
     let queries_len = queries.len();
     let mut vrl_stream_name = "".to_string();
@@ -785,6 +789,13 @@ pub async fn _search_partition_multi(
 
     if let Err(e) = req.decode() {
         return MetaHttpResponse::bad_request(e);
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    for sql in &req.sql {
+        if let Some(res) = super::digest_query_refusal(sql, stream_type, &trace_id) {
+            return res;
+        }
     }
 
     #[cfg(feature = "enterprise")]
@@ -1403,6 +1414,11 @@ pub async fn search_multi_stream(
             return http_response;
         }
 
+        #[cfg(not(feature = "enterprise"))]
+        if let Some(res) = super::digest_query_refusal(&req.query.sql, stream_type, &trace_id) {
+            return res;
+        }
+
         #[cfg(feature = "enterprise")]
         if let Some(res) = super::check_sql_stream_permissions(
             &req.query.sql,
@@ -1641,6 +1657,8 @@ mod tests {
         let req = parse_simple_multi_stream_request(body(r#","use_index":false"#).as_bytes());
         assert!(!req.unwrap().use_index);
     }
+
+    const DIGEST_SQL: &str = r#"SELECT * FROM "default" WHERE x IN (SELECT alert_id FROM "_o2_alert_calibration_digests")"#;
 
     #[test]
     fn multi_stream_checks_each_query_after_decoding_it() {
@@ -2500,5 +2518,100 @@ mod tests {
         )
         .await;
         assert_unauthorized(resp).await;
+    }
+
+    async fn assert_protected(resp: axum::response::Response) {
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let code = resp
+            .headers()
+            .get(crate::common::meta::http::ERROR_HEADER)
+            .map(|v| v.to_str().unwrap().to_string());
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert_eq!(code.as_deref(), Some("20014"), "{body}");
+        assert!(body.contains("\"code\":20014"), "{body}");
+    }
+
+    fn digest_multi_body(per_query_response: bool, query_fn: Option<&str>) -> serde_json::Value {
+        serde_json::json!({
+            "sql": [{"sql": r#"SELECT * FROM "default""#}, {"sql": DIGEST_SQL}],
+            "start_time": 1,
+            "end_time": 2,
+            "per_query_response": per_query_response,
+            "query_fn": query_fn.map(base64::encode_url),
+        })
+    }
+
+    // The cloud build checks the org's trial period first, which can answer 403 before this guard.
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn search_multi_refuses_a_digest_query_with_403_before_any_query_runs() {
+        use axum::Json;
+
+        let req: MultiStreamRequest =
+            serde_json::from_value(digest_multi_body(false, None)).unwrap();
+        let resp = super::search_multi(
+            Path("default".to_string()),
+            Query(HashMap::new()),
+            Headers(UserEmail {
+                user_id: "user@example.com".to_string(),
+            }),
+            HeaderMap::new(),
+            Json(req),
+        )
+        .await;
+        assert_protected(resp).await;
+    }
+
+    // Enterprise answers the same refusal from its audited stream-permission check.
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
+    #[tokio::test]
+    async fn search_multi_stream_refuses_a_digest_query_with_403_before_streaming() {
+        for (per_query_response, query_fn) in [
+            (false, None),
+            (true, Some("#ResultArray#\n.")),
+            (true, None),
+        ] {
+            let body = digest_multi_body(per_query_response, query_fn);
+            let resp = super::search_multi_stream(
+                Path("default".to_string()),
+                Query(HashMap::new()),
+                Headers(UserEmail {
+                    user_id: "user@example.com".to_string(),
+                }),
+                HeaderMap::new(),
+                axum::body::Bytes::from(body.to_string()),
+            )
+            .await;
+            assert_protected(resp).await;
+        }
+    }
+
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
+    #[tokio::test]
+    async fn search_partition_multi_refuses_a_digest_query_with_403() {
+        let resp = super::_search_partition_multi(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            Query(HashMap::new()),
+            Headers(UserEmail {
+                user_id: "user@example.com".to_string(),
+            }),
+            axum::Json(MultiSearchPartitionRequest {
+                sql: vec![DIGEST_SQL.to_string()],
+                start_time: 1,
+                end_time: 2,
+                encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
+                clusters: vec![],
+                query_fn: None,
+                streaming_output: false,
+                histogram_interval: 0,
+            }),
+        )
+        .await;
+        assert_protected(resp).await;
     }
 }

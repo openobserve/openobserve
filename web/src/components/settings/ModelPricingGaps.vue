@@ -37,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :truncated-of="truncatedOf"
         :loading="unpricedQuery.isLoading.value"
         :fetching="unpricedQuery.isFetching.value"
-        :error="unpricedQuery.isError.value"
+        :error="unpricedQuery.isError.value && !forbidden"
+        :forbidden="forbidden"
         :loaded="unpricedQuery.isSuccess.value"
         :last-run-at="unpricedQuery.dataUpdatedAt.value"
         :streams="streams"
@@ -56,6 +57,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import { unpricedModelsQuery } from "@/services/model_pricing.queries";
+import { forbiddenState } from "@/utils/featureGate";
 import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -121,6 +123,8 @@ const models = computed(() => unpricedQuery.data.value?.models ?? []);
 const truncatedOf = computed(() =>
   unpricedQuery.data.value?.models_truncated ? unpricedQuery.data.value.model_count : null,
 );
+// A denied read gets the no-access state, not the load error, whose Retry cannot help.
+const forbidden = computed(() => forbiddenState(unpricedQuery.error.value));
 
 function refresh() {
   if (linkedWindow.value) unpricedQuery.refetch();

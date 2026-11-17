@@ -103,6 +103,13 @@ describe("Date Utilities", () => {
       expect(generateDurationLabel(3661)).toBe("3661s"); // 1 hour + 1 minute + 1 second
     });
 
+    it("should fall back to the largest unit that divides exactly", () => {
+      expect(generateDurationLabel(5400)).toBe("90m");
+      expect(generateDurationLabel(129600)).toBe("36h");
+      expect(generateDurationLabel(864000)).toBe("10d");
+      expect(generateDurationLabel(3660)).toBe("61m");
+    });
+
     it("should return 'Off' for 0 duration", () => {
       expect(generateDurationLabel(0)).toBe("Off");
     });

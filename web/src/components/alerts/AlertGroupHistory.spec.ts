@@ -141,6 +141,30 @@ describe("AlertGroupHistory", () => {
       expect(wrapper.find('[data-test="alerts-alertgrouphistory-empty"]').exists()).toBe(true);
     });
 
+    it("the empty level changes say how long changes are kept", () => {
+      const original = store.state.zoConfig;
+      try {
+        for (const [days, tail] of [
+          [97, " Changes older than 97 days are not kept."],
+          [1, " Changes older than 1 day are not kept."],
+          [0, ""],
+          [undefined, ""],
+        ] as const) {
+          store.commit("setConfig", { ...original, alert_transitions_retention_days: days });
+          wrapper = mountComp({ transitions: [], showGroupColumn: false });
+          const empty = wrapper.find('[data-test="alerts-alertgrouphistory-empty"]');
+          expect(empty.text()).toContain("No transitions recorded");
+          expect(empty.text()).toContain(
+            "Level changes appear here as groups start firing, escalate or recover." + tail,
+          );
+          if (!tail) expect(empty.text()).not.toContain("not kept");
+          wrapper.unmount();
+        }
+      } finally {
+        store.commit("setConfig", original);
+      }
+    });
+
     it("suppresses the empty state while loading", () => {
       wrapper = mountComp({
         transitions: [],

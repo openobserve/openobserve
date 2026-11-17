@@ -58,7 +58,6 @@ vi.mock("@/enterprise/composables/useAiDateController", () => ({
     applyRelative: vi.fn(),
     onDateChange: vi.fn(),
     writeToUrl: vi.fn(),
-    mountResolve: vi.fn(),
     DEFAULT_RELATIVE: "15m",
   }),
 }));

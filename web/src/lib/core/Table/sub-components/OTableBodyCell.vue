@@ -83,7 +83,8 @@ const defaultTextClass = computed(() => ["text-inherit"]);
 
 const alignClass = computed(() => {
   if (align.value === "center") return "text-center";
-  if (align.value === "right") return "text-right";
+  // End-aligned columns hold numbers, so fixed-width digits keep a column's places lined up.
+  if (align.value === "right") return "text-right tabular-nums";
   return "text-left";
 });
 
@@ -527,6 +528,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           type="button"
           class="rounded-default text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body inline-flex h-4.5 w-4.5 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
+          :aria-label="treeMeta?.isExpanded ? t('common.collapse') : t('common.expand')"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
         >

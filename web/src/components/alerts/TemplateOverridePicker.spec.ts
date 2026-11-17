@@ -284,9 +284,86 @@ describe("TemplateOverridePicker", () => {
     expect(w.find('[data-test="template-override-mismatch"]').text()).toContain("mail-ops");
   });
 
-  it("shows the server 400 under the select", async () => {
+  it("shows the server 400 under the select and marks the select", async () => {
     list.mockResolvedValue({ data: [{ name: "card", kind: "content" }] } as any);
     const w = await mountPicker({ serverError: "template 'x' does not apply to anomaly" });
-    expect(String(select(w).props("errorMessage"))).toBe("template 'x' does not apply to anomaly");
+    expect(select(w).props("error")).toBe(true);
+    expect(w.find('[data-test="template-override-server-error"]').text()).toBe(
+      "template 'x' does not apply to anomaly",
+    );
+  });
+
+  // B1/B28: the empty and error states have no select, so the reason must still show.
+  it("shows the server 400 with an empty list and with a failed list read", async () => {
+    const message = "template 'x' does not apply to anomaly";
+    list.mockResolvedValue({ data: [] } as any);
+    const empty = await mountPicker({ modelValue: "x", serverError: message });
+    expect(empty.find('[data-test="template-override-empty"]').exists()).toBe(true);
+    expect(empty.find('[data-test="template-override-server-error"]').text()).toBe(message);
+
+    list.mockRejectedValue({ response: { status: 500 } });
+    const failed = await mountPicker({ modelValue: "x", serverError: message });
+    expect(failed.find('[data-test="template-override-error"]').exists()).toBe(true);
+    expect(failed.find('[data-test="template-override-server-error"]').text()).toBe(message);
+  });
+
+  it("shows the stored name with a clear button in the empty and error states", async () => {
+    list.mockResolvedValue({ data: [] } as any);
+    const empty = await mountPicker({ modelValue: "card" });
+    expect(empty.find('[data-test="template-override-stored"]').text()).toBe("card");
+    await empty.find('[data-test="template-override-clear"]').trigger("click");
+    expect(empty.emitted("update:modelValue")).toEqual([[null]]);
+
+    list.mockRejectedValue({ response: { status: 500 } });
+    const failed = await mountPicker({ modelValue: "card" });
+    await failed.find('[data-test="template-override-clear"]').trigger("click");
+    expect(failed.emitted("update:modelValue")).toEqual([[null]]);
+
+    const unset = await mountPicker({ modelValue: null });
+    expect(unset.find('[data-test="template-override-clear"]').exists()).toBe(false);
+  });
+
+  it("shows no select in the empty and error states, with or without a stored value", async () => {
+    list.mockResolvedValue({ data: [] } as any);
+    const empty = await mountPicker({ modelValue: "card" });
+    expect(select(empty).exists()).toBe(false);
+    await empty.find('[data-test="template-override-clear"]').trigger("click");
+    await empty.setProps({ modelValue: null });
+    expect(select(empty).exists()).toBe(false);
+    expect(
+      (await mountPicker({ modelValue: null })).findComponent({ name: "OSelect" }).exists(),
+    ).toBe(false);
+
+    list.mockRejectedValue({ response: { status: 500 } });
+    expect(select(await mountPicker({ modelValue: "card" })).exists()).toBe(false);
+    expect(select(await mountPicker({ modelValue: null })).exists()).toBe(false);
+  });
+
+  it("says a name missing from the kind's list is not available, not deleted", async () => {
+    list.mockResolvedValue({ data: [{ name: "card", kind: "content" }] } as any);
+    const w = await mountPicker({ modelValue: "other" });
+    const text = w.find('[data-test="template-override-stale"]').text();
+    expect(text).toContain("not available for this kind");
+    expect(text).not.toContain("no longer exists");
+  });
+
+  // B32: without the destinations read, the line would guess the type and template.
+  it("leaves the Will use line out when the destinations read fails", async () => {
+    list.mockResolvedValue({
+      data: [{ name: "card", kind: "content", applies_to: [] }],
+    } as any);
+    listDestinations.mockRejectedValue({ response: { status: 403 } });
+    const w = await mountPicker({ modelValue: "card", destinations: ["hook"] });
+    expect(w.find('[data-test="template-override-will-use"]').exists()).toBe(false);
+  });
+
+  it("wraps long names in the Will use line", async () => {
+    const long = "t".repeat(200);
+    list.mockResolvedValue({ data: [{ name: long, kind: "content", applies_to: [] }] } as any);
+    listDestinations.mockResolvedValue({ data: [{ name: "slack", type: "http" }] } as any);
+    const w = await mountPicker({ modelValue: long, destinations: ["slack"] });
+    const line = w.find('[data-test="template-override-will-use"]');
+    expect(line.text()).toContain(long);
+    expect(line.classes()).toContain("wrap-anywhere");
   });
 });

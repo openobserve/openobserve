@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rules="rules"
       :teams="teams"
       :aliases="aliases"
+      :services="services"
       :team-id="teamId"
       :default-team-id="routingConfig?.default_team_id ?? null"
       :loading="loadingRules"
@@ -177,6 +178,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { SERVICE_DIMENSION, readableConditions } from "@/utils/oncall";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import { displayFieldsOf } from "@/types/serviceRef";
 
 const props = defineProps<{
   teamId: string;
@@ -299,15 +301,13 @@ async function fetchServices() {
   try {
     const rows = await queryClient.fetchQuery(servicesListQuery(orgId.value));
     // A record filed under its stream's name is ignored by routing, so offering it would claim nothing.
-    const names = rows
-      .filter((row) => row.named_after_stream !== true)
-      .map((row) => String(row.service_name ?? ""))
-      .filter(Boolean);
-    discovered.value = [...new Set(names)].map((name) => ({
-      name,
-      setId: "default",
-      identity: {},
-    }));
+    const seen = new Map<string, DiscoveredService>();
+    for (const row of rows) {
+      const name = String(row.service_name ?? "");
+      if (!name || row.named_after_stream === true || seen.has(name)) continue;
+      seen.set(name, { name, setId: "default", identity: {}, ...displayFieldsOf(row) });
+    }
+    discovered.value = [...seen.values()];
   } catch {
     discovered.value = [];
   }

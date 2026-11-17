@@ -45,6 +45,9 @@ pub struct StreamInfo {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub filters: HashMap<String, String>,
 
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub filter_spellings: HashMap<String, Vec<String>>,
+
     /// Identity dimensions that could not be resolved to a queryable field on
     /// this stream's schema and were therefore omitted from `filters`.
     /// Consumers should warn: queries on this stream are wider than the chips imply.
@@ -74,6 +77,7 @@ impl StreamInfo {
             stream_type: StreamType::default(),
             filters: HashMap::new(),
             dropped_dimensions: Vec::new(),
+            filter_spellings: HashMap::new(),
         }
     }
 
@@ -84,6 +88,7 @@ impl StreamInfo {
             stream_type,
             filters: HashMap::new(),
             dropped_dimensions: Vec::new(),
+            filter_spellings: HashMap::new(),
         }
     }
 
@@ -94,6 +99,7 @@ impl StreamInfo {
             stream_type: StreamType::default(),
             filters,
             dropped_dimensions: Vec::new(),
+            filter_spellings: HashMap::new(),
         }
     }
 
@@ -108,6 +114,7 @@ impl StreamInfo {
             stream_type,
             filters,
             dropped_dimensions: Vec::new(),
+            filter_spellings: HashMap::new(),
         }
     }
 }
@@ -153,6 +160,18 @@ pub struct CorrelationResponse {
     /// routing on a table name. Consumers that need a real service check this.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub service_name_from_stream: bool,
+    /// Trace `service.name` this identity displays as; `service_name` stays the key (ENT only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    /// One of trace, alias:{rename,rum_service,k8s_workload}, detection, detection_ambiguous.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_source: Option<String>,
+    /// Sorted trace names (max 10) an ambiguous identity covers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_candidates: Option<Vec<String>>,
+    /// Env, else namespace, that tells two keys with the same display name apart.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_qualifier: Option<String>,
 }
 
 impl CorrelationResponse {
@@ -211,6 +230,10 @@ impl CorrelationResponse {
             source_stream: None,
             source_type: None,
             service_name_from_stream: false,
+            display_name: None,
+            display_source: None,
+            display_candidates: None,
+            display_qualifier: None,
         };
         response.build_all_streams();
         response
@@ -256,6 +279,10 @@ pub struct DimensionAnalyticsSummary {
 
     /// When this summary was generated
     pub generated_at: i64,
+
+    /// `service` dimension value (the key) → its display name; filled by the OSS handler.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value_display: Option<HashMap<String, String>>,
 }
 
 /// Describes a raw field name that was used to populate a semantic group,
@@ -772,6 +799,10 @@ mod tests {
             source_stream: None,
             source_type: None,
             service_name_from_stream: false,
+            display_name: None,
+            display_source: None,
+            display_candidates: None,
+            display_qualifier: None,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
@@ -796,6 +827,10 @@ mod tests {
             source_stream: None,
             source_type: None,
             service_name_from_stream: false,
+            display_name: None,
+            display_source: None,
+            display_candidates: None,
+            display_qualifier: None,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
@@ -838,5 +873,85 @@ mod tests {
         assert!(obj.contains_key("traces"));
         assert!(obj.contains_key("metrics"));
         assert!(obj.contains_key("profiles"));
+    }
+
+    fn display_response() -> CorrelationResponse {
+        let mut r = CorrelationResponse::new(
+            "checkoutservice".to_string(),
+            HashMap::new(),
+            HashMap::new(),
+            RelatedStreams {
+                logs: vec![],
+                traces: vec![],
+                metrics: vec![],
+                profiles: vec![],
+            },
+        );
+        r.display_name = Some("CheckoutService".to_string());
+        r.display_source = Some("trace".to_string());
+        r.display_candidates = Some(vec!["a".to_string(), "b".to_string()]);
+        r.display_qualifier = Some("prod".to_string());
+        r
+    }
+
+    #[test]
+    fn serde_round_trip_and_old_json() {
+        let r = display_response();
+        let back: CorrelationResponse =
+            serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+        assert_eq!(back.service_name, "checkoutservice");
+        assert_eq!(back.display_name.as_deref(), Some("CheckoutService"));
+        assert_eq!(back.display_source.as_deref(), Some("trace"));
+        assert_eq!(
+            back.display_candidates,
+            Some(vec!["a".to_string(), "b".to_string()])
+        );
+        assert_eq!(back.display_qualifier.as_deref(), Some("prod"));
+
+        let old: CorrelationResponse = serde_json::from_str(
+            r#"{"service_name":"x","matched_dimensions":{},"additional_dimensions":{},
+                "related_streams":{"logs":[],"traces":[],"metrics":[],"profiles":[]}}"#,
+        )
+        .unwrap();
+        assert!(old.display_name.is_none());
+        assert!(old.display_source.is_none());
+        assert!(old.display_candidates.is_none());
+        assert!(old.display_qualifier.is_none());
+
+        let old_summary: DimensionAnalyticsSummary = serde_json::from_str(
+            r#"{"org_id":"o","total_dimensions":0,"by_cardinality":{},
+                "recommended_priority_dimensions":[],"dimensions":[],"generated_at":1}"#,
+        )
+        .unwrap();
+        assert!(old_summary.value_display.is_none());
+    }
+
+    #[test]
+    fn payload_byte_identical_without_display() {
+        let mut r = display_response();
+        r.display_name = None;
+        r.display_source = None;
+        r.display_candidates = None;
+        r.display_qualifier = None;
+        let json = serde_json::to_string(&r).unwrap();
+        assert_eq!(
+            json,
+            r#"{"service_name":"checkoutservice","matched_dimensions":{},"additional_dimensions":{},"related_streams":{"logs":[],"traces":[],"metrics":[],"profiles":[]}}"#
+        );
+        let summary = DimensionAnalyticsSummary {
+            org_id: "o".to_string(),
+            total_dimensions: 0,
+            by_cardinality: HashMap::new(),
+            recommended_priority_dimensions: vec![],
+            dimensions: vec![],
+            available_groups: vec![],
+            service_field_sources: vec![],
+            generated_at: 1,
+            value_display: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&summary).unwrap(),
+            r#"{"org_id":"o","total_dimensions":0,"by_cardinality":{},"recommended_priority_dimensions":[],"dimensions":[],"generated_at":1}"#
+        );
     }
 }

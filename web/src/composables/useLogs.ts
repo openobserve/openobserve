@@ -267,6 +267,7 @@ const useLogs = (t: TranslateFn) => {
       const wasLoading = searchObj.loading;
       autoRun.engine.resetScope(reason === "url" ? "url" : "org");
       const generationAtStart = autoRun.engine.currentGeneration("grid")?.id;
+      const cancelsAtStart = autoRun.engine.userCancelCount();
       // Sync, because a run cancelled or failed before it completes clears its pending record again.
       const sentDuringLoad = new Set<number>();
       const stopWatchingSends = watch(
@@ -304,8 +305,10 @@ const useLogs = (t: TranslateFn) => {
             [searchObj.meta.pendingExecution, searchObj.meta.executed].some(
               (run) => run?.generation === latest.id,
             ));
+        // Cancel pressed while the metadata loaded means no search until the user runs one.
+        const userCancelled = autoRun.engine.userCancelCount() !== cancelsAtStart;
         const result =
-          searchObj.data.stream.selectedStream.length > 0 && !userSearchSent
+          searchObj.data.stream.selectedStream.length > 0 && !userSearchSent && !userCancelled
             ? autoRun.request(fromUrl ? "url" : reason, { origin: options.origin })
             : "skipped-ineligible";
         // A run that is about to start keeps loading on, or the histogram flashes "No data" first.

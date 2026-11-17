@@ -17,8 +17,14 @@
 //! every file is indexed, the late files alone while fragmentation is low,
 //! else the whole hour.
 
+use std::sync::Arc;
+
+use arrow_schema::Schema;
 use config::meta::stream::FileKey;
 use metrics_index::MetricsFileLayout;
+use search::merge::{MergeMode, hash_ordered_chains};
+
+use super::plan::{PlannedBatch, mergeable_chunks};
 
 /// Extra indexed files tolerated before rewriting the closed hour.
 const METRICS_INDEX_REWRITE_SLACK: usize = 4;
@@ -56,6 +62,78 @@ pub(super) fn metrics_index_merge_scope(
     } else {
         MetricsIndexMergeScope::LateFilesOnly
     }
+}
+
+/// Hash-merged batches a closed hour runs before its indexed merge while it exceeds the cap.
+pub(super) async fn pre_merge_batches(
+    files: &[FileKey],
+    max_groups: usize,
+    schema: &Arc<Schema>,
+    stream: &str,
+) -> Vec<PlannedBatch> {
+    // fewer files than the cap cannot form more groups than it: no footer is read
+    if max_groups == 0 || files.len() <= max_groups {
+        return Vec::new();
+    }
+
+    let mut ingester = Vec::new();
+    let mut hash_merged = Vec::new();
+    let mut indexed_groups = 0;
+    for file in files {
+        match MetricsFileLayout::of(&file.key) {
+            Some(MetricsFileLayout::HashSorted) => ingester.push(file.clone()),
+            Some(MetricsFileLayout::HashMerged) => hash_merged.push(file.clone()),
+            // indexed files are never pre-merged; the scan spreads even one chain over two groups
+            Some(MetricsFileLayout::Indexed) => indexed_groups = 2,
+            None => {}
+        }
+    }
+
+    let chains = hash_ordered_chains(schema.clone(), hash_merged, stream).await;
+    let groups = split_into_pre_merge_groups(ingester, chains, indexed_groups, max_groups);
+    if !groups.is_empty() {
+        log::info!(
+            "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed merge of {} files exceeds {max_groups} merge groups, pre-merging in {} hash-merged batches first",
+            files.len(),
+            groups.len()
+        );
+    }
+
+    groups
+        .into_iter()
+        .map(|group| (group, MergeMode::MetricsHashMerged))
+        .collect()
+}
+
+/// The groups to pre-merge, empty while the hour holds at most `max_groups` merge groups.
+fn split_into_pre_merge_groups(
+    ingester: Vec<FileKey>,
+    hash_merged_chains: Option<Vec<Vec<FileKey>>>,
+    indexed_groups: usize,
+    max_groups: usize,
+) -> Vec<Vec<FileKey>> {
+    let Some(chains) = hash_merged_chains else {
+        // chains of unknown width are never rewritten: only fewer ingester files surely shrink it
+        if ingester.len() <= max_groups {
+            return Vec::new();
+        }
+        return mergeable_chunks(ingester, max_groups);
+    };
+
+    // every ingester file spans the whole hash range, so each is a group of its own
+    let mut groups: Vec<Vec<FileKey>> = ingester.into_iter().map(|file| vec![file]).collect();
+    groups.extend(chains);
+    if groups.len() + indexed_groups <= max_groups {
+        return Vec::new();
+    }
+
+    // smallest first: the most groups collapse for the fewest bytes rewritten
+    groups.sort_by_key(|group| group.iter().map(|f| f.meta.compressed_size).sum::<i64>());
+    groups
+        .chunks(max_groups)
+        .filter(|chunk| chunk.len() > 1)
+        .map(|chunk| chunk.concat())
+        .collect()
 }
 
 #[cfg(test)]
@@ -129,5 +207,39 @@ mod tests {
             metrics_index_merge_scope(&large, max_file_size),
             MetricsIndexMergeScope::LateFilesOnly
         );
+    }
+
+    /// Over the cap the smallest groups merge first and a lone trailing group waits.
+    #[test]
+    fn test_split_into_pre_merge_groups() {
+        let file = |name: &str, compressed_size| {
+            let mut file = file_key(name, 0);
+            file.meta.compressed_size = compressed_size;
+            file
+        };
+        let ingester = vec![
+            file("hash-sorted-v1-1.parquet", 30),
+            file("hash-sorted-v1-2.parquet", 30),
+        ];
+        let chains = vec![
+            vec![file("hash-merged-v1-a.parquet", 400)],
+            vec![file("hash-merged-v1-b.parquet", 10)],
+        ];
+        let groups = |indexed_groups, max_groups| {
+            split_into_pre_merge_groups(
+                ingester.clone(),
+                Some(chains.clone()),
+                indexed_groups,
+                max_groups,
+            )
+        };
+        assert!(groups(0, 4).is_empty(), "four groups fit a cap of four");
+        assert_eq!(groups(2, 4).len(), 1, "indexed files add two groups");
+        let batches = groups(0, 3);
+        let sizes: Vec<Vec<i64>> = batches
+            .iter()
+            .map(|batch| batch.iter().map(|f| f.meta.compressed_size).collect())
+            .collect();
+        assert_eq!(sizes, [[10, 30, 30]], "the largest group waits alone");
     }
 }

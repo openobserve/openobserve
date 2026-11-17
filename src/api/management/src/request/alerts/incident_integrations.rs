@@ -18,7 +18,9 @@
 //! `service_routes()` — auth is enforced by the router's auth middleware,
 //! not inside these handlers.
 
-use axum::{Json, extract::Path, response::Response};
+#[cfg(feature = "enterprise")]
+use axum::Json;
+use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
@@ -592,10 +594,7 @@ pub async fn list_integrations(_path: Path<String>) -> Response {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn create_integration(
-    _path: Path<String>,
-    _body: Json<CreateIntegrationPayload>,
-) -> Response {
+pub async fn create_integration(_path: Path<String>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -621,10 +620,7 @@ pub async fn create_integration(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn set_integration_enabled(
-    _path: Path<(String, String)>,
-    _body: Json<SetEnabledPayload>,
-) -> Response {
+pub async fn set_integration_enabled(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -676,10 +672,7 @@ pub async fn rotate_integration_token(_path: Path<(String, String)>) -> Response
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn update_integration(
-    _path: Path<(String, String)>,
-    _body: Json<UpdateIntegrationPayload>,
-) -> Response {
+pub async fn update_integration(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 

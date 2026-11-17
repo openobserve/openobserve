@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section class="flex flex-col gap-3">
     <div class="flex items-center gap-2">
-      <h3 class="text-text-secondary text-xs font-semibold tracking-wide uppercase">
+      <h3 class="text-text-heading text-sm font-semibold">
         {{ title }}
       </h3>
       <slot name="aside" />

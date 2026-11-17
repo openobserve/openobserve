@@ -15,16 +15,14 @@
 
 //! Downtime handlers: enterprise-only (D1), 403 in the OSS build and while the flag is off.
 
-use axum::{
-    Json,
-    extract::{Path, Query},
-    response::Response,
-};
+#[cfg(feature = "enterprise")]
+use axum::{Json, extract::Query};
+use axum::{extract::Path, response::Response};
 use config::meta::downtimes::{
-    CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest, DowntimeTestRequest,
-    DowntimeTestResult, ExtendDowntimeRequest, ExtendDowntimeResponse, ListDowntimesQuery,
-    ListDowntimesResponse, MoveDowntimesRequest, PreviewRequest, PreviewResponse, ResourcesRequest,
-    ResourcesResponse, ValuesRequest, ValuesResponse,
+    CancelDowntimeQuery, CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest,
+    DowntimeTestRequest, DowntimeTestResult, ExtendDowntimeRequest, ExtendDowntimeResponse,
+    ListDowntimesQuery, ListDowntimesResponse, MoveDowntimesRequest, PreviewRequest,
+    PreviewResponse, ResourcesRequest, ResourcesResponse, ValuesRequest, ValuesResponse,
 };
 use openobserve_api_common::extractors::Headers;
 use serde::Deserialize;
@@ -47,11 +45,12 @@ pub struct FolderQuery {
     tag = "Downtimes",
     operation_id = "ListDowntimes",
     summary = "List downtimes",
-    description = "Lists the downtimes in the folders the user may list, with their status, windows and match counts.",
+    description = "Lists the downtimes in the folders the user may list, with their status, windows and match counts. The `counts` follow every filter except `status`, so each status keeps its total.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), ListDowntimesQuery),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ListDowntimesResponse),
+        (status = 400, description = "Unknown `status` or `repeat` value", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -61,7 +60,7 @@ pub struct FolderQuery {
 )]
 pub async fn list_downtimes(
     Path(org_id): Path<String>,
-    Query(query): Query<ListDowntimesQuery>,
+    #[cfg(feature = "enterprise")] Query(query): Query<ListDowntimesQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -70,7 +69,7 @@ pub async fn list_downtimes(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, query, user_email);
+        let _ = (org_id, user_email);
         not_supported()
     }
 }
@@ -99,9 +98,9 @@ pub async fn list_downtimes(
 )]
 pub async fn create_downtime(
     Path(org_id): Path<String>,
-    Query(folder): Query<FolderQuery>,
+    #[cfg(feature = "enterprise")] Query(folder): Query<FolderQuery>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<DowntimeRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<DowntimeRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -129,7 +128,7 @@ pub async fn create_downtime(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, folder, user_email, req);
+        let _ = (org_id, user_email);
         not_supported()
     }
 }
@@ -158,7 +157,7 @@ pub async fn create_downtime(
 pub async fn preview_downtime(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<PreviewRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<PreviewRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -166,7 +165,7 @@ pub async fn preview_downtime(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, user_email, req);
+        let _ = (org_id, user_email);
         not_supported()
     }
 }
@@ -196,7 +195,7 @@ pub async fn preview_downtime(
 pub async fn downtime_resources(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<ResourcesRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<ResourcesRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -204,7 +203,7 @@ pub async fn downtime_resources(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, user_email, req);
+        let _ = (org_id, user_email);
         not_supported()
     }
 }
@@ -234,7 +233,7 @@ pub async fn downtime_resources(
 pub async fn downtime_values(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<ValuesRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<ValuesRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -242,7 +241,7 @@ pub async fn downtime_values(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, user_email, req);
+        let _ = (org_id, user_email);
         not_supported()
     }
 }
@@ -293,7 +292,7 @@ pub async fn get_downtime(
     tag = "Downtimes",
     operation_id = "UpdateDowntime",
     summary = "Update a downtime",
-    description = "Edits the condition, targets, schedule, reason and banner. The folder changes only through move.",
+    description = "Edits the condition, targets, schedule, reason and banner. The folder changes only through move. The body must carry the `version` the downtime was loaded at. A finished downtime (ended, ended early or cancelled) cannot be edited; duplicate it instead. After the first window started, the schedule cannot change, and on a downtime with an SLO target the condition, the SLO target and its `slo_mode` cannot change either. The end can change, but not to before now.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -302,9 +301,10 @@ pub async fn get_downtime(
     request_body(content = DowntimeRequest, description = "Downtime definition", content_type = "application/json"),
     responses(
         (status = 200, description = "Updated", content_type = "application/json", body = Downtime),
-        (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid request, or no version", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 409, description = "Changed since loaded, finished, a locked field of a started downtime changed, or the new end is before now", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": true})),
@@ -314,7 +314,7 @@ pub async fn get_downtime(
 pub async fn update_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<DowntimeRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<DowntimeRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -325,7 +325,7 @@ pub async fn update_downtime(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, downtime_id, user_email, req);
+        let _ = (org_id, downtime_id, user_email);
         not_supported()
     }
 }
@@ -338,16 +338,18 @@ pub async fn update_downtime(
     tag = "Downtimes",
     operation_id = "CancelDowntime",
     summary = "End or cancel a downtime",
-    description = "Ends an active window now, or calls off a scheduled one. The row stays for history.",
+    description = "Ends an active window now, or calls off a scheduled one. The row stays for history. A `version` other than the stored one cancels nothing and answers 409.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("downtime_id" = String, Path, description = "Downtime id"),
+        CancelDowntimeQuery,
     ),
     responses(
         (status = 200, description = "Cancelled", content_type = "application/json", body = Downtime),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 409, description = "The downtime changed since the given version", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": true})),
@@ -356,12 +358,19 @@ pub async fn update_downtime(
 )]
 pub async fn cancel_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Query(query): Query<CancelDowntimeQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         respond(
-            openobserve_core::downtimes::cancel(&org_id, &user_email.user_id, &downtime_id).await,
+            openobserve_core::downtimes::cancel(
+                &org_id,
+                &user_email.user_id,
+                &downtime_id,
+                query.version,
+            )
+            .await,
         )
     }
     #[cfg(not(feature = "enterprise"))]
@@ -401,7 +410,7 @@ pub async fn cancel_downtime(
 pub async fn extend_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<ExtendDowntimeRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<ExtendDowntimeRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -412,7 +421,7 @@ pub async fn extend_downtime(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, downtime_id, user_email, req);
+        let _ = (org_id, downtime_id, user_email);
         not_supported()
     }
 }
@@ -425,7 +434,7 @@ pub async fn extend_downtime(
     tag = "Downtimes",
     operation_id = "TestDowntimeNotifications",
     summary = "Send a downtime's started message to its destinations",
-    description = "Renders and sends the started message of the downtime's current or next window through the same path a real start uses, to the listed destinations of the downtime (all of them when the list is empty). Each destination gets one result.",
+    description = "Renders and sends the started message of the downtime's current or next window through the same path a real start uses, marked `[TEST] `, to the listed destinations of the downtime (all of them when the list is empty). Each destination gets one result. Rate-capped per user with the alert test-send limit.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -436,6 +445,7 @@ pub async fn extend_downtime(
         (status = 200, description = "One result per destination", content_type = "application/json", body = Vec<DowntimeTestResult>),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 429, description = "Too many test sends; see Retry-After", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "update"})),
@@ -445,7 +455,7 @@ pub async fn extend_downtime(
 pub async fn test_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<DowntimeTestRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<DowntimeTestRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -461,7 +471,7 @@ pub async fn test_downtime(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, downtime_id, user_email, req);
+        let _ = (org_id, downtime_id, user_email);
         not_supported()
     }
 }
@@ -490,7 +500,7 @@ pub async fn test_downtime(
 pub async fn move_downtimes(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<MoveDowntimesRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<MoveDowntimesRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -518,7 +528,7 @@ pub async fn move_downtimes(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, user_email, req);
+        let _ = (org_id, user_email);
         not_supported()
     }
 }
@@ -540,7 +550,7 @@ pub async fn move_downtimes(
         (status = 200, description = "Deleted"),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
-        (status = 409, description = "Active, scheduled, or it corrected SLO slices", content_type = "application/json", body = ()),
+        (status = 409, description = "Active, scheduled, it corrected SLO data, or an extension of it is still running", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
@@ -600,6 +610,10 @@ pub(crate) fn error_response(e: openobserve_core::downtimes::DowntimeError) -> R
         DowntimeError::BadRequest(m) => MetaHttpResponse::bad_request(m),
         DowntimeError::Forbidden(m) => MetaHttpResponse::forbidden(m),
         DowntimeError::Conflict(m) => MetaHttpResponse::conflict(m),
+        DowntimeError::RateLimited {
+            message,
+            retry_after_secs,
+        } => MetaHttpResponse::too_many_requests_retry_after(message, retry_after_secs),
         // The text can carry database errors, so it goes to the log only.
         DowntimeError::Internal(m) => {
             log::error!("[DOWNTIMES] {m}");
@@ -626,29 +640,111 @@ mod tests {
     async fn every_route_is_forbidden_in_the_oss_build() {
         let org = || Path("default".to_string());
         let one = || Path(("default".to_string(), "d1".to_string()));
-        let body: DowntimeRequest = serde_json::from_value(serde_json::json!({
-            "targets": [{ "module": "alerts", "folders": { "kind": "all" } }],
-            "schedule": { "repeat": "none", "starts_at": 1, "ends_at": 2, "timezone": "UTC", "duration_secs": 60 }
-        }))
-        .unwrap();
         let responses = vec![
-            list_downtimes(org(), Query(ListDowntimesQuery::default()), user()).await,
-            create_downtime(
-                org(),
-                Query(FolderQuery::default()),
-                user(),
-                Json(body.clone()),
-            )
-            .await,
+            list_downtimes(org(), user()).await,
+            create_downtime(org(), user()).await,
+            preview_downtime(org(), user()).await,
+            downtime_resources(org(), user()).await,
+            downtime_values(org(), user()).await,
             get_downtime(one(), user()).await,
-            update_downtime(one(), user(), Json(body)).await,
+            update_downtime(one(), user()).await,
             cancel_downtime(one(), user()).await,
-            extend_downtime(one(), user(), Json(ExtendDowntimeRequest::default())).await,
+            extend_downtime(one(), user()).await,
+            test_downtime(one(), user()).await,
+            move_downtimes(org(), user()).await,
             delete_downtime(one(), user()).await,
         ];
         for response in responses {
             assert_eq!(response.status(), StatusCode::FORBIDDEN);
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_cancel_route_answers_409_at_a_stale_version_and_200_at_a_current_or_absent_one() {
+        use config::meta::folder::{DEFAULT_FOLDER, Folder, FolderType};
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let now = config::utils::time::now_micros();
+        let org = format!("cancel_route_{now}");
+        let root = "root-cancel-route@example.com";
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create(&org, folder, FolderType::Downtimes)
+            .await
+            .unwrap();
+        let hour = 3_600_000_000;
+        let conn = infra::db::get_orm_client_rw().await;
+        let mut versions = std::collections::HashMap::new();
+        for id in ["stale", "current", "absent"] {
+            let row: Downtime = serde_json::from_value(serde_json::json!({
+                "id": id, "org": org, "name": id,
+                "targets": [{ "module": "alerts", "folders": { "kind": "all" } }],
+                "schedule": { "repeat": "none", "starts_at": now - hour, "ends_at": now + hour,
+                              "timezone": "UTC", "duration_secs": 7200 },
+                "created_by": root, "created_at": now, "updated_by": root, "updated_at": now
+            }))
+            .unwrap();
+            infra::table::downtimes::put_with(conn, &row).await.unwrap();
+            let stored = infra::table::downtimes::get_rw(&org, id)
+                .await
+                .unwrap()
+                .unwrap();
+            versions.insert(id, stored.version);
+        }
+        let cancel = |id: &'static str, version: Option<i64>| {
+            cancel_downtime(
+                Path((org.clone(), id.to_string())),
+                Query(CancelDowntimeQuery { version }),
+                Headers(UserEmail {
+                    user_id: root.to_string(),
+                }),
+            )
+        };
+        let cancelled = |id: &'static str| {
+            let org = org.clone();
+            async move {
+                let stored = infra::table::downtimes::get_rw(&org, id)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                stored.cancelled_at.is_some()
+            }
+        };
+
+        let stale = cancel("stale", Some(versions["stale"] - 1)).await;
+        assert_eq!(stale.status(), StatusCode::CONFLICT);
+        assert!(
+            !cancelled("stale").await,
+            "a refused cancel leaves the window live"
+        );
+        let current = cancel("current", Some(versions["current"])).await;
+        assert_eq!(current.status(), StatusCode::OK);
+        assert!(cancelled("current").await);
+        let absent = cancel("absent", None).await;
+        assert_eq!(absent.status(), StatusCode::OK);
+        assert!(cancelled("absent").await);
     }
 
     #[cfg(feature = "enterprise")]

@@ -28,7 +28,7 @@ const OSelect = {
   props: ["modelValue", "label", "options", "disabled", "dataTest"],
   emits: ["update:modelValue"],
   template:
-    '<div class="o-select" :data-test="dataTest" :data-disabled="disabled" :data-label="label">' +
+    '<div class="o-select" :data-test="dataTest" :data-disabled="disabled" :data-label="label" :data-model="modelValue">' +
     '<span class="opt" v-for="o in options" :key="String(o.value)" :data-value="o.value" @click="$emit(\'update:modelValue\', o.value)">{{ o.label }}</span>' +
     "</div>",
 };
@@ -167,5 +167,33 @@ describe("AgentScopeCascade", () => {
     expect(w.find('[data-test="agent-graph-cascade-env"]').exists()).toBe(true);
     expect(w.find('[data-test="agent-graph-cascade-agent"]').exists()).toBe(true);
     expect(w.find('[data-test="agent-graph-cascade-version"]').exists()).toBe(true);
+  });
+
+  it("shows no Stream dropdown when the agent sends to one stream", () => {
+    expect(mountCascade().find('[data-test="sessions-list-cascade-stream"]').exists()).toBe(false);
+    const w = mountCascade({ agentStreams: [opt("main")], selectedStream: "main" });
+    expect(w.find('[data-test="sessions-list-cascade-stream"]').exists()).toBe(false);
+  });
+
+  it("shows a Stream dropdown of the agent's streams, on the stream the page reads", () => {
+    const w = mountCascade({
+      agentStreams: [opt("main"), opt("qa_u304")],
+      selectedStream: "main",
+    });
+    const stream = w.find('[data-test="sessions-list-cascade-stream"]');
+    expect(stream.attributes("data-label")).toBe("Stream");
+    expect(stream.attributes("data-model")).toBe("main");
+    expect(stream.findAll(".opt").map((o) => o.text())).toEqual(["main", "qa_u304"]);
+  });
+
+  it("emits update:selectedStream when another stream is picked", async () => {
+    const w = mountCascade({
+      agentStreams: [opt("main"), opt("qa_u304")],
+      selectedStream: "main",
+    });
+    await w
+      .find('[data-test="sessions-list-cascade-stream"] .opt[data-value="qa_u304"]')
+      .trigger("click");
+    expect(w.emitted("update:selectedStream")!.at(-1)).toEqual(["qa_u304"]);
   });
 });

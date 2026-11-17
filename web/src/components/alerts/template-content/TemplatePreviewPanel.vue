@@ -145,7 +145,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-wrap items-center gap-1"
       data-test="template-preview-panel-unknown-variables-warning"
     >
-      <OTag variant="warning-soft" data-test="template-preview-panel-unknown-variables-chip">
+      <OTag
+        variant="warning-soft"
+        class="max-w-full leading-snug! wrap-anywhere whitespace-normal!"
+        data-test="template-preview-panel-unknown-variables-chip"
+      >
         {{ t("alert_templates.unknownVariables") }}: {{ unknownVariables.join(", ") }}
       </OTag>
     </div>
@@ -155,7 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-wrap items-center gap-1"
       data-test="template-preview-panel-empty-variables-warning"
     >
-      <OTag variant="warning-soft" data-test="template-preview-panel-empty-variables-chip">
+      <OTag
+        variant="warning-soft"
+        class="max-w-full leading-snug! wrap-anywhere whitespace-normal!"
+        data-test="template-preview-panel-empty-variables-chip"
+      >
         {{
           t("alert_templates.emptyVariables", {
             kind: t(kindLabelKey(previewKind)),
@@ -195,8 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else-if="view === 'visual'">
         <div
           v-if="previewModel"
-          class="rounded-surface bg-surface-panel border-border-default flex flex-col gap-2 border border-s-4 p-3"
-          :class="severityAccentClass"
+          class="rounded-surface bg-surface-panel border-border-default flex flex-col gap-2 border p-3"
           data-test="template-preview-panel-visual-card"
         >
           <!-- The card is a NORMALISED shape — the backend returns the same
@@ -218,8 +225,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                bold/bullets look broken to the author. Same treatment the
                dashboard markdown panel uses (MarkdownRenderer.vue). -->
           <!-- eslint-disable-next-line vue/no-v-html -- sanitized via DOMPurify.sanitize above -->
+          <!-- No backticks around inline code: real messages show none. -->
           <div
-            class="prose prose-sm max-w-none text-sm"
+            class="prose prose-sm prose-code:before:content-none prose-code:after:content-none max-w-none text-sm"
             :class="isDark && 'prose-invert'"
             data-test="template-preview-panel-body"
             v-html="sanitizedBodyHtml"
@@ -238,8 +246,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-sm">{{ field.value }}</span>
             </div>
           </div>
+          <!-- Rows as the real message lists them: the template's row lines win over columns. -->
           <div
-            v-if="previewModel.links.length > 0 || previewModel.footer"
+            v-if="previewModel.row_lines?.length"
+            class="flex flex-col text-sm"
+            data-test="template-preview-panel-row-lines"
+          >
+            <span v-for="(line, index) in previewModel.row_lines" :key="index">{{ line }}</span>
+          </div>
+          <table
+            v-else-if="!previewModel.row_lines && previewModel.rows?.length"
+            class="text-sm"
+            data-test="template-preview-panel-rows"
+          >
+            <thead>
+              <tr>
+                <th
+                  v-for="cell in previewModel.rows[0]"
+                  :key="cell.label"
+                  class="text-text-secondary pe-4 text-start text-xs font-normal"
+                >
+                  {{ cell.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, index) in previewModel.rows" :key="index">
+                <td v-for="cell in row" :key="cell.label" class="pe-4">{{ cell.value }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div
+            v-if="previewModel.links.length > 0 || previewModel.footer || previewModel.detail"
             class="flex flex-wrap gap-2"
             data-test="template-preview-panel-links"
           >
@@ -247,30 +285,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(link, index) in previewModel.links"
               :key="`${link.label}-${index}`"
               variant="outline"
-              size="sm-action"
+              size="sm"
               :data-test="`template-preview-panel-link-${index}`"
               @click="openLink(link.url)"
               >{{ link.label }}</OButton
             >
-            <!-- `footer` is the default alert-URL link with no authored
-                 label (§4.2: an empty label means "use the channel's
-                 default text"). Every real channel renders it as a styled
-                 button — often the primary one, e.g. Slack's green
-                 "View in OpenObserve" (see slack.rs render_slack) — so the
-                 preview must too, not as trailing plain-text URL, or the
-                 card looks like it's missing the button real messages show.
-                 `preview-action` (not a per-channel brand color) matches
-                 this card's normalized, channel-agnostic design — the
-                 fidelity note below already directs users to Payload for
-                 the exact per-channel styling. -->
+            <!-- The server names the data button per kind; an older server sends no label. -->
             <OButton
               v-if="previewModel.footer"
-              variant="preview-action"
+              variant="primary"
+              size="sm"
               data-test="template-preview-panel-default-link"
               @click="openLink(previewModel.footer)"
-              >{{ t("alert_templates.viewAlertLinkLabel") }}</OButton
+              >{{ footerLabel }}</OButton
+            >
+            <OButton
+              v-if="previewModel.detail"
+              variant="outline"
+              size="sm"
+              data-test="template-preview-panel-detail-link"
+              @click="openLink(previewModel.detail.url)"
+              >{{ previewModel.detail.label }}</OButton
             >
           </div>
+          <p
+            v-if="slackHiddenLinks.length > 0"
+            class="text-text-secondary text-xs"
+            data-test="template-preview-panel-slack-hidden-links"
+          >
+            {{
+              t(
+                "alert_templates.slackLinksNotShown",
+                { count: slackHiddenLinks.length, links: slackHiddenLinks.join(", ") },
+                slackHiddenLinks.length,
+              )
+            }}
+          </p>
           <!-- `chart_placeholder` is a BOOLEAN flag from the preview endpoint
                (preview.rs) — a real chart needs a real alert's evaluation
                history, so the preview shows a labeled placeholder box. -->
@@ -369,9 +419,17 @@ interface PreviewModel {
   color: string;
   severity: string | null;
   footer: string | null;
+  /** The data button label; absent from an older server, empty when the server has none. */
+  footer_label?: string;
+  /** The object button; null when the message has none. */
+  detail?: PreviewLink | null;
   // Boolean in the backend (preview.rs `chart_placeholder: bool`); the old
   // `string | null` here was a latent type mismatch.
   chart_placeholder: boolean;
+  /** The sample's rows, column-ordered. */
+  rows?: PreviewField[][];
+  /** Set when the template formats each row; shown instead of `rows`. */
+  row_lines?: string[] | null;
 }
 interface PreviewResponseData {
   payload: unknown;
@@ -516,28 +574,6 @@ const previewModel = computed(() => previewData.value?.preview_model ?? null);
 const unknownVariables = computed(() => previewData.value?.unknown_variables ?? []);
 const emptyVariables = computed(() => previewData.value?.empty_variables ?? []);
 
-/**
- * Severity accent for the preview card.
- *
- * The response also carries `preview_model.color` (a hex the non-web renderers
- * embed in their payloads), but a literal colour may not enter a component —
- * including through a `:style` binding, which the design linter cannot see.
- * So the card maps the `severity` enum to registered token utilities instead,
- * and the hex stays where it belongs: in the raw payload tab.
- */
-const severityAccentClass = computed(() => {
-  switch (previewModel.value?.severity) {
-    case "critical":
-      return "border-s-status-negative";
-    case "warning":
-      return "border-s-status-warning-text";
-    case "ok":
-      return "border-s-status-positive";
-    default:
-      return "border-s-accent";
-  }
-});
-
 const sanitizedBodyHtml = computed(() =>
   previewModel.value ? DOMPurify.sanitize(previewModel.value.body_html) : "",
 );
@@ -545,6 +581,40 @@ const sanitizedBodyHtml = computed(() =>
 const rawPayloadJson = computed(() =>
   previewData.value ? JSON.stringify(previewData.value.payload, null, 2) : "",
 );
+
+const footerLabel = computed<I18nText>(() =>
+  previewModel.value?.footer_label
+    ? raw(previewModel.value.footer_label)
+    : t("alert_templates.viewAlertLinkLabel"),
+);
+
+// Authored links the real Slack message shows in its context block, read from the rendered payload.
+const slackHiddenLinks = computed<string[]>(() => {
+  if (channel.value !== "slack" || !previewModel.value || !previewData.value) return [];
+  const blocks = (previewData.value.payload as { blocks?: unknown[] } | null)?.blocks ?? [];
+  // Buttons are counted per URL, so a second link to a URL already shown still counts as hidden.
+  const shown = new Map<string, number>();
+  for (const block of blocks as { type?: string; elements?: { url?: string }[] }[]) {
+    if (block.type !== "actions") continue;
+    for (const el of block.elements ?? []) {
+      const url = el.url?.trim();
+      if (url) shown.set(url, (shown.get(url) ?? 0) + 1);
+    }
+  }
+  for (const value of [previewModel.value.footer, previewModel.value.detail?.url]) {
+    const system = value?.trim();
+    const left = system ? (shown.get(system) ?? 0) : 0;
+    if (system && left > 0) shown.set(system, left - 1);
+  }
+  return previewModel.value.links
+    .filter((link) => {
+      const url = link.url.trim();
+      const left = shown.get(url) ?? 0;
+      if (left > 0) shown.set(url, left - 1);
+      return left === 0;
+    })
+    .map((link) => link.label);
+});
 
 const openLink = (url: string) => {
   window.open(url, "_blank", "noopener,noreferrer");
@@ -659,10 +729,11 @@ const runTestSend = async () => {
     });
     toast({ variant: "success", message: t("alert_templates.testSendSuccess") });
   } catch (err: any) {
+    // The server's text names the reason, and on a 429 the wait time.
+    const serverText = err?.response?.data?.message ?? err?.response?.data?.error;
     const message =
-      err?.response?.status === 429
-        ? t("alert_templates.testSendRateLimited")
-        : (err?.response?.data?.message ?? err?.response?.data?.error ?? String(err));
+      serverText ??
+      (err?.response?.status === 429 ? t("alert_templates.testSendRateLimited") : String(err));
     toast({ variant: "error", message });
   } finally {
     isTestSending.value = false;

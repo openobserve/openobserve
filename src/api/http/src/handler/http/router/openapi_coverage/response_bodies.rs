@@ -169,6 +169,8 @@ fn ack_response() -> openobserve_synthetics::job_api::AckResponse {
         failing_environments: vec![],
         suppressed_by: None,
         template: None,
+        coverage: Some("Failing in 1 of 2 locations (us-east)".to_string()),
+        gap_notice: None,
     }
 }
 

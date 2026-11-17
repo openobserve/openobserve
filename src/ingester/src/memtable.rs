@@ -95,6 +95,14 @@ impl MemTable {
         Ok((self.id, batches))
     }
 
+    pub(crate) fn min_ts(&self, org_id: &str, stream_name: &str) -> Option<i64> {
+        let key = format!("{org_id}/{stream_name}");
+        self.streams
+            .get(key.as_str())
+            .and_then(|s| s.time_range())
+            .map(|(min, _)| min)
+    }
+
     pub(crate) async fn persist(
         &self,
         id: u64,

@@ -115,10 +115,9 @@ struct StreamRecordNeeds {
 
 impl StreamRecordNeeds {
     async fn load(stream_param: StreamParams) -> Self {
-        // Chat history is replayed verbatim and hash-checked; no user pipeline may
-        // read (copy elsewhere) or rewrite it.
+        // No user pipeline may copy a protected stream's rows elsewhere or rewrite them.
         let executable_pipelines =
-            if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+            if config::meta::self_reporting::protected_streams::is_read_protected_stream(
                 &stream_param.stream_name,
             ) {
                 Vec::new()
@@ -177,7 +176,12 @@ fn is_blocked_internal_rollup_write(
     user: &IngestUser,
     is_derived: bool,
 ) -> bool {
-    is_internal_rollup_stream(stream_name) && !is_derived && matches!(user, IngestUser::User(_))
+    is_internal_rollup_stream(stream_name) && !is_internal_writer(user, is_derived)
+}
+
+/// A pipeline-derived write or a server-side job; a user credential is never one.
+fn is_internal_writer(user: &IngestUser, is_derived: bool) -> bool {
+    is_derived || matches!(user, IngestUser::SystemJob(_))
 }
 
 /// Keyed on the destination: gRPC relabels forwarded customer writes as `InternalGrpc`.
@@ -320,7 +324,7 @@ async fn ingest_inner(
     // Internal writers pass the same test as the rollup write guard below.
     #[cfg(feature = "vectorscan")]
     let platform_write = {
-        let internal_writer = is_derived || matches!(user, IngestUser::SystemJob(_));
+        let internal_writer = is_internal_writer(&user, is_derived);
         let source = stream_name.clone();
         move |stream: &str| {
             config::meta::self_reporting::redaction::is_platform_write(
@@ -1784,6 +1788,23 @@ mod tests {
             &user,
             true
         ));
+    }
+
+    #[test]
+    fn feature_writers_pass_the_rollup_guard_and_sdr_fail_closed() {
+        use config::meta::{
+            alerts::alert_calibration::DIGEST_STREAM, self_reporting::redaction::is_platform_write,
+        };
+        for job in [SystemJobType::AlertCalibration, SystemJobType::AutoObserve] {
+            let writer = IngestUser::SystemJob(job);
+            assert!(is_internal_writer(&writer, false), "{job:?}");
+            for stream in [DIGEST_STREAM, "_o2_autoobserve_health"] {
+                assert!(!is_blocked_internal_rollup_write(stream, &writer, false));
+                assert!(is_platform_write(false, true, stream, stream), "{stream}");
+            }
+        }
+        let user = IngestUser::User("someone@example.com".to_string());
+        assert!(!is_internal_writer(&user, false));
     }
 
     #[test]

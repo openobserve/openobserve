@@ -9,6 +9,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -39,6 +40,7 @@ const defaults = computed<CaseSettingsValues | null>(() => {
     ? {
         auto_close_days: current.auto_close_days,
         group_window_minutes: current.group_window_minutes,
+        roll_up_low_priority: current.roll_up_low_priority ?? true,
       }
     : null;
 });
@@ -145,6 +147,16 @@ async function onSubmit(value: CaseSettingsValues) {
           required
           data-test="security-case-settings-group-window"
         />
+        <div class="flex flex-col gap-1">
+          <OFormSwitch
+            name="roll_up_low_priority"
+            :label="t('siem.cases.settings.rollUpLowPriority')"
+            data-test="security-case-settings-roll-up"
+          />
+          <span class="text-text-secondary text-xs">{{
+            t("siem.cases.settings.rollUpLowPriorityHint")
+          }}</span>
+        </div>
       </OForm>
     </div>
   </ODialog>

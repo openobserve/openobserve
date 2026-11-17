@@ -15,10 +15,13 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import downtimes from "./downtimes";
+import { announcementKeys } from "./announcements.querykeys";
 import type { DowntimeDetail, DowntimeListItem } from "./downtimes";
 import {
   downtimesListQuery,
   downtimesLookupQuery,
+  quickMuteMutation,
+  saveDowntimeMutation,
   sendDowntimeTestMutation,
 } from "./downtimes.queries";
 
@@ -79,5 +82,15 @@ describe("the downtime test send", () => {
       throw { response: { data: { message: "boom" } } };
     });
     expect(await send(["hook"])).toEqual([{ destination: "hook", ok: false, error: "boom" }]);
+  });
+});
+
+describe("downtime writes refresh the banner", () => {
+  it("invalidates the announcements after a save and after a quick mute", () => {
+    const banner = announcementKeys.all("acme");
+    for (const options of [saveDowntimeMutation("acme"), quickMuteMutation("acme")]) {
+      const keys = (options.meta as { invalidates: unknown[] }).invalidates;
+      expect(keys).toContainEqual(banner);
+    }
   });
 });

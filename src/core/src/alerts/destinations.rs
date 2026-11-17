@@ -23,6 +23,7 @@ use db::{
     authz::{remove_ownership, set_ownership},
     org_users, user,
 };
+use infra::table::templates::NAME_MAX_CHARS;
 
 use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz};
 
@@ -290,6 +291,10 @@ pub async fn save_in(
     if destination.name.contains('/') || is_ofga_unsupported(&destination.name) {
         return Err(DestinationError::InvalidName);
     }
+    // Create only: older rows over the limit (SQLite does not enforce it) stay editable.
+    if create && destination.name.chars().count() > NAME_MAX_CHARS {
+        return Err(DestinationError::NameTooLong(NAME_MAX_CHARS));
+    }
 
     let previous = existing(&destination.org_id, &destination.name, create).await?;
     if let Some(target) = super::slack_destination::slack_app_target(&destination) {
@@ -344,6 +349,24 @@ pub async fn save_in(
                     );
                 }
             }
+        }
+    }
+
+    // The write stores null for a name it finds no row for, so refuse it here. The lookup falls
+    // back to the default org and follows renames; the canonical name is what the write resolves.
+    if let Module::Alert {
+        template: Some(template_name),
+        ..
+    } = &mut destination.module
+        && !template_name.is_empty()
+    {
+        match db::alerts::templates::get(&destination.org_id, template_name).await {
+            Ok(found) => *template_name = found.name,
+            Err(TemplateError::NotFound) => {
+                return Err(DestinationError::UnknownTemplate(template_name.clone()));
+            }
+            Err(TemplateError::InfraError(e)) => return Err(DestinationError::InfraError(e)),
+            Err(e) => return Err(DestinationError::TemplateRetrievalFailed(e.to_string())),
         }
     }
 
@@ -978,6 +1001,97 @@ mod tests {
         // Clean up
         let _ = db::alerts::destinations::delete(org_id, "test_no_template").await;
         let _ = db::alerts::destinations::delete(org_id, "test_empty_template").await;
+    }
+
+    fn sns_destination(org_id: &str, name: &str, template: Option<&str>) -> Destination {
+        Destination {
+            id: None,
+            org_id: org_id.to_string(),
+            name: name.to_string(),
+            module: Module::Alert {
+                template: template.map(str::to_string),
+                destination_type: DestinationType::Sns(config::meta::destinations::AwsSns {
+                    sns_topic_arn: "arn:aws:sns:us-east-1:000000000000:t".to_string(),
+                    aws_region: "us-east-1".to_string(),
+                }),
+            },
+        }
+    }
+
+    /// An unknown name is refused; a name only the default org holds still saves.
+    #[tokio::test]
+    async fn test_save_refuses_an_unknown_template_and_keeps_the_default_org_fallback() {
+        meta_store().await;
+        let org_id = "test_org_unknown_template";
+        let shared = "b22_shared_template";
+        let _ = db::alerts::destinations::delete(org_id, "b22_typo").await;
+        let _ = db::alerts::destinations::delete(org_id, "b22_shared").await;
+
+        let err = save(
+            "b22_typo",
+            sns_destination(org_id, "", Some("no_such_t")),
+            true,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, DestinationError::UnknownTemplate(ref n) if n == "no_such_t"),
+            "{err:?}"
+        );
+        assert_eq!(err.to_string(), "template 'no_such_t' does not exist");
+
+        infra::table::templates::put(Template {
+            org_id: config::DEFAULT_ORG.to_string(),
+            name: shared.to_string(),
+            body: "{}".to_string(),
+            template_type: config::meta::destinations::TemplateType::Http,
+            ..Default::default()
+        })
+        .await
+        .expect("default org template");
+        let saved = save(
+            "b22_shared",
+            sns_destination(org_id, "", Some(shared)),
+            true,
+        )
+        .await
+        .expect("default org fallback saves");
+        assert!(
+            matches!(&saved.module, Module::Alert { template: Some(t), .. } if t == shared),
+            "{saved:?}"
+        );
+        // Read the row back: the write stored the default org template's id, not null.
+        let stored = infra::table::destinations::get(org_id, "b22_shared")
+            .await
+            .expect("read back")
+            .expect("row");
+        assert!(
+            matches!(&stored.module, Module::Alert { template: Some(t), .. } if t == shared),
+            "{stored:?}"
+        );
+
+        let _ = db::alerts::destinations::delete(org_id, "b22_shared").await;
+        let _ = infra::table::templates::delete(config::DEFAULT_ORG, shared).await;
+    }
+
+    /// A create over the 256-character column refuses with a 400 error, not the raw DB error.
+    #[tokio::test]
+    async fn test_save_refuses_a_name_over_256_chars_on_create() {
+        meta_store().await;
+        let org_id = "test_org_long_name";
+        let over = "é".repeat(257);
+        let err = save(&over, sns_destination(org_id, "", None), true)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, DestinationError::NameTooLong(256)), "{err:?}");
+
+        // 256 multi-byte characters still fit the varchar(256) column.
+        let fits = "é".repeat(256);
+        let _ = db::alerts::destinations::delete(org_id, &fits).await;
+        save(&fits, sns_destination(org_id, "", None), true)
+            .await
+            .expect("256 characters save");
+        let _ = db::alerts::destinations::delete(org_id, &fits).await;
     }
 
     /// A delete blocked by three kinds names all three, not just the one `first_use` stopped at.

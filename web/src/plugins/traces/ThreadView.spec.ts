@@ -40,9 +40,16 @@ vi.mock("vuex", async (importOriginal) => {
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, VueWrapper, config } from "@vue/test-utils";
+import { computed } from "vue";
 import i18n from "@/locales";
 
 import ThreadView from "./ThreadView.vue";
+import { attributeSteps, REQUEST_TIMELINE_KEY } from "./timeAttribution";
+
+// The lanes query correlation and metrics; the strip's own logic is under test here.
+vi.mock("./TraceLanes.vue", () => ({
+  default: { name: "TraceLanes", template: '<div data-test="trace-lanes-stub" />' },
+}));
 
 // Install the real app i18n for every mount in this file so the migrated
 // useI18n() calls in ThreadView.vue resolve real translations.
@@ -181,21 +188,52 @@ describe("ThreadView", () => {
       expect(text).toContain("1");
     });
 
-    it("should display Tools count equal to the number of tool-call spans", () => {
+    const toolChipValue = () => wrapper.find(".thread-chip--tools .thread-chip__value").text();
+
+    it("should display Tools count equal to the number of tool cards", () => {
       const llm = makeLLMSpan();
       const tool = makeToolSpan();
       wrapper = mountThreadView({ spans: [llm, tool] });
-      const text = wrapper.find(".thread-summary").text();
-      expect(text).toContain("Tools");
-      expect(text).toContain("1");
+      expect(toolChipValue()).toBe("1");
+      expect(wrapper.findAll(".thread-tool-row")).toHaveLength(1);
+    });
+
+    // The chip counts the cards drawn, including calls with no tool span.
+    it("counts tool calls recorded without a tool span, as the cards do", () => {
+      const llm = makeLLMSpan({
+        gen_ai_output_messages: JSON.stringify([
+          {
+            role: "assistant",
+            parts: [
+              { type: "tool_call", id: "c1", name: "search_web", arguments: {} },
+              { type: "tool_call", id: "c2", name: "read_file", arguments: {} },
+            ],
+          },
+        ]),
+      });
+      wrapper = mountThreadView({ spans: [llm] });
+      expect(wrapper.findAll(".thread-tool-row")).toHaveLength(2);
+      expect(toolChipValue()).toBe("2");
+    });
+
+    // A tool span that wraps the only model call starts before it.
+    it("shows and counts a tool span that starts before the first model call", () => {
+      const llm = makeLLMSpan({ reference_parent_span_id: "outer" });
+      const outer = makeToolSpan({
+        span_id: "outer",
+        tool_name: "outer_task",
+        start_time: BASE_TIME_NS - 200_000_000,
+      });
+      const inner = makeToolSpan({ span_id: "inner", tool_name: "inner_lookup" });
+      wrapper = mountThreadView({ spans: [llm, outer, inner] });
+      const names = wrapper.findAll(".thread-tool-row__name").map((n) => n.text());
+      expect(names).toEqual(["outer_task", "inner_lookup"]);
+      expect(toolChipValue()).toBe("2");
     });
 
     it("should display zero Tools when no tool spans are present", () => {
       wrapper = mountThreadView({ spans: [makeLLMSpan()] });
-      const chips = wrapper.findAll(".thread-chip");
-      const toolChip = chips.find((c) => c.text().includes("Tools"));
-      expect(toolChip).toBeDefined();
-      expect(toolChip!.text()).toContain("0");
+      expect(toolChipValue()).toBe("0");
     });
 
     it("should display the dominant model name in the Model chip", () => {
@@ -371,12 +409,6 @@ describe("ThreadView", () => {
       });
     }
 
-    // The tool thread renders COLLAPSED (a "Show calls" pill). The per-tool
-    // rows/pills/view button/body only exist once the thread is revealed.
-    async function reveal(w: VueWrapper) {
-      await w.find(".tt-toggle").trigger("click");
-    }
-
     it("should render a tool call thread when the turn has tool spans", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p");
@@ -384,33 +416,18 @@ describe("ThreadView", () => {
       expect(wrapper.find(".thread-tools-thread").exists()).toBe(true);
     });
 
-    it("should display the tool call count in the collapsed toggle", () => {
-      const llm = makeLLMSpan({ span_id: "llm-p" });
-      const tool = makeLinkedToolSpan("llm-p");
-      wrapper = mountThreadView({ spans: [llm, tool] });
-      const count = wrapper.find(".tt-count");
-      expect(count.text().replace(/\s+/g, " ")).toContain("1 tool call");
-    });
-
-    it("should use pluralised label for multiple tool calls", () => {
+    it("shows the cards without a Show calls pill", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const t1 = makeLinkedToolSpan("llm-p", { span_id: "tool-1" });
       const t2 = makeLinkedToolSpan("llm-p", { span_id: "tool-2", tool_name: "write_file" });
       wrapper = mountThreadView({ spans: [llm, t1, t2] });
-      const count = wrapper.find(".tt-count");
-      expect(count.text().replace(/\s+/g, " ")).toContain("2 tool calls");
-    });
-
-    it("should not show tool rows until the thread is revealed", () => {
-      const llm = makeLLMSpan({ span_id: "llm-p" });
-      const tool = makeLinkedToolSpan("llm-p");
-      wrapper = mountThreadView({ spans: [llm, tool] });
-      expect(wrapper.find(".thread-tool-row").exists()).toBe(false);
+      expect(wrapper.find(".tt-toggle").exists()).toBe(false);
+      expect(wrapper.findAll(".thread-tool-row")).toHaveLength(2);
     });
 
     // Issue #3135: `span.duration` is µs. A 3.51 s LLM call and a 10.10 ms
     // tool call must read as the waterfall shows them.
-    it("shows per-turn and per-tool durations from a real µs span as the waterfall does", async () => {
+    it("shows per-turn and per-tool durations from a real µs span as the waterfall does", () => {
       const llm = makeLLMSpan({
         span_id: "llm-p",
         end_time: BASE_TIME_NS + 3_510_000_000,
@@ -424,65 +441,91 @@ describe("ThreadView", () => {
 
       const turnMetric = wrapper.find('.thread-metric[title="Duration"]');
       expect(turnMetric.text()).toContain("3.51s");
-      expect(wrapper.find(".tt-count").text()).toContain("10.10ms");
-
-      await reveal(wrapper);
       expect(wrapper.find(".thread-pill").text()).toContain("10.10ms");
     });
 
-    it("should not show tool body by default (collapsed)", async () => {
+    it("opens the first call and every failed call; the rest show one summary line", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
-      const tool = makeLinkedToolSpan("llm-p");
-      wrapper = mountThreadView({ spans: [llm, tool] });
-      await reveal(wrapper);
-      const body = wrapper.find(".thread-tool-body");
-      expect(body.exists()).toBe(false);
+      const first = makeLinkedToolSpan("llm-p", {
+        span_id: "tool-1",
+        start_time: BASE_TIME_NS + 1,
+      });
+      const ok = makeLinkedToolSpan("llm-p", { span_id: "tool-2", start_time: BASE_TIME_NS + 2 });
+      const failed = makeLinkedToolSpan("llm-p", {
+        span_id: "tool-3",
+        start_time: BASE_TIME_NS + 3,
+        span_status: "ERROR",
+      });
+      wrapper = mountThreadView({ spans: [llm, first, ok, failed] });
+      const cards = wrapper.findAll(".thread-tool");
+      expect(cards.map((c) => c.classes().includes("thread-tool--open"))).toEqual([
+        true,
+        false,
+        true,
+      ]);
     });
 
-    it("should expand the tool body when the tool row is clicked", async () => {
+    it("should collapse an open card when its row is clicked, and reopen it", async () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p");
       wrapper = mountThreadView({ spans: [llm, tool] });
-      await reveal(wrapper);
       const row = wrapper.find(".thread-tool-row");
+      expect(wrapper.find(".thread-tool-body").exists()).toBe(true);
       await row.trigger("click");
-      const body = wrapper.find(".thread-tool-body");
-      expect(body.exists()).toBe(true);
+      expect(wrapper.find(".thread-tool-body").exists()).toBe(false);
+      await row.trigger("click");
+      expect(wrapper.find(".thread-tool-body").exists()).toBe(true);
     });
 
-    it("should collapse the tool body on second click", async () => {
-      const llm = makeLLMSpan({ span_id: "llm-p" });
-      const tool = makeLinkedToolSpan("llm-p");
-      wrapper = mountThreadView({ spans: [llm, tool] });
-      await reveal(wrapper);
-      const row = wrapper.find(".thread-tool-row");
-      await row.trigger("click"); // expand
-      await row.trigger("click"); // collapse
-      const body = wrapper.find(".thread-tool-body");
-      expect(body.exists()).toBe(false);
-    });
-
-    it("should show both Arguments and Result sections when expanded", async () => {
+    it("should show both Arguments and Result sections when expanded", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p", {
         gen_ai_input_messages: JSON.stringify({ q: "hello" }),
         gen_ai_output_messages: JSON.stringify({ result: "ok" }),
       });
       wrapper = mountThreadView({ spans: [llm, tool] });
-      await reveal(wrapper);
-      const row = wrapper.find(".thread-tool-row");
-      await row.trigger("click");
-      const labels = wrapper.findAll(".thread-tool-body__label");
-      const labelTexts = labels.map((l) => l.text());
+      const labelTexts = wrapper.findAll(".thread-tool-body__label").map((l) => l.text());
       expect(labelTexts.some((t) => t.includes("Arguments"))).toBe(true);
       expect(labelTexts.some((t) => t.includes("Result"))).toBe(true);
+    });
+
+    it("cuts a long result at 6 lines with the full text one click away", async () => {
+      const llm = makeLLMSpan({ span_id: "llm-p" });
+      const tool = makeLinkedToolSpan("llm-p", {
+        span_id: "tool-long",
+        gen_ai_output_messages: JSON.stringify({ lines: Array.from({ length: 12 }, (_, i) => i) }),
+      });
+      wrapper = mountThreadView({ spans: [llm, tool] });
+      const more = wrapper.find("[data-test='thread-tool-show-json-tool-long']");
+      expect(more.exists()).toBe(true);
+      await more.trigger("click");
+      expect(wrapper.find("[data-test='thread-tool-show-json-tool-long']").exists()).toBe(false);
+    });
+
+    it("draws a tool_call part with no execute_tool span as a card without a status", () => {
+      const llm = makeLLMSpan({
+        span_id: "llm-p",
+        gen_ai_output_messages: JSON.stringify([
+          {
+            role: "assistant",
+            parts: [{ type: "tool_call", id: "call_1", name: "grep", arguments: { q: "x" } }],
+          },
+        ]),
+      });
+      wrapper = mountThreadView({ spans: [llm] });
+      const row = wrapper.find(".thread-tool-row");
+      expect(row.text()).toContain("grep");
+      expect(wrapper.find(".thread-pill").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Called grep");
+      // No span means no result was recorded, not an empty result.
+      expect(wrapper.text()).toContain("No result recorded");
+      expect(wrapper.text()).not.toContain("(empty)");
     });
 
     it("should emit span-selected with the tool span_id when the view button is clicked", async () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p", { span_id: "tool-xyz" });
       wrapper = mountThreadView({ spans: [llm, tool] });
-      await reveal(wrapper);
       const viewBtn = wrapper.find(".thread-tool-row__view");
       await viewBtn.trigger("click");
       const emitted = wrapper.emitted("span-selected");
@@ -490,23 +533,67 @@ describe("ThreadView", () => {
       expect(emitted![0]).toEqual(["tool-xyz"]);
     });
 
-    it("should show ERROR pill when tool span has ERROR status", async () => {
+    it("should show ERROR pill when tool span has ERROR status", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p", { span_status: "ERROR" });
       wrapper = mountThreadView({ spans: [llm, tool] });
-      await reveal(wrapper);
       const errorPill = wrapper.find(".thread-pill--error");
       expect(errorPill.exists()).toBe(true);
       expect(errorPill.text()).toContain("ERROR");
     });
 
-    it("should show OK pill when tool span is not in error state", async () => {
+    it("should show OK pill when tool span is not in error state", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p", { span_status: "UNSET" });
       wrapper = mountThreadView({ spans: [llm, tool] });
-      await reveal(wrapper);
-      const okPill = wrapper.find(".thread-pill--ok");
-      expect(okPill.exists()).toBe(true);
+      expect(wrapper.find(".thread-pill--ok").exists()).toBe(true);
+    });
+  });
+
+  describe("behind this step", () => {
+    const llm = makeLLMSpan({ span_id: "llm-p" });
+    const failed = makeToolSpan({
+      span_id: "tool-x",
+      reference_parent_span_id: "llm-p",
+      gen_ai_tool_name: "search_db",
+      span_status: "ERROR",
+    });
+
+    function mountWithTimeline(spans: any[]) {
+      const steps = attributeSteps(spans);
+      const timeline = {
+        steps: computed(() => new Map(steps.map((step) => [step.spanId, step]))),
+        spans: computed(() => spans),
+        streamName: computed(() => "default"),
+        openLogsAt: vi.fn(),
+        openInWaterfall: vi.fn(),
+      };
+      wrapper = mount(ThreadView, {
+        props: { spans },
+        global: { provide: { [REQUEST_TIMELINE_KEY as symbol]: timeline } },
+      });
+      return timeline;
+    }
+
+    it("explains a failed tool call and opens it in the waterfall", async () => {
+      const timeline = mountWithTimeline([llm, failed]);
+      const strip = wrapper.find('[data-test="behind-this-step-tool-x"]');
+      expect(strip.exists()).toBe(true);
+      expect(strip.find('[data-test="behind-this-step-sentence"]').text()).toBe(
+        "search_db failed after 200.00ms. The step itself held the time, not a child span.",
+      );
+      await strip.find('[data-test="behind-this-step-open-waterfall"]').trigger("click");
+      expect(timeline.openInWaterfall).toHaveBeenCalledWith("tool-x");
+    });
+
+    it("leaves a quick, healthy turn alone", () => {
+      mountWithTimeline([llm]);
+      expect(wrapper.find('[data-test^="behind-this-step"]').exists()).toBe(false);
+    });
+
+    it("shows nothing outside the trace view", () => {
+      wrapper = mountThreadView({ spans: [llm, failed] });
+      expect(wrapper.find('[data-test^="behind-this-step"]').exists()).toBe(false);
     });
   });
 

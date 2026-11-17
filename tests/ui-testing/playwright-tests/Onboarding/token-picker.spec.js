@@ -57,7 +57,7 @@ test.describe('Code block token link opens the header token picker', () => {
         expect(maskedAfter).toContain(tokenValue.slice(0, 4));
         expect(maskedAfter).not.toContain(tokenValue);
 
-        await pm.ingestionConfigPage.clickCodeBlock('curl');
+        await pm.ingestionConfigPage.clickCodeBlockCopyBtn('curl');
         await pm.ingestionConfigPage.expectToastText(`Copied with org token ${tokenName}`);
         expect(await pm.ingestionConfigPage.readClipboard()).toContain(tokenValue);
         expect(navigations).toBe(0);

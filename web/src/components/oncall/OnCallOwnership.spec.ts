@@ -25,6 +25,7 @@ import * as toastModule from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import serviceStreamsService from "@/services/service_streams";
 import store from "@/test/unit/helpers/store";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 const push = vi.fn();
 vi.mock("vue-router", async (importOriginal) => ({
@@ -238,6 +239,33 @@ describe("OnCallOwnership", () => {
 
       expect(wrapper.emitted("licenseDenied")).toBeUndefined();
     });
+  });
+
+  it("carries the display fields onto each discovered service, one row per key", async () => {
+    queryClient.removeQueries();
+    const row = labelRows.qualified;
+    correlation.getServicesList.mockResolvedValue({
+      data: [
+        { ...row, set_id: "kubernetes", disambiguation: {} },
+        { ...row, set_id: "kubernetes", disambiguation: { "k8s-cluster": "pentest" } },
+      ],
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    const services = wrapper.findComponent({ name: "OnCallRuleEditor" }).props("services") as {
+      name: string;
+    }[];
+    expect(services.filter((service) => service.name === row.service_name)).toEqual([
+      {
+        name: row.service_name,
+        setId: "default",
+        identity: {},
+        display_name: row.display_name,
+        display_source: row.display_source,
+        display_qualifier: row.display_qualifier,
+      },
+    ]);
   });
 
   it("titles the tab with the team and states the same precedence as org Routing", async () => {

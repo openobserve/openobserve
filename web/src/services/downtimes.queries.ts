@@ -180,8 +180,8 @@ export const downtimeValuesQuery = (
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
-/** A downtime changes the Muted chip on every list it can cover. */
-const mutedListKeys = (org: string) => [
+/** Every list that shows a Muted chip, which a mute, an End or an Extend changes. */
+export const mutedListKeys = (org: string) => [
   downtimeKeys.all(org),
   alertKeys.all(org),
   anomalyKeys.all(org),
@@ -193,19 +193,20 @@ export const saveDowntimeMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { id?: string; body: DowntimeRequest }) =>
       vars.id ? downtimes.update(org, vars.id, vars.body) : downtimes.create(org, vars.body),
-    meta: { invalidates: mutedListKeys(org), silentError: true },
+    // The banner shows the new window or end at once, as it does after a cancel.
+    meta: { invalidates: [...mutedListKeys(org), announcementKeys.all(org)], silentError: true },
   });
 
 export const quickMuteMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (body: DowntimeRequest) => (await downtimes.create(org, body)).data,
-    meta: { invalidates: mutedListKeys(org), silentError: true },
+    meta: { invalidates: [...mutedListKeys(org), announcementKeys.all(org)], silentError: true },
   });
 
 export const cancelDowntimeMutation = (org: string) =>
   mutationOptions({
-    mutationFn: (vars: { id: string; folder?: string }) =>
-      downtimes.cancel(org, vars.id, vars.folder),
+    mutationFn: (vars: { id: string; folder?: string; version?: number }) =>
+      downtimes.cancel(org, vars.id, vars.folder, vars.version),
     meta: { invalidates: [...mutedListKeys(org), announcementKeys.all(org)], silentError: true },
   });
 

@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="String(currentIndex)"
           orientation="vertical"
           dense
-          class="min-h-0 flex-1 overflow-y-auto px-1.5 py-1"
+          class="min-h-0 flex-1 overflow-y-auto px-1 py-1"
           data-test="ai-queue-workbench-nav"
         >
           <OTab

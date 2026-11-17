@@ -89,6 +89,8 @@ test("dependency-bot, docs-only and translation-only PRs need no review; anythin
   assert.equal(nothingToReviewReason({ author: "alice", paths: ["README.md", "docs/setup.txt", "web/README.MD"] }), "docs_only");
   assert.equal(nothingToReviewReason({ author: "alice", paths: ["web/src/locales/languages/fr.json", "web/src/locales/languages/de.json", "scripts/translations/.translation_state.json"] }), "translation_only");
   assert.equal(nothingToReviewReason({ author: "alice", paths: ["web/src/locales/languages/en-US.json"] }), "", "the English source is written by a person");
+  assert.equal(nothingToReviewReason({ author: "alice", paths: ["web/src/locales/languages/security/fr-FR.json"] }), "translation_only");
+  assert.equal(nothingToReviewReason({ author: "alice", paths: ["web/src/locales/languages/security/en-US.json"] }), "", "the Security English source is written by a person");
   assert.equal(nothingToReviewReason({ author: "alice", paths: ["web/src/locales/languages/fr.json", "web/src/App.vue"] }), "");
   assert.equal(nothingToReviewReason({ author: "alice", paths: ["README.md", "src/main.rs"] }), "");
   assert.equal(nothingToReviewReason({ author: "alice", paths: ["web/src/locales/dbmMessages.spec.ts"] }), "");

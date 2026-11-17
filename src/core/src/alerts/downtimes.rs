@@ -363,8 +363,8 @@ pub(crate) mod enterprise {
 
     use config::meta::{
         downtimes::{
-            ActiveDowntime, CorrectionRef, CorrectionWindow, Downtime, DowntimeStatus,
-            IncidentMode, Repeat, SloCorrectionMode, TargetModule,
+            ActiveDowntime, AlertGroupRef, CorrectionRef, CorrectionWindow, Downtime,
+            DowntimeStatus, IncidentMode, Repeat, SloCorrectionMode, TargetModule,
         },
         slo::{Slo, window::align_up},
     };
@@ -474,7 +474,10 @@ pub(crate) mod enterprise {
                     item,
                     group,
                 )
-                .then(|| active_of(row, window.end, target.incident_mode))
+                .then(|| {
+                    let here = end_here(row, module, item.id, group);
+                    active_of(row, window.end, target.incident_mode, here)
+                })
             })
             .reduce(merged)
     }
@@ -483,6 +486,7 @@ pub(crate) mod enterprise {
         row: &Downtime,
         ends_at: i64,
         incident_mode: IncidentMode,
+        end_here: bool,
     ) -> ActiveDowntime {
         ActiveDowntime {
             id: row.id.clone(),
@@ -493,7 +497,30 @@ pub(crate) mod enterprise {
             alert_groups: row.alert_groups.clone(),
             end_on_clear: row.end_on_clear.clone(),
             source: row.source,
+            folder_id: row.folder_id.clone(),
+            end_here,
         }
+    }
+
+    /// Whether ending `row` unmutes the row of `item_id` (at `group`) and no other row. [pure]
+    pub(crate) fn end_here(
+        row: &Downtime,
+        module: TargetModule,
+        item_id: &str,
+        group: GroupScope<'_>,
+    ) -> bool {
+        let [target] = row.targets.as_slice() else {
+            return false;
+        };
+        let only_this_item = row.schedule.repeat == Repeat::None
+            && target.module == module
+            && matches!(target.ids.as_slice(), [id] if id == item_id);
+        if !only_this_item || module != TargetModule::Alerts {
+            return only_this_item;
+        }
+        // The alert cancel route refuses any other shape, and it ignores the groups.
+        crate::alerts::mute::is_quick_mute(row, item_id)
+            && groups_end_here(row.alert_groups.as_deref(), item_id, group)
     }
 
     /// Overlapping downtimes in any order: the latest end names the chip, any muted mode mutes.
@@ -503,9 +530,12 @@ pub(crate) mod enterprise {
         } else {
             IncidentMode::None
         };
+        // Ending one of two downtimes leaves the row muted by the other.
+        let end_here = a.id == b.id && a.end_here && b.end_here;
         let latest = if b.ends_at > a.ends_at { b } else { a };
         ActiveDowntime {
             incident_mode,
+            end_here,
             ..latest
         }
     }
@@ -533,7 +563,8 @@ pub(crate) mod enterprise {
         })?;
         let window = schedule::window_at(&row.schedule, at)?;
         let target = scope::target_for(&row.targets, module)?;
-        Some(active_of(row, window.end, target.incident_mode))
+        // No row to judge against: the chip links to the downtime instead.
+        Some(active_of(row, window.end, target.incident_mode, false))
     }
 
     /// The span of slice starts `[start, end)` corrects, in micros; `None` when it holds none.
@@ -611,6 +642,21 @@ pub(crate) mod enterprise {
         schedule::window_at(&row.schedule, now)
             .or_else(|| schedule::next_window(&row.schedule, now))
             .is_none_or(|w| aligned_span(w.start, w.end, slice_interval_secs).is_some())
+    }
+
+    /// A group row needs a mute of exactly its group; a parent row any mute of its own groups.
+    fn groups_end_here(
+        groups: Option<&[AlertGroupRef]>,
+        alert_id: &str,
+        group: GroupScope<'_>,
+    ) -> bool {
+        let groups = groups.unwrap_or_default();
+        match group {
+            GroupScope::Group(key) => {
+                matches!(groups, [one] if one.alert_id == alert_id && one.group_key == key)
+            }
+            GroupScope::Alert | GroupScope::Any => groups.iter().all(|g| g.alert_id == alert_id),
+        }
     }
 
     fn covers(row: &Downtime, module: TargetModule, item: &TargetItem<'_>) -> bool {
@@ -1313,5 +1359,175 @@ mod tests {
         assert_eq!(anomaly_sql("filters", sql), None);
         assert_eq!(anomaly_sql("custom_sql", sql), sql);
         assert_eq!(anomaly_sql("", sql), sql, "a missing mode keeps the SQL");
+    }
+
+    fn only(module: TargetModule, ids: &[&str]) -> DowntimeTarget {
+        DowntimeTarget {
+            ids: ids.iter().map(|id| id.to_string()).collect(),
+            ..target(module)
+        }
+    }
+
+    fn quick(targets: Vec<DowntimeTarget>) -> Downtime {
+        let mut quick = row("d1", targets, 0, 10 * HOUR);
+        quick.condition = None;
+        quick
+    }
+
+    fn groups(pairs: &[(&str, &str)]) -> Option<Vec<config::meta::downtimes::AlertGroupRef>> {
+        Some(
+            pairs
+                .iter()
+                .map(|(alert_id, key)| config::meta::downtimes::AlertGroupRef {
+                    alert_id: alert_id.to_string(),
+                    group_key: key.to_string(),
+                    group_labels: None,
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn a_module_row_ends_here_only_for_a_one_time_mute_of_exactly_this_row() {
+        use o2_enterprise::enterprise::downtimes::scope::GroupScope;
+
+        for module in [TargetModule::AnomalyDetections, TargetModule::Synthetics] {
+            let here = |row: &Downtime| end_here(row, module, "x1", GroupScope::Alert);
+            assert!(here(&quick(vec![only(module, &["x1"])])), "{module:?}");
+            // Folders, tags and a condition only narrow the match, so ending still frees one row.
+            let mut narrowed = row("d1", vec![only(module, &["x1"])], 0, 10 * HOUR);
+            narrowed.targets[0].folders = TargetFolders::Some {
+                folder_ids: vec!["default".to_string()],
+            };
+            narrowed.targets[0].tags = vec!["team:pay".to_string()];
+            assert!(here(&narrowed), "{module:?}");
+            assert!(!here(&quick(vec![only(module, &["x1", "x2"])])));
+            assert!(
+                !here(&quick(vec![only(module, &[])])),
+                "empty ids is every row"
+            );
+            assert!(!here(&quick(vec![only(module, &["x2"])])));
+            assert!(!here(&quick(vec![
+                only(module, &["x1"]),
+                only(TargetModule::Slos, &["s1"]),
+            ])));
+            let mut daily = quick(vec![only(module, &["x1"])]);
+            daily.schedule.repeat = Repeat::Daily;
+            assert!(!here(&daily), "a recurring row mutes again tomorrow");
+            assert!(!end_here(
+                &quick(vec![only(module, &["x1"])]),
+                TargetModule::Alerts,
+                "x1",
+                GroupScope::Alert
+            ));
+        }
+    }
+
+    #[test]
+    fn an_alert_row_ends_here_only_for_a_quick_mute_the_alert_route_accepts() {
+        use o2_enterprise::enterprise::downtimes::scope::GroupScope;
+
+        let alerts = TargetModule::Alerts;
+        let parent = |row: &Downtime| end_here(row, alerts, "a1", GroupScope::Any);
+        assert!(parent(&quick(vec![only(alerts, &["a1"])])));
+        assert!(end_here(
+            &quick(vec![only(alerts, &["a1"])]),
+            alerts,
+            "a1",
+            GroupScope::Alert
+        ));
+        let conditioned = row("d1", vec![only(alerts, &["a1"])], 0, 10 * HOUR);
+        assert!(!parent(&conditioned), "a condition is not a quick mute");
+        let mut tagged = quick(vec![only(alerts, &["a1"])]);
+        tagged.targets[0].tags = vec!["t".to_string()];
+        assert!(!parent(&tagged));
+        assert!(!parent(&quick(vec![
+            only(alerts, &["a1"]),
+            only(TargetModule::Slos, &["s1"]),
+        ])));
+        assert!(!parent(&quick(vec![only(alerts, &["a1", "a2"])])));
+    }
+
+    #[test]
+    fn a_group_row_ends_here_only_for_a_mute_of_exactly_its_group() {
+        use o2_enterprise::enterprise::downtimes::scope::GroupScope;
+
+        let alerts = TargetModule::Alerts;
+        let mut mute = quick(vec![only(alerts, &["a1"])]);
+        let at = |mute: &Downtime, key| end_here(mute, alerts, "a1", GroupScope::Group(key));
+        assert!(!at(&mute, "k1"), "a whole-alert mute unmutes every group");
+        mute.alert_groups = groups(&[("a1", "k1")]);
+        assert!(at(&mute, "k1"));
+        assert!(!at(&mute, "k2"));
+        mute.alert_groups = groups(&[("a1", "k1"), ("a1", "k2")]);
+        assert!(!at(&mute, "k1"), "ending it also unmutes k2");
+    }
+
+    #[test]
+    fn a_parent_alert_row_ends_a_mute_of_its_own_groups_but_not_of_another_alerts() {
+        use o2_enterprise::enterprise::downtimes::scope::GroupScope;
+
+        let alerts = TargetModule::Alerts;
+        let mut mute = quick(vec![only(alerts, &["a1"])]);
+        let parent = |mute: &Downtime| end_here(mute, alerts, "a1", GroupScope::Any);
+        mute.alert_groups = groups(&[("a1", "k1")]);
+        assert!(parent(&mute));
+        mute.alert_groups = groups(&[("a1", "k1"), ("a1", "k2")]);
+        assert!(parent(&mute), "D3: both groups belong to this alert");
+        mute.alert_groups = groups(&[("a1", "k1"), ("a2", "k9")]);
+        assert!(!parent(&mute));
+    }
+
+    #[test]
+    fn the_row_lookups_carry_end_here_and_the_downtime_folder() {
+        use o2_enterprise::enterprise::downtimes::scope::GroupScope;
+
+        let module = TargetModule::AnomalyDetections;
+        let mut mute = quick(vec![only(module, &["x1"])]);
+        mute.folder_id = "ops".to_string();
+        let mut grouped = quick(vec![only(TargetModule::Alerts, &["a1"])]);
+        grouped.id = "d2".to_string();
+        grouped.alert_groups = groups(&[("a1", "k1")]);
+        let rows = vec![mute, grouped];
+        let dims = HashMap::new();
+        let anomaly = item("x1", "default", &dims, &[]);
+        let hit = active_in(&rows, module, &anomaly, HOUR).expect("muted");
+        assert!(hit.end_here);
+        assert_eq!(hit.folder_id, "ops");
+        let alert = item("a1", "default", &dims, &[]);
+        let at = |scope| {
+            active_scoped(&rows, TargetModule::Alerts, &alert, HOUR, None, scope)
+                .expect("muted")
+                .end_here
+        };
+        assert!(at(GroupScope::Group("k1")));
+        assert!(at(GroupScope::Any));
+        let by_id = active_by_id_in(&rows, module, "d1", HOUR).expect("live");
+        assert!(!by_id.end_here, "no row to judge it against");
+        assert_eq!(by_id.folder_id, "ops");
+    }
+
+    #[test]
+    fn two_downtimes_merged_never_end_here_and_one_downtime_twice_keeps_its_flag() {
+        let one = ActiveDowntime {
+            id: "a".to_string(),
+            ends_at: 10,
+            end_here: true,
+            ..Default::default()
+        };
+        let other = ActiveDowntime {
+            id: "b".to_string(),
+            ends_at: 12,
+            end_here: true,
+            ..Default::default()
+        };
+        assert!(!merged(one.clone(), other.clone()).end_here);
+        assert!(!merged(other, one.clone()).end_here);
+        assert!(merged(one.clone(), one.clone()).end_here);
+        let shared = ActiveDowntime {
+            end_here: false,
+            ..one.clone()
+        };
+        assert!(!merged(one, shared).end_here);
     }
 }

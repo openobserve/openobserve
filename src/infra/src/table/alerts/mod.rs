@@ -59,6 +59,21 @@ pub struct AlertSummaryRow {
     pub enabled: bool,
 }
 
+/// A guarded save lands only while `updated_at` holds `written_us` and the fence row its bytes.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct WriteGuard {
+    pub written_us: Option<i64>,
+    pub fence: Option<KvFence>,
+}
+
+/// A kv row of the alert's org that the save swaps from `expected` to `written` in its transaction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KvFence {
+    pub key: String,
+    pub expected: Vec<u8>,
+    pub written: Vec<u8>,
+}
+
 impl TryFrom<alerts::Model> for MetaAlert {
     type Error = errors::Error;
 
@@ -409,6 +424,19 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
     folder_id: Option<&str>,
     alert: MetaAlert,
 ) -> Result<MetaAlert, errors::Error> {
+    update_where(conn, org_id, folder_id, alert, None)
+        .await?
+        .ok_or_else(|| errors::DbError::PutAlert(PutAlertError::UpdateAlertNotFound).into())
+}
+
+/// With `guard`, writes only while it holds, as one transaction; None when it did not.
+pub async fn update_where<C: TransactionTrait + ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: MetaAlert,
+    guard: Option<WriteGuard>,
+) -> Result<Option<MetaAlert>, errors::Error> {
     // Ensure that ID is provided.
     let Some(alert_id) = alert.id else {
         return Err(errors::DbError::PutAlert(PutAlertError::UpdateAlertMissingID).into());
@@ -443,10 +471,34 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
         alert_am.folder_id = Set(folder_m.id);
     }
 
-    let alert_m: alerts::Model = alert_am.update(&txn).await?.try_into_model()?;
+    let mut write = alerts::Entity::update(alert_am);
+    if let Some(guard) = &guard {
+        if let Some(fence) = &guard.fence {
+            let expected = Some(fence.expected.as_slice());
+            let swap = super::kv_store::compare_and_set_in(
+                &txn,
+                org_id,
+                &fence.key,
+                expected,
+                &fence.written,
+            );
+            if !swap.await? {
+                return Ok(None);
+            }
+        }
+        write = write.filter(match guard.written_us {
+            Some(us) => alerts::Column::UpdatedAt.eq(us),
+            None => alerts::Column::UpdatedAt.is_null(),
+        });
+    }
+    let alert_m: alerts::Model = match write.exec(&txn).await {
+        Ok(model) => model,
+        Err(sea_orm::DbErr::RecordNotUpdated) if guard.is_some() => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
     let alert = alert_m.try_into()?;
     txn.commit().await?;
-    Ok(alert)
+    Ok(Some(alert))
 }
 
 /// Deletes an alert by its ID.
@@ -1372,6 +1424,8 @@ pub(super) mod tests {
     // ===================================================================
 
     mod slo_lookups {
+        use std::str::FromStr;
+
         use config::meta::{
             alerts::{
                 Operator,
@@ -1381,7 +1435,8 @@ pub(super) mod tests {
             slo::condition::{SloAlertKind, SloCondition},
         };
         use sea_orm::{
-            ActiveValue::Set, ConnectionTrait, Database, DatabaseConnection, EntityTrait, Schema,
+            ActiveValue::Set, ColumnTrait, ConnectionTrait, Database, DatabaseConnection,
+            EntityTrait, QueryFilter, Schema,
         };
         use svix_ksuid::{Ksuid, KsuidLike as _};
 
@@ -1391,9 +1446,10 @@ pub(super) mod tests {
         use super::make_model;
         use crate::table::{
             alerts::{
-                intermediate, list_models, list_names_by_oncall_team, list_slo_burn_window_pairs,
+                KvFence, WriteGuard, get_by_id, intermediate, last_written_us, list_models,
+                list_names_by_oncall_team, list_slo_burn_window_pairs, update, update_where,
             },
-            entity::{alerts, folders},
+            entity::{alerts, folders, kv_store},
             folders::folder_type_into_i16,
         };
 
@@ -1435,6 +1491,10 @@ pub(super) mod tests {
             let db = Database::connect("sqlite::memory:")
                 .await
                 .expect("in-memory sqlite");
+            with_tables(db).await
+        }
+
+        async fn with_tables(db: DatabaseConnection) -> DatabaseConnection {
             let backend = db.get_database_backend();
             let schema = Schema::new(backend);
             // Folders first: the entity FK is emitted and sqlx enables
@@ -1447,6 +1507,10 @@ pub(super) mod tests {
                 (
                     "alerts",
                     backend.build(&schema.create_table_from_entity(alerts::Entity)),
+                ),
+                (
+                    "kv_store",
+                    backend.build(&schema.create_table_from_entity(kv_store::Entity)),
                 ),
             ] {
                 db.execute(stmt)
@@ -2593,6 +2657,163 @@ pub(super) mod tests {
                     "{err}"
                 );
             }
+        }
+
+        #[tokio::test]
+        async fn a_guarded_update_refuses_once_another_save_moved_the_column() {
+            guarded_update_refuses_a_moved_column(&db_with_folder().await).await;
+        }
+
+        #[tokio::test]
+        async fn a_guarded_update_refuses_a_moved_column_on_postgres() {
+            let Ok(dsn) = std::env::var("ZO_META_POSTGRES_DSN") else {
+                eprintln!("skipped: needs a postgres at ZO_META_POSTGRES_DSN");
+                return;
+            };
+            // The SQLite lane sets the variable empty rather than unsetting it.
+            if dsn.trim().is_empty() {
+                eprintln!("skipped: needs a postgres at ZO_META_POSTGRES_DSN");
+                return;
+            }
+            let schema = format!("alg_test_{}", config::ider::generate().to_ascii_lowercase());
+            let admin = Database::connect(&dsn).await.unwrap();
+            admin
+                .execute_unprepared(&format!(r#"CREATE SCHEMA "{schema}""#))
+                .await
+                .unwrap();
+            let mut options = sea_orm::ConnectOptions::new(dsn.clone());
+            options
+                .max_connections(1)
+                .set_schema_search_path(schema.clone());
+            let db = with_tables(Database::connect(options).await.unwrap()).await;
+            seed_folder(&db, FOLDER_A_PK, ORG, "default").await;
+            guarded_update_refuses_a_moved_column(&db).await;
+            eprintln!("ran on postgres schema {schema}");
+            db.close().await.unwrap();
+            admin
+                .execute_unprepared(&format!(r#"DROP SCHEMA "{schema}" CASCADE"#))
+                .await
+                .unwrap();
+        }
+
+        async fn guarded_update_refuses_a_moved_column(db: &DatabaseConnection) {
+            let id = alert_id();
+            insert_alert(db, AlertSpec::plain(&id, "a1")).await;
+            let ksuid = Ksuid::from_str(&id).unwrap();
+            let read = last_written_us(db, ORG, &id).await.unwrap();
+            let (_, mut theirs) = get_by_id(db, ORG, ksuid).await.unwrap().unwrap();
+            let mut ours = theirs.clone();
+            theirs.pending_period_sec = 300;
+            update(db, ORG, None, theirs).await.unwrap();
+            ours.pending_period_sec = 120;
+            let refused = update_where(db, ORG, None, ours.clone(), Some(guard(read))).await;
+            assert!(refused.unwrap().is_none(), "the stale guard writes nothing");
+            let (_, kept) = get_by_id(db, ORG, ksuid).await.unwrap().unwrap();
+            assert_eq!(kept.pending_period_sec, 300);
+            let fresh = last_written_us(db, ORG, &id).await.unwrap();
+            let saved = update_where(db, ORG, None, ours, Some(guard(fresh))).await;
+            assert_eq!(saved.unwrap().unwrap().pending_period_sec, 120);
+        }
+
+        #[tokio::test]
+        async fn a_fenced_update_writes_the_alert_and_its_row_together_or_neither() {
+            fenced_update_writes_both_or_neither(&db_with_folder().await).await;
+        }
+
+        #[tokio::test]
+        async fn a_fenced_update_writes_both_or_neither_on_postgres() {
+            let Ok(dsn) = std::env::var("ZO_META_POSTGRES_DSN") else {
+                eprintln!("skipped: needs a postgres at ZO_META_POSTGRES_DSN");
+                return;
+            };
+            if dsn.trim().is_empty() {
+                eprintln!("skipped: needs a postgres at ZO_META_POSTGRES_DSN");
+                return;
+            }
+            let schema = format!("alf_test_{}", config::ider::generate().to_ascii_lowercase());
+            let admin = Database::connect(&dsn).await.unwrap();
+            admin
+                .execute_unprepared(&format!(r#"CREATE SCHEMA "{schema}""#))
+                .await
+                .unwrap();
+            let mut options = sea_orm::ConnectOptions::new(dsn.clone());
+            options
+                .max_connections(1)
+                .set_schema_search_path(schema.clone());
+            let db = with_tables(Database::connect(options).await.unwrap()).await;
+            seed_folder(&db, FOLDER_A_PK, ORG, "default").await;
+            fenced_update_writes_both_or_neither(&db).await;
+            eprintln!("ran fenced on postgres schema {schema}");
+            db.close().await.unwrap();
+            admin
+                .execute_unprepared(&format!(r#"DROP SCHEMA "{schema}" CASCADE"#))
+                .await
+                .unwrap();
+        }
+
+        fn guard(written_us: Option<i64>) -> WriteGuard {
+            WriteGuard {
+                written_us,
+                fence: None,
+            }
+        }
+
+        async fn kv_row(db: &DatabaseConnection, key: &str) -> Option<Vec<u8>> {
+            kv_store::Entity::find()
+                .filter(kv_store::Column::OrgId.eq(ORG))
+                .filter(kv_store::Column::Key.eq(key))
+                .one(db)
+                .await
+                .unwrap()
+                .map(|m| m.value)
+        }
+
+        async fn fenced_update_writes_both_or_neither(db: &DatabaseConnection) {
+            const KEY: &str = "_o2_ao/applied/a1/f1";
+            let id = alert_id();
+            insert_alert(db, AlertSpec::plain(&id, "a1")).await;
+            let ksuid = Ksuid::from_str(&id).unwrap();
+            let (_, mut ours) = get_by_id(db, ORG, ksuid).await.unwrap().unwrap();
+            ours.pending_period_sec = 120;
+            let set = crate::table::kv_store::compare_and_set_in(db, ORG, KEY, None, b"intent");
+            assert!(set.await.unwrap());
+            let fenced = |expected: &[u8], written_us| WriteGuard {
+                written_us,
+                fence: Some(KvFence {
+                    key: KEY.to_string(),
+                    expected: expected.to_vec(),
+                    written: b"written".to_vec(),
+                }),
+            };
+            let read = last_written_us(db, ORG, &id).await.unwrap();
+            let taken_back =
+                update_where(db, ORG, None, ours.clone(), Some(fenced(b"other", read)));
+            assert!(
+                taken_back.await.unwrap().is_none(),
+                "a moved fence writes nothing"
+            );
+            let (_, kept) = get_by_id(db, ORG, ksuid).await.unwrap().unwrap();
+            assert_eq!(kept.pending_period_sec, 0);
+            assert_eq!(kv_row(db, KEY).await.as_deref(), Some(&b"intent"[..]));
+            let stale = update_where(
+                db,
+                ORG,
+                None,
+                ours.clone(),
+                Some(fenced(b"intent", Some(-1))),
+            );
+            assert!(
+                stale.await.unwrap().is_none(),
+                "a moved column writes nothing"
+            );
+            assert_eq!(
+                kv_row(db, KEY).await.as_deref(),
+                Some(&b"intent"[..]),
+                "the row's swap rolls back with the refused alert write"
+            );
+            let saved = update_where(db, ORG, None, ours, Some(fenced(b"intent", read)));
+            assert_eq!(saved.await.unwrap().unwrap().pending_period_sec, 120);
+            assert_eq!(kv_row(db, KEY).await.as_deref(), Some(&b"written"[..]));
         }
 
         #[tokio::test]

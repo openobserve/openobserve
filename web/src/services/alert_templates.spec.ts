@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import template from "@/services/alert_templates";
+import { templateKeys } from "@/services/alert_templates.querykeys";
 import http from "@/services/http";
 import analytics from "@/services/product_analytics";
 
@@ -171,6 +172,34 @@ describe("alert_templates service", () => {
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/alerts/templates`,
       );
+    });
+  });
+
+  describe("list with usage", () => {
+    it("sends include_usage=true only when asked", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: [] });
+
+      await template.list({ org_identifier: "org1", include_usage: true });
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/org1/alerts/templates", {
+        params: { include_usage: "true" },
+      });
+
+      mockHttpInstance.get.mockClear();
+      await template.list({ org_identifier: "org1", include_usage: false });
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/org1/alerts/templates");
+    });
+
+    it("keeps the usage list apart from the plain list pickers read", async () => {
+      const { templatesQuery } = await import("./alert_templates.queries");
+      const plain = templatesQuery("org1");
+      const usage = templatesQuery("org1", true);
+      expect(usage.queryKey).not.toEqual(plain.queryKey);
+      // The plain key is unchanged, and the usage key sits under it, so a template write
+      // that invalidates the templates scope drops both.
+      expect(plain.queryKey).toEqual(templateKeys.all("org1"));
+      expect(usage.queryKey.slice(0, plain.queryKey.length)).toEqual(plain.queryKey);
+      expect(usage.staleTime).toBe(0);
+      expect(plain.staleTime).toBeGreaterThan(0);
     });
   });
 

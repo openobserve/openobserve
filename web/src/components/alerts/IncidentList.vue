@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Toolbar: status toggle (All / Active / Resolved) + search — same
              shape as the Alerts page tabs. -->
         <template #toolbar>
-          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+          <div class="contents">
             <OToggleGroup
               mobile-dropdown
               :model-value="statusFilter"
@@ -68,6 +68,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OToggleGroupItem value="active" size="sm" data-test="incident-status-filter-active">
                 <template #icon-left><OIcon name="radio-button-unchecked" size="sm" /></template>
                 {{ t("alerts.incidents.filterActive") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="open" size="sm" data-test="incident-status-filter-open">
+                <template #icon-left><OIcon name="error-outline" size="sm" /></template>
+                {{ t("alerts.incidents.statusOpen") }}
               </OToggleGroupItem>
               <OToggleGroupItem
                 value="resolved"
@@ -84,24 +88,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="min-w-0 flex-1 max-md:min-w-40"
+              class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
             />
-          </div>
-        </template>
-        <!-- Severity summary strip below the toolbar (mirrors the Alerts state
-             strip): Total + the four severities as selectable filter tiles. -->
-        <template #subheader>
-          <div data-test="incident-list-summary">
             <OStatStrip
               :items="severityStats"
               :loading="loading"
               selectable
-              :selected-key="severityFilter"
+              :row="false"
+              multiple
+              :selected-keys="severityFilters"
               default-key="total"
-              @select="onSeveritySelect"
+              class="max-md:order-last"
+              data-test="incident-list-summary"
+              @update:selected-keys="severityFilters = $event as SeverityKey[]"
             />
           </div>
         </template>
@@ -148,16 +150,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText class="min-w-0">
               {{ row.title || formatDimensions(row.group_values) }}
             </OTruncatedText>
-            <OTag
+            <IncidentMutedTag
               v-if="row.muted_by_downtime_id"
-              type="downtimeStatus"
-              value="active"
-              class="max-w-60 min-w-12 shrink-4"
-              data-test="incident-list-muted"
-            >
-              <span class="truncate">{{ mutedLabel(row.muted_by_downtime_id) }}</span>
-              <OTooltip :content="mutedTooltip(row.muted_by_downtime_id)" />
-            </OTag>
+              :label="mutedLabel(row.muted_by_downtime_id)"
+              :tooltip="mutedTooltip(row.muted_by_downtime_id)"
+              :to="mutedRoute(row.muted_by_downtime_id)"
+            />
           </div>
         </template>
         <template #cell-dimensions="{ row }">
@@ -165,34 +163,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="getSortedDimensions(row.group_values).length"
             class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
           >
-            <ODimensionChip
-              v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
-              :key="key"
-              :dim-key="key"
-              :value="value"
-              :tooltip="true"
-              class="min-w-0"
-            />
+            <template v-for="dim in displayDimensions(row.group_values).slice(0, 2)" :key="dim.key">
+              <span
+                v-if="dim.key === 'service'"
+                class="min-w-0"
+                data-test="incident-list-service-chip"
+                ><ServiceNameLabel
+                  layout="chip"
+                  :service-key="row.group_values?.[dim.key] ?? ''"
+                  :display-name="row.group_values_display?.service"
+              /></span>
+              <ODimensionChip
+                v-else
+                :dim-key="dim.key"
+                :key-label="dim.label"
+                :value="dim.value"
+                :tooltip="!dim.label"
+                class="min-w-0"
+              />
+            </template>
             <OTag
               v-if="getSortedDimensions(row.group_values).length > 2"
               type="countChip"
               value="neutral"
               class="shrink-0"
+              data-test="incident-dimensions-more"
             >
               {{
                 t("alerts.incidents.moreDimensions", {
                   count: getSortedDimensions(row.group_values).length - 2,
                 })
               }}
-              <OTooltip :delay="300" :max-width="'28rem'">
+              <OTooltip :max-width="'28rem'">
                 <template #content>
                   <div class="space-y-1">
-                    <div
-                      v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
-                      :key="key"
-                    >
-                      <span>{{ key }}</span
-                      >=<span>{{ value }}</span>
+                    <div v-for="dim in displayDimensions(row.group_values).slice(2)" :key="dim.key">
+                      <span>{{ dim.label ?? dim.key }}</span
+                      >=<span>{{ dim.value }}</span>
                     </div>
                   </div>
                 </template>
@@ -222,7 +229,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="shrink-0">&nbsp;×{{ group.count }}</span>
               </span>
               <OTooltip
-                :delay="300"
                 :content="
                   t(
                     'alerts.incidents.alertGroupTooltip',
@@ -240,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="incident-alert-group-more"
             >
               {{ t("alerts.incidents.moreAlertGroups", { count: row.alert_groups.length - 2 }) }}
-              <OTooltip :delay="300" :max-width="'28rem'">
+              <OTooltip :max-width="'28rem'">
                 <template #content>
                   <div
                     class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1"
@@ -271,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
-              size="icon-sm"
+              size="icon-xs-sq"
               :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
               class="max-md:hidden"
               @click.stop="acknowledgeIncident(row)"
@@ -282,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
-              size="icon-sm"
+              size="icon-xs-sq"
               class="max-md:hidden"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
@@ -292,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
-              size="icon-sm"
+              size="icon-xs-sq"
               class="max-md:hidden"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
@@ -397,9 +403,13 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import IncidentMutedTag from "@/components/alerts/downtimes/IncidentMutedTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
+import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import { matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -412,10 +422,15 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 /** Re-fetch period while a live RCA run is on the current page. */
 const RCA_LIVE_POLL_MS = 30_000;
+const SEVERITY_KEYS = ["P1", "P2", "P3", "P4"] as const;
+type SeverityKey = (typeof SEVERITY_KEYS)[number];
+const isSeverityKey = (key: string): key is SeverityKey =>
+  (SEVERITY_KEYS as readonly string[]).includes(key);
 
 export default defineComponent({
   name: "IncidentList",
   components: {
+    IncidentMutedTag,
     OPageLayout,
     OEmptyState,
     OButton,
@@ -427,6 +442,7 @@ export default defineComponent({
     OTable,
     OTag,
     ODimensionChip,
+    ServiceNameLabel,
     OTimeCell,
     OStatStrip,
     OToggleGroup,
@@ -484,7 +500,11 @@ export default defineComponent({
     // reactivity hot path — the difference is very visible at a few hundred rows.
     const allIncidents = shallowRef<Incident[]>([]);
     // The downtimes list is read only to name a muted row's downtime.
-    const { nameOf, notLoaded } = useDowntimeLookup(() =>
+    const {
+      nameOf,
+      notLoaded,
+      detailRoute: mutedRoute,
+    } = useDowntimeLookup(() =>
       allIncidents.value.some((incident) => !!incident.muted_by_downtime_id),
     );
     // A downtime past the lookup's one page says so, with its id kept for the tooltip.
@@ -497,19 +517,20 @@ export default defineComponent({
         ? t("alerts.downtimes.incident.notLoadedTooltip", { id })
         : t("alerts.downtimes.incident.mutedBy", { name: nameOf(id) });
     const searchQuery = ref("");
-    // Primary filter groups the lifecycle like other list pages: Active covers
-    // both open and acknowledged (still needs attention), Resolved is done.
-    const validStatuses = ["all", "active", "resolved"];
-    // Default to "active" so the page opens focused on incidents that need
-    // attention (a saved state or ?status= query still wins).
-    const statusFilter = ref(
-      validStatuses.includes(route.query.status as string)
-        ? (route.query.status as string)
-        : "active",
-    );
+    // Active covers open and acknowledged; Open is open only, matching the Overview count.
+    const validStatuses = ["all", "active", "open", "resolved"];
+    // Default to "active"; a valid ?status= query wins over the saved state.
+    const urlStatus = validStatuses.includes(route.query.status as string)
+      ? (route.query.status as string)
+      : null;
+    if (route.query.status !== undefined) {
+      const { status: _status, ...rest } = route.query;
+      router.replace({ query: rest });
+    }
+    const statusFilter = ref(urlStatus ?? "active");
     const isRestoringState = ref(false);
     const viewState = useListViewState("incidents", {
-      severityFilter: "all",
+      severityFilter: [] as SeverityKey[],
       pageSize: 20,
       sortBy: "",
       sortOrder: "asc" as "asc" | "desc",
@@ -523,11 +544,14 @@ export default defineComponent({
       currentPage.value = page;
       savePageState();
     };
-    // Severity facet — independent of status ("all" | "P1".."P4").
-    const severityFilter = ref(viewState.severityFilter);
-    watch([severityFilter, pageSize, sortBy, sortOrder], () => {
+    // Severity facet, independent of status; an empty list is every severity.
+    // A status link lands on every severity of that status, so the saved facet is dropped.
+    const severityFilters = ref<SeverityKey[]>(
+      urlStatus ? [] : readFilterKeys(viewState.severityFilter, isSeverityKey),
+    );
+    watch([severityFilters, pageSize, sortBy, sortOrder], () => {
       Object.assign(viewState, {
-        severityFilter: severityFilter.value,
+        severityFilter: severityFilters.value,
         pageSize: pageSize.value,
         sortBy: sortBy.value,
         sortOrder: sortOrder.value,
@@ -540,7 +564,7 @@ export default defineComponent({
       qTableRef.value?.restorePage?.(1);
       savePageState();
     };
-    watch([searchQuery, statusFilter, severityFilter, pageSize, sortBy, sortOrder], () => {
+    watch([searchQuery, statusFilter, severityFilters, pageSize, sortBy, sortOrder], () => {
       if (!isRestoringState.value) resetPage();
     });
 
@@ -587,7 +611,7 @@ export default defineComponent({
         accessorKey: "group_values",
         resizable: true,
         hideable: true,
-        size: 320,
+        size: 340,
         meta: { align: "left" },
       },
       {
@@ -658,6 +682,9 @@ export default defineComponent({
       if (statusFilter.value === "active") {
         return rows.filter((i) => i.status === "open" || i.status === "acknowledged");
       }
+      if (statusFilter.value === "open") {
+        return rows.filter((i) => i.status === "open");
+      }
       if (statusFilter.value === "resolved") {
         return rows.filter((i) => i.status === "resolved");
       }
@@ -665,9 +692,12 @@ export default defineComponent({
     });
     const visibleIncidents = computed(() => {
       const rows = statusScopedIncidents.value;
-      if (severityFilter.value === "all") return rows;
-      return rows.filter(
-        (incident) => String(incident.severity).toUpperCase() === severityFilter.value,
+      return rows.filter((incident) =>
+        matchesAnyKey(
+          severityFilters.value,
+          incident,
+          (row, key) => String(row.severity).toUpperCase() === key,
+        ),
       );
     });
 
@@ -717,8 +747,7 @@ export default defineComponent({
       return { p1, p2, p3, p4, total: rows.length };
     });
     // Severity summary strip — mirrors the Alerts state strip: Total + the four
-    // severities as selectable filter tiles. Keys map to severityFilter values
-    // ("all" | "P1" | "P2" | "P3" | "P4").
+    // severities as filter tiles, keyed by severity ("P1" .. "P4").
     const severityStats = computed<StatItem[]>(() => {
       const c = severityCounts.value;
       const hasData = c.total > 0;
@@ -763,7 +792,7 @@ export default defineComponent({
         },
         {
           key: "total",
-          label: t("alerts.summaryTotal"),
+          label: t("common.all"),
           value: v(c.total),
           icon: "format-list-bulleted",
           tone: "primary",
@@ -771,12 +800,6 @@ export default defineComponent({
         },
       ];
     });
-    // Total clears the severity filter (and is never highlighted, like Alerts);
-    // the severity tiles set the facet.
-    const onSeveritySelect = (key: string) => {
-      // Re-clicking the active severity clears back to "all" (toggle), like the Alerts strip.
-      severityFilter.value = key === "total" || severityFilter.value === key ? "all" : key;
-    };
 
     // Extreme-left rail coloured by severity (P1 red … P4 blue); resolved rows
     // stand out. The rail answers "does this need action, and how urgently?":
@@ -867,14 +890,14 @@ export default defineComponent({
     const filterByStatus = (value: string) => {
       statusFilter.value = value;
       // Switching the primary status resets the severity facet back to "all".
-      severityFilter.value = "all";
+      severityFilters.value = [];
       store.dispatch("incidents/setStatusFilter", value);
       savePageState();
     };
 
     const clearFilters = () => {
       searchQuery.value = "";
-      severityFilter.value = "all";
+      severityFilters.value = [];
       filterByStatus("active");
     };
 
@@ -1001,12 +1024,18 @@ export default defineComponent({
       if (!dimensions || typeof dimensions !== "object") return [];
       const cached = sortedDimCache.get(dimensions);
       if (cached) return cached;
-      const sorted = Object.keys(dimensions)
-        .sort()
-        .map((key) => [key, dimensions[key]] as [string, string]);
+      const sorted = chipDimensionKeys(dimensions).map(
+        (key) => [key, dimensions[key]] as [string, string],
+      );
       sortedDimCache.set(dimensions, sorted);
       return sorted;
     };
+
+    const displayDimensions = (dimensions: Record<string, string> | undefined) =>
+      getSortedDimensions(dimensions).map(([key, value]) => {
+        const shown = dimensionDisplay(t, dimensions, key, value);
+        return { key, label: shown.label ?? undefined, value: shown.value };
+      });
 
     const getDimensionColorClass = (key: string) => {
       const colorMap: Record<string, string> = {
@@ -1063,13 +1092,13 @@ export default defineComponent({
         if (cachedData && cachedData.length > 0) {
           allIncidents.value = cachedData;
         }
-        if (savedState.searchQuery !== undefined) {
+        if (savedState.searchQuery !== undefined && !urlStatus) {
           searchQuery.value = savedState.searchQuery;
         }
-        if (savedState.statusFilter !== undefined) {
+        if (savedState.statusFilter !== undefined && !urlStatus) {
           statusFilter.value = savedState.statusFilter;
         }
-        if (savedState.pagination?.page) {
+        if (savedState.pagination?.page && !urlStatus) {
           currentPage.value = savedState.pagination.page;
         }
         return true;
@@ -1137,6 +1166,7 @@ export default defineComponent({
 
     return {
       mutedLabel,
+      mutedRoute,
       mutedTooltip,
       raw,
       t,
@@ -1149,8 +1179,7 @@ export default defineComponent({
       rcaEnabled,
       now,
       severityStats,
-      severityFilter,
-      onSeveritySelect,
+      severityFilters,
       incidentRowStyle,
       searchQuery,
       statusFilter,
@@ -1173,6 +1202,7 @@ export default defineComponent({
       formatTimestamp,
       formatDimensions,
       getSortedDimensions,
+      displayDimensions,
       getDimensionColorClass,
       qTableRef,
       store,

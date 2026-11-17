@@ -2,7 +2,7 @@
 //
 // Client-side validation coverage for the migrated internal-user login form
 // (OForm + zod schema in web/src/components/login/Login.vue). Complements the
-// happy-path Login test in auth.spec.js.
+// happy-path UI login that utils/global-setup.js performs on every run.
 //
 // These run on a FRESH, UNAUTHENTICATED page, so they import the raw
 // @playwright/test `test` (a clean context) rather than enhanced-baseFixtures —

@@ -126,6 +126,7 @@ function handleUpdate(value: BrowserCheck) {
       <div class="h-full min-h-0 overflow-y-auto">
         <div class="w-full px-6 py-4">
           <div class="max-w-[53.75rem]">
+            <slot name="before-sections" />
             <CheckDetails
               :check="check"
               :folders="folders ?? []"
@@ -206,6 +207,7 @@ function handleUpdate(value: BrowserCheck) {
               data-test="synthetics-check-configure-capture"
               @update:check="handleUpdate"
             />
+            <slot name="after-sections" />
           </div>
         </div>
       </div>

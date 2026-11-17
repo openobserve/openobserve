@@ -125,10 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="@container/report-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
                 >
-                  <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
-                  <div
-                    class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:max-lg:min-w-80"
-                  >
+                  <!-- flex-1 is basis-0, so below lg the full-width basis is what wraps the input before its scope chips spill. -->
+                  <div class="min-w-0 flex-1 max-lg:basis-full max-md:order-last">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -280,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`report-list-${row.name}-pause-start-report`"
                   :data-row-action="row.enabled ? 'pause' : 'resume'"
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
                   class="max-md:hidden"
@@ -293,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="run-now"
                   icon-left="send"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   :loading="runningReportId === row.report_id"
                   :disabled="!!runningReportId"
                   :title="t('reports.history.runNow')"
@@ -307,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="edit"
                   icon-left="edit"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   :title="t('alerts.edit')"
                   class="max-md:hidden"
                   @click.stop="editReport(row)"
@@ -318,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`report-list-${row.name}-move-report`"
                   icon-left="drive-file-move"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   :title="t('reports.moveToFolder')"
                   class="max-md:hidden"
                   @click.stop="openMoveDialog(row)"
@@ -330,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="delete"
                   icon-left="delete"
                   variant="ghost-destructive"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   :title="t('alerts.delete')"
                   class="max-md:hidden"
                   @click.stop="confirmDeleteReport(row)"

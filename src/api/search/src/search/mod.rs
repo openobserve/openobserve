@@ -286,6 +286,11 @@ pub async fn search(
             .and_then(|event_type| get_search_event_context_from_request(event_type, &url_query));
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    if let Some(res) = digest_query_refusal(&req.query.sql, stream_type, &trace_id) {
+        return res;
+    }
+
     #[cfg(feature = "enterprise")]
     if let Some(res) = check_sql_stream_permissions(
         &req.query.sql,
@@ -296,6 +301,15 @@ pub async fn search(
         &trace_id,
     )
     .await
+        && !security_scope_admits(
+            &req.query.sql,
+            &org_id,
+            user_id,
+            stream_type,
+            StreamPermissionResourceType::Search,
+            &url_query,
+        )
+        .await
     {
         return res;
     }
@@ -1270,7 +1284,6 @@ fn values_field_where(sql_where: &str, column: &str, keyword: &str) -> String {
 }
 
 /// Every stream `sql` reads, typed by its schema prefix as the search engine resolves it.
-#[cfg(any(feature = "enterprise", test))]
 fn resolve_typed_stream_names(
     sql: &str,
     stream_type: StreamType,
@@ -1319,6 +1332,9 @@ pub(crate) async fn check_sql_stream_permissions(
         Ok(streams) => streams,
         Err(e) => return Some(map_error_to_http_response(&e, Some(trace_id.to_string()))),
     };
+    if let Some(res) = calibration_refusal(&streams, trace_id) {
+        return Some(res);
+    }
     for (stream, stream_type) in streams {
         if let Some(res) = check_stream_permissions(
             &stream,
@@ -1333,6 +1349,68 @@ pub(crate) async fn check_sql_stream_permissions(
         }
     }
     None
+}
+
+/// Answered before any permission, so no handler streams, queues or swallows the refusal.
+fn calibration_refusal(streams: &[(String, StreamType)], trace_id: &str) -> Option<Response> {
+    let names = streams.iter().map(|(stream, _)| stream.as_str());
+    match search::sql::protected_stream_refusal(names, None) {
+        // The chat stream keeps answering "not found" from the search itself.
+        Some(code @ infra::errors::ErrorCodes::SearchStreamProtected(_)) => {
+            Some(map_error_to_http_response(
+                &infra::errors::Error::ErrorCode(code),
+                Some(trace_id.to_string()),
+            ))
+        }
+        _ => None,
+    }
+}
+
+/// The digest refusal on its own, for builds and handlers without the stream-permission check.
+fn digest_query_refusal(sql: &str, stream_type: StreamType, trace_id: &str) -> Option<Response> {
+    // SQL that does not parse is answered by the handler's own resolution or by the search.
+    let streams = resolve_typed_stream_names(sql, stream_type).ok()?;
+    calibration_refusal(&streams, trace_id)
+}
+
+/// A Security page's search (`security_scope=true`) may also read the org's Security sources.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn security_scope_admits(
+    sql: &str,
+    org_id: &str,
+    user_id: &str,
+    stream_type: StreamType,
+    permission_resource_type: StreamPermissionResourceType,
+    query: &HashMap<String, String>,
+) -> bool {
+    if !crate::common::utils::http::get_security_scope_from_request(query)
+        || !openobserve_core::security::security_licensed()
+    {
+        return false;
+    }
+    let Ok(streams) = resolve_typed_stream_names(sql, stream_type) else {
+        return false;
+    };
+    for (stream, stream_type) in streams {
+        if stream_type == StreamType::Logs
+            && openobserve_core::security::security_source_readable(org_id, user_id, &stream).await
+        {
+            continue;
+        }
+        if check_stream_permissions(
+            &stream,
+            org_id,
+            user_id,
+            &stream_type,
+            permission_resource_type,
+        )
+        .await
+        .is_some()
+        {
+            return false;
+        }
+    }
+    true
 }
 
 /// SearchStreamPartition
@@ -1428,6 +1506,11 @@ pub async fn search_partition(
 
     if let Err(e) = req.decode() {
         return MetaHttpResponse::bad_request(e);
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    if let Some(res) = digest_query_refusal(&req.sql, stream_type, &trace_id) {
+        return res;
     }
 
     #[cfg(feature = "enterprise")]
@@ -1795,6 +1878,11 @@ pub async fn result_schema(
         }
     };
 
+    #[cfg(not(feature = "enterprise"))]
+    if let Some(res) = digest_query_refusal(&req.query.sql, stream_type, "") {
+        return res;
+    }
+
     #[cfg(feature = "enterprise")]
     if let Some(res) = check_sql_stream_permissions(
         &req.query.sql,
@@ -1835,7 +1923,10 @@ pub async fn result_schema(
         return res;
     }
 
-    let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
+    let query: proto::cluster_rpc::SearchQuery = match req.query.clone().try_into() {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
     let sql = match search::sql::Sql::new(&query, &org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
@@ -1969,6 +2060,107 @@ mod tests {
 
     use super::*;
 
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_digest_query_is_refused_before_any_stream_permission() {
+        let res = check_sql_stream_permissions(
+            r#"SELECT * FROM "0ops" WHERE x IN (SELECT alert_id FROM "_o2_alert_calibration_digests")"#,
+            "ops",
+            "u-stream@example.com",
+            StreamType::Logs,
+            StreamPermissionResourceType::Search,
+            "t",
+        )
+        .await
+        .expect("refused");
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+        let code = res.headers().get(crate::common::meta::http::ERROR_HEADER);
+        assert_eq!(code.unwrap().to_str().unwrap(), "20014");
+        for sql in [
+            r#"SELECT * FROM "_o2_ai_chat_events""#,
+            r#"SELECT * FROM "default""#,
+        ] {
+            let streams = resolve_typed_stream_names(sql, StreamType::Logs).unwrap();
+            assert!(calibration_refusal(&streams, "t").is_none(), "{sql}");
+        }
+    }
+
+    #[test]
+    fn the_digest_refusal_runs_in_every_build_and_only_for_the_digest() {
+        let res = digest_query_refusal(
+            r#"WITH d AS (SELECT * FROM "_o2_alert_calibration_digests") SELECT * FROM d"#,
+            StreamType::Logs,
+            "t",
+        )
+        .expect("refused");
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+        let code = res.headers().get(crate::common::meta::http::ERROR_HEADER);
+        assert_eq!(code.unwrap().to_str().unwrap(), "20014");
+        for sql in [
+            r#"SELECT * FROM "_o2_ai_chat_events""#,
+            r#"SELECT * FROM "default""#,
+            "not sql",
+        ] {
+            assert!(
+                digest_query_refusal(sql, StreamType::Logs, "t").is_none(),
+                "{sql}"
+            );
+        }
+    }
+
+    #[test]
+    fn oss_search_handlers_refuse_the_digest_before_they_run() {
+        let handlers = [
+            ("mod.rs", include_str!("mod.rs"), "pub async fn search("),
+            (
+                "mod.rs",
+                include_str!("mod.rs"),
+                "pub async fn search_partition(",
+            ),
+            (
+                "mod.rs",
+                include_str!("mod.rs"),
+                "pub async fn result_schema(",
+            ),
+            (
+                "search_stream.rs",
+                include_str!("search_stream.rs"),
+                "pub async fn search_http2_stream(",
+            ),
+            (
+                "search_stream.rs",
+                include_str!("search_stream.rs"),
+                "pub async fn values_http2_stream(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn search_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn _search_partition_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn search_multi_stream(",
+            ),
+        ];
+        for (file, text, signature) in handlers {
+            let start = text
+                .find(signature)
+                .unwrap_or_else(|| panic!("{file}: {signature} not found"));
+            let body = &text[start..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            assert!(
+                body.contains("digest_query_refusal("),
+                "{file}: {signature} must refuse the digest in builds without enterprise"
+            );
+        }
+    }
+
     #[test]
     fn test_resolve_typed_stream_names_honours_the_schema_prefix() {
         assert_eq!(
@@ -2049,6 +2241,20 @@ mod tests {
                 "{file}: {signature} must authorize each stream under the type its SQL names"
             );
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_security_scope_checks_other_streams_with_the_callers_resource_type() {
+        let stream = include_str!("search_stream.rs");
+        let call = &stream[stream
+            .find("security_scope_admits(")
+            .expect("search_stream admits Security sources")..];
+        let call = &call[..call.find(".await").expect("call end")];
+        assert!(
+            call.contains("permission_resource_type"),
+            "an Insights search must not fall back to the Search permission"
+        );
     }
 
     fn schema() -> Schema {

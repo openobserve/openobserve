@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center justify-end">
           <OButton
             variant="ghost-destructive"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="delete-outline"
             :aria-label="t('oncall.coverRemove')"
             :data-test="`oncall-cover-remove-${row.id}`"

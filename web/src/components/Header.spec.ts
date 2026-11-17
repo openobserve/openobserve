@@ -555,6 +555,27 @@ describe("Header Component", () => {
       aiWrapper.unmount();
     });
 
+    it("explains the edition lock on the AI button with a tooltip", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: { state: { zoConfig: { ai_enabled: true } } },
+        configOverrides: { isEnterprise: "false" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
+      const tooltip = aiButton.findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      expect(String(tooltip.props("content"))).toBe(
+        "AI Assistant is available in OpenObserve Enterprise",
+      );
+      expect(aiButton.attributes("aria-label")).toBe(
+        "AI Assistant is available in OpenObserve Enterprise",
+      );
+      aiWrapper.unmount();
+    });
+
     it("keeps the AI logo with a lock badge and under a locked license", async () => {
       const aiWrapper = createWrapper({
         mountType: "mount",

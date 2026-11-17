@@ -50,10 +50,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import { coverageWord } from "../live/liveCopy";
 
-const props = defineProps<{ watching: number; learning: number; unseen: number }>();
+const props = defineProps<{
+  watching: number;
+  partial?: number;
+  learning: number;
+  gaps: number;
+}>();
 
-const emit = defineEmits<{ select: [filter: "watching" | "learning" | "attention"] }>();
+const emit = defineEmits<{ select: [filter: "watching" | "partial" | "learning" | "attention"] }>();
 
 const { t } = useI18nTyped();
 
@@ -61,25 +67,32 @@ const { t } = useI18nTyped();
 const shown = computed(() =>
   [
     {
-      key: "watching",
+      key: "watched",
       count: props.watching,
-      color: "bg-status-positive",
+      color: "bg-badge-success-soft-text",
       filter: "watching" as const,
-      label: t("autoobserve2.coverageDrawer.legend.watching"),
+      label: coverageWord(t, "watched"),
+    },
+    {
+      key: "partial",
+      count: props.partial ?? 0,
+      color: "bg-ingest-accent-amber/50",
+      filter: "partial" as const,
+      label: coverageWord(t, "partial"),
     },
     {
       key: "learning",
       count: props.learning,
-      color: "bg-status-info-text",
+      color: "bg-status-neutral-text/60",
       filter: "learning" as const,
       label: t("autoobserve2.coverageDrawer.legend.learning"),
     },
     {
-      key: "unseen",
-      count: props.unseen,
-      color: "bg-status-warning-text",
+      key: "gap",
+      count: props.gaps,
+      color: "bg-ingest-accent-amber",
       filter: "attention" as const,
-      label: t("autoobserve2.coverageDrawer.legend.unseen"),
+      label: coverageWord(t, "gap"),
     },
   ].filter((seg) => seg.count > 0),
 );

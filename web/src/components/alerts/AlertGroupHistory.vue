@@ -120,7 +120,7 @@
           v-if="!loading"
           size="hero"
           :title="t('alerts.groups.noHistoryTitle')"
-          :description="t('alerts.groups.noHistoryDescription')"
+          :description="emptyDescription"
           data-test="alerts-alertgrouphistory-empty"
         />
       </template>
@@ -142,6 +142,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { AlertGroup, AlertGroupTransition } from "@/ts/interfaces/alert";
+import { levelChangesEmptyText } from "@/utils/alerts/levelChanges";
 
 type TransitionRow = AlertGroupTransition & { rowKey: string };
 
@@ -162,8 +163,12 @@ const emit = defineEmits<{
   "clear-filter": [];
 }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 const store = useStore();
+
+const emptyDescription = computed(() =>
+  levelChangesEmptyText(t, locale.value, store.state.zoConfig?.alert_transitions_retention_days),
+);
 
 // The transitions table has no surrogate key, and (group_key, at) can repeat
 // within the same microsecond in principle, so the index disambiguates.

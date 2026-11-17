@@ -100,11 +100,16 @@ async fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
 
 // update node memory usage metrics every second
 async fn update_node_memory_usage() -> Result<(), anyhow::Error> {
+    // Only these roles reject requests on the breaker, so only they report its state.
+    let enforces_memory_breaker = LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier();
     loop {
         let mem_usage = config::utils::sysinfo::get_memory_usage();
         config::metrics::NODE_MEMORY_USAGE
             .with_label_values::<&str>(&[])
             .set(mem_usage as i64);
+        if enforces_memory_breaker {
+            ingester::update_memory_circuit_breaker(mem_usage);
+        }
         tokio::time::sleep(time::Duration::from_secs(1)).await;
     }
 }

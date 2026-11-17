@@ -22,13 +22,27 @@ export type MeasureText = (text: string, font: number) => number;
 
 export const LINE_HEIGHT = 1.15;
 const MIN_FONT = 9;
-const FONT_STEP = 1.5;
+// Whole sizes, so one map never mixes 12 with an off-scale 10.5.
+const FONT_STEP = 1;
 const ELLIPSIS = "…";
+// A 1-2 character line reads as a typo ("svc-" over "e", demo bug 7), so every wrapped line keeps 3.
+const MIN_PART = 3;
 
-// Hyphen- or underscore-separated parts, each keeping its trailing separator.
-const segments = (name: string) => name.match(/[^-_]+[-_]*|[-_]+/g) ?? [name];
+// Coverage labels join a name and its place ("svc-a · ns-b"); a line never ends on the joiner.
+const PLACE = " · ";
 
-// Every way to group the parts into at most `max` consecutive lines.
+const places = (name: string) =>
+  name.split(PLACE).map((part, i, all) => (i < all.length - 1 ? `${part}${PLACE}` : part));
+
+// Hyphen- or underscore-separated parts of the name, each keeping its separator; a place is never split.
+const segments = (name: string) =>
+  places(name).flatMap((part, i) => (i ? [part] : (part.match(/[^-_]+[-_]*|[-_]+/g) ?? [part])));
+
+const visible = (line: string) => line.replace(/[-_\s·]/g, "").length;
+
+const unjoin = (line: string) => (line.endsWith(PLACE) ? line.slice(0, -PLACE.length) : line);
+
+// Every way to group the parts into at most `max` consecutive lines, none of them a stub.
 const groupings = (parts: string[], max: number): string[][] => {
   const out: string[][] = [];
   const cuts = parts.length - 1;
@@ -38,20 +52,29 @@ const groupings = (parts: string[], max: number): string[][] => {
       if (mask & (1 << (i - 1))) lines.push(parts[i]);
       else lines[lines.length - 1] += parts[i];
     }
-    if (lines.length <= max) out.push(lines);
+    if (lines.length > max) continue;
+    if (lines.length === 1 || lines.every((l) => visible(l) >= MIN_PART))
+      out.push(lines.map(unjoin));
   }
   return out;
 };
 
 // Fewest lines that fit, most balanced among those; otherwise the narrowest grouping.
 const best = (name: string, font: number, max: number, room: number, measure: MeasureText) => {
-  const all = groupings(segments(name), max).map((lines) => ({
-    lines,
-    wide: Math.max(...lines.map((l) => measure(l, font))),
-  }));
+  const scored = (parts: string[]) =>
+    groupings(parts, max).map((lines) => ({
+      lines,
+      wide: Math.max(...lines.map((l) => measure(l, font))),
+    }));
+  const pick = (fits: { lines: string[]; wide: number }[]) =>
+    fits.sort((a, b) => a.lines.length - b.lines.length || a.wide - b.wide)[0];
+  // Name and place stay whole whenever they fit, as m1 draws them.
+  const whole = scored(places(name)).filter((g) => g.wide <= room);
+  if (whole.length) return pick(whole);
+  const all = scored(segments(name));
   const fits = all.filter((g) => g.wide <= room);
   if (!fits.length) return all.sort((a, b) => a.wide - b.wide)[0];
-  return fits.sort((a, b) => a.lines.length - b.lines.length || a.wide - b.wide)[0];
+  return pick(fits);
 };
 
 const shorten = (text: string, font: number, room: number, measure: MeasureText) => {
@@ -63,6 +86,22 @@ const shorten = (text: string, font: number, room: number, measure: MeasureText)
   return "";
 };
 
+// The name at exactly this size: wrapped at its own separators, then cut with an ellipsis.
+const fitAt = (
+  name: string,
+  room: number,
+  height: number,
+  size: number,
+  measure: MeasureText,
+): HexLabel | null => {
+  const max = Math.floor(height / (size * LINE_HEIGHT));
+  if (max < 1) return null;
+  const fit = best(name, size, max, room, measure);
+  if (fit.wide <= room) return { lines: fit.lines, font: size };
+  const lines = fit.lines.map((l) => shorten(l, size, room, measure)).filter(Boolean);
+  return lines.length ? { lines, font: size } : null;
+};
+
 // Wraps only at the name's own separators; one font step down, then an ellipsis.
 export const fitLabel = (
   name: string,
@@ -71,18 +110,30 @@ export const fitLabel = (
   font: number,
   measure: MeasureText,
 ): HexLabel | null => {
-  for (const size of [font, Math.max(MIN_FONT, font - FONT_STEP)]) {
+  const base = Math.max(MIN_FONT, Math.floor(font));
+  const smaller = Math.max(MIN_FONT, base - FONT_STEP);
+  for (const size of [base, smaller]) {
     const max = Math.floor(height / (size * LINE_HEIGHT));
     if (max < 1) return null;
     const fit = best(name, size, max, room, measure);
     if (fit.wide <= room) return { lines: fit.lines, font: size };
   }
-  const size = Math.max(MIN_FONT, font - FONT_STEP);
-  const max = Math.max(1, Math.floor(height / (size * LINE_HEIGHT)));
-  const lines = best(name, size, max, room, measure)
-    .lines.map((l) => shorten(l, size, room, measure))
-    .filter(Boolean);
-  return lines.length ? { lines, font: size } : null;
+  return fitAt(name, room, Math.max(height, smaller * LINE_HEIGHT), smaller, measure);
+};
+
+/** Every hex's label at one size: the smallest any of them needs, so a map never mixes two. */
+export const fitLabels = (
+  names: string[],
+  room: number,
+  height: number,
+  font: number,
+  measure: MeasureText,
+): (HexLabel | null)[] => {
+  const natural = names.map((name) => fitLabel(name, room, height, font, measure));
+  const sizes = natural.flatMap((label) => (label ? [label.font] : []));
+  const size = Math.min(...sizes);
+  if (!sizes.length || sizes.every((s) => s === size)) return natural;
+  return names.map((name) => fitAt(name, room, height, size, measure));
 };
 
 // Smallest hex worth labelling: about six average characters at the minimum font.

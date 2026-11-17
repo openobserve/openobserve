@@ -17,69 +17,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="mx-auto flex w-full max-w-[52rem] flex-col gap-6 px-4 pt-6 pb-16 @min-[60rem]:px-6"
+    :aria-busy="live.pending.value"
     data-test="autoobserve2-activity-page"
   >
-    <header
-      class="border-border-subtle rounded-surface from-ai-accent/15 via-surface-base to-ingest-accent-teal/15 dark:from-ai-accent/25 dark:via-surface-base dark:to-ingest-accent-teal/20 flex flex-col gap-5 border bg-linear-to-br px-4 pt-3 pb-5 shadow-xs sm:px-6 sm:pb-6"
+    <div
+      v-if="live.skeleton.value"
+      class="flex flex-col gap-3"
+      aria-hidden="true"
+      data-test="autoobserve2-activity-skeleton"
     >
-      <OButton
-        variant="ghost"
-        size="xs"
-        icon-left="arrow-back"
-        class="-ms-2 self-start"
-        data-test="autoobserve2-activity-back"
-        @click="emit('back')"
+      <OSkeleton animation="none" class="rounded-surface h-24 w-full" />
+      <OSkeleton v-for="n in 3" :key="n" animation="none" class="rounded-surface h-28 w-full" />
+    </div>
+    <LiveNoticeState
+      v-else-if="live.notice.value"
+      :notice="live.notice.value"
+      size="block"
+      :busy="live.busy.value"
+      data-test="autoobserve2-activity-error"
+      retry-test="autoobserve2-activity-retry"
+      @retry="live.retry()"
+    />
+    <template v-else-if="!live.pending.value && changes.length">
+      <header
+        class="bg-surface-base border-border-subtle rounded-surface flex flex-col gap-5 border px-4 py-5 shadow-xs sm:px-6"
       >
-        {{ t("autoobserve2.coveragePage.back") }}
-      </OButton>
-      <div class="flex flex-col gap-1.5">
-        <h1
-          class="text-text-heading text-2xl leading-tight font-semibold tracking-tight sm:text-3xl"
-          data-test="autoobserve2-activity-title"
-        >
-          {{ t("autoobserve2.activityPage.title") }}
-        </h1>
-        <p class="text-text-body flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          {{ t("autoobserve2.activityPage.stats.window") }}
-        </p>
-      </div>
-      <dl
-        v-if="changes.length"
-        class="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4"
-        data-test="autoobserve2-activity-stats"
-      >
-        <div
-          v-for="stat in statFigures"
-          :key="stat.id"
-          class="flex flex-col-reverse gap-1"
-          :data-test="`autoobserve2-activity-stat-${stat.id}`"
-        >
-          <dt class="text-text-body flex items-center gap-1.5 text-xs font-medium">
-            <OIcon :name="stat.icon" size="xs" aria-hidden="true" />
-            {{ stat.label }}
-          </dt>
-          <dd
-            class="text-3xl leading-none font-semibold tracking-tight tabular-nums"
-            :class="
-              stat.id === 'worked' && stat.value
-                ? 'from-badge-success-soft-text to-badge-teal-soft-text bg-linear-to-br bg-clip-text text-transparent'
-                : 'text-text-heading'
-            "
+        <dl class="grid grid-cols-3 gap-x-4 gap-y-4" data-test="autoobserve2-activity-stats">
+          <div
+            v-for="stat in statFigures"
+            :key="stat.id"
+            class="flex flex-col-reverse gap-1"
+            :data-test="`autoobserve2-activity-stat-${stat.id}`"
           >
-            {{ stat.value }}
-          </dd>
-        </div>
-      </dl>
-    </header>
+            <dt class="text-text-body flex items-center gap-1.5 text-xs font-medium">
+              <OIcon :name="stat.icon" size="xs" aria-hidden="true" />
+              {{ stat.label }}
+            </dt>
+            <dd
+              class="text-text-heading text-3xl leading-none font-semibold tracking-tight tabular-nums"
+            >
+              {{ stat.value }}
+            </dd>
+          </div>
+        </dl>
+      </header>
 
-    <p
-      v-if="!changes.length"
-      class="text-text-secondary bg-surface-base border-border-subtle rounded-surface border px-5 py-6 text-sm shadow-xs"
-      data-test="autoobserve2-activity-empty"
-    >
-      {{ t("autoobserve2.activityPage.empty.scenario") }}
-    </p>
-    <template v-else>
       <OToggleGroup
         :model-value="filter"
         mobile-dropdown
@@ -93,149 +75,134 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :value="f"
           size="sm"
           class="rounded-full! px-3!"
+          :disabled="f !== 'all' && !counts[f]"
           :data-test="`autoobserve2-activity-filter-${f}`"
         >
-          <span
-            v-if="FILTER_DOT[f]"
-            class="size-1.5 shrink-0 rounded-full"
-            :class="FILTER_DOT[f]"
-            aria-hidden="true"
-          />
           {{ t(FILTER_LABEL[f]) }}
           <span class="font-semibold tabular-nums">{{ counts[f] }}</span>
         </OToggleGroupItem>
       </OToggleGroup>
 
-      <div v-if="dayGroups.length" class="relative flex flex-col gap-8">
+      <div v-if="groups.length" class="relative flex flex-col gap-8">
         <span
           class="from-ai-accent/60 via-border-default to-border-subtle/0 absolute start-4.5 top-4 bottom-0 w-px bg-linear-to-b sm:start-5"
           aria-hidden="true"
         />
         <section
-          v-for="group in dayGroups"
+          v-for="group in groups"
           :key="group.day"
           class="relative flex flex-col gap-3"
           :data-test="`autoobserve2-activity-day-${group.day}`"
         >
           <h2
-            class="bg-surface-base border-border-subtle text-text-secondary sticky top-2 z-20 self-start rounded-full border px-3 py-1 text-xs font-semibold tracking-wider uppercase shadow-xs"
+            class="bg-surface-base border-border-subtle text-text-secondary sticky top-2 z-20 self-start rounded-full border px-3 py-1 text-xs font-semibold shadow-xs"
           >
-            {{ t(DAY_LABEL[group.day]) }}
+            {{ dayLabel(t, live.zone.value, group.changes[0].at, live.now.value) }}
           </h2>
           <ul class="flex flex-col gap-3">
-            <li v-for="change in group.changes" :key="change.entry.id">
+            <li v-for="change in group.changes" :key="change.id">
               <ChangeRow
-                v-bind="rowProps(change)"
-                :when="change.time ? raw(change.time) : undefined"
-                @update:open="(v) => setOpen(change.entry.id, v)"
-                @undo="undo(change)"
+                :change="change"
+                :open="!!opened[change.id]"
+                :flash="flashId === change.id"
+                :actors="live.actorsOf(change)"
+                :alert-href="live.alertHref(change)"
+                :undoing="live.isUndoing(change)"
+                @update:open="(v) => (opened[change.id] = v)"
+                @undo="void live.undo(change)"
               />
             </li>
           </ul>
         </section>
+        <OButton
+          v-if="capped.more"
+          variant="ghost-primary"
+          size="sm"
+          icon-right="expand-more"
+          class="ms-10 self-start sm:ms-12"
+          data-test="autoobserve2-activity-more"
+          @click="showAll = true"
+        >
+          {{ t("autoobserve.activityLive.showMore", { count: capped.more }, capped.more) }}
+        </OButton>
       </div>
-
       <p
-        v-if="!dayGroups.length"
+        v-else
         class="text-text-secondary py-6 text-center text-sm"
         data-test="autoobserve2-activity-filter-empty"
       >
         {{ t("autoobserve2.activityPage.empty.filter") }}
       </p>
     </template>
+    <div
+      v-else-if="!live.pending.value"
+      class="bg-surface-base border-border-subtle rounded-surface border py-6 shadow-xs"
+      data-test="autoobserve2-activity-empty"
+    >
+      <LiveSurfaceEmpty surface="changes" @action="emit('see-suggestions')" />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OButton from "@/lib/core/Button/OButton.vue";
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import { daysBefore, type DayKey } from "../data/facts";
-import type { LedgerEntry } from "../fixtures";
+import LiveNoticeState from "../live/LiveNoticeState.vue";
+import LiveSurfaceEmpty from "../live/LiveSurfaceEmpty.vue";
 import ChangeRow from "./ChangeRow.vue";
-import { useDecisions } from "./useDecisions";
-import { DAY_LABEL, type Scenario } from "./fixtures";
 import {
   CHANGE_FILTERS,
-  FILTER_DOT,
   FILTER_LABEL,
-  TRUST_WINDOW_DAYS,
-  byNewest,
-  filterOf,
-  toChanges,
-  trustCounts,
-  type Change,
+  capList,
+  changeCounts,
+  dayGroups,
+  dayLabel,
+  matches,
   type ChangeFilter,
 } from "./changes";
+import { useLiveChanges } from "./useLiveChanges";
 
-const props = defineProps<{ ledger: LedgerEntry[]; scenario: Scenario; highlightId?: string }>();
-
-const emit = defineEmits<{
-  back: [];
-  "update-entry": [id: string, patch: Partial<LedgerEntry>];
-}>();
+const props = defineProps<{ highlightId?: string }>();
+const emit = defineEmits<{ "see-suggestions": [] }>();
 
 const { t } = useI18nTyped();
-const store = useDecisions();
+const live = useLiveChanges();
 
 const filter = ref<ChangeFilter>("all");
 const opened = reactive<Record<string, boolean>>({});
 const flashId = ref<string | null>(null);
 
-// The list covers the header's window; a change opened by link stays visible even when older.
-const changes = computed(() =>
-  toChanges(props.ledger, store.phases)
-    .filter((c) => daysBefore(c.day) < TRUST_WINDOW_DAYS || c.entry.id === props.highlightId)
-    .sort(byNewest),
-);
-const matches = (change: Change, f: ChangeFilter) => f === "all" || filterOf(change.kind) === f;
-
-const dayGroups = computed(() => {
-  const groups: { day: DayKey; changes: Change[] }[] = [];
-  changes.value
-    .filter((c) => matches(c, filter.value))
-    .forEach((c) => {
-      const last = groups[groups.length - 1];
-      if (last?.day === c.day) last.changes.push(c);
-      else groups.push({ day: c.day, changes: [c] });
-    });
-  return groups;
-});
-
-const counts = computed(() =>
-  Object.fromEntries(
-    CHANGE_FILTERS.map((f) => [f, changes.value.filter((c) => matches(c, f)).length]),
+const changes = computed(() => live.changes.value);
+const counts = computed(() => changeCounts(changes.value));
+const showAll = ref(false);
+const capped = computed(() =>
+  capList(
+    changes.value.filter((c) => matches(c, filter.value)),
+    showAll.value,
   ),
 );
-
-// Applying is a fix seconds from being judged, so it counts with the changes still in review.
-const stats = computed(() => trustCounts(changes.value));
+const groups = computed(() => dayGroups(capped.value.shown, "all"));
 
 const statFigures = computed(() => {
-  const n = stats.value;
+  const n = counts.value;
   const figures: { id: string; icon: IconName; value: number; label: I18nText }[] = [
     {
       id: "made",
       icon: "history",
-      value: n.made,
-      label: t("autoobserve2.activityPage.stats.made", { count: n.made }, n.made),
+      value: n.all,
+      label: t("autoobserve2.activityPage.stats.made", { count: n.all }, n.all),
     },
     {
-      id: "worked",
+      id: "inForce",
       icon: "check-circle",
-      value: n.worked,
-      label: t("autoobserve2.activityPage.stats.worked"),
-    },
-    {
-      id: "review",
-      icon: "schedule",
-      value: n.review + n.applying,
-      label: t("autoobserve2.activityPage.stats.review"),
+      value: n.inForce,
+      label: t("autoobserve.activityLive.stats.inForce"),
     },
     {
       id: "undone",
@@ -247,46 +214,31 @@ const statFigures = computed(() => {
   return figures;
 });
 
-const rowProps = (change: Change) => ({
-  change,
-  open: !!opened[change.entry.id],
-  flash: flashId.value === change.entry.id,
-});
-
-const setOpen = (id: string, open: boolean) => {
-  opened[id] = open;
-};
-
-const undo = (change: Change) => {
-  const decided = !!change.entry.decided;
-  emit(
-    "update-entry",
-    change.entry.id,
-    decided
-      ? { status: "awaiting" }
-      : { status: "rolled_back", note: t("autoobserve.activity.undoneNote") },
-  );
-  toast({
-    variant: "success",
-    message: decided
-      ? t("autoobserve2.activityPage.toast.undoDecided")
-      : t("autoobserve2.activityPage.toast.undone"),
-  });
-};
-
 let flashTimer: ReturnType<typeof setTimeout> | undefined;
 
-onMounted(async () => {
+// A change opened by link is expanded and scrolled to once the list has loaded.
+const highlight = async () => {
   const id = props.highlightId;
-  if (!id || !changes.value.some((c) => c.entry.id === id)) return;
+  if (!id || !changes.value.some((c) => c.id === id)) return;
   opened[id] = true;
+  if (!capped.value.shown.some((c) => c.id === id)) showAll.value = true;
   await nextTick();
   document
     .querySelector(`[data-test="autoobserve2-change-${id}"]`)
     ?.scrollIntoView({ block: "center", behavior: "smooth" });
   flashId.value = id;
   flashTimer = setTimeout(() => (flashId.value = null), 2500);
-});
+};
+
+const stopHighlight = watch(
+  () => live.pending.value,
+  (pending) => {
+    if (pending) return;
+    void highlight();
+    queueMicrotask(() => stopHighlight());
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
   clearTimeout(flashTimer);

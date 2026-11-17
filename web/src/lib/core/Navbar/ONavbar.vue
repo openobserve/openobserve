@@ -41,9 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       supported here but not currently emitted by groupNavLinks.
          `pinBottom` groups float to the foot of the rail via the flex spacer. -->
     <div class="relative flex min-h-0 flex-1 flex-col gap-y-1">
-      <!-- Single sliding-selection pill: tracks the active rail tile and slides to
-           it on navigation. Active MenuLinks defer their fill to this (see
-           RailIndicatorActiveKey). Snaps (no slide) on mount/reflow/reveal. -->
+      <!-- Active MenuLinks defer their fill to this pill (see RailIndicatorActiveKey). -->
       <div ref="indicatorRef" aria-hidden="true" :class="indicatorClass" :style="indicatorStyle" />
       <div
         v-if="loading"
@@ -179,11 +177,8 @@ const bottomEntries = computed(
     >[],
 );
 
-// ── Sliding-selection pill ──────────────────────────────────────────────────
-// One indicator tracks the active rail tile (.nav-menu-item--active) and slides
-// to it when the route changes. Same approach as OToggleGroup: animate only real
-// selection changes; snap on mount, reflow and reveal; skip measuring while the
-// rail is hidden so a bogus 0-position is never stored.
+// Animate only real selection changes (snap on mount, reflow and reveal); skip
+// measuring while the rail is hidden so a bogus 0-position is never stored.
 const router: any = useRouter();
 
 const navRef = ref<HTMLElement | null>(null);
@@ -191,9 +186,13 @@ const indicatorRef = ref<HTMLElement | null>(null);
 const indicatorStyle = ref<Record<string, string>>({});
 const indicatorVisible = ref(false);
 const hasValidPosition = ref(false);
-const transitionOn = ref(false);
 
 let resizeObserver: ResizeObserver | null = null;
+
+const fadeIndicatorIn = (indicator: HTMLElement) => {
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  indicator.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" });
+};
 
 const measure = (animated: boolean) => {
   const indicator = indicatorRef.value;
@@ -215,13 +214,17 @@ const measure = (animated: boolean) => {
     return;
   }
 
-  transitionOn.value = animated && hasValidPosition.value;
+  const transform = `translate(${activeRect.left - listRect.left}px, ${activeRect.top - listRect.top}px)`;
+  // Pages mirroring state into the query re-measure the same tile, which must not flicker.
+  if (animated && hasValidPosition.value && indicatorStyle.value.transform !== transform) {
+    fadeIndicatorIn(indicator);
+  }
   hasValidPosition.value = true;
   indicatorVisible.value = true;
   indicatorStyle.value = {
     width: `${activeRect.width}px`,
     height: `${activeRect.height}px`,
-    transform: `translate(${activeRect.left - listRect.left}px, ${activeRect.top - listRect.top}px)`,
+    transform,
   };
 };
 
@@ -304,7 +307,7 @@ function onRailFocusin(event: FocusEvent) {
   applyReveal(tile);
 }
 
-// Slide to the newly-active tile when the route changes …
+// Fade in on the newly-active tile when the route changes …
 watch(
   () => router.currentRoute.value.fullPath,
   async () => {
@@ -335,7 +338,7 @@ onMounted(async () => {
     updateOverflow();
     revealActiveTile();
   });
-  // … but snap (not slide) when tile sizes/visibility change — reflow, the rail
+  // … but snap (no fade) when tile sizes/visibility change — reflow, the rail
   // being revealed, labels rewrapping — none of which are user selections.
   const list = indicatorRef.value?.parentElement;
   if (list && typeof ResizeObserver !== "undefined") {
@@ -360,14 +363,12 @@ onBeforeUnmount(() => {
 // tinted selected pill + lighter accent in dark, where a white pill would vanish
 // on the near-black rail.
 const indicatorClass = computed(() => [
-  "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border-s-2",
-  "bg-surface-base border-accent dark:bg-tabs-active-bg dark:border-accent",
-  transitionOn.value &&
-    "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
+  "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border border-accent",
+  "bg-surface-base shadow-xs dark:bg-surface-accent-active dark:shadow-none",
   indicatorVisible.value ? "opacity-100" : "opacity-0",
 ]);
 
-// Tiles read this to know whether to defer their fill to the sliding pill.
+// Tiles read this to know whether to defer their fill to the selection pill.
 provide(
   RailIndicatorActiveKey,
   computed(() => indicatorVisible.value),

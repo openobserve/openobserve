@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "alert_composites")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]

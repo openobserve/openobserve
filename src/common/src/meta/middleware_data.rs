@@ -41,7 +41,10 @@ pub struct GeoInfoData<'a> {
 static UA_PARSER: Lazy<Arc<UserAgentParser>> = Lazy::new(|| Arc::new(initialize_ua_parser()));
 
 pub fn initialize_ua_parser() -> UserAgentParser {
+    // Unicode classes multiply each regex's lazy-DFA cache (kept per thread, never shrunk).
+    // Input is HeaderValue::to_str output, which is ASCII only, so matching is unchanged.
     UserAgentParser::builder()
+        .with_unicode_support(false)
         .build_from_bytes(USER_AGENT_REGEX_FILE)
         .expect("User Agent Parser creation failed")
 }
@@ -494,5 +497,67 @@ mod tests {
         let big = "x".repeat(1_000_000);
         let body = format!(r#"[{{"o2tags":"a:b"}},{{"m":"{big}"}}]"#);
         assert_eq!(body_tags(&body).as_deref(), Some("a:b"));
+    }
+
+    const UA_SAMPLES: &[&str] = &[
+        "",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.2210.91",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 OPR/105.0.0.0",
+        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBDV/iPhone14,2;FBMD/iPhone;FBSN/iOS;FBSV/17.1;FBSS/3;FBID/phone;FBLC/en_US;FBOP/5]",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.20(0x18001442) NetType/WIFI Language/zh_CN",
+        "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/23.0 Chrome/115.0.0.0 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/UD1A.230803.041; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/119.0.6045.163 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; U; Android 4.2.2; en-us; ALCATEL ONE TOUCH 6040D Build/JDQ39) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+        "Mozilla/5.0 (Linux; Android 4.4.2; OnePAD 1100X Build/KOT49H) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 7_0 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11A465 Safari/9537.53 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+        "MyApp/1.2.3 CFNetwork/1410.0.3 Darwin/22.6.0",
+        "curl/8.4.0",
+        "okhttp/4.9.0",
+    ];
+
+    #[test]
+    fn test_ua_parser_without_unicode_matches_unicode_parser() {
+        let unicode = UserAgentParser::builder()
+            .with_unicode_support(true)
+            .build_from_bytes(USER_AGENT_REGEX_FILE)
+            .unwrap();
+        let parser = initialize_ua_parser();
+        for ua in UA_SAMPLES {
+            for input in [ua.to_string(), ua.to_lowercase(), ua.to_uppercase()] {
+                assert_eq!(parser.parse(&input), unicode.parse(&input), "{input}");
+            }
+        }
+        let non_ascii = axum::http::HeaderValue::from_bytes("小米手机/1.0".as_bytes()).unwrap();
+        assert!(non_ascii.to_str().is_err());
+    }
+
+    #[test]
+    fn test_ua_parser_known_results() {
+        let parser = initialize_ua_parser();
+        let chrome = parser.parse(UA_SAMPLES[1]);
+        assert_eq!(chrome.user_agent.family, "Chrome");
+        assert_eq!(chrome.user_agent.major.as_deref(), Some("120"));
+        assert_eq!(chrome.os.family, "Windows");
+        let iphone = parser.parse(UA_SAMPLES[6]);
+        assert_eq!(iphone.user_agent.family, "Mobile Safari");
+        assert_eq!(iphone.os.family, "iOS");
+        assert_eq!(iphone.os.major.as_deref(), Some("17"));
+        assert_eq!(iphone.device.brand.as_deref(), Some("Apple"));
+        let samsung = parser.parse(UA_SAMPLES[10]);
+        assert_eq!(samsung.user_agent.family, "Samsung Internet");
+        assert_eq!(samsung.device.brand.as_deref(), Some("Samsung"));
+        assert_eq!(samsung.device.model.as_deref(), Some("SM-S918B"));
+        let lowercase_alcatel = UA_SAMPLES[12].to_lowercase();
+        let alcatel = parser.parse(&lowercase_alcatel);
+        assert_eq!(alcatel.device.brand.as_deref(), Some("Alcatel"));
+        let bot = parser.parse(UA_SAMPLES[14]);
+        assert_eq!(bot.user_agent.family, "Googlebot");
+        assert_eq!(bot.device.family, "Spider");
     }
 }

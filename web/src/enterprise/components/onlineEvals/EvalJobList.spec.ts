@@ -55,3 +55,56 @@ describe("EvalJobList columns", () => {
     expect(name.minSize).toBe(160);
   });
 });
+
+describe("EvalJobList budget banner", () => {
+  it("offers Keep paused next to Resume, and Keep paused pauses the job", async () => {
+    const row = {
+      id: "job-1",
+      name: "qa",
+      status: "paused",
+      budget: { dailyUsd: 5, onReach: "pause", pausedAt: Date.now() * 1000, pausedSpendUsd: 6 },
+    };
+    const wrapper = mount(EvalJobList, {
+      props: { rows: [row], search: "", pendingStatusId: null },
+      global: {
+        stubs: {
+          OTable: { template: "<div><slot name='subheader' /></div>" },
+          EvalListShell: { template: "<div><slot name='table' /></div>" },
+        },
+      },
+    });
+    expect(wrapper.find('[data-test="eval-job-budget-resume-qa"]').exists()).toBe(true);
+    await wrapper.find('[data-test="eval-job-budget-keep-paused-qa"]').trigger("click");
+    expect(wrapper.emitted("pause")).toEqual([[row]]);
+    expect(wrapper.emitted("activate")).toBeUndefined();
+  });
+});
+
+describe("EvalJobList status chips", () => {
+  it("ORs two picked status chips", async () => {
+    const rows = [
+      { id: "a", name: "a", status: "active" },
+      { id: "p", name: "p", status: "paused" },
+      { id: "d", name: "d", status: "draft" },
+    ];
+    const wrapper = mount(EvalJobList, {
+      props: { rows, search: "" },
+      global: {
+        stubs: {
+          OTable: {
+            props: ["data"],
+            template:
+              "<div><slot name='toolbar' /><i data-test='ids'>{{ (data || []).map((r) => r.id).join(',') }}</i></div>",
+          },
+          EvalListShell: { template: "<div><slot name='table' /></div>" },
+        },
+      },
+    });
+    const ids = () => wrapper.get('[data-test="ids"]').text();
+    await wrapper.get('[data-test="eval-job-summary-active"]').trigger("click");
+    await wrapper.get('[data-test="eval-job-summary-draft"]').trigger("click");
+    expect(ids()).toBe("a,d");
+    await wrapper.get('[data-test="eval-job-summary-all"]').trigger("click");
+    expect(ids()).toBe("a,p,d");
+  });
+});

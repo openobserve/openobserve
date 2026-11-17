@@ -26,6 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <LLMPanelCard :title="displayTitle" :subtitle="displaySubtitle || undefined">
+    <template v-if="panel.alert" #actions>
+      <CreateAlertAction
+        variant="icon"
+        source="ai"
+        :build="buildAlert"
+        :data-test="`llm-panel-create-alert-${panel.id}`"
+      />
+    </template>
     <!-- h-55 matches LLMTrendPanel's chart height (13.75rem) so the converted
          panel lines up with the legacy ones in the same grid row. The renderer
          needs an explicit full size to fill the box — without it the echarts
@@ -41,6 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :folderId="folderId"
         searchType="dashboards"
         :allowAnnotationsAPI="false"
+        :allowDrilldown="false"
+        :class="panel.drill ? 'cursor-pointer' : ''"
+        @chart-click="onChartClick"
         :width="6"
         :height="6"
       />
@@ -49,12 +60,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import LLMPanelCard from "./LLMPanelCard.vue";
 import { type LLMPanelDef, renderPanelSql } from "./config/llmInsightsPanels";
 import { buildLLMPanelSchema } from "./llmPanelSchema";
+import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import { buildAiPrefill } from "@/utils/alerts/prefill/fromAi";
+import type { LLMPanelDrill } from "./llmInsightsDrill";
+import { streamHasParentSpan } from "./llmStreamColumns";
 
 interface Props {
   panel: LLMPanelDef;
@@ -72,9 +89,48 @@ interface Props {
   // reuses that same mechanism. See LLMInsightsDashboard for how they're built.
   dashboardId?: string;
   folderId?: string;
+  /** The agent in scope, for "Create alert" (none = every agent on the stream). */
+  alertAgent?: string | null;
 }
 
 const props = defineProps<Props>();
+const emit = defineEmits<{ (e: "drill", drill: LLMPanelDrill): void }>();
+
+const buildAlert = () =>
+  buildAiPrefill({ kind: props.panel.alert!, stream: props.streamName, agent: props.alertAgent });
+const store = useStore();
+
+// Usage trends fall back to top-level agents, so they wait to learn whether the stream stores span parents.
+const needsParents = computed(() => props.panel.query.sql.includes("{{agentParents}}"));
+const hasParentSpan = ref<boolean | null>(null);
+watch(
+  () => [props.streamName, needsParents.value] as const,
+  async ([stream, needs]) => {
+    hasParentSpan.value = null;
+    if (!needs || !stream) return;
+    const resolved = await streamHasParentSpan(store.state.selectedOrganization.identifier, stream);
+    if (props.streamName === stream) hasParentSpan.value = resolved;
+  },
+  { immediate: true },
+);
+
+// Chart times are shifted into the viewer's timezone.
+function onChartClick(params: any) {
+  if (!props.panel.drill || !params) return;
+  if (props.panel.type === "horizontal-bar") {
+    emit("drill", { panel: props.panel, series: String(params.name ?? ""), atMicros: null });
+    return;
+  }
+  const x = Array.isArray(params.value) ? params.value[0] : params.name;
+  const ms = typeof x === "number" ? x : Date.parse(String(x));
+  emit("drill", {
+    panel: props.panel,
+    series: params.seriesName ?? null,
+    atMicros: Number.isFinite(ms)
+      ? getUTCTimestampFromZonedTimestamp(ms, store.state.timezone || "UTC")
+      : null,
+  });
+}
 
 const { t } = useI18nTyped();
 
@@ -90,7 +146,7 @@ const displaySubtitle = computed(() => (props.panel.subtitleKey ? t(props.panel.
 // (Decision D8). No `pickInterval` needed.
 const sql = computed(() => {
   const autoBucketSql = props.panel.query.sql.replace(
-    /histogram\((_timestamp),\s*'\{\{interval\}\}'\)/g,
+    /histogram\((_timestamp|first_ts),\s*'\{\{interval\}\}'\)/g,
     "histogram($1)",
   );
   let rendered = renderPanelSql(autoBucketSql, {
@@ -99,6 +155,8 @@ const sql = computed(() => {
     endTime: props.endTime,
     interval: "",
     agentFilter: props.agentFilter,
+    unattributedLabel: t("llmAttribution.unattributed"),
+    hasParentSpan: !!hasParentSpan.value,
   });
 
   // Bar panels declare a top-N cap (the legacy renderer sliced client-side).
@@ -111,7 +169,7 @@ const sql = computed(() => {
 });
 
 const chartData = computed(() =>
-  props.streamName
+  props.streamName && (!needsParents.value || hasParentSpan.value !== null)
     ? buildLLMPanelSchema({
         panel: props.panel,
         sql: sql.value,

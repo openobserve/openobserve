@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    :title="t('invitation.pendingInvitations')"
+    :title="t('iam.invitations')"
     :subtitle="t('iam.invitationList.subtitle')"
     icon="mail"
     bleed
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar-trailing>
             <OButton
               variant="outline"
-              size="icon-sm"
+              size="icon-toolbar"
               icon-left="refresh"
               :loading="loading"
               data-test="invitation-list-refresh-btn"

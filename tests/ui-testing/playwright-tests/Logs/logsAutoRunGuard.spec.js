@@ -23,9 +23,10 @@ const {
   estimateMb,
   readConfig,
 } = require('../utils/auto-run-helpers.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
-const ORG = `autorunguard${Date.now()}`;
-const STREAM = 'guarded_24h';
+const ORG = getOrgIdentifier() || 'default';
+const STREAM = `e2e_guarded_24h_${Math.random().toString(36).slice(2, 7)}`;
 const HOUR_US = 60 * MINUTE_US;
 
 const guard = '[data-test="logs-auto-run-guard"]';

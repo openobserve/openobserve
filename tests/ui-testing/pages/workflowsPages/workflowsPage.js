@@ -92,7 +92,8 @@ class WorkflowsPage {
     this.branchUnwiredBadge = '[data-test="workflow-node-branch-unwired-badge"]';
     // Hover-only "+" on the canvas: one per OPEN (still unwired) source handle, in
     // declared arm order, so nth(i) addresses arm i of what remains unwired.
-    this.flowAppendAdd = '[data-test="workflow-flow-append-add"]';
+    // The wrapper is pointer-events-none (the canvas pane takes clicks on it); only its inner button is clickable.
+    this.flowAppendAdd = '[data-test="workflow-flow-append-add"] > button';
     // Edge labels name the arm each connector leaves by — the only on-canvas evidence of
     // which path a destination is actually wired to. They are HTML in vue-flow's label
     // LAYER, not SVG <text>, and the layer also holds the (empty) hover-"+" wrappers, so

@@ -38,14 +38,14 @@
       <!-- Headline: the finding, stated plainly -->
       <div class="flex items-start gap-2" data-test="agent-signal-detail-headline">
         <OIcon :name="signalIcon" size="sm" class="mt-0.5 shrink-0" :class="signalIconColor" />
-        <div class="flex flex-col gap-1">
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
           <div class="flex flex-wrap items-center gap-2">
             <p class="text-compact text-text-heading m-0 leading-normal">
               {{ headline }}
             </p>
             <OAgentBadges
-              :env="agentEnv"
-              :version="agentVersion"
+              :env="agentEnv === UNSET ? t('traces.agentNoEnv') : agentEnv"
+              :version="agentVersion === UNSET ? t('traces.agentNoVersion') : agentVersion"
               data-test="agent-signal-detail-badges"
             />
           </div>
@@ -53,6 +53,20 @@
             {{ explanation }}
           </p>
         </div>
+        <!-- Waits for the evidence so the question to O2 AI carries it. -->
+        <OButton
+          v-if="explainable"
+          variant="outline"
+          size="sm"
+          icon-left="auto-awesome"
+          class="shrink-0"
+          :disabled="loading"
+          :title="t('aiObservability.behavior.detail.explainHelp')"
+          data-test="agent-signal-detail-explain"
+          @click="explain"
+        >
+          {{ t("aiObservability.behavior.detail.explain") }}
+        </OButton>
       </div>
 
       <!-- FAILURE: the real error messages (the "read it, know the fix" section) -->
@@ -72,6 +86,8 @@
           :columns="errorColumns"
           :loading="loading"
           :loading-reset-key="row"
+          :error="queryError"
+          @retry="fetchDetails"
           :empty-message="t('aiObservability.behavior.detail.noErrors')"
           :default-columns="false"
           :frame="false"
@@ -123,6 +139,8 @@
           :columns="traceColumns"
           :loading="loading"
           :loading-reset-key="row"
+          :error="queryError"
+          @retry="fetchDetails"
           :empty-message="t('aiObservability.behavior.detail.noTraces')"
           :default-columns="false"
           :frame="false"
@@ -181,11 +199,20 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import searchService from "@/services/search";
-import { escapeSingleQuotes } from "@/utils/queryUtils";
-import { buildAgentClimbFilter } from "./agentClimbFilter";
+import { errorMessage } from "@/services/alert_calibration";
+import useStreams from "@/composables/useStreams";
+import {
+  buildAgentClimbFilter,
+  errorDetailExpr,
+  failureErrorsSql,
+  failureTracesSql,
+  loopTracesSql,
+} from "./agentClimbFilter";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import { explainSignalPrompt } from "./agentSignalPrompt";
+import { UNSET } from "@/enterprise/composables/useAgentScope";
 
 interface SignalRow {
   signalType: "loop" | "failure" | "cost";
@@ -210,14 +237,21 @@ const props = defineProps<{
   sourceStream?: string;
   startTime?: number;
   endTime?: number;
+  /** The variant the drill-down narrows to: null = any, UNSET = not set. */
   agentEnv?: string | null;
   agentVersion?: string | null;
+  /** Offer "Explain with O2 AI"; only where the host page forwards `sendToAiChat`. */
+  explainable?: boolean;
 }>();
 
-const emit = defineEmits<{ (e: "update:open", v: boolean): void }>();
+const emit = defineEmits<{
+  (e: "update:open", v: boolean): void;
+  (e: "sendToAiChat", value: unknown, append?: boolean): void;
+}>();
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { getStream } = useStreams(t);
 const router = useRouter();
 const tracesLock = useLicenseLock("traces");
 
@@ -231,6 +265,8 @@ const errorRows = ref<
 >([]);
 const traceRows = ref<Array<Record<string, any>>>([]);
 const loading = ref(false);
+// A failed drill-down query, shown in place of the "nothing found" empty state.
+const queryError = ref<string | null>(null);
 // Which error rows are expanded to their full raw text (keyed by the raw
 // message — the OTable cell slot doesn't expose a row index).
 const expandedErrors = ref<Set<string>>(new Set());
@@ -463,26 +499,27 @@ const runQuery = async (sql: string): Promise<any[]> => {
   const now = Date.now() * 1000;
   const start = props.startTime ?? now - 24 * 60 * 60 * 1_000_000;
   const end = props.endTime ?? now;
-  try {
-    const res = await searchService.search({
-      org_identifier: orgId.value,
-      query: {
-        query: { sql, start_time: start, end_time: end, from: 0, size: 50 },
-      },
-      page_type: "traces",
-    });
-    return res.data?.hits ?? [];
-  } catch {
-    return [];
-  }
+  const res = await searchService.search({
+    org_identifier: orgId.value,
+    query: {
+      query: { sql, start_time: start, end_time: end, from: 0, size: 50 },
+    },
+    page_type: "traces",
+  });
+  return res.data?.hits ?? [];
 };
 
+// Only the latest call's answer lands, so the drawer always describes the row it shows.
+let seq = 0;
 const fetchDetails = async () => {
+  const mine = ++seq;
   const r = props.row;
   expandedErrors.value = new Set();
+  queryError.value = null;
   if (!r || !props.sourceStream || !orgId.value) {
     errorRows.value = [];
     traceRows.value = [];
+    loading.value = false;
     return;
   }
   loading.value = true;
@@ -495,40 +532,37 @@ const fetchDetails = async () => {
   // the "(unknown agent)" display string, which is not a real column value and
   // would filter everything out. Null → no agent filter (show all of the class).
   const af = agentClimbFilter(r.agentRaw ?? undefined);
-  // The error detail can live in status_message OR error_message depending on
-  // the framework — COALESCE so the message shows wherever it was populated
-  // (mirrors the rollup's configurable error-detail-field coalescing).
-  const detail = "COALESCE(NULLIF(c.status_message, ''), NULLIF(c.error_message, ''))";
   try {
+    let errors: typeof errorRows.value = [];
+    let traces: typeof traceRows.value;
     if (r.signalType === "failure") {
-      // The real, grouped error messages behind this class — the actionable content.
-      errorRows.value = (
-        await runQuery(
-          `SELECT ${detail} AS message, COUNT(*) AS occurrences, approx_distinct(c.trace_id) AS traces FROM "${s}" AS c ${joins} WHERE c.span_status = 'ERROR' AND ${af} AND ${detail} IS NOT NULL GROUP BY ${detail} ORDER BY occurrences DESC LIMIT 20`,
-        )
-      ).map((h: any) => ({
-        // `message` is the condensed one-line gist (scannable); `full` is the
-        // raw text, revealed on demand via the expand toggle.
-        message: raw(condenseError(h.message)),
-        full: h.message,
-        occurrences: h.occurrences,
-        traces: h.traces,
+      // The error text column differs per framework; COALESCE the ones this stream has.
+      const schema = await getStream(s, "traces", true);
+      const detail = errorDetailExpr(
+        new Set((schema?.schema ?? []).map((f: { name: string }) => f.name)),
+      );
+      // Not narrowed to this class: the class taxonomy lives server-side (failureErrorsSql).
+      errors = detail
+        ? (await runQuery(failureErrorsSql(s, joins, af, detail))).map((h: any) => ({
+            message: raw(condenseError(h.message)),
+            full: h.message,
+            occurrences: h.occurrences,
+            traces: h.traces,
+          }))
+        : [];
+      traces = (await runQuery(failureTracesSql(s, joins, af))).map((h: any) => ({
+        trace_id: h.trace_id,
+        spans: h.spans,
       }));
-      traceRows.value = (
-        await runQuery(
-          `SELECT c.trace_id AS trace_id, COUNT(*) AS spans FROM "${s}" AS c ${joins} WHERE c.span_status = 'ERROR' AND ${af} GROUP BY c.trace_id ORDER BY spans DESC LIMIT 50`,
-        )
-      ).map((h: any) => ({ trace_id: h.trace_id, spans: h.spans }));
     } else if (r.signalType === "loop") {
       // Worst traces first — ranked by how many times the tool repeated.
-      traceRows.value = (
-        await runQuery(
-          `SELECT c.trace_id AS trace_id, COUNT(*) AS repeats FROM "${s}" AS c ${joins} WHERE c.gen_ai_tool_name = '${escapeSingleQuotes(r.tool ?? "")}' AND c.gen_ai_operation_name = 'execute_tool' AND ${af} GROUP BY c.trace_id ORDER BY repeats DESC LIMIT 50`,
-        )
-      ).map((h: any) => ({ trace_id: h.trace_id, repeats: h.repeats }));
+      traces = (await runQuery(loopTracesSql(s, joins, af, r.tool ?? ""))).map((h: any) => ({
+        trace_id: h.trace_id,
+        repeats: h.repeats,
+      }));
     } else {
       // Cost outliers — the traces driving this agent's spend.
-      traceRows.value = (
+      traces = (
         await runQuery(
           `SELECT c.trace_id AS trace_id, ROUND(SUM(c.gen_ai_usage_cost), 4) AS cost, SUM(c.gen_ai_usage_total_tokens) AS tokens FROM "${s}" AS c ${joins} WHERE ${af} AND c.gen_ai_usage_cost IS NOT NULL GROUP BY c.trace_id ORDER BY cost DESC LIMIT 50`,
         )
@@ -538,10 +572,43 @@ const fetchDetails = async () => {
         tokens: h.tokens,
       }));
     }
+    if (mine !== seq) return;
+    errorRows.value = errors;
+    traceRows.value = traces;
+  } catch (e) {
+    if (mine !== seq) return;
+    errorRows.value = [];
+    traceRows.value = [];
+    queryError.value = errorMessage(e) || String(e);
   } finally {
-    loading.value = false;
+    if (mine === seq) loading.value = false;
   }
 };
+
+function explain() {
+  const r = props.row;
+  if (!r) return;
+  const prompt = explainSignalPrompt(r, {
+    stream: props.sourceStream ?? "",
+    env: props.agentEnv,
+    version: props.agentVersion,
+    startTime: props.startTime,
+    endTime: props.endTime,
+    errors: errorRows.value.map((e) => ({ message: e.full, occurrences: e.occurrences })),
+    traces: traceRows.value.map((row) => ({
+      trace_id: row.trace_id,
+      measure:
+        r.signalType === "loop"
+          ? `${row.repeats} repeats`
+          : r.signalType === "cost"
+            ? `$${row.cost}`
+            : `${row.spans} error spans`,
+    })),
+  });
+  // The drawer closes so the chat panel opening beneath it is visible.
+  emit("sendToAiChat", { query: raw(prompt), autoSend: true }, false);
+  emit("update:open", false);
+}
 
 // Open the trace in a NEW tab so the drawer + Agent Behavior page stay put —
 // the user is triaging a list and shouldn't lose their place. Same

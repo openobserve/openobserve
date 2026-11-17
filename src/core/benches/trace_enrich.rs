@@ -22,10 +22,12 @@ use std::{
     time::{Duration, Instant},
 };
 
+use common::meta::traces::Span;
+use config::utils::flatten;
 use criterion::{BatchSize, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use openobserve_core::{
     db_monitoring::EnrichOptions,
-    traces::{enrich_json_record, enrich_otlp_span},
+    traces::{enrich_json_record, enrich_otlp_span, service_identity::ServiceIdentityCollector},
 };
 use serde_json::{Map, Value, json};
 
@@ -37,11 +39,21 @@ const DB_CORPUS: [&str; 3] = [
 const SPANS_PER_BATCH: usize = 1000;
 // more hot statements than a small per-thread cache holds, but within the shared LRU
 const DISTINCT_STATEMENTS: usize = 1000;
+// Acceptance gate: 10k spans in 50 resources, stamped within 2% of unstamped.
+const STAMP_RESOURCES: usize = 50;
+const STAMP_SPANS: usize = 10_000;
 
 struct OtlpSpan {
     kind: i32,
     span: HashMap<String, Value>,
     resource: HashMap<String, Value>,
+}
+
+/// One ResourceSpans of the stamping corpus: its service, attributes and spans.
+struct StampResource {
+    service: String,
+    attrs: HashMap<String, Value>,
+    spans: Vec<(i32, HashMap<String, Value>)>,
 }
 
 fn resource_attrs() -> HashMap<String, Value> {
@@ -192,7 +204,7 @@ fn run_otlp(spans: &mut [OtlpSpan], opts: &EnrichOptions) -> usize {
 fn run_json(records: &mut [Map<String, Value>], opts: &EnrichOptions) -> usize {
     let mut stamped = 0;
     for r in records.iter_mut() {
-        stamped += usize::from(enrich_json_record(r, true, opts));
+        stamped += usize::from(enrich_json_record(r, true, opts, false));
     }
     stamped
 }
@@ -230,6 +242,8 @@ fn bench_trace_enrich(c: &mut Criterion) {
         });
     }
 
+    bench_service_stamp(&mut group, &opts);
+
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
     let otlp = otlp_batch(&db_heavy);
     let pool = Pool::new(threads, opts.clone());
@@ -242,6 +256,114 @@ fn bench_trace_enrich(c: &mut Criterion) {
         })
     });
     group.finish();
+}
+
+/// The per-span OTLP work of `handle_otlp_request`, with or without the service identity stamp.
+fn bench_service_stamp(
+    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    opts: &EnrichOptions,
+) {
+    let corpus = stamp_corpus();
+    group.throughput(Throughput::Elements(STAMP_SPANS as u64));
+    for (name, stamp) in [("stamp_off_10k_50res", false), ("stamp_on_10k_50res", true)] {
+        black_box(run_stamp(&corpus, stamp, opts));
+        group.bench_function(name, |b| {
+            b.iter(|| black_box(run_stamp(&corpus, stamp, opts)))
+        });
+    }
+}
+
+fn stamp_corpus() -> Vec<StampResource> {
+    let spans = batch(10);
+    (0..STAMP_RESOURCES)
+        .map(|r| {
+            let service = format!("svc-{}", r % 10);
+            let mut attrs = resource_attrs();
+            attrs.insert("service.name".to_string(), json!(service));
+            attrs.insert(
+                "service_service.version".to_string(),
+                json!(format!("1.{r}.0")),
+            );
+            attrs.insert(
+                "service_k8s.cluster.name".to_string(),
+                json!(format!("prod-{}", r % 3)),
+            );
+            attrs.insert(
+                "service_k8s.deployment.name".to_string(),
+                json!(format!("{service}-api")),
+            );
+            if r % 2 == 0 {
+                attrs.remove("service_deployment.environment.name");
+            }
+            let per_resource = STAMP_SPANS / STAMP_RESOURCES;
+            let spans = (0..per_resource)
+                .map(|i| {
+                    let (kind, span) = &spans[(r * per_resource + i) % spans.len()];
+                    (
+                        *kind,
+                        span.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                    )
+                })
+                .collect();
+            StampResource {
+                service,
+                attrs,
+                spans,
+            }
+        })
+        .collect()
+}
+
+fn run_stamp(corpus: &[StampResource], stamp: bool, opts: &EnrichOptions) -> usize {
+    let mut identity = ServiceIdentityCollector::new(Arc::default());
+    let mut columns = 0;
+    for (r, resource) in corpus.iter().enumerate() {
+        if stamp {
+            identity.enter_resource(&[]);
+        }
+        for (i, (kind, span)) in resource.spans.iter().enumerate() {
+            let mut attrs = span.clone();
+            enrich_otlp_span(*kind, &mut attrs, &resource.attrs, true, opts);
+            let service_stamp = stamp
+                .then(|| identity.stamp_for_span(&resource.service, &resource.attrs))
+                .flatten();
+            let start_time = 1_700_000_000_000_000_000u64 + (r * 1000 + i) as u64;
+            let local_val = Span {
+                trace_id: format!("{r:016x}{i:016x}"),
+                span_id: format!("{i:016x}"),
+                span_kind: kind.to_string(),
+                span_status: "UNSET".to_string(),
+                operation_name: "op".to_string(),
+                start_time,
+                end_time: start_time + 1_000_000,
+                duration: 1000,
+                reference: HashMap::new(),
+                service_name: resource.service.clone(),
+                attributes: attrs,
+                service: resource.attrs.clone(),
+                flags: 1,
+                events: "[]".to_string(),
+                links: "[]".to_string(),
+            };
+            let mut value = serde_json::to_value(local_val).unwrap();
+            let record = value.as_object_mut().unwrap();
+            record.insert("_timestamp".to_string(), json!((start_time / 1000) as i64));
+            if let Some(service_stamp) = &service_stamp {
+                service_stamp.apply(record);
+            }
+            let value = flatten::flatten(value).unwrap();
+            let record = value.as_object().unwrap();
+            if stamp {
+                identity.observe("default", record);
+            }
+            columns += record.len();
+        }
+    }
+    #[cfg(feature = "enterprise")]
+    if stamp {
+        columns += identity.into_observations("bench").len();
+    }
+    columns
 }
 
 fn clone_span(s: &OtlpSpan) -> OtlpSpan {

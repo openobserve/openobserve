@@ -15,11 +15,14 @@
 
 import { describe, expect, it, vi } from "vitest";
 import alertCalibration, { errorMessage } from "./alert_calibration";
-import { alertCalibrationConfigQuery } from "./alert_calibration.queries";
+import { activeDismissalsQuery, alertCalibrationConfigQuery } from "./alert_calibration.queries";
 
 vi.mock("./alert_calibration", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./alert_calibration")>();
-  return { ...actual, default: { ...actual.default, getConfig: vi.fn() } };
+  return {
+    ...actual,
+    default: { ...actual.default, getConfig: vi.fn(), listDismissals: vi.fn() },
+  };
 });
 
 const read = () => (alertCalibrationConfigQuery("acme").queryFn as () => Promise<unknown>)();
@@ -51,5 +54,44 @@ describe("errorMessage", () => {
       "unknown field `enabledd`",
     );
     expect(errorMessage(new Error("Network Error"))).toBe("Network Error");
+  });
+});
+
+describe("the active dismissals query", () => {
+  const readAll = () =>
+    (
+      activeDismissalsQuery("acme").queryFn as unknown as (ctx: {
+        signal: AbortSignal;
+      }) => Promise<{ items: { id: string }[]; total: number; capped: boolean }>
+    )({ signal: new AbortController().signal });
+  const pageOf = (n: number, total: number, next: string | null) => ({
+    data: { items: [{ id: `id${n}` }], next_cursor: next, total },
+  });
+
+  it("the_state_query_pages_to_the_cap", async () => {
+    const list = vi.mocked(alertCalibration.listDismissals);
+    list.mockReset();
+    list
+      .mockResolvedValueOnce(pageOf(1, 3, "c1") as never)
+      .mockResolvedValueOnce(pageOf(2, 99, "c2") as never)
+      .mockResolvedValueOnce(pageOf(3, 99, null) as never);
+    await expect(readAll()).resolves.toEqual({
+      items: [{ id: "id1" }, { id: "id2" }, { id: "id3" }],
+      total: 3,
+      capped: false,
+    });
+    expect(list.mock.calls.map((call) => call[1])).toEqual([
+      { state: "active", limit: 200 },
+      { state: "active", limit: 200, cursor: "c1" },
+      { state: "active", limit: 200, cursor: "c2" },
+    ]);
+
+    list.mockReset();
+    for (let n = 1; n <= 7; n += 1) list.mockResolvedValueOnce(pageOf(n, 1400, `c${n}`) as never);
+    const capped = await readAll();
+    expect(list).toHaveBeenCalledTimes(5);
+    expect(capped.capped).toBe(true);
+    expect(capped.total).toBe(1400);
+    expect(capped.items).toHaveLength(5);
   });
 });

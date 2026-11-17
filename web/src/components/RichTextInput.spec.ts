@@ -68,3 +68,25 @@ describe("RichTextInput chip detail card", () => {
     expect(document.querySelector(".chip-detail-card")).toBeNull();
   });
 });
+
+describe("RichTextInput prependText", () => {
+  afterEach(() => window.getSelection()?.removeAllRanges());
+
+  it("puts a prefilled request before the chips, keeps them, and reports the text", async () => {
+    const wrapper = mount(RichTextInput, {
+      props: { modelValue: "" },
+      global: { plugins: [i18n] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    wrapper.vm.insertChip(chip("c1"));
+    wrapper.vm.prependText("Draft a no-data alert.");
+    await flushPromises();
+    const div = document.querySelector("[contenteditable]")!;
+    expect(div.firstChild?.textContent).toBe("Draft a no-data alert. ");
+    expect(div.querySelector(".reference-chip")).not.toBeNull();
+    const updates = wrapper.emitted("update:modelValue") ?? [];
+    expect(String(updates[updates.length - 1]?.[0])).toContain("Draft a no-data alert.");
+    wrapper.unmount();
+  });
+});

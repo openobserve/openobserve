@@ -20,10 +20,10 @@
   >
     <div class="flex flex-col gap-4">
       <p class="text-text-secondary text-compact m-0 leading-normal">
-        {{ t("onlineEvals.scorerTypeDialog.intro") }}
+        {{ t("codeScorer.typeDialogIntro") }}
       </p>
 
-      <div class="grid grid-cols-2 gap-3 max-md:grid-cols-1">
+      <div class="grid grid-cols-3 gap-3 max-md:grid-cols-1">
         <button
           v-for="opt in typeOptions"
           :key="opt.type"
@@ -89,6 +89,14 @@ const typeOptions = computed<TypeOption[]>(() => [
     title: t("onlineEvals.scorerTypeDialog.llmJudgeTitle"),
     description: t("onlineEvals.scorerTypeDialog.llmJudgeDescription"),
     cta: t("onlineEvals.scorerTypeDialog.llmJudgeCta"),
+  },
+  {
+    type: "code",
+    testKey: "code",
+    icon: "code",
+    title: t("codeScorer.typeTitle"),
+    description: t("codeScorer.typeDescription"),
+    cta: t("codeScorer.typeCta"),
   },
   {
     type: "remote",

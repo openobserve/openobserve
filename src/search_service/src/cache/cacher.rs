@@ -1489,7 +1489,7 @@ mod tests {
         let mut should_exec_query = true;
 
         // Parse SQL to get metadata (new signature requires this)
-        let query: SearchQuery = req.query.clone().into();
+        let query: SearchQuery = req.query.clone().try_into().unwrap();
         let sql = Sql::new(&query, org_id, stream_type, req.search_type)
             .await
             .unwrap();

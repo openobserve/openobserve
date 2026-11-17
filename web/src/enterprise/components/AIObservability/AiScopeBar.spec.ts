@@ -43,9 +43,11 @@ const AgentScopeCascade = {
     "selectedEnv",
     "selectedAgentName",
     "selectedVersion",
+    "agentStreams",
+    "selectedStream",
   ],
   template:
-    '<div class="agent-scope-cascade" :data-test="`${prefix}-cascade`" :data-envs="envs.length" :data-names="agentNames.length" :data-versions="versions.length" />',
+    '<div class="agent-scope-cascade" :data-test="`${prefix}-cascade`" :data-envs="envs.length" :data-names="agentNames.length" :data-versions="versions.length" :data-streams="agentStreams.length" :data-stream="selectedStream" />',
 };
 
 const stubs = {
@@ -138,6 +140,23 @@ describe("AiScopeBar", () => {
     expect(cascade.attributes("data-envs")).toBe("1");
     expect(cascade.attributes("data-names")).toBe("1");
     expect(cascade.attributes("data-versions")).toBe("1");
+  });
+
+  it("forwards the agent's streams to the cascade and turns a stream pick into an agent pick", () => {
+    const w = mountBar({
+      filterMode: "agent",
+      agentStreams: [
+        { label: "main", value: "main" },
+        { label: "qa_u304", value: "qa_u304" },
+      ],
+      selectedAgentStream: "main",
+    });
+    const cascade = w.findComponent(AgentScopeCascade);
+    expect(cascade.attributes("data-streams")).toBe("2");
+    expect(cascade.attributes("data-stream")).toBe("main");
+    cascade.vm.$emit("update:selectedStream", "qa_u304");
+    expect(w.emitted("update:selectedAgentStream")!.at(-1)).toEqual(["qa_u304"]);
+    expect(w.emitted("agent-pick")).toHaveLength(1);
   });
 
   it("does not render the removed env/version OAgentBadges anymore", () => {

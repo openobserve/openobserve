@@ -24,10 +24,12 @@ export const makeCaseSettingsSchema = (t: Translate) =>
   z.object({
     auto_close_days: wholeNumber(t, MAX_AUTO_CLOSE_DAYS),
     group_window_minutes: wholeNumber(t, MAX_GROUP_WINDOW_MINUTES),
+    roll_up_low_priority: z.boolean(),
   });
 
 /** Field values as typed; a cleared number input holds an empty string. */
 export type CaseSettingsValues = {
   auto_close_days: number | string;
   group_window_minutes: number | string;
+  roll_up_low_priority: boolean;
 };

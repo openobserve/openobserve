@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import enLocale from "@/locales/languages/en-US.json";
 import store from "@/stores";
+import config from "@/aws-exports";
 
 /** Every `meta.titleKey` in a route tree, children included. */
 const collectTitleKeys = (routes: any[]): string[] =>
@@ -272,6 +273,12 @@ describe("useEnterpriseRoutes.ts", () => {
       const names = useEnterpriseRoutes().map((route: any) => route.name);
       expect(names).not.toContain("fleet");
       expect(names).not.toContain("fleetConfigEditor");
+    });
+
+    it("should not register AutoObserve, so its coverage drawer charts never render on OSS", () => {
+      const routes = useEnterpriseRoutes();
+      expect(routes.map((route: any) => route.name)).not.toContain("autoobserve");
+      expect(routes.map((route: any) => route.path)).not.toContain("auto-observe-2");
     });
 
     // Synthetics moved out of `o2_enterprise` into `src/synthetics`; only the
@@ -754,6 +761,50 @@ describe("useEnterpriseRoutes.ts", () => {
     });
   });
 
+  describe("private locations edition gate", () => {
+    const find = (routes: any[], name: string): any =>
+      routes.flatMap((r) => [r, ...(r.children ?? [])]).find((r) => r.name === name);
+    const to = { query: { org_identifier: "acme" }, fullPath: "/synthetic/private-locations/1" };
+
+    afterEach(() => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      store.state.zoConfig = {};
+    });
+
+    it("sends an OSS build to the locked screen instead of rendering 'Location not found'", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      store.state.zoConfig = {};
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), "synthetic-private-location").beforeEnter(to, {}, next);
+      expect(next).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "privateLocations", org_identifier: "acme", redirect: to.fullPath },
+      });
+    });
+
+    it("lets an enterprise build through to the page", async () => {
+      config.isEnterprise = "true";
+      store.state.zoConfig = {};
+      const { routeGuard } = await import("@/utils/zincutils");
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), "synthetic-private-location").beforeEnter(to, {}, next);
+      expect(routeGuard).toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: "enterpriseFeatureLocked" }),
+      );
+    });
+
+    it("keeps sending an enterprise build with the flag off home", () => {
+      config.isEnterprise = "true";
+      store.state.zoConfig = { synthetics_private_locations_enabled: false };
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), "synthetic-private-location").beforeEnter(to, {}, next);
+      expect(next).toHaveBeenCalledWith("/");
+    });
+  });
+
   describe("Route Structure Validation", () => {
     // Test 50: Should have valid route structure for all basic routes
     it("should have valid route structure for all basic routes", () => {
@@ -1003,5 +1054,35 @@ describe("useEnterpriseRoutes lazy loading", () => {
         if (route.children) walk(route.children);
       });
     walk(useEnterpriseRoutes());
+  });
+
+  describe("AutoObserve is enterprise-only", () => {
+    const autoobserveRoutes = () =>
+      useEnterpriseRoutes().filter((route: any) => String(route.path).includes("autoobserve"));
+
+    it.each([
+      ["an OSS build", "false", "false"],
+      ["a cloud build without enterprise", "true", "false"],
+    ])("registers no AutoObserve route in %s", async (_name, isCloud, isEnterprise) => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = isCloud;
+      config.default.isEnterprise = isEnterprise;
+      expect(autoobserveRoutes()).toEqual([]);
+    });
+
+    it("registers the AutoObserve routes in an enterprise build", async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "false";
+      config.default.isEnterprise = "true";
+      expect(autoobserveRoutes().map((route: any) => route.name)).toContain("autoobserve");
+    });
+
+    it("keeps each AutoObserve sub-page's access denials apart, so What I've changed never counts the home's (T3-N7)", async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "false";
+      config.default.isEnterprise = "true";
+      const home = autoobserveRoutes().find((route: any) => route.name === "autoobserve");
+      expect(home.meta.accessScopeQuery).toEqual(["page"]);
+    });
   });
 });

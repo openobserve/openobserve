@@ -121,6 +121,8 @@ const props = withDefaults(
     notifiesNobody?: boolean;
     /** Show the one-line status under the field: where the alert sends, or that it sends nowhere. */
     showStatus?: boolean;
+    /** The caller refuses to save without a target, so the empty status says required instead of optional. */
+    targetRequired?: boolean;
     /** Shown in the empty picker. Omit where empty means something else (recovery destinations). */
     placeholder?: I18nText;
     /** Override the tooltip; pass "" for alert families that need none. */
@@ -134,7 +136,7 @@ const props = withDefaults(
      *  enterprise, so the picker cannot offer options that would not save. */
     supportsWorkflows?: boolean;
   }>(),
-  { supportsWorkflows: true, notifiesNobody: false, showStatus: false },
+  { supportsWorkflows: true, notifiesNobody: false, showStatus: false, targetRequired: false },
 );
 
 const emit = defineEmits<{
@@ -223,8 +225,13 @@ const fetchWorkflows = async (force = false) => {
 };
 
 // One name reads better than "1 destination"; more than one is a count.
+const noTargetNote = (): I18nText =>
+  props.targetRequired
+    ? t("alerts.alertSettings.targetRequiredNote")
+    : t("alerts.alertSettings.noDestinationNote");
+
 const statusText = computed<I18nText | null>(() => {
-  if (props.notifiesNobody) return t("alerts.alertSettings.noDestinationNote");
+  if (props.notifiesNobody) return noTargetNote();
   const parts: string[] = [];
   const { destinations } = props;
   if (destinations.length === 1) parts.push(destinations[0]);
@@ -253,7 +260,7 @@ const statusText = computed<I18nText | null>(() => {
     parts.push(t("alerts.alertSettings.oncallTeamTarget"));
   }
   if (parts.length === 0) {
-    return statusLocks.value.length > 0 ? null : t("alerts.alertSettings.noDestinationNote");
+    return statusLocks.value.length > 0 ? null : noTargetNote();
   }
   const targets = new Intl.ListFormat(locale.value, { type: "conjunction" }).format(parts);
   return t("alerts.alertSettings.sendsToStatus", { targets });

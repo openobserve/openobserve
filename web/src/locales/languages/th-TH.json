@@ -10,7 +10,8 @@
     "toastMessageGeneric": "สิทธิ์การใช้งานของคุณไม่รวมฟีเจอร์นี้ โปรดขอให้ผู้ดูแลระบบอัปเดตสิทธิ์การใช้งาน",
     "bannerMessage": "ฟีเจอร์นี้ถูกล็อก ต้องมีฟีเจอร์ {feature} ในสิทธิ์การใช้งานของคุณ",
     "bannerMessageGeneric": "หน้านี้ต้องใช้ฟีเจอร์ที่ไม่มีในสิทธิ์การใช้งานของคุณ",
-    "headerLocked": "ล็อกอยู่: ต้องมี {feature}"
+    "headerLocked": "ล็อกอยู่: ต้องมี {feature}",
+    "availableInEnterprise": "{feature} ใช้งานได้ใน OpenObserve Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -1965,6 +1966,7 @@
     "slos": "SLOs",
     "reliability": "ความเสถียร (Reliability)",
     "onCall": "เวรประจำการ (On-Call)",
+    "response": "การตอบสนอง",
     "toggleNavigation": "สลับการแสดงแถบนำทาง",
     "ingestionText": "การนำเข้าข้อมูล",
     "navigationLink": "ลิงก์นำทาง",
@@ -4472,6 +4474,7 @@
       "noUpdatesDetected": "No updates detected.",
       "updateSuccess": "Updated role successfully!",
       "updateError": "Error while updating role!",
+      "presetSaveFailed": "สร้างบทบาทแล้ว แต่ยังไม่ได้บันทึกสิทธิ์จากค่าที่ตั้งไว้ล่วงหน้า โปรดตรวจสอบแล้วเลือกบันทึก",
       "dbmPresetSeeded": "Pre-selected read access on {matched} of {total} DB Monitoring metric streams, plus the DB Monitoring module. Review before saving.",
       "dbmPresetNoMatch": "None of the {total} DB Monitoring metric streams exist in this organization yet, so nothing was pre-selected on them; the DB Monitoring module grant was still staged.",
       "k8sPresetSeeded": "Pre-selected read access on {matched} of {total} Kubernetes metric streams. Review before saving.",
@@ -4583,7 +4586,7 @@
       "effectStillAllowed": "ไม่มีการเปลี่ยนแปลงสิทธิ์การเข้าถึง: การให้สิทธิ์ที่กว้างกว่ายังอนุญาตให้ทำสิ่งนี้ได้",
       "moduleGroupSecurity": "ความปลอดภัย",
       "presetSocAnalystTitle": "นักวิเคราะห์ SOC",
-      "presetSocAnalystDescription": "คัดแยกการแจ้งเตือนและเคสด้านความปลอดภัย พร้อมสิทธิ์อ่านการตรวจจับ สตรีม และรายการข่าวกรองภัยคุกคาม",
+      "presetSocAnalystDescription": "คัดกรองการแจ้งเตือนและเคสของ Security พร้อมสิทธิ์อ่านการตรวจจับ สตรีมแหล่งข้อมูลของ Security และรายการข่าวกรองภัยคุกคาม",
       "presetDetectionEngineerTitle": "วิศวกรการตรวจจับ",
       "presetDetectionEngineerDescription": "สร้าง ปรับแต่ง เปิดใช้ และเรียกใช้การตรวจจับ ติดตั้งเนื้อหา เชื่อมต่อแหล่งข้อมูลพร้อมฟังก์ชันและไปป์ไลน์ และดูแลตารางเสริมข้อมูล เช่น รายการข่าวกรองภัยคุกคาม พร้อมสิทธิ์อ่านความปลอดภัย เคส และสตรีม",
       "presetSecurityAdminTitle": "ผู้ดูแลความปลอดภัย",
@@ -4814,7 +4817,7 @@
       "uploadingRules": "Please wait while uploading rules...",
       "errorUploadingRules": "Error while uploading rules",
       "errorParsingJson": "Error parsing JSON from file {name}",
-      "someValuesEmpty": "some values are empty please check",
+      "someValuesEmpty": "Some values are empty. Please check them.",
       "saveBeforeSwitchingTimeUnits": "Please save or cancel your changes before switching time units"
     },
     "addRolePage": {
@@ -10363,6 +10366,23 @@
     "services": "Services",
     "recentEvents": "เหตุการณ์ล่าสุด",
     "investigate": "Investigate →",
+    "askAi": {
+      "label": "ถาม AI",
+      "hint": "ถาม AI เกี่ยวกับเรื่องนี้",
+      "labelFor": "ถาม AI เกี่ยวกับ {item}",
+      "chip": {
+        "firing": "การแจ้งเตือนที่ Firing",
+        "failing": "กฎที่ล้มเหลว",
+        "incidents": "เหตุการณ์ขัดข้องที่เปิดอยู่",
+        "pipelines": "ข้อผิดพลาดของไปป์ไลน์",
+        "delivery": "การส่งไม่สำเร็จ",
+        "quiet": "สตรีมที่เงียบ",
+        "critical": "การแจ้งเตือนวิกฤต",
+        "warning": "การแจ้งเตือนระดับคำเตือน",
+        "alert": "การแจ้งเตือน · {name}",
+        "incident": "เหตุการณ์ขัดข้อง · {name}"
+      }
+    },
     "viewAll": "View all",
     "showingOf": "Showing {shown} of {total}",
     "colErrorRate": "Error rate",
@@ -10386,31 +10406,12 @@
     "hoursAgo": "{count}h ago",
     "daysAgo": "{count}d ago",
     "cards": {
-      "firingAlerts": "การแจ้งเตือนที่กำลังแจ้งเตือน",
-      "failingRules": "กฎที่ล้มเหลว",
-      "openIncidents": "เหตุการณ์ขัดข้องที่เปิดอยู่",
-      "pipelineErrors": "ข้อผิดพลาดของไปป์ไลน์",
-      "pipelinesOf": "จาก {enabled} ที่เปิดใช้งาน",
-      "quietStreams": "สตรีมที่ไม่มีการเขียนข้อมูล",
-      "firingNone": "ไม่มีรายการที่กำลังแจ้งเตือน",
-      "noAlertRules": "ไม่มีกฎการแจ้งเตือน",
-      "noEnabledRules": "ไม่มีกฎที่เปิดใช้งาน",
-      "failingNone": "ไม่มีรายการที่ล้มเหลว",
-      "failingNote": "การประเมินครั้งล่าสุดเกิดข้อผิดพลาด",
-      "incidentsNone": "ไม่มีรายการที่เปิดอยู่",
-      "noPipelines": "ไม่มีไปป์ไลน์",
-      "noStreams": "ไม่มีสตรีม",
-      "quietNote": "หยุดเขียนข้อมูลใน 7 วันที่ผ่านมา",
-      "criticalUnit": "{count} รายการที่ระดับวิกฤต",
-      "deliveryFailures": "ความล้มเหลวในการส่งการแจ้งเตือน",
-      "deliveryNote": "การแจ้งเตือนที่ถูกทริกเกอร์แล้วแต่ไม่สามารถส่งการแจ้งเตือนได้",
-      "oldestFiring": "รายการที่กำลังแจ้งเตือนนานที่สุดเป็นเวลา {age}"
+      "openIncidents": "เหตุการณ์ขัดข้องที่เปิดอยู่"
     },
     "state": {
       "tileForbidden": "ไม่มีสิทธิ์เข้าถึง",
       "tileLocked": "ถูกล็อก",
       "tileError": "ไม่สามารถโหลดได้",
-      "tileUnavailable": "ไม่พร้อมใช้งาน",
       "sectionLocked": "ใช้งานได้ด้วยใบอนุญาตระดับองค์กร",
       "sectionForbidden": "บทบาทของคุณไม่สามารถดูข้อมูลนี้ได้ โปรดขอสิทธิ์เข้าถึงจากผู้ดูแลองค์กร"
     },
@@ -10532,20 +10533,6 @@
       "retry": "ลองอีกครั้ง"
     },
     "dataAsOf": "ข้อมูล ณ {time}",
-    "status": {
-      "attention": "ต้องได้รับการดูแล",
-      "checking": "กำลังตรวจสอบ…",
-      "partial": "ไม่สามารถโหลดการตรวจสอบบางรายการได้",
-      "clear": "ไม่มีสิ่งที่ต้องได้รับการดูแล",
-      "items": {
-        "firing": "{count} การแจ้งเตือนกำลังแจ้งเตือน | {count} การแจ้งเตือนกำลังแจ้งเตือน",
-        "failing": "{count} กฎที่ทำงานผิดพลาด | {count} กฎที่ทำงานผิดพลาด",
-        "incidents": "{count} เหตุการณ์ขัดข้องที่เปิดอยู่ | {count} เหตุการณ์ขัดข้องที่เปิดอยู่",
-        "pipelines": "{count} ไปป์ไลน์ที่มีข้อผิดพลาด | {count} ไปป์ไลน์ที่มีข้อผิดพลาด",
-        "quiet": "{count} สตรีมที่ไม่มีความเคลื่อนไหว | {count} สตรีมที่ไม่มีความเคลื่อนไหว"
-      },
-      "unmonitored": "ยังไม่มีการตรวจสอบใด ๆ"
-    },
     "timeRange": {
       "heading": "ในช่วงเวลาที่เลือก"
     }
@@ -11306,12 +11293,11 @@
     "SearchSQLCancelled": "Error: Search SQL was cancelled."
   },
   "alertCalibration": {
-    "title": "Alert Calibration",
+    "title": "Alert calibration",
     "subtitle": "How your alerts behave, measured from their own run history",
     "configure": "Configure",
     "runNow": "Run now",
     "runNowHint": "Asks for a run now instead of waiting for the next one. If a run is already due or in progress, it answers the request instead.",
-    "runRequested": "Run requested. Findings are written to the {stream} stream when it finishes.",
     "runFailed": "The run could not be requested: {message}",
     "runNeedsConfig": "Turn alert calibration on in its settings to run it.",
     "refresh": "รีเฟรช",
@@ -11421,7 +11407,7 @@
       "scopeAll": "All runs",
       "scopeFindings": "With findings",
       "scopeGaps": "Coverage gaps",
-      "searchPlaceholder": "Search runs by alert name",
+      "searchPlaceholder": "Search by alert name",
       "colRun": "Run",
       "colFindings": "Findings",
       "colCoverage": "Coverage",
@@ -11432,7 +11418,6 @@
       "emptyDescription": "Alert calibration writes a digest every time it runs. Run it now to see what it finds.",
       "filteredTitle": "No runs match this filter",
       "filteredDescription": "Widen the filter, or clear the search.",
-      "errorTitle": "Runs unavailable",
       "runsCapped": "The runs search stopped at its latest {count} rows, so older runs are not listed.",
       "searchCapped": "The alert name search stopped at {count} matching runs, so other matching runs are not shown."
     },
@@ -11444,7 +11429,6 @@
       "viewInLogs": "View in Logs",
       "viewInLogsHint": "Opens this run's records in Logs",
       "unavailableTitle": "Digest unavailable",
-      "noRecords": "The {stream} stream has no records for this run.",
       "loadFailed": "The digest could not be loaded: {message}",
       "backToDigests": "Back to digests",
       "partialCoverage": "Partial coverage",
@@ -11452,7 +11436,7 @@
       "statFindings": "Findings",
       "statAlertsInScope": "Alerts in scope",
       "statDeclined": "Declined",
-      "statDeclinedSub": "Declined, not cleared",
+      "statDeclinedSub": "Not cleared",
       "statDeclinedTooltip": "Rule and alert pairs a rule would not judge, because the alert had too little history or too few samples for it. A gate, not a clearance; the per-alert reasons are not written to the stream.",
       "statWindow": "Window",
       "findingsHeading": "Findings",
@@ -11519,74 +11503,11 @@
       "loadFailed": "The settings could not be loaded: {message}",
       "lastSaved": "Last saved {time}",
       "runNowHeading": "Run now",
-      "findingsDesc": "Findings are written to the {stream} stream of this organization and kept for that stream's retention. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
       "windowRange": "Choose a window between 1 minute and 90 days."
     }
   },
   "alerts": {
-    "firing": {
-      "title": "กำลังแจ้งเตือน",
-      "drawer": {
-        "openInLogs": "เปิดในล็อก",
-        "partOfIncident": "เป็นส่วนหนึ่งของเหตุการณ์ขัดข้อง:",
-        "incidentAck": "การกดรับทราบที่นี่จะเป็นการรับทราบเหตุการณ์ขัดข้องทั้งหมด.",
-        "incidentTakeOver": "การเข้าดูแลแทนที่นี่จะเป็นการเข้าดูแลเหตุการณ์ขัดข้องทั้งหมด.",
-        "now": "ตอนนี้",
-        "threshold": "เกณฑ์ {value}",
-        "since": "ตั้งแต่ {time}",
-        "flaps": "การสลับสถานะ 6 ชม. ล่าสุด",
-        "flapsUnit": "การเปลี่ยนสถานะ",
-        "notified": "แจ้งเตือนแล้ว",
-        "notDeliveredTo": "{name}: ส่งไม่สำเร็จ",
-        "history": "ประวัติ",
-        "last2h": "2 ชม. ล่าสุด",
-        "lastSpan": "{span} ล่าสุด",
-        "viewAll": "ดูทั้งหมด",
-        "historyEmpty": "ไม่มีการทำงานในช่วงเวลานี้.",
-        "historyFailed": "ไม่สามารถโหลดประวัติได้.",
-        "barFiring": "{span} กำลังแจ้งเตือน",
-        "barOk": "{span} ปกติ",
-        "barUnknown": "ไม่ได้อ่าน {span}",
-        "eventStarted": "เริ่มแจ้งเตือน",
-        "eventRecovered": "กลับสู่ปกติ",
-        "eventNotified": "แจ้งเตือนแล้ว",
-        "eventNotifiedTo": "แจ้งเตือนไปยัง {names}",
-        "eventFailed": "ส่งไม่สำเร็จ",
-        "eventFailedTo": "ส่งถึง {names} ไม่สำเร็จ",
-        "soFar": "{span} จนถึงขณะนี้",
-        "lasted": "กินเวลา {span}",
-        "okFor": "ปกติเป็นเวลา {span}"
-      },
-      "chipCount": "{label} {count}",
-      "chipFiring": "กำลังแจ้งเตือน",
-      "chipAcked": "รับทราบแล้ว",
-      "chipMuted": "ปิดเสียงแจ้งเตือน",
-      "chipFailed": "ส่งไม่สำเร็จ",
-      "searchPlaceholder": "ค้นหาการแจ้งเตือน",
-      "priorityAll": "ลำดับความสำคัญ",
-      "priorityLabel": "ลำดับความสำคัญ",
-      "priorityUnset": "ไม่ระบุลำดับความสำคัญ",
-      "folderAll": "โฟลเดอร์: ทั้งหมด",
-      "folderLabel": "โฟลเดอร์",
-      "stale": "ข้อมูลเก่า",
-      "refreshFailed": "ไม่สามารถรีเฟรชการแจ้งเตือนที่กำลังแจ้งเตือนได้ ({reason}) กำลังแสดงข้อมูลจาก {time}.",
-      "refreshFailedReason": "คำขอล้มเหลว",
-      "statusUnavailable": "สถานะการแจ้งเตือนไม่พร้อมใช้งานในขณะนี้ จึงไม่สามารถแสดงการแจ้งเตือนที่กำลังแจ้งเตือนได้.",
-      "retry": "ลองใหม่",
-      "columnPriority": "ลำดับความสำคัญ",
-      "columnState": "สถานะ",
-      "columnAlert": "การแจ้งเตือน",
-      "columnFolder": "โฟลเดอร์",
-      "columnFiringFor": "ระยะเวลาที่กำลังแจ้งเตือน",
-      "acknowledgeCount": "รับทราบ {count}",
-      "mute": "ปิดเสียงแจ้งเตือน",
-      "clear": "ล้าง",
-      "emptyFiring": "ไม่มีรายการที่กำลังแจ้งเตือน",
-      "emptyAcked": "ไม่มีรายการที่รับทราบแล้ว",
-      "emptyMuted": "ไม่มีรายการที่ปิดเสียงแจ้งเตือน",
-      "emptyFailed": "ไม่มีรายการที่ยังไม่ได้ส่ง"
-    },
     "moreActions": "การดำเนินการเพิ่มเติม",
     "promRuleMode": "โหมดกฎการแจ้งเตือน",
     "promRulePreview": "{count} returned series match now. Each series must complete the pending period before firing.",
@@ -11783,23 +11704,6 @@
     "isOptionalNote": "is optional",
     "noTriggersLoaded": "No triggers loaded",
     "externalDestinationTitle": "External Destination",
-    "serviceGraphLegendTitle": "Graph Legend",
-    "serviceGraphRootCause": "Red = Potential Root Cause",
-    "serviceGraphHighFrequency": "Orange = High Frequency",
-    "serviceGraphNormal": "Blue = Normal",
-    "serviceGraphTemporalFlow": "Purple arrows show temporal flow",
-    "serviceGraphUnavailable": "Service Graph Unavailable",
-    "serviceGraphNoTopologyData": "No topology data available for this incident.",
-    "serviceGraphTooltipService": "Service: {name}",
-    "serviceGraphTooltipAlertCount": "Alert Count: {count}",
-    "serviceGraphTooltipFirstFired": "First Fired: {time}",
-    "serviceGraphTooltipLastFired": "Last Fired: {time}",
-    "serviceGraphTooltipRootCause": "⚠ First Alert (Potential Root Cause)",
-    "serviceGraphTooltipTimeDifference": "⏱ Time difference: {duration}",
-    "serviceGraphTooltipFrom": "From: {time}",
-    "serviceGraphTooltipTo": "To: {time}",
-    "serviceGraphTooltipTemporalCorrelation": "Temporal correlation",
-    "serviceGraphTooltipServiceDependency": "Service dependency",
     "suppressed": "suppressed /",
     "historyTimeline": {
       "firing": "Firing",
@@ -12007,6 +11911,12 @@
     "summaryPaused": "Paused",
     "summaryFailed": "Failed",
     "summaryFiring": "Firing",
+    "summaryEvalError": "ข้อผิดพลาดในการประเมิน",
+    "summaryDeliveryFailed": "ส่งไม่สำเร็จ",
+    "levelFilter": "ทำงานที่ระดับ {level}",
+    "levelFilterRemove": "ลบตัวกรอง: {label}",
+    "levelCritical": "วิกฤต",
+    "levelWarning": "คำเตือน",
     "summaryRecent": "Triggered < 15m",
     "summaryTotal": "ทั้งหมด",
     "webhook": "Web Hook",
@@ -12224,7 +12134,6 @@
       "filterActive": "Active",
       "alertCount": "Alerts",
       "alertCountAxis": "Alert Count",
-      "correlatedAlertsCount": "Alerts: {count} correlated alerts",
       "noCorrelatedLogs": "No correlated logs found",
       "noCorrelatedMetrics": "No correlated metrics found",
       "noCorrelatedTraces": "No correlated traces found",
@@ -12392,8 +12301,6 @@
         "cancelledByChecks": "Cancelled by {user} at {time} UTC after {duration}. {done} of {total} checks finished; the partial results below are not a verdict.",
         "cancelledAtChecks": "Cancelled at {time} UTC after {duration}. {done} of {total} checks finished; the partial results below are not a verdict.",
         "loadingReport": "Loading report…",
-        "fullReport": "Full report",
-        "reportLoadFailed": "Failed to load the analysis report",
         "reportAfterRun": "The report shows after the run.",
         "noAnalysisTitle": "No analysis yet",
         "noAnalysisText": "The AI SRE Agent checks this incident's alerts, topology, recent changes, traces, logs and metrics, then writes a report. You can follow its work in the Investigation thread while it runs.",
@@ -12632,7 +12539,7 @@
           "refuted": "Refuted"
         },
         "openEvidence": "Open evidence {number}",
-        "notVerifiedId": "{id} · not verified",
+        "notVerifiedId": "not verified",
         "hypotheses": "Hypotheses",
         "noHypotheses": "No hypotheses recorded yet.",
         "noEvidenceYet": "No evidence yet",
@@ -12876,6 +12783,9 @@
         "alertStartTimeMillis": "Window start time in epoch millis",
         "alertEndTimeMillis": "Window end time in epoch millis",
         "alertUrl": "Link back to OpenObserve to investigate",
+        "alertUrlLabel": "ป้ายของลิงก์หลัก เช่น \"View logs\"",
+        "alertDetailUrl": "ลิงก์ไปยังหน้าของการแจ้งเตือนที่ส่งข้อความนี้ ว่างเมื่อลิงก์หลักเปิดหน้านั้นอยู่แล้ว",
+        "alertDetailLabel": "ป้ายของลิงก์นั้น เช่น \"Open alert\" ว่างเมื่อลิงก์ว่าง",
         "alertTriggerTime": "When the alert fired (ISO 8601)",
         "alertTriggerTimeMillis": "Trigger time in epoch millis",
         "alertTriggerTimeSeconds": "Trigger time in epoch seconds",
@@ -12897,7 +12807,8 @@
       "suppressRepeats": "ระงับการแจ้งซ้ำ",
       "suppressRepeatsTooltip": "แจ้งเตือนเพียงครั้งเดียวเมื่อการแจ้งเตือนเข้าสู่สถานะกำลังแจ้งเตือนหรือเปลี่ยนระดับ ไม่ใช่ทุกครั้งที่มีการประเมิน หากปิดไว้จะยังได้รับการเตือนซ้ำหลังช่วงปิดเสียงแจ้งเตือนแต่ละครั้ง",
       "keepFiringForInvalid": "Enter 0 or more seconds",
-      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)",
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -13408,7 +13319,10 @@
       "chartUnavailable": "No chart available for this alert's query.",
       "eventCount": "Events",
       "notFoundTitle": "Alert not found",
-      "notFoundDescription": "This alert no longer exists, or you do not have access to it. It may have been deleted."
+      "notFoundDescription": "This alert no longer exists, or you do not have access to it. It may have been deleted.",
+      "noAccessTitle": "คุณไม่มีสิทธิ์เข้าถึงการแจ้งเตือนนี้",
+      "noAccessDescription": "ขอสิทธิ์อ่านการแจ้งเตือนในโฟลเดอร์นี้จากผู้ดูแลระบบ",
+      "loadFailedTitle": "ไม่สามารถโหลดการแจ้งเตือนนี้ได้"
     },
     "timeLabel": "เวลา",
     "unknownHttpStatus": "Unknown",
@@ -14209,6 +14123,10 @@
       "sourcePlatformResolve": "การกำหนดจากแพลตฟอร์ม",
       "sourceLegacy": "เพย์โหลดแบบเดิม",
       "sourceLegacyPayload": "เพย์โหลด JSON ของชนิดนั้นเอง (webhook ทั่วไป)"
+    },
+    "siemDetection": {
+      "notice": "การแจ้งเตือนนี้เป็นการตรวจจับของ Security คิวรีของการแจ้งเตือนถูกคอมไพล์จากกฎ Sigma ดังนั้นกฎ สตรีม และกำหนดเวลาจะต้องแก้ไขใน Security ซึ่งช่วยให้กฎและคิวรีสอดคล้องกันเสมอ",
+      "open": "แก้ไขใน Security"
     }
   },
   "alert_dependencies": {
@@ -14461,6 +14379,10 @@
     "insertVariable": "Insert variable",
     "moreVariables": "+{count} more",
     "viewAlertLinkLabel": "View in OpenObserve",
+    "variableAlertUrlLabelDescription": "ป้ายของลิงก์หลัก เช่น \"View logs\"",
+    "variableAlertDetailUrlDescription": "ลิงก์ไปยังหน้าของการแจ้งเตือนที่ส่งข้อความนี้ ว่างเมื่อลิงก์หลักเปิดหน้านั้นอยู่แล้ว",
+    "variableAlertDetailLabelDescription": "ป้ายของลิงก์นั้น เช่น \"Open alert\" ว่างเมื่อลิงก์ว่าง",
+    "slackLinksNotShown": "ลิงก์ {count} รายการไม่แสดงเป็นปุ่ม: {links} | ลิงก์ {count} รายการไม่แสดงเป็นปุ่ม: {links}",
     "moveUp": "Move up",
     "moveDown": "Move down",
     "fieldLabel": "Label",
@@ -15764,7 +15686,7 @@
       "contractRevokedSuccess": "External contract revoked successfully.",
       "revokeContractError": "Failed to revoke external contract.",
       "enableByobTitle": "Enable BYOB",
-      "enablingStorage": "enabling storage settings...",
+      "enablingStorage": "Enabling storage settings...",
       "storageEnabledSuccess": "Storage settings enabled successfully.",
       "enableStorageError": "Failed to enable storage settings.",
       "processingTrialExtension": "Please wait while processing trial period extension request...",
@@ -22884,6 +22806,8 @@
       "noResults": "No icons match your search",
       "groups": {
         "results": "Results",
+        "icons": "ไอคอน",
+        "monoLogos": "โลโก้",
         "status": "สถานะ",
         "services": "Services",
         "ai": "AI",
@@ -23385,11 +23309,6 @@
       "failedToLoadToolset": "Failed to load toolset"
     },
     "alerts": {
-      "firing": {
-        "bulkResult": "รับทราบ {acked} รายการ, ข้าม {skipped} รายการ",
-        "bulkResultFailed": "รับทราบ {acked} รายการ, ข้าม {skipped} รายการ, ล้มเหลว {failed} รายการ",
-        "bulkAllAcked": "รับทราบ {acked} รายการ"
-      },
       "failedToNavigateToAlert": "Failed to navigate to alert",
       "alertNotFound": "Alert not found",
       "failedToLoadAlerts": "Failed to load alerts",
@@ -23621,9 +23540,9 @@
       "pipelinesExportedSuccessfully": "{count} pipeline exported successfully | {count} pipelines exported successfully",
       "functionsNotBundled": "{count} function could not be included in the export file: {names} | {count} functions could not be included in the export file: {names}",
       "pipelineDeletedSuccessfully": "Pipeline deleted successfully",
-      "deletingPipeline": "deleting pipeline...",
+      "deletingPipeline": "Deleting pipeline...",
       "pipelineCreatedSuccessfully": "Pipeline created successfully",
-      "savingPipeline": "saving pipeline...",
+      "savingPipeline": "Saving pipeline...",
       "stateResumed": "{name} state resumed successfully",
       "statePaused": "{name} state paused successfully"
     },
@@ -24149,1413 +24068,6 @@
     "security": {
       "label": "ความปลอดภัย",
       "description": "SIEM · OCSF · กฎ Sigma"
-    }
-  },
-  "siem": {
-    "severity": {
-      "critical": "วิกฤต",
-      "high": "สูง",
-      "medium": "ปานกลาง",
-      "low": "ต่ำ",
-      "info": "ข้อมูล",
-      "unknown": "ไม่ทราบ",
-      "fatal": "ร้ายแรง",
-      "other": "อื่นๆ"
-    },
-    "range": {
-      "1h": "1 ชม.",
-      "24h": "24 ชม.",
-      "7d": "7 วัน",
-      "30d": "30 วัน"
-    },
-    "common": {
-      "close": "ปิด",
-      "mitre": "MITRE ATT&CK",
-      "severity": "ความรุนแรง",
-      "viewAll": "ดูทั้งหมด"
-    },
-    "caseStatus": {
-      "open": "ใหม่",
-      "acknowledged": "กำลังตรวจสอบ",
-      "resolved": "ปิดแล้ว"
-    },
-    "health": {
-      "live": "กำลังรายงาน",
-      "quiet": "ไม่มีการรายงานเกิน 24 ชั่วโมง",
-      "never": "ยังไม่มีข้อมูล"
-    },
-    "outcome": {
-      "success": "สำเร็จ",
-      "failure": "ล้มเหลว"
-    },
-    "op": {
-      "eq": "เท่ากับ",
-      "neq": "ไม่เท่ากับ",
-      "contains": "มี",
-      "notContains": "ไม่มี"
-    },
-    "pivot": {
-      "include": "กรองเฉพาะค่านี้",
-      "exclude": "กรองค่านี้ออก",
-      "copy": "คัดลอกค่า"
-    },
-    "entity": {
-      "actor": "ผู้กระทำ",
-      "source": "แหล่งที่มา",
-      "destination": "ปลายทาง",
-      "host": "โฮสต์",
-      "process": "โปรเซส",
-      "operation": "การดำเนินการ",
-      "resource": "ทรัพยากร"
-    },
-    "notices": {
-      "more": "อีก {n} รายการ",
-      "less": "แสดงน้อยลง",
-      "readMore": "อ่านเพิ่มเติม",
-      "tone": {
-        "error": "ข้อผิดพลาด",
-        "warning": "คำเตือน",
-        "info": "ข้อมูล"
-      }
-    },
-    "fieldGroup": {
-      "event": "เหตุการณ์",
-      "actor": "ผู้กระทำ",
-      "src": "เอนด์พอยต์ต้นทาง",
-      "dst": "เอนด์พอยต์ปลายทาง",
-      "network": "การเชื่อมต่อ",
-      "http": "HTTP",
-      "process": "โปรเซสและไฟล์",
-      "cloud": "คลาวด์และ API",
-      "finding": "สิ่งที่ตรวจพบ",
-      "device": "อุปกรณ์",
-      "metadata": "ข้อมูลเมตา",
-      "other": "ฟิลด์อื่นๆ"
-    },
-    "column": {
-      "time": "เวลา",
-      "severityId": "ความรุนแรง",
-      "className": "คลาส",
-      "activity": "กิจกรรม",
-      "statusId": "ผลลัพธ์",
-      "actor": "ผู้กระทำ",
-      "srcIp": "IP ต้นทาง",
-      "dstIp": "IP ปลายทาง",
-      "host": "โฮสต์",
-      "process": "โปรเซส",
-      "operation": "การดำเนินงาน",
-      "resource": "ทรัพยากร",
-      "product": "ผลิตภัณฑ์",
-      "message": "ข้อความ"
-    },
-    "mitre": {
-      "tactics": {
-        "reconnaissance": "การลาดตระเวน",
-        "resource_development": "การพัฒนาทรัพยากร",
-        "initial_access": "การเข้าถึงครั้งแรก",
-        "execution": "การดำเนินการ",
-        "persistence": "การคงอยู่",
-        "privilege_escalation": "การยกระดับสิทธิ์",
-        "defense_evasion": "การหลบหลีกการป้องกัน",
-        "credential_access": "การเข้าถึงข้อมูลรับรอง",
-        "discovery": "การสำรวจ",
-        "lateral_movement": "การเคลื่อนที่ในแนวนอน",
-        "collection": "การรวบรวมข้อมูล",
-        "command_and_control": "การสั่งการและควบคุม",
-        "exfiltration": "การขโมยข้อมูลออก",
-        "impact": "ผลกระทบ"
-      }
-    },
-    "overview": {
-      "title": "ภาพรวม SOC",
-      "subtitle": "สิ่งที่กำลังแจ้งเตือน สิ่งที่เปิดอยู่ และแหล่งข้อมูลของคุณยังรายงานอยู่หรือไม่",
-      "autoRefreshOn": "เปิดการรีเฟรชอัตโนมัติทุกนาทีอยู่",
-      "autoRefreshOff": "ปิดการรีเฟรชอัตโนมัติอยู่",
-      "historyError": "ไม่สามารถโหลดประวัติการตรวจจับได้: {reason}",
-      "rulesError": "ไม่สามารถโหลดรายการตรวจจับได้: {reason}",
-      "noDetections": "ยังไม่มีการเปิดใช้การตรวจจับ SIEM จึงยังไม่มีสิ่งใดแจ้งเตือนได้ที่นี่ เปิดใช้การตรวจจับจากแคตตาล็อก Sigma เพื่อเริ่มการตรวจสอบ",
-      "browseDetections": "เรียกดูการตรวจจับ",
-      "stat": {
-        "critical": "การแจ้งเตือนระดับวิกฤต",
-        "high": "การแจ้งเตือนระดับสูง",
-        "openCases": "เคสที่เปิดอยู่",
-        "firingDetections": "การตรวจจับที่กำลังแจ้งเตือน",
-        "quietSources": "แหล่งข้อมูลที่ไม่ส่งข้อมูล",
-        "activeRules": "การตรวจจับที่ใช้งานอยู่"
-      },
-      "activity": "กิจกรรมการตรวจจับ",
-      "activityHint": "ไม่มีการแจ้งเตือนในช่วงเวลานี้ | {n} การแจ้งเตือนในช่วงเวลานี้ แยกตามระดับความรุนแรง | {n} การแจ้งเตือนในช่วงเวลานี้ แยกตามระดับความรุนแรง",
-      "quiet": "ไม่มีการแจ้งเตือน",
-      "quietHint": "ไม่มีการตรวจจับใดแจ้งเตือนในช่วงเวลานี้",
-      "openCases": "เคสที่เปิดอยู่",
-      "casesUnsupported": "การจัดการเคสไม่มีให้ใช้งานในการติดตั้งนี้",
-      "noOpenCases": "ไม่มีเคสที่เปิดอยู่",
-      "untitledCase": "เคสที่ไม่มีชื่อ",
-      "caseAlerts": "{n} การแจ้งเตือน | {n} การแจ้งเตือน",
-      "triage": "คิวคัดแยก",
-      "triageHint": "การแจ้งเตือนล่าสุด ใหม่ที่สุดก่อน",
-      "fullQueue": "คิวทั้งหมด",
-      "detection": "การตรวจจับ",
-      "matches": "รายการที่ตรงกัน",
-      "fired": "แจ้งเตือนแล้ว",
-      "queueClear": "คิวคัดแยกว่างเปล่า",
-      "topDetections": "การตรวจจับที่แจ้งเตือนบ่อยที่สุด",
-      "topDetectionsHint": "จุดที่การปรับแต่งให้ผลคุ้มค่าที่สุดก่อน",
-      "mitre": "ความครอบคลุม MITRE ATT&CK",
-      "mitreHint": "ครอบคลุม {covered} จาก {total} กลยุทธ์ โดยการตรวจจับที่เปิดใช้งาน",
-      "rulesCount": "{n} กฎ | {n} กฎ",
-      "firingsCount": "แจ้งเตือน {n} ครั้ง | แจ้งเตือน {n} ครั้ง",
-      "legendFiring": "แจ้งเตือนในช่วงเวลา",
-      "legendCovered": "ครอบคลุม",
-      "legendGap": "ไม่มีความครอบคลุม",
-      "sources": "สุขภาพของแหล่งข้อมูลล็อก",
-      "sourcesHint": "มี {live} จาก {total} แหล่งข้อมูลความปลอดภัยที่รายงาน",
-      "explore": "สำรวจ",
-      "noSources": "ยังไม่มีแหล่งข้อมูลความปลอดภัย",
-      "noSourcesHint": "นำเข้าข้อมูล CloudTrail, Okta, VPC Flow หรือ syslog สตรีมที่มีชื่อมีคำว่า security, audit, auth หรือ firewall จะแสดงที่นี่โดยอัตโนมัติ",
-      "summaryPartial": "ช่วงเวลานี้มีประวัติการแจ้งเตือนมากกว่าที่สรุปหนึ่งครั้งจะเก็บได้ ตัวเลขและแผนภูมิจึงเป็นค่าต่ำสุด เลือกช่วงเวลาที่สั้นลงเพื่อให้ได้ตัวเลขที่สมบูรณ์"
-    },
-    "events": {
-      "title": "เหตุการณ์ความปลอดภัย",
-      "subtitle": "ค้นหาในข้อมูลเทเลเมทรีความปลอดภัยที่ปรับรูปแบบแล้ว",
-      "run": "เรียกใช้",
-      "hideSidebar": "ซ่อนฟิลด์",
-      "showSidebar": "แสดงฟิลด์",
-      "selectStream": "เลือกสตรีม",
-      "securityStreams": "สตรีมความปลอดภัย",
-      "otherStreams": "สตรีมอื่น ๆ",
-      "builder": "ตัวสร้าง",
-      "allSeverities": "ทุกระดับความรุนแรง",
-      "field": "ฟิลด์",
-      "value": "ค่า",
-      "addFilter": "เพิ่มตัวกรอง",
-      "clearFilters": "ล้างทั้งหมด",
-      "sources": "แหล่งข้อมูล",
-      "addSource": "เพิ่มสตรีมเป็นแหล่งข้อมูล",
-      "removeSource": "ลบออกจากแหล่งข้อมูล",
-      "autoSource": "เลือกโดยอัตโนมัติ: {label}, ตรงกัน {n}%",
-      "nameSource": "เลือกเพราะชื่อดูเหมือนแหล่งข้อมูลด้านความปลอดภัย",
-      "autoTag": "อัตโนมัติ",
-      "suggested": "แนะนำ",
-      "suggestedSource": "ดูเหมือน {label} (ตรงกัน {n}%)",
-      "addSuggested": "เพิ่มเป็นแหล่งข้อมูล",
-      "dismissSuggestion": "ไม่สนใจ",
-      "showMore": "แสดงอีก {n} รายการ",
-      "showFewer": "แสดงน้อยลง",
-      "classShare": "{uid} {pct}%",
-      "classifying": "กำลังตรวจสอบสตรีมสำหรับข้อมูลด้านความปลอดภัย",
-      "searchFields": "ค้นหาฟิลด์",
-      "addColumn": "แสดงเป็นคอลัมน์",
-      "removeColumn": "ซ่อนคอลัมน์",
-      "noValues": "ไม่มีค่าในช่วงเวลานี้",
-      "noFields": "ไม่มีฟิลด์ที่ตรงกัน",
-      "selectStreamFirst": "เลือกสตรีมเพื่อดูฟิลด์",
-      "confidence": "ตรงกัน {n}%",
-      "telemetryOnly": "เฉพาะเทเลเมทรี",
-      "matchedOn": "ตรงกันที่ {fields}",
-      "ocsfCategory": "หมวดหมู่ OCSF: {name}",
-      "ocsfClass": "คลาส OCSF: {name} ({uid})",
-      "rulesMatch": "กฎตรงกันกับ {logsource}",
-      "rulesMatchHint": "การตรวจจับของ Sigma จะตรงกันกับ logsource ไม่ใช่หมวดหมู่ OCSF",
-      "product": "ผลิตภัณฑ์: {name}",
-      "classMix": "คลาสในชั่วโมงที่ผ่านมา: {mix}",
-      "objects": "ออบเจ็กต์ OCSF",
-      "missingSignals": "ไม่พบ: {fields}",
-      "detections": "{n} กฎที่ตรงกัน | {n} กฎที่ตรงกัน",
-      "firing": "{n} ที่ตรวจพบ | {n} ที่ตรวจพบ",
-      "matchingRulesHint": "กฎในแค็ตตาล็อก Sigma ที่ใช้กับแหล่งข้อมูลนี้ ผลตรงกันคือรายการที่ตรงในช่วงเวลาปัจจุบัน ไม่ใช่การตรวจจับที่ติดตั้งใช้งานแล้ว",
-      "rulesFor": "กฎ Sigma สำหรับ {source}",
-      "hits": "{n} รายการที่ตรงกัน | {n} รายการที่ตรงกัน",
-      "viewHits": "ดูรายการที่ตรงกัน",
-      "createDetection": "สร้างการตรวจจับ",
-      "events": "เหตุการณ์",
-      "sqlTimelineNote": "ไทม์ไลน์และการแจกแจงรายละเอียดตามระดับความรุนแรงจะเป็นไปตามตัวกรองในโหมดตัวสร้าง สลับกลับไปที่โหมดตัวสร้างเพื่อดูข้อมูลสำหรับการค้นหานี้",
-      "noStreamTitle": "ไม่มีสตรีมให้ค้นหา",
-      "noStreamHint": "นำเข้าล็อกด้านความปลอดภัยเพื่อเริ่มค้นหา สตรีมจะปรากฏที่นี่ทันทีที่ข้อมูลเข้ามา",
-      "showingOf": "แสดง {shown} จาก {total} เหตุการณ์ล่าสุด",
-      "count": "{n} เหตุการณ์ | {n} เหตุการณ์",
-      "hideTimeline": "ซ่อนไทม์ไลน์",
-      "showTimeline": "แสดงไทม์ไลน์",
-      "normalized": "ปรับให้เป็นมาตรฐาน",
-      "normalizedHint": "ทุกแหล่งข้อมูลถูกแมปไปยังคอลัมน์ OCSF",
-      "raw": "ข้อมูลดิบ",
-      "refresh": "รีเฟรชผลลัพธ์",
-      "noEvents": "ไม่พบเหตุการณ์",
-      "noEventsHint": "ขยายช่วงเวลาหรือผ่อนปรนตัวกรอง",
-      "noEventsLastReported": "{stream} ไม่มีข้อมูลในช่วงเวลานี้ รายงานล่าสุดเมื่อ {ago}",
-      "searchWider": "ค้นหาย้อนหลัง {period}",
-      "searchFailed": "การค้นหาล้มเหลว",
-      "cancel": "ยกเลิก",
-      "cancelled": "ยกเลิกการค้นหาแล้ว",
-      "latestCount": "เหตุการณ์ที่ตรงกันล่าสุด {n} รายการ | เหตุการณ์ที่ตรงกันล่าสุด {n} รายการ",
-      "sql": "SQL",
-      "invertFilter": "สลับระหว่างการรวมและการยกเว้น",
-      "removeFilter": "ลบตัวกรอง",
-      "pivotSqlUnsupported": "คิวรี SQL นี้ไม่ใช่ SELECT … WHERE แบบง่าย จึงไม่สามารถเพิ่มตัวกรองได้ แก้ไขคิวรีด้วยตนเอง หรือสลับไปใช้ Builder",
-      "topValuesWholeStream": "โหมด SQL: ค่าจะถูกนับจากทั้งสตรีม ไม่ใช่จากคิวรีของคุณ",
-      "allSources": "แหล่งข้อมูลด้านความปลอดภัยทั้งหมด",
-      "sortSqlMode": "คิวรีที่เขียนเองจะกำหนด ORDER BY ของตัวเอง",
-      "includeFailed": "เพิ่ม {name} ในความปลอดภัยไม่สำเร็จ",
-      "excludeFailed": "นำ {name} ออกจากความปลอดภัยไม่สำเร็จ",
-      "hunt": {
-        "title": "ค้นหาทุกแหล่งข้อมูลด้านความปลอดภัยพร้อมกัน",
-        "hint": "พิมพ์ที่อยู่ IP ผู้ใช้ หรือโฮสต์ ระบบจะค้นหาแต่ละแหล่งข้อมูลด้วยคอลัมน์ของตัวเอง และแต่ละแถวจะระบุว่ามาจากแหล่งข้อมูลใด",
-        "noMatches": "ไม่พบรายการที่ตรงกันในช่วงเวลานี้",
-        "noMatchesHint": "ขยายช่วงเวลา หรือค้นหาในฟิลด์ใดก็ได้แทนการจำกัดเพียงประเภทเดียว",
-        "noFields": "ฟิลด์แตกต่างกันไปตามแต่ละแหล่งข้อมูล เลือกแหล่งข้อมูลเดียวเพื่อดูฟิลด์ของแหล่งนั้น",
-        "search": "ค้นหา",
-        "aliases": "ตรงกับการสะกดอีก {n} แบบ | ตรงกับการสะกดอีก {n} แบบ",
-        "clearAliases": "จับคู่เฉพาะชื่อที่พิมพ์",
-        "uncounted": "ไม่ได้นับ: {streams}",
-        "kind": {
-          "any": "ฟิลด์ใดก็ได้",
-          "user": "ผู้ใช้",
-          "ip": "ที่อยู่ IP",
-          "host": "โฮสต์"
-        },
-        "placeholder": {
-          "any": "ที่อยู่ IP ผู้ใช้ โฮสต์ หรือข้อความ",
-          "user": "dave, ACME\\dave หรือ dave{'@'}acme.io",
-          "ip": "185.220.101.47",
-          "host": "ชื่อโฮสต์"
-        },
-        "column": {
-          "time": "เวลา",
-          "source": "ต้นทาง",
-          "user": "ผู้ใช้",
-          "ip": "IP ต้นทาง",
-          "host": "โฮสต์",
-          "action": "การดำเนินการ",
-          "outcome": "ผลลัพธ์",
-          "message": "ข้อความ"
-        }
-      }
-    },
-    "drawer": {
-      "event": "เหตุการณ์ความปลอดภัย",
-      "overview": "ภาพรวม",
-      "detections": "การตรวจจับ",
-      "fields": "ฟิลด์",
-      "json": "JSON",
-      "noEntities": "ไม่พบเอนทิตีที่รู้จัก",
-      "noEntitiesHint": "แหล่งข้อมูลนี้ไม่มีการแมปสำหรับฟิลด์ผู้กระทำ เครือข่าย หรือโฮสต์ ดูแท็บฟิลด์เพื่อดูข้อมูลทั้งหมดที่เข้ามา",
-      "classifiedAs": "จัดประเภทเป็น",
-      "evaluating": "กำลังประเมินการตรวจจับกับเหตุการณ์นี้",
-      "noRules": "ไม่มีการตรวจจับที่ใช้กับแหล่งข้อมูลนี้",
-      "noRulesHint": "ไม่มีกฎ Sigma ที่มีมาให้ซึ่งเขียนสำหรับแหล่งล็อกนี้",
-      "matchError": "ไม่สามารถประเมินการตรวจจับได้",
-      "noMatches": "ไม่มีการตรวจจับที่ตรงกัน",
-      "noMatchesHint": "ประเมินกฎ {n} ข้อกับเหตุการณ์นี้แล้ว แต่ไม่ตรงกัน | ประเมินกฎ {n} ข้อกับเหตุการณ์นี้แล้ว แต่ไม่ตรงกัน",
-      "attack": "เทคนิค ATT&CK",
-      "classUid": "class_uid {n}",
-      "eyebrow": "เหตุการณ์ความปลอดภัย",
-      "source": "แหล่งข้อมูล",
-      "matchedRules": "การตรวจจับที่ตรงกัน {n} รายการ | การตรวจจับที่ตรงกัน {n} รายการ",
-      "openCase": "เปิดเคส",
-      "openCaseHint": "เปิดเคสสำหรับโฮสต์ ผู้ใช้ หรือที่อยู่ที่ระบุในเหตุการณ์นี้",
-      "addToCase": "เพิ่มลงในเคส",
-      "pickCase": "เพิ่มลงในเคสที่เปิดอยู่",
-      "caseOpened": "เปิดเคสแล้ว: {title}",
-      "caseUpdated": "เพิ่มเหตุการณ์ลงใน {title} แล้ว",
-      "caseError": "เปิดเคสจากเหตุการณ์นี้ไม่ได้"
-    },
-    "record": {
-      "prev": "ระเบียนก่อนหน้า",
-      "next": "ระเบียนถัดไป",
-      "position": "{n} จาก {total}",
-      "copyLink": "คัดลอกลิงก์ไปยังระเบียนนี้",
-      "linkCopied": "คัดลอกลิงก์แล้ว",
-      "searchFields": "ค้นหาฟิลด์และค่า",
-      "noFields": "ไม่มีฟิลด์ที่ตรงกัน",
-      "copyFailed": "ไม่สามารถคัดลอกไปยังคลิปบอร์ดได้"
-    },
-    "alerts": {
-      "title": "การแจ้งเตือน",
-      "subtitle": "ทุกครั้งที่การตรวจจับถูกทริกเกอร์ พร้อมหลักฐานประกอบ",
-      "eyebrow": "การตรวจจับกำลังทำงาน",
-      "range": {
-        "1h": "1 ชม.",
-        "6h": "6 ชม.",
-        "24h": "24 ชม.",
-        "7d": "7 วัน",
-        "30d": "30 วัน"
-      },
-      "stat": {
-        "firings": "จำนวนครั้งที่แจ้งเตือนระดับ {severity}",
-        "error": "การประเมินที่ล้มเหลว",
-        "silenced": "ปิดเสียงแจ้งเตือน",
-        "low": "จำนวนครั้งที่แจ้งเตือนระดับต่ำ / ข้อมูล"
-      },
-      "status": {
-        "firing": "กำลังแจ้งเตือน",
-        "notify_failed": "กำลังแจ้งเตือน · ส่งการแจ้งเตือนไม่สำเร็จ",
-        "error": "การประเมินล้มเหลว",
-        "normal": "ปกติ",
-        "skipped": "ข้าม",
-        "other": "ไม่ทราบ"
-      },
-      "column": {
-        "detection": "การตรวจจับ",
-        "status": "ผลลัพธ์",
-        "value": "ค่าที่ตรงกัน",
-        "window": "ช่วงเวลา",
-        "fired": "เวลาแจ้งเตือน",
-        "evaluated": "เวลาที่ประเมิน"
-      },
-      "fact": {
-        "firedAt": "แจ้งเตือนเมื่อ",
-        "value": "ค่าที่ตรงกันเทียบกับเกณฑ์",
-        "window": "ช่วงเวลา",
-        "evaluation": "การประเมินใช้เวลา",
-        "windowRange": "ช่วงเวลาที่ประเมิน",
-        "group": "กลุ่ม",
-        "error": "ข้อผิดพลาด",
-        "evaluatedAt": "ประเมินเมื่อ"
-      },
-      "tab": {
-        "overview": "ภาพรวม",
-        "evidence": "หลักฐาน",
-        "detection": "การตรวจจับ",
-        "raw": "ข้อมูลดิบ"
-      },
-      "rule": {
-        "name": "ชื่อ",
-        "state": "สถานะ",
-        "enabled": "เปิดใช้งาน",
-        "disabled": "ปิดใช้งาน",
-        "stream": "สตรีม",
-        "frequency": "ทำงานทุก",
-        "logsource": "แหล่งที่มาของล็อก",
-        "sigmaId": "รหัสกฎ Sigma"
-      },
-      "minutes": "{n} นาที | {n} นาที",
-      "seconds": "{n} วินาที",
-      "yes": "ใช่",
-      "search": "ค้นหาการตรวจจับหรือเทคนิค",
-      "showEvaluations": "แสดงการประเมินทั้งหมด",
-      "count": "{n} แถว | {n} แถว",
-      "refresh": "รีเฟรช",
-      "cappedRows": "ตารางแสดง {n} รายการล่าสุดจาก {total} การทำงานที่ตรงกัน ย้อนไปถึง {from} ส่วนจำนวนตามระดับความรุนแรงครอบคลุมทั้งช่วงเวลา",
-      "summaryPartial": "จำนวนตามระดับความรุนแรงแตะขีดจำกัดแถวของเซิร์ฟเวอร์และอาจต่ำกว่าความเป็นจริง โปรดเลือกช่วงเวลาที่สั้นลงเพื่อดูจำนวนที่ครบถ้วน",
-      "notSiem": "ไม่ใช่กฎ SIEM",
-      "notSiemTitle": "ไม่ใช่การตรวจจับของ SIEM",
-      "notSiemHint": "การแจ้งเตือนนี้ไม่มีข้อมูลเมตาของ Sigma จึงไม่มีกฎให้แสดง รายการนี้แสดงอยู่เนื่องจากตัวเลือกเฉพาะ SIEM ถูกปิดอยู่",
-      "empty": "ไม่มีการแจ้งเตือน",
-      "emptyHint": "ไม่มีการแจ้งเตือนจากการตรวจจับใดในช่วงเวลานี้",
-      "noDetections": "ยังไม่มีการตรวจจับ SIEM",
-      "noDetectionsHint": "เปิดใช้การตรวจจับจากแคตตาล็อก Sigma ในหน้าการตรวจจับ รายการแจ้งเตือนที่เกิดขึ้นจะแสดงที่นี่",
-      "whatItDetects": "สิ่งที่ตรวจจับได้",
-      "whyItFired": "สาเหตุที่แจ้งเตือน",
-      "falsePositives": "ผลบวกลวงที่ทราบแล้ว",
-      "noEvidence": "ไม่มีคิวรีหลักฐาน",
-      "noEvidenceHint": "การตรวจจับนี้ไม่มีสตรีมหรือเงื่อนไข WHERE ที่จะเล่นซ้ำ",
-      "evidenceCount": "{n} เหตุการณ์ที่ตรงกันในช่วงเวลาที่ประเมิน | {n} เหตุการณ์ที่ตรงกันในช่วงเวลาที่ประเมิน",
-      "evidenceError": "ไม่สามารถโหลดเหตุการณ์ที่ตรงกันได้",
-      "evidenceAgedOut": "ไม่มีเหตุการณ์ที่ตรงกันเหลืออยู่ในหน้าต่างนี้; เหตุการณ์เหล่านี้อาจหมดอายุการเก็บรักษาแล้ว",
-      "query": "คิวรีการตรวจจับ",
-      "investigate": "ตรวจสอบในเหตุการณ์",
-      "openDetection": "เปิดการตรวจจับ",
-      "evaluation": "การประเมิน",
-      "eyebrowEvaluation": "การประเมินการตรวจจับ",
-      "evidenceNone": "ไม่มีสิ่งใดตรงกับการตรวจจับนี้ในช่วงเวลาที่ประเมิน",
-      "customWindow": "กำลังแสดงช่วงเวลาแบบคงที่: {from} → {to}",
-      "backToRange": "กลับไปที่ช่วง {range} ล่าสุด",
-      "missing": "การแจ้งเตือนที่ลิงก์นี้อ้างถึงไม่อยู่ในหน้าต่างที่โหลดไว้ อาจเก่ากว่าช่วงเวลานี้หรือเกินขีดจำกัดแถวล่าสุด",
-      "dismiss": "ปิด",
-      "triage": {
-        "createCase": "สร้างเคส",
-        "addToCase": "เพิ่มลงในเคส",
-        "openCase": "เปิดเคส",
-        "acknowledge": "เริ่มสอบสวน",
-        "addNote": "เพิ่มบันทึก",
-        "notePlaceholder": "เพิ่มบันทึกในเคสของการทริกเกอร์นี้",
-        "acknowledged": "ทำเครื่องหมายเคสว่ากำลังสอบสวนแล้ว",
-        "noted": "เพิ่มบันทึกในเคสแล้ว",
-        "caseOpened": "เปิดเคสแล้ว",
-        "attached": "เพิ่มการทริกเกอร์ลงในเคสแล้ว",
-        "failed": "ไม่สามารถอัปเดตเคส"
-      }
-    },
-    "cases": {
-      "title": "เคส",
-      "subtitle": "รายการแจ้งเตือนที่เชื่อมโยงกัน ซึ่งคัดแยกจนได้ข้อสรุป",
-      "eyebrow": "เคส",
-      "search": "กรองหน้านี้ตามชื่อเรื่อง, id, ผู้รับผิดชอบ หรือเอนทิตี",
-      "refresh": "รีเฟรช",
-      "loadError": "ไม่สามารถโหลดเคสได้",
-      "openError": "ไม่สามารถเปิดเคสได้",
-      "hiddenAlerts": "การแจ้งเตือน {n} ครั้งจากการแจ้งเตือนที่ไม่ใช่ด้านความปลอดภัยในเคสนี้ถูกซ่อน | การแจ้งเตือน {n} ครั้งจากการแจ้งเตือนที่ไม่ใช่ด้านความปลอดภัยในเคสนี้ถูกซ่อน",
-      "noSecurityAlerts": "เคสนี้ถูกเปิดโดยการแจ้งเตือนที่ไม่ใช่การตรวจจับด้านความปลอดภัย จึงไม่แสดงไว้ที่นี่",
-      "updateError": "ไม่สามารถอัปเดตเคสได้",
-      "commentError": "ไม่สามารถโพสต์ความคิดเห็นได้",
-      "analysisError": "การวิเคราะห์สาเหตุหลักล้มเหลว",
-      "empty": "ไม่มีเคส",
-      "emptyHint": "เคสจะเปิดขึ้นโดยอัตโนมัติเมื่อการตรวจจับที่เกี่ยวข้องถูกทริกเกอร์พร้อมกัน",
-      "unassigned": "ยังไม่กำหนด",
-      "column": {
-        "priority": "ลำดับความสำคัญ",
-        "title": "เคส",
-        "status": "สถานะ",
-        "alerts": "การแจ้งเตือน",
-        "assignee": "ผู้รับผิดชอบ",
-        "firstSeen": "พบครั้งแรก",
-        "lastSeen": "พบล่าสุด"
-      },
-      "fact": {
-        "duration": "ระยะเวลา",
-        "timeToClose": "เวลาจนปิดเคส"
-      },
-      "durationMinutes": "{n} นาที",
-      "durationHours": "{n} ชม.",
-      "durationDays": "{n} วัน",
-      "tab": {
-        "overview": "ภาพรวม",
-        "alerts": "การแจ้งเตือน",
-        "timeline": "ไทม์ไลน์",
-        "analysis": "การวิเคราะห์"
-      },
-      "detections": "การตรวจพบในเคสนี้",
-      "noDetections": "ยังไม่มีการบันทึกการตรวจพบ",
-      "firedTimes": "แจ้งเตือน {n} ครั้ง | แจ้งเตือน {n} ครั้ง",
-      "entities": "เอนทิตีที่ได้รับผลกระทบ",
-      "noEntities": "เอนจินคอร์รีเลชันไม่ได้บันทึกมิติการจัดกลุ่มสำหรับเคสนี้",
-      "noAlerts": "ไม่มีการบันทึกการแจ้งเตือน",
-      "external": "ภายนอก",
-      "reason": {
-        "service_discovery": "คอร์รีเลตจากการค้นพบบริการ",
-        "primary_match": "คอร์รีเลตจากมิติหลัก",
-        "secondary_match": "คอร์รีเลตจากมิติรอง",
-        "alert_id": "การตรวจพบเดียวกัน",
-        "entity": "โฮสต์ ผู้ใช้ หรือที่อยู่เดียวกัน"
-      },
-      "commentPlaceholder": "เพิ่มบันทึกสำหรับทีม",
-      "postComment": "โพสต์บันทึก",
-      "noEvents": "ยังไม่มีกิจกรรม",
-      "event": {
-        "created": "เปิดเคสแล้ว",
-        "alert": "{name} เกิดการแจ้งเตือน ({n})",
-        "severityUpgrade": "ความสำคัญถูกยกระดับ {from} → {to}: {reason}",
-        "severityOverride": "ตั้งค่าความสำคัญ {from} → {to}",
-        "acknowledged": "ทำเครื่องหมายว่ากำลังตรวจสอบ",
-        "resolved": "ปิดแล้ว",
-        "autoResolved": "ปิดโดยอัตโนมัติ",
-        "reopened": "เปิดใหม่: {reason}",
-        "titleChanged": "เปลี่ยนชื่อเป็น {to}",
-        "assigned": "มอบหมายให้ {to}",
-        "unassigned": "ยกเลิกการมอบหมาย",
-        "comment": "บันทึก",
-        "analysisBegin": "เริ่มการวิเคราะห์สาเหตุราก",
-        "analysisComplete": "การวิเคราะห์สาเหตุรากเสร็จสิ้น",
-        "analysisFailed": "การวิเคราะห์สาเหตุรากล้มเหลว: {reason}",
-        "analysisCancelled": "ยกเลิกการวิเคราะห์สาเหตุรากแล้ว",
-        "other": "{type}",
-        "verdict": {
-          "true_positive": "ข้อสรุป: ผลบวกจริง",
-          "false_positive": "ข้อสรุป: ผลบวกลวง",
-          "benign": "ข้อสรุป: ไม่เป็นอันตราย",
-          "duplicate": "ข้อสรุป: ซ้ำ",
-          "stale": "คำตัดสิน: เก่า / ย้อนหลัง"
-        },
-        "alertsAttached": "การทริกเกอร์ที่เพิ่มด้วยตนเอง: {names}",
-        "eventAttached": "เพิ่มเหตุการณ์จาก {stream} เมื่อ {at} แล้ว"
-      },
-      "analysisHint": "สรุปโดย AI ว่าอะไรเชื่อมโยงการแจ้งเตือนที่เกิดขึ้นในเคสนี้",
-      "runAnalysis": "วิเคราะห์",
-      "rerunAnalysis": "วิเคราะห์ใหม่",
-      "noAnalysis": "ยังไม่มีการวิเคราะห์",
-      "priorityOption": "{p} · {level}",
-      "priorityChanged": "ตั้งค่าความสำคัญเป็น {p}",
-      "statusChanged": "เคสถูกทำเครื่องหมายเป็น {status}",
-      "viewFirings": "ดูการแจ้งเตือนที่เกิดขึ้น",
-      "transition": {
-        "open": "เปิดใหม่",
-        "acknowledged": "เริ่มตรวจสอบ",
-        "resolved": "ปิดเคส"
-      },
-      "notFound": "ไม่พบเคส",
-      "timelinePartial": "ไทม์ไลน์นี้ถูกสร้างใหม่จากระเบียนเคส ดังนั้นบันทึก การรับทราบ และกิจกรรมการวิเคราะห์ก่อนการสร้างใหม่อาจหายไป",
-      "verdict": {
-        "true_positive": "ผลบวกจริง",
-        "false_positive": "ผลบวกลวง",
-        "benign": "ไม่เป็นอันตราย",
-        "duplicate": "ซ้ำ",
-        "stale": "เก่า / ย้อนหลัง"
-      },
-      "close": {
-        "title": "ปิดเคส",
-        "verdict": "ข้อสรุป",
-        "verdictRequired": "เลือกข้อสรุป",
-        "reason": "เหตุผล",
-        "reasonPlaceholder": "สิ่งที่คุณพบและเหตุผลที่ปิดเคสได้",
-        "reasonRequired": "ระบุเหตุผล",
-        "reasonTooLong": "เหตุผลต้องไม่เกิน {max} อักขระ",
-        "cancel": "ยกเลิก"
-      },
-      "settings": {
-        "open": "การตั้งค่าเคส",
-        "title": "การตั้งค่าเคส",
-        "save": "บันทึก",
-        "saved": "บันทึกการตั้งค่าเคสแล้ว",
-        "loadFailed": "โหลดการตั้งค่าเคสไม่สำเร็จ",
-        "saveFailed": "บันทึกการตั้งค่าเคสไม่สำเร็จ",
-        "autoCloseDays": "ปิดเคสที่เงียบหลังจาก (วัน)",
-        "autoCloseDaysHint": "เคสที่ไม่มีการทริกเกอร์ใหม่ตามจำนวนวันนี้จะปิดเอง 0 คือเปิดเคสไว้ตลอด สูงสุด {max}",
-        "groupWindowMinutes": "จัดกลุ่มการทริกเกอร์ภายใน (นาที)",
-        "groupWindowMinutesHint": "กิจกรรมบนโฮสต์ ผู้ใช้ หรือที่อยู่เดียวกันภายในจำนวนนาทีนี้นับจากกิจกรรมล่าสุดของเคส (ตามเวลาของเหตุการณ์) จะรวมเข้าในเคสนั้น 0 คือเปิดหนึ่งเคสต่อการตรวจจับหนึ่งรายการ สูงสุด {max}",
-        "wholeNumber": "ป้อนจำนวนเต็ม",
-        "range": "ป้อนค่าตั้งแต่ 0 ถึง {max}"
-      },
-      "assignedTo": "มอบหมายให้ {to}",
-      "unassignedToast": "ยกเลิกการมอบหมายเคสแล้ว",
-      "historical": "ย้อนหลัง (backfill)",
-      "historicalHint": "การทริกเกอร์ทั้งหมดในเคสนี้มาจาก backfill ข้อมูลในอดีต จึงไม่ได้แสดงถึงกิจกรรมปัจจุบัน"
-    },
-    "mitrePage": {
-      "title": "MITRE ATT&CK",
-      "subtitle": "เทคนิคใดบ้างที่การตรวจพบที่คุณเปิดใช้งานครอบคลุมอยู่ และเทคนิคใดที่เกิดการแจ้งเตือน",
-      "summaryPartial": "ช่วงเวลานี้มีประวัติการแจ้งเตือนมากกว่าที่สรุปหนึ่งชุดจะบรรจุได้ ดังนั้นจำนวนครั้งที่แจ้งเตือนจึงเป็นค่าต่ำสุด; เลือกช่วงเวลาที่สั้นลงเพื่อดูจำนวนที่ครบถ้วน",
-      "stat": {
-        "firing": "เทคนิคที่เกิดการแจ้งเตือน",
-        "gaps": "ช่องว่างการครอบคลุม",
-        "techniques": "เทคนิคที่ครอบคลุมจาก {total}",
-        "tactics": "แท็กติกที่ครอบคลุมจากทั้งหมด {total}"
-      },
-      "view": {
-        "all": "ทั้งหมด",
-        "covered": "ครอบคลุมแล้ว",
-        "gaps": "ช่องว่าง",
-        "firing": "กำลังแจ้งเตือน"
-      },
-      "search": "ค้นหาเทคนิคหรือกฎ",
-      "legend": {
-        "firing": "เกิดการแจ้งเตือนในช่วงเวลา (สีเข้มกว่า = มากกว่า)",
-        "covered": "ครอบคลุมโดยการตรวจจับที่เปิดใช้งาน",
-        "available": "มีกฎพร้อมใช้งาน แต่ยังไม่เปิดใช้งาน",
-        "none": "ไม่มีกฎในแคตตาล็อก"
-      },
-      "columnCount": "{covered} จาก {total} ครอบคลุมแล้ว",
-      "cellEnabled": "{n} การตรวจจับที่เปิดใช้งาน | {n} การตรวจจับที่เปิดใช้งาน",
-      "cellAvailable": "{n} กฎที่พร้อมใช้งาน | {n} กฎที่พร้อมใช้งาน",
-      "noMatch": "ไม่พบเทคนิคที่ตรงกัน",
-      "unmapped": "เทคนิคที่ไม่มีแท็กติกที่รู้จัก",
-      "footnote": "ความครอบคลุมวัดเทียบกับ {total} เทคนิคของ MITRE ATT&CK Enterprise v{version} โดยเทคนิคย่อยจะนับรวมกับเทคนิคหลัก; มีกฎ Sigma จำนวน {n} กฎที่มาพร้อมกับผลิตภัณฑ์.",
-      "drawerEyebrow": "เทคนิค ATT&CK",
-      "state": {
-        "firing": "กำลังแจ้งเตือน",
-        "covered": "ครอบคลุมแล้ว",
-        "available": "ยังไม่ครอบคลุม",
-        "none": "ไม่มีกฎ"
-      },
-      "fact": {
-        "state": "ความครอบคลุม",
-        "enabled": "การตรวจจับที่เปิดใช้งาน",
-        "catalog": "กฎในแคตตาล็อก",
-        "firings": "จำนวนครั้งที่แจ้งเตือน ({range})"
-      },
-      "tab": {
-        "detections": "การตรวจจับ",
-        "firings": "กำลังแจ้งเตือน",
-        "reference": "ข้อมูลอ้างอิง"
-      },
-      "subOf": "เทคนิคย่อยของ {id}",
-      "yourDetections": "การตรวจจับของคุณ",
-      "noDetections": "ยังไม่มีการตรวจจับของคุณที่ครอบคลุมเทคนิคนี้",
-      "enabled": "เปิด",
-      "disabled": "ปิด",
-      "inCatalog": "พร้อมใช้งานในแคตตาล็อก",
-      "enable": "เปิดใช้งาน",
-      "noFirings": "ไม่มีการแจ้งเตือนเกิดขึ้นสำหรับเทคนิคนี้ในช่วง {range} ที่ผ่านมา",
-      "referenceHint": "ชื่อเทคนิค ขั้นตอน และมาตรการบรรเทาผลกระทบได้รับการดูแลโดย MITRE หน้านี้แสดง ID ที่กฎของคุณมีอยู่ และลิงก์ไปยังรายการอ้างอิงที่เป็นทางการ",
-      "openTechnique": "เปิด {id} บน attack.mitre.org",
-      "viewOnAttack": "ดูบน ATT&CK",
-      "manageDetections": "จัดการการตรวจจับ",
-      "historyNarrowed": "ช่วงการค้นหาสูงสุดของประวัติการแจ้งเตือนจำกัดการแจ้งเตือนให้เริ่มตั้งแต่ {from}; การแจ้งเตือนที่เกิดก่อนหน้าในช่วงนี้จะไม่ถูกนับ",
-      "cellNone": "ไม่มีกฎ",
-      "coverageError": "ไม่สามารถโหลดความครอบคลุม ATT&CK ได้: {reason}"
-    },
-    "detections": {
-      "title": "การตรวจจับ",
-      "subtitle": "กฎ Sigma ที่ทำงานเป็นการตรวจจับตามกำหนดเวลาบนสตรีมความปลอดภัยของคุณ",
-      "new": "สร้างการตรวจจับใหม่",
-      "eyebrow": "กฎการตรวจจับ",
-      "refresh": "รีเฟรชการตรวจจับ",
-      "search": "ค้นหาด้วยชื่อ สตรีม หรือเทคนิค",
-      "anySeverity": "ทุกระดับความรุนแรง",
-      "notSiem": "การแจ้งเตือน",
-      "scheduleValue": "ทุก {every} นาที ครอบคลุม {over} นาที",
-      "minutes": "{n} นาที | {n} นาที",
-      "stat": {
-        "fired": "แจ้งเตือนใน 24 ชม.",
-        "erroring": "เกิดข้อผิดพลาด",
-        "enabled": "เปิดใช้งาน",
-        "disabled": "ปิดใช้งาน",
-        "all": "การตรวจจับทั้งหมด",
-        "notifyFailing": "ส่งการแจ้งเตือนไม่สำเร็จ"
-      },
-      "column": {
-        "name": "การตรวจจับ",
-        "stream": "สตรีม",
-        "schedule": "กำหนดการ",
-        "enabled": "เปิดใช้งาน",
-        "fired24h": "แจ้งเตือนแล้ว (24 ชม.)",
-        "lastRun": "การทำงานล่าสุด"
-      },
-      "state": {
-        "enabled": "เปิดใช้งาน",
-        "disabled": "ปิดใช้งาน",
-        "erroring": "เกิดข้อผิดพลาด",
-        "notifyFailing": "ส่งการแจ้งเตือนไม่สำเร็จ"
-      },
-      "tab": {
-        "overview": "ภาพรวม",
-        "history": "ประวัติ",
-        "sigma": "กฎ Sigma",
-        "sql": "คิวรี"
-      },
-      "field": {
-        "logsource": "แหล่งล็อก",
-        "sourceType": "ประเภทแหล่งที่มา",
-        "sigmaId": "ID กฎ Sigma",
-        "destinations": "แจ้งเตือนไปยัง",
-        "silence": "ช่วงเงียบหลังแจ้งเตือน",
-        "owner": "เจ้าของ",
-        "lastError": "ข้อผิดพลาดล่าสุด"
-      },
-      "erroringHint": "การประเมินกฎนี้ครั้งล่าสุดล้มเหลว กฎจะไม่ตรวจจับสิ่งใดจนกว่าการทำงานครั้งถัดไปจะสำเร็จ",
-      "historyLoading": "กำลังโหลดประวัติการประเมิน…",
-      "historyError": "ไม่สามารถโหลดประวัติของกฎนี้ได้",
-      "historyEmpty": "ไม่มีการบันทึกการประเมิน",
-      "historyEmptyHint": "กฎนี้ไม่ได้รับการประเมินใน {days} วันที่ผ่านมา",
-      "historySummary": "แจ้งเตือน {firings} ครั้งจากการประเมิน {runs} ครั้งล่าสุดใน {days} วันที่ผ่านมา | แจ้งเตือน {firings} ครั้งจากการประเมิน {runs} ครั้งล่าสุดใน {days} วันที่ผ่านมา",
-      "historyCapped": "การประเมินทั้งหมด {total} ครั้ง; รายการที่เก่ากว่าถูกซ่อนไว้",
-      "outcome": {
-        "firing": "แจ้งเตือนแล้ว",
-        "error": "ข้อผิดพลาด",
-        "normal": "ไม่พบสิ่งใด",
-        "notify_failed": "แจ้งเตือนแล้ว · ส่งการแจ้งเตือนไม่สำเร็จ",
-        "skipped": "ข้ามไป",
-        "other": "ผลลัพธ์ที่ไม่ทราบ"
-      },
-      "matched": "{n} แถวที่ตรงกัน",
-      "took": "{s} วินาที",
-      "noSigma": "การแจ้งเตือนนี้ไม่มีกฎ Sigma",
-      "noSigmaHint": "การแจ้งเตือนที่สร้างนอก SIEM ทำงานแบบเดียวกัน แต่ไม่ได้ถูกเขียนเป็นการตรวจจับ",
-      "noSql": "-- กฎนี้ไม่มีคิวรี SQL",
-      "delete": "ลบ",
-      "deleteTitle": "ลบการตรวจจับ",
-      "deleteMessage": "ลบ “{name}” หรือไม่? กฎจะหยุดทำงานทันที การแจ้งเตือนที่เคยเกิดขึ้นจะยังคงอยู่ในประวัติการแจ้งเตือน",
-      "deleted": "ลบ {name} แล้ว",
-      "deleteFailed": "ไม่สามารถลบการตรวจจับได้",
-      "enable": "เปิดใช้งาน",
-      "disable": "ปิดใช้งาน",
-      "enabledToast": "เปิดใช้งาน {name} แล้ว",
-      "disabledToast": "ปิดใช้งาน {name} แล้ว",
-      "toggleFailed": "ไม่สามารถเปลี่ยนสถานะกฎได้",
-      "noId": "{name} ไม่มี id จึงไม่สามารถเปลี่ยนแปลงได้",
-      "viewMatches": "ดูรายการที่ตรงกันในเหตุการณ์",
-      "emptyTitle": "ยังไม่มีการตรวจจับ",
-      "emptyHint": "การตรวจจับคือกฎ Sigma ที่ทำงานเป็นการแจ้งเตือนตามกำหนดเวลา ทุกครั้งที่เกิดการแจ้งเตือนจะไปอยู่ใน Alerts และถูกรวมเข้า Cases",
-      "createFirst": "สร้างการตรวจจับ",
-      "newTitle": "การตรวจจับใหม่",
-      "newSubtitle": "กฎ Sigma ที่คอมไพล์เป็น SQL โดยอิงสตรีมของคุณ และตั้งเวลาให้ทำงานเป็นการแจ้งเตือน",
-      "create": "สร้างการตรวจจับ",
-      "cancel": "ยกเลิก",
-      "library": "คลังกฎ ({n})",
-      "writeSigma": "เขียน Sigma",
-      "librarySearch": "กรองตามชื่อเรื่อง เทคนิค หรือ logsource",
-      "libraryEmpty": "ไม่มีกฎที่ตรงกับตัวกรองนั้น",
-      "stream": "สตรีม",
-      "streamPlaceholder": "เลือกสตรีมที่ต้องการรัน",
-      "notify": "แจ้งเตือน (ไม่บังคับ)",
-      "notifyPlaceholder": "ไม่มี: การแจ้งเตือนที่เกิดขึ้นยังคงเปิดเคส",
-      "noDestinations": "ยังไม่มีปลายทางการแจ้งเตือน การตรวจจับยังคงสร้างข้อค้นพบและเปิดเคสได้โดยไม่มีปลายทาง; เพิ่มปลายทางเฉพาะเมื่อคุณต้องการรับการแจ้งเตือนด้วยเท่านั้น.",
-      "createDestination": "สร้างปลายทาง",
-      "reloadDestinations": "รีเฟรช",
-      "lookBack": "ย้อนหลัง (นาที)",
-      "lookBackHelp": "อย่างน้อยเท่ากับช่วงเวลาการเชื่อมโยง {minutes} นาที แต่ละการรันจะเลื่อนช่วงเวลานั้นไปตลอดช่วง",
-      "correlationWindowLabel": "ช่วงเวลาการเชื่อมโยง (นาที)",
-      "backfill": "ตรวจสอบข้อมูลในอดีตด้วยในการรันครั้งแรก",
-      "backfillRange": "ข้อมูลในอดีตที่จะตรวจสอบ",
-      "backfillHours": "ชั่วโมงที่ผ่านมา | {n} ชั่วโมงที่ผ่านมา",
-      "runEvery": "ทำงานทุก (นาที)",
-      "silence": "เงียบเป็นเวลา (นาที)",
-      "compiles": "คอมไพล์กับ {stream}",
-      "compilesAs": "คอมไพล์กับ {stream} โดยระบุเป็น {source}",
-      "logsourceMismatch": "กฎนี้เขียนสำหรับ {rule} แต่ {stream} ถูกระบุเป็น {source} จึงจะตรงกันได้เฉพาะเมื่อทั้งสองมีชื่อฟิลด์ร่วมกัน",
-      "unseenFields": "ยังไม่พบฟิลด์นี้ในสตรีมนี้: {fields} การสร้างการตรวจจับจะเพิ่มคอลัมน์เหล่านี้ เพื่อให้พร้อมทำงานก่อนเหตุการณ์แรกดังกล่าว",
-      "ocsfBridge": "{stream} เป็น OCSF ดังนั้นฟิลด์ของกฎจะถูกแมปไปยังพาธ OCSF และจะทำงานเฉพาะกับเหตุการณ์ที่มี {guard}",
-      "ocsfGuard": {
-        "class": "class_uid {uid}",
-        "activity": "activity_id {id}",
-        "product": "ชื่อผลิตภัณฑ์ที่มี \"{name}\""
-      },
-      "createDestinationAria": "สร้างปลายทาง (เปิดในแท็บใหม่)",
-      "wontRun": "จะไม่ทำงานบน {stream}",
-      "created": "สร้างการตรวจจับ {name} แล้ว",
-      "createFailed": "ไม่สามารถสร้างการตรวจจับได้",
-      "neverRun": "ยังไม่เคยทำงาน",
-      "notFired": "ไม่เกิดการแจ้งเตือน",
-      "firedTimes": "ครั้งเดียว, {when} | {n} ครั้ง, ล่าสุด {when}",
-      "firedCount": "เกิดการแจ้งเตือน 1 ครั้งใน 24 ชม. | เกิดการแจ้งเตือน {n} ครั้งใน 24 ชม.",
-      "firingsPartial": "มีการประเมินมากเกินไปใน 24 ชั่วโมงที่ผ่านมาจนนับทั้งหมดไม่ได้ จำนวนครั้งที่แจ้งเตือนจึงเป็นค่าต่ำสุด",
-      "firingsNarrowed": "จำนวนครั้งที่แจ้งเตือนเริ่มนับตั้งแต่ {from}: ที่เก็บประวัติจำกัดช่วงเวลาย้อนหลังที่คิวรีเดียวสามารถดูได้",
-      "ago": {
-        "now": "เมื่อสักครู่",
-        "minutes": "{n} นาทีที่แล้ว",
-        "hours": "{n} ชั่วโมงที่แล้ว",
-        "days": "{n} วันที่แล้ว"
-      },
-      "firingsError": "ไม่สามารถโหลดประวัติการแจ้งเตือนได้",
-      "firingsErrorBanner": "จำนวนครั้งที่แจ้งเตือนไม่พร้อมใช้งาน: {reason}",
-      "validation": {
-        "positive": "ต้องมีอย่างน้อย 1 นาที",
-        "nonNegative": "ต้องไม่เป็นค่าลบ",
-        "periodGap": "สั้นกว่าช่วงเวลาการทำงาน: นาทีระหว่างการทำงานแต่ละครั้งจะไม่ถูกตรวจสอบ",
-        "belowTimespan": "ต้องไม่น้อยกว่าช่วงเวลาการเชื่อมโยง {minutes} นาที"
-      },
-      "nameTaken": "มีการตรวจจับหรือการแจ้งเตือนชื่อ “{name}” อยู่แล้ว ประวัติของรายการนั้นจะถูกรวมเข้ากับรายการนี้ โปรดเลือกสตรีมอื่นหรือลบรายการที่มีอยู่ก่อน",
-      "loadError": "โหลดกฎการตรวจจับไม่สำเร็จ",
-      "notifyFailingHint": "กฎนี้ทริกเกอร์แล้วแต่ส่งการแจ้งเตือนล่าสุดไม่สำเร็จ ตรวจสอบปลายทางในประวัติ",
-      "correlationWindow": "กำหนดโดยช่วงเวลาของการเชื่อมโยงเหตุการณ์",
-      "createForbidden": "การสร้างการตรวจจับต้องมีสิทธิ์ด้านความปลอดภัย",
-      "preview": {
-        "run": "ดูตัวอย่างรายการที่ตรงกัน",
-        "hint": "รันคิวรีกับข้อมูล 24 ชั่วโมงที่ผ่านมา และแสดง 20 เหตุการณ์แรกที่ตรงกัน",
-        "empty": "ไม่มีสิ่งใดตรงกันใน 24 ชั่วโมงที่ผ่านมา",
-        "shown": "{shown} จาก {total} เหตุการณ์ที่ตรงกันใน 24 ชั่วโมงที่ผ่านมา",
-        "failed": "คิวรีล้มเหลว: {reason}",
-        "time": "เวลา"
-      },
-      "queryFailed": "ไม่ได้บันทึก: คิวรีของการตรวจจับนี้รันไม่ได้ ({reason})"
-    },
-    "content": {
-      "title": "เนื้อหา",
-      "subtitle": "กฎการตรวจจับและแหล่งข้อมูลล็อกที่มาพร้อมกับ SIEM โดยเทียบกับข้อมูลของคุณ",
-      "refresh": "รีเฟรช",
-      "streamsError": "ไม่สามารถโหลดสตรีมของคุณได้ จึงไม่ทราบรายการที่ตรงกับข้อมูลของคุณ",
-      "tab": {
-        "rules": "กฎการตรวจจับ",
-        "sources": "แหล่งข้อมูลล็อก",
-        "overview": "ภาพรวม",
-        "yourData": "ข้อมูลของคุณ",
-        "yaml": "Sigma YAML",
-        "yourStreams": "สตรีมของคุณ",
-        "mapping": "การแมปฟิลด์"
-      },
-      "logsources": "แหล่งข้อมูลล็อก",
-      "allLogsources": "กฎทั้งหมด",
-      "anyLevel": "ทุกระดับ",
-      "searchRules": "ค้นหากฎตามชื่อ เทคนิค หรือแหล่งข้อมูลล็อก",
-      "searchSources": "ค้นหาแหล่งข้อมูลตามชื่อ ผู้จำหน่าย หรือแหล่งข้อมูลล็อก",
-      "stat": {
-        "ready": "พร้อมติดตั้ง",
-        "installed": "ติดตั้งแล้ว",
-        "applies": "นำไปใช้กับข้อมูลของคุณ",
-        "allRules": "กฎทั้งหมด",
-        "detected": "พบในข้อมูลของคุณ",
-        "supported": "แหล่งข้อมูลที่รองรับ"
-      },
-      "column": {
-        "rule": "กฎ",
-        "logsource": "แหล่งข้อมูลล็อก",
-        "status": "สถานะ",
-        "yourData": "ข้อมูลของคุณ",
-        "installed": "ติดตั้งแล้ว",
-        "source": "แหล่งข้อมูล",
-        "vendor": "ผู้จำหน่าย",
-        "ocsf": "คลาส OCSF",
-        "rules": "กฎ",
-        "yourStreams": "สตรีมของคุณ"
-      },
-      "status": {
-        "stable": "เสถียร",
-        "test": "ทดสอบ",
-        "experimental": "ทดลอง",
-        "deprecated": "เลิกใช้งาน",
-        "unsupported": "ไม่รองรับ"
-      },
-      "streamCount": "{n} สตรีม | {n} สตรีม",
-      "noMatchingData": "ไม่มีแหล่งข้อมูลที่ตรงกัน",
-      "installed": "ติดตั้งแล้ว",
-      "readyToInstall": "พร้อมติดตั้ง",
-      "noRules": "ไม่มีกฎที่ตรงกัน",
-      "noSources": "ไม่มีแหล่งข้อมูลที่ตรงกัน",
-      "telemetryOnly": "เฉพาะข้อมูลเทเลเมทรี",
-      "notDetected": "ไม่อยู่ในข้อมูลของคุณ",
-      "detectedInData": "พบในข้อมูลของคุณ",
-      "ruleEyebrow": "กฎ Sigma",
-      "sourceEyebrow": "แหล่งที่มาล็อก",
-      "field": {
-        "author": "ผู้เขียน",
-        "modified": "อัปเดต",
-        "required": "ระบุโดย",
-        "signals": "ฟิลด์สนับสนุน"
-      },
-      "falsePositives": "ผลบวกลวงที่ทราบ",
-      "references": "เอกสารอ้างอิง",
-      "noStreamsForRule": "ไม่มีสตรีมของคุณที่ตรงกับกฎนี้",
-      "noStreamsForRuleHint": "กฎนี้เขียนขึ้นสำหรับ {logsource} เมื่อนำเข้าข้อมูลจากแหล่งนั้นแล้ว จะแสดงที่นี่",
-      "runnable": "ทำงานบนสตรีมนี้",
-      "openInEvents": "เปิดในเหตุการณ์",
-      "installHere": "ติดตั้งบนสตรีมนี้",
-      "install": "ติดตั้งเป็นการตรวจจับ",
-      "installAgain": "ติดตั้งบนสตรีมอื่น",
-      "viewDetection": "ดูการตรวจจับ",
-      "noStreamsForSource": "ไม่พบในข้อมูลของคุณ",
-      "noStreamsForSourceHint": "สตรีมจะถูกระบุว่าเป็นแหล่งนี้เมื่อมีฟิลด์ {fields}",
-      "noRulesForSource": "ยังไม่มีกฎที่เขียนขึ้นสำหรับแหล่งนี้",
-      "mappingHint": "วิธีที่ฟิลด์ของแหล่งนี้แมปกับคอลัมน์ที่ปรับมาตรฐานซึ่งทุกหน้า SIEM อ่าน ฟิลด์แรกที่มีอยู่ในแถวจะถูกใช้",
-      "detectionCount": "ใช่ เป็นการตรวจจับ {n} รายการ | ใช่ เป็นการตรวจจับ {n} รายการ",
-      "notInstalled": "ยังไม่ได้ติดตั้ง",
-      "mapColumn": {
-        "actorId": "ID ผู้กระทำ",
-        "srcPort": "พอร์ตต้นทาง",
-        "dstPort": "พอร์ตปลายทาง",
-        "vendor": "ผู้จำหน่าย",
-        "classUid": "รหัสคลาส OCSF",
-        "className": "คลาส",
-        "severityId": "ความรุนแรง",
-        "statusId": "ผลลัพธ์"
-      },
-      "catalogError": "ไม่สามารถโหลดแคตตาล็อกการตรวจจับได้: {reason}",
-      "notRunnableYet": "ยังเรียกใช้ไม่ได้",
-      "newRulesAvailable": "ขณะนี้กฎใหม่ {n} รายการเรียกใช้บน {stream} ได้แล้ว | ขณะนี้กฎใหม่ {n} รายการเรียกใช้บน {stream} ได้แล้ว",
-      "reviewNewRules": "ตรวจสอบ",
-      "reviewingNewRules": "กำลังแสดงกฎ {n} รายการที่เรียกใช้บน {stream} ได้แล้ว | กำลังแสดงกฎ {n} รายการที่เรียกใช้บน {stream} ได้แล้ว",
-      "showAllRules": "แสดงกฎทั้งหมด",
-      "installSelected": "ติดตั้งที่เลือก",
-      "selectRunnable": "เลือกที่รันได้",
-      "selectRunnableHint": "เลือกกฎทั้งหมดที่แสดงอยู่ซึ่งทำงานกับข้อมูลของคุณและยังไม่ได้ติดตั้ง",
-      "bulk": {
-        "title": "ติดตั้งกฎ {n} ข้อ | ติดตั้งกฎ {n} ข้อ",
-        "subtitle": "แต่ละกฎจะถูกคอมไพล์สำหรับสตรีมของตนบนเซิร์ฟเวอร์ และบันทึกเป็นการตรวจจับด้วยการตั้งค่าเหล่านี้",
-        "stream": "สตรีม",
-        "everyStream": "ทุกสตรีมที่แต่ละกฎทำงาน",
-        "folder": "โฟลเดอร์การแจ้งเตือน",
-        "correlationWindow": "กฎการเชื่อมโยงจะย้อนดูอย่างน้อยเท่ากับช่วงเวลาของตัวเอง",
-        "nothing": "ไม่มีกฎที่เลือกใดทำงานบนสตรีมนี้",
-        "plan": "จะสร้างการตรวจจับ {n} รายการ: | จะสร้างการตรวจจับ {n} รายการ:",
-        "correlation": "การเชื่อมโยง",
-        "confirm": "ติดตั้งการตรวจจับ {n} รายการ | ติดตั้งการตรวจจับ {n} รายการ",
-        "close": "ปิด",
-        "summary": "ติดตั้งแล้ว {installed} ข้าม {skipped} ล้มเหลว {failed} จาก {total}",
-        "duplicate": "มีการตรวจจับชื่อ {name} อยู่แล้ว",
-        "correlationBlocked": "การเชื่อมโยงนี้ทำงานบนสตรีมนี้ไม่ได้",
-        "status": {
-          "installed": "ติดตั้งแล้ว",
-          "skipped": "ข้ามแล้ว",
-          "failed": "ล้มเหลว",
-          "pending": "กำลังรอ"
-        },
-        "done": "ติดตั้งการตรวจจับแล้ว {n} รายการ | ติดตั้งการตรวจจับแล้ว {n} รายการ"
-      }
-    },
-    "entities": {
-      "title": "เอนทิตี",
-      "subtitle": "ผู้ใช้ ที่อยู่ IP ต้นทาง และโฮสต์ทั้งหมดที่แหล่งความปลอดภัยของคุณกล่าวถึง",
-      "view": {
-        "table": "ตาราง",
-        "graph": "กราฟความเสี่ยง"
-      },
-      "riskGraph": {
-        "empty": "ไม่มีข้อมูลเชื่อมโยงในช่วงเวลานี้",
-        "emptyHint": "กราฟเชื่อมโยงผู้ใช้ ที่อยู่ IP และโฮสต์ที่ปรากฏในเหตุการณ์เดียวกันหรือเคสเดียวกัน ไม่มีรายการใดเชื่อมโยงในช่วงเวลานี้; โปรดขยายช่วงเวลา.",
-        "showingTop": "แสดง {n} อันดับสูงสุดจาก {total} ตามความเสี่ยง",
-        "legend": "เส้นทึบ: พบในเหตุการณ์เดียวกัน เส้นประ: ถูกระบุโดยเคสเดียวกัน",
-        "edgeEvents": "{n} เหตุการณ์ | {n} เหตุการณ์",
-        "edgeCases": "{n} เคส | {n} เคส",
-        "scoreHint": "เคสที่ระบุถึง: {detection} เหตุการณ์ที่ล้มเหลว: {failure} เชื่อมโยงกับเอนทิตีที่เคสระบุ: {neighbour}",
-        "nodeFacts": "{events} เหตุการณ์ · ล้มเหลว {failures}",
-        "nodeCases": "{n} เคส | {n} เคส"
-      },
-      "kinds": {
-        "user": "ผู้ใช้",
-        "ip": "ที่อยู่ IP",
-        "host": "โฮสต์"
-      },
-      "kind": {
-        "user": "ผู้ใช้",
-        "ip": "ที่อยู่ IP",
-        "host": "โฮสต์"
-      },
-      "all": {
-        "user": "ผู้ใช้ทั้งหมด",
-        "ip": "ที่อยู่ IP ทั้งหมด",
-        "host": "โฮสต์ทั้งหมด"
-      },
-      "search": {
-        "user": "ค้นหาผู้ใช้",
-        "ip": "ค้นหาที่อยู่ IP",
-        "host": "ค้นหาโฮสต์"
-      },
-      "col": {
-        "signals": "สัญญาณ",
-        "events": "เหตุการณ์",
-        "failures": "ความล้มเหลว",
-        "peers": {
-          "ips": "จำนวน IP สูงสุดในหนึ่งแหล่งข้อมูล",
-          "users": "จำนวนผู้ใช้สูงสุดในหนึ่งแหล่งข้อมูล"
-        },
-        "streams": "แหล่งข้อมูล",
-        "firstSeen": "พบครั้งแรก",
-        "lastSeen": "พบล่าสุด"
-      },
-      "signal": {
-        "failures": "อัตราความล้มเหลวสูง",
-        "spread": {
-          "user": "มี IP ต้นทางจำนวนมาก",
-          "ip": "มีผู้ใช้จำนวนมาก",
-          "host": "มีผู้ใช้จำนวนมาก"
-        },
-        "external": "ที่อยู่สาธารณะ",
-        "fail_then_success": "สำเร็จหลังล้มเหลว",
-        "open_case": "เคสที่เปิดอยู่"
-      },
-      "signalHint": {
-        "failures": "อย่างน้อย {rate}% ของเหตุการณ์ของเอนทิตีนี้ล้มเหลว โดยมีจำนวนความล้มเหลวอย่างน้อย {n} ครั้ง นับเฉพาะแหล่งข้อมูลที่รายงานผลลัพธ์",
-        "spread": {
-          "user": "พบจากที่อยู่ IP ต้นทางตั้งแต่ {n} รายการขึ้นไปในแหล่งข้อมูลเดียว ซึ่งสูงกว่าที่ผู้ใช้อื่นแสดงในช่วงเวลานี้อย่างมาก",
-          "ip": "ถูกใช้งานโดยผู้ใช้ตั้งแต่ {n} รายขึ้นไปในแหล่งข้อมูลเดียว ซึ่งสูงกว่าที่อยู่รายอื่นในช่วงเวลานี้อย่างมาก ทราฟฟิกขาออกของ NAT และ VPN ก็มีลักษณะเช่นนี้เช่นกัน; การโจมตีแบบ password spraying ก็เช่นกัน.",
-          "host": "ถูกเข้าถึงโดยผู้ใช้ตั้งแต่ {n} รายขึ้นไปในแหล่งข้อมูลเดียว ซึ่งสูงกว่าโฮสต์อื่นในช่วงเวลานี้อย่างมาก"
-        },
-        "external": "ไม่อยู่ในช่วงส่วนตัว ลูปแบ็ก หรือลิงก์โลคอล",
-        "fail_then_success": "มีเหตุการณ์ล้มเหลวอย่างน้อย {n} รายการ แล้วมีเหตุการณ์สำเร็จหลังความล้มเหลวครั้งแรก: การเดาที่อาจได้ผล",
-        "open_case": "มีเคส SIEM ที่เปิดอยู่ระบุถึงเอนทิตีนี้"
-      },
-      "peersChip": {
-        "ips": "สูงสุด {n} IP ต้นทางในหนึ่งแหล่งข้อมูล | สูงสุด {n} IP ต้นทางในหนึ่งแหล่งข้อมูล",
-        "users": "สูงสุด {n} ผู้ใช้ในหนึ่งแหล่งข้อมูล | สูงสุด {n} ผู้ใช้ในหนึ่งแหล่งข้อมูล"
-      },
-      "noSignals": "ไม่มีสัญญาณ",
-      "windowNote": "การนับครอบคลุมช่วงเวลาที่เลือกจากทุกแหล่งข้อมูลด้านความปลอดภัย",
-      "capped": "แต่ละแหล่งข้อมูลส่งคืนเอนทิตีที่มีกิจกรรมมากที่สุด {n} รายการ เอนทิตีที่มีกิจกรรมน้อยกว่าจะไม่แสดง และการนับสำหรับเอนทิตีที่ใกล้จุดตัดนี้อาจไม่สมบูรณ์ จำนวนในแท็บที่มีเครื่องหมาย + ถูกตัดทอน",
-      "failedStreams": "ไม่สามารถอ่านได้: {streams}",
-      "noSources": "ไม่มีแหล่งข้อมูลด้านความปลอดภัยให้อ่าน",
-      "noSourcesHint": "เอนทิตีจะพบได้ในสตรีมที่มีชื่อระบุว่าเป็นข้อมูลความปลอดภัย หรือสตรีมที่คุณรวมไว้ภายใต้ความปลอดภัย → แหล่งข้อมูล.",
-      "empty": "ไม่มีเอนทิตีในช่วงเวลานี้",
-      "emptyHint": "ขยายช่วงเวลา หรือตรวจสอบว่าแหล่งข้อมูลของคุณมีฟิลด์ผู้ใช้ IP หรือโฮสต์",
-      "refresh": "รีเฟรช",
-      "drawerSubtitle": "กิจกรรมในช่วง {window} ที่ผ่านมา",
-      "tab": {
-        "activity": "กิจกรรม",
-        "related": "ที่เกี่ยวข้อง",
-        "sources": "แหล่งข้อมูล",
-        "cases": "เคส"
-      },
-      "activity": "เหตุการณ์ตามช่วงเวลา",
-      "chart": {
-        "ok": "สำเร็จหรือไม่ทราบผล",
-        "failed": "ล้มเหลว"
-      },
-      "topN": "อันดับสูงสุด {n} ตามจำนวนเหตุการณ์",
-      "noRelated": "ไม่มีรายการที่เกี่ยวข้องในช่วงเวลานี้",
-      "noCases": "ไม่มีเคส SIEM ใดระบุถึงเอนทิตีนี้",
-      "caseOpen": "เปิดอยู่",
-      "caseResolved": "แก้ไขแล้ว",
-      "failedCount": "{n} ล้มเหลว | {n} ล้มเหลว",
-      "openEvents": "เปิดใน Events",
-      "huntInEvents": "ค้นหาเชิงสืบสวนใน Events",
-      "partialStreams": "ผลลัพธ์บางส่วนจาก: {streams}",
-      "limited": "{stream}: ~{rows} แถวใน {window} กำลังแสดง {slice} ล่าสุด",
-      "runFull": "เรียกใช้ช่วงเวลาเต็ม",
-      "limitedMany": "{n} แหล่งข้อมูลขนาดใหญ่แสดงเฉพาะ {slice} ล่าสุดของ {window}: {streams}",
-      "sourcesLoading": "กำลังอ่านแหล่งข้อมูล:",
-      "sourceStatus": {
-        "loading": "กำลังโหลด",
-        "done": "โหลดแล้ว",
-        "failed": "อ่านไม่ได้"
-      },
-      "loadError": "ไม่สามารถโหลดแหล่งข้อมูลความปลอดภัยได้",
-      "detailFailed": "ข้อมูลบางส่วนของเอนทิตีนี้ไม่สามารถอ่านได้: {streams}",
-      "aliasCount": "+{n} การสะกด | +{n} การสะกด",
-      "aliasHint": "บันทึกด้วยการสะกดนี้ ซึ่งเป็นตัวตนเดียวกัน"
-    },
-    "ueba": {
-      "title": "การวิเคราะห์พฤติกรรมผู้ใช้",
-      "subtitle": "ผู้ใช้แต่ละรายเปรียบเทียบกับอดีตอันใกล้ของตนเอง",
-      "windowHint": "{current} ล่าสุด เปรียบเทียบกับ {baseline} ก่อนหน้านั้น",
-      "method": "คะแนนความเสี่ยงเป็นการประเมินเชิงฮิวริสติก: {current} ล่าสุดของผู้ใช้แต่ละรายจะถูกเปรียบเทียบกับ {baseline} ของตนเองก่อนหน้านั้น ทุกสัญญาณที่ถูกตั้งจะแสดงตัวเลขที่ทำให้เกิดสัญญาณนั้น",
-      "noSources": "ไม่มีแหล่งข้อมูลใดระบุผู้ใช้",
-      "noSourcesHint": "UEBA ต้องมีแหล่งข้อมูลความปลอดภัยที่มีฟิลด์ผู้ใช้ (CloudTrail, Okta หรือล็อกการยืนยันตัวตนที่มีคอลัมน์ผู้ใช้)",
-      "search": "ค้นหาผู้ใช้",
-      "empty": "ไม่มีกิจกรรมของผู้ใช้ในช่วงเวลานี้",
-      "emptyHint": "ขยายช่วงเวลา หรือตรวจสอบว่าแหล่งข้อมูลของคุณมีฟิลด์ผู้ใช้",
-      "eyebrow": "พฤติกรรมผู้ใช้",
-      "riskChip": "ความเสี่ยง {tone} · {score}",
-      "expected": "เทียบกับ ~{n} ตามปกติ",
-      "new": "ใหม่",
-      "newIp": "ใหม่",
-      "noIps": "ไม่มีการบันทึก IP ต้นทางสำหรับผู้ใช้นี้",
-      "col": {
-        "user": "ผู้ใช้",
-        "risk": "ความเสี่ยง",
-        "signals": "สัญญาณ",
-        "events": "เหตุการณ์",
-        "failures": "ความล้มเหลว",
-        "ips": "IP ต้นทาง"
-      },
-      "stat": {
-        "critical": "ความเสี่ยงระดับวิกฤต",
-        "high": "ความเสี่ยงระดับสูง",
-        "medium": "ความเสี่ยงระดับปานกลาง",
-        "all": "ผู้ใช้ที่วิเคราะห์แล้ว"
-      },
-      "signal": {
-        "volume": "ปริมาณพุ่งสูง",
-        "new_ip": "IP ต้นทางใหม่",
-        "failure_jump": "ความล้มเหลวพุ่งขึ้น",
-        "new_hours": "ช่วงเวลาที่ผิดปกติ",
-        "first_seen": "พบครั้งแรก",
-        "peer_volume": "สูงกว่าผู้ใช้อื่นมาก",
-        "peer_failures": "ความล้มเหลวสูงกว่าผู้ใช้อื่นมาก",
-        "fail_then_success": "สำเร็จหลังล้มเหลว",
-        "open_case": "เคสที่เปิดอยู่"
-      },
-      "reason": {
-        "volume": "{n} เหตุการณ์ ประมาณ {ratio}× ของ ~{expected} ที่คาดไว้จากช่วง {baseline} ก่อนหน้า",
-        "newIp": "{n} เหตุการณ์จาก {ip} ไม่เคยพบในช่วง {baseline} ก่อนหน้า | {n} เหตุการณ์จาก {ip} ไม่เคยพบในช่วง {baseline} ก่อนหน้า (ที่อยู่ใหม่ทั้งหมด {count} รายการ)",
-        "newIpExternal": "{n} เหตุการณ์จากที่อยู่สาธารณะ {ip} ไม่เคยพบในช่วง {baseline} ก่อนหน้า | {n} เหตุการณ์จากที่อยู่สาธารณะ {ip} ไม่เคยพบในช่วง {baseline} ก่อนหน้า (ที่อยู่ใหม่ทั้งหมด {count} รายการ)",
-        "failureJump": "{n} ความล้มเหลว — คิดเป็น {rate}% ของเหตุการณ์ เพิ่มขึ้นจาก {baseline}% ในช่วงอ้างอิง",
-        "newHours": "{n} เหตุการณ์ในเวลา {hours} UTC ซึ่งเป็นชั่วโมงที่ผู้ใช้นี้ไม่เคยมีกิจกรรมในช่วง {baseline} ก่อนหน้า",
-        "firstSeen": "{n} เหตุการณ์จากผู้ใช้ที่ไม่มีกิจกรรมเลยในช่วง {baseline} ก่อนหน้า",
-        "peerVolume": "{n} เหตุการณ์ ขณะที่ผู้ใช้ทั่วไปมีประมาณ {median} เส้นฐานของผู้ใช้รายนี้ยังอยู่ระหว่างสร้าง",
-        "peerFailures": "ล้มเหลว {n} ครั้ง ({rate}% ของเหตุการณ์) ขณะที่ผู้ใช้ทั่วไปมีประมาณ {median} เส้นฐานของผู้ใช้รายนี้ยังอยู่ระหว่างสร้าง",
-        "newIpBuilding": "{n} เหตุการณ์จากที่อยู่สาธารณะ {ip} บรรทัดฐานของผู้ใช้นี้ยังอยู่ระหว่างสร้าง จึงแจ้งเตือนทุกที่อยู่สาธารณะ | {n} เหตุการณ์จากที่อยู่สาธารณะ {ip} บรรทัดฐานของผู้ใช้นี้ยังอยู่ระหว่างสร้าง จึงแจ้งเตือนทุกที่อยู่สาธารณะ (ที่อยู่สาธารณะทั้งหมด {count} รายการ)",
-        "failThenSuccess": "ล้มเหลว {n} ครั้งจาก {ip} แล้วมีเหตุการณ์สำเร็จจากที่อยู่เดียวกัน",
-        "openCase": "ถูกระบุโดยเคสที่เปิดอยู่ \"{title}\" ({severity}) | ถูกระบุโดยเคสที่เปิดอยู่ {n} เคส ล่าสุดคือ \"{title}\" ({severity})"
-      },
-      "fact": {
-        "events": "เหตุการณ์",
-        "eventsValue": "{n} เทียบกับ ~{expected}",
-        "failureRate": "อัตราความล้มเหลว",
-        "failureValue": "{now}% เทียบกับ {base}%",
-        "history": "ประวัติช่วงอ้างอิง",
-        "historyValue": "{span} จาก {window}",
-        "noHistory": "ไม่มี — พบครั้งแรก",
-        "scoreValue": "{n} จาก 100"
-      },
-      "tab": {
-        "signals": "สัญญาณ",
-        "hours": "ชั่วโมงที่ใช้งาน",
-        "ips": "IP ต้นทาง"
-      },
-      "noSignals": "ไม่มีสิ่งผิดปกติ",
-      "noSignalsHint": "กิจกรรมของผู้ใช้รายนี้ในช่วงเวลาที่ตรวจสอบดูเหมือนค่าพื้นฐานของตน",
-      "scoring": "คะแนน = ผลรวมของน้ำหนักสัญญาณ โดยกำหนดเพดานไว้ที่ 100 ปริมาณที่คาดหมายจะปรับสเกลตามประวัติที่ผู้ใช้มีจริง การพุ่งขึ้นของปริมาณต้องมีอย่างน้อย {min} เหตุการณ์ และเป็น {ratio}× ของค่านั้น ชั่วโมงที่ผิดปกติต้องมีประวัติครอบคลุม {share}% ของ {baseline} ก่อนหน้า",
-      "hoursTitle": "ช่วงเวลาที่ผู้ใช้รายนี้ใช้งาน",
-      "hoursUtc": "ชั่วโมงของวัน, UTC",
-      "baselineRow": "ก่อนหน้า {w}",
-      "nowRow": "{w} ล่าสุด",
-      "hourCell": "{h}:00 UTC — {n} เหตุการณ์",
-      "legendUsual": "กิจกรรม",
-      "legendNew": "ชั่วโมงที่ไม่เคยใช้งานในค่าพื้นฐาน",
-      "openEntity": "เปิดเอนทิตี",
-      "withheld": "ข้อมูลพื้นฐานบางส่วนไม่สมบูรณ์ จึงไม่ได้ประเมินสัญญาณเหล่านี้: {signals}",
-      "currentPartial": "หน้าต่างเวลาปัจจุบันส่งข้อมูลกลับมาเพียงบางส่วน จำนวนที่นับได้อาจต่ำกว่าจริง",
-      "limited": "{stream}: ประมาณ {rows} แถวใน {window} และค่าพื้นฐาน {baseline} ของสตรีมนี้ อ่านเฉพาะ {slice} ล่าสุดและ {slice} ก่อนหน้าช่วงเวลา ดังนั้นจึงไม่ได้ประเมินสัญญาณการพบครั้งแรก สัญญาณ IP ใหม่ และสัญญาณชั่วโมงที่ผิดปกติ รวมถึงสัญญาณปริมาณและอัตราความล้มเหลวสำหรับผู้ใช้ของสตรีมนี้",
-      "limitedMany": "แหล่งข้อมูลขนาดใหญ่ {n} แหล่งถูกอ่านเฉพาะ {slice} ล่าสุดของ {window} และ {slice} ก่อนหน้าเท่านั้น ไม่ได้อ่านค่าพื้นฐาน {baseline} ทั้งหมด ดังนั้นจึงไม่ได้ประเมินสัญญาณการพบครั้งแรก สัญญาณ IP ใหม่ และสัญญาณชั่วโมงที่ผิดปกติสำหรับแหล่งข้อมูลเหล่านี้ รวมถึงสัญญาณปริมาณและอัตราความล้มเหลวสำหรับผู้ใช้ของแหล่งข้อมูลเหล่านี้: {streams}",
-      "provisional": "ยังคงอ่านแหล่งข้อมูลอยู่: สัญญาณการพบครั้งแรก สัญญาณ IP ใหม่ และสัญญาณชั่วโมงที่ผิดปกติจะแสดงเมื่อแหล่งข้อมูลทั้งหมดตอบกลับแล้ว",
-      "limitedTag": "{slice} ล่าสุด",
-      "limitedTagHint": "เหตุการณ์บางส่วนของผู้ใช้รายนี้มาจากแหล่งข้อมูลที่ใหญ่เกินกว่าจะอ่านทั้งช่วงเวลา จึงนับเฉพาะ {slice} ล่าสุดเท่านั้น",
-      "excluded": "ไม่นับรวม (ไม่สามารถอ่านข้อมูลได้ในทั้งสองช่วงเวลา): {streams}",
-      "loadError": "ไม่สามารถโหลดแหล่งข้อมูลด้านความปลอดภัยได้",
-      "spanHours": "{n} ชั่วโมง | {n} ชั่วโมง",
-      "spanDays": "{n} วัน | {n} วัน",
-      "notEvaluated": "ไม่ได้ประเมินสำหรับผู้ใช้รายนี้เนื่องจากข้อมูลพื้นฐานไม่สมบูรณ์: {signals}",
-      "hoursNotJudged": "ชั่วโมงที่ผิดปกติจะได้รับการประเมินก็ต่อเมื่อมีเหตุการณ์พื้นฐานอย่างน้อย {min} เหตุการณ์ ซึ่งครอบคลุม {share}% ของ {baseline} ก่อนหน้า ประวัติของผู้ใช้รายนี้สั้นกว่า จึงไม่มีชั่วโมงใดถูกทำเครื่องหมาย",
-      "noHistory": "ไม่มีข้อมูลในช่วง {baseline} ก่อนหน้าสำหรับ {streams} จึงไม่มีผู้ใช้รายใดในสตรีมเหล่านั้นถูกระบุว่าพบครั้งแรก",
-      "volumeNotJudged": "ไม่มีการประเมินปริมาณสำหรับผู้ใช้รายนี้: หน้าต่างเวลาที่สั้นกว่าหนึ่งวันจะเปรียบเทียบกับชั่วโมงเดียวกันของวันในค่าพื้นฐาน ซึ่งต้องมีประวัติอย่างน้อยหนึ่งวัน",
-      "baselineBuilding": "กำลังสร้างเส้นฐาน",
-      "baselineBuildingHint": "มีประวัติแล้ว {span} การเปรียบเทียบกับอดีตของผู้ใช้รายนี้จะเริ่มเมื่อมีประวัติครบ {baseline} ระหว่างนี้จะทำเครื่องหมายเฉพาะค่าผิดปกติที่ชัดเจนเมื่อเทียบกับผู้ใช้อื่น",
-      "buildingNotice": "เส้นฐานของผู้ใช้ {n} รายยังอยู่ระหว่างสร้าง: จนกว่าจะมีประวัติครบ {baseline} จะทำเครื่องหมายเฉพาะค่าผิดปกติที่ชัดเจนเมื่อเทียบกับผู้ใช้อื่น | เส้นฐานของผู้ใช้ {n} รายยังอยู่ระหว่างสร้าง: จนกว่าจะมีประวัติครบ {baseline} จะทำเครื่องหมายเฉพาะค่าผิดปกติที่ชัดเจนเมื่อเทียบกับผู้ใช้อื่น"
-    },
-    "intel": {
-      "title": "ข่าวกรองภัยคุกคาม",
-      "subtitle": "ตัวบ่งชี้ที่เป็นอันตรายซึ่งเป็นที่รู้จัก และทุกจุดที่ตัวบ่งชี้เหล่านั้นปรากฏในข้อมูลด้านความปลอดภัยของคุณ",
-      "loadFailed": "ไม่สามารถโหลดรายการตัวบ่งชี้ได้",
-      "add": "เพิ่มตัวบ่งชี้",
-      "import": "นำเข้า",
-      "importFile": "ไฟล์ CSV",
-      "importFeed": "URL ของฟีด",
-      "runSweep": "เริ่มสแกน",
-      "refresh": "โหลดรายการใหม่และสแกนอีกครั้ง",
-      "search": "ค้นหาตัวบ่งชี้ แหล่งข้อมูล และรายการ",
-      "allTypes": "ทุกประเภท",
-      "expiringOnly": "กำลังจะหมดอายุ",
-      "expired": "หมดอายุแล้ว",
-      "never": "ไม่เคย",
-      "notSighted": "ไม่พบ",
-      "notSightedIn": "ไม่พบในช่วง {range}",
-      "sighted": "Seen once | Seen {n} times",
-      "sweeping": "กำลังสแกน… {done} จาก {total} คิวรี",
-      "sweptAcross": "สแกนแล้ว {n} แหล่งข้อมูลด้านความปลอดภัย | สแกนแล้ว {n} แหล่งข้อมูลด้านความปลอดภัย",
-      "failedQueries": "ไม่สามารถค้นหา {n} คอลัมน์และถูกข้ามไป | ไม่สามารถค้นหา {n} คอลัมน์และถูกข้ามไป",
-      "truncated": "อ่านเฉพาะ {n} แถวแรกของ {lists}; แถวที่เหลือไม่ได้ถูกสแกน",
-      "noIndicators": "ไม่มีตัวบ่งชี้",
-      "noCoverage": "เรียกใช้การสแกนเพื่อดูว่าคอลัมน์ใดถูกค้นหา",
-      "coverageHint": "สิ่งที่การตรวจค้นค้นหาในแหล่งข้อมูลความปลอดภัย {n} แหล่ง แต่ละคอลัมน์จะจับคู่กับค่าทั้งหมดและโทเค็นทั้งหมดภายในค่านั้น เช่น อาร์เรย์ ข้อความล็อก และแฮช SHA256=; ประเภทที่ไม่มีคอลัมน์จะไม่สามารถตรวจพบได้เลย.",
-      "indicatorCount": "{n} ตัวบ่งชี้ | {n} ตัวบ่งชี้",
-      "columnsSearched": "{n} คอลัมน์ | {n} คอลัมน์",
-      "blind": "ไม่สามารถค้นหาได้",
-      "blindHint": "ไม่มีสตรีมความปลอดภัยใดมีคอลัมน์ที่เก็บค่าประเภทนี้ ดังนั้นตัวบ่งชี้เหล่านี้จึงยังไม่สามารถตรงกับสิ่งใดได้",
-      "cidrNote": "เก็บ {n} ช่วง CIDR ไว้ในรายการแต่ไม่ถูกสแกน: การจับคู่แบบตรงตัวไม่สามารถทดสอบการอยู่ในช่วงได้ | เก็บ {n} ช่วง CIDR ไว้ในรายการแต่ไม่ถูกสแกน: การจับคู่แบบตรงตัวไม่สามารถทดสอบการอยู่ในช่วงได้",
-      "stat": {
-        "matched": "ตัวบ่งชี้ที่พบ",
-        "hits": "การพบเห็น",
-        "indicators": "ตัวบ่งชี้",
-        "expiring": "หมดอายุหรือใกล้หมดอายุ",
-        "lists": "รายการ"
-      },
-      "tab": {
-        "matches": "รายการที่ตรงกัน",
-        "indicators": "ตัวบ่งชี้",
-        "coverage": "ความครอบคลุม"
-      },
-      "col": {
-        "indicator": "ตัวบ่งชี้",
-        "type": "ประเภท",
-        "hits": "การพบเห็น",
-        "seenIn": "พบใน",
-        "firstSeen": "พบครั้งแรก",
-        "lastSeen": "พบครั้งล่าสุด",
-        "source": "แหล่งที่มา",
-        "confidence": "ความเชื่อมั่น",
-        "list": "รายการ",
-        "added": "เพิ่มเมื่อ",
-        "expires": "หมดอายุ",
-        "description": "คำอธิบาย"
-      },
-      "type": {
-        "auto": "ตรวจจับอัตโนมัติ",
-        "ip": "ที่อยู่ IP",
-        "cidr": "ช่วง CIDR",
-        "domain": "โดเมน",
-        "url": "URL",
-        "hash": "แฮชไฟล์",
-        "email": "ที่อยู่อีเมล"
-      },
-      "empty": {
-        "title": "ยังไม่มีข้อมูลข่าวกรองภัยคุกคาม",
-        "description": "เพิ่มตัวบ่งชี้จากรายงาน นำเข้า CSV หรือสมัครรับฟีด จากนั้นตัวบ่งชี้ทุกตัวจะถูกสแกนเทียบกับแหล่งข้อมูลความปลอดภัยของคุณ"
-      },
-      "noMatches": {
-        "title": "ไม่พบตัวบ่งชี้ใด",
-        "description": "ไม่มีตัวบ่งชี้แบบเรียลไทม์ใดจาก {n} ตัวที่ปรากฏในแหล่งข้อมูลความปลอดภัย {streams} แหล่งในช่วง {range}"
-      },
-      "drawer": {
-        "eyebrow": "ตัวบ่งชี้ · {type}",
-        "sightings": "การพบเห็น",
-        "details": "รายละเอียด",
-        "overTime": "การพบเห็นตามช่วงเวลา",
-        "hunt": "ล่าหา",
-        "huntTop": "ล่าหาในเหตุการณ์",
-        "notSeenTitle": "ไม่พบในช่วงเวลานี้",
-        "notSeen": "ตัวบ่งชี้นี้ไม่ปรากฏในแหล่งข้อมูลความปลอดภัย {streams} แหล่งในช่วง {range}",
-        "cidrNotSwept": "ช่วง CIDR จะไม่ถูกสแกน: การจับคู่แบบตรงตัวไม่สามารถตรวจสอบได้ว่าค่าอยู่ในช่วงหรือไม่"
-      },
-      "remove": {
-        "action": "ลบ",
-        "title": "ลบตัวบ่งชี้",
-        "message": "ลบ {indicator} ออกจาก {table} หรือไม่ รายการจะถูกอ่านและเขียนกลับโดยไม่มีรายการนี้ โดยเก็บแถวอื่นทั้งหมดไว้ตามที่จัดเก็บไว้ การดำเนินการนี้ไม่ใช่แบบอะตอมมิก: ตัวบ่งชี้ที่บุคคลอื่นเพิ่มลงใน {table} ระหว่างที่การดำเนินการนี้ทำงานอยู่จะสูญหาย",
-        "confirm": "ลบ",
-        "done": "ลบ {indicator} แล้ว | ลบ {n} แถวที่มี {indicator} แล้ว",
-        "failed": "ไม่สามารถลบตัวบ่งชี้ได้",
-        "tooLarge": "{table} มี {n} แถว มากกว่าที่หน้านี้จะอ่านได้ จึงไม่สามารถเขียนใหม่ได้อย่างปลอดภัย โปรดแก้ไขบนหน้า Enrichment Tables",
-        "feedHint": "รายการนี้รีเฟรชจากฟีด โปรดลบตัวบ่งชี้ที่ฟีดต้นทาง",
-        "notFound": "{indicator} ไม่ได้อยู่ใน {table} แล้ว อาจถูกลบไปแล้ว"
-      },
-      "form": {
-        "addTitle": "เพิ่มตัวบ่งชี้",
-        "addSubtitle": "วางจากรายงานได้ ค่าที่ถูกทำให้ปลอดภัย (defanged) เช่น evil[.]com และ hxxp:// จะได้รับการยอมรับ",
-        "addSubmit": "เพิ่ม",
-        "cancel": "ยกเลิก",
-        "indicators": "ตัวบ่งชี้",
-        "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
-        "indicatorsHelp": "หนึ่งรายการต่อบรรทัด หรือคั่นด้วยเครื่องหมายจุลภาคหรือช่องว่าง รายการซ้ำจะถูกละเว้น รายการหนึ่งรองรับได้สูงสุด {max} รายการ.",
-        "indicatorsRequired": "ป้อนตัวบ่งชี้อย่างน้อยหนึ่งรายการ",
-        "invalid": "ไม่ได้รับการยอมรับว่าเป็นตัวบ่งชี้ ({n}): {sample}",
-        "line": "บรรทัด {n}",
-        "list": "รายการ",
-        "listHelp": "จัดเก็บเป็นตารางเสริมข้อมูล; ชื่อจะมีคำนำหน้า ioc_",
-        "listRequired": "ตั้งชื่อรายการ",
-        "type": "ประเภท",
-        "confidence": "ความเชื่อมั่น (0–100)",
-        "confidenceRange": "ความเชื่อมั่นต้องอยู่ระหว่าง 0 ถึง 100",
-        "source": "แหล่งที่มา",
-        "sourcePlaceholder": "ชื่อรายงาน ผู้จัดจำหน่าย หรือฟีด",
-        "description": "คำอธิบาย",
-        "expiry": "หมดอายุ",
-        "never": "ไม่หมดอายุ",
-        "days": "ใน {n} วัน | ใน {n} วัน",
-        "added": "เพิ่มตัวบ่งชี้ {n} รายการลงใน {table} แล้ว | เพิ่มตัวบ่งชี้ {n} รายการลงใน {table} แล้ว",
-        "importedSkipped": "เพิ่มตัวบ่งชี้ {n} รายการลงใน {table} แล้ว; ข้าม {skipped} แถวที่ไม่ใช่ตัวบ่งชี้ | เพิ่มตัวบ่งชี้ {n} รายการลงใน {table} แล้ว; ข้าม {skipped} แถวที่ไม่ใช่ตัวบ่งชี้",
-        "saveFailed": "ไม่สามารถบันทึกตัวบ่งชี้ได้",
-        "feedReadOnly": "{table} รีเฟรชจากฟีดและไม่สามารถรับแถวที่เพิ่มเข้ามาได้ โปรดเลือกรายการอื่น",
-        "importTitle": "นำเข้าตัวบ่งชี้จาก CSV",
-        "importSubtitle": "ต้องมีคอลัมน์ตัวบ่งชี้; ประเภท ความรุนแรง แหล่งที่มา และวันหมดอายุเป็นตัวเลือกเสริม",
-        "importSubmit": "นำเข้า",
-        "file": "ไฟล์ CSV",
-        "fileHelp": "แถวที่ไม่ใช่ตัวบ่งชี้จะถูกข้ามและนับจำนวน รายการหนึ่งรองรับตัวบ่งชี้ได้สูงสุด {max} รายการ; ไฟล์ได้สูงสุด {mb} MB.",
-        "fileRequired": "เลือกไฟล์ CSV",
-        "defaultSeverity": "ความรุนแรงสำหรับแถวที่ไม่มีค่า",
-        "append": "เพิ่มต่อท้ายรายการแทนการแทนที่",
-        "noIndicatorColumn": "ไฟล์ไม่มีคอลัมน์ตัวบ่งชี้",
-        "noValidRows": "ไม่มีแถวใดในไฟล์ที่เป็นตัวบ่งชี้ที่รู้จัก",
-        "feedTitle": "สมัครรับฟีด",
-        "feedSubtitle": "เซิร์ฟเวอร์จะดึงไฟล์ CSV ในเบื้องหลังและทำให้รายการสอดคล้องกับไฟล์นั้น",
-        "feedSubmit": "สมัครรับ",
-        "url": "URL ของฟีด",
-        "urlHelp": "ไฟล์ CSV สาธารณะที่มีคอลัมน์ตัวบ่งชี้.",
-        "urlInvalid": "ป้อน URL ที่ขึ้นต้นด้วย http:// หรือ https://",
-        "feedQueued": "กำลังดึง {table} ตัวบ่งชี้จะแสดงเมื่อดาวน์โหลดเสร็จสิ้น.",
-        "allPresent": "ตัวบ่งชี้ทั้งหมดมีอยู่ใน {table} แล้ว",
-        "addedSkippedDupes": "เพิ่มตัวบ่งชี้ {n} รายการลงใน {table}; มีอยู่แล้ว {dupes} รายการ | เพิ่มตัวบ่งชี้ {n} รายการลงใน {table}; มีอยู่แล้ว {dupes} รายการ",
-        "urlPlaceholder": "https://feeds.example/indicators.csv",
-        "noIndicatorColumnIn": "{table} ไม่มีคอลัมน์ indicator, ioc หรือ value จึงไม่สามารถเพิ่มตัวบ่งชี้ได้ เลือกรายการอื่น.",
-        "replaceTitle": "แทนที่รายการ",
-        "replaceMessage": "การนำเข้าโดยปิดการเพิ่มต่อท้ายจะแทนที่ {table} ทั้งหมด: แถวที่มีอยู่ทั้งหมด คอลัมน์และการตั้งค่าจะถูกลบ และเหลือเพียงตัวบ่งชี้จากไฟล์นี้เท่านั้น.",
-        "replaceConfirm": "แทนที่",
-        "tooMany": "วางตัวบ่งชี้ {n} รายการ หนึ่งรายการเก็บได้สูงสุด {max}",
-        "listFull": "{table} จะมีตัวบ่งชี้ {count} รายการ หนึ่งรายการเก็บได้สูงสุด {max} แบ่งไปไว้หลายรายการ",
-        "fileTooLarge": "ไฟล์ใหญ่กว่า {max} MB แบ่งเป็นไฟล์ที่เล็กลง"
-      },
-      "importCsv": "นำเข้า CSV",
-      "unreadTables": "ไม่สามารถอ่าน {lists} ได้ ตัวบ่งชี้จึงไม่ถูกแสดงหรือสแกน. | ไม่สามารถอ่าน {lists} ได้ ตัวบ่งชี้จึงไม่ถูกแสดงหรือสแกน.",
-      "noIndicatorColumn": "{lists} ไม่มีคอลัมน์ indicator จึงไม่มีการใช้แถวใด ๆ. | {lists} ไม่มีคอลัมน์ indicator จึงไม่มีการใช้แถวใด ๆ.",
-      "skippedRows": "แถวที่ไม่ใช่ตัวบ่งชี้ที่รู้จักถูกข้ามไป: {detail}.",
-      "unreadStreams": "ไม่สามารถอ่านสคีมาของ {streams} ได้ จึงไม่ได้ค้นหา. | ไม่สามารถอ่านสคีมาของ {streams} ได้ จึงไม่ได้ค้นหา.",
-      "columnsSkipped": "{n} คอลัมน์ไม่ได้ถูกค้นหา | {n} คอลัมน์ไม่ได้ถูกค้นหา",
-      "skippedHint": "ค้นหาไม่ครบถ้วน — การสแกนถึงขีดจำกัดคิวรีหรือคิวรีล้มเหลว:",
-      "caveat": {
-        "failed": "ไม่สามารถค้นหา {n} คอลัมน์ได้. | ไม่สามารถค้นหา {n} คอลัมน์ได้.",
-        "partial": "คิวรี {n} รายการส่งคืนผลลัพธ์เพียงบางส่วน คอลัมน์เหล่านั้นจึงไม่ได้ถูกค้นหาอย่างครบถ้วน. | คิวรี {n} รายการส่งคืนผลลัพธ์เพียงบางส่วน คอลัมน์เหล่านั้นจึงไม่ได้ถูกค้นหาอย่างครบถ้วน.",
-        "unsearched": "ไม่มีสตรีมใดมีคอลัมน์สำหรับ: {types}.",
-        "cidr": "ไม่ได้สแกนช่วง CIDR จำนวน {n} ช่วง. | ไม่ได้สแกนช่วง CIDR จำนวน {n} ช่วง.",
-        "checked": "ตรวจครบเพียง {checked} จาก {total} ตัวบ่งชี้"
-      },
-      "partialChecked": "ผลลัพธ์บางส่วน: ตรวจตัวบ่งชี้แล้ว {checked} จาก {total} จำนวนของที่เหลืออาจต่ำกว่าจริง",
-      "partialCapped": "ผลลัพธ์บางส่วน: ตรวจตัวบ่งชี้แล้ว {checked} จาก {total} การกวาดหยุดที่ {n} คิวรี ตัวบ่งชี้ที่รุนแรงน้อยที่สุดไม่ได้ถูกตรวจ",
-      "inText": "{column} (ในข้อความ)"
-    },
-    "sources": {
-      "title": "แหล่งข้อมูล (Data Sources)",
-      "comingSoon": "การเริ่มต้นใช้งานแบบมีคำแนะนำด้วยเทมเพลตการปรับมาตรฐาน OCSF กำลังจะมา จนถึงตอนนั้น ให้ นำเข้าล็อกความปลอดภัยเป็นสตรีมใดก็ได้ หน้าเหตุการณ์จะระบุและปรับมาตรฐานให้โดยอัตโนมัติ.",
-      "subtitle": "แนบแพ็ก OCSF เพื่อปรับมาตรฐานสตรีมขณะนำเข้าข้อมูล หรือรวมสตรีมนั้นเป็นแหล่งข้อมูลความปลอดภัยตามสภาพเดิม.",
-      "colStream": "สตรีม",
-      "colSourceType": "ประเภทแหล่งข้อมูล",
-      "colMapping": "การแมป",
-      "colActions": "การดำเนินการ",
-      "stateMapped": "แมปแล้ว {pack}",
-      "stateIncluded": "รวมอยู่ (ไม่ได้แมป)",
-      "stateNotMapped": "ไม่ได้แมป",
-      "stateSuggested": "แนะนำ: {label}",
-      "attach": "แนบแพ็ก",
-      "detach": "ถอดออก",
-      "include": "รวม",
-      "exclude": "ไม่รวม",
-      "attached": "แนบ {pack} แล้ว.",
-      "detached": "ถอดแพ็กออกแล้ว.",
-      "empty": "ยังไม่มีสตรีมล็อก นำเข้าล็อกความปลอดภัยเป็นสตรีมใดก็ได้ แล้วล็อกเหล่านั้นจะปรากฏที่นี่.",
-      "noticePackRemoved": "{stream}: แพ็กถูกถอดออกนอก SIEM แนบใหม่หรือล้างออก.",
-      "noticeNoRecord": "{stream}: มีแพ็กแนบอยู่โดยไม่มีบันทึก บันทึกไว้หรือถอดออก.",
-      "noticeNotWriting": "{stream}: ไปป์ไลน์ไม่ได้เขียนไปยังสตรีมนี้แล้ว.",
-      "noticeDisabled": "{stream}: ไปป์ไลน์ถูกปิดใช้งาน ไม่มีการแมปใด ๆ.",
-      "blockStreamNotWritten": "{stream}: ไปป์ไลน์ที่มีอยู่กำหนดเส้นทางแถวไปยัง {streams} เท่านั้น ไม่ได้ส่งกลับมาที่สตรีมนี้.",
-      "blockFlattenLevel": "{stream}: ระดับการแบนของสตรีมแตกต่างจากระดับส่วนกลาง การแนบจึงจะเปลี่ยนชื่อคอลัมน์.",
-      "blockGlobalFlatten": "{stream}: ระดับการแบนส่วนกลาง ({level}) จะไม่ทำให้คอลัมน์ OCSF แบน.",
-      "blockSchemaMissing": "{stream}: สคีมาที่ผู้ใช้กำหนดขาดคอลัมน์ OCSF: {columns}.",
-      "blockPipelineDisabled": "{stream}: ไปป์ไลน์ที่มีอยู่ถูกปิดใช้งาน เปิดใช้งานก่อนแนบ.",
-      "actionFailed": "ไม่ได้บันทึกการเปลี่ยนแปลง",
-      "stateExcluded": "ไม่รวม",
-      "excludedBy": "ไม่รวมโดย {user} เมื่อ {time}",
-      "sourceTypeConfidence": "{label} ({n}%)",
-      "notClassified": "ยังไม่ได้จัดประเภท",
-      "lastChange": "เปลี่ยนล่าสุดโดย {user} เมื่อ {time}: {summary}",
-      "previewTitle": "แนบ {pack} กับ {stream} หรือไม่",
-      "previewSubtitle": "จะไม่มีการเขียนใด ๆ จนกว่าคุณจะยืนยัน",
-      "previewLoading": "กำลังตรวจสอบว่าการแนบจะเปลี่ยนแปลงอะไร…",
-      "previewPack": "แพ็ก",
-      "previewClasses": "คลาส OCSF ที่เขียน",
-      "previewFunction": "ฟังก์ชัน",
-      "previewPipeline": "ไปป์ไลน์",
-      "previewFunctionCreate": "สร้าง {name}",
-      "previewFunctionReuse": "ใช้ {name} ซ้ำ ซึ่งเหมือนกันอยู่แล้ว",
-      "previewPipelineCreate": "สร้าง {name}: {stream} → ฟังก์ชัน → {stream}",
-      "previewPipelineExtend": "เพิ่มโหนดฟังก์ชันใน {name} ถัดจากแหล่งข้อมูล โดยส่งต่อไปยัง {feeds}",
-      "previewPipelineAlready": "{name} รันแพ็กนี้อยู่แล้ว จะเขียนเฉพาะระเบียนเท่านั้น",
-      "confirmAttach": "แนบ",
-      "cancel": "ยกเลิก",
-      "detachedSkipped": "ถอดแพ็กออกแล้ว ไม่ได้เปลี่ยนไปป์ไลน์ {id}: {reason}",
-      "skipReason": {
-        "pipeline_missing": "ไม่มีอยู่แล้ว",
-        "other_stream": "ตอนนี้อ่านสตรีมอื่นอยู่",
-        "other_pack": "ตอนนี้รันแพ็กอื่นอยู่"
-      }
-    },
-    "nav": {
-      "overview": "ภาพรวม",
-      "events": "เหตุการณ์",
-      "detections": "การตรวจจับ",
-      "alerts": "การแจ้งเตือน",
-      "cases": "เคส",
-      "entities": "เอนทิตี",
-      "intel": "ข่าวกรองภัยคุกคาม",
-      "ueba": "UEBA",
-      "mitre": "MITRE ATT&CK",
-      "content": "เนื้อหา",
-      "sources": "แหล่งข้อมูล"
-    },
-    "sigma": {
-      "notSupported": "ไม่รองรับ: {fields}",
-      "cannotMatch": "ไม่สามารถจับคู่ให้ตรงกันได้: สตรีมนี้ไม่มี {fields}",
-      "compiledEmpty": "กฎคอมไพล์แล้วไม่ให้ผลลัพธ์ใด ๆ",
-      "assumedAbsent": "สันนิษฐานว่าสตรีมนี้ไม่มี {fields} เลย"
-    },
-    "audit": {
-      "title": "บันทึกการเปลี่ยนแปลง",
-      "hint": "ใครเปลี่ยนการตรวจจับ แหล่งข้อมูล และเคสใน 7 วันที่ผ่านมา",
-      "when": "เวลา",
-      "who": "เปลี่ยนโดย",
-      "area": "พื้นที่",
-      "action": "การดำเนินการ",
-      "target": "สิ่งที่เปลี่ยน",
-      "empty": "ไม่มีการเปลี่ยนแปลงที่บันทึกไว้",
-      "emptyHint": "การเปลี่ยนแปลงการตรวจจับ แหล่งข้อมูลด้านความปลอดภัย และเคสจะแสดงที่นี่",
-      "disabled": "การบันทึก Audit ปิดอยู่",
-      "disabledHint": "เปิดการบันทึก Audit สำหรับการติดตั้งนี้ เพื่อบันทึกว่าใครเปลี่ยนการตั้งค่าความปลอดภัย",
-      "category": {
-        "detection": "การตรวจจับ",
-        "case": "เคส",
-        "source": "แหล่งข้อมูล",
-        "security": "ความปลอดภัย"
-      },
-      "verb": {
-        "created": "สร้างแล้ว",
-        "changed": "เปลี่ยนแล้ว",
-        "deleted": "ลบแล้ว",
-        "enabled": "เปิดแล้ว",
-        "disabled": "ปิดแล้ว"
-      }
-    },
-    "access": {
-      "needsAuthor": "ต้องมีสิทธิ์สร้างในความปลอดภัย",
-      "openPreset": "เริ่มสร้างบทบาทจาก {preset}",
-      "askPreset": "ขอพรีเซ็ต {preset} จากผู้ดูแลระบบ",
-      "checkFailedTitle": "ตรวจสอบสิทธิ์เข้าถึงส่วนความปลอดภัยไม่ได้",
-      "checkFailedHint": "เซิร์ฟเวอร์ไม่ตอบสนอง คุณยังคงลงชื่อเข้าใช้อยู่"
-    },
-    "aria": {
-      "addSource": "เพิ่มแหล่งข้อมูล",
-      "addToCase": "เพิ่มลงในเคส",
-      "caseAssignee": "ผู้รับผิดชอบเคส",
-      "casePriority": "ลำดับความสำคัญของเคส",
-      "filterField": "ฟิลด์ตัวกรอง",
-      "filterOperator": "ตัวดำเนินการตัวกรอง",
-      "filterValue": "ค่าตัวกรอง",
-      "huntKind": "สิ่งที่จะค้นหา",
-      "indicatorType": "ประเภทตัวบ่งชี้",
-      "severityFilter": "ตัวกรองความรุนแรง",
-      "stream": "สตรีม"
     }
   },
   "promql": {
@@ -29550,18 +28062,11 @@
   "autoobserve": {
     "title": "AutoObserve",
     "subtitle": "Send your data. OpenObserve finds the problems and tells you, with its best read on the cause. When it's quiet, it shows you what it checked and what it can't see.",
-    "phase2": "Phase 2",
     "tabs": {
       "issues": "Issues",
       "coverage": "Coverage",
       "activity": "Activity",
       "policy": "Policy"
-    },
-    "loops": {
-      "coverage": "Coverage",
-      "calibration": "Calibration",
-      "investigation": "Investigation",
-      "action": "Action"
     },
     "signals": {
       "requests": "Requests",
@@ -29571,72 +28076,25 @@
       "logPatterns": "Log patterns",
       "dependencies": "Dependencies"
     },
-    "ledgerStatus": {
-      "autoApplied": "Auto-applied",
-      "awaiting": "Awaiting approval",
-      "approved": "Approved",
-      "rejected": "Rejected",
-      "rolledBack": "Rolled back",
-      "kept": "Kept — checks passed"
-    },
     "issues": {
-      "subtitle": "Incidents grouped and investigated by the SRE agent. One notification per problem; the cause is attached, or follows in the same thread if triage times out or fails.",
-      "open": "Open",
       "recent": "Resolved",
       "all": "ทั้งหมด",
-      "heldForDigest": "Held for Friday's summary",
-      "colId": "Incident",
-      "colTitle": "Problem",
-      "colSeverity": "Severity",
-      "colServices": "Affected services",
-      "colStarted": "Started",
-      "colStatus": "สถานะ",
-      "colCause": "Cause",
       "emptyTitle": "Nothing here",
       "emptyDescription": "No problems match this filter.",
-      "subsetNote": "{shown} shown. This demo shows a selection of this week's {total} incidents.",
       "searchLabel": "Search issues",
-      "searchPlaceholder": "Search issues, services, causes or INC-…",
       "noMatch": "No issues match “{query}”",
       "clearSearch": "Clear search",
       "matchCount": "No issues match | 1 issue matches | {count} issues match",
-      "colSignal": "Signal",
       "span": "{start} → {end}",
-      "spanOpen": "{start} → now",
-      "minutes": "{count} min",
-      "grouped": "{count} alert → 1 incident | {count} alerts → 1 incident",
-      "confidence": "{level} confidence",
-      "proposed": "Proposed",
-      "reversible": "reversible",
-      "proposalFor": "Proposed fix for {title}"
+      "spanOpen": "{start} → now"
     },
     "drawer": {
       "rca": "Root cause",
-      "rcaSummary": "Summary",
       "likelyCause": "Likely cause",
-      "confidence": "Confidence",
-      "confidenceValue": "Confidence: {value} (no calibrated score yet)",
-      "nextStep": "Suggested next step",
-      "evidence": "Evidence",
       "blastRadius": "Blast radius",
-      "upstream": "Upstream callers",
-      "affected": "Affected",
-      "downstream": "Downstream dependencies",
-      "none": "None",
       "timeline": "Timeline",
       "notification": "Notification sent",
-      "notSent": "No page: this low-severity problem was held for the Friday summary. Recorded in the in-product inbox.",
-      "sender": "AutoObserve",
-      "threadReply": "replied in thread",
-      "p1Note": "P1 pages immediately, before the investigation lands. The cause follows in the same thread.",
-      "gateNote": "P2 and P3 notifications wait up to 2 minutes for the investigation, so the first message usually carries the cause. If triage times out or fails, the message says the investigation is still running or failed, and the cause follows in the same thread. P4 problems don't notify anyone; they go into the Friday summary.",
-      "caughtEarlier": "What would have caught this earlier",
-      "analyzedAt": "Investigation landed at {time}.",
-      "triggersSample": "Showing {shown} of {total} firings",
-      "waitingForOk": "Waiting for your OK",
-      "proposedFix": "Proposed fix",
-      "unfoldTab": "How it unfolded",
-      "seeEvidence": "See the evidence ({count}) →"
+      "unfoldTab": "How it unfolded"
     },
     "unfold": {
       "hint": "Read left to right: what changed, the signals it set off, then what reached your team. Select a card for its firings.",
@@ -29649,7 +28107,6 @@
         "change": "Change"
       },
       "likelyCause": "Likely cause",
-      "linesUpWith": "Lines up with",
       "times": "×{count}",
       "sameMinute": "same minute",
       "plusMinutes": "+{count} min",
@@ -29662,28 +28119,14 @@
       "detector": "Detector",
       "firedAt": "Fired at",
       "when": "When",
-      "chartNote": "The problem's main chart, as in Evidence",
       "outcome": {
         "paged": "Paged on-call",
-        "asked": "Asked for an OK",
-        "notified": "Message sent, no page",
-        "held": "Held for Friday's summary",
-        "fixFailed": "Fix didn't help",
-        "fixed": "Fixed",
-        "resolved": "Resolved",
         "open": "Still open"
       }
     },
     "coverage": {
       "showing": "Showing {shown} of {total} services",
-      "watched": "Watched",
-      "learning": "Learning",
-      "gap": "Gap",
-      "na": "Not applicable",
-      "anomaly": "Anomaly",
-      "threshold": "Threshold",
       "service": "Service",
-      "lastScanned": "Last scanned",
       "detector": "Detector",
       "methodAnomaly": "Anomaly detector, learned baseline",
       "methodThreshold": "Static threshold from the library",
@@ -29695,34 +28138,15 @@
       "history": "{days} of {total} days of history",
       "notScanned": "First scan in progress — unknown, not covered until it finishes",
       "guardrails": "Guardrails active while learning: error-ratio ceiling · freshness check (fires if the stream stops)",
-      "alsoWatchedBy": "Also watched by",
       "searchLabel": "Search services",
-      "searchPlaceholder": "Search service or stream",
       "matchCount": "No services match | 1 service matches | {count} services match",
-      "noMatch": "No service or stream matches “{query}”",
       "clearSearch": "Clear search",
       "filterLabel": "Filter services by coverage",
       "all": "ทั้งหมด",
-      "gaps": "Gaps",
-      "cantWatch": "Can't watch",
       "detectorCount": "1 detector | {count} detectors",
-      "stream": "Stream",
-      "coverage": "Coverage",
-      "coverageCount": "{watched}/{total}",
-      "coverageLabel": "{watched} of {total} applicable signals watched",
       "legendLabel": "Legend",
-      "gapChip": "GAP",
-      "daysShort": "{days}/{total}d",
-      "tipAnomaly": "{signal}: anomaly detector, learned baseline",
-      "tipThreshold": "{signal}: static threshold from the library",
-      "tipLearning": "{signal}: learning, {days} of {total} days of history",
-      "tipGap": "{signal}: gap, can't be watched yet",
-      "tipNa": "{signal}: not applicable",
       "config": "Detector config",
       "lastFired": "Last fired",
-      "never": "Never",
-      "hoursAgo": "1 hour ago | {count} hours ago",
-      "daysAgo": "1 day ago | {count} days ago",
       "fixNoLink": "Add service.name label",
       "fixStopped": "Check the collector",
       "fixQueued": "Mock only: “{action}” for {service} was not sent anywhere",
@@ -29731,26 +28155,14 @@
       "viewTable": "Table",
       "fillBy": "Fill by",
       "fillState": "Coverage state",
-      "fillLearning": "Learning progress",
       "fillDetectors": "Detector count",
       "fillScanned": "Last scanned age",
-      "summaryWatched": "{watched} of {total} fully watched · {pct}%",
       "addedThisWeek": "1 new service this week | {count} new services this week",
-      "splitLabel": "{watched} fully watched, {learning} learning, {gaps} can't be watched yet",
       "stateWatched": "Fully watched",
-      "stateLearning": "Learning · {days} of {total} days",
       "stateGap": "Can't be watched yet",
       "hexName": "{service}, {state}, {stream}, {detectors}",
       "legendOf": "Legend for {fill}, select to highlight",
       "mapLabel": "Coverage map, 1 service filled by {fill} | Coverage map, {count} services filled by {fill}",
-      "bucketLearned": "Learned",
-      "bucketDays67": "6–7 days",
-      "bucketDays35": "3–5 days",
-      "bucketDays02": "0–2 days",
-      "bucketNoData": "ไม่มีข้อมูล",
-      "bucketSix": "6 detectors",
-      "bucketFive": "5 detectors",
-      "bucketFewer": "1–4 detectors",
       "bucketNone": "None",
       "bucketFresh": "Under 5 min",
       "bucketRecent": "5–15 min",
@@ -29771,9 +28183,8 @@
       "openTraces": "Traces",
       "openCatalog": "Service Catalog",
       "rangeLabel": "Time range",
-      "logPatternsValue": "{known} known · {fresh} new today",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "Not watched",
+      "badgeNotWatched": "Coverage gap",
       "signalsWatched": "Signals watched",
       "chipAria": "{signal}: {state}",
       "deltaUp": "Up {change} since the start of the range",
@@ -29783,7 +28194,6 @@
       "badgeAnomaly": "Anomaly · learned",
       "badgeThreshold": "Threshold > {threshold}",
       "now": "Now",
-      "bandLearning": "Learning the baseline · {days} of {total} days · normal range ready {day}",
       "metric": {
         "requests": "Requests",
         "errors": "Errors",
@@ -29804,149 +28214,9 @@
       }
     },
     "activity": {
-      "allLoops": "All loops",
-      "allStatuses": "All statuses",
-      "ledgerHint": "Every change AutoObserve proposes or makes is recorded here.",
-      "userBuilt": "User-built alert",
-      "confidence": "Confidence: {value}",
-      "evidence": "Evidence:",
       "before": "Before",
       "after": "After",
-      "neverAutoRetire": "Retiring an alert is never automatic.",
-      "neverSilent": "User-built alerts are never changed silently.",
-      "undo": "เลิกทำ",
-      "approve": "Approve",
-      "edit": "แก้ไข",
-      "reject": "Reject",
-      "saveApprove": "Save and approve",
-      "undoneNote": "Undone by you — prior state restored from snapshot",
-      "undoneToast": "Undone. Marked rolled back in this demo's ledger.",
-      "approvedToast": "Approved. Marked approved in this demo's ledger.",
-      "rejectedNote": "Rejected by you",
-      "rejectedToast": "Rejected. Recorded against this action class.",
-      "emptyTitle": "No entries",
-      "emptyDescription": "Nothing in the ledger matches these filters.",
-      "reviewWindow": "In review for {window} — kept automatically if its checks pass, rolled back if they fail. The prior configuration keeps being evaluated silently, so anything this change would have hidden still shows up. Undo restores the prior state now.",
-      "approvedNote": "Approved by you at {time}.",
-      "applyingNote": "Approved by you at {time}; applying it now.",
-      "appliedNote": "Approved by you at {time} and applied.",
-      "declinedNote": "Declined by you.",
-      "needsApproval": "Needs your approval",
-      "awaiting": "Awaiting",
-      "auto": "Auto",
-      "outcomeFilter": "Filter by outcome",
-      "loopFilter": "Filter by loop",
-      "columns": {
-        "time": "When",
-        "loop": "Loop",
-        "action": "Action",
-        "target": "Target",
-        "change": "Change",
-        "confidence": "Confidence",
-        "decision": "Decision",
-        "outcome": "Outcome",
-        "actions": "การดำเนินการ"
-      },
-      "showDetails": "Show details for {action} on {target}",
-      "hideDetails": "Hide details for {action} on {target}",
-      "approveFor": "Approve {action} on {target}",
-      "rejectFor": "Reject {action} on {target}",
-      "editFor": "Edit {action} on {target}",
-      "undoFor": "Undo {action} on {target}",
-      "openIncident": "Open incident {id}",
-      "confidenceHint": "{value} — no calibrated score yet",
-      "diff": "Proposed change, removed and added lines",
-      "daysLeft": "{count} day left | {count} days left",
-      "reviewProgress": "Review window elapsed",
-      "entryId": "Entry",
-      "logged": "Logged"
-    },
-    "policy": {
-      "gateHint": "Among changes to existing alerts, only deduplication applies on its own, with a prior-state snapshot and a review window: kept if its checks pass, rolled back if they fail. Everything else waits for one-click approval.",
-      "off": "Off",
-      "suggest": "Suggest",
-      "auto": "Auto",
-      "phase2Title": "Action — remediation",
-      "phase2Hint": "Production fixes. Each class earns its level from its measured track record and never acts above it.",
-      "investigation": "Investigation",
-      "outcomesTitle": "Outcomes",
-      "outcomesBody": "AutoObserve measures what each action did: did the error rate recover, did the page stop, was it undone. A class that keeps landing well earns more autonomy, one class at a time; a miss counts against it, and a fix that keeps being needed is reported as a bug instead of automated.",
-      "outcomesExample": "ScaleQueueWorkers moved to Auto after 7 approved scale-outs worked. Its one miss, on 2 October, added a pre-check, and a second miss moves it back to Suggest. AbortRollout waits for your OK; RollbackDeploy stays Off until it has a track record.",
-      "triage": {
-        "parallel": "Parallel",
-        "gate": "Gate",
-        "p2p4": "P2–P3",
-        "p1Short": "P1",
-        "p1Desc": "Pages at once and investigates alongside; the cause follows in the same thread. Gate is not allowed for P1.",
-        "gateDesc": "Hold the page until the investigation lands, for up to 2 minutes. Fails open: if triage times out or fails, it pages anyway, says the investigation is still running or failed, and the cause follows in the thread."
-      },
-      "classes": {
-        "EnableDeduplication": "Turn on deduplication for an alert that repeats within minutes.",
-        "CreateDetector": "Create an anomaly detector on a service's requests, errors or latency.",
-        "RaiseThreshold": "Raise a threshold that fires on healthy days.",
-        "LengthenEvaluationWindow": "Lengthen the window of an alert that flaps.",
-        "FixAlertQuery": "Correct an alert query that measures the wrong thing or can never match.",
-        "AttachDestination": "Attach a destination to a detector that fires into nowhere.",
-        "AddLibraryAlert": "Add a scheduled alert from the library where its predicate matches.",
-        "MoveToIncidentDelivery": "Deliver a user-built alert through its incident instead of its own route.",
-        "ReviewForDeletion": "Propose retiring an alert nobody acts on.",
-        "RollbackDeploy": "Roll back the deploy that caused a problem.",
-        "ScaleService": "Scale a saturated service out.",
-        "RestartPod": "Restart a pod that stopped serving while its replicas are healthy; a repeat opens a bug instead.",
-        "ToggleFeatureFlag": "Turn off the feature flag behind a problem.",
-        "RunRunbookStep": "Run a step from the service's runbook.",
-        "LowerThreshold": "Lower a threshold that fired too late to warn before an incident.",
-        "RevertConfigChange": "Put back a recent setting change a problem started with, when the replicas without it are healthy.",
-        "EvictLeakedConnections": "Close connections a service checked out and never returned (found by leak detection), leaving queries in flight alone. Each one is linked to the leak's bug.",
-        "AbortRollout": "Send traffic back to the previous version when only the new version's pods fail mid-rollout. Resumable in one click.",
-        "ScaleQueueWorkers": "Add workers to a backed-up queue, up to a cap; scale back on its own if the drain rate doesn't improve."
-      },
-      "triageHint": "L0 triage per severity. Fixed in phase 1.",
-      "channels": "Channels",
-      "channelInbox": "In-product inbox",
-      "channelEmailAdmins": "Email to org admins",
-      "channelDefault": "Default for every org. Always on.",
-      "alwaysOn": "Always on",
-      "channelSlack": "Slack {channel}",
-      "channelConnectedDesc": "Connected. Optional; the inbox and email work without it.",
-      "connected": "Connected",
-      "defaultsNote": "Phase 1 ships fixed product defaults. Per-org overrides come later.",
-      "groupCoverage": "Coverage — creates detectors automatically",
-      "groupCoverageHint": "Every new service gets anomaly detectors and the matching library alerts as soon as it appears, with basic safety checks while it learns. Each creation is recorded, can be undone, and goes through a review window.",
-      "groupCalibration": "Calibration — changes to existing alerts",
-      "channelEmail": "Email {address}",
-      "paging": "Paging",
-      "pagingHint": "Severity decides how a problem reaches people.",
-      "routing": {
-        "p1p2": "P1 and P2",
-        "p1p2Desc": "Hurts customers. Pages on-call at any hour.",
-        "page": "Page",
-        "p3": "P3",
-        "p3Desc": "A Slack message sent as soon as it's ready. Never pages anyone.",
-        "message": "Message",
-        "p4": "P4",
-        "p4Desc": "Goes into the Friday summary.",
-        "summary": "Friday summary"
-      },
-      "nav": {
-        "coverage": "Coverage",
-        "alerts": "Alert changes",
-        "fixes": "Fixes",
-        "investigation": "Investigation & paging",
-        "channels": "Channels"
-      },
-      "summary": {
-        "count": "{count} {mode}",
-        "row": "{label} {mode}",
-        "channels": "{count} connected"
-      }
-    },
-    "notInDemo": "Not available in this demo",
-    "confidence": {
-      "high": "High",
-      "medium": "Medium",
-      "low": "Low",
-      "uncalibrated": "no calibrated score yet"
+      "outcomeFilter": "Filter by outcome"
     },
     "analysis": {
       "verdict": "Verdict",
@@ -29973,15 +28243,6 @@
     }
   },
   "autoobserve2": {
-    "demoTag": "Demo",
-    "scenarioLabel": "Demo scenario",
-    "scenarios": {
-      "demo": "Demo week",
-      "allClear": "All clear",
-      "incident": "Active incident",
-      "cantSee": "Can't see",
-      "noBaseline": "No baseline"
-    },
     "nav": {
       "history": "History",
       "settings": "การตั้งค่า",
@@ -30006,295 +28267,29 @@
         "weeksAgo": "{count} weeks ago"
       },
       "all": "ทั้งหมด",
-      "none": "No {priority} problems {within}.",
       "allIssues": "All issues",
-      "priorityLabel": "Priority",
-      "showing": "{count} problem shown | {count} problems shown"
+      "priorityLabel": "Priority"
     },
-    "noProblems": "No problems {within}. I checked {count} service around the clock. | No problems {within}. I checked {count} services around the clock.",
-    "entryLabel": "{when} · {service}",
-    "when": "{day}, {time}",
     "showMore": "Show {count} more",
     "showFewer": "Show fewer",
-    "days": {
-      "today": "Today",
-      "monday": "Monday",
-      "tuesday": "Tuesday",
-      "wednesday": "Wednesday",
-      "thursday": "Thursday",
-      "friday": "Friday",
-      "jul18": "18 July",
-      "jul30": "30 July",
-      "aug13": "13 August",
-      "aug26": "26 August",
-      "sep4": "4 September",
-      "sep12": "12 September",
-      "sep24": "24 September",
-      "sep30": "30 September",
-      "oct1": "1 October",
-      "oct2": "2 October",
-      "sep23": "23 September"
-    },
-    "problems": {
-      "ordersDisk": {
-        "title": "orders-db will run out of disk in about 3 days",
-        "summary": "Its disk is filling about 18 GB a day since Thursday's orders release turned up audit logging, so it fills around Wednesday morning. When it does, checkout, orders and refunds will start failing. Nothing is broken yet, so I sent your team a heads-up instead of paging.",
-        "notify1": "orders-db will run out of disk in about 3 days, around Wednesday 11:00.",
-        "notify2": "Cause: since orders 3.8.0 went out on Thursday, audit logging writes about 18 GB a day. Before that the disk grew about 6 GB a day.",
-        "notify3": "Turn audit logging back down or add disk space before Wednesday. When it fills, checkout, orders and refunds will fail. Nothing is broken yet, so this is a heads-up, not a page.",
-        "chartCaption": "disk · full ~Wed 11:00",
-        "chartLabel": "Disk use grew from 334 to 445 GB of 500 over 14 days, faster since Thursday, and is forecast to be full around Wednesday 11:00"
-      },
-      "search": {
-        "title": "Search is slow and search-2 keeps crashing",
-        "titleFixed": "Search was slow while search-2 kept crashing",
-        "summary": "About 1 in 5 searches take over 3 seconds, since 10:27. A setting changed on search-2 at 10:16 makes it run out of memory. I've paged on-call, and it's still happening.",
-        "notify1": "Search is slow: about 1 in 5 searches take over 3 seconds, since 10:27.",
-        "notify2": "Cause: a setting changed on search-2 at 10:16 fills its memory. It has crashed about 10 times since 10:20. The other 4 nodes don't have the change and are fine.",
-        "notify3": "Putting the old setting back should fix it, and I can undo it. Reply \"revert\" and I'll do it. Whoever made the change should check why.",
-        "summaryFixed": "It started at 10:27, because a setting changed on search-2 filled its memory. You approved putting the old setting back, so I did, and searches are back to normal.",
-        "summaryFixing": "It started at 10:27, because a setting changed on search-2 fills its memory. You approved putting the old setting back, so I'm doing that now.",
-        "chartCaption": "p95 latency · 3.4 s peak",
-        "chartLabel": "p95 latency rose from 0.38 s to 3.4 s at 10:27 and is still high",
-        "chartLabelFixed": "p95 latency rose from 0.38 s to 3.4 s at 10:27 and fell back to normal once the setting was put back"
-      },
-      "checkout": {
-        "title": "1 in 12 payments failed after a deploy",
-        "summary": "payments-api 2.3.1 asked the payments database for more connections than it allows. Rolling back fixed it 18 minutes after the failures began.",
-        "notify1": "Checkout is failing about 1 in 12 payments, since 14:02.",
-        "notify2": "Likely cause: payments-api 2.3.1 went out at 14:01 and raised its connection pool from 20 to 50 per server. 6 servers × 50 is more than the 200 the payments database allows.",
-        "notify3": "Rolling back to 2.3.0 is the quickest fix.",
-        "chartCaption": "failed payments · 1 in 12 peak",
-        "chartLabel": "Failed payments jumped from 0.1% to 1 in 12 at 14:02 and were back to normal 18 minutes later, after the rollback"
-      },
-      "pool": {
-        "title": "Checkout ran out of database connections",
-        "summary": "Leaked connections used up all the free ones, and payments started timing out. You approved clearing them, so I did. Payments recovered 2 minutes later.",
-        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 11:18.",
-        "notify2": "Cause: 48 of 50 connections are held by refund exports that never returned them. It's the CHK-482 leak, third time in two weeks.",
-        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
-        "chartCaption": "timeouts · 1 in 9 peak",
-        "chartLabel": "Payment timeouts rose to about 1 in 9 at 11:18 and recovered 2 minutes after the fix at 11:21"
-      },
-      "email": {
-        "title": "Order emails ran up to 9 minutes late",
-        "summary": "All the mail workers were replaced at once overnight, and the queue caught up by itself within about 20 minutes. This was minor, so it went into Friday's summary.",
-        "chartCaption": "email delay · 9 min peak",
-        "chartLabel": "Email delay rose to 9 minutes from 03:15 and recovered by itself by 03:36"
-      },
-      "recs": {
-        "title": "Recommendations got slower for 15 minutes",
-        "summary": "They went from a quarter of a second to almost a second. The nightly cache rebuild had been started by hand during the afternoon, and it finished by itself. I held it for Friday's summary.",
-        "chartCaption": "p95 latency · 0.94 s peak",
-        "chartLabel": "p95 latency rose from 0.26 s to 0.94 s at 16:40 and recovered by itself 15 minutes later"
-      },
-      "login": {
-        "title": "Sign-in was slow for about 25 minutes",
-        "summary": "1 in 8 people waited more than 5 seconds. The session cache ran out of space after a traffic spike and signed some people out. Your team added space and it recovered.",
-        "notify1": "Sign-in is slow: about 1 in 8 people wait over 5 seconds, since 10:12.",
-        "notify2": "Cause: the session cache is full after traffic doubled at 10:05.",
-        "notify3": "Adding space to the cache should fix it.",
-        "chartCaption": "p95 sign-in · 5.8 s peak",
-        "chartLabel": "p95 sign-in time rose from 0.6 s to 5.8 s at 10:12 and recovered after cache space was added at 10:31"
-      },
-      "queue": {
-        "title": "Orders backed up in the queue",
-        "summary": "About 4,000 were waiting at the worst. I added workers as you've allowed, but it didn't help, so I put them back and paged on-call. The real cause was a database index that a migration left broken; your team fixed it 40 minutes after it began.",
-        "notify1": "Orders are backing up: about 4,000 waiting, since 21:30.",
-        "notify2": "I added workers at 21:33, as you've allowed, but it didn't help, so I've put them back.",
-        "notify3": "Order lookups are about 40 times slower since the 21:20 database migration. Check the orders_by_status index first.",
-        "chartCaption": "backlog · 4,120 peak",
-        "chartLabel": "Orders waiting climbed to 4,120 from 21:30, kept climbing after workers were added, and drained once the index was rebuilt at 21:52"
-      },
-      "uploads": {
-        "title": "Image uploads failed for 1 in 40 people",
-        "summary": "It lasted 10 minutes, because a certificate expired before one server had loaded its replacement. It sorted itself out, so I held it for Friday's summary.",
-        "chartCaption": "failed uploads · 1 in 40 peak",
-        "chartLabel": "Failed uploads rose to about 1 in 40 at 07:05 and recovered by itself 10 minutes later"
-      },
-      "push": {
-        "title": "Push notifications arrived 2 minutes late",
-        "summary": "It lasted half an hour, while the provider that delivers them was slow. Minor, so it waited for Friday's summary.",
-        "chartCaption": "delivery delay · 2 min peak",
-        "chartLabel": "Delivery delay rose from 4 s to about 2 minutes at 13:50 and recovered by itself 30 minutes later"
-      },
-      "checkoutNow": {
-        "title": "Checkout is failing 1 in 6 payments",
-        "titleFixed": "Checkout failed 1 in 6 payments",
-        "summary": "It started at 10:43, and I'm still looking into why. So far it lines up with version 2.4.0 going out at 10:41, and I've paged on-call.",
-        "notify1": "Checkout is failing about 1 in 6 payments, since 10:43.",
-        "notify2": "I'm still looking into why. So far it lines up with checkout 2.4.0 going out at 10:41.",
-        "notify3": "Only the servers on 2.4.0 are failing. Reply \"stop\" and I'll send traffic back to the old version; the old servers have room for it. I can't see payments-db directly, so I haven't ruled it out.",
-        "summaryFixing": "It started at 10:43, right after version 2.4.0 went out. You approved stopping the rollout, so I'm sending traffic back to the old version now.",
-        "summaryFixed": "It started at 10:43, after version 2.4.0 went out. You approved stopping the rollout, and failures stopped once traffic went back to the old version. Why 2.4.0 fails is still for your team to find.",
-        "chartCaption": "failed payments · 1 in 6 peak",
-        "chartLabel": "Failed payments jumped from 0.1% to about 1 in 6 at 10:43 and are still failing",
-        "chartLabelFixed": "Failed payments jumped from 0.1% to about 1 in 6 at 10:43 and fell back to normal once the rollout was stopped"
-      },
-      "gateway": {
-        "title": "The API rejected 1 in 30 requests",
-        "summary": "It started after a config change. Your team reverted it, and it was back to normal 13 minutes after it began.",
-        "notify1": "The API is rejecting about 1 in 30 requests, since 15:22.",
-        "notify2": "Likely cause: a config change at 15:20 shortened how long sign-in tokens last.",
-        "notify3": "Reverting that change should fix it.",
-        "chartCaption": "rejected · 1 in 30 peak",
-        "chartLabel": "Rejected requests rose to 1 in 30 at 15:22 and fell back to normal when the config change was reverted at 15:34"
-      },
-      "poolSep": {
-        "title": "Checkout ran out of database connections",
-        "summary": "Leaked connections used up all the free ones, and payments started timing out. I traced the leak to refund exports, and you approved clearing the leaked connections. Payments recovered 2 minutes later.",
-        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 15:42.",
-        "notify2": "Cause: 47 of 50 connections are held by refund exports that never returned them. It looks like a leak in the refund export code.",
-        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
-        "chartCaption": "timeouts · 1 in 9 peak",
-        "chartLabel": "Payment timeouts rose to about 1 in 9 at 15:42 and recovered 2 minutes after the fix at 15:45"
-      },
-      "poolOct": {
-        "title": "Checkout ran out of database connections again",
-        "summary": "It was the same refund-export leak (CHK-482). You approved clearing the leaked connections, and payments recovered 2 minutes later.",
-        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 10:05.",
-        "notify2": "Cause: 46 of 50 connections are held by refund exports. It's the CHK-482 leak again, second time in 8 days.",
-        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
-        "chartCaption": "timeouts · 1 in 9 peak",
-        "chartLabel": "Payment timeouts rose to about 1 in 9 at 10:05 and recovered 2 minutes after the fix at 10:08"
-      },
-      "lagSep": {
-        "title": "New products took up to 40 minutes to show up in search",
-        "summary": "search-indexer fell behind on catalog updates after version 1.12.0 shortened how long it may take per batch. Your team rolled it back and it caught up 40 minutes after it began.",
-        "notify1": "New and changed products are missing from search: search-indexer is about 48,000 catalog updates behind, since 14:06.",
-        "notify2": "Cause: search-indexer 1.12.0 went out at 13:58 and cut the Kafka poll interval to 30 s. Large batches take about 45 s, so the consumer keeps getting removed from its group.",
-        "notify3": "Rolling back to 1.11.4 should let it catch up. Search itself still works; it just shows older products.",
-        "chartCaption": "consumer lag · 48,000 peak",
-        "chartLabel": "Consumer lag rose from about 200 to 48,000 messages from 14:06 and drained after the rollback at 14:39"
-      },
-      "poolAug": {
-        "title": "Checkout ran out of database connections during the refund export",
-        "summary": "The nightly refund export held almost all of checkout's database connections, and about 1 in 12 payments timed out. It cleared when the export finished, 13 minutes after it began.",
-        "notify1": "Checkout has run out of database connections, and about 1 in 12 payments are timing out, since 02:04.",
-        "notify2": "Cause: 44 of 50 connections are held by the nightly refund export, which is about 3 times its usual size after the end-of-month sale.",
-        "notify3": "It should clear when the export finishes. If it doesn't, stopping the export will free the connections.",
-        "chartCaption": "timeouts · 1 in 12 peak",
-        "chartLabel": "Payment timeouts rose to about 1 in 12 at 02:04 and recovered by themselves when the export finished at 02:17"
-      },
-      "throttleAug": {
-        "title": "Fraud checks were slow for 35 minutes",
-        "summary": "A batch job landed on the same servers and took their spare CPU, so fraud checks took up to 1.4 seconds. Checkout still worked, just slower, and it recovered when the job finished, so I held it for Friday's summary.",
-        "chartCaption": "p95 fraud check · 1.4 s peak",
-        "chartLabel": "p95 fraud check time rose from 0.18 s to 1.4 s at 11:20 and recovered by itself when the batch job finished at 11:55"
-      },
-      "tlsJul": {
-        "title": "Invoices stopped sending for 43 minutes",
-        "summary": "invoice-service's certificate for billing-api expired, so every invoice failed to send. Your team renewed it, and the queued invoices all went out.",
-        "notify1": "No invoices are going out: every send from invoice-service is failing, since 09:01.",
-        "notify2": "Cause: invoice-service's client certificate for billing-api expired at 09:00, and billing-api rejects every connection from it.",
-        "notify3": "Renewing the certificate should fix it. Invoices are queuing, not lost.",
-        "chartCaption": "failed sends · all of them",
-        "chartLabel": "Failed invoice sends jumped from 0.2% to 100% at 09:01 and fell back to normal after the certificate was renewed at 09:41"
-      },
-      "dnsJul": {
-        "title": "Cart prices went missing for 1 in 4 people",
-        "summary": "A DNS change stopped half the cluster's DNS servers answering for internal names, so cart couldn't reach currency. Your team reverted it 31 minutes after it began.",
-        "notify1": "About 1 in 4 cart loads show no prices, since 16:22.",
-        "notify2": "Cause: a DNS config change at 16:20 dropped the internal zone from 2 of the 4 cluster DNS servers, so cart can't find currency.internal on those lookups.",
-        "notify3": "Reverting the DNS change should fix it. Orders still go through at checkout.",
-        "chartCaption": "missing prices · 1 in 4 peak",
-        "chartLabel": "Cart loads without prices rose from 0.1% to about 1 in 4 at 16:22 and fell back to normal when the DNS change was reverted at 16:51"
-      }
-    },
-    "drawer": {
-      "worked": "Worked",
-      "didntHelp": "Didn't help",
-      "now": "Now"
-    },
     "needs": {
-      "more": "More",
-      "less": "Less",
-      "canUndo": "You can undo it",
-      "undo": "เลิกทำ",
-      "undone": "Undone. This is waiting for your answer again.",
-      "shiftTo": "to",
-      "retune": {
-        "body": "The \"{alert}\" alert on {host} went off {fired} times this month, and nobody needed to act. The disk climbs to about 85% during nightly cleanup and is back near 70% by morning. Even on its busiest day, it would take more than 3 days to fill from 90%. I'd like to raise it to {to}%. I'll still warn you if the disk is ever on track to fill within a day.",
-        "yes": "Yes, change it",
-        "no": "Leave it",
-        "doneYes": "Done. I raised it to {to}%. The fill warning stays on.",
-        "doneNo": "Okay, I'll leave it at {from}%.",
-        "headline": "Raise the 'disk 80%' alert on ingest-3 to 90%?",
-        "why": "It went off 41 times this month and nobody needed to act.",
-        "cost": "Fill warning stays on"
-      },
-      "fixNow": {
-        "search": {
-          "body": "Search is slow because a setting changed on node search-2 at 10:16 fills its memory, so it keeps crashing. The other 4 nodes still have the old setting and are fine. May I put it back? I can undo this.",
-          "yes": "Put it back",
-          "no": "I'll handle it",
-          "doneYes": "Done. Putting it back now.",
-          "doneNo": "Okay, it's yours. I'll keep watching.",
-          "doneSettled": "Done. search-2 is back and searches are normal.",
-          "headline": "Put search-2's cache setting back to 10%?",
-          "why": "A 10:16 change fills its memory, so it keeps crashing.",
-          "cost": "One restart of search-2"
-        },
-        "checkoutNow": {
-          "body": "Checkout is failing about 1 in 6 payments, and only the servers on 2.4.0 are failing. The 6 servers on the old version have room for all the traffic. May I stop the rollout and send traffic back to them? 2.4.0 stays deployed for your team to look at.",
-          "yes": "Stop the rollout",
-          "no": "I'll handle it",
-          "doneYes": "Done. Stopping the rollout now.",
-          "doneNo": "Okay, it's yours. I'll keep watching.",
-          "doneSettled": "Done. Payments are back to normal.",
-          "headline": "Stop checkout's 2.4.0 rollout?",
-          "why": "About 1 in 6 payments fail, all on 2.4.0. The old version can take all the traffic.",
-          "cost": "2.4.0 stays deployed"
-        }
-      },
-      "fromNowOn": {
-        "body": "{done} times now, a new version made only its own servers fail while it was rolling out. Each time I asked to send traffic back to the old version, and the failures stopped within 2 minutes. May I do that on my own during a rollout from now on? I'll leave the new version in place for your team, and tell them straight away.",
-        "yes": "Yes, on its own",
-        "no": "Keep asking me",
-        "doneYes": "Done. I'll stop bad rollouts on my own and tell you each time.",
-        "doneNo": "Okay, I'll keep asking you first.",
-        "headline": "Stop bad rollouts on my own from now on?",
-        "why": "All 6 times you said yes, the failures stopped within 2 minutes.",
-        "cost": "Only during a rollout"
-      },
-      "labels": {
-        "fixNow": "Fix now",
-        "fromNowOn": "Let me handle this",
-        "retune": "Quieter alert"
-      },
-      "needsOk": "Needs your OK"
+      "shiftTo": "to"
     },
     "footer": {
-      "text": "I check myself too: if I stop working, you'll hear about it.",
       "seeAll": "See everything I watch",
       "seeChanges": "See everything I've changed"
     },
     "coverageDrawer": {
-      "ago": {
-        "minutes": "1 minute ago | {count} minutes ago",
-        "stale": "No new data for 1 minute (since {since}) | No new data for {count} minutes (since {since})"
-      },
-      "summaryWatching": "I'm watching {watched} of your {total} services.",
-      "summaryAll": "I'm watching all {total} of your services.",
-      "summaryWithClauses": "{head} {clauses}.",
-      "clauseLearning": "{count} is still learning | {count} are still learning",
-      "clauseUnseen": "there's one I can't see | there are {count} I can't see",
       "legend": {
-        "watching": "Fully watched",
-        "learning": "Learning",
-        "unseen": "Can't see"
-      },
-      "legendAria": "{label}: {count}",
-      "summaryAllLearning": "I'm watching all {total} of your services, and I'm still learning what normal looks like for each of them."
+        "learning": "Learning"
+      }
     },
     "coveragePage": {
-      "title": "Everything I watch",
-      "back": "ย้อนกลับ"
+      "title": "Everything I watch"
     },
     "issuesPage": {
       "title": "All issues",
       "sentence": "Every problem I opened {within}. Pick one to see what happened and what I did about it.",
-      "back": "ย้อนกลับ",
       "ranges": {
         "week": "Last 7 days",
         "month": "Last 30 days",
@@ -30309,25 +28304,13 @@
     "activityPage": {
       "title": "What I've changed",
       "stats": {
-        "window": "Last 7 days",
         "made": "Change | Changes",
-        "worked": "Worked",
-        "review": "In review",
         "undone": "Undone"
       },
       "filters": {
-        "all": "ทั้งหมด",
-        "fixes": "Fixes",
-        "watching": "Watching",
-        "tuning": "Alert tuning"
+        "all": "ทั้งหมด"
       },
       "status": {
-        "applying": "Applying now",
-        "worked": "Worked",
-        "done": "Done",
-        "review": "In review",
-        "reviewDays": "In review · {count} day left | In review · {count} days left",
-        "didntHelp": "Didn't help",
         "undone": "Undone"
       },
       "actions": {
@@ -30337,265 +28320,33 @@
       },
       "details": {
         "name": "Change",
-        "target": "On",
-        "confidence": "Confidence",
-        "saw": "What I saw",
-        "recurring": "This fix keeps being needed for the same leak ({bug}), so I'll always ask first until it's fixed.",
-        "undoDecided": "Undo takes this back, and I'll ask you again."
-      },
-      "toast": {
-        "undone": "Undone. It's back the way it was.",
-        "undoDecided": "Undone. I'll ask you again."
+        "target": "On"
       },
       "empty": {
-        "filter": "Nothing here right now.",
-        "scenario": "I haven't changed anything yet. When I make a change, you'll see it here."
-      },
-      "entries": {
-        "L-313": {
-          "done": "Stopped checkout's 2.4.0 rollout",
-          "why": "Only the 6 servers on 2.4.0 are failing; the 6 on the old version can take all the traffic.",
-          "from": "6 of 12 pods",
-          "to": "no traffic",
-          "on": "checkout 2.4.0"
-        },
-        "L-308": {
-          "done": "Put search-2's cache setting back to 10%",
-          "why": "It went up to 60% at 10:16, and search-2 has been running out of memory since.",
-          "from": "60%",
-          "to": "10%",
-          "on": "cache size · search-2"
-        },
-        "L-309": {
-          "done": "Raised the 'disk 80%' alert on ingest-3 to 90%",
-          "why": "It went off 41 times this month and nobody needed to act. The fill warning stays on.",
-          "from": "80%",
-          "to": "90%",
-          "on": "disk alert · ingest-3"
-        },
-        "L-310": {
-          "done": "Started watching returns, exchanges and gift-cards",
-          "why": "Found them this morning. Learning what's normal for them over 7 days.",
-          "from": "not watched",
-          "to": "watched",
-          "on": "3 services"
-        },
-        "L-314": {
-          "done": "Started watching 6 services I found this morning",
-          "why": "They showed up in your traces today. Learning what's normal for them over 7 days.",
-          "from": "not watched",
-          "to": "watched",
-          "on": "6 services"
-        },
-        "L-311": {
-          "done": "Got your OK to stop bad rollouts on my own",
-          "why": "I stopped 6 with your approval in 60 days; errors were back to normal within 2 minutes each time.",
-          "from": "ask first",
-          "to": "on my own",
-          "on": "stopping rollouts"
-        },
-        "L-304": {
-          "done": "Cleared checkout's 48 leaked database connections",
-          "why": "Payments were timing out. They were back to normal 2 minutes later.",
-          "from": "50 of 50 in use",
-          "to": "2 in use",
-          "on": "checkout pool"
-        },
-        "L-299": {
-          "done": "Cleared checkout's 46 leaked database connections",
-          "why": "The same leak as 23 September. Payments were back to normal 2 minutes later.",
-          "from": "50 of 50 in use",
-          "to": "4 in use",
-          "on": "checkout pool"
-        },
-        "L-296": {
-          "done": "Cleared checkout's 47 leaked database connections",
-          "why": "A new leak, so I filed it with the checkout team as CHK-482 afterwards.",
-          "from": "50 of 50 in use",
-          "to": "3 in use",
-          "on": "checkout pool"
-        },
-        "L-301": {
-          "done": "Started watching billing-api, billing-worker and invoice-service",
-          "why": "Found them in your traces. Still learning what's normal for them.",
-          "from": "not watched",
-          "to": "watched",
-          "on": "3 services"
-        },
-        "L-307": {
-          "done": "Fixed the payments-api connection alert so it counts all servers",
-          "why": "It checked each server on its own, so it never went off during Tuesday's outage.",
-          "from": "each pod over 95%",
-          "to": "all pods over 85%",
-          "on": "connection alert"
-        },
-        "L-302": {
-          "done": "Grouped the 3 checkout latency alerts into one",
-          "why": "They went off together 94% of the time, so one slowdown paged you 3 times.",
-          "from": "3 alerts",
-          "to": "1",
-          "on": "checkout latency"
-        },
-        "L-303": {
-          "done": "Raised the 'disk 80%' alert on ingest-1 to 90%",
-          "why": "It went off 29 times in 30 days and nobody needed to act. The fill warning stays on.",
-          "from": "80%",
-          "to": "90%",
-          "on": "disk alert · ingest-1"
-        },
-        "L-305": {
-          "done": "Added 4 orders-consumer workers to clear a backlog",
-          "why": "It didn't help, so I scaled back to 4 and paged on-call 3 minutes later.",
-          "from": "4 workers",
-          "to": "8 workers",
-          "on": "orders-consumer"
-        },
-        "L-306": {
-          "done": "Got your OK to add queue workers on my own",
-          "why": "You approved it 7 times during traffic bursts, and the backlog cleared every time.",
-          "from": "ask first",
-          "to": "on my own",
-          "on": "adding queue workers"
-        },
-        "L-312": {
-          "done": "Started watching the 18 services I found when you connected",
-          "why": "Learning what's normal for each one. Their alerts start once that's ready.",
-          "from": "not watched",
-          "to": "watched",
-          "on": "18 services"
-        }
+        "filter": "Nothing here right now."
       }
     },
     "historyDrawer": {
-      "title": "History",
-      "seeChange": "See the change",
-      "filters": {
-        "all": "ทั้งหมด",
-        "problems": "Problems",
-        "changes": "Changes",
-        "fixes": "Fixes",
-        "decisions": "Your decisions"
-      },
-      "empty": "Nothing here yet.",
-      "entries": {
-        "checkoutNowPaged": "I paged on-call about checkout failing payments.",
-        "searchPaged": "I paged on-call about search being slow.",
-        "searchAsked": "I asked whether I may put search-2's cache setting back.",
-        "euStopped": "Nothing has arrived from the {cluster} cluster since this time. I told you here and in Slack.",
-        "fridaySummary": "I sent Friday's summary with {count} minor problem. | I sent Friday's summary with {count} minor problems.",
-        "emailHeld": "I held a minor problem with order emails for Friday's summary.",
-        "poolFixed": "I closed checkout's leaked database connections. Payments recovered 2 minutes later.",
-        "poolApproved": "You approved closing checkout's leaked database connections.",
-        "billingWatch": "I started watching billing-api, billing-worker and invoice-service.",
-        "checkoutPaged": "I paged on-call about checkout failing payments.",
-        "recsHeld": "I held a minor problem with recommendations for Friday's summary.",
-        "diskApproved": "You approved raising the disk alert on ingest-1 to {to}%.",
-        "latencyGrouped": "I grouped the three checkout slowness alerts into one, so a single slowdown pages once.",
-        "queueFixed": "I added orders queue workers, but the queue kept growing, so I put them back and paged on-call.",
-        "loginPaged": "I paged on-call about slow sign-in.",
-        "queuePermission": "You allowed me to add queue workers on my own, up to 8.",
-        "gatewayPaged": "I paged on-call about the API rejecting requests.",
-        "found18": "I found {count} services and started learning what normal looks like for them.",
-        "connected": "You connected me to your data.",
-        "thresholdApproved": "You approved making the payments-api connection alert count all servers against the database's limit of 200.",
-        "decision": {
-          "fixNow": {
-            "search": {
-              "yes": "You approved putting search-2's setting back.",
-              "no": "You said you'd handle search-2 yourself.",
-              "undoYes": "You undid putting search-2's setting back. I re-applied 60%, so search-2 will start running out of memory again; I've told on-call.",
-              "cancel": "You cancelled putting search-2's setting back before I applied it. search-2 is still running out of memory; I've told on-call.",
-              "undoNo": "You took back saying you'd handle search-2 yourself."
-            },
-            "checkoutNow": {
-              "yes": "You approved stopping the checkout 2.4.0 rollout.",
-              "no": "You said you'd handle the checkout rollout yourself.",
-              "undoYes": "You undid stopping the 2.4.0 rollout. Traffic is going to 2.4.0 again, so payments may start failing again; I've told on-call and I'm watching.",
-              "cancel": "You cancelled stopping the 2.4.0 rollout before I did it. Payments are still failing; I've told on-call.",
-              "undoNo": "You took back saying you'd handle the checkout rollout yourself."
-            }
-          },
-          "retune": {
-            "yes": "You approved raising the disk alert on ingest-3 to 90%.",
-            "no": "You said not now to raising the disk alert on ingest-3.",
-            "undoYes": "You undid raising the disk alert on ingest-3. It's back at 80%, so it will start going off on healthy nights again.",
-            "undoNo": "You took back your not-now on the disk alert on ingest-3."
-          },
-          "fromNowOn": {
-            "yes": "You approved letting me stop bad rollouts on my own.",
-            "no": "You said not now to letting me stop bad rollouts on my own.",
-            "undoYes": "You took back letting me stop bad rollouts on my own.",
-            "undoNo": "You took back your not-now on letting me stop bad rollouts on my own."
-          }
-        },
-        "fixedNow": {
-          "search": "I put search-2's setting back. Searches are back to normal.",
-          "checkoutNow": "I sent traffic back to the old version, and failures stopped. Why 2.4.0 fails is still for your team to find; I've kept it deployed for them."
-        },
-        "checkoutNowAsked": "I asked whether I may stop the checkout 2.4.0 rollout.",
-        "newWatch": "I found {count} new services this morning (returns, exchanges and gift-cards) and started watching them right away.",
-        "foundWatch": "I found {count} new services this morning and started watching them right away."
-      }
+      "title": "History"
     },
     "settingsDrawer": {
       "title": "การตั้งค่า",
-      "reach": "Where should I reach you?",
-      "destSlack": "Slack: {channel}",
-      "destEmail": "Email: {address}",
-      "autonomy": "How much should I do on my own?",
-      "tell": "Tell me",
-      "ask": "Ask me first",
-      "fix": "Fix it, then tell me",
-      "tellHint": "I'll tell you what I would do, and leave the doing to you.",
-      "askHint": "I'll ask before each fix, and do it when you say yes.",
-      "fixHint": "For kinds of fix with a solid track record, I'll go ahead within the limits you set, and tell you straight after.",
-      "advanced": "Advanced",
-      "perKind": "Each kind of fix",
-      "digestDay": "Summary day",
-      "excluded": "Services I should ignore",
-      "excludedNone": "None",
-      "kinds": {
-        "pool": "Close leaked database connections",
-        "queueWorker": "Add queue workers during a backlog",
-        "retune": "Raise a noisy alert's threshold",
-        "rollback": "Roll back a deploy",
-        "record": "Done {done} times, worked {worked} times.",
-        "keptRecord": "Done {done} times, kept {worked} times.",
-        "noRecord": "Never done yet, so I won't do it on my own until it has a track record.",
-        "revertConfig": "Undo a recent setting change",
-        "abortRollout": "Stop a bad rollout",
-        "recurringRecord": "Done {done} times, all for the same leak ({bug}). I'll keep asking until it's fixed."
-      },
-      "weekdays": {
-        "monday": "Monday",
-        "tuesday": "Tuesday",
-        "wednesday": "Wednesday",
-        "thursday": "Thursday",
-        "friday": "Friday"
-      },
-      "saved": "Saved",
-      "noDestination": "I won't be able to reach anyone.",
-      "routing": "When I page you",
-      "routingNote": "I page for anything that hurts customers. Smaller things get a message that won't wake anyone, and the smallest go into Friday's summary."
+      "reach": "Where should I reach you?"
     },
     "howItWorks": {
       "title": "How it works",
       "intro": "Here's what I do, in five steps.",
       "gotIt": "Got it",
       "s1Title": "I find your services",
-      "s1": "I look through the data you already send and find every service in it. When a new one appears, I start watching it the same day; you don't need to ask.",
-      "s2Title": "I watch them",
-      "s2": "I learn what normal looks like for each service: its errors, slowness and traffic for each hour of the day, with weekly patterns sharpening over time. Until I know, I use basic safety checks.",
-      "s3Title": "I stay quiet unless it's real",
-      "s3": "Most odd moments aren't problems. I page your team when something hurts customers, send a message that won't wake anyone for smaller issues, and keep minor things for the Friday summary.",
-      "s4Title": "I explain every page",
-      "s4": "Every message says what broke, since when, and my best read on why, with how sure I am.",
-      "s5Title": "I fix what you've allowed",
-      "s5": "I only fix things you've said I may. A fix that works earns a little trust, and one that doesn't help counts against me. If I keep needing the same fix, that's a bug I report to your team, not a habit I automate."
-    },
-    "topbar": {
-      "brand": "AutoObserve",
-      "checked": "Checked 1 minute ago | Checked {count} minutes ago"
+      "s1": "I look through the data you already send and find the services in it. A new service shows up after my next check; you don't need to add it.",
+      "s2Title": "I learn what normal looks like",
+      "s2": "I learn how much data each stream normally sends from 14 days of its history. Until a stream has that history, I say it is still learning and don't judge it.",
+      "s3Title": "I page only when a stream stops",
+      "s3": "When a stream stops sending data, I open an incident and, if paging is on, page the on-call team that owns the service. Sharp drops and rises show as findings and never page. Smaller things wait for the daily digest.",
+      "s4Title": "I say what happened",
+      "s4": "Every incident says what stopped and since when. With AI analysis on, it also carries a best read on why.",
+      "s5Title": "You decide what changes",
+      "s5": "I suggest alerts for what nothing watches and fixes for alerts that can't fire. Nothing changes until you review and apply it, and you can undo what you applied."
     },
     "outcome": {
       "active": "Happening now",
@@ -30608,13 +28359,10 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
-      "nerdTooltip": "Nerd view shows every detector, loop and setting in full",
+      "nerdTooltip": "The detailed view shows every detector, loop and setting in full",
       "label": "ดู"
-    },
-    "rail": {
-      "more": "More below"
     },
     "suggestions": {
       "title": "Suggestions",
@@ -30678,7 +28426,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Step 0 · Server prerequisites",
+      "title": "Step 1 · Server prerequisites",
       "subtitle": "Checked on this server before any Slack work",
       "columnSetting": "Setting",
       "columnResult": "Result",
@@ -30749,7 +28497,7 @@
       "back": "ย้อนกลับ",
       "finish": "Finish",
       "connection": {
-        "title": "Step 1 · Connection",
+        "title": "Step 2 · Connection",
         "description": "The check reaches Slack from this server through the same code path production uses.",
         "allPassed": "Slack is reachable from this server",
         "someFailed": "Slack is not reachable from this server. Allow *.slack.com through your proxy or firewall, then Re-check.",
@@ -30758,7 +28506,7 @@
         "socketHost": "WebSocket host {host}"
       },
       "create": {
-        "title": "Step 2 · Create the app",
+        "title": "Step 3 · Create the app",
         "modeLabel": "Connection mode",
         "socket": "Socket Mode",
         "socketDescription": "Recommended. OpenObserve opens the connection, so Slack needs no public URL",
@@ -30787,7 +28535,7 @@
         "signingSecretRequired": "HTTP mode needs the signing secret"
       },
       "install": {
-        "title": "Step 3 · Install",
+        "title": "Step 4 · Install",
         "created": "App created · {appId}",
         "allowHint": "Opens Slack's install screen: click Allow there. The bot token comes back from Slack by itself; nothing to copy.",
         "allow": "Allow in Slack",
@@ -30810,7 +28558,7 @@
         "appNotCreatedByO2": "OpenObserve did not create this app, so it stays in Slack. Delete it there if you no longer need it."
       },
       "test": {
-        "title": "Step 4 · Test and linking",
+        "title": "Step 5 · Test and linking",
         "run": "Run checks",
         "signIn": "Test Sign in with Slack",
         "signInPassed": "Sign in with Slack works",
@@ -32540,5 +30288,97 @@
     "recentRow": "การค้นหาล่าสุด",
     "deletedQuery": "ลบ {query} แล้ว",
     "undo": "เลิกทำ"
+  },
+  "autoobserveLive": {
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "incidents": {
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
+  "insight": {
+    "kind": {
+      "paged": {
+        "page": {
+          "paged": "Paged {team}",
+          "pagedTeam": "Paged the on-call team",
+          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand."
+        },
+        "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "stream_silence": {
+          "headline": "{count} streams stopped sending data",
+          "why": "No data has arrived on {stream} ({type}) since {time}.",
+          "whyMany": "{streams} have sent no data since {time}.",
+          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
+          "nextMany": "One cause is likely, such as a shared collector."
+        },
+        "stream_drop": {
+          "headline": "{count} streams dropped sharply",
+          "why": "{stream} ({type}) has received much less data than usual since {time}.",
+          "whyMany": "{streams} have received much less data than usual since {time}.",
+          "next": "Check whether a sender stopped or a filter changed.",
+          "nextMany": "One cause is likely, such as a shared collector or filter."
+        },
+        "stream_rise": {
+          "headline": "{count} streams rose sharply",
+          "why": "{stream} ({type}) has received much more data than usual since {time}.",
+          "whyMany": "{streams} have received much more data than usual since {time}.",
+          "next": "Check for a retry loop or a new sender writing to it.",
+          "nextMany": "One cause is likely, such as a shared sender retrying."
+        }
+      }
+    },
+    "bulk": {},
+    "decisions": {
+      "saved": {
+        "applied": "Applied to {title}.",
+        "appliedEditor": "Saved and recorded for {title}.",
+        "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
+      },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undone": "Undone",
+        "you": "you"
+      },
+      "undone": {
+        "applyOne": "Undone: {title} is back to how it was.",
+        "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
+      }
+    }
   }
 }

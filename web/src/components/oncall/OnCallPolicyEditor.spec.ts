@@ -841,6 +841,130 @@ describe("OnCallPolicyEditor", () => {
 
         expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(false);
       });
+
+      // B5: a hidden picker releases the override, but only once the room is known to be empty.
+      const saveWith = async (wrapper: any) => {
+        await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+        await flushPromises();
+        return (service.setPolicy.mock.calls.at(-1)?.[0] as any)?.data;
+      };
+
+      it("sends null when the picker is hidden for a confirmed empty room", async () => {
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: [], source: "team" },
+        } as any);
+        const wrapper = mountWithPicker({ ...policy, template: "ops-card" });
+        await flushPromises();
+        expect((await saveWith(wrapper)).template).toBeNull();
+      });
+
+      it("keeps the override when Save runs while the team channel read is pending", async () => {
+        service.getTeamChannel.mockReturnValue(new Promise(() => {}) as any);
+        const wrapper = mountWithPicker({ ...policy, template: "ops-card" });
+        await flushPromises();
+        expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(false);
+        expect((await saveWith(wrapper)).template).toBe("ops-card");
+      });
+
+      it("keeps the override when the team channel read failed", async () => {
+        service.getTeamChannel.mockRejectedValue({ response: { status: 500 } });
+        const wrapper = mountWithPicker({ ...policy, template: "ops-card" });
+        await flushPromises();
+        expect((await saveWith(wrapper)).template).toBe("ops-card");
+      });
+
+      const emptyTheRoom = async (wrapper: any) => {
+        const channelSelect = wrapper
+          .findAllComponents({ name: "OSelect" })
+          .find((c: any) => c.attributes("data-test") === "oncall-team-channel-select");
+        await channelSelect!.vm.$emit("update:modelValue", []);
+        await flushPromises();
+      };
+
+      it("releases the override once the saved channel empties the room", async () => {
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+        } as any);
+        service.setTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: [], source: "team" },
+        } as any);
+        const wrapper = mountWithPicker({ ...policy, template: "ops-card" });
+        await flushPromises();
+        await emptyTheRoom(wrapper);
+        expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(false);
+        expect((await saveWith(wrapper)).template).toBeNull();
+        const sent = service.setPolicy.mock.calls.map((c: any) => c[0].data.template);
+        expect(sent).toEqual(["ops-card", null]);
+        expect(wrapper.emitted("saved")).toHaveLength(1);
+      });
+
+      it("keeps the override when the channel write that empties the room fails", async () => {
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+        } as any);
+        service.setTeamChannel.mockRejectedValue({ response: { status: 500 } });
+        const wrapper = mountWithPicker({ ...policy, template: "ops-card" });
+        await flushPromises();
+        await emptyTheRoom(wrapper);
+        expect((await saveWith(wrapper)).template).toBe("ops-card");
+        expect(service.setPolicy).toHaveBeenCalledTimes(1);
+        expect(wrapper.emitted("saved")).toBeUndefined();
+      });
+
+      it("ignores an older team channel read that lands after a newer one", async () => {
+        let resolveFirst: (v: any) => void = () => {};
+        service.getTeamChannel
+          .mockReturnValueOnce(new Promise((r) => (resolveFirst = r)) as any)
+          .mockReturnValueOnce(new Promise(() => {}) as any);
+        const wrapper = mountWithPicker({ ...policy, template: "ops-card" });
+        await flushPromises();
+        await wrapper.setProps({ open: false });
+        await wrapper.setProps({ open: true });
+        await flushPromises();
+        resolveFirst({ data: { team_id: "team_1", destinations: [], source: "team" } });
+        await flushPromises();
+        expect((await saveWith(wrapper)).template).toBe("ops-card");
+      });
+
+      // B1: the server's binding refusal shows under the picker until the pick changes.
+      it("passes a refused template's reason to the picker and clears it on a new pick", async () => {
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+        } as any);
+        service.setPolicy.mockRejectedValue({
+          response: {
+            status: 400,
+            data: { message: "template 'ops-card' does not apply to on_call" },
+          },
+        });
+        const wrapper = mount(OnCallPolicyEditor, {
+          props: {
+            teamId: "team_1",
+            policy: { ...policy, template: "ops-card" },
+            open: true,
+            rotations: ROTATIONS,
+          },
+          global: {
+            plugins: [i18n, store],
+            stubs: {
+              ...stubs,
+              TemplateOverridePicker: {
+                name: "TemplateOverridePicker",
+                props: ["kind", "modelValue", "destinations", "serverError"],
+                template: "<div />",
+              },
+            },
+          },
+        });
+        await flushPromises();
+        await saveWith(wrapper);
+        const picker = wrapper.findComponent({ name: "TemplateOverridePicker" });
+        expect(picker.props("serverError")).toBe("template 'ops-card' does not apply to on_call");
+
+        await picker.vm.$emit("update:modelValue", null);
+        await flushPromises();
+        expect(picker.props("serverError")).toBeNull();
+      });
     });
 
     /// RO-1: the Slack card sits under the team channel; its changes are written at once.

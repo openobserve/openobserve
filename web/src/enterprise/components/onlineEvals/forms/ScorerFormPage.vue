@@ -45,7 +45,9 @@
                 <OFormInput
                   name="name"
                   :label="t('onlineEvals.scorer.nameLabel')"
-                  :placeholder="raw('faithfulness_judge')"
+                  :placeholder="
+                    raw(formValues.scorerType === 'code' ? 'json_is_valid' : 'faithfulness_judge')
+                  "
                   size="sm"
                   required
                   :disabled="mode === 'edit'"
@@ -172,7 +174,7 @@
                         class="scorer-field__help-link text-accent font-semibold no-underline hover:underline"
                         target="_blank"
                       >
-                        {{ t("onlineEvals.scorer.providerHelpSettingsLink") }}
+                        {{ t("onlineEvals.scorer.providerHelpLink") }}
                       </router-link>
                     </template>
                   </i18n-t>
@@ -323,6 +325,88 @@
                     {{ t("onlineEvals.scorer.extraFields.previewSchema") }}
                   </OButton>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <section
+            v-else-if="formValues.scorerType === 'code'"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+            data-test="scorer-form-code-section"
+          >
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+                t("codeScorer.codeSection")
+              }}</span>
+            </div>
+            <div class="flex flex-col gap-3 px-4 py-3.5">
+              <div class="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-end gap-3">
+                <OSelect
+                  :model-value="starterKey"
+                  :label="t('codeScorer.startFromLabel')"
+                  :options="starterOptions"
+                  :placeholder="t('codeScorer.startFromPlaceholder')"
+                  size="md"
+                  data-test="scorer-form-code-starter"
+                  @update:model-value="applyStarter"
+                />
+                <div class="flex flex-col gap-1">
+                  <span class="text-text-heading text-xs font-semibold">{{
+                    t("codeScorer.languageLabel")
+                  }}</span>
+                  <span class="text-text-body py-1.5 text-xs">{{
+                    t("codeScorer.languageJavascript")
+                  }}</span>
+                </div>
+              </div>
+
+              <div>
+                <span class="text-text-heading mb-1 flex items-center text-xs font-semibold">
+                  {{ t("codeScorer.functionLabel") }}
+                  <span class="text-status-error-text ms-0.5">*</span>
+                </span>
+                <div class="h-64">
+                  <CodeEditor
+                    editor-id="scorer-form-code-editor"
+                    class="rounded-default border-border-default h-full border"
+                    language="javascript"
+                    :query="formValues.template"
+                    :show-auto-complete="false"
+                    data-test="scorer-form-code-editor"
+                    @update:query="(v: string) => form.setFieldValue('template', v ?? '')"
+                  />
+                </div>
+                <p
+                  v-if="codeVariables === null"
+                  class="text-2xs text-status-error-text m-0 mt-1"
+                  data-test="scorer-form-code-signature-error"
+                >
+                  {{ t("codeScorer.signatureRequired") }}
+                </p>
+                <div
+                  v-else
+                  class="text-2xs mt-1.5 flex flex-wrap items-center gap-1.5"
+                  data-test="scorer-form-code-variables"
+                >
+                  <span class="text-text-secondary">{{ t("codeScorer.variablesLabel") }}</span>
+                  <span
+                    v-for="v in codeVariables"
+                    :key="v"
+                    class="rounded-default text-2xs bg-surface-subtle text-text-body px-1.5 py-px font-mono"
+                    >{{ v }}</span
+                  >
+                  <span class="text-text-secondary">{{ t("codeScorer.returnHint") }}</span>
+                </div>
+              </div>
+
+              <div
+                class="border-status-info-text rounded-default bg-status-info-bg text-text-body flex items-center gap-2 border px-3 py-2 text-xs"
+                data-test="scorer-form-code-sandbox-note"
+              >
+                <OIcon name="lock" size="xs" />
+                <strong class="font-semibold">{{ t("codeScorer.sandboxTitle") }}</strong>
+                <span class="text-text-secondary">{{ t("codeScorer.sandboxNote") }}</span>
               </div>
             </div>
           </section>
@@ -616,6 +700,7 @@
           :result="scorerTestResult"
           :error-message="scorerTestError"
           :can-run="canRunScorerTest"
+          :free="formValues.scorerType === 'code'"
           @run="onRunScorerTest"
           @update:inputs="scorerTestInputs = $event"
         />
@@ -691,7 +776,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, toRef, watch } from "vue";
+import { computed, defineAsyncComponent, onMounted, ref, toRef, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -700,14 +785,18 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import onlineEvalsService, {
   type ExtraMetadataField,
   type Provider,
   type ScoreConfig,
   type Scorer,
+  type ScorerTestPayload,
   type ScorerType,
 } from "@/services/online-evals.service";
 import {
@@ -720,6 +809,7 @@ import {
 import { isDecisionOnlyProvider } from "@/services/llm-playground.service";
 import { extractTemplateVariables, formatTemplateVariable, showError } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
+import { CODE_SCORER_STARTERS, scoreFunctionParams } from "../utils/codeScorerStarters";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
 import { makeScorerFormSchema, type ScorerForm } from "./ScorerFormPage.schema";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
@@ -749,7 +839,9 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const { confirm } = useConfirmDialog();
 const saveScorer = useMutation(() => saveScorerMutation(props.orgId));
+const CodeEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 // Co-located Zod schema (factory keeps messages i18n-driven). The form is
 // mounted fresh for each create/edit action, so building it once is safe.
@@ -780,7 +872,58 @@ const {
 } = useScorerTest(
   toRef(() => formValues.value.template),
   t,
+  (template) =>
+    formValues.value.scorerType === "code"
+      ? (scoreFunctionParams(template) ?? [])
+      : extractTemplateVariables(template),
 );
+
+// `null` when the parameters cannot be read, which the schema also refuses.
+const codeVariables = computed(() => scoreFunctionParams(formValues.value.template || ""));
+
+// A new Code scorer opens on the first starter, as the design shows.
+const starterKey = ref(
+  props.mode === "create" && props.scorerType === "code" ? CODE_SCORER_STARTERS[0].key : "",
+);
+const starterOptions = computed(() =>
+  CODE_SCORER_STARTERS.map((starter) => ({
+    label: t(`codeScorer.starters.${starter.key}.title`),
+    value: starter.key,
+  })),
+);
+
+// A starter-filled description is replaced too, so the scorer never describes another check.
+async function applyStarter(key: unknown) {
+  const starter = CODE_SCORER_STARTERS.find((s) => s.key === key);
+  if (!starter) return;
+  const current = formValues.value.template?.trim() ?? "";
+  const edited = !!current && !CODE_SCORER_STARTERS.some((s) => s.source.trim() === current);
+  if (
+    edited &&
+    !(await confirm({
+      title: t("codeScorer.replaceTitle"),
+      message: t("codeScorer.replaceMessage", {
+        starter: t(`codeScorer.starters.${starter.key}.title`),
+      }),
+      confirmLabel: t("codeScorer.replaceConfirm"),
+      cancelLabel: t("common.cancel"),
+    }))
+  ) {
+    return;
+  }
+  starterKey.value = starter.key;
+  form.setFieldValue("template", starter.source);
+  if (props.mode === "create" && !formValues.value.name?.trim()) {
+    form.setFieldValue("name", starter.key);
+  }
+  const description = formValues.value.description?.trim() ?? "";
+  const starterDescription = CODE_SCORER_STARTERS.some(
+    (s) => t(`codeScorer.starters.${s.key}.description`) === description,
+  );
+  if (!description || starterDescription) {
+    form.setFieldValue("description", t(`codeScorer.starters.${starter.key}.description`));
+  }
+}
 
 const canRunScorerTest = computed(() => {
   if (!props.orgId) return false;
@@ -790,6 +933,8 @@ const canRunScorerTest = computed(() => {
     if (!formValues.value.providerId) return false;
   } else if (formValues.value.scorerType === "remote") {
     if (!formValues.value.remoteEndpoint?.trim()) return false;
+  } else if (codeVariables.value === null) {
+    return false;
   }
   if (scorerTestVariables.value.length === 0) return false;
   return scorerTestVariables.value.every(
@@ -797,7 +942,7 @@ const canRunScorerTest = computed(() => {
   );
 });
 
-function buildScorerTestPayload() {
+function buildScorerTestPayload(): ScorerTestPayload {
   const isLlmJudge = formValues.value.scorerType === "llm_judge";
   const scoreConfigRef: Record<string, any> = {};
   if (formValues.value.producesScoreConfigId) {
@@ -809,7 +954,7 @@ function buildScorerTestPayload() {
     }
   }
 
-  const scorer = isLlmJudge
+  const scorer: ScorerTestPayload["scorer"] = isLlmJudge
     ? {
         type: "llm_judge" as const,
         ...scoreConfigRef,
@@ -824,12 +969,14 @@ function buildScorerTestPayload() {
             : {}),
         },
       }
-    : {
-        type: "remote" as const,
-        ...scoreConfigRef,
-        template: formValues.value.template,
-        params: buildRemoteParams(formValues.value),
-      };
+    : formValues.value.scorerType === "code"
+      ? { type: "code" as const, ...scoreConfigRef, template: formValues.value.template }
+      : {
+          type: "remote" as const,
+          ...scoreConfigRef,
+          template: formValues.value.template,
+          params: buildRemoteParams(formValues.value),
+        };
 
   return {
     name: formValues.value.name.trim(),
@@ -1056,6 +1203,9 @@ async function previewOutputSchema() {
 
 const titleText = computed(() => {
   const isRemote = formValues.value.scorerType === "remote";
+  if (formValues.value.scorerType === "code") {
+    return props.mode === "create" ? t("codeScorer.createTitle") : t("codeScorer.editTitle");
+  }
   if (props.mode === "create") {
     return isRemote
       ? t("onlineEvals.scorer.createTitleRemote")
@@ -1218,7 +1368,10 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
       model: "",
       temperature: "",
       remoteEndpoint: "",
-      template: "Evaluate {{ input }} and {{ output }}.",
+      template:
+        scorerType === "code"
+          ? CODE_SCORER_STARTERS[0].source
+          : "Evaluate {{ input }} and {{ output }}.",
       includeReasoning: true,
       extraMetadataFields: [] as ExtraMetadataField[],
       httpMethod: DEFAULT_HTTP_METHOD,
@@ -1342,12 +1495,14 @@ async function save(value: ScorerForm) {
             ...(extraFields.length ? { extra_metadata_fields: extraFields } : {}),
           },
         }
-      : {
-          type: "remote",
-          ...scoreConfigRef,
-          template: value.template,
-          params: buildRemoteParams(value),
-        };
+      : value.scorerType === "code"
+        ? { type: "code", ...scoreConfigRef, template: value.template }
+        : {
+            type: "remote",
+            ...scoreConfigRef,
+            template: value.template,
+            params: buildRemoteParams(value),
+          };
 
     await saveScorer.mutateAsync({
       id: props.mode === "edit" && props.row ? entityId(props.row) : undefined,

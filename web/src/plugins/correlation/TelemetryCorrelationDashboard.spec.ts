@@ -770,6 +770,31 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       expect(callArg.queryReq.filter).toContain("\"env\" = 'prod'");
     });
 
+    it("filters traces on every spelling of the service key", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
+        handlers.complete();
+      });
+
+      wrapper = createWrapper({
+        traceStreams: [
+          {
+            stream_name: "traces",
+            stream_type: "traces",
+            filters: { service_name: "checkout", env: "prod" },
+            filter_spellings: { service_name: ["checkout", "checkout.service"] },
+          },
+        ],
+      });
+
+      await wrapper.vm.fetchTracesByDimensions();
+
+      const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+      expect(callArg.queryReq.filter).toContain(
+        "lower(trim(\"service_name\")) IN ('checkout', 'checkout.service')",
+      );
+      expect(callArg.queryReq.filter).toContain("\"env\" = 'prod'");
+    });
+
     it("should escape single quotes in trace filter values", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
         handlers.complete();

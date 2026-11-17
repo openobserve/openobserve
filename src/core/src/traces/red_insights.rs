@@ -40,9 +40,9 @@ const KIND_PREDICATE: &str = "CAST(span_kind AS VARCHAR) IN ('2','5')";
 /// Any root span is a request, whatever its kind: a trace starting at a client span entered there.
 const ROOT_ARM: &str = "OR (reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
 
-/// Tolerates reformatting, not rewrites: a condition before `service_name` stays unrecognised.
+/// Tolerates reformatting, not rewrites; `(` opens the `||` chain `quote_sql_string` writes.
 static IDENTITY: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?i)\bFROM\s+("(?:[^"]|"")*")\s+WHERE\s+service_name\s*=\s*'"#).unwrap()
+    Regex::new(r#"(?i)\bFROM\s+("(?:[^"]|"")*")\s+WHERE\s+service_name\s*=\s*\(?'"#).unwrap()
 });
 
 /// A RED signal; each managed service gets one detector per signal.
@@ -355,7 +355,7 @@ pub fn parse_managed(
     if caps[1] != quoted_stream {
         return None;
     }
-    let service = leading_sql_literal(&custom_sql[caps.get(0)?.end()..])?;
+    let service = leading_sql_string(&custom_sql[caps.get(0)?.end()..])?;
     let quoted_service = quote_sql_string(&service);
     let current = [true, false].into_iter().any(|has_parent| {
         detector_sql(&quoted_stream, &quoted_service, signal, has_parent) == custom_sql
@@ -429,21 +429,36 @@ fn duplicates(group: &[&ManagedDetector]) -> Vec<String> {
         .collect()
 }
 
-/// Reads a single-quoted SQL literal at the start of `s` (opening quote already consumed).
-fn leading_sql_literal(s: &str) -> Option<String> {
+/// Also accepts the `'a' || 'b'` chain `quote_sql_string` writes.
+fn leading_sql_string(s: &str) -> Option<String> {
+    let (mut out, mut rest) = leading_sql_literal(s)?;
+    while let Some(next) = rest
+        .trim_start()
+        .strip_prefix("||")
+        .and_then(|r| r.trim_start().strip_prefix('\''))
+    {
+        let (piece, tail) = leading_sql_literal(next)?;
+        out.push_str(&piece);
+        rest = tail;
+    }
+    Some(out)
+}
+
+fn leading_sql_literal(s: &str) -> Option<(String, &str)> {
     let mut out = String::new();
-    let mut chars = s.chars().peekable();
-    while let Some(c) = chars.next() {
+    let mut chars = s.char_indices().peekable();
+    while let Some((_, c)) = chars.next() {
         if c != '\'' {
             out.push(c);
             continue;
         }
-        if chars.peek() == Some(&'\'') {
+        if chars.peek().map(|&(_, c)| c) == Some('\'') {
             chars.next();
             out.push('\'');
             continue;
         }
-        return Some(out);
+        let end = chars.peek().map_or(s.len(), |&(i, _)| i);
+        return Some((out, &s[end..]));
     }
     None
 }

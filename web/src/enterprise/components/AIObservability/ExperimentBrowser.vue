@@ -2,7 +2,7 @@
 
 <template>
   <section class="space-y-4" data-test="ai-experiment-browser">
-    <div v-if="!compact" class="grid grid-cols-[30%_1fr_auto] items-center gap-3">
+    <div v-if="!compact" class="grid grid-cols-[25%_1fr_auto_auto_auto] items-center gap-3">
       <OSelect
         v-model="datasetFilter"
         :aria-label="t('aiObservability.experiments.datasetFilter')"
@@ -17,6 +17,24 @@
         :aria-label="t('aiObservability.experiments.nameSearch')"
         :placeholder="t('aiObservability.experiments.nameSearchPlaceholder')"
         data-test="ai-experiment-name-search"
+      />
+      <OSelect
+        :model-value="groupBy"
+        :label="t('experimentsAtScale.groupBy')"
+        label-position="inside"
+        width="md"
+        :options="groupByOptions"
+        data-test="ai-experiment-group-by"
+        @update:model-value="(value: unknown) => (groupBy = parseGroupBy(value))"
+      />
+      <OSelect
+        :model-value="groupSort"
+        :label="t('experimentsAtScale.sort')"
+        label-position="inside"
+        width="md"
+        :options="sortOptions"
+        data-test="ai-experiment-sort"
+        @update:model-value="(value: unknown) => (groupSort = parseGroupSort(value))"
       />
       <!-- The counter is ALWAYS rendered and always the same length, so it
            teaches the two-experiment rule up front without the layout moving as
@@ -122,12 +140,18 @@
         </div>
       </header>
 
-      <!-- Five rows then scroll inside the group: the header row is h-9 and the
-           body rows are OTable's normal density, so one dataset with many runs
-           can't push every other group off the page. -->
+      <ExperimentTrendChart
+        v-if="!compact && group.baseline && isGroupExpanded(group.id)"
+        :runs="group.rows"
+        :baseline="group.baseline"
+        :policies="policies"
+        :shared-cases="sharedCases"
+      />
+
+      <!-- Five rows then scroll, so one dataset with many runs can't push other groups off the page. -->
       <OTable
         v-if="isGroupExpanded(group.id)"
-        :data="group.children"
+        :data="group.rows"
         :columns="buildColumns(group.children)"
         :loading="loading"
         max-height="calc(2.25rem + 5 * var(--table-row-height-normal, 2.75rem))"
@@ -146,12 +170,37 @@
         :show-select-all="false"
         :selected-ids="selectedIds"
         :is-row-selectable="canSelectRow"
+        tree
+        tree-column-id="name"
+        :get-children="(row: LlmExperiment) => earlierRuns.get(row.id)"
+        :row-section="
+          groupBy === 'none' ? undefined : (row: LlmExperiment) => ciGroupKey(row, groupBy)
+        "
+        :section-order="group.sections.map((section) => section.key)"
         width="100%"
         class="w-full"
         :data-test="`ai-experiment-table-${group.datasetId}`"
         @update:selected-ids="(ids: string[]) => onSelectionChange(ids, group.children)"
         @row-click="(experiment: any) => $emit('select', experiment.id)"
       >
+        <template #group-header="{ sectionKey }">
+          <div
+            v-for="section in group.sections.filter(({ key }) => key === sectionKey)"
+            :key="section.key"
+            class="flex items-center gap-2 px-2 py-1 text-xs"
+            :data-test="`ai-experiment-ci-group-${section.key}`"
+          >
+            <span class="text-text-heading font-medium">{{ ciGroupLabel(section) }}</span>
+            <span class="text-text-secondary">{{ ciGroupDetail(section) }}</span>
+            <OTag v-if="section.regressed" size="sm" variant="error-soft">
+              {{ t("experimentsAtScale.regressedCount", { count: section.regressed }) }}
+            </OTag>
+            <OTag v-if="section.improved" size="sm" variant="success-soft">
+              {{ t("experimentsAtScale.improvedCount", { count: section.improved }) }}
+            </OTag>
+          </div>
+        </template>
+
         <template #cell-name="{ row: experiment }">
           <div
             class="flex min-w-0 items-center gap-2"
@@ -163,15 +212,115 @@
             <OTag v-if="isBaseline(experiment)" size="sm" variant="blue-soft">
               {{ t("aiObservability.experiments.baseline") }}
             </OTag>
+            <OTag
+              v-if="earlierRuns.has(experiment.id)"
+              size="sm"
+              variant="default-soft"
+              :data-test="`ai-experiment-fold-${experiment.id}`"
+            >
+              {{ t("experimentsAtScale.foldCount", { count: foldTally(experiment).settled }) }}
+              <OTooltip :content="foldTooltip(experiment)" />
+            </OTag>
+          </div>
+        </template>
+
+        <template #cell-vsBaseline="{ row }">
+          <div
+            v-if="outcomeOf(row)"
+            class="flex min-w-0 flex-col"
+            :data-test="`ai-experiment-outcome-${row.id}`"
+          >
+            <div class="flex min-w-0 items-center gap-2">
+              <OTag size="sm" :variant="OUTCOME_BADGES[outcomeOf(row)!.outcome]">
+                {{ t(`experimentsAtScale.outcome.${outcomeOf(row)!.outcome}`) }}
+              </OTag>
+              <OTruncatedText
+                v-if="outcomeOf(row)!.outcome !== 'unchanged'"
+                class="text-text-secondary text-xs"
+              >
+                {{
+                  t(
+                    outcomeOf(row)!.headline.relative
+                      ? "experimentsAtScale.headlineRelative"
+                      : "experimentsAtScale.headline",
+                    {
+                      score: scoreColumnLabel(outcomeOf(row)!.headline, t),
+                      delta: signedPoints(outcomeOf(row)!.headline.delta),
+                    },
+                  )
+                }}
+              </OTruncatedText>
+            </div>
+            <span
+              v-if="outcomeOf(row)!.cases"
+              class="text-text-secondary text-xs"
+              :data-test="`ai-experiment-cases-${row.id}`"
+            >
+              {{ sharedCasesLabel(outcomeOf(row)!.cases!) }}
+              <OTooltip :content="t('experimentsAtScale.sharedCasesTooltip')" />
+            </span>
+          </div>
+          <span v-else class="text-text-secondary">{{ raw("—") }}</span>
+        </template>
+
+        <template
+          v-for="column in groupScoreColumns(group.children)"
+          :key="column.key"
+          #[`cell-score:${column.key}`]="{ row }"
+        >
+          <div class="flex min-w-0 flex-col">
+            <div class="flex min-w-0 items-center gap-1.5">
+              <OTruncatedText>{{ raw(scoreCell(row, column.key)) }}</OTruncatedText>
+              <OTag
+                v-if="deltaOf(row, column.key)"
+                size="sm"
+                :variant="OUTCOME_BADGES[deltaOf(row, column.key)!.outcome]"
+                :data-test="`ai-experiment-delta-${row.id}-${column.key}`"
+              >
+                {{ raw(signedDelta(deltaOf(row, column.key)!)) }}
+                <OTooltip
+                  :content="
+                    t(
+                      deltaOf(row, column.key)!.relative
+                        ? 'experimentsAtScale.deltaTooltipRelative'
+                        : 'experimentsAtScale.deltaTooltip',
+                      {
+                        delta: signedPoints(deltaOf(row, column.key)!.delta),
+                        threshold: COMPARISON_THRESHOLD * 100,
+                      },
+                    )
+                  "
+                />
+              </OTag>
+            </div>
+            <span
+              v-if="foldSpread(row, column.key)"
+              class="text-text-secondary text-xs"
+              :data-test="`ai-experiment-spread-${row.id}-${column.key}`"
+            >
+              {{ t("experimentsAtScale.spread", foldSpread(row, column.key)!) }}
+            </span>
+            <span
+              v-if="scoreErrors(row, column.key)"
+              class="text-status-error-text text-xs"
+              :data-test="`ai-experiment-score-errors-${row.id}-${column.key}`"
+            >
+              {{
+                t(
+                  "experimentsAtScale.scoreErrors",
+                  { count: scoreErrors(row, column.key) },
+                  scoreErrors(row, column.key),
+                )
+              }}
+              <OTooltip :content="t('experimentsAtScale.scoreErrorsTooltip')" />
+            </span>
           </div>
         </template>
 
         <template #cell-status="{ row }">
-          <div
-            class="flex min-w-0 items-center gap-2"
-            :data-test="`ai-experiment-status-${row.id}`"
-          >
-            <template v-if="row.status === 'running'">
+          <!-- Notes sit under the chip: beside it, a 200 px column truncated them. -->
+          <div class="flex min-w-0 flex-col" :data-test="`ai-experiment-status-${row.id}`">
+            <div v-if="row.status === 'running'" class="flex min-w-0 items-center gap-2">
               <OProgressBar
                 size="sm"
                 class="min-w-0 flex-1"
@@ -181,18 +330,45 @@
               <span class="text-text-secondary shrink-0 text-xs tabular-nums">
                 {{ progressLabel(row) }}
               </span>
-            </template>
+            </div>
             <template v-else>
-              <OTag
-                size="sm"
-                :variant="statusVariant(row.status, 'eval').variant"
-                :data-test="`ai-experiment-status-chip-${row.id}`"
+              <div class="flex min-w-0 items-center gap-2">
+                <OTag
+                  size="sm"
+                  :variant="statusVariant(row.status, 'eval').variant"
+                  :data-test="`ai-experiment-status-chip-${row.id}`"
+                >
+                  {{ statusVariant(row.status, "eval").label }}
+                </OTag>
+                <OTruncatedText v-if="visibleStatusReason(row)" class="text-text-secondary text-xs">
+                  {{ raw(visibleStatusReason(row)) }}
+                </OTruncatedText>
+              </div>
+              <span
+                v-if="taskFailures(row)"
+                class="text-status-error-text text-xs"
+                :data-test="`ai-experiment-task-failures-${row.id}`"
               >
-                {{ statusVariant(row.status, "eval").label }}
-              </OTag>
-              <OTruncatedText v-if="visibleStatusReason(row)" class="text-text-secondary text-xs">
-                {{ raw(visibleStatusReason(row)) }}
-              </OTruncatedText>
+                {{
+                  t(
+                    "experimentsAtScale.tasksFailed",
+                    { count: taskFailures(row), total: row.taskOutcomes?.total ?? 0 },
+                    taskFailures(row),
+                  )
+                }}
+              </span>
+              <span
+                v-if="newerIncompleteRuns.get(row.id)"
+                class="text-text-secondary text-xs"
+                :data-test="`ai-experiment-newer-rerun-${row.id}`"
+              >
+                {{
+                  t("experimentsAtScale.newerRerun", {
+                    status: statusVariant(newerIncompleteRuns.get(row.id)!.status, "eval").label,
+                  })
+                }}
+                <OTooltip :content="t('experimentsAtScale.newerRerunTooltip')" />
+              </span>
             </template>
           </div>
         </template>
@@ -209,10 +385,7 @@
           <!-- No gap: icon-sm buttons are square hit targets that already carry
                their own whitespace, the same as the Alerts row actions. -->
           <div class="flex items-center">
-            <OTooltip
-              :content="t('aiObservability.experiments.baselineRequiresCompleted')"
-              :disabled="canSetBaseline(row)"
-            >
+            <OTooltip :content="baselineBlockedReason(row)" :disabled="canSetBaseline(row)">
               <OButton
                 size="icon-sm"
                 variant="ghost"
@@ -329,7 +502,10 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { LlmDataset } from "@/services/llm-datasets.service";
-import { cloneExperimentMutation } from "@/services/llm-experiments.queries";
+import {
+  cloneExperimentMutation,
+  experimentCompareQuery,
+} from "@/services/llm-experiments.queries";
 import { useMutation } from "@tanstack/vue-query";
 import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import {
@@ -337,6 +513,7 @@ import {
   experimentCostText,
   experimentEvidence,
   groupExperiments,
+  scoreColumnLabel,
   type ComparisonIneligibilityReason,
 } from "@/enterprise/views/AIObservability/experimentDiscovery";
 import {
@@ -349,6 +526,39 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import ExperimentTrendChart from "./ExperimentTrendChart.vue";
+import { experimentScoreSummaryValue } from "@/enterprise/views/AIObservability/experimentResults";
+import {
+  COMPARISON_THRESHOLD,
+  ciGroupKey,
+  ciGroups,
+  compareToBaseline,
+  foldReruns,
+  isSettled,
+  parseGroupBy,
+  parseGroupSort,
+  sameCases,
+  scorePolicies,
+  scoreSpread,
+  sharedCaseComparison,
+  signedDelta,
+  signedPoints,
+  sortByRegressions,
+  tallyRuns,
+  type BaselineOutcome,
+  type CiGroup,
+  type ExperimentGroupBy,
+  type ExperimentGroupSort,
+  type RunComparison,
+  type RunFold,
+  type RunTally,
+  type ScoreColumn,
+  type ScorePolicy,
+  type SharedCaseComparison,
+} from "@/enterprise/views/AIObservability/experimentScale";
+import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
+import { queryClient } from "@/composables/query/queryClient";
 
 const props = withDefaults(
   defineProps<{
@@ -394,20 +604,60 @@ const nameSearch = ref(props.syncUrl ? String(route.query.experiment ?? "") : ""
 const baselineChangingId = ref("");
 const selectedIds = ref<string[]>([]);
 const collapsedGroups = ref<string[]>([]);
+const groupBy = ref<ExperimentGroupBy>(parseGroupBy(props.syncUrl ? route.query.group : ""));
+const groupSort = ref<ExperimentGroupSort>(parseGroupSort(props.syncUrl ? route.query.sort : ""));
+const groupByOptions = (["pr", "branch", "commit", "none"] as const).map((value) => ({
+  value,
+  label: t(`experimentsAtScale.groupByOption.${value}`),
+}));
+const sortOptions = (["recent", "regressions"] as const).map((value) => ({
+  value,
+  label: t(`experimentsAtScale.sortOption.${value}`),
+}));
+
+const OUTCOME_BADGES: Record<BaselineOutcome, BadgeVariant> = {
+  regressed: "error-soft",
+  improved: "success-soft",
+  unchanged: "default-soft",
+};
+
+// Without Score Config health policies nothing can vote, so the list shows values but no deltas.
+const policies = ref(new Map<string, ScorePolicy>());
+watch(
+  () => props.orgId,
+  async (orgId) => {
+    if (!orgId) return;
+    try {
+      policies.value = scorePolicies(await queryClient.fetchQuery(scoreConfigsQuery(orgId)));
+    } catch {
+      policies.value = new Map();
+    }
+  },
+  { immediate: true },
+);
 
 function isGroupRow(row: TreeRow): row is DatasetRow {
   return (row as DatasetRow).isGroup === true;
 }
 
 function buildColumns(experiments: LlmExperiment[]): OTableColumnDef[] {
-  const scoreColumns: OTableColumnDef[] = groupScorerNames(experiments).map((name) => ({
-    id: `score:${name}`,
-    header: raw(name),
-    accessorFn: (row: TreeRow) => (isGroupRow(row) ? "" : scoreCell(row, name)),
+  const scoreColumns: OTableColumnDef[] = groupScoreColumns(experiments).map((column) => ({
+    id: `score:${column.key}`,
+    header: scoreColumnLabel(column, t),
+    accessorFn: (row: TreeRow) => (isGroupRow(row) ? "" : scoreCell(row, column.key)),
     sortable: true,
     hideable: true,
     size: 140,
-    meta: { align: "left" as const },
+    meta: {
+      align: "left" as const,
+      ...(column.clientScorerKey === null
+        ? {}
+        : {
+            headerTooltip: t("experimentsAtScale.clientScoreTooltip", {
+              key: column.clientScorerKey,
+            }),
+          }),
+    },
   }));
 
   return [
@@ -426,6 +676,16 @@ function buildColumns(experiments: LlmExperiment[]): OTableColumnDef[] {
       accessorKey: "status",
       sortable: true,
       size: 200,
+      meta: { align: "left" as const },
+    },
+    {
+      // Sorts on the worst score move, so ascending puts regressions on top.
+      id: "vsBaseline",
+      header: t("experimentsAtScale.vsBaseline"),
+      accessorFn: (row: LlmExperiment) => outcomeOf(row)?.worst.delta,
+      sortable: true,
+      sortUndefined: "last" as const,
+      size: 220,
       meta: { align: "left" as const },
     },
     ...scoreColumns,
@@ -486,6 +746,12 @@ type DatasetRow = {
   datasetId: string;
   experimentCount: number;
   children: LlmExperiment[];
+  baseline: LlmExperiment | null;
+  folds: RunFold[];
+  /** The table's rows: each fold's latest run, in the chosen sort. */
+  rows: LlmExperiment[];
+  /** CI-metadata sections, in display order; empty under "None". */
+  sections: CiGroup[];
 };
 // The optional false discriminant lets the template narrow a row to an
 // experiment with `v-if="!row.isGroup"`.
@@ -503,16 +769,154 @@ function toggleGroup(groupId: string) {
     : collapsedGroups.value.filter((id) => id !== groupId);
 }
 
-const datasetRows = computed<DatasetRow[]>(() =>
-  groups.value.map((group) => ({
-    id: `dataset:${group.datasetId}`,
-    isGroup: true as const,
-    name: group.datasetName,
-    datasetId: group.datasetId,
-    experimentCount: group.experiments.length,
-    children: group.experiments,
-  })),
+// From the unfiltered list: a name search that hides the baseline must not drop every verdict against it.
+const baselines = computed(
+  () => new Map(props.experiments.filter(isBaseline).map((row) => [row.datasetId, row])),
 );
+const comparisons = computed(() => {
+  const result = new Map<string, RunComparison | null>();
+  for (const group of groups.value) {
+    const baseline = baselines.value.get(group.datasetId) ?? null;
+    for (const run of group.experiments) {
+      result.set(
+        run.id,
+        compareToBaseline(run, baseline, policies.value, sharedCases.value.get(run.id)),
+      );
+    }
+  }
+  return result;
+});
+const datasetRows = computed<DatasetRow[]>(() =>
+  groups.value.map((group) => {
+    const unsorted = foldReruns(group.experiments);
+    const sorted =
+      groupSort.value === "regressions" ? sortByRegressions(unsorted, comparisons.value) : unsorted;
+    const sections = ciGroups(sorted, groupBy.value, groupSort.value, comparisons.value);
+    // Row numbers follow data order, so sort the data as the sections show it; else rows read "02, 03, 04, 01".
+    const sectionIndex = new Map(sections.map((section, index) => [section.key, index]));
+    const folds = sections.length
+      ? [...sorted].sort(
+          (left, right) =>
+            (sectionIndex.get(ciGroupKey(left.latest, groupBy.value) ?? "") ?? 0) -
+            (sectionIndex.get(ciGroupKey(right.latest, groupBy.value) ?? "") ?? 0),
+        )
+      : sorted;
+    return {
+      id: `dataset:${group.datasetId}`,
+      isGroup: true as const,
+      name: group.datasetName,
+      datasetId: group.datasetId,
+      experimentCount: group.experiments.length,
+      children: group.experiments,
+      baseline: baselines.value.get(group.datasetId) ?? null,
+      folds,
+      rows: folds.map((fold) => fold.latest),
+      sections,
+    };
+  }),
+);
+// A folded row's other re-runs, by the row's run id: its tree children.
+const earlierRuns = computed(
+  () =>
+    new Map(
+      datasetRows.value.flatMap((group) =>
+        group.folds
+          .filter((fold) => fold.earlier.length)
+          .map((fold) => [fold.latest.id, fold.earlier] as const),
+      ),
+    ),
+);
+// A newer re-run that did not complete, by the row's run id: the row says so.
+const newerIncompleteRuns = computed(
+  () =>
+    new Map(
+      datasetRows.value.flatMap((group) =>
+        group.folds.flatMap((fold) =>
+          fold.newerIncomplete ? [[fold.latest.id, fold.newerIncomplete] as const] : [],
+        ),
+      ),
+    ),
+);
+
+function outcomeOf(run: LlmExperiment) {
+  return comparisons.value.get(run.id) ?? null;
+}
+
+function deltaOf(run: LlmExperiment, scoreKey: string) {
+  return outcomeOf(run)?.deltas.get(scoreKey) ?? null;
+}
+
+function sharedCasesLabel(cases: NonNullable<RunComparison["cases"]>) {
+  return cases.excluded
+    ? t(
+        "experimentsAtScale.sharedCasesExcluded",
+        { count: cases.shared, excluded: cases.excluded },
+        cases.shared,
+      )
+    : t("experimentsAtScale.sharedCases", { count: cases.shared }, cases.shared);
+}
+
+const INCOMPLETE_KINDS = ["cancelled", "failed", "inProgress"] as const;
+
+function incompleteText(tally: RunTally): I18nText | null {
+  const rest = INCOMPLETE_KINDS.filter((kind) => tally.incomplete[kind]).map((kind) =>
+    t(`experimentsAtScale.incomplete.${kind}`, { count: tally.incomplete[kind] }),
+  );
+  return rest.length ? raw(rest.join(", ")) : null;
+}
+
+function foldTally(run: LlmExperiment) {
+  return tallyRuns([run, ...(earlierRuns.value.get(run.id) ?? [])]);
+}
+
+// The badge stays "× 4" so the name keeps its width; the tooltip names the uncounted re-runs.
+function foldTooltip(run: LlmExperiment) {
+  const tally = foldTally(run);
+  const counted = t("experimentsAtScale.foldTooltip", { count: tally.settled }, tally.settled);
+  const incomplete = incompleteText(tally);
+  return incomplete
+    ? t("experimentsAtScale.foldTooltipIncomplete", { counted, incomplete })
+    : counted;
+}
+
+function foldSpread(run: LlmExperiment, scoreKey: string) {
+  const earlier = earlierRuns.value.get(run.id);
+  return earlier ? scoreSpread([run, ...earlier], scoreKey) : null;
+}
+
+// Rows a Scorer failed on: the value covers the other rows, and the score casts no verdict.
+function scoreErrors(run: LlmExperiment, scoreKey: string) {
+  return evidence(run).scores.find((entry) => entry.key === scoreKey)?.errorCount ?? 0;
+}
+
+function taskFailures(run: LlmExperiment) {
+  return run.taskOutcomes?.failed ?? 0;
+}
+
+function ciGroupLabel(section: CiGroup) {
+  if (section.kind === "pr") return t("experimentsAtScale.prGroup", { pr: section.value });
+  if (section.kind === "commit") return raw(section.value?.slice(0, 7));
+  if (section.kind === "branch") return raw(section.value);
+  return t(`experimentsAtScale.noGroup.${groupBy.value}`);
+}
+
+// "12 runs · all on commit 303cfc8" says the group is re-runs of one change.
+function ciGroupDetail(section: CiGroup) {
+  const { settled, incomplete } = section.runs;
+  const total = settled + incomplete.cancelled + incomplete.failed + incomplete.inProgress;
+  const settledRuns = t("experimentsAtScale.groupRuns", { count: settled }, settled);
+  const rest = incompleteText(section.runs);
+  const runs = rest
+    ? t("experimentsAtScale.withIncomplete", { runs: settledRuns, incomplete: rest })
+    : settledRuns;
+  if (section.commit && section.kind !== "commit" && total > 1) {
+    return t("experimentsAtScale.groupCommit", { runs, commit: section.commit.slice(0, 7) });
+  }
+  if (section.branch && section.kind === "pr") {
+    return t("experimentsAtScale.groupBranch", { runs, branch: section.branch });
+  }
+  return runs;
+}
 const groups = computed(() =>
   groupExperiments(
     props.experiments,
@@ -520,6 +924,40 @@ const groups = computed(() =>
     props.fixedDatasetId || datasetFilter.value,
     nameSearch.value,
   ),
+);
+
+// Runs on other cases than their baseline need Compare, which pairs cases; same-case runs cost no extra request.
+const sharedCasePairs = computed(() =>
+  groups.value.flatMap((group) => {
+    const baseline = baselines.value.get(group.datasetId);
+    if (baseline?.status !== "completed") return [];
+    return group.experiments
+      .filter((run) => run.id !== baseline.id && isSettled(run) && !sameCases(run, baseline))
+      .map((run) => ({ baselineId: baseline.id, candidateId: run.id }));
+  }),
+);
+const sharedCases = ref(new Map<string, SharedCaseComparison>());
+watch(
+  [() => props.orgId, sharedCasePairs],
+  async ([orgId, pairs], _, onCleanup) => {
+    let stale = false;
+    onCleanup(() => (stale = true));
+    const loaded = await Promise.all(
+      pairs.map(async ({ baselineId, candidateId }) => {
+        try {
+          const comparison = await queryClient.fetchQuery(
+            experimentCompareQuery(orgId, baselineId, candidateId),
+          );
+          return [[candidateId, sharedCaseComparison(comparison)] as const];
+        } catch {
+          // The run keeps no verdict ("—"), the same as a run with nothing to compare.
+          return [];
+        }
+      }),
+    );
+    if (!stale) sharedCases.value = new Map(loaded.flat());
+  },
+  { immediate: true },
 );
 const selectedExperiments = computed(() =>
   props.experiments.filter(({ id }) => selectedIds.value.includes(id)),
@@ -532,13 +970,22 @@ const comparisonReason = computed(() => {
 });
 
 watch(
-  () => [route.query.dataset, route.query.experiment, route.query.baseline, route.query.candidate],
-  ([dataset, experiment, baseline, candidate]) => {
+  () => [
+    route.query.dataset,
+    route.query.experiment,
+    route.query.baseline,
+    route.query.candidate,
+    route.query.group,
+    route.query.sort,
+  ],
+  ([dataset, experiment, baseline, candidate, group, sort]) => {
     if (!props.syncUrl) return;
     const nextDataset = String(dataset ?? "");
     const nextSearch = String(experiment ?? "");
     if (datasetFilter.value !== nextDataset) datasetFilter.value = nextDataset;
     if (nameSearch.value !== nextSearch) nameSearch.value = nextSearch;
+    groupBy.value = parseGroupBy(group);
+    groupSort.value = parseGroupSort(sort);
     const routeSelection = [baseline, candidate]
       .map((id) => String(id ?? ""))
       .filter((id) => props.experiments.some((row) => row.id === id));
@@ -549,16 +996,26 @@ watch(
   { immediate: true },
 );
 
-watch([datasetFilter, nameSearch], () => {
+// Defaults stay out of the URL, so a plain list keeps a plain link.
+watch([datasetFilter, nameSearch, groupBy, groupSort], () => {
   if (!props.syncUrl) return;
   const query = { ...route.query };
   if (datasetFilter.value) query.dataset = datasetFilter.value;
   else delete query.dataset;
   if (nameSearch.value.trim()) query.experiment = nameSearch.value.trim();
   else delete query.experiment;
+  if (groupBy.value !== "none") query.group = groupBy.value;
+  else delete query.group;
+  if (groupSort.value !== "recent") query.sort = groupSort.value;
+  else delete query.sort;
   const currentDataset = String(route.query.dataset ?? "");
   const currentSearch = String(route.query.experiment ?? "");
-  if (currentDataset !== datasetFilter.value || currentSearch !== nameSearch.value.trim()) {
+  if (
+    currentDataset !== datasetFilter.value ||
+    currentSearch !== nameSearch.value.trim() ||
+    (route.query.group ?? "none") !== groupBy.value ||
+    (route.query.sort ?? "recent") !== groupSort.value
+  ) {
     router.replace({ query });
   }
 });
@@ -595,28 +1052,37 @@ function visibleStatusReason(experiment: LlmExperiment) {
     : null;
 }
 
-// One column per scorer in the group: the scores array already carries each
-// scorer separately, so nothing here needs the API to change.
-function groupScorerNames(experiments: LlmExperiment[]): string[] {
-  const names: string[] = [];
+// Keyed so a client dimension never shares a column with a Scorer of the same Score Config.
+function groupScoreColumns(experiments: LlmExperiment[]): ScoreColumn[] {
+  const columns = new Map<string, ScoreColumn>();
   for (const experiment of experiments) {
-    for (const score of evidence(experiment).scores) {
-      if (!names.includes(score.name)) names.push(score.name);
+    for (const { key, name, clientScorerKey } of evidence(experiment).scores) {
+      if (!columns.has(key)) columns.set(key, { key, name, clientScorerKey });
     }
   }
-  return names;
+  return [...columns.values()];
 }
 
-function scoreCell(experiment: LlmExperiment, scorerName: string): string {
-  const score = evidence(experiment).scores.find((entry) => entry.name === scorerName);
+function scoreCell(experiment: LlmExperiment, scoreKey: string): string {
+  const score = evidence(experiment).scores.find((entry) => entry.key === scoreKey);
   if (!score) return "—";
   if (score.kind === "numeric") return score.value.toFixed(3);
   if (score.kind === "boolean") {
     const pct = score.sampleCount ? Math.round((score.trueCount / score.sampleCount) * 100) : 0;
     return `${pct}% true`;
   }
-  const top = [...score.values].sort((a, b) => b.count - a.count)[0];
-  return top ? `${top.value} × ${top.count}` : "—";
+  // Every category with its count: the mode alone read "none × 39" over 17 full leaks.
+  const aggregate =
+    score.clientScorerKey === null
+      ? experiment.scoreSummaries?.find(
+          (entry) => (entry.scoreConfigName || entry.name) === scoreKey,
+        )?.value
+      : experiment.clientScoreSummaries?.find(
+          (entry) =>
+            entry.scoreConfigId === score.scoreConfigId &&
+            entry.clientScorerKey === score.clientScorerKey,
+        )?.value;
+  return experimentScoreSummaryValue(aggregate);
 }
 
 function rejectComparison(reason: ComparisonIneligibilityReason) {
@@ -636,12 +1102,16 @@ function isBaseline(experiment: LlmExperiment) {
   return experiment.isBaseline;
 }
 
-// A baseline is the fixed reference every later run gets compared against, so
-// it must point at a run with final results — pending/running/failed/cancelled
-// runs have nothing stable to pin. Already-baseline experiments can still be
-// cleared regardless of status: unpinning is always safe.
+// Only a run with final results can be a baseline (baseline.rs refuses others); clearing is always safe.
 function canSetBaseline(experiment: LlmExperiment) {
-  return experiment.isBaseline || experiment.status === "completed";
+  return experiment.isBaseline || (experiment.status === "completed" && !taskFailures(experiment));
+}
+
+function baselineBlockedReason(experiment: LlmExperiment) {
+  const failed = taskFailures(experiment);
+  return experiment.status === "completed" && failed
+    ? t("experimentsAtScale.baselineTaskFailures", { count: failed }, failed)
+    : t("aiObservability.experiments.baselineRequiresCompleted");
 }
 
 // The clone is a new row the list this returns to would otherwise miss.
@@ -672,16 +1142,18 @@ async function cloneExperiment(experiment: LlmExperiment) {
 
 async function toggleBaseline(experiment: LlmExperiment) {
   baselineChangingId.value = experiment.id;
+  // The write's response has no summary fields, so only the flag is updated to avoid blanking the row.
+  const flagged = (isBaseline: boolean) => ({ ...experiment, isBaseline });
   try {
     if (experiment.isBaseline) {
       const updated = await llmExperimentsService.clearBaseline(props.orgId, experiment.id);
-      emit("baseline-changed", updated, null);
+      emit("baseline-changed", flagged(updated.isBaseline), null);
     } else {
       const { experiment: updated, previousBaselineId } = await llmExperimentsService.setBaseline(
         props.orgId,
         experiment.id,
       );
-      emit("baseline-changed", updated, previousBaselineId);
+      emit("baseline-changed", flagged(updated.isBaseline), previousBaselineId);
       // Pinning starts a comparison from the new baseline. Clearing does not
       // touch the selection: dropping the pin is not a statement about what
       // to compare.

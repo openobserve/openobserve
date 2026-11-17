@@ -105,6 +105,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { DimensionCatalogue, DiscoveredService, UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { serviceOptionParts } from "@/types/serviceRef";
 import {
   SERVICE_DIMENSION,
   fieldLabel,
@@ -299,7 +300,29 @@ function valueOptionsFor(row: ConditionRow) {
       const [fb, sb] = weight(b);
       return fb - fa || sb - sa || a.localeCompare(b);
     })
-    .map((value) => ({ label: raw(value), value }));
+    .map((value) =>
+      row.name === SERVICE_DIMENSION ? serviceOption(value) : { label: raw(value), value },
+    );
+}
+
+const servicesByKey = computed(
+  () => new Map(props.services.map((service) => [service.name, service])),
+);
+
+/// A service option reads as its trace name; the value stays the key, so the rule writes the key.
+function serviceOption(key: string) {
+  const parts = serviceOptionParts(key, servicesByKey.value.get(key));
+  return {
+    label: raw(parts.display),
+    value: key,
+    searchText: key,
+    subLabel:
+      parts.note === "ambiguous"
+        ? t("serviceVersions.names.ambiguity", { count: parts.count }, parts.count)
+        : parts.note === "detected"
+          ? t("serviceVersions.names.detectedAs", { name: raw(key) })
+          : undefined,
+  };
 }
 
 function setValue(row: ConditionRow, value: string) {

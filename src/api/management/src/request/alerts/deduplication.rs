@@ -15,7 +15,9 @@
 
 //! Semantic field group endpoints (Enterprise feature), under the historical `deduplication` path.
 
-use axum::{Json, extract::Path, response::Response};
+#[cfg(feature = "enterprise")]
+use axum::Json;
+use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(feature = "enterprise")]
@@ -208,6 +210,7 @@ pub async fn preview_semantic_groups_diff(
     params(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
+    request_body(content = serde_json::Value, content_type = "application/json"),
     responses(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
@@ -216,10 +219,7 @@ pub async fn preview_semantic_groups_diff(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
     )
 )]
-pub async fn preview_semantic_groups_diff(
-    _org_id: Path<String>,
-    _proposed_groups: Json<serde_json::Value>,
-) -> Response {
+pub async fn preview_semantic_groups_diff(_org_id: Path<String>) -> Response {
     axum::response::Response::builder()
         .status(axum::http::StatusCode::FORBIDDEN)
         .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -346,6 +346,7 @@ pub async fn save_semantic_groups(
     params(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
+    request_body(content = serde_json::Value, content_type = "application/json"),
     responses(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
@@ -354,10 +355,7 @@ pub async fn save_semantic_groups(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
-pub async fn save_semantic_groups(
-    _org_id: Path<String>,
-    _groups: Json<serde_json::Value>,
-) -> Response {
+pub async fn save_semantic_groups(_org_id: Path<String>) -> Response {
     axum::response::Response::builder()
         .status(axum::http::StatusCode::FORBIDDEN)
         .header(axum::http::header::CONTENT_TYPE, "application/json")

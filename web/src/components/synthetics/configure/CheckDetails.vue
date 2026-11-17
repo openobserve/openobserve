@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { BrowserCheck, SyntheticsFolder } from "@/types/synthetics";
+import type { BrowserCheck, ProtocolCheck, SyntheticsFolder } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
 import VariableSuggestionRow from "../variables/VariableSuggestionRow.vue";
@@ -27,6 +27,8 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import PrefillNote from "../prefill/PrefillNote.vue";
+import { useSyntheticPrefillView, type TestRunResult } from "../prefill/useSyntheticPrefill";
 
 const props = defineProps<{
   check: BrowserCheck;
@@ -45,6 +47,32 @@ const props = defineProps<{
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
 const { t } = useI18nTyped();
+const prefill = useSyntheticPrefillView();
+const prefillView = computed(() => prefill?.value ?? null);
+
+const testRunning = ref(false);
+const testResult = ref<TestRunResult | null>(null);
+
+async function runTest() {
+  const preSaveRun = prefillView.value?.preSaveRun;
+  if (!preSaveRun) return;
+  testRunning.value = true;
+  try {
+    testResult.value = await preSaveRun.run(props.check as ProtocolCheck);
+  } catch (err) {
+    testResult.value = { ok: false, location: "", error: String(err) };
+  } finally {
+    testRunning.value = false;
+  }
+}
+
+const testResultText = computed(() => {
+  const r = testResult.value;
+  if (!r) return "";
+  return r.ok
+    ? t("synthetics.prefill.testPassed", { location: r.location, status: r.status, ms: r.ms })
+    : t("synthetics.prefill.testFailed", { location: r.location, error: r.error });
+});
 
 function update(patch: Partial<BrowserCheck>) {
   emit("update:check", { ...props.check, ...patch });
@@ -147,6 +175,13 @@ function handleTagKeydown(event: KeyboardEvent) {
             : t("synthetics.checkDetails.foldersUnavailable")
         }}</template>
       </OSelect>
+      <PrefillNote
+        v-if="prefillView?.notes.folder"
+        chip
+        :text="prefillView.notes.folder"
+        class="-mt-3"
+        data-test="synthetics-prefill-note-folder"
+      />
 
       <OSwitch
         v-model="enabled"
@@ -169,6 +204,39 @@ function handleTagKeydown(event: KeyboardEvent) {
           <VariableSuggestionRow :suggestion="suggestion" :active="active" />
         </template>
       </OTemplateInput>
+      <div
+        v-if="prefillView?.notes.url || prefillView?.preSaveRun"
+        class="-mt-3 flex flex-col gap-1"
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <PrefillNote
+            v-if="prefillView.notes.url"
+            :chip="prefillView.chips.has('url') && check.url !== ''"
+            :text="prefillView.notes.url"
+            class="min-w-0 flex-1"
+            data-test="synthetics-prefill-note-url"
+          />
+          <OButton
+            v-if="prefillView.preSaveRun"
+            variant="outline"
+            size="sm"
+            :loading="testRunning"
+            :disabled="!check.url"
+            data-test="synthetics-prefill-test-now"
+            @click="runTest"
+          >
+            {{ t("synthetics.prefill.testNow") }}
+          </OButton>
+        </div>
+        <p
+          v-if="testResult"
+          class="text-xs"
+          :class="testResult.ok ? 'text-status-success-text' : 'text-status-error-text'"
+          data-test="synthetics-prefill-test-result"
+        >
+          {{ testResultText }}
+        </p>
+      </div>
 
       <OInput
         v-model="description"
@@ -177,6 +245,12 @@ function handleTagKeydown(event: KeyboardEvent) {
         :placeholder="t('synthetics.checkDetails.descriptionPlaceholder')"
         :rows="3"
         data-test="synthetics-check-details-description-textarea"
+      />
+      <PrefillNote
+        v-if="prefillView?.notes.description"
+        :text="prefillView.notes.description"
+        class="-mt-3"
+        data-test="synthetics-prefill-note-description"
       />
 
       <div>
@@ -221,6 +295,13 @@ function handleTagKeydown(event: KeyboardEvent) {
             </OButton>
           </OTag>
         </div>
+        <PrefillNote
+          v-if="prefillView?.notes.tags"
+          chip
+          :text="prefillView.notes.tags"
+          class="mt-2"
+          data-test="synthetics-prefill-note-tags"
+        />
       </div>
     </div>
   </div>

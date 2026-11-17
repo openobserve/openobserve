@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
-    <div class="flex shrink-0 flex-col gap-1.5 px-1.5 pt-1 pb-1">
+    <div class="flex shrink-0 flex-col gap-1.5 px-1 pt-1 pb-1">
       <OSearchInput
         v-model="query"
         clearable
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-1.5 pt-1 pb-3">
+    <div class="flex-1 overflow-y-auto px-1 pt-1 pb-3">
       <OTabs
         orientation="vertical"
         class="w-full"

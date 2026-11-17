@@ -216,6 +216,41 @@ describe("TracesSearchResultList", () => {
   // Long operation names are the reason this exists: a trace or span name is
   // often the widest thing on the row, and clipping it hides the part that
   // distinguishes one entry from the next. Same affordance the logs table has.
+  describe("version column", () => {
+    const hits = [{ trace_id: "t1", service_name: "svc", duration: 1, start_time: 1 }];
+    beforeEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [{ id: "service_name" }, { id: "duration" }];
+      sharedSearchObj.data.stream.selectedFields = ["service_name", "duration"];
+    });
+
+    it("adds a local Version column after the service only when asked", () => {
+      wrapper = mount_({ hits, loading: false, versionColumn: true });
+      const ids = (
+        wrapper.findComponent({ name: "OTable" }).props("columns") as { id: string }[]
+      ).map((column) => column.id);
+      expect(ids).toEqual(["service_name", "o2_service_version", "duration"]);
+      expect(sharedSearchObj.data.resultGrid.columns.map((c: { id: string }) => c.id)).toEqual([
+        "service_name",
+        "duration",
+      ]);
+      wrapper.unmount();
+      wrapper = mount_({ hits, loading: false });
+      expect(
+        (wrapper.findComponent({ name: "OTable" }).props("columns") as { id: string }[]).length,
+      ).toBe(2);
+    });
+
+    it("renders an empty cell when a trace carries no version and never persists the column", () => {
+      wrapper = mount_({ hits, loading: false, versionColumn: true });
+      const table = wrapper.findComponent({ name: "OTable" });
+      const version = (table.props("columns") as any[]).find((c) => c.id === "o2_service_version");
+      expect(version.accessorFn({ o2_service_version: "v1.1.0" })).toBe("v1.1.0");
+      expect(version.accessorFn({})).toBe("");
+      table.vm.$emit("column-order-change", ["o2_service_version", "service_name", "duration"]);
+      expect(sharedSearchObj.data.stream.selectedFields).toEqual(["service_name", "duration"]);
+    });
+  });
+
   describe("wrap", () => {
     const row = {
       trace_id: "t1",
@@ -271,14 +306,6 @@ describe("TracesSearchResultList", () => {
     it("shows skeleton while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
       expect(wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists()).toBe(true);
-    });
-
-    // The component uses v-show="hasResults || loading" on the table wrapper, so
-    // the wrapper remains visible while loading (the loading slot inside shows a spinner).
-    // It is only absent from the DOM when noResults is true (searchPerformed && !loading && empty).
-    it.skip("hides the table wrapper while loading", () => {
-      wrapper = mount_({ hits: [], loading: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
     });
 
     it("hides the empty state while loading", () => {
@@ -462,16 +489,6 @@ describe("TracesSearchResultList", () => {
       await table.vm.$emit("row-click", hits[0]);
       expect(wrapper.emitted("row-click")).toBeTruthy();
       expect(wrapper.emitted("row-click")![0]).toEqual([hits[0]]);
-    });
-
-    // TracesSearchResultList does not forward load-more — callers attach an
-    // external scroll listener on the container instead.
-    it.skip("re-emits load-more from TracesTable", async () => {
-      const hits = [makeHit("t1")];
-      wrapper = mount_({ hits, loading: false });
-      const table = wrapper.findComponent({ name: "OTable" });
-      await table.vm.$emit("load-more");
-      expect(wrapper.emitted("load-more")).toBeTruthy();
     });
   });
 

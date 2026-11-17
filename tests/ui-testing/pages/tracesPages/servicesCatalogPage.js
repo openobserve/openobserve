@@ -108,21 +108,23 @@ export class ServicesCatalogPage {
     // =====================================================================
     // Factory locators — runtime-bound (allowed by POM strict policy)
     // =====================================================================
+    // The catalog has one row per service and place, so a name can match several rows;
+    // every per-name locator reads the same, topmost row.
     /** @param {string} name */
     this.getServiceLink = (name) =>
-      page.locator(`[data-test="${this.serviceLinkPrefix}${name}"]`);
+      page.locator(`[data-test="${this.serviceLinkPrefix}${name}"]`).first();
     /** @param {string} name */
     this.getStatusBadgeLocator = (name) =>
-      page.locator(`[data-test="${this.statusBadgePrefix}${name}"]`);
+      page.locator(`[data-test="${this.statusBadgePrefix}${name}"]`).first();
     /** @param {string} name */
     this.getErrorRateLocator = (name) =>
-      page.locator(`[data-test="${this.errorRatePrefix}${name}"]`);
+      page.locator(`[data-test="${this.errorRatePrefix}${name}"]`).first();
     /** @param {string} name */
     this.getRequestsLocator = (name) =>
-      page.locator(`[data-test="${this.requestsPrefix}${name}"]`);
+      page.locator(`[data-test="${this.requestsPrefix}${name}"]`).first();
     /** @param {string} name */
     this.getErrorsLocator = (name) =>
-      page.locator(`[data-test="${this.errorsPrefix}${name}"]`);
+      page.locator(`[data-test="${this.errorsPrefix}${name}"]`).first();
     /**
      * Sort click target for a column: OTable renders a per-<th> sort trigger
      * `[data-test="o2-table-th-{id}"] [data-test="o2-table-th-sort-trigger"]`.

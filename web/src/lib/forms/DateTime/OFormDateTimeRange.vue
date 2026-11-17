@@ -20,7 +20,7 @@
 import { inject, ref, watch } from "vue";
 import DateTime from "@/components/DateTime.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { useVisibleFieldError } from "@/lib/forms/Form/fieldError";
 import { raw } from "@/types/i18n";
 import type { FormDateTimeRangeProps, DateTimeRangeValue } from "./OFormDateTimeRange.types";
 
@@ -29,6 +29,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormDateTimeRangeProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormDateTimeRange] must be rendered inside <OForm>. No form context found.");
@@ -115,13 +116,14 @@ const onDateChange = (field: any, dt: any) => {
         }"
         :default-relative-time="field.state.value?.period ?? '30m'"
         @on:date-change="(d: any) => onDateChange(field, d)"
+        @hide="field.handleBlur()"
       />
       <p
-        v-if="props.showError && field.state.meta.errors.length > 0"
+        v-if="props.showError && shown(field).message !== undefined"
         class="text-input-error-text mt-1 text-xs leading-snug"
         :data-test="$attrs['data-test'] ? `${$attrs['data-test']}-error` : undefined"
       >
-        {{ raw(firstFieldError(field.state.meta.errors)) }}
+        {{ raw(shown(field).message) }}
       </p>
     </template>
   </component>

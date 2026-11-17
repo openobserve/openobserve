@@ -1,6 +1,8 @@
 
 import { expect } from '@playwright/test';
 import { openNavFlyoutChild } from '../commonActions.js';
+const APICleanup = require('../apiCleanup.js');
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 
 export class PipelinesEP {
@@ -33,7 +35,11 @@ export class PipelinesEP {
         this.fileInput = page.locator('input[type="file"]');
         this.sourceStreamNameInput = '[data-test="pipeline-import-source-stream-name-input"]';
         this.destinationFunctionNameInput = '[data-test="pipeline-import-destination-function-name-input"]';
-        this.destinationStreamTypeInput = '[data-test="pipeline-import-destination-stream-type-input"]';
+        this.destinationFunctionNameDataTest = 'pipeline-import-destination-function-name-input';
+        this.remoteDestinationDataTest = 'pipeline-import-destination-stream-type-input';
+        this.importOrgIdTrigger = page.locator('[data-test="pipeline-import-org-id-input-trigger"]');
+        this.importOrgIdSearch = page.locator('[data-test="pipeline-import-org-id-input-search"]');
+        this.importOrgIdOption = (org) => page.locator(`[data-test="pipeline-import-org-id-input-option"][data-test-value="${org}"]`);
         // Stream picker is OSelect (Reka Listbox) post-migration.
         this.menuScroll = '[data-test$="-popover"], [role="listbox"]';
         this.menuItem = '[data-test$="-option"]';
@@ -187,6 +193,7 @@ export class PipelinesEP {
         const nameField = this.page.locator(this.pipelineImportNameInput);
         await nameField.waitFor({ state: 'attached', timeout: 10000 });
         await nameField.fill(name, { force: true });
+        await this.selectImportOrgIdIfAsked();
 
         // Check if stream dropdown exists using specific data-test attribute (more reliable than positional indexes)
         const streamDropdownExists = await this.page.locator(this.sourceStreamNameInput)
@@ -249,38 +256,53 @@ export class PipelinesEP {
             await this.page.waitForTimeout(1000);
         }
 
-        // Find all function dropdowns using specific data-test attribute
-        const functionDropdowns = this.page.locator(this.destinationFunctionNameInput);
-        const functionCount = await functionDropdowns.count();
-
-        // Fill function dropdowns in order
+        const functionCount = await this.page.locator(this.destinationFunctionNameInput).count();
         const functionNames = [functionName1, functionName2];
         for (let i = 0; i < Math.min(functionCount, functionNames.length); i++) {
-            const dropdown = functionDropdowns.nth(i);
-
-            // Click to open the dropdown
-            await dropdown.waitFor({ state: 'visible', timeout: 5000 });
-            await dropdown.click();
-
-            // Wait for dropdown to open
-            await this.page.waitForTimeout(500);
-
-            // Select the function (use exact match to avoid partial matches like 'first5' matching 'first587')
-            const option = this.page.locator('[data-test="pipeline-import-destination-function-name-input-option"]', { hasText: new RegExp(`^${functionNames[i]}$`, 'i') }).first();
-            try {
-                await option.scrollIntoViewIfNeeded({ timeout: 3000 });
-            } catch (error) {
-                // If scroll fails, wait a bit for dropdown to populate
-                await this.page.waitForTimeout(1000);
-            }
-            await option.waitFor({ state: 'visible', timeout: 10000 });
-            await option.click();
-
-            // Wait for dropdown to close before moving to next
-            await this.page.waitForTimeout(1000);
+            await this.selectImportOption(this.destinationFunctionNameDataTest, functionNames[i], i);
         }
     }
 
+    // The option list is virtualised, so on an org with many functions the wanted row is not rendered until searched for.
+    async selectImportOption(dataTest, value, index = 0, label = null) {
+        let field = this.page.locator(`[data-test="${dataTest}"]`);
+        if (label) field = field.filter({ has: this.page.getByText(label, { exact: true }) });
+        const trigger = field.nth(index).locator(`[data-test="${dataTest}-trigger"]`);
+        await trigger.click();
+        const search = this.page.locator(`[data-test="${dataTest}-search"]`);
+        await search.fill(value);
+        await this.page.locator(`[data-test="${dataTest}-option"][data-test-value="${value}"]`).click();
+        await expect(search).toBeHidden();
+        await expect(trigger).toHaveAttribute('data-test-selected-value', value);
+    }
+
+    // The import fixtures carry org "default"; in any other org the form asks for the Organization Id, which must be the current org.
+    async selectImportOrgIdIfAsked() {
+        // A pipeline's error rows render as one group, so once its function picker is up a missing org picker was not asked for.
+        await this.importOrgIdTrigger.first()
+            .or(this.page.locator(`[data-test="${this.destinationFunctionNameDataTest}-trigger"]`).first())
+            .first()
+            .waitFor({ state: 'visible', timeout: 15000 });
+        const org = process.env.ORGNAME || 'default';
+        const pickers = await this.importOrgIdTrigger.count();
+        for (let i = 0; i < pickers; i++) {
+            const trigger = this.importOrgIdTrigger.nth(i);
+            await trigger.click();
+            await this.importOrgIdSearch.fill(org);
+            await this.importOrgIdOption(org).click();
+            await expect(this.importOrgIdSearch).toBeHidden();
+            await expect(trigger).toHaveAttribute('data-test-selected-value', org);
+        }
+    }
+
+    // Logs instead of throwing: an afterEach error would count as the failure a test.fail() expects.
+    async deleteImportPrerequisites(org, { functionName, destinationName }) {
+        const api = new APICleanup(this.page);
+        const destination = await api.deletePipelineDestination(destinationName);
+        if (destination.code !== 200) testLogger.warn('Import cleanup: destination not deleted', { destinationName, code: destination.code });
+        const fn = await api.deleteFunctionInOrg(org, functionName);
+        if (fn.code !== 200) testLogger.warn('Import cleanup: function not deleted', { org, functionName, code: fn.code });
+    }
 
     async importJsonButtonPipeline() {
         await this.page.locator(this.importJsonButton).waitFor({ state: 'visible' });
@@ -322,78 +344,10 @@ export class PipelinesEP {
         const nameField = this.page.locator(this.pipelineImportNameInput);
         await nameField.waitFor({ state: 'attached', timeout: 10000 });
         await nameField.fill(name, { force: true });
-        await this.page.locator(this.destinationFunctionNameInput).click();
-
-        // Wait for dropdown to open
-        await this.page.waitForTimeout(1000);
-
-        // Wait for dropdown menu to be visible
-        const dropdownMenu = this.page.locator(this.menuScroll);
-        await dropdownMenu.waitFor({ state: 'visible', timeout: 5000 });
-
-        // Scroll through the virtual scroll dropdown to find the option
-        let functionOptionVisible = false;
-        let scrollAttempts = 0;
-        const maxScrollAttempts = 50;
-
-        while (!functionOptionVisible && scrollAttempts < maxScrollAttempts) {
-            // Check if option is visible
-            const functionOption = this.page.locator('[data-test$="-option"]', { hasText: new RegExp(`^${functionName}$`, 'i') }).first();
-            functionOptionVisible = await functionOption.isVisible().catch(() => false);
-
-            if (!functionOptionVisible) {
-                // Scroll down in the dropdown
-                await dropdownMenu.evaluate(menu => {
-                    menu.scrollTop += 200;
-                });
-                await this.page.waitForTimeout(100);
-                scrollAttempts++;
-            } else {
-                await functionOption.click();
-                break;
-            }
-        }
-
-        if (!functionOptionVisible) {
-            throw new Error(`Could not find option: ${functionName} after ${maxScrollAttempts} scroll attempts`);
-        }
-
-        await this.page.locator(this.destinationStreamTypeInput).click();
-
-        // Wait for dropdown to open
-        await this.page.waitForTimeout(1000);
-
-        // Wait for dropdown menu to be visible
-        const destinationDropdown = this.page.locator(this.menuScroll);
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-
-        // Scroll through the virtual scroll dropdown to find the destination option
-        let destinationOptionVisible = false;
-        let destinationScrollAttempts = 0;
-        const maxDestinationScrollAttempts = 50;
-
-        while (!destinationOptionVisible && destinationScrollAttempts < maxDestinationScrollAttempts) {
-            // Check if option is visible
-            const destinationOption = this.page.locator('[data-test$="-option"]', { hasText: new RegExp(`^${remoteDestination}$`, 'i') }).first();
-            destinationOptionVisible = await destinationOption.isVisible().catch(() => false);
-
-            if (!destinationOptionVisible) {
-                // Scroll down in the dropdown
-                await destinationDropdown.evaluate(menu => {
-                    menu.scrollTop += 200;
-                });
-                await this.page.waitForTimeout(100);
-                destinationScrollAttempts++;
-            } else {
-                await destinationOption.click();
-                break;
-            }
-        }
-
-        if (!destinationOptionVisible) {
-            throw new Error(`Could not find destination option: ${remoteDestination} after ${maxDestinationScrollAttempts} scroll attempts`);
-        }
-
+        await this.selectImportOrgIdIfAsked();
+        await this.selectImportOption(this.destinationFunctionNameDataTest, functionName);
+        // This data-test is shared by the stream-type, remote-destination and timezone pickers, so pick by label.
+        await this.selectImportOption(this.remoteDestinationDataTest, remoteDestination, 0, 'Remote Destination');
     }
 
 }

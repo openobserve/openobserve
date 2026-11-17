@@ -149,7 +149,7 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     let req_clusters = in_req.clusters.clone();
 
-    let query: SearchQuery = in_req.query.clone().into();
+    let query: SearchQuery = in_req.query.clone().try_into()?;
     let req_query = query.clone();
     let mut request = config::datafusion::request::Request::new(
         trace_id.clone(),
@@ -172,7 +172,7 @@ pub async fn search(
     request.set_use_index(in_req.use_index);
     request.set_analyze_profile(in_req.query.analyze_profile);
     // Before the query is planned again in spawned tasks (cluster::http).
-    request.mark_chat_history_reader();
+    request.mark_protected_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
 
     // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent

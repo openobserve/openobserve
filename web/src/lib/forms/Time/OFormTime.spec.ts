@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OFormTime from "./OFormTime.vue";
@@ -47,5 +47,60 @@ describe("OFormTime", () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain("Required");
+  });
+  it("never submits the previous time while a typed time is unreadable (V-N3)", async () => {
+    const onSubmit = vi.fn();
+    wrapper = mount(OForm, {
+      attachTo: document.body,
+      props: { defaultValues: { meet: "10:00" }, onSubmit },
+      slots: {
+        default: () => h(OFormTime, { name: "meet", format24: true }),
+      },
+      global: { components: { OFormTime } },
+    });
+    const form = (
+      wrapper.vm as unknown as {
+        form: { handleSubmit: () => Promise<unknown>; state: { canSubmit: boolean } };
+      }
+    ).form;
+    const input = wrapper.find('input[type="text"]');
+    (input.element as HTMLInputElement).value = "99:99";
+    await input.trigger("change");
+    await flushPromises();
+    expect(form.state.canSubmit).toBe(false);
+    await form.handleSubmit();
+    await flushPromises();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(wrapper.get('[role="alert"]').text()).toBe("Enter a time as HH:MM.");
+
+    (input.element as HTMLInputElement).value = "11:30";
+    await input.trigger("change");
+    await flushPromises();
+    expect(form.state.canSubmit).toBe(true);
+    await form.handleSubmit();
+    await flushPromises();
+    expect(onSubmit).toHaveBeenCalledWith({ meet: "11:30" });
+  });
+
+  it("clears the refusal when the same time as before is typed back (V-N3)", async () => {
+    const onSubmit = vi.fn();
+    wrapper = mount(OForm, {
+      attachTo: document.body,
+      props: { defaultValues: { meet: "10:00" }, onSubmit },
+      slots: {
+        default: () => h(OFormTime, { name: "meet", format24: true }),
+      },
+      global: { components: { OFormTime } },
+    });
+    const form = (wrapper.vm as unknown as { form: { handleSubmit: () => Promise<unknown> } }).form;
+    const input = wrapper.find('input[type="text"]');
+    (input.element as HTMLInputElement).value = "ab";
+    await input.trigger("change");
+    (input.element as HTMLInputElement).value = "10:00";
+    await input.trigger("change");
+    await flushPromises();
+    await form.handleSubmit();
+    await flushPromises();
+    expect(onSubmit).toHaveBeenCalledWith({ meet: "10:00" });
   });
 });

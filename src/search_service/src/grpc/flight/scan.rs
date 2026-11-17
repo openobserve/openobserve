@@ -168,7 +168,7 @@ pub(super) struct PrecomputedAggregates {
 }
 
 /// Also returns the files left for the storage scan, `None` when the request has no file ids.
-pub(super) async fn route_files(
+pub(super) async fn split_scan_files(
     query: &Arc<QueryParams>,
     req: &FlightSearchRequest,
     settings: &StreamSearchSettings,
@@ -283,7 +283,7 @@ pub(super) async fn route_files(
     Ok((aggregates, Some(scan_files)))
 }
 
-pub(super) async fn search_tables(
+pub(super) async fn collect_table_providers(
     query: &Arc<QueryParams>,
     ctx: &SessionContext,
     source: &StreamSource,
@@ -303,7 +303,7 @@ pub(super) async fn search_tables(
             source.schema.clone(),
             &files,
             source.sort_order,
-            file_stats_cache.clone(),
+            file_stats_cache,
             index.condition.clone(),
             settings.fts_fields.clone(),
             settings.bloom_fields.clone(),
@@ -359,7 +359,6 @@ pub(super) async fn search_tables(
         source.schema.clone(),
         &settings.search_partition_keys,
         source.sort_order,
-        file_stats_cache,
         index.condition.clone(),
         settings.fts_fields.clone(),
         memtable_ids,

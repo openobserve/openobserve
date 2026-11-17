@@ -231,7 +231,7 @@ const selectionLabel = computed(() => {
       <span
         v-else
         :class="[
-          'text-primary text-xs whitespace-nowrap transition-opacity',
+          'text-text-secondary text-xs whitespace-nowrap tabular-nums transition-opacity',
           stale ? 'opacity-60' : '',
           rangeHidden ? 'invisible' : '',
         ]"
@@ -252,7 +252,7 @@ const selectionLabel = computed(() => {
       <div
         v-if="pageSizeOptions.length > 0"
         :class="[
-          'text-primary flex items-center gap-1.5 text-xs transition-opacity',
+          'flex items-center gap-1.5 text-xs transition-opacity',
           stale ? 'cursor-not-allowed opacity-60' : '',
         ]"
         :role="pagingInactive ? 'group' : undefined"
@@ -269,7 +269,7 @@ const selectionLabel = computed(() => {
           v-model="pageSizeModel"
           :options="pageSizeSelectOptions"
           :searchable="false"
-          size="sm"
+          size="xs"
           :aria-label="t('search.recordsPerPage')"
           data-test="o2-table-page-size-select"
         />
@@ -278,7 +278,8 @@ const selectionLabel = computed(() => {
       <nav class="flex items-center gap-1" :aria-label="t('components.pagination.pagination')">
         <OButton
           variant="outline"
-          size="icon"
+          size="icon-xs-sq"
+          class="max-lg:h-6 max-lg:w-6"
           :disabled="isFirstPage || stale"
           focusable-unavailable
           :aria-label="t('search.firstPage')"
@@ -293,7 +294,8 @@ const selectionLabel = computed(() => {
         </OButton>
         <OButton
           variant="outline"
-          size="icon"
+          size="icon-xs-sq"
+          class="max-lg:h-6 max-lg:w-6"
           :disabled="isFirstPage || stale"
           focusable-unavailable
           :aria-label="t('components.pagination.previousPage')"
@@ -308,7 +310,8 @@ const selectionLabel = computed(() => {
         </OButton>
         <OButton
           variant="outline"
-          size="icon"
+          size="icon-xs-sq"
+          class="max-lg:h-6 max-lg:w-6"
           :disabled="isLastPage || stale"
           focusable-unavailable
           :aria-label="t('components.pagination.nextPage')"
@@ -324,7 +327,8 @@ const selectionLabel = computed(() => {
         <OButton
           v-if="totalCountExact"
           variant="outline"
-          size="icon"
+          size="icon-xs-sq"
+          class="max-lg:h-6 max-lg:w-6"
           :disabled="isLastPage || stale"
           focusable-unavailable
           :aria-label="t('search.lastPage')"

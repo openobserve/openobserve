@@ -43,6 +43,8 @@ vi.mock("@/composables/useHomeDashboard", () => ({
 }));
 
 import MainLayout from "./MainLayout.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useLeaveGuard } from "@/lib/forms/SaveBar/useLeaveGuard";
 
 const StubDiv = defineComponent({ setup: () => () => h("div") });
 
@@ -137,5 +139,49 @@ describe("MainLayout — organization selection without an org list", () => {
       "Error in setSelectedOrganization:",
       expect.anything(),
     );
+  });
+
+  it("a header switch waits for the unsaved-changes answer, and cancelling keeps the organization", async () => {
+    getOrgSettings.mockResolvedValue({ data: { data: {} } });
+    wrapper = await mountLayout();
+    await flushPromises();
+    const layout = wrapper.vm as unknown as {
+      selectedOrg: { identifier?: string };
+      updateOrganization: () => Promise<void>;
+    };
+    const current = store.state.selectedOrganization;
+    const dirtyPage = mount(
+      defineComponent({
+        setup() {
+          useLeaveGuard(() => true);
+          return () => h("div");
+        },
+      }),
+    );
+    const dialog = useConfirmDialog();
+    const pickOther = async () => {
+      layout.selectedOrg = { identifier: "other-org" };
+      const switching = layout.updateOrganization();
+      await flushPromises();
+      return switching;
+    };
+
+    const cancelled = pickOther();
+    await flushPromises();
+    expect(dialog.currentDialog.value).not.toBeNull();
+    expect(store.state.selectedOrganization.identifier).toBe(current.identifier);
+    dialog.handleCancel();
+    await cancelled;
+    expect(store.state.selectedOrganization.identifier).toBe(current.identifier);
+    expect(layout.selectedOrg.identifier).toBe(current.identifier);
+
+    const confirmed = pickOther();
+    await flushPromises();
+    dialog.handleConfirm();
+    await confirmed;
+    expect(store.state.selectedOrganization.identifier).toBe("other-org");
+
+    dirtyPage.unmount();
+    store.state.selectedOrganization = current;
   });
 });

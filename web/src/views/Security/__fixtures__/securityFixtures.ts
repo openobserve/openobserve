@@ -420,6 +420,9 @@ export const settle = async () => {
   await flushPromises();
 };
 
+/** Stream name to the source type the server has stored for it; empty unless a test sets one. */
+export const storedSourceTypes = new Map<string, string>();
+
 /** `@/services/securitySources.queries` as the server answers for the fixture streams. */
 export async function sourceQueriesModule() {
   const { SOURCE_TYPES_FIXTURE, SOURCE_TYPE_BY_ID } =
@@ -458,7 +461,12 @@ export async function sourceQueriesModule() {
       queryKey: ["security-sources", org],
       queryFn: async () => ({ streams: [], sources: [], suggestions: [], notices: [] }),
     }),
-    fetchSecuritySources: async () => ({ streams: [], sources: [], suggestions: [], notices: [] }),
+    fetchSecuritySources: async () => ({
+      streams: [...storedSourceTypes].map(([name, source_type]) => ({ name, source_type })),
+      sources: [],
+      suggestions: [],
+      notices: [],
+    }),
     classifySourcesMutation: () => ({ mutationFn: async () => ({ classified: [] }) }),
     attachPackMutation: () => ({ mutationFn: async () => ({}) }),
     attachPlanMutation: () => ({ mutationFn: async () => ({}) }),

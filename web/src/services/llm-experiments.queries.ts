@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import llmExperimentsService, { type LlmExperiment } from "./llm-experiments.service";
+import llmExperimentsService, {
+  type ExperimentComparison,
+  type LlmExperiment,
+} from "./llm-experiments.service";
 import remoteTasksService, {
   type RemoteTask,
   type RemoteTaskSecretMaterial,
@@ -32,6 +35,15 @@ export const experimentsListQuery = (org: string, datasetId?: string) =>
         includeSummary: true,
         ...(datasetId ? { datasetId } : {}),
       }),
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
+/** Compare at the server's own threshold, every eligible score voting: the answer the Compare page opens on. */
+export const experimentCompareQuery = (org: string, baselineId: string, candidateId: string) =>
+  queryOptions({
+    queryKey: experimentKeys.compare(org, baselineId, candidateId),
+    queryFn: (): Promise<ExperimentComparison> =>
+      llmExperimentsService.compare(org, baselineId, candidateId),
     staleTime: MEDIUM_STALE_TIME,
   });
 

@@ -213,6 +213,16 @@ beforeEach(() => {
 });
 
 describe("AgentGraphPage — agent-mode stream gating", () => {
+  it("writes the store's org into the scope URL, not the route's previous org", async () => {
+    mockRouteQuery.org_identifier = "old-org";
+    mockListAgents.mockResolvedValue({ agents: [AGENT] });
+    const wrapper = await mountPage();
+    (wrapper.vm as any).onFilterModeChange("agent");
+    await flushPromises();
+    const queries = mockRouterReplace.mock.calls.map((c: any[]) => c[0].query);
+    expect(queries.some((q: any) => q.type === "agent")).toBe(true);
+    for (const q of queries) expect(q.org_identifier).toBe("test-org");
+  });
   it("mounts ServiceGraph with the SELECTED agent's source_stream (not 'default')", async () => {
     mockListAgents.mockResolvedValue({ agents: [AGENT] });
 

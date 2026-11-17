@@ -61,6 +61,7 @@ use crate::{
             TriggerStatusSearchResult,
         },
     },
+    ingestion::feature_writer::{FeatureWriter, SYSTEM_CREATOR},
     ingestion_tokens, self_reporting,
     users::add_admin_to_org,
 };
@@ -375,7 +376,7 @@ async fn update_passcode_inner(
                 .await
                 .is_ok_and(|r| r.is_some());
         if should_use_org_ingestion_token(is_service_account, default_org_token_exists) {
-            let new_token = db::org_ingestion_tokens::rotate_token(local_org_id, "default").await?;
+            let new_token = rotate_org_passcode(local_org_id).await?;
             return Ok(IngestionTokensContainer::Passcode(IngestionPasscode {
                 user: db_user.email,
                 passcode: new_token,
@@ -398,6 +399,59 @@ async fn update_passcode_inner(
         })
     };
     Ok(ret)
+}
+
+/// Rotates the org's `default` token and, with it, the tokens its feature writers hold.
+async fn rotate_org_passcode(org_id: &str) -> Result<String, anyhow::Error> {
+    use infra::table::org_ingestion_tokens::get_by_name_rw;
+
+    let mut reads = Vec::new();
+    for writer in FeatureWriter::ALL {
+        // From the primary: a writer token made moments ago may not have reached a replica.
+        let row = get_by_name_rw(org_id, writer.token_name()).await;
+        reads.push((
+            writer,
+            row.map(|r| r.map(|r| r.created_by)).map_err(Into::into),
+        ));
+    }
+    let writers = system_writers(org_id, reads)?;
+    rotate_writers_then_default(org_id, &writers).await
+}
+
+/// The writers whose token the system made, from each writer's `created_by` read.
+fn system_writers(
+    org_id: &str,
+    reads: Vec<(FeatureWriter, Result<Option<String>, anyhow::Error>)>,
+) -> Result<Vec<FeatureWriter>, anyhow::Error> {
+    let mut writers = Vec::new();
+    for (writer, read) in reads {
+        match read {
+            Ok(created_by) if created_by.as_deref() == Some(SYSTEM_CREATOR) => writers.push(writer),
+            Ok(_) => {}
+            Err(e) => {
+                let name = writer.token_name();
+                log::error!("[ORG] could not read {org_id}'s {name} ingestion token: {e}");
+                anyhow::bail!(writer.rotation_failed_message());
+            }
+        }
+    }
+    Ok(writers)
+}
+
+/// Rotates writer tokens before `default`, so a failed one leaves `default` unrotated.
+async fn rotate_writers_then_default(
+    org_id: &str,
+    writers: &[FeatureWriter],
+) -> Result<String, anyhow::Error> {
+    // A writer looks its token up by name before each pass, so it picks the new value up.
+    for writer in writers {
+        let name = writer.token_name();
+        if let Err(e) = db::org_ingestion_tokens::rotate_token(org_id, name).await {
+            log::error!("[ORG] rotating {org_id}'s {name} ingestion token failed: {e}");
+            anyhow::bail!(writer.rotation_failed_message());
+        }
+    }
+    db::org_ingestion_tokens::rotate_token(org_id, "default").await
 }
 
 pub async fn list_all_orgs(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
@@ -1625,6 +1679,118 @@ mod tests {
 
         let resp = update_passcode(Some(org_id), user_id).await.unwrap();
         assert_ne!(resp.passcode, passcode);
+    }
+
+    #[tokio::test]
+    async fn rotating_the_org_passcode_rotates_its_writer_tokens() {
+        use crate::ingestion::feature_writer::{self, FeatureWriter, tests::meta_store};
+        meta_store().await;
+        let org = format!("demo-org-rotate-{}", config::utils::time::now_micros());
+        crate::ingestion_tokens::create_default_token(&org, "system")
+            .await
+            .unwrap();
+        feature_writer::token(FeatureWriter::AlertCalibration, &org)
+            .await
+            .unwrap();
+        crate::ingestion_tokens::create_token(&org, "ci-collector", "", "admin@demo-org", false)
+            .await
+            .unwrap();
+        let values = || async {
+            let mut rows = db::org_ingestion_tokens::list_by_org(&org).await.unwrap();
+            rows.sort_by(|a, b| a.name.cmp(&b.name));
+            rows.into_iter()
+                .map(|r| (r.name, r.token))
+                .collect::<Vec<_>>()
+        };
+        let before = values().await;
+        let passcode = rotate_org_passcode(&org).await.unwrap();
+        let after = values().await;
+        let changed: Vec<&str> = before
+            .iter()
+            .zip(&after)
+            .filter(|(b, a)| b.1 != a.1)
+            .map(|(b, _)| b.0.as_str())
+            .collect();
+        assert_eq!(changed, ["_o2_alert_calibration", "default"]);
+        assert!(after.contains(&("default".to_string(), passcode)));
+    }
+
+    fn assert_plain_rotation_failure(err: &anyhow::Error) {
+        let msg = err.to_string();
+        assert_eq!(
+            msg,
+            FeatureWriter::AlertCalibration.rotation_failed_message()
+        );
+        for internal in [
+            "_o2_",
+            "demo-org",
+            "row 42",
+            "connection reset",
+            "not found",
+        ] {
+            assert!(!msg.contains(internal), "{msg}");
+        }
+    }
+
+    #[test]
+    fn a_failed_writer_token_lookup_fails_the_rotation() {
+        let reads = vec![
+            (
+                FeatureWriter::AlertCalibration,
+                Err(anyhow::anyhow!("connection reset reading token row 42")),
+            ),
+            (FeatureWriter::AutoObserve, Ok(None)),
+        ];
+        let err = system_writers("demo-org", reads).unwrap_err();
+        assert_plain_rotation_failure(&err);
+    }
+
+    #[test]
+    fn only_system_made_writer_tokens_are_rotated() {
+        use FeatureWriter::{AlertCalibration, AutoObserve};
+        let cases: [(Option<&str>, Option<&str>, &[FeatureWriter]); 4] = [
+            (
+                Some("system"),
+                Some("system"),
+                &[AlertCalibration, AutoObserve],
+            ),
+            (Some("system"), Some("admin@demo-org"), &[AlertCalibration]),
+            (None, Some("system"), &[AutoObserve]),
+            (Some("admin@demo-org"), None, &[]),
+        ];
+        for (calibration, autoobserve, want) in cases {
+            let read = |c: Option<&str>| Ok(c.map(str::to_string));
+            let reads = vec![
+                (AlertCalibration, read(calibration)),
+                (AutoObserve, read(autoobserve)),
+            ];
+            let got = system_writers("demo-org", reads).unwrap();
+            assert_eq!(got, want, "{calibration:?} {autoobserve:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_failed_writer_token_rotation_fails_the_rotation_and_keeps_default() {
+        use crate::ingestion::feature_writer::tests::meta_store;
+        meta_store().await;
+        let org = format!("demo-org-rotate-fail-{}", config::utils::time::now_micros());
+        crate::ingestion_tokens::create_default_token(&org, "system")
+            .await
+            .unwrap();
+        let default_token = || async {
+            infra::table::org_ingestion_tokens::get_by_name_rw(&org, "default")
+                .await
+                .unwrap()
+                .unwrap()
+                .token
+        };
+        let before = default_token().await;
+        // The org has no `_o2_alert_calibration` row, so the store fails to rotate it.
+        let err = rotate_writers_then_default(&org, &[FeatureWriter::AlertCalibration])
+            .await
+            .unwrap_err();
+        assert_plain_rotation_failure(&err);
+        assert_eq!(default_token().await, before);
     }
 
     #[test]

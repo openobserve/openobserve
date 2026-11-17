@@ -35,6 +35,8 @@ import type {
   SlackCredentialsRequest,
   SlackDisconnectResponse,
   SlackHelpContact,
+  SlackInsightsSettings,
+  SlackInsightsSettingsRequest,
   SlackInstallationsResponse,
   SlackInstallExchangeRequest,
   SlackInstallExchangeResponse,
@@ -232,6 +234,13 @@ const slack = {
 
   putHelpContact: (org: string, id: string, body: { help_contact: string }) =>
     http().put<SlackHelpContact>(`${installation(org, id)}/help-contact`, body),
+
+  getInsightsSettings: (org: string) =>
+    http().get<SlackInsightsSettings>(`${base(org)}/insights-settings`),
+
+  // The AutoObserve section shows every refusal, a 403 included, in its own footer.
+  putInsightsSettings: (org: string, body: SlackInsightsSettingsRequest) =>
+    http().put<SlackInsightsSettings>(`${base(org)}/insights-settings`, body, RENDERS_FORBIDDEN),
 
   getOrgAccess: (org: string, id: string) =>
     http().get<SlackOrgAccessView>(`${installation(org, id)}/org-access`),

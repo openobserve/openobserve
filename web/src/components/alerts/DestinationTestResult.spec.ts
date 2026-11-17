@@ -331,3 +331,19 @@ describe("DestinationTestResult - getStatusText", () => {
     expect((wrapper.vm as any).getStatusText(999)).toBe("Unknown");
   });
 });
+
+describe("DestinationTestResult - generic sample", () => {
+  it("says the connection was checked, not the template, after a generic-sample test", async () => {
+    wrapper = await mountComp({ result: makeResult({ genericSample: true }) });
+    const text = wrapper.get('[data-test="test-success-message"]').text();
+    expect(text).toContain("generic sample, not your template");
+    expect(text).not.toContain("configured correctly");
+  });
+
+  it("keeps the configured text when the test sent the template", async () => {
+    wrapper = await mountComp({ result: makeResult() });
+    expect(wrapper.get('[data-test="test-success-message"]').text()).toContain(
+      "configured correctly",
+    );
+  });
+});

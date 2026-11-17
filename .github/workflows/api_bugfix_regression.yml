@@ -288,7 +288,7 @@ jobs:
     # Gated on the GATE, not on the test job: a failed build_api_binary skips
     # api_regression_tests, and keying off that would turn the loudest failure
     # mode into silence. should_run tells "nothing to do" apart from "it broke".
-    if: ${{ always() && needs.check_main_changed.outputs.should_run == 'true' }}
+    if: ${{ always() && github.ref == 'refs/heads/main' && needs.check_main_changed.outputs.should_run == 'true' }}
     timeout-minutes: 5
     runs-on: ubuntu-latest
     permissions:

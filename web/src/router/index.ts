@@ -77,15 +77,9 @@ export default function (store: any) {
   const router = createRouter(routerMap);
 
   router.beforeEach((to: any, from: any, next: any) => {
-    // Set page title with OpenObserve prefix.
-    //
-    // Routes carry an i18n KEY (`meta.titleKey`), not the text: the route tables
-    // are module-scope, so translating where a route is declared would freeze the
-    // tab title at whatever locale happened to be active at import time. Resolving
-    // here — per navigation — keeps it in the current locale. `gt` (not `t`)
-    // because a navigation guard runs outside any component setup. `title` is the
-    // English literal fallback the routes not yet migrated to `titleKey` still carry.
-    const routeTitle = to.meta?.titleKey ? gt(to.meta.titleKey) : to.meta?.title;
+    // Resolve the i18n titleKey per navigation (module-scope route tables would freeze the locale); `gt` works outside setup.
+    const titleKey = to.meta?.titleKeyByTab?.[to.query?.tab] ?? to.meta?.titleKey;
+    const routeTitle = titleKey ? gt(titleKey) : to.meta?.title;
     if (routeTitle) {
       // The brand prefix is a product noun, never translated; the page name is.
       document.title = `OpenObserve - ${routeTitle}`;

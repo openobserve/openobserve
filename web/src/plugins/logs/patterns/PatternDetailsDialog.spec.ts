@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import PatternDetailsDialog from "./PatternDetailsDialog.vue";
 import { PATTERN_VOLUME_CACHE } from "./usePatternVolume";
 import store from "@/test/unit/helpers/store";
@@ -252,6 +252,21 @@ describe("PatternDetailsDialog", () => {
       });
       const drawer = w.findComponent({ name: "ODrawer" });
       expect(drawer.props("subTitle")).toBeUndefined();
+    });
+
+    it("shows the pattern position once with the real drawer", async () => {
+      const real = mount(PatternDetailsDialog, {
+        props: {
+          modelValue: true,
+          selectedPattern: { ...mockSelectedPattern, index: 1 },
+          totalPatterns: 17,
+        },
+        global: { ...globalConfig, stubs: { ...globalConfig.stubs, ODrawer: false } },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      expect(document.body.innerHTML.match(/2 of 17/g)).toHaveLength(1);
+      real.unmount();
     });
 
     it("should emit update:modelValue when ODrawer emits update:open", async () => {

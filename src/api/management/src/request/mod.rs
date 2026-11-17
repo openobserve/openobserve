@@ -17,6 +17,8 @@
 pub mod ai;
 #[cfg(feature = "enterprise")]
 pub mod alert_calibration;
+#[cfg(feature = "enterprise")]
+pub(crate) mod alert_grants;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod annotation_queues;
@@ -26,6 +28,8 @@ pub mod announcements;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
 pub mod authz;
+#[cfg(feature = "enterprise")]
+pub mod autoobserve;
 #[cfg(feature = "cloud")]
 pub mod cloud;
 pub mod dashboards;
@@ -80,7 +84,9 @@ pub mod score_configs;
 pub mod scorers;
 pub mod security;
 pub mod service_accounts;
+pub mod service_identity;
 pub mod service_streams;
+pub mod service_versions;
 pub mod short_url;
 pub mod slack;
 pub mod slos;
@@ -108,6 +114,7 @@ pub(super) enum LoginFailure {
     InvalidLoginLink,
     LoginLinkExpired,
     InvalidLoginState,
+    LoginStateStoreFailed,
     TokenExchangeFailed,
     TokenValidationFailed,
     LoginPolicyDenied,
@@ -127,6 +134,7 @@ impl LoginFailure {
             Self::InvalidLoginLink => "invalid_login_link",
             Self::LoginLinkExpired => "login_link_expired",
             Self::InvalidLoginState => "invalid_login_state",
+            Self::LoginStateStoreFailed => "login_state_store_failed",
             Self::TokenExchangeFailed => "token_exchange_failed",
             Self::TokenValidationFailed => "token_validation_failed",
             Self::LoginPolicyDenied => "login_policy_denied",

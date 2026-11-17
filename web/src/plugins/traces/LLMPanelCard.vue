@@ -13,23 +13,9 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<!--
-  LLMPanelCard — the shared chrome for every LLM Insights panel (the trend
-  charts and the recent-errors table). One card + one header bar, so the header
-  isn't hand-rolled per panel.
-
-  The header deliberately reuses the dashboards PanelContainer bar styling
-  (compact single line, `text-compact` medium title, a bottom divider, a
-  `flex-1` spacer, trailing controls) so these read-only AI panels look like
-  native dashboard panels — WITHOUT pulling in PanelContainer's editable-grid
-  machinery (drag / edit / delete / variables / alerts) or losing the inline
-  subtitle it has no slot for. `#actions` is the trailing-control spot (e.g. a
-  future overflow menu). `rootEl` is exposed for consumers that must observe the
-  card element (the error table's lazy-load IntersectionObserver).
--->
+<!-- Reuses the PanelContainer bar styling without its editable-grid machinery. -->
 <template>
   <div
-    ref="rootEl"
     class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
   >
     <div
@@ -56,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
 import type { I18nText } from "@/types/i18n";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
@@ -66,9 +51,4 @@ defineProps<{
   /** Optional resolved subtitle, shown muted inline after the title. */
   subtitle?: I18nText;
 }>();
-
-// The card's root element — exposed via a getter so a consumer can observe it
-// (e.g. the recent-errors table lazy-loads when this scrolls into view).
-const rootEl = ref<HTMLElement | null>(null);
-defineExpose({ getRootEl: () => rootEl.value });
 </script>

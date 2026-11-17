@@ -422,6 +422,20 @@ describe("QueryConfig.vue", () => {
       h.unmount();
     });
 
+    it("binds the SQL editor shell so the query field can take focus", async () => {
+      const { h } = mountHost({
+        tab: "sql",
+        columns: [],
+        streamFieldsMap: {},
+        sqlQuery: "SELECT * FROM test",
+      });
+      await flushPromises();
+      const sqlWrapper = h.findComponent(QueryConfig);
+
+      expect((sqlWrapper.vm as any).sqlPromqlPreviewRef).toBeInstanceOf(HTMLElement);
+      h.unmount();
+    });
+
     it("should load functions from store", () => {
       expect(wrapper.vm.functionsList).toEqual([
         { name: "test_func", function: "// test function" },

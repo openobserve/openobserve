@@ -23,9 +23,11 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({ t: (key: string) => key })),
 }));
 
-const { mockListNotices, mockListNoticeUpdates } = vi.hoisted(() => ({
+const { mockListNotices, mockListNoticeUpdates, mockMarkFalse, mockUndoFalse } = vi.hoisted(() => ({
   mockListNotices: vi.fn(),
   mockListNoticeUpdates: vi.fn(),
+  mockMarkFalse: vi.fn(),
+  mockUndoFalse: vi.fn(),
 }));
 
 vi.mock("@/services/status_pages", () => ({
@@ -33,6 +35,8 @@ vi.mock("@/services/status_pages", () => ({
     listNotices: mockListNotices,
     listNoticeUpdates: mockListNoticeUpdates,
     deleteNotice: vi.fn(),
+    markFalsePositive: mockMarkFalse,
+    undoFalsePositive: mockUndoFalse,
   },
 }));
 
@@ -126,6 +130,12 @@ function makeWrapper(components: { id: string; name: string }[] = COMPONENTS) {
         OTimeCell: OTimeCellStub,
         OSpinner: true,
         OIcon: true,
+        OTextarea: {
+          template:
+            '<textarea :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+          props: ["modelValue", "label", "rows", "maxlength", "autofocus"],
+          emits: ["update:modelValue"],
+        },
       },
     },
   });
@@ -214,6 +224,68 @@ describe("NoticeHistoryDialog", () => {
           confirmVariant: "destructive",
         }),
       );
+    });
+  });
+
+  describe("false alarm", () => {
+    const auto = () => makeNotice({ id: "n-auto", source: 0 });
+
+    it("offers the action only on an incident that synthetics opened", async () => {
+      mockListNotices.mockResolvedValue({ data: [auto(), makeNotice({ id: "n-manual" })] });
+      wrapper = makeWrapper();
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="status-page-notice-mark-false-alarm-n-auto"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="status-page-notice-mark-false-alarm-n-manual"]').exists(),
+      ).toBe(false);
+    });
+
+    it("sends the reason and reloads", async () => {
+      mockListNotices.mockResolvedValue({ data: [auto()] });
+      mockMarkFalse.mockResolvedValue({});
+      wrapper = makeWrapper();
+      await flushPromises();
+      await wrapper
+        .find('[data-test="status-page-notice-mark-false-alarm-n-auto"]')
+        .trigger("click");
+      await wrapper
+        .find('[data-test="status-page-notice-false-alarm-reason-n-auto"]')
+        .setValue("  probe outage ");
+      await wrapper
+        .find('[data-test="status-page-notice-false-alarm-confirm-n-auto"]')
+        .trigger("click");
+      await flushPromises();
+      expect(mockMarkFalse).toHaveBeenCalledWith("org-1", "n-auto", "probe outage");
+      expect(mockListNotices).toHaveBeenCalledTimes(2);
+      expect(wrapper.emitted("deleted")).toHaveLength(1);
+    });
+
+    it("shows who marked it and lets the owner undo it", async () => {
+      mockListNotices.mockResolvedValue({
+        data: [
+          {
+            ...auto(),
+            excluded_from_uptime: true,
+            false_alarm: { by: "a@b.c", at: 5, reason: "probe outage" },
+          },
+        ],
+      });
+      mockUndoFalse.mockResolvedValue({});
+      wrapper = makeWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="status-page-notice-false-alarm-n-auto"]').exists()).toBe(
+        true,
+      );
+      expect(
+        wrapper.find('[data-test="status-page-notice-mark-false-alarm-n-auto"]').exists(),
+      ).toBe(false);
+      await wrapper
+        .find('[data-test="status-page-notice-undo-false-alarm-n-auto"]')
+        .trigger("click");
+      await flushPromises();
+      expect(mockUndoFalse).toHaveBeenCalledWith("org-1", "n-auto");
     });
   });
 });

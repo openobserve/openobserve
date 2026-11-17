@@ -80,6 +80,27 @@ pub async fn names_using_template<C: ConnectionTrait>(
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))
 }
 
+/// The template each config in scope names, one entry per config, for the template list's usage
+/// counts.
+pub async fn templates_in_use<C: ConnectionTrait>(
+    conn: &C,
+    org_id: Option<&str>,
+) -> Result<Vec<String>> {
+    let mut query = anomaly_detection_config::Entity::find()
+        .select_only()
+        .column(anomaly_detection_config::Column::Template)
+        .filter(anomaly_detection_config::Column::Template.is_not_null());
+    if let Some(org) = org_id {
+        query = query.filter(anomaly_detection_config::Column::OrgId.eq(org));
+    }
+    query
+        .into_tuple::<Option<String>>()
+        .all(conn)
+        .await
+        .map(|rows| rows.into_iter().flatten().collect())
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))
+}
+
 /// Configs in a folder, by the `folders.id` key they store.
 pub async fn count_in_folder<C: ConnectionTrait>(
     conn: &C,

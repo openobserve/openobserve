@@ -33,6 +33,7 @@ import { deleteLinkMutation, slackLinksQuery } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { SlackAdminLink } from "@/types/slack";
 import { statusOf } from "@/utils/slackLink";
+import { useSlackReadOnly } from "./slackReadOnly";
 
 const props = defineProps<{
   open: boolean;
@@ -43,6 +44,7 @@ const emit = defineEmits<{ "update:open": [open: boolean] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
+const readOnly = useSlackReadOnly();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const timezone = computed<string | undefined>(() => store.state.timezone || undefined);
 
@@ -64,6 +66,7 @@ const loadError = computed(() =>
 const pending = ref<SlackAdminLink | null>(null);
 const confirmOpen = ref(false);
 const askUnlink = (row: SlackAdminLink): void => {
+  if (readOnly.value) return;
   pending.value = row;
   confirmOpen.value = true;
 };
@@ -88,7 +91,7 @@ const columns = computed<OTableColumnDef<SlackAdminLink>[]>(() => [
   { id: "last_used_at", header: t("slackApp.people.columnLastUsed"), size: 120 },
   {
     id: "actions",
-    header: raw(""),
+    header: t("common.actions"),
     size: 100,
     isAction: true,
     pinned: "right",
@@ -154,10 +157,16 @@ const confirmUnlink = (): void => {
               icon-left="link-off"
               class="max-md:hidden"
               :aria-label="t('slackApp.people.unlink')"
+              :disabled="readOnly"
               :data-test="`slack-people-unlink-${row.id}`"
               @click.stop="askUnlink(row)"
             >
-              <OTooltip side="bottom" :content="t('slackApp.people.unlink')" />
+              <OTooltip
+                side="bottom"
+                :content="
+                  readOnly ? t('slackApp.connect.permissionHint') : t('slackApp.people.unlink')
+                "
+              />
             </OButton>
             <ODropdown side="bottom" align="end">
               <template #trigger>
@@ -174,6 +183,7 @@ const confirmUnlink = (): void => {
               <ODropdownItem
                 icon-left="link-off"
                 variant="destructive"
+                :disabled="readOnly"
                 :data-test="`slack-people-unlink-${row.id}-menu`"
                 @select="askUnlink(row)"
               >
@@ -192,12 +202,7 @@ const confirmUnlink = (): void => {
           />
         </template>
         <template #empty>
-          <OEmptyState
-            size="compact"
-            illustration="users"
-            :title="t('slackApp.people.empty')"
-            :backdrop="false"
-          />
+          <OEmptyState size="compact" preset="no-slack-linked-people" :backdrop="false" />
         </template>
       </OTable>
       <OButton

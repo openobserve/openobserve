@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`workflow-list-${row.name}-pause-start-action`"
                   :data-row-action="row.enabled ? 'pause' : 'resume'"
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   class="max-md:hidden"
                   @click.stop="toggleWorkflow(row)"
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :data-test="`workflow-list-${row.name}-view`"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   icon-left="visibility"
                   :title="t('workflow.view')"
                 >
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :data-test="`workflow-list-${row.name}-edit`"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   icon-left="edit"
                   class="max-md:hidden"
                   @click.stop="editWorkflow(row)"
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="!row.is_draft"
                   :data-test="`workflow-list-${row.name}-move`"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   icon-left="drive-file-move"
                   :title="t('workflow.moveToFolder')"
                   @click.stop="openMoveDialog(row)"
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       :aria-label="t('common.moreActions')"
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       icon-left="more-vert"
                       :data-test="`workflow-list-${row.name}-more-options`"
                       @click.stop

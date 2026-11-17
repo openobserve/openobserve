@@ -22,6 +22,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import i18n from "@/locales";
 import type { OwnershipRuleStats } from "@/ts/interfaces/oncall";
 import store from "@/test/unit/helpers/store";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
+import { displayFieldsOf } from "@/types/serviceRef";
 
 const stubs = {
   OEmptyState: {
@@ -283,5 +285,46 @@ describe("OnCallOwnershipRules", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-routing-edit-r1"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-routing-catch-all-set"]').exists()).toBe(false);
+  });
+});
+
+describe("OnCallOwnershipRules service display names", () => {
+  const row = labelRows.differs;
+  const services = [
+    { name: row.service_name, setId: "kubernetes", identity: {}, ...displayFieldsOf(row) },
+  ];
+  const named = rule({
+    rule_id: "r_display",
+    path: `service=${row.service_name}`,
+    dimensions: { service: row.service_name },
+  });
+
+  it("renders a rule's service condition by trace name, keyed by the stored key", async () => {
+    const wrapper = render({ rules: [named], services });
+    await flushPromises();
+
+    const chip = wrapper.find('[data-test="oncall-routing-rule-service-r_display"]');
+    expect(chip.text()).toContain(row.display_name);
+    expect(chip.text()).toContain("Service");
+    expect(chip.text()).not.toContain(row.service_name);
+  });
+
+  it("falls back to the stored key when discovery has no display for it", async () => {
+    const wrapper = render({ rules: [named], services: [] });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-routing-rule-service-r_display"]').text()).toContain(
+      row.service_name,
+    );
+  });
+
+  it("keeps a starts-with service condition on the plain chip", async () => {
+    const wrapper = render({
+      rules: [rule({ rule_id: "r_prefix", path: "service=pay*", dimensions: { service: "pay*" } })],
+      services,
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-routing-rule-service-r_prefix"]').exists()).toBe(false);
   });
 });

@@ -14,6 +14,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OverviewRowButton
+    compact
     :data-test="`overview-data-health-row-${row.key}`"
     :disabled="!row.ok"
     @click="emit('open', row.destination)"
@@ -65,6 +66,7 @@ export interface HealthRow {
   value: I18nText;
   ok: boolean;
   notSetUp: boolean;
+  count?: number;
 }
 
 type Tier = HealthTone | "notSetUp";

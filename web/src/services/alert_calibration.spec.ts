@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import alertCalibration from "./alert_calibration";
+import { AxiosError, AxiosHeaders } from "axios";
+import { gt } from "@/types/i18n";
+import alertCalibration, { readErrorCopy } from "./alert_calibration";
 import analytics from "./product_analytics";
 
 vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
@@ -45,5 +47,56 @@ describe("alert calibration service analytics", () => {
     client.post.mockRejectedValueOnce(new Error("boom"));
     await expect(alertCalibration.requestRun("acme")).rejects.toThrow("boom");
     expect(analytics.track).not.toHaveBeenCalled();
+  });
+});
+
+const answered = (status: number, data: unknown) =>
+  new AxiosError(
+    `Request failed with status code ${status}`,
+    "ERR_BAD_RESPONSE",
+    undefined,
+    {},
+    {
+      status,
+      statusText: "",
+      data,
+      headers: {},
+      config: { headers: new AxiosHeaders() },
+    },
+  );
+
+const FORBIDDEN =
+  "You don't have access to Alert calibration. Ask an org admin for read access to it.";
+const UNREACHABLE = "Couldn't reach the server. Check your connection and try again.";
+const RUNS = "Alert calibration runs couldn't be loaded. Try again in a moment.";
+
+describe("readErrorCopy", () => {
+  it.each([
+    ["403", answered(403, { message: "Unauthorized Access" }), FORBIDDEN],
+    ["500 with body internal", answered(500, "internal"), RUNS],
+    ["502 with an HTML body", answered(502, "<html><body>Bad Gateway</body></html>"), RUNS],
+    ["network error", new AxiosError("Network Error", "ERR_NETWORK", undefined, {}), UNREACHABLE],
+    [
+      "timeout",
+      new AxiosError("timeout of 1ms exceeded", "ECONNABORTED", undefined, {}),
+      UNREACHABLE,
+    ],
+    ["404", answered(404, { message: "not found" }), RUNS],
+    ["a thrown non-HTTP error", new TypeError("x is undefined"), RUNS],
+  ])("%s", (_, error, copy) => {
+    const text = readErrorCopy(gt, error);
+    expect(text).toBe(copy);
+    expect(text).not.toMatch(/internal|html|Bad Gateway|not found|Unauthorized|undefined/i);
+  });
+
+  it("names the subject that failed", () => {
+    const failed = answered(500, "internal");
+    expect(readErrorCopy(gt, failed, "run")).toBe(
+      "This run couldn't be loaded. Try again in a moment.",
+    );
+    expect(readErrorCopy(gt, failed, "settings")).toBe(
+      "Alert calibration settings couldn't be loaded. Try again in a moment.",
+    );
+    expect(readErrorCopy(gt, answered(403, ""), "settings")).toBe(FORBIDDEN);
   });
 });

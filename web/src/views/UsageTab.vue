@@ -342,7 +342,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 exact
                 :to="{
                   name: 'alertList',
-                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                  query: {
+                    org_identifier: store.state.selectedOrganization?.identifier,
+                    state: ALERT_LIST_ALL_STATES,
+                    all_folders: ALERT_LIST_ALL_FOLDERS,
+                  },
                 }"
                 class="absolute inset-0"
                 :aria-label="viewLabel('alerts')"
@@ -495,6 +499,7 @@ import config from "@/aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
 import { formatEventCount } from "@/utils/formatters";
 import { summaryHasUserData } from "@/utils/internalStreams";
+import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import { chartColor } from "@/utils/chartTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -514,6 +519,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { useLicensePage } from "@/composables/useLicensePage";
+import { markFullConfigLoaded } from "@/composables/useFullConfigLoad";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -987,6 +993,7 @@ const refreshConfig = async () => {
         })
         .then(() => queryClient.fetchQuery(configFullQuery(orgId.value))),
     );
+    markFullConfigLoaded(orgId.value);
   } catch (error) {
     console.log(error);
   }

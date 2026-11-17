@@ -73,14 +73,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="bar in detailBars"
             :key="bar.index"
             :turn="bar.turn"
-            :index="bar.index"
+            :index="bar.index + turnOffset"
             :cache-pct="cachePct"
             :delay="40"
+            :user-text="userText?.(bar.turn)"
           >
             <div
               class="rounded-t-default relative min-w-0 flex-1 cursor-pointer transition-[height] duration-300 ease-out hover:brightness-110"
               :style="{ height: bar.pct + '%', background: bar.color }"
-              @click="emit('jump', bar.index + 1)"
+              @click="emit('jump', bar.index + turnOffset + 1)"
             />
           </TurnPreviewCard>
         </div>
@@ -98,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="bar.index"
               class="text-3xs text-text-muted min-w-0 flex-1 text-center tabular-nums"
             >
-              {{ detailLabeled.has(bar.index + 1) ? bar.index + 1 : "" }}
+              {{ detailLabeled.has(bar.index + 1) ? bar.index + turnOffset + 1 : "" }}
             </span>
           </div>
 
@@ -172,11 +173,18 @@ import TurnPreviewCard from "./TurnPreviewCard.vue";
 import type { SessionTraceRow } from "./composables/useSessions";
 import { splitCost, splitDuration, splitNumberWithUnit } from "./llmInsightsDashboard.utils";
 
-const props = defineProps<{
-  traces: SessionTraceRow[];
-  /** Session-level cache reuse percentage forwarded to hover cards. */
-  cachePct: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    traces: SessionTraceRow[];
+    /** Session-level cache reuse percentage forwarded to hover cards. */
+    cachePct: number;
+    /** Unloaded turns before `traces[0]`, so loading older turns doesn't renumber. */
+    turnOffset?: number;
+    /** A turn's user message for the hover card, when it differs from the raw one. */
+    userText?: (turn: SessionTraceRow) => string | undefined;
+  }>(),
+  { turnOffset: 0 },
+);
 
 // Emitted when a bar is clicked — the parent scrolls/expands that turn (S5).
 const emit = defineEmits<{ (e: "jump", turn: number): void }>();

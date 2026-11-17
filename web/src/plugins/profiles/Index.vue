@@ -34,8 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Applies a picked window at once, as on Logs and Traces: Run query is the apply step. -->
       <DateTimePickerDashboard
         ref="datePickerRef"
-        v-model="dateState"
+        :model-value="dateState"
         :auto-apply-dashboard="true"
+        @update:model-value="pickInput('date', $event)"
         :hide-range-shift="isMobile"
         class="h-8"
         data-test="profiles-date-picker"
@@ -124,7 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
         >
           <OSelect
-            v-model="selectedStream"
+            :model-value="selectedStream"
+            @update:model-value="pickSelect('stream', $event)"
             :label="t('profiles.stream')"
             label-position="inside"
             :options="streamOptions"
@@ -137,7 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
         >
           <OSelect
-            v-model="selectedService"
+            :model-value="selectedService"
+            @update:model-value="pickSelect('service', $event)"
             :label="t('profiles.service')"
             label-position="inside"
             :options="serviceOptions"
@@ -149,7 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="max-w-44 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
         >
           <OSelect
-            v-model="selectedProfileType"
+            :model-value="selectedProfileType"
+            @update:model-value="pickSelect('profileType', $event)"
             :label="t('profiles.profileType')"
             label-position="inside"
             :options="profileTypeSelectOptions"
@@ -651,7 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useThemeRevision } from "@/composables/useTheme";
 import { useRoute, useRouter, type LocationQuery } from "vue-router";
@@ -668,6 +672,7 @@ import OContent from "@/lib/core/Content/OContent.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
@@ -764,6 +769,13 @@ const defaultDateState = () => ({
   relativeTimePeriod: "15m",
   valueType: "relative",
 });
+type DateInput = ReturnType<typeof defaultDateState>;
+type HeldInputs = {
+  stream: string | null;
+  service: string | null;
+  profileType: string | null;
+  date: DateInput;
+};
 const dateState = ref(defaultDateState());
 const datePickerRef = ref<{
   setCustomDate: (type: string, range: { start: Date; end: Date }) => void;
@@ -894,6 +906,10 @@ const tagValuesCache = new Map<string, Promise<string[]>>();
 let initRunSeq = 0;
 // Holds the stream and date watchers off while a route seed is applied or dropped, so they cannot reset it or reload.
 let seeding = false;
+// The inputs the user picked while seeding held the watchers; replayed when it ends, so the latest change wins.
+let heldChanges: Partial<HeldInputs> = {};
+// Open while the picker echoes a window the page set (on mount, after setSavedDate), rounding it to its seconds and zone.
+let pickerEchoes = 1;
 let lastRunSeeded = false;
 // The focus from a link belongs to the first run's tree; any later run draws a tree its index path may not match.
 let keepSeededFocus = false;
@@ -1821,6 +1837,11 @@ const showDateInPicker = () => {
       ? { type: "relative", relativeTimePeriod: date.relativeTimePeriod }
       : { type: "absolute", startTime: date.startTime, endTime: date.endTime },
   );
+  // Registered after the set, so it runs after the flush in which the picker's auto-apply watcher echoes it.
+  pickerEchoes += 1;
+  nextTick(() => {
+    pickerEchoes -= 1;
+  });
 };
 
 const applyRouteSeed = (seed: RouteSeed) => {
@@ -1939,6 +1960,7 @@ const initPage = async () => {
   lastRunSeeded = !!seed;
   // Always hold the watchers: loadStreams picks a stream, and the stream watcher must not run a second query.
   seeding = true;
+  heldChanges = {};
   initializing.value = true;
   try {
     resetProfilesState();
@@ -1964,8 +1986,8 @@ const initPage = async () => {
     await runAlongsideMeta(loadMeta);
   } finally {
     if (run === initRunSeq) {
-      seeding = false;
       initializing.value = false;
+      await finishSeeding();
     }
   }
 };
@@ -1980,26 +2002,23 @@ const reloadMeta = async () => {
   }
 };
 
-// A new service or profile type runs the query (Auto Run) or marks Run query pending.
-watch([selectedService, selectedProfileType], async ([service], [previousService]) => {
-  if (seeding || reloadingMeta) return;
-  // Profile types are scoped to the service; reloadMeta holds this watcher, so it cannot loop.
-  if (service !== previousService) await reloadMeta();
+/** A new service or profile type runs the query (Auto Run) or marks Run query pending. */
+const onSelectionChange = async (serviceChanged: boolean) => {
+  // Profile types are scoped to the service; reloadMeta holds the select watcher, so it cannot loop.
+  if (serviceChanged) await reloadMeta();
   await runOrMarkPending();
-});
+};
 
-watch(selectedStream, async (stream, previousStream) => {
-  if (seeding || !stream || stream === previousStream) return;
+const onStreamChange = async () => {
   invalidateTagValuesRequest();
   appliedFilters.value = [];
   selectedService.value = null;
   await reloadMeta();
   await runOrMarkPending();
-});
+};
 
-// A new window reloads meta, then runs (Auto Run, or a drag on the chart) or marks Run query pending.
-watch(dateState, async () => {
-  if (seeding) return;
+/** A new window reloads meta, then runs (Auto Run, or a drag on the chart) or marks Run query pending. */
+const onDateChange = async () => {
   const fromChart = runNextRange;
   runNextRange = false;
   if (fromChart || isAutoRunOn.value) {
@@ -2008,6 +2027,77 @@ watch(dateState, async () => {
     await reloadMeta();
     runPending.value = true;
   }
+};
+
+const inputRefs: { [K in keyof HeldInputs]: Ref<HeldInputs[K]> } = {
+  stream: selectedStream,
+  service: selectedService,
+  profileType: selectedProfileType,
+  date: dateState,
+};
+
+// A relative window's times are resolved only at query time, so its period alone identifies it.
+const sameWindow = (a: DateInput, b: DateInput) =>
+  a.valueType === b.valueType &&
+  (a.valueType === "relative"
+    ? a.relativeTimePeriod === b.relativeTimePeriod
+    : a.startTime === b.startTime && a.endTime === b.endTime);
+
+const pickInput = <K extends keyof HeldInputs>(key: K, value: HeldInputs[K]) => {
+  const target = inputRefs[key];
+  const current = target.value;
+  const isPick =
+    key === "date"
+      ? pickerEchoes === 0 && !sameWindow(current as DateInput, value as DateInput)
+      : current !== value;
+  if (seeding && isPick) heldChanges[key] = value;
+  target.value = value;
+};
+
+const pickSelect = (key: "stream" | "service" | "profileType", value: SelectModelValue) =>
+  pickInput(key, typeof value === "string" ? value : null);
+
+// Children mount first, so the picker's mount replay has been emitted by now.
+onMounted(() =>
+  nextTick(() => {
+    pickerEchoes -= 1;
+  }),
+);
+
+const finishSeeding = async () => {
+  const held = heldChanges;
+  heldChanges = {};
+  if (!Object.keys(held).length) {
+    seeding = false;
+    return;
+  }
+  // Seeding may have written over a pick (meta resets the service), so picks are restored while the watchers still hold.
+  if (held.date) dateState.value = held.date;
+  if ("stream" in held) selectedStream.value = held.stream ?? null;
+  if ("service" in held) selectedService.value = held.service ?? null;
+  if ("profileType" in held) selectedProfileType.value = held.profileType ?? null;
+  const run = initRunSeq;
+  await nextTick();
+  if (run !== initRunSeq) return;
+  seeding = false;
+  if (held.stream) await onStreamChange();
+  else if (held.date) await onDateChange();
+  else await onSelectionChange("service" in held);
+};
+
+watch([selectedService, selectedProfileType], async ([service], [previousService]) => {
+  if (seeding || reloadingMeta) return;
+  await onSelectionChange(service !== previousService);
+});
+
+watch(selectedStream, async (stream, previousStream) => {
+  if (seeding || !stream || stream === previousStream) return;
+  await onStreamChange();
+});
+
+watch(dateState, async () => {
+  if (seeding) return;
+  await onDateChange();
 });
 
 /** The org in the URL and the page state it seeds. */

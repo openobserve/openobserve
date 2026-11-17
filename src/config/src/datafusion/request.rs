@@ -15,7 +15,11 @@
 
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier, SearchInfo, SuperClusterInfo};
 
-use crate::meta::{search::default_use_cache, stream::StreamType};
+use crate::meta::{
+    search::default_use_cache,
+    self_reporting::protected_streams::{ProtectedReader, current_reader},
+    stream::StreamType,
+};
 
 #[derive(Debug, Clone)]
 pub struct Request {
@@ -34,12 +38,8 @@ pub struct Request {
     pub use_index: bool,
     pub overwrite_cache: bool,
     pub histogram_interval: i64,
-    /// Issued by the AI Chat API's history reader, the only reader allowed on
-    /// the protected chat-events stream. Set server-side from
-    /// `self_reporting::ai_chat::is_chat_history_reader()` and carried on the
-    /// request because the query is planned again in spawned tasks, where
-    /// that task-local is gone. Never derived from client input.
-    pub chat_history_reader: bool,
+    /// The protected-stream reader that issued this request; spawned planning has no task-local.
+    pub protected_reader: Option<ProtectedReader>,
     /// Adds the structured `profile` column to EXPLAIN ANALYZE output.
     pub analyze_profile: bool,
 }
@@ -62,7 +62,7 @@ impl Default for Request {
             use_index: true,
             overwrite_cache: false,
             histogram_interval: 0,
-            chat_history_reader: false,
+            protected_reader: None,
             analyze_profile: false,
         }
     }
@@ -97,7 +97,7 @@ impl Request {
             use_index: true,
             overwrite_cache,
             histogram_interval,
-            chat_history_reader: false,
+            protected_reader: None,
             analyze_profile: false,
         }
     }
@@ -127,10 +127,9 @@ impl Request {
         self.analyze_profile = analyze_profile;
     }
 
-    /// Mark the request as the AI Chat API's history reader when — and only
-    /// when — it is issued from inside that reader's scope.
-    pub fn mark_chat_history_reader(&mut self) {
-        self.chat_history_reader = crate::meta::self_reporting::ai_chat::is_chat_history_reader();
+    /// Mark the request with the protected-stream reader whose scope issues it, if any.
+    pub fn mark_protected_reader(&mut self) {
+        self.protected_reader = current_reader();
     }
 }
 
@@ -153,7 +152,7 @@ impl From<FlightSearchRequest> for Request {
             overwrite_cache: req.search_info.clear_cache,
             histogram_interval: req.search_info.histogram_interval,
             // Never carried across nodes.
-            chat_history_reader: false,
+            protected_reader: None,
             analyze_profile: false,
         }
     }
@@ -206,6 +205,7 @@ mod tests {
     use proto::cluster_rpc::{IndexInfo, QueryIdentifier, SearchInfo, SuperClusterInfo};
 
     use super::*;
+    use crate::meta::self_reporting::protected_streams::as_reader;
 
     fn make_flight_request() -> FlightSearchRequest {
         FlightSearchRequest {
@@ -253,6 +253,20 @@ mod tests {
         assert_eq!(req.local_mode, Some(true));
         assert!(!req.streaming_output);
         assert!(req.streaming_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn the_mark_is_never_carried_across_nodes() {
+        let reader = ProtectedReader::AlertCalibration;
+        let remote = as_reader(reader, async { Request::from(make_flight_request()) }).await;
+        assert_eq!(remote.protected_reader, None);
+        let local = as_reader(reader, async {
+            let mut req = Request::default();
+            req.mark_protected_reader();
+            req
+        })
+        .await;
+        assert_eq!(local.protected_reader, Some(reader));
     }
 
     #[test]

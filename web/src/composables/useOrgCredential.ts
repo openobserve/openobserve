@@ -17,6 +17,7 @@ import { computed, reactive, toValue, watch, type MaybeRefOrGetter } from "vue";
 import { useStore, type Store } from "vuex";
 import { queryClient } from "@/composables/query/queryClient";
 import { ingestionTokensQuery, orgPasscodeQuery } from "@/services/organizations.queries";
+import { pickableIngestionTokens } from "@/utils/ingestionTokens";
 
 // keyed by store so setup pages, empty pages and Home publish one credential, and a test's fresh store starts clean
 const states = new WeakMap<object, CredentialState>();
@@ -117,7 +118,8 @@ export async function loadOrgCredential(store: AnyStore, org: string): Promise<P
     queryClient
       .fetchQuery(ingestionTokensQuery(org))
       .then((res: { data?: OrgToken[] } | undefined) => {
-        if (state.org === org) store.dispatch("setOrgTokens", res?.data ?? []);
+        if (state.org === org)
+          store.dispatch("setOrgTokens", pickableIngestionTokens(res?.data ?? []));
       })
       .catch(() => undefined),
     queryClient

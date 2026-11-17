@@ -45,6 +45,8 @@ use crate::{
 
 const READ_REFUSED: &str = "Threat intel needs the Security permission";
 
+const MAX_SWEEP_RANGE_MICROS: i64 = 30 * 24 * 3600 * 1_000_000;
+
 /// SweepSecurityIntel
 #[utoipa::path(
     post,
@@ -80,7 +82,7 @@ pub async fn sweep(
     if !security_allowed(&org_id, &user_id, "GET").await {
         return MetaHttpResponse::forbidden(READ_REFUSED);
     }
-    if let Err(msg) = validate_history_range(req.start_time, req.end_time) {
+    if let Err(msg) = validate_sweep_range(req.start_time, req.end_time) {
         return MetaHttpResponse::bad_request(msg);
     }
     if req.indicators.len() > MAX_SWEEP_INDICATORS || req.streams.len() > MAX_SWEEP_STREAMS {
@@ -107,8 +109,14 @@ pub async fn sweep(
                     .map(|f| f.name().to_string())
                     .collect();
                 let mut target = target.clone();
-                if target.mapped.is_empty() {
-                    target.mapped = mapped_columns(&source_type, &fields);
+                // The page knows only the catalog keys; the server adds each source type's own.
+                for (kind, columns) in mapped_columns(&source_type, &fields) {
+                    let known = target.mapped.entry(kind).or_default();
+                    for column in columns {
+                        if !known.contains(&column) {
+                            known.push(column);
+                        }
+                    }
                 }
                 fields_of.push((target, fields));
             }
@@ -211,7 +219,7 @@ pub async fn sightings(
     if !security_allowed(&org_id, &user_id, "GET").await {
         return MetaHttpResponse::forbidden(READ_REFUSED);
     }
-    if let Err(msg) = validate_history_range(req.start_time, req.end_time) {
+    if let Err(msg) = validate_sweep_range(req.start_time, req.end_time) {
         return MetaHttpResponse::bad_request(msg);
     }
     if !is_valid_interval(&req.interval) {
@@ -304,6 +312,14 @@ pub async fn guard_intel_list(
     }
 }
 
+fn validate_sweep_range(start_time: i64, end_time: i64) -> Result<(), &'static str> {
+    validate_history_range(start_time, end_time)?;
+    if end_time - start_time > MAX_SWEEP_RANGE_MICROS {
+        return Err("time range must be 30 days or less");
+    }
+    Ok(())
+}
+
 /// `None` for a non-Security stream, else whether the caller may search it and its source type.
 async fn security_source_access(
     org_id: &str,
@@ -315,15 +331,10 @@ async fn security_source_access(
     if !is_security_source(Some(&security)) {
         return None;
     }
-    let denied = openobserve_core::authz::check_stream_permissions(
-        stream,
-        org_id,
-        user_id,
-        &StreamType::Logs,
-        openobserve_core::authz::StreamPermissionResourceType::Search,
-    )
-    .await;
-    Some((denied.is_none(), security.source_type))
+    let readable = super::unreadable_streams(org_id, user_id, [stream])
+        .await
+        .is_empty();
+    Some((readable, security.source_type))
 }
 
 async fn run_search(
@@ -364,6 +375,21 @@ async fn run_search(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sweep_range_is_capped_at_30_days() {
+        let end = 1_700_000_000_000_000;
+        for (range, accepted) in [
+            (MAX_SWEEP_RANGE_MICROS, true),
+            (MAX_SWEEP_RANGE_MICROS + 1, false),
+        ] {
+            assert_eq!(
+                validate_sweep_range(end - range, end).is_ok(),
+                accepted,
+                "{range}"
+            );
+        }
+    }
 
     #[tokio::test]
     async fn test_non_intel_tables_pass_without_a_security_grant() {

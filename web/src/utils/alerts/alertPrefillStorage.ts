@@ -29,7 +29,11 @@
  * route.
  */
 
-import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
+import {
+  ALERT_PREFILL_VERSION,
+  type AlertEditHandoff,
+  type AlertPrefill,
+} from "@/ts/interfaces/alertPrefill";
 
 export const ALERT_PREFILL_KEY = "o2:alertPrefill";
 
@@ -54,6 +58,8 @@ export const readAlertPrefill = (): AlertPrefill | null => {
 
     const parsed = JSON.parse(raw);
     if (!parsed || parsed.version !== ALERT_PREFILL_VERSION) return null;
+    // An edit handoff shares the key, and must never seed a new alert.
+    if ("target" in parsed) return null;
 
     return parsed as AlertPrefill;
   } catch {
@@ -66,5 +72,29 @@ export const clearAlertPrefill = (): void => {
     sessionStorage.removeItem(ALERT_PREFILL_KEY);
   } catch {
     // Nothing to do — a leftover key is ignored on the next read anyway.
+  }
+};
+
+export const writeAlertEditHandoff = (handoff: AlertEditHandoff): void => {
+  try {
+    sessionStorage.setItem(ALERT_PREFILL_KEY, JSON.stringify(handoff));
+  } catch {
+    // A full or unavailable sessionStorage opens the editor with nothing suggested.
+  }
+};
+
+/** Reads a calibration handoff once and clears it, so a reload or a second visit never applies it again. */
+export const takeAlertEditHandoff = (alertId: string): AlertEditHandoff | null => {
+  try {
+    const raw = sessionStorage.getItem(ALERT_PREFILL_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !("target" in parsed)) return null;
+    sessionStorage.removeItem(ALERT_PREFILL_KEY);
+    const handoff = parsed as AlertEditHandoff;
+    if (handoff.version !== ALERT_PREFILL_VERSION) return null;
+    return handoff.target?.alertId === alertId ? handoff : null;
+  } catch {
+    return null;
   }
 };

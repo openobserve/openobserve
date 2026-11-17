@@ -115,8 +115,8 @@ describe("CreateAlertAction", () => {
     wrapper = mountAction({ variant: "toolbar", source: "explorer" });
     const button = wrapper.findComponent({ name: "OButton" });
     expect(button.props("variant")).toBe("outline");
-    expect(button.attributes("aria-label")).toBe("Create alert");
-    expect(button.find("span.max-md\\:hidden").text()).toBe("Create alert");
+    expect(button.attributes("aria-label")).toBe("Add alert");
+    expect(button.find("span.max-md\\:hidden").text()).toBe("Add alert");
   });
 
   it("adds no tooltip on a toolbar button whose label is visible", () => {
@@ -254,8 +254,8 @@ describe("CreateAlertAction", () => {
       const reason = wrapper.get(".sr-only");
       expect(reason.text()).toBe("Select a stream first");
       expect(button.attributes("aria-describedby")).toBe(reason.attributes("id"));
-      if (variant !== "button") expect(button.attributes("aria-label")).toBe("Create Alert");
-      else expect(button.text()).toContain("Create Alert");
+      if (variant !== "button") expect(button.attributes("aria-label")).toBe("Add alert");
+      else expect(button.text()).toContain("Add alert");
       button.element.focus();
       expect(document.activeElement).toBe(button.element);
       await button.trigger("keydown", { key: "Enter" });
@@ -330,7 +330,7 @@ describe("CreateAlertAction", () => {
 
   it("uses the registry label for the source", () => {
     wrapper = mountAction({ source: "logs" });
-    expect(wrapper.text()).toContain("Create Alert");
+    expect(wrapper.text()).toContain("Add alert");
   });
 
   describe("license lock", () => {

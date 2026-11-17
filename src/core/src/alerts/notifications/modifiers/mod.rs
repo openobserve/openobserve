@@ -49,6 +49,34 @@ impl PreparedTemplate {
     }
 }
 
+/// Quote state inside a modifier's arguments; `json` marks the `\"` delimiter form.
+#[derive(Default)]
+struct ArgQuote {
+    open: bool,
+    json: bool,
+    escaped: bool,
+}
+
+impl ArgQuote {
+    fn opened(json: bool) -> Self {
+        Self {
+            open: true,
+            json,
+            escaped: false,
+        }
+    }
+
+    fn feed(&mut self, ch: char) {
+        if self.escaped {
+            self.escaped = false;
+        } else if ch == '\\' {
+            self.escaped = true;
+        } else if ch == '"' {
+            self.open = false;
+        }
+    }
+}
+
 pub(crate) fn prepare_modifiers(
     tpl: &str,
     mut lookup: impl FnMut(&str) -> Option<String>,
@@ -57,7 +85,7 @@ pub(crate) fn prepare_modifiers(
 ) -> PreparedTemplate {
     let mut prepared = PreparedTemplate::plain(String::with_capacity(tpl.len()));
     let mut cursor = 0;
-    while let Some((start, end)) = next_placeholder(tpl, cursor) {
+    while let Some((start, end, json_escaped)) = next_placeholder(tpl, cursor) {
         prepared.template.push_str(&tpl[cursor..start]);
         let expression = &tpl[start + 1..end - 1];
         let literal = is_literal_placeholder(expression, &mut literal_field_exists);
@@ -66,7 +94,14 @@ pub(crate) fn prepare_modifiers(
                 && !tpl[..start].ends_with('{')
                 && (!field.contains(':') || literal_field_exists(field))
             {
-                lookup(field).and_then(|value| format_modifier(&value, function))
+                let function = if json_escaped {
+                    decode_json_layer(function)
+                } else {
+                    Some(function.to_string())
+                };
+                function.and_then(|function| {
+                    lookup(field).and_then(|value| format_modifier(&value, &function))
+                })
             } else {
                 None
             };
@@ -85,23 +120,27 @@ pub(crate) fn prepare_modifiers(
     prepared
 }
 
-fn next_placeholder(tpl: &str, mut cursor: usize) -> Option<(usize, usize)> {
+fn next_placeholder(tpl: &str, mut cursor: usize) -> Option<(usize, usize, bool)> {
     loop {
         let mut start = None;
         let mut modifier = false;
-        let mut quoted = false;
-        let mut escaped = false;
+        let mut quote = ArgQuote::default();
+        let mut json_escaped = false;
         let mut nested = 0usize;
-        for (index, ch) in tpl[cursor..].char_indices() {
-            let index = cursor + index;
-            if quoted {
-                if escaped {
-                    escaped = false;
-                } else if ch == '\\' {
-                    escaped = true;
-                } else if ch == '"' {
-                    quoted = false;
-                }
+        let mut chars = tpl[cursor..].char_indices().peekable();
+        while let Some((offset, ch)) = chars.next() {
+            let index = cursor + offset;
+            if quote.open {
+                let decoded = match ch {
+                    '\\' if quote.json => match read_json_escape(&mut chars) {
+                        Some(decoded) => decoded,
+                        None => break,
+                    },
+                    // A raw quote ends the JSON string, so the `\"` argument is unclosed.
+                    '"' if quote.json => break,
+                    ch => ch,
+                };
+                quote.feed(decoded);
                 continue;
             }
             match ch {
@@ -109,13 +148,18 @@ fn next_placeholder(tpl: &str, mut cursor: usize) -> Option<(usize, usize)> {
                 '{' => {
                     start = (!tpl[index + 1..].trim_start().starts_with('"')).then_some(index);
                     modifier = false;
+                    json_escaped = false;
                 }
                 '|' if start.is_some() => modifier = true,
-                '"' if modifier => quoted = true,
+                '"' if modifier => quote = ArgQuote::opened(false),
+                '\\' if modifier && chars.next_if(|(_, next)| *next == '"').is_some() => {
+                    quote = ArgQuote::opened(true);
+                    json_escaped = true;
+                }
                 '}' if nested > 0 => nested -= 1,
                 '}' => {
                     if let Some(start) = start {
-                        return Some((start, index + 1));
+                        return Some((start, index + 1, json_escaped));
                     }
                 }
                 _ => {}
@@ -124,6 +168,28 @@ fn next_placeholder(tpl: &str, mut cursor: usize) -> Option<(usize, usize)> {
         // An unclosed modifier is literal text, so later placeholders still substitute.
         cursor = start.filter(|_| modifier)? + 1;
     }
+}
+
+/// Decodes the JSON escape after a backslash, so the `\"` form scans what the formatter will read.
+fn read_json_escape(chars: &mut impl Iterator<Item = (usize, char)>) -> Option<char> {
+    let (_, escaped) = chars.next()?;
+    Some(match escaped {
+        'u' => {
+            let hex: String = chars.take(4).map(|(_, c)| c).collect();
+            let code = (hex.len() == 4).then(|| u32::from_str_radix(&hex, 16).ok())??;
+            // A lone surrogate half is neither a quote nor a backslash, so it cannot end the scan.
+            char::from_u32(code).unwrap_or(char::REPLACEMENT_CHARACTER)
+        }
+        'n' => '\n',
+        't' => '\t',
+        'r' => '\r',
+        other => other,
+    })
+}
+
+/// Removes the one JSON escape layer a Raw payload body puts on `\"`-quoted arguments.
+fn decode_json_layer(function: &str) -> Option<String> {
+    serde_json::from_str(&format!("\"{function}\"")).ok()
 }
 
 fn is_literal_placeholder(
@@ -231,5 +297,41 @@ mod tests {
         );
         let plain = prepared.template.replace("{alert_count}", "99");
         assert_eq!(prepared.finish(plain), r#"{alert_count} 1970 \"quoted\""#);
+    }
+
+    #[test]
+    fn json_escaped_quotes_delimit_arguments_like_plain_quotes() {
+        let lookup = |field: &str| match field {
+            "t" => Some("0".to_string()),
+            "v" => Some("1200".to_string()),
+            _ => None,
+        };
+        let raw = r#"{"text":"a={n} t={t|formatTimestamp(\"%Y-%m-%d\",\"UTC\")} p={t|formatTimestamp("%Y")} b={v|humanize}"}"#;
+        let prepared = prepare_modifiers(raw, lookup, |_| false, false);
+        assert_eq!(
+            prepared.finish(prepared.template.clone()),
+            r#"{"text":"a={n} t=1970-01-01 p=1970 b=1.2k"}"#
+        );
+
+        let embedded = r#"{t|formatTimestamp(\"%Y \\\"q\\\" \\\\ }\")} {v|humanize}"#;
+        let prepared = prepare_modifiers(embedded, lookup, |_| false, true);
+        assert_eq!(
+            prepared.finish(prepared.template.clone()),
+            r#"1970 "q" \ } 1.2k"#
+        );
+
+        let unicode = r#"{"text":"{t|formatTimestamp(\"%Y\u0022)} {v|humanize}"}"#;
+        let prepared = prepare_modifiers(unicode, lookup, |_| false, false);
+        assert_eq!(
+            prepared.finish(prepared.template.clone()),
+            r#"{"text":"1970 1.2k"}"#
+        );
+
+        let unclosed = r#"{"text":"{t|formatTimestamp(\"%Y)} {v|humanize}"}"#;
+        let prepared = prepare_modifiers(unclosed, lookup, |_| false, false);
+        assert_eq!(
+            prepared.finish(prepared.template.clone()),
+            r#"{"text":"{t|formatTimestamp(\"%Y)} 1.2k"}"#
+        );
     }
 }

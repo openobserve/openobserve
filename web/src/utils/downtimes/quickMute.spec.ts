@@ -36,11 +36,11 @@ describe("endTimeText", () => {
   const hours = (n: number) => now + n * 3_600_000_000;
 
   it("keeps a bare time for an end later today", () => {
-    expect(endTimeText(hours(2), now, "UTC", t)).toBe("4:07 PM");
+    expect(endTimeText(hours(2), now, "UTC", t)).toBe("16:07");
   });
 
   it("says tomorrow for the 24 h safety end", () => {
-    expect(endTimeText(hours(24), now, "UTC", t)).toBe("2:07 PM tomorrow");
+    expect(endTimeText(hours(24), now, "UTC", t)).toBe("14:07 tomorrow");
   });
 
   it("gives the date for an end after tomorrow", () => {

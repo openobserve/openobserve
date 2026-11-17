@@ -21,6 +21,8 @@ export const experimentKeys = {
   /** `datasetId` scopes the request, so it forks the entry rather than sharing one. */
   list: (org: string, datasetId?: string) =>
     datasetId ? orgKey(org, "experiments", "list", datasetId) : orgKey(org, "experiments", "list"),
+  compare: (org: string, baselineId: string, candidateId: string) =>
+    orgKey(org, "experiments", "compare", baselineId, candidateId),
 };
 
 export const remoteTaskKeys = {

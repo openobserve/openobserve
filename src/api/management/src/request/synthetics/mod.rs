@@ -1863,70 +1863,35 @@ async fn process_ack(
     // 3` alerted on the first failure and a 30-minute cooldown sent thirty
     // notifications.
     #[cfg(feature = "enterprise")]
-    use openobserve_synthetics::job_api::AlertDecision;
-    #[cfg(feature = "enterprise")]
-    let recovery = matches!(resp.alert, AlertDecision::Recovered);
-    #[cfg(feature = "enterprise")]
-    let flaky = matches!(resp.alert, AlertDecision::Flaky);
-    // A degrading target is `warning` on every run for as long as the condition
-    // lasts, so this one is throttled by transition upstream, not by cooldown.
-    #[cfg(feature = "enterprise")]
-    let degraded = matches!(resp.alert, AlertDecision::Degraded);
-    #[cfg(feature = "enterprise")]
-    let should_notify =
-        !matches!(resp.alert, AlertDecision::Silent) && resp.suppressed_by.is_none();
+    let should_notify = !matches!(
+        resp.alert,
+        openobserve_synthetics::job_api::AlertDecision::Silent
+    ) && resp.suppressed_by.is_none();
     // Enterprise-gated because alert *destinations* are: the dispatch it ends in
     // (the shared notification path) is not built in OSS. An OSS build
     // runs the check, records the run and serves the result — it just has
     // nowhere to send a notification, exactly as it has for alerts.
     #[cfg(feature = "enterprise")]
     if should_notify && !resp.destinations.is_empty() {
-        let notification = openobserve_core::synthetics::CheckNotification {
-            org_id: resp.org_id.clone(),
-            check_name: resp.synthetics_name.clone(),
-            check_id: resp.synthetics_id.clone(),
-            check_type: resp.synthetic_type.clone(),
-            target: resp.target.clone(),
-            destinations: resp.destinations.clone(),
-            run_id: resp.run_id.clone(),
-            status: resp.run_status.clone().unwrap_or_else(|| status.clone()),
-            job_count: resp.job_count as i64,
-            error: error.clone(),
+        let notification = openobserve_core::synthetics::CheckNotification::from_ack(
+            &resp,
+            &status,
+            error.clone(),
+            error_source.clone(),
             checked_at,
-            recovery,
-            consecutive_failures: resp.consecutive_failures,
-            flaky,
-            degraded,
-            status_reason: resp.status_reason.clone(),
-            error_source: error_source.clone(),
-            failing_locations: resp.failing_locations.clone(),
-            failing_environments: resp.failing_environments.clone(),
-            passing_locations: resp.passing_locations.clone(),
-            template: resp.template.clone(),
-            event: check_event(recovery, flaky, degraded),
-        };
+        );
         tokio::spawn(async move {
             openobserve_core::synthetics::notify_check_result(notification).await;
         });
     }
-    Ok(resp)
-}
-
-/// The platform event of a run's message: a recovery resolves, the notices never open a record.
-#[cfg(feature = "enterprise")]
-fn check_event(
-    recovery: bool,
-    flaky: bool,
-    degraded: bool,
-) -> config::meta::alerts::notification_kind::NotificationEvent {
-    use config::meta::alerts::notification_kind::NotificationEvent;
-    if recovery {
-        NotificationEvent::Resolved
-    } else if flaky || degraded {
-        NotificationEvent::Informational
-    } else {
-        NotificationEvent::Firing
+    // The gap notices are about our side, so they go out whatever the run's own alert decided.
+    #[cfg(feature = "enterprise")]
+    if let Some(gap) = openobserve_core::synthetics::GapNotification::from_ack(&resp) {
+        tokio::spawn(async move {
+            openobserve_core::synthetics::notify_gap(gap).await;
+        });
     }
+    Ok(resp)
 }
 
 // ── Agent liveness API (probe-facing, authenticated via o2syn_ token) ────────
@@ -2573,19 +2538,19 @@ mod tests {
     fn a_runs_event_follows_the_alerting_decision() {
         use config::meta::alerts::notification_kind::NotificationEvent;
         assert_eq!(
-            super::check_event(true, false, false),
+            openobserve_core::synthetics::check_event(true, false, false),
             NotificationEvent::Resolved
         );
         assert_eq!(
-            super::check_event(false, true, false),
+            openobserve_core::synthetics::check_event(false, true, false),
             NotificationEvent::Informational
         );
         assert_eq!(
-            super::check_event(false, false, true),
+            openobserve_core::synthetics::check_event(false, false, true),
             NotificationEvent::Informational
         );
         assert_eq!(
-            super::check_event(false, false, false),
+            openobserve_core::synthetics::check_event(false, false, false),
             NotificationEvent::Firing
         );
     }
@@ -2651,6 +2616,8 @@ mod tests {
             failing_environments: Vec::new(),
             usage_events,
             suppressed_by: None,
+            coverage: None,
+            gap_notice: None,
             template: None,
         }
     }

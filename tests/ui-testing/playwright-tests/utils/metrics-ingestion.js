@@ -1,6 +1,10 @@
+const path = require('path');
+const { request } = require('@playwright/test');
 const testLogger = require('./test-logger');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('./cloud-auth');
 const { ingestBase } = require('./ingest-url.js');
+
+const AUTH_FILE = path.join(__dirname, 'auth', 'user.json');
 
 /**
  * OTLP Metrics Ingestion Module for OpenObserve E2E Tests
@@ -399,27 +403,37 @@ class MetricsIngestion {
     async waitForMetricQueryable(metricName, maxRetries = 30, interval = 1000) {
         const base = this.config.queryBase;
         const url = `${base}/prometheus/api/v1/query?query=${encodeURIComponent(metricName)}`;
-        const headers = getAuthHeaders();
-        for (let i = 0; i < maxRetries; i++) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const response = await fetch(url, { method: 'GET', headers, signal: controller.signal });
-                clearTimeout(timeoutId);
-                if (response.ok) {
-                    const body = await response.json();
-                    const result = body?.data?.result;
-                    if (Array.isArray(result) && result.length > 0) {
-                        testLogger.info(`Metric "${metricName}" queryable after ${i + 1} poll(s)`, { series: result.length });
-                        return true;
+        // A regular user's passcode only authenticates ingestion routes, so cloud reads use the login session.
+        const context = await request.newContext(
+            isCloudEnvironment() ? { storageState: AUTH_FILE } : { extraHTTPHeaders: getAuthHeaders() }
+        );
+        let lastStatus = null;
+        let failureLogged = false;
+        try {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await context.get(url, { timeout: 5000 });
+                    lastStatus = response.status();
+                    if (response.ok()) {
+                        const body = await response.json();
+                        const result = body?.data?.result;
+                        if (Array.isArray(result) && result.length > 0) {
+                            testLogger.info(`Metric "${metricName}" queryable after ${i + 1} poll(s)`, { series: result.length });
+                            return true;
+                        }
+                    } else if (!failureLogged) {
+                        testLogger.warn(`Metric "${metricName}" query returned HTTP ${lastStatus} on poll ${i + 1}`);
+                        failureLogged = true;
                     }
+                } catch (error) {
+                    testLogger.debug(`waitForMetricQueryable attempt ${i + 1} error`, { error: error.message });
                 }
-            } catch (error) {
-                testLogger.debug(`waitForMetricQueryable attempt ${i + 1} error`, { error: error.message });
+                await new Promise(resolve => setTimeout(resolve, interval));
             }
-            await new Promise(resolve => setTimeout(resolve, interval));
+        } finally {
+            await context.dispose();
         }
-        testLogger.warn(`Metric "${metricName}" not queryable after ${maxRetries} polls`);
+        testLogger.warn(`Metric "${metricName}" not queryable after ${maxRetries} polls`, { lastStatus });
         return false;
     }
 

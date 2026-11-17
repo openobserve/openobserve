@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :row-key="rowKey"
         :loading="showSkeleton"
         :error="error ? t('emptyState.loadError.title') : null"
+        :forbidden="forbidden"
         pagination="none"
         sorting="client"
         :default-columns="false"
@@ -88,8 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("modelPricing.unpriced.noMatch") }}
           </OBadge>
           <div v-else class="flex min-w-0 flex-col py-1">
-            <div class="flex min-w-0 items-center gap-1.5">
-              <OTruncatedText as="span">{{ row.matched.name }}</OTruncatedText>
+            <!-- A narrow column wraps the badge under the name instead of cutting the name short. -->
+            <div class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <OTruncatedText as="span" class="max-w-full min-w-0">{{
+                row.matched.name
+              }}</OTruncatedText>
               <OBadge
                 :variant="row.priced_now ? 'success-soft' : 'warning-soft'"
                 size="sm"
@@ -104,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </OBadge>
             </div>
-            <span v-if="matchedPrices(row)" class="text-text-secondary text-xs">
+            <span v-if="matchedPrices(row)" class="text-text-secondary text-xs whitespace-normal">
               {{ matchedPrices(row) }}
             </span>
           </div>
@@ -155,7 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="model-pricing-unpriced-keep-btn"
               @click.stop="keepPrices(row)"
             >
-              {{ t("modelPricing.unpriced.keepPrices", { name: row.matched.name }) }}
+              {{ t("modelPricing.unpriced.keepPricesButton") }}
+              <OTooltip
+                :content="t('modelPricing.unpriced.keepPrices', { name: row.matched.name })"
+              />
             </OButton>
             <OButton
               v-else
@@ -246,6 +253,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 const props = defineProps<{
   models: UnpricedModel[];
@@ -257,6 +265,8 @@ const props = defineProps<{
   fetching: boolean;
   /** The last read failed: the load-error state, whose Retry emits `refresh`. */
   error: boolean;
+  /** The read was denied: the no-access state (a license denial names its features). */
+  forbidden?: ForbiddenState;
   /** A read for the current stream succeeded, so zero rows means everything is priced. */
   loaded: boolean;
   lastRunAt: number;
@@ -286,7 +296,7 @@ const noStreams = computed(() => props.streamsLoaded && !props.streams.length);
 // Until the stream list and a read resolve there is nothing to judge, so the
 // skeleton holds instead of a premature "everything is priced".
 const showSkeleton = computed(
-  () => !props.error && !noStreams.value && (props.loading || !props.loaded),
+  () => !props.error && !props.forbidden && !noStreams.value && (props.loading || !props.loaded),
 );
 
 const bannerText = computed(() =>
@@ -304,23 +314,25 @@ const columns: OTableColumnDef<UnpricedModel>[] = [
     header: t("modelPricing.unpriced.colModel"),
     accessorKey: "model",
     sortable: true,
-    minSize: 180,
-    meta: { align: "left", flex: true },
+    size: 136,
+    minSize: 136,
+    meta: { align: "left", flex: true, autoWidth: true },
   },
   {
     id: "priced_as",
     header: t("modelPricing.unpriced.colPricedAs"),
     accessorFn: (row) => row.matched?.name ?? "",
     sortable: true,
-    minSize: 180,
-    meta: { align: "left", flex: true },
+    size: 136,
+    minSize: 136,
+    meta: { align: "left", flex: true, autoWidth: true },
   },
   {
     id: "tokens",
     header: t("modelPricing.unpriced.colTokens"),
     accessorKey: "tokens",
     sortable: true,
-    size: 100,
+    size: 76,
     meta: { align: "right" },
   },
   {
@@ -328,7 +340,7 @@ const columns: OTableColumnDef<UnpricedModel>[] = [
     header: t("modelPricing.unpriced.colCost"),
     accessorKey: "cost",
     sortable: true,
-    size: 120,
+    size: 116,
     meta: { align: "right" },
   },
   {
@@ -336,8 +348,7 @@ const columns: OTableColumnDef<UnpricedModel>[] = [
     header: t("modelPricing.unpriced.colActions"),
     isAction: true,
     pinned: "right",
-    // Fits "Create price" next to "Keep <model name> prices" for a typical model name.
-    size: 330,
+    size: 232,
     meta: { align: "right", actionCount: 2 },
   },
 ];

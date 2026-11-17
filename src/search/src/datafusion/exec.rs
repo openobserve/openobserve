@@ -363,6 +363,9 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
         ctx.register_udf(super::udf::cipher_udf::DECRYPT_SLOW_UDF.clone());
         ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
         ctx.register_udaf(AggregateUDF::from(
+            o2_enterprise::enterprise::search::datafusion::udaf::ddsketch::DDSketchMergeAgg::new(),
+        ));
+        ctx.register_udaf(AggregateUDF::from(
             o2_enterprise::enterprise::search::datafusion::udaf::ddsketch::DDSketchAgg::new(),
         ));
     }

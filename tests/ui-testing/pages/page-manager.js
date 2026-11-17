@@ -40,7 +40,6 @@ import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 import { AlertAckPage } from "./alertsPages/alertAckPage.js";
-import { AlertFiringPage } from "./alertsPages/alertFiringPage.js";
 import { AlertSaveQueryModePage } from "./alertsPages/alertSaveQueryModePage.js";
 import { AlertNoDestinationPage } from "./alertsPages/alertNoDestinationPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
@@ -50,6 +49,7 @@ import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
 import { SloAlertsPage } from "./sloPages/sloAlertsPage.js";
+import { SloImportPage } from "./sloPages/sloImportPage.js";
 import { OnCallTeamsPage } from "./oncallPages/oncallTeamsPage.js";
 import { OnCallTeamDetailPage } from "./oncallPages/oncallTeamDetailPage.js";
 import { OnCallPagesListPage } from "./oncallPages/oncallPagesListPage.js";
@@ -63,6 +63,7 @@ import { SyntheticsListPage } from "./syntheticsPages/syntheticsListPage.js";
 import { SyntheticsCreatePage } from "./syntheticsPages/syntheticsCreatePage.js";
 import { SyntheticsResultsPage } from "./syntheticsPages/syntheticsResultsPage.js";
 import { SyntheticsSettingsPage } from "./syntheticsPages/syntheticsSettingsPage.js";
+import { SyntheticsRegressionPage } from "./syntheticsPages/syntheticsRegressionPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -97,6 +98,8 @@ import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
 import { RumIngestionPage } from "./rumPages/rumIngestionPage.js";
 import { RumSourcemapsPage } from "./rumPages/rumSourcemapsPage.js";
 import { RumProductAnalyticsPage } from "./rumPages/rumProductAnalyticsPage.js";
+import { RumReplayPlayerPage } from "./rumPages/rumReplayPlayerPage.js";
+import { RumSessionTracesTabPage } from "./rumPages/rumSessionTracesTabPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { ReportsFormValidationPage } from "./reportsPages/reportsFormValidationPage.js";
@@ -133,6 +136,7 @@ import { LogoManagementPage } from "./generalPages/logoManagementPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
 import { QueryManagementPage } from "./generalPages/queryManagementPage.js";
 import { BillingGroupPage } from "./generalPages/billingGroupPage.js";
+import { BillingUsagePage } from "./generalPages/billingUsagePage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
 import { SharedComponentsFormValidationPage } from "./generalPages/sharedComponentsFormValidationPage.js";
@@ -141,6 +145,7 @@ import { PasswordPolicyPage } from "./generalPages/passwordPolicyPage.js";
 import { AiToolsetsFormValidationPage } from "./generalPages/aiToolsetsFormValidationPage.js";
 import { AiAssistantCreditsPage } from "./generalPages/aiAssistantCreditsPage.js";
 import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
+import { QuickFilterCardsPage } from "./generalPages/quickFilterCardsPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -229,12 +234,12 @@ class PageManager {
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
+    this.quickFilterCardsPage = new QuickFilterCardsPage(page);
     this.createAlertFromSourceDialog = new CreateAlertFromSourceDialogPage(page);
     this.alertLibraryPage = new AlertLibraryPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
     this.alertAckPage = new AlertAckPage(page);
-    this.alertFiringPage = new AlertFiringPage(page);
     this.alertSaveQueryModePage = new AlertSaveQueryModePage(page);
     this.alertNoDestinationPage = new AlertNoDestinationPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
@@ -246,6 +251,7 @@ class PageManager {
     this.sloFormPage = new SloFormPage(page);
     this.sloDetailPage = new SloDetailPage(page);
     this.sloAlertsPage = new SloAlertsPage(page);
+    this.sloImportPage = new SloImportPage(page);
 
     // ===== ON-CALL PAGE OBJECTS (enterprise) =====
     this.oncallTeamsPage = new OnCallTeamsPage(page);
@@ -263,6 +269,7 @@ class PageManager {
     this.syntheticsCreatePage = new SyntheticsCreatePage(page);
     this.syntheticsResultsPage = new SyntheticsResultsPage(page);
     this.syntheticsSettingsPage = new SyntheticsSettingsPage(page);
+    this.syntheticsRegressionPage = new SyntheticsRegressionPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);
@@ -344,6 +351,7 @@ class PageManager {
     this.statusPagesPage = new StatusPagesPage(page);
     this.queryManagementPage = new QueryManagementPage(page);
     this.billingGroupPage = new BillingGroupPage(page);
+    this.billingUsagePage = new BillingUsagePage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);
     this.schemaPage = new SchemaPage(page);
@@ -390,6 +398,8 @@ class PageManager {
     this.rumIngestionPage = new RumIngestionPage(page);
     this.rumSourcemapsPage = new RumSourcemapsPage(page);
     this.rumProductAnalyticsPage = new RumProductAnalyticsPage(page);
+    this.rumReplayPlayerPage = new RumReplayPlayerPage(page);
+    this.rumSessionTracesTabPage = new RumSessionTracesTabPage(page);
   }
 }
 

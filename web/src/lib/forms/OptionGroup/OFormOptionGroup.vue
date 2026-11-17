@@ -4,7 +4,7 @@
 import { inject } from "vue";
 import OOptionGroup from "./OOptionGroup.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import type { FormOptionGroupProps } from "./OFormOptionGroup.types";
 import type { OptionGroupValue } from "./OOptionGroup.types";
 
@@ -13,6 +13,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormOptionGroupProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormOptionGroup] must be rendered inside <OForm>. No form context found.");
@@ -35,7 +36,7 @@ if (import.meta.env.DEV && !form) {
           :size="props.size"
           :name="props.name"
           :model-value="field.state.value"
-          :error="field.state.meta.errors.length > 0"
+          :error="shown(field).invalid"
           @update:model-value="
             (v: OptionGroupValue) => {
               field.handleChange(v);
@@ -47,8 +48,8 @@ if (import.meta.env.DEV && !form) {
             <slot name="label" />
           </template>
         </OOptionGroup>
-        <div v-if="field.state.meta.errors.length > 0" class="text-option-group-error-text text-xs">
-          {{ firstFieldError(field.state.meta.errors) }}
+        <div v-if="shown(field).message !== undefined" class="text-option-group-error-text text-xs">
+          {{ shown(field).message }}
         </div>
       </div>
     </template>

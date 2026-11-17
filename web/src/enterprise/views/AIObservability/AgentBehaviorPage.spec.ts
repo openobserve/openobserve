@@ -42,7 +42,6 @@ vi.mock("@/enterprise/composables/useAiDateController", () => ({
     timeRange: mockTimeRange,
     applyRelative: vi.fn(),
     onDateChange: vi.fn(),
-    mountResolve: vi.fn(),
     DEFAULT_RELATIVE: "15m",
   }),
 }));
@@ -100,6 +99,17 @@ beforeEach(() => {
 });
 
 describe("AgentBehaviorPage — scope", () => {
+  it("writes the store's org into the scope URL, not the route's previous org", async () => {
+    mockRouteQuery.org_identifier = "old-org";
+    mockListAgents.mockResolvedValue({ agents: [at("omp", "s_prod", "production", "2")] });
+    const wrapper = mount(AgentBehaviorPage);
+    await flushPromises();
+    (wrapper.vm as any).onFilterModeChange("agent");
+    await flushPromises();
+    const queries = mockRouterReplace.mock.calls.map((c: any[]) => c[0].query);
+    expect(queries.some((q: any) => q.type === "agent")).toBe(true);
+    for (const q of queries) expect(q.org_identifier).toBe("test-org");
+  });
   it("opens on the agent, env and version in the URL, not the first agent", async () => {
     Object.assign(mockRouteQuery, { agent: "omp", env: "production", version: "2" });
     mockListAgents.mockResolvedValue({

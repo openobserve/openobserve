@@ -287,11 +287,21 @@ async fn login_attempts_retain_request_metadata_and_do_not_panic_on_headers() {
             ))
             .header("X-Real-IP", "198.51.100.10")
             .header("User-Agent", "LoginAudit/sso"),
-        StatusCode::BAD_REQUEST,
+        StatusCode::FOUND,
     )
     .await;
     assert_eq!(row["login_ip"], "198.51.100.10");
     assert_eq!(row["user_agent"], "LoginAudit/sso");
+    assert_eq!(row["error_msg"], "invalid_login_state");
+
+    let row = audit_of(
+        proxied
+            .client
+            .get(format!("{}/config/redirect", proxied.url)),
+        StatusCode::FOUND,
+    )
+    .await;
+    assert_eq!(row["error_msg"], "invalid_login_state");
 
     let no_ip = LoginServer::start(None).await;
     let row = audit_of(

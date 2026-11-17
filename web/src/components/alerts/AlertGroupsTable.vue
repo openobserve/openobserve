@@ -198,24 +198,18 @@
           </template>
           <template v-if="muteEnabled">
             <ODropdownSeparator v-if="canAcknowledge(row) || row.ack" />
-            <template v-if="groupMute(row)">
-              <MuteMenuItems
-                labels="extend"
-                until-clear
-                :data-test-prefix="`alerts-alertgroupstable-extend-${row.group_key}`"
-                @preset="(secs) => onExtend(row, { minutes: secs / 60 })"
-                @until-clear="onExtend(row, { untilClear: true })"
-                @until="openExtendUntil(row)"
-              />
-              <ODropdownItem
-                variant="destructive"
-                icon-left="notifications-active"
-                :data-test="`alerts-alertgroupstable-end-mute-${row.group_key}`"
-                @select="onEndMute(row)"
-              >
-                {{ t("alerts.downtimes.mute.endNow") }}
-              </ODropdownItem>
-            </template>
+            <RowMuteMenu
+              v-if="menuMute(row)"
+              :downtime="menuMute(row)!"
+              until-clear
+              :extend-test-prefix="`alerts-alertgroupstable-extend-${row.group_key}`"
+              :end-test="`alerts-alertgroupstable-end-mute-${row.group_key}`"
+              :muted-by-test="`alerts-alertgroupstable-muted-by-${row.group_key}`"
+              @preset="(secs) => onExtend(row, { minutes: secs / 60 })"
+              @until-clear="onExtend(row, { untilClear: true })"
+              @until="openExtendUntil(row)"
+              @end="onEndMute(row)"
+            />
             <MuteMenuItems
               v-else
               labels="group"
@@ -263,6 +257,7 @@
     :target="target"
     :downtime="untilGroup ? muteRef(untilGroup) : null"
     @done="emit('changed')"
+    @settled="emit('changed')"
   />
   <QuickMuteDialog
     v-if="muteEnabled"
@@ -280,6 +275,7 @@ import { useStore } from "vuex";
 
 import type { ActiveDowntime } from "@/services/downtimes";
 import { useAlertActions, type AlertMuteRef } from "@/composables/alerts/useAlertActions";
+import type { MuteActionResult } from "@/utils/downtimes/muteResult";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { ackShortName, downtimeForGroup } from "@/utils/alerts/ackState";
 import { isFiringOutcome } from "@/utils/alerts/runOutcome";
@@ -295,6 +291,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
 import MutedChip from "./downtimes/MutedChip.vue";
+import RowMuteMenu from "./downtimes/RowMuteMenu.vue";
 import AlertMuteUntilDialog from "./AlertMuteUntilDialog.vue";
 import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -372,10 +369,21 @@ const groupMute = (row: AlertGroup): ActiveDowntime | null => {
   return covering ? { ...covering, alert_groups: null } : null;
 };
 
+// Only the group's own lookup knows whether ending frees this group alone; the alert's does not.
+const menuMute = (row: AlertGroup): ActiveDowntime | null => {
+  const covering = coveringMute(row);
+  return covering ? { ...covering, end_here: !!row.downtime?.end_here } : null;
+};
+
 const muteRef = (row: AlertGroup): AlertMuteRef | null => {
   const covering = coveringMute(row);
   return covering
-    ? { id: covering.id, ends_at: covering.ends_at, version: covering.version }
+    ? {
+        id: covering.id,
+        ends_at: covering.ends_at,
+        version: covering.version,
+        folder_id: covering.folder_id,
+      }
     : null;
 };
 
@@ -419,14 +427,19 @@ const onMute = async (row: AlertGroup, end: AlertMuteEnd) =>
     }),
   );
 
+// Any answer refreshes: a refused End or Extend means the table shows a stale mute.
+const afterMute = (result: MuteActionResult) => {
+  if (result !== "failed") emit("changed");
+};
+
 const onExtend = async (row: AlertGroup, end: AlertMuteEnd) => {
   const downtime = muteRef(row);
-  if (downtime) after(await actions.extend(target.value, downtime, end));
+  if (downtime) afterMute(await actions.extend(target.value, downtime, end));
 };
 
 const onEndMute = async (row: AlertGroup) => {
   const downtime = muteRef(row);
-  if (downtime) after(await actions.endMute(target.value, downtime.id));
+  if (downtime) afterMute(await actions.endMute(target.value, downtime));
 };
 
 const openExtendUntil = (row: AlertGroup) => {

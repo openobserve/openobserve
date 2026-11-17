@@ -297,7 +297,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:pending-date="pendingDay = $event"
                     />
                   </div>
-                  <div class="text-3xs ps-6 pe-6">{{ t("common.datetimeMessage") }}</div>
+                  <div class="text-text-secondary ps-6 pe-6 text-xs">
+                    {{ t("common.datetimeMessage") }}
+                  </div>
                   <OSeparator v-if="!disableRelative" class="my-2" />
 
                   <table
@@ -519,6 +521,10 @@ export default defineComponent({
       default: "15m",
     },
     autoApply: {
+      type: Boolean,
+      default: false,
+    },
+    applyPresets: {
       type: Boolean,
       default: false,
     },
@@ -1007,12 +1013,12 @@ export default defineComponent({
       calendarToken.value = null;
       relativePeriod.value = period;
       relativeValue.value = value;
-      if (props.autoApply) saveDate("relative");
+      if (props.autoApply || props.applyPresets) saveDate("relative");
     };
 
     const pickRelativeChip = (period: string, value: number) => {
       setRelativeDate(period, value);
-      if (props.autoApply) closeMenu();
+      if (props.autoApply || props.applyPresets) closeMenu();
     };
 
     const isValidCustomValue = (value: unknown) =>
@@ -1171,8 +1177,9 @@ export default defineComponent({
      * Promote the pending selection to the applied one, so the trigger button
      * starts advertising it. Called from every path that actually puts a range
      * into force — Apply, `refresh()`, mount, and the parent-invoked setters.
-     * NOT called from `setRelativeDate` / `onCustomPeriodSelect` / the popup's
-     * absolute inputs when `autoApply` is off: those stay pending until Apply.
+     * NOT called from `onCustomPeriodSelect` / the popup's absolute inputs when
+     * `autoApply` is off: those stay pending until Apply. `setRelativeDate` also
+     * applies under `applyPresets`.
      */
     const markApplied = () => {
       appliedDisplayValue.value = getDisplayValue.value;

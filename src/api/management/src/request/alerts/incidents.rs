@@ -15,8 +15,9 @@
 
 //! HTTP handlers for alert incident management
 
+#[cfg(feature = "enterprise")]
+use axum::Json;
 use axum::{
-    Json,
     extract::{Path, Query},
     response::Response,
 };
@@ -115,6 +116,69 @@ pub enum UpdatePayload {
 pub struct ListIncidentsResponse {
     pub incidents: Vec<config::meta::alerts::incidents::Incident>,
     pub total: u64,
+}
+
+#[utoipa::path(post, path = "/v2/{org_id}/alerts/incidents", context_path = "/api", tag = "Incidents", operation_id = "CreateServiceIncident", summary = "Open or attach to a service version incident", params(("org_id" = String, Path)), request_body = config::meta::alerts::incidents::ManualIncidentRequest, responses((status = 201, description = "Incident created", content_type = "application/json", body = Object), (status = 200, description = "Attached to incident", content_type = "application/json", body = Object), (status = 403, description = "Forbidden")), security(("Authorization" = [])), extensions(("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})), ("x-o2-mcp" = json!({"enabled": false}))))]
+pub async fn create_incident(
+    Path(org): Path<String>,
+    Headers(user): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] Json(request): Json<
+        config::meta::alerts::incidents::ManualIncidentRequest,
+    >,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !openobserve_core::auth::check_permissions(
+            &org,
+            &org,
+            &user.user_id,
+            "incidents",
+            "POST",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+        if request.title.trim().is_empty()
+            || request.service.trim().is_empty()
+            || request.where_key.trim().is_empty()
+            || !matches!(request.severity.as_str(), "P1" | "P2" | "P3" | "P4")
+        {
+            return MetaHttpResponse::bad_request(
+                "title, service, where_key and a P1-P4 severity are required",
+            );
+        }
+        match openobserve_core::alerts::incidents::open_manual_incident(
+            &org,
+            &user.user_id,
+            &request,
+        )
+        .await
+        {
+            Ok((id, created)) => {
+                use axum::response::IntoResponse;
+                (
+                    if created {
+                        axum::http::StatusCode::CREATED
+                    } else {
+                        axum::http::StatusCode::OK
+                    },
+                    Json(serde_json::json!({"incident_id":id,"created":created})),
+                )
+                    .into_response()
+            }
+            Err(error) => MetaHttpResponse::internal_error(error),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org, user);
+        MetaHttpResponse::forbidden("Service incidents require the enterprise build")
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -548,20 +612,25 @@ pub const RCA_RUNS_MAX_LIMIT: u64 = 100;
 
 /// Query parameters for listing an incident's analysis runs
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
 pub struct ListRcaRunsQuery {
     /// Page size (default 25, max 100)
     #[serde(default)]
+    #[param(nullable)]
     pub limit: Option<u64>,
     /// Return runs older than this run id (the last run of the previous page)
     #[serde(default)]
+    #[param(nullable)]
     pub before: Option<String>,
 }
 
 /// Query parameters for reading an analysis run's investigation thread
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
 pub struct RcaThreadQuery {
     /// The `state_version` of the caller's copy; an equal version returns `not_modified`
     #[serde(default)]
+    #[param(nullable)]
     pub known_version: Option<String>,
 }
 
@@ -620,7 +689,10 @@ pub async fn trigger_incident_rca(
     };
     use openobserve_core::alerts::rca_runs;
 
-    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "PUT", &incident_id).await
+    // The route checks only a read, so a security case needs triage and any other incident POST.
+    if let Err(resp) =
+        security::guard_case_or_incidents(&org_id, &user_email.user_id, &incident_id, "PUT", "POST")
+            .await
     {
         return resp;
     }
@@ -1303,7 +1375,10 @@ pub async fn steer_incident_rca_run(
     use axum::http::StatusCode;
     use openobserve_core::alerts::rca_steering;
 
-    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "PUT", &incident_id).await
+    // The route checks only a read, so a security case needs triage and any other incident POST.
+    if let Err(resp) =
+        security::guard_case_or_incidents(&org_id, &user_email.user_id, &incident_id, "PUT", "POST")
+            .await
     {
         return resp;
     }
@@ -1461,7 +1536,10 @@ pub async fn resume_incident_rca_run(
     Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "PUT", &incident_id).await
+    // The route checks only a read, so a security case needs triage and any other incident POST.
+    if let Err(resp) =
+        security::guard_case_or_incidents(&org_id, &user_email.user_id, &incident_id, "PUT", "POST")
+            .await
     {
         return resp;
     }
@@ -1751,9 +1829,11 @@ pub async fn get_incident_rca_summary(
 
 /// Query of `GET …/rca/live_stream`.
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
 pub struct RcaLiveStreamQuery {
     /// The run whose thread, summary and steering to send; without it, only the incident's state.
     #[serde(default)]
+    #[param(nullable)]
     pub run_id: Option<String>,
 }
 
@@ -2033,7 +2113,6 @@ pub async fn post_incident_comment(
 pub async fn post_incident_comment(
     _path: Path<(String, String)>,
     _headers: Headers<UserEmail>,
-    _body: Json<CommentRequest>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -2205,10 +2284,7 @@ pub async fn get_incident_stats(_path: Path<String>) -> Response {
         ("x-o2-mcp" = json!({"description": "Update an incident's title, severity, or status", "category": "alerts"}))
     )
 )]
-pub async fn update_incident(
-    _path: Path<(String, String)>,
-    _body: Json<UpdatePayload>,
-) -> Response {
+pub async fn update_incident(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -2264,10 +2340,7 @@ pub async fn cancel_incident_rca(
         ("x-o2-mcp" = json!({"enabled": true, "description": "List past incident RCA runs", "category": "alerts"}))
     )
 )]
-pub async fn list_incident_rca_runs(
-    _path: Path<(String, String)>,
-    _query: Query<ListRcaRunsQuery>,
-) -> Response {
+pub async fn list_incident_rca_runs(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -2322,10 +2395,7 @@ pub async fn get_incident_rca_run(_path: Path<(String, String, String)>) -> Resp
         ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
-pub async fn get_incident_rca_thread(
-    _path: Path<(String, String, String)>,
-    _query: Query<RcaThreadQuery>,
-) -> Response {
+pub async fn get_incident_rca_thread(_path: Path<(String, String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -2353,10 +2423,7 @@ pub async fn get_incident_rca_thread(
         ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
-pub async fn get_incident_rca_summary(
-    _path: Path<(String, String, String)>,
-    _query: Query<RcaThreadQuery>,
-) -> Response {
+pub async fn get_incident_rca_summary(_path: Path<(String, String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -2446,7 +2513,6 @@ pub async fn get_incident_rca_steering(
 )]
 pub async fn get_incident_rca_live_stream(
     _path: Path<(String, String)>,
-    _query: Query<RcaLiveStreamQuery>,
     _headers: Headers<UserEmail>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
@@ -2556,6 +2622,8 @@ mod tests {
             rca_off_reason: None,
             alert_groups: None,
             historical: false,
+            group_values_display: None,
+            last_detection_at: None,
         };
 
         let response = ListIncidentsResponse {
@@ -2860,6 +2928,8 @@ mod tests {
             rca_off_reason: Some("l0_off".to_string()),
             alert_groups: None,
             historical: false,
+            group_values_display: None,
+            last_detection_at: None,
         };
         let json = serde_json::to_value(&incident).unwrap();
         assert!(json.as_object().unwrap().contains_key("rca"));
@@ -3814,6 +3884,7 @@ mod tests {
             rca_off_reason: None,
             security_case: false,
             historical: false,
+            last_detection_at: None,
         };
         alert_incidents::Entity::insert(alert_incidents::ActiveModel::from(row).reset_all())
             .exec(conn)
@@ -4056,11 +4127,15 @@ mod tests {
         assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
         assert!(steer_rows(&org, "run_live").await.is_empty());
 
-        for user in [STEER_ROOT, STEER_READER] {
+        // The handler checks the grant first, so a reader learns nothing about other incidents.
+        for (user, want) in [
+            (STEER_ROOT, StatusCode::NOT_FOUND),
+            (STEER_READER, StatusCode::FORBIDDEN),
+        ] {
             let (status, body) =
                 status_and_body(steer_as(&org, "inc_unknown", "run_live", user, message).await)
                     .await;
-            assert_eq!(status, StatusCode::NOT_FOUND, "{user}: {body}");
+            assert_eq!(status, want, "{user}: {body}");
         }
         for (incident, run) in [("inc_1", "run_unknown"), ("inc_2", "run_live")] {
             let (status, body) =
@@ -5333,7 +5408,6 @@ mod tests {
     async fn test_the_oss_live_stream_is_403() {
         let response = get_incident_rca_live_stream(
             Path(("default".to_string(), "inc_1".to_string())),
-            Query(RcaLiveStreamQuery { run_id: None }),
             Headers(UserEmail {
                 user_id: "a.rao@acme.io".to_string(),
             }),
@@ -5376,6 +5450,9 @@ mod tests {
         )
         .await
         .unwrap();
+        infra::table::alert_incidents::mark_security_case(&org, &sid(&org, "case"))
+            .await
+            .unwrap();
         let stranger = || {
             Headers(UserEmail {
                 user_id: STEER_READER.to_string(),

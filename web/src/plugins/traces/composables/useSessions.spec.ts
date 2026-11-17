@@ -40,7 +40,7 @@ vi.mock("@/utils/zincutils", () => ({
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useSessions } from "./useSessions";
+import { useSessions, chunkTurnsBySpans, SESSION_TURNS_PAGE_SIZE } from "./useSessions";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -274,6 +274,16 @@ describe("useSessions — fetchPage: search", () => {
     expect(mockSessionsList.mock.calls[0][0].keyword).toHaveLength(256);
   });
 
+  // The Users page's "Sessions" link: that user only, not a substring match.
+  it("sends an exact user as userId, apart from the keyword", async () => {
+    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
+    const { fetchPage } = useSessions();
+    await fetchPage("qa_stream", 1000, 2000, 0, 25, "", { user: " qa-u1 " });
+    expect(mockSessionsList).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "qa-u1", keyword: undefined }),
+    );
+  });
+
   it("drops a late response from a superseded run (last request wins)", async () => {
     let resolveFirst!: (v: any) => void;
     const first = new Promise((r) => (resolveFirst = r));
@@ -382,26 +392,26 @@ describe("useSessions — fetchSession: early return guards", () => {
   it("returns { detail: null, traces: [] } when streamName is missing", async () => {
     const { fetchSession } = useSessions();
     const result = await fetchSession("", "session-id", 1000, 2000);
-    expect(result).toEqual({ detail: null, traces: [] });
+    expect(result).toEqual({ detail: null, traces: [], hasOlder: false });
     expect(mockSessionsDetails).not.toHaveBeenCalled();
   });
 
   it("returns { detail: null, traces: [] } when sessionId is missing", async () => {
     const { fetchSession } = useSessions();
     const result = await fetchSession("stream", "", 1000, 2000);
-    expect(result).toEqual({ detail: null, traces: [] });
+    expect(result).toEqual({ detail: null, traces: [], hasOlder: false });
   });
 
   it("returns { detail: null, traces: [] } when startTime is 0", async () => {
     const { fetchSession } = useSessions();
     const result = await fetchSession("stream", "session-id", 0, 2000);
-    expect(result).toEqual({ detail: null, traces: [] });
+    expect(result).toEqual({ detail: null, traces: [], hasOlder: false });
   });
 
   it("returns { detail: null, traces: [] } when endTime is 0", async () => {
     const { fetchSession } = useSessions();
     const result = await fetchSession("stream", "session-id", 1000, 0);
-    expect(result).toEqual({ detail: null, traces: [] });
+    expect(result).toEqual({ detail: null, traces: [], hasOlder: false });
   });
 });
 
@@ -411,7 +421,7 @@ describe("useSessions — fetchSession: empty API response", () => {
 
     const { fetchSession } = useSessions();
     const result = await fetchSession("stream", "sess-1", 1000, 2000);
-    expect(result).toEqual({ detail: null, traces: [] });
+    expect(result).toEqual({ detail: null, traces: [], hasOlder: false });
   });
 
   it("calls the session details API with the session id and time range", async () => {
@@ -732,7 +742,12 @@ describe("useSessions — fetchSessionSpans", () => {
     mockExecuteQuery.mockResolvedValue([{ span_id: "span-1" }]);
 
     const { fetchSessionSpans } = useSessions();
-    const result = await fetchSessionSpans("default", ["trace-1"], 1000, 2000);
+    const result = await fetchSessionSpans(
+      "default",
+      [{ traceId: "trace-1", spanCount: 3 }],
+      1000,
+      2000,
+    );
 
     const sql = mockExecuteQuery.mock.calls[0][0] as string;
     expect(sql).toContain("gen_ai_tool_name");
@@ -740,6 +755,152 @@ describe("useSessions — fetchSessionSpans", () => {
     expect(sql).not.toContain("tool_args");
     expect(mockExecuteQuery).toHaveBeenCalledWith(sql, 1000, 2000);
     expect(result).toEqual([{ span_id: "span-1" }]);
+  });
+
+  it("fetches the spans of every turn, the newest included, however long the session", async () => {
+    // 300 turns of 10 spans: 3,000 spans, more than one query's LIMIT.
+    const turns = Array.from({ length: 300 }, (_, i) => ({
+      traceId: `t${String(i).padStart(4, "0")}`,
+      spanCount: 10,
+    }));
+    const spanCounts = new Map(turns.map((t) => [t.traceId, t.spanCount]));
+    mockExecuteQuery.mockImplementation(async (sql: string) => {
+      const ids = [...sql.matchAll(/'(t\d{4})'/g)].map((m) => m[1]);
+      const limit = Number(/LIMIT (\d+)/.exec(sql)![1]);
+      // Each query must have room for all of its turns' spans.
+      const spans = ids.reduce((sum, id) => sum + spanCounts.get(id)!, 0);
+      expect(spans).toBeLessThanOrEqual(limit);
+      return ids.map((id) => ({ trace_id: id }));
+    });
+
+    const { fetchSessionSpans } = useSessions();
+    const rows = await fetchSessionSpans("default", turns, 1000, 2000);
+
+    expect(mockExecuteQuery.mock.calls.length).toBeGreaterThan(1);
+    expect(rows.map((r) => r.trace_id)).toEqual(turns.map((t) => t.traceId));
+  });
+});
+
+describe("chunkTurnsBySpans", () => {
+  it("gives a turn larger than the budget a query of its own, with room for all its spans", () => {
+    const chunks = chunkTurnsBySpans(
+      [
+        { traceId: "a", spanCount: 5 },
+        { traceId: "big", spanCount: 50 },
+        { traceId: "b", spanCount: 5 },
+      ],
+      20,
+    );
+    expect(chunks).toEqual([
+      { traceIds: ["a"], limit: 20 },
+      { traceIds: ["big"], limit: 50 },
+      { traceIds: ["b"], limit: 20 },
+    ]);
+  });
+});
+
+describe("useSessions — fetchSession: paging long sessions", () => {
+  const hit = (n: number) => ({
+    trace_id: `trace-${n}`,
+    start_time: String(n * 1000),
+    end_time: String(n * 1000 + 10),
+    spans: [2, n % 2],
+    service_name: [],
+    user_ids: [],
+  });
+  // The API pages newest first: page `from`/`size` of turns N..1.
+  function sessionOf(turnCount: number) {
+    const newestFirst = Array.from({ length: turnCount }, (_, i) => hit(turnCount - i));
+    mockSessionsDetails.mockImplementation(async ({ from, size }) => ({
+      data: { hits: newestFirst.slice(from, from + size), total: turnCount },
+    }));
+  }
+
+  it("reports the session's turn count and that older turns remain", async () => {
+    sessionOf(SESSION_TURNS_PAGE_SIZE + 100);
+    const { fetchSession } = useSessions();
+    const { detail, traces, hasOlder } = await fetchSession("stream", "s", 1000, 2000);
+
+    expect(mockSessionsDetails).toHaveBeenCalledWith(
+      expect.objectContaining({ from: 0, size: SESSION_TURNS_PAGE_SIZE }),
+    );
+    expect(traces).toHaveLength(SESSION_TURNS_PAGE_SIZE);
+    // The newest turns are the ones loaded.
+    expect(traces[0].traceId).toBe("trace-101");
+    expect(traces.at(-1)!.traceId).toBe(`trace-${SESSION_TURNS_PAGE_SIZE + 100}`);
+    expect(detail!.turns).toBe(SESSION_TURNS_PAGE_SIZE + 100);
+    expect(hasOlder).toBe(true);
+  });
+
+  it("loads the older page before the loaded turns and rolls up all of them", async () => {
+    sessionOf(SESSION_TURNS_PAGE_SIZE + 100);
+    const { fetchSession } = useSessions();
+    const first = await fetchSession("stream", "s", 1000, 2000);
+    const older = await fetchSession("stream", "s", 1000, 2000, first.traces);
+
+    expect(mockSessionsDetails).toHaveBeenLastCalledWith(
+      expect.objectContaining({ from: SESSION_TURNS_PAGE_SIZE }),
+    );
+    expect(older.traces).toHaveLength(SESSION_TURNS_PAGE_SIZE + 100);
+    expect(older.traces[0].traceId).toBe("trace-1");
+    expect(older.hasOlder).toBe(false);
+    // Odd-numbered turns carry one error span.
+    expect(older.detail!.errorCount).toBe((SESSION_TURNS_PAGE_SIZE + 100) / 2);
+    expect(older.detail!.firstSeenMicros).toBe(1000);
+  });
+
+  it("keeps one copy of a turn an older page repeats", async () => {
+    sessionOf(SESSION_TURNS_PAGE_SIZE + 100);
+    const { fetchSession } = useSessions();
+    const first = await fetchSession("stream", "s", 1000, 2000);
+    // A new turn arrived: the next offset repeats the oldest loaded turn.
+    sessionOf(SESSION_TURNS_PAGE_SIZE + 101);
+    const older = await fetchSession("stream", "s", 1000, 2000, first.traces);
+
+    const ids = older.traces.map((t) => t.traceId);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toHaveLength(SESSION_TURNS_PAGE_SIZE + 100);
+    expect(older.hasOlder).toBe(false);
+  });
+
+  // The session time index keeps ids of turns whose spans were deleted.
+  it("counts only turns with data and finishes once the index's last page is read", async () => {
+    const count = SESSION_TURNS_PAGE_SIZE + 100;
+    const newestFirst = Array.from({ length: count }, (_, i) => count - i);
+    mockSessionsDetails.mockImplementation(async ({ from, size }) => ({
+      data: {
+        hits: newestFirst
+          .slice(from, from + size)
+          .filter((n) => n <= 500 || n > 555) // turns 501–555 lost their spans
+          .map(hit),
+        total: count,
+      },
+    }));
+    const { fetchSession } = useSessions();
+    const first = await fetchSession("stream", "s", 1000, 2000);
+    expect(first.hasOlder).toBe(true);
+    expect(first.detail!.turns).toBe(count);
+
+    const older = await fetchSession("stream", "s", 1000, 2000, first.traces);
+    expect(older.traces).toHaveLength(count - 55);
+    expect(older.detail!.turns).toBe(count - 55);
+    expect(older.hasOlder).toBe(false);
+  });
+
+  it("stops offering older turns when a page comes back empty or adds no turn", async () => {
+    const newest = Array.from({ length: SESSION_TURNS_PAGE_SIZE }, (_, i) => hit(5000 - i));
+    for (const second of [[], newest.slice(-10)]) {
+      mockSessionsDetails.mockReset();
+      mockSessionsDetails.mockResolvedValueOnce({ data: { hits: newest, total: 5000 } });
+      mockSessionsDetails.mockResolvedValueOnce({ data: { hits: second, total: 5000 } });
+      const { fetchSession } = useSessions();
+      const first = await fetchSession("stream", "s", 1000, 2000);
+      expect(first.hasOlder).toBe(true);
+      const older = await fetchSession("stream", "s", 1000, 2000, first.traces);
+      expect(older.traces).toHaveLength(SESSION_TURNS_PAGE_SIZE);
+      expect(older.detail!.turns).toBe(SESSION_TURNS_PAGE_SIZE);
+      expect(older.hasOlder).toBe(false);
+    }
   });
 });
 

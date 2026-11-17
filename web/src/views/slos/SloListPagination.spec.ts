@@ -246,7 +246,7 @@ describe("SloList view state persistence", () => {
   const defaults = {
     search: "",
     typeFilter: "all",
-    healthFilter: null as string | null,
+    healthFilter: [] as string[],
     sortBy: "",
     sortOrder: "asc" as "asc" | "desc",
     pageSize: 25,
@@ -269,7 +269,7 @@ describe("SloList view state persistence", () => {
     Object.assign(useListViewState("slos", defaults), {
       search: "checkout",
       typeFilter: "metrics",
-      healthFilter: "healthy",
+      healthFilter: "meeting",
       sortBy: "name",
       sortOrder: "desc",
       pageSize: 50,
@@ -279,10 +279,35 @@ describe("SloList view state persistence", () => {
     const vm = wrapper.vm as any;
     expect(vm.search).toBe("checkout");
     expect(vm.typeFilter).toBe("metrics");
-    expect(vm.healthFilter).toBe("healthy");
+    // A single key saved before chips went multi-select still restores.
+    expect(vm.healthFilters).toEqual(["meeting"]);
     expect(vm.sortBy).toBe("name");
     expect(vm.sortOrder).toBe("desc");
     expect(vm.pageSize).toBe(50);
+  });
+
+  it("ORs two picked health chips", async () => {
+    const st = (remaining: number | null, burn = 0.4) => ({
+      sli: 99,
+      error_budget_remaining: remaining,
+      burn_rate: burn,
+      coverage: 1,
+      no_data: remaining === null,
+    });
+    vi.mocked(sloService.list).mockResolvedValue({
+      data: {
+        list: [
+          sloRow({ name: "ok", status: st(0.6) }),
+          sloRow({ name: "blown", status: st(0) }),
+          sloRow({ name: "risk", status: st(0.5, 3) }),
+        ],
+      },
+    } as any);
+    wrapper = await mountList();
+    const vm = wrapper.vm as any;
+    vm.healthFilters = ["budget_blown", "at_risk"];
+    await flushPromises();
+    expect(vm.visibleRows.map((r: any) => r.name).sort()).toEqual(["blown", "risk"]);
   });
 
   it("saves filter changes into the view state", async () => {
@@ -290,16 +315,63 @@ describe("SloList view state persistence", () => {
     const vm = wrapper.vm as any;
 
     vm.search = "api";
-    vm.onStatSelect("breached");
+    vm.healthFilters = ["budget_blown", "at_risk"];
     vm.sortBy = "target";
     vm.sortOrder = "desc";
     await flushPromises();
 
     expect(useListViewState("slos", defaults)).toMatchObject({
       search: "api",
-      healthFilter: "breached",
+      healthFilter: ["budget_blown", "at_risk"],
       sortBy: "target",
       sortOrder: "desc",
     });
+  });
+});
+
+describe("SloList health filter", () => {
+  let wrapper: any;
+  const meeting = sloRow({ id: "slo-ok", name: "api-ok" });
+  const blown = sloRow({
+    id: "slo-blown",
+    name: "api-blown",
+    status: { sli: 98, error_budget_remaining: -5, burn_rate: 3, coverage: 1, no_data: false },
+  });
+  const atRisk = sloRow({
+    id: "slo-risk",
+    name: "api-risk",
+    status: { sli: 99.9, error_budget_remaining: 40, burn_rate: 2, coverage: 1, no_data: false },
+  });
+  const card = (key: string) => wrapper.find(`[data-test="slos-slolist-stat-${key}"]`);
+  const listedNames = () => (wrapper.vm as any).visibleRows.map((r: any) => r.name).sort();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetListViewState();
+    (router as any).currentRoute.value.query = {};
+    vi.mocked(sloService.list).mockResolvedValue({
+      data: { list: [meeting, blown, atRisk] },
+    } as any);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    resetListViewState();
+    vi.restoreAllMocks();
+  });
+
+  it("clears the health filter when the selected card is clicked again", async () => {
+    wrapper = await mountList();
+    const vm = wrapper.vm as any;
+
+    await card("budget_blown").trigger("click");
+    await flushPromises();
+    expect(vm.healthFilters).toEqual(["budget_blown"]);
+    expect(listedNames()).toEqual(["api-blown"]);
+
+    await card("budget_blown").trigger("click");
+    await flushPromises();
+    expect(vm.healthFilters).toEqual([]);
+    expect(listedNames()).toEqual(["api-blown", "api-ok", "api-risk"]);
   });
 });

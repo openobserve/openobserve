@@ -261,15 +261,22 @@ describe("useLLMStreamQuery — executeQuery: hits accumulation", () => {
 });
 
 describe("useLLMStreamQuery — executeQuery: error handling", () => {
+  // useStreamingSearch wraps the server error body as `{ content: { ...body, trace_id }, type: "error" }`.
+  const payload = { queryReq: { query: { sql: "BAD" } } };
+  const wrapped = (body: Record<string, unknown>) => ({
+    content: { ...body, trace_id: "trace-fixed-id" },
+    type: "error",
+  });
+
   // Error message follows the precedence: message → error → error_detail
   // → fallback string. This matches the streaming endpoint's variable
   // payload shapes.
-  it("rejects with `message` field when present", async () => {
+  it("rejects with the server's `message` from the second handler argument", async () => {
     const { executeQuery } = useLLMStreamQuery();
     const promise = executeQuery("BAD", 1, 2);
 
     const [, callbacks] = mockFetchQueryDataWithHttpStream.mock.calls[0];
-    callbacks.error({ message: "syntax error", status: 400, code: 42 });
+    callbacks.error(payload, wrapped({ message: "syntax error", status: 400, code: 42 }));
 
     await expect(promise).rejects.toThrow("syntax error");
   });
@@ -279,7 +286,7 @@ describe("useLLMStreamQuery — executeQuery: error handling", () => {
     const promise = executeQuery("BAD", 1, 2);
 
     const [, callbacks] = mockFetchQueryDataWithHttpStream.mock.calls[0];
-    callbacks.error({ error: "internal" });
+    callbacks.error(payload, wrapped({ error: "internal" }));
 
     await expect(promise).rejects.toThrow("internal");
   });
@@ -289,7 +296,7 @@ describe("useLLMStreamQuery — executeQuery: error handling", () => {
     const promise = executeQuery("BAD", 1, 2);
 
     const [, callbacks] = mockFetchQueryDataWithHttpStream.mock.calls[0];
-    callbacks.error({ error_detail: "detail" });
+    callbacks.error(payload, wrapped({ error_detail: "detail" }));
 
     await expect(promise).rejects.toThrow("detail");
   });
@@ -299,7 +306,7 @@ describe("useLLMStreamQuery — executeQuery: error handling", () => {
     const promise = executeQuery("BAD", 1, 2);
 
     const [, callbacks] = mockFetchQueryDataWithHttpStream.mock.calls[0];
-    callbacks.error({});
+    callbacks.error(payload, wrapped({}));
 
     await expect(promise).rejects.toThrow("Failed to fetch query data");
   });
@@ -311,16 +318,10 @@ describe("useLLMStreamQuery — executeQuery: error handling", () => {
     const promise = executeQuery("BAD", 1, 2);
 
     const [, callbacks] = mockFetchQueryDataWithHttpStream.mock.calls[0];
-    const raw = { message: "x", status: 500, code: 99, error_detail: "boom" };
-    callbacks.error(raw);
+    const raw = wrapped({ message: "x", status: 500, code: 99, error_detail: "boom" });
+    callbacks.error(payload, raw);
 
-    try {
-      await promise;
-    } catch (e: any) {
-      expect(e.status).toBe(500);
-      expect(e.code).toBe(99);
-      expect(e.raw).toBe(raw);
-    }
+    await expect(promise).rejects.toMatchObject({ status: 500, code: 99, raw });
   });
 });
 
@@ -365,7 +366,7 @@ describe("useLLMStreamQuery — cancelAll", () => {
     executeQuery("BAD", 1, 2).catch(() => {});
 
     const [, callbacks] = mockFetchQueryDataWithHttpStream.mock.calls[0];
-    callbacks.error({ message: "x" });
+    callbacks.error({}, { content: { message: "x" }, type: "error" });
 
     cancelAll();
     expect(mockCancelStreamQuery).not.toHaveBeenCalled();

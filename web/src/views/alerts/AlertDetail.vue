@@ -28,15 +28,15 @@
 -->
 <template>
   <OPageLayout
-    :title="notFound ? t('alerts.groups.notFoundTitle') : raw(alert?.name || '')"
+    :title="unavailableTitle ?? raw(alert?.name || '')"
     icon="notifications"
-    :subtitle="notFound ? raw('') : subtitle"
+    :subtitle="unavailable ? raw('') : subtitle"
     :back="backTarget"
     title-data-test="alerts-alertdetail-title"
     bleed
   >
     <template #title-trail>
-      <div v-if="!notFound" class="flex items-center gap-2">
+      <div v-if="!unavailable" class="flex items-center gap-2">
         <OTag
           v-if="isMultiAlert"
           variant="purple-soft"
@@ -75,6 +75,26 @@
           :downtime="headerDowntime"
           data-test="alerts-alertdetail-muted-chip"
         />
+        <ODropdown v-if="isAnomalyAlert && headerDowntime && downtimesEnabled" align="start">
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="more-vert"
+              :aria-label="t('alerts.downtimes.mute.rowActions')"
+              data-test="alerts-alertdetail-anomaly-mute-menu"
+            />
+          </template>
+          <RowMuteMenu
+            :downtime="headerDowntime"
+            extend-test-prefix="alerts-alertdetail-anomaly-extend"
+            end-test="alerts-alertdetail-anomaly-end-mute"
+            muted-by-test="alerts-alertdetail-anomaly-muted-by"
+            @preset="onAnomalyExtend"
+            @until="anomalyMuteActions.openExtendUntil(headerDowntime)"
+            @end="onAnomalyEndMute"
+          />
+        </ODropdown>
         <CompositeReferencesDrawer
           v-if="(alert?.referenced_by_composite_count ?? 0) > 0"
           :open="referenceDrawerOpen"
@@ -101,7 +121,7 @@
         :groups="firingGroups"
         @changed="onAckMuteChanged"
       />
-      <OTooltip v-if="!notFound && editAnomalyLocked" :content="anomalyLockedReason">
+      <OTooltip v-if="!unavailable && editAnomalyLocked" :content="anomalyLockedReason">
         <span class="inline-flex">
           <OButton variant="outline" size="sm-action" disabled data-test="alerts-alertdetail-edit">
             <template #icon-left>
@@ -117,7 +137,7 @@
         </span>
       </OTooltip>
       <OButton
-        v-else-if="!notFound"
+        v-else-if="!unavailable"
         variant="outline"
         size="sm-action"
         icon-left="edit"
@@ -128,8 +148,25 @@
       </OButton>
     </template>
 
-    <OContent v-if="notFound" class="py-6">
+    <OContent v-if="unavailable" class="py-6">
       <OEmptyState
+        v-if="loadFailure === 'forbidden'"
+        size="hero"
+        preset="no-access"
+        :title="t('alerts.groups.noAccessTitle')"
+        :description="t('alerts.groups.noAccessDescription')"
+        data-test="alerts-alertdetail-no-access"
+      />
+      <OEmptyState
+        v-else-if="loadFailure === 'failed'"
+        size="hero"
+        preset="load-error"
+        :title="t('alerts.groups.loadFailedTitle')"
+        data-test="alerts-alertdetail-load-error"
+        @action="loadPage"
+      />
+      <OEmptyState
+        v-else
         size="hero"
         :title="t('alerts.groups.notFoundTitle')"
         :description="t('alerts.groups.notFoundDescription')"
@@ -372,22 +409,31 @@
           <OTabPanel name="configuration" stretch>
             <OContent class="h-full overflow-y-auto py-4">
               <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
+              <AlertCalibrationHeadroomCard v-if="alert && !isAnomalyAlert" :alert-id="alertId" />
             </OContent>
           </OTabPanel>
         </OTabPanels>
       </template>
     </div>
+    <ExtendDowntimeDialog
+      v-if="isAnomalyAlert && downtimesEnabled"
+      v-model:open="anomalyMuteActions.extendUntilOpen.value"
+      :downtime="anomalyMuteActions.extendUntilRow.value"
+      :submit="anomalyMuteActions.extendUntil"
+      @settled="onAckMuteChanged"
+    />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AlertConfigSummary from "@/components/alerts/AlertConfigSummary.vue";
+import AlertCalibrationHeadroomCard from "@/components/alert_calibration/AlertCalibrationHeadroomCard.vue";
 import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.vue";
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";
@@ -395,6 +441,11 @@ import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
 import AlertHeaderActions from "@/components/alerts/AlertHeaderActions.vue";
 import AckChip from "@/components/alerts/AckChip.vue";
 import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
+import RowMuteMenu from "@/components/alerts/downtimes/RowMuteMenu.vue";
+import ExtendDowntimeDialog from "@/components/alerts/downtimes/ExtendDowntimeDialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import { useDowntimeRowActions } from "@/composables/downtimes/useDowntimeRowActions";
+import type { MuteActionResult } from "@/utils/downtimes/muteResult";
 import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
 import CompositeAlertDetail from "@/components/alerts/composite/CompositeAlertDetail.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
@@ -425,6 +476,7 @@ import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatDuration } from "@/utils/downtimes/schedule";
 import { formatInZone } from "@/utils/oncall";
 import { isFiringOutcome, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
+import { isFiringNow as isOpenFiring } from "@/utils/alerts/firingAlerts";
 import { ackedCount, unackedFiringCount } from "@/utils/alerts/ackState";
 import sloService from "@/services/slos";
 import {
@@ -463,10 +515,21 @@ const transitions = ref<AlertGroupTransition[]>([]);
 const loadingGroups = ref(false);
 const loadingTransitions = ref(false);
 const historyGroupFilter = ref<AlertGroup | null>(null);
-// The alert could not be loaded — deleted, mistyped id, or no access. Without
-// this the page rendered a phantom alert: the raw id as the title, live-looking
-// tabs and a working Edit button for something that does not exist.
-const notFound = ref(false);
+// Why the alert could not be loaded; without it the page showed a phantom alert with a live Edit.
+const loadFailure = ref<"not-found" | "forbidden" | "failed" | null>(null);
+const unavailable = computed(() => loadFailure.value !== null);
+const unavailableTitle = computed<I18nText | null>(() => {
+  switch (loadFailure.value) {
+    case "forbidden":
+      return t("alerts.groups.noAccessTitle");
+    case "failed":
+      return t("alerts.groups.loadFailedTitle");
+    case "not-found":
+      return t("alerts.groups.notFoundTitle");
+    default:
+      return null;
+  }
+});
 const activeTab = ref<string | number>("history");
 // Simple alerts only: which reading of "history" the tab shows. Evaluations
 // is the default — the transitions log is write-on-change, so it answers
@@ -687,6 +750,7 @@ interface AlertListRow {
   last_outcome?: string | null;
   last_outcome_since?: number | null;
   firing_started_at?: number | null;
+  groups_firing?: number | null;
   level?: string | null;
   ack?: AlertListAck | null;
   active_downtime?: (ActiveDowntime & { version?: number }) | null;
@@ -707,14 +771,17 @@ const acksQuery = useQuery(() =>
   }),
 );
 
-const showHeaderActions = computed(() => !!alert.value && !notFound.value && !isAnomalyAlert.value);
+const showHeaderActions = computed(
+  () => !!alert.value && !unavailable.value && !isAnomalyAlert.value,
+);
 
 const isFiringNow = computed(() => {
   const row = listRow.value;
+  // Same rule as the list's Firing tile: an errored run during an open firing saw no recovery.
   const runFiring =
     !!row &&
-    shouldShowRunOutcome(row.enabled, row.last_outcome) &&
-    isFiringOutcome(row.last_outcome);
+    ((shouldShowRunOutcome(row.enabled, row.last_outcome) && isFiringOutcome(row.last_outcome)) ||
+      (!!row.enabled && isOpenFiring(row)));
   return runFiring || (isCompositeAlert.value && alert.value?.evaluation?.result === true);
 });
 
@@ -820,19 +887,39 @@ const onAckMuteChanged = async () => {
   if (isMultiAlert.value) await fetchGroups();
 };
 
+// An anomaly config has no alert-scoped mute routes, so its own mute ends through the downtime.
+const anomalyMuteActions = useDowntimeRowActions();
+
+const afterAnomalyMute = async (result: MuteActionResult) => {
+  if (result !== "failed") await onAckMuteChanged();
+};
+
+const onAnomalyExtend = async (seconds: number) => {
+  if (headerDowntime.value) {
+    await afterAnomalyMute(await anomalyMuteActions.extendBy(headerDowntime.value, seconds));
+  }
+};
+
+const onAnomalyEndMute = async () => {
+  if (headerDowntime.value) {
+    await afterAnomalyMute(await anomalyMuteActions.end(headerDowntime.value));
+  }
+};
+
 const fetchAlert = async () => {
   if (!orgId.value || !alertId.value) return;
   try {
     const res = await alertsService.get_by_alert_id(orgId.value, alertId.value);
     alert.value = res.data;
-    notFound.value = !res.data;
+    loadFailure.value = res.data ? null : "not-found";
     // Same tick as the assignment, not down in onMounted: setting alert.value
     // queues the render, so any await before this one lets the default History
     // tab mount and fire a fetch for a page that is about to switch away.
     if (isAnomalyAlert.value) activeTab.value = "charts";
-  } catch {
+  } catch (e: unknown) {
     alert.value = null;
-    notFound.value = true;
+    const status = (e as { response?: { status?: number } })?.response?.status;
+    loadFailure.value = status === 403 ? "forbidden" : status === 404 ? "not-found" : "failed";
   }
 };
 
@@ -938,14 +1025,13 @@ const editAlert = () => {
   });
 };
 
-onMounted(async () => {
+// Mount and Retry share it, so a recovered page loads what the first load skipped.
+const loadPage = async () => {
   await fetchAlert();
+  if (unavailable.value) return;
   await fetchSloName();
   if (isCompositeAlert.value) return;
-  // Multi-alerts land on Groups (the reason the page exists for them); everything
-  // else has no groups tab, so History is the only sensible default. The alert is
-  // fetched exactly once and never re-fetched, so handling the initial load here
-  // is enough — a separate watch on isMultiAlert would just re-fire fetchGroups().
+  // Multi-alerts land on Groups, the reason the page exists for them; other alerts have no groups tab.
   if (isMultiAlert.value) {
     activeTab.value = "groups";
     await fetchGroups();
@@ -953,5 +1039,7 @@ onMounted(async () => {
   // Anomaly configs never write to the transitions table.
   if (isAnomalyAlert.value) return;
   await fetchTransitions();
-});
+};
+
+onMounted(loadPage);
 </script>

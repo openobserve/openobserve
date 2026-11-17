@@ -15,7 +15,11 @@
 
 import { queryOptions } from "@tanstack/vue-query";
 import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
-import security, { type SecurityAccess, type SecurityAuditPage } from "./security";
+import security, {
+  type SecurityAccess,
+  type SecurityAuditPage,
+  type SecurityAuditParams,
+} from "./security";
 import { securityKeys } from "./security.querykeys";
 
 export const securityAccessQuery = (org: string) =>
@@ -25,9 +29,9 @@ export const securityAccessQuery = (org: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
-export const securityAuditQuery = (org: string) =>
+export const securityAuditQuery = (org: string, params: SecurityAuditParams) =>
   queryOptions({
-    queryKey: securityKeys.audit(org),
-    queryFn: async (): Promise<SecurityAuditPage> => (await security.getAudit(org)).data,
+    queryKey: securityKeys.audit(org, params),
+    queryFn: async (): Promise<SecurityAuditPage> => (await security.getAudit(org, params)).data,
     staleTime: LIVE_STALE_TIME,
   });

@@ -1535,6 +1535,35 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     expect(wrapper.find('[data-test="oncall-schedule-rule-stop-past-0"]').exists()).toBe(true);
   });
 
+  it("never stops at the previous time while a typed time is unreadable (V-N3)", async () => {
+    const wrapper = mount(OnCallScheduleEditor, {
+      props: {
+        teamId: "team_1",
+        timezone: "Asia/Kolkata",
+        schedule: schedule([WEEKEND]),
+        members: members("ana@o2.ai"),
+      },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await openRotation(wrapper);
+    await openStop(wrapper);
+    await wrapper.find('[data-test="oncall-schedule-rule-stop-pick-0"]').trigger("click");
+    await flushPromises();
+    await wrapper
+      .find('[data-test="oncall-schedule-rule-stop-date-0"] input')
+      .setValue("2026-08-17");
+    const time = wrapper.find('[data-test="oncall-schedule-rule-stop-time-0"] input');
+    await time.setValue("10:00");
+    const field = wrapper.findComponent({ name: "OTime" });
+    field.vm.$emit("invalid", true);
+    await flushPromises();
+    const confirm = wrapper.find('[data-test="oncall-schedule-rule-stop-confirm-0"]');
+    expect(confirm.attributes("disabled")).toBeDefined();
+    field.vm.$emit("invalid", false);
+    await flushPromises();
+    expect(confirm.attributes("disabled")).toBeUndefined();
+  });
+
   // B4: the consequence names who takes the hours, or warns of the gap.
   it("says what stopping leaves behind", async () => {
     const wrapper = render({

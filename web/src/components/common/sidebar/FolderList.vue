@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Search Input -->
-          <div class="px-1.5 pb-1.5" :class="mobileRail ? 'pt-1' : ''">
+          <div class="px-1 pb-1.5" :class="mobileRail ? 'pt-1' : ''">
             <OSearchInput
               v-model="searchQuery"
               data-test="folder-search"
@@ -84,12 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <div class="folders-tabs flex-1 overflow-y-auto px-1.5">
+        <div class="folders-tabs flex-1 overflow-y-auto px-1">
           <OTabs
             orientation="vertical"
             dense
-            v-model="activeFolderId"
+            :model-value="hideActive ? '' : activeFolderId"
             data-test="dashboards-folder-tabs"
+            @update:model-value="(v) => (activeFolderId = String(v))"
           >
             <OTab
               v-for="tab in filteredTabs"
@@ -247,6 +248,11 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // The owner is listing every folder, so none reads as the open one; the active id is kept for its return.
+    hideActive: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["update:folders", "update:activeFolderId"],
   setup(props, { emit }) {
@@ -270,8 +276,10 @@ export default defineComponent({
           }
         : {},
     );
-    const activeFolderName = computed(
-      () => filteredTabs.value.find((f: any) => f.folderId === activeFolderId.value)?.name ?? "",
+    const activeFolderName = computed(() =>
+      props.hideActive
+        ? ""
+        : (filteredTabs.value.find((f: any) => f.folderId === activeFolderId.value)?.name ?? ""),
     );
     const showAddFolderDialog = ref(false);
     const isFolderEditMode = ref(false);

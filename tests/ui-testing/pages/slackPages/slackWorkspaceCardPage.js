@@ -5,8 +5,10 @@ class SlackWorkspaceCardPage {
   constructor(page) {
     this.page = page;
     this.root = page.locator('[data-test="slack-workspace"]');
-    this.name = page.locator('[data-test="slack-workspace-name"]');
-    this.meta = page.locator('[data-test="slack-workspace-meta"]');
+    this.name = page.locator('[data-test="slack-workspace-card"] h2');
+    this.meta = page.locator('[data-test="slack-workspace-card-description"]');
+    // The connected-by tooltip triggers on this text span only, not the full-width line.
+    this.metaText = this.meta.locator(':scope > span');
     this.tooltip = page.locator('[data-test="o-tooltip-content"]:visible');
     this.status = page.locator('[data-test="slack-workspace-status"]');
     this.sockets = page.locator('[data-test="slack-workspace-sockets"]');

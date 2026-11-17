@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="selectedDate"
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons h-7.5 [transition:all_0.2s_ease] max-md:[&_.date-time-label]:hidden"
+            class="dashboard-icons max-md:[&_.date-time-label]:hidden"
             size="sm"
             :modelValue="pickedDate ?? selectedDate"
             :auto-apply-dashboard="true"
@@ -132,8 +132,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
             @trigger="onAutoRefreshTick"
-            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            class="dashboard-icons hideOnPrintMode"
             size="sm"
+          />
+          <DeployMarkersUnavailable
+            v-if="
+              (config.isEnterprise == 'true' || config.isCloud == 'true') && !store.state.printMode
+            "
+            @retry="refreshData()"
           />
           <OButtonGroup v-show="store.state.printMode !== true">
             <OTooltip
@@ -313,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
             @trigger="onAutoRefreshTick"
-            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            class="dashboard-icons hideOnPrintMode"
             size="sm"
           />
           <!-- These save, print or reload outside the draft, so edit mode hides them until Save or Discard. -->
@@ -754,6 +760,7 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
+import { useDeployMarkerClicks } from "@/composables/dashboard/deployMarkerScope";
 import {
   createDashboardFreshOnOpen,
   DASHBOARD_FRESH_ON_OPEN,
@@ -848,6 +855,9 @@ const DashboardSettings = defineAsyncComponent(() => {
 const ScheduledDashboards = defineAsyncComponent(() => {
   return import("./ScheduledDashboards.vue");
 });
+const DeployMarkersUnavailable = defineAsyncComponent(
+  () => import("@/enterprise/components/ServiceVersions/DeployMarkersUnavailable.vue"),
+);
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -861,6 +871,7 @@ export default defineComponent({
     AutoRefreshInterval,
     DashboardSettings,
     RenderDashboardCharts,
+    DeployMarkersUnavailable,
     ScheduledDashboards,
     PanelLayoutSettings,
     DashboardJsonEditor,
@@ -888,6 +899,7 @@ export default defineComponent({
     const currentDashboardData = reactive({
       data: {},
     });
+    useDeployMarkerClicks(() => currentDashboardData.data);
     const showScheduledReportsDialog = ref(false);
     const { locked: reportsLocked, lockedReason: reportsLockedReason } = useLicenseLock("reports");
 
