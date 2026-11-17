@@ -979,10 +979,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             max-width="300px"
                           >
                             <span style="font-size: 14px"
-                              >Delay for which the pipeline is scheduled to
-                              run.<br />
-                              e.g. 10 minutes delay means that the pipeline will
-                              run 10 minutes after its scheduled time.</span
+                              >Time to wait after the scheduled time, so that
+                              late data can arrive.<br />
+                              e.g. with a 10 minute delay, an hourly pipeline
+                              runs at 10:10 and reads the data from 9:00 to
+                              10:00.</span
                             >
                           </q-tooltip>
                         </q-icon>
