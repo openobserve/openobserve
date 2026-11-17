@@ -42,6 +42,16 @@ const def = computed(() => ALERT_SECTIONS.find((section) => section.id === props
 const icon = computed(() => def.value?.icon);
 const previous = computed(() => ALERT_SECTIONS[props.index - 2]);
 const next = computed(() => ALERT_SECTIONS[props.index]);
+const previousLabel = computed(() =>
+  previous.value
+    ? t("alerts.sections.back", { title: t(previous.value.navKey) })
+    : t("alerts.sections.previousStep"),
+);
+const nextLabel = computed(() =>
+  next.value
+    ? t("alerts.sections.next", { title: t(next.value.navKey) })
+    : t("alerts.sections.nextStep"),
+);
 
 provide(SETTING_ROW_BARE_KEY, true);
 </script>
@@ -82,38 +92,37 @@ provide(SETTING_ROW_BARE_KEY, true);
           {{ help }}
         </p>
       </div>
-      <OButton
-        v-if="previous"
-        class="shrink-0 max-md:hidden"
-        :class="current === false && 'invisible'"
-        variant="primary"
-        size="icon-circle-lg"
-        icon-left="arrow-upward"
-        :aria-label="t('alerts.sections.back', { title: t(previous.navKey) })"
-        :data-test="`add-alert-section-${id}-prev`"
-        @click="emit('go', previous.id)"
-      >
-        <OTooltip side="left" :content="t('alerts.sections.back', { title: t(previous.navKey) })" />
-      </OButton>
-    </header>
-    <div class="flex flex-1 flex-col px-4 pb-4 xl:pe-16">
-      <slot />
       <div
-        v-if="next"
-        class="mt-auto flex justify-end pt-4 max-md:hidden xl:sticky xl:bottom-4 xl:-me-11"
+        class="flex shrink-0 gap-1 max-md:hidden"
         :class="current === false && 'invisible'"
+        :data-test="`add-alert-section-${id}-steps`"
       >
         <OButton
-          variant="primary"
-          size="icon-circle-lg"
-          icon-left="arrow-downward"
-          :aria-label="t('alerts.sections.next', { title: t(next.navKey) })"
-          :data-test="`add-alert-section-${id}-next`"
-          @click="emit('go', next.id)"
+          variant="outline"
+          size="icon-sm"
+          icon-left="keyboard-arrow-up"
+          :disabled="!previous"
+          :aria-label="previousLabel"
+          :data-test="`add-alert-section-${id}-prev`"
+          @click="previous && emit('go', previous.id)"
         >
-          <OTooltip side="left" :content="t('alerts.sections.next', { title: t(next.navKey) })" />
+          <OTooltip v-if="previous" side="bottom" :content="previousLabel" />
+        </OButton>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="keyboard-arrow-down"
+          :disabled="!next"
+          :aria-label="nextLabel"
+          :data-test="`add-alert-section-${id}-next`"
+          @click="next && emit('go', next.id)"
+        >
+          <OTooltip v-if="next" side="bottom" :content="nextLabel" />
         </OButton>
       </div>
+    </header>
+    <div class="flex flex-1 flex-col px-4 pb-4">
+      <slot />
     </div>
   </section>
 </template>
