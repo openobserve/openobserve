@@ -80,11 +80,7 @@ const logoOf = (source: FindMoreSource) => builtInOf(source.packId)?.pack.logo;
 // Visible rows never hold an installed built-in, so its setup makes what the popup would.
 const sourceCounts = (source: FindMoreSource): [number, number, number] => {
   const flow = builtInOf(source.packId)?.flow;
-  if (flow) {
-    return [flow.dashboardCount.value ?? 0, flow.alertCount.value ?? 0, flow.viewCount.value ?? 0];
-  }
-  const count = (wanted: string) => source.items.filter(({ kind }) => kind === wanted).length;
-  return [count("dashboard"), count("alert"), count("savedView")];
+  return [flow?.dashboardCount.value ?? 0, flow?.alertCount.value ?? 0, flow?.viewCount.value ?? 0];
 };
 
 const countsLine = (source: FindMoreSource): I18nText => {
@@ -114,9 +110,7 @@ const openDrawer = (packId: string) => {
   activePack.value = packId;
 };
 
-// A Library group has no setup popup of its own yet, so it is set up from the Starter Packs page.
-const setUp = (source: FindMoreSource) =>
-  builtInOf(source.packId) ? openDrawer(source.packId!) : openLibrary();
+const setUp = (source: FindMoreSource) => openDrawer(source.packId!);
 
 const notNowAll = () => {
   const ids = matches.notNowAll();

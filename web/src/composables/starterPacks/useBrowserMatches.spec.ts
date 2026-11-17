@@ -29,8 +29,9 @@ const source = (id: string, packId?: string): FindMoreSource => ({
 });
 
 const HOSTS = source("hosts", "hosts");
-const NGINX = source("library-nginx");
-const DOCKER = source("library-docker");
+const NGINX = source("postgresql", "postgresql");
+const DOCKER = source("docker", "docker");
+const LIBRARY = source("library-k8s");
 
 const result = (sources: FindMoreSource[]) => ({ checkedAt: 1, sources, dismissed: 0 });
 
@@ -75,8 +76,8 @@ describe("useBrowserMatches", () => {
     const matches = useBrowserMatches("org");
     expect(matches.copy.value).toBeNull();
     matches.saveFull(result([NGINX]), ["hosts"]);
-    matches.notNowOne("library-nginx");
-    expect(matches.notNow.value).toEqual(["library-nginx"]);
+    matches.notNowOne("postgresql");
+    expect(matches.notNow.value).toEqual(["postgresql"]);
     expect(matches.count.value).toBe(0);
   });
 
@@ -96,11 +97,11 @@ describe("useBrowserMatches", () => {
     expect(matches.notNow.value).toEqual(["a"]);
   });
 
-  it("replaces built-in pack sources on a Home save and keeps Library sources", () => {
+  it("replaces every source on a Home save", () => {
     const matches = useBrowserMatches("org");
     matches.saveFull(result([source("kubernetes", "kubernetes"), NGINX]), ["hosts"]);
     matches.saveBuiltIn([HOSTS], ["kubernetes"], { packId: "kubernetes", label: "Kubernetes" });
-    expect(matches.copy.value?.sources.map(({ id }) => id)).toEqual(["hosts", "library-nginx"]);
+    expect(matches.copy.value?.sources.map(({ id }) => id)).toEqual(["hosts"]);
     expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes"]);
     expect(matches.copy.value?.interrupted?.packId).toBe("kubernetes");
   });
@@ -132,13 +133,28 @@ describe("useBrowserMatches", () => {
     expect(useBrowserMatches("org").copy.value?.sources).toEqual([NGINX]);
   });
 
+  it("keeps only built-in packs, so the header lists what Home offers", () => {
+    const matches = useBrowserMatches("org");
+    matches.saveFull(result([HOSTS, LIBRARY]), []);
+    expect(matches.visible.value).toEqual([HOSTS]);
+    expect(JSON.parse(window.localStorage.getItem(matchesKey("org"))!).sources).toEqual([HOSTS]);
+  });
+
+  it("drops Library groups from a copy saved by an older version", () => {
+    window.localStorage.setItem(
+      matchesKey("org"),
+      JSON.stringify({ checkedAt: 1, sources: [LIBRARY, HOSTS], installedPackIds: [] }),
+    );
+    expect(useBrowserMatches("org").visible.value).toEqual([HOSTS]);
+  });
+
   it("drops an installed source and records a built-in pack as installed", () => {
     const matches = useBrowserMatches("org");
     matches.saveFull(result([HOSTS, NGINX]), ["kubernetes"]);
     matches.markInstalled("hosts", "hosts");
     expect(matches.copy.value?.sources).toEqual([NGINX]);
     expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes", "hosts"]);
-    matches.markInstalled("library-nginx");
+    matches.markInstalled("postgresql");
     expect(matches.copy.value?.sources).toEqual([]);
     expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes", "hosts"]);
   });
@@ -146,14 +162,14 @@ describe("useBrowserMatches", () => {
   it("hides a match on Not now and brings it back on undo", () => {
     const matches = useBrowserMatches("org");
     matches.saveFull(result([NGINX, DOCKER]), ["hosts"]);
-    matches.notNowOne("library-nginx");
+    matches.notNowOne("postgresql");
     expect(matches.visible.value).toEqual([DOCKER]);
     const hidden = matches.notNowAll();
-    expect(hidden).toEqual(["library-docker"]);
+    expect(hidden).toEqual(["docker"]);
     expect(matches.count.value).toBe(0);
     matches.undoNotNow(hidden);
     expect(matches.visible.value).toEqual([DOCKER]);
-    expect(JSON.parse(window.localStorage.getItem(notNowKey("org"))!)).toEqual(["library-nginx"]);
+    expect(JSON.parse(window.localStorage.getItem(notNowKey("org"))!)).toEqual(["postgresql"]);
   });
 
   it("shows while at least one match is left, with or without a pack installed", () => {

@@ -169,7 +169,7 @@ describe("StarterPackHeaderChip", () => {
   });
 
   it("shows before any pack is installed", async () => {
-    save([source("library-nginx")], []);
+    save([source("postgresql", "postgresql")], []);
     await render();
     expect(chip().exists()).toBe(true);
   });
@@ -181,20 +181,20 @@ describe("StarterPackHeaderChip", () => {
   });
 
   it("stays hidden when every match was put off with Not now", async () => {
-    save([source("library-nginx")]);
+    save([source("postgresql", "postgresql")]);
     useBrowserMatches(ORG).notNowAll();
     await render();
     expect(chip().exists()).toBe(false);
   });
 
   it("stays hidden in kiosk mode", async () => {
-    save([source("library-nginx")]);
+    save([source("postgresql", "postgresql")]);
     await render(true);
     expect(chip().exists()).toBe(false);
   });
 
   it("shows the count of matches and names it for screen readers", async () => {
-    save([source("library-nginx"), source("hosts", "hosts")]);
+    save([source("postgresql", "postgresql"), source("hosts", "hosts")]);
     await render();
     expect(byTest("header-starter-packs-count").text()).toBe("2");
     expect(chip().attributes("aria-label")).toBe("Starter packs, 2 fit your data");
@@ -202,11 +202,8 @@ describe("StarterPackHeaderChip", () => {
   });
 
   it("counts a built-in pack as its popup would, and hides the count until then", async () => {
-    save([source("library-nginx"), source("hosts", "hosts")]);
+    save([source("hosts", "hosts")]);
     await render();
-    expect(byTest("header-starter-packs-counts-library-nginx").text()).toBe(
-      "1 dashboard · 1 alert · 1 saved view",
-    );
     expect(wrapper!.find('[data-test="header-starter-packs-counts-hosts"]').exists()).toBe(false);
     const hosts = fake.flows.find((flow) => flow.pack.id === "hosts")!;
     hosts.dashboardCount.value = 1;
@@ -217,13 +214,17 @@ describe("StarterPackHeaderChip", () => {
   });
 
   it("makes no check on its own", async () => {
-    save([source("library-nginx")]);
+    save([source("postgresql", "postgresql")]);
     await render();
     expect(fake.check).not.toHaveBeenCalled();
   });
 
   it("lists five matches and links the rest to Starter Packs", async () => {
-    save(["a", "b", "c", "d", "e", "f", "g"].map((id) => source(`library-${id}`)));
+    const ids = ["kubernetes", "hosts", "traces", "postgresql", "docker", "genai", "github"];
+    save(
+      ids.map((id) => source(id, id)),
+      [],
+    );
     await render();
     expect(wrapper!.findAll('[data-test^="header-starter-packs-row-"]')).toHaveLength(5);
     expect(byTest("header-starter-packs-more").text()).toBe("+2 more in Starter Packs");
@@ -240,19 +241,9 @@ describe("StarterPackHeaderChip", () => {
     expect(hosts.load).toHaveBeenCalled();
   });
 
-  it("sends a Library match to the Starter Packs page", async () => {
-    save([source("library-nginx")]);
-    await render();
-    await byTest("header-starter-packs-setup-btn-library-nginx").trigger("click");
-    expect(fake.push).toHaveBeenCalledWith({
-      name: "starterPacks",
-      query: { org_identifier: ORG },
-    });
-  });
-
   it("finishes a stopped setup through the same popup", async () => {
     useBrowserMatches(ORG).saveFull(
-      { checkedAt: 1, sources: [source("library-nginx")], dismissed: 0 },
+      { checkedAt: 1, sources: [source("postgresql", "postgresql")], dismissed: 0 },
       ["kubernetes"],
       {
         packId: "hosts",
@@ -269,17 +260,15 @@ describe("StarterPackHeaderChip", () => {
   });
 
   it("hides one match on Not now", async () => {
-    save([source("library-nginx"), source("library-docker")]);
+    save([source("postgresql", "postgresql"), source("docker", "docker")]);
     await render();
-    await byTest("header-starter-packs-not-now-library-nginx").trigger("click");
+    await byTest("header-starter-packs-not-now-postgresql").trigger("click");
     expect(byTest("header-starter-packs-count").text()).toBe("1");
-    expect(wrapper!.find('[data-test="header-starter-packs-row-library-nginx"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper!.find('[data-test="header-starter-packs-row-postgresql"]').exists()).toBe(false);
   });
 
   it("hides the chip on Not now for all and brings it back on Undo", async () => {
-    save([source("library-nginx")]);
+    save([source("postgresql", "postgresql")]);
     await render();
     await byTest("header-starter-packs-not-now-all").trigger("click");
     expect(chip().exists()).toBe(false);
@@ -293,10 +282,10 @@ describe("StarterPackHeaderChip", () => {
   });
 
   it("refreshes with the full check and saves the result in this browser", async () => {
-    save([source("library-nginx")]);
+    save([source("postgresql", "postgresql")]);
     fake.checkResult = {
       checkedAt: 2,
-      sources: [source("library-nginx"), source("library-docker")],
+      sources: [source("postgresql", "postgresql"), source("docker", "docker")],
       dismissed: 0,
     };
     fake.records = { hosts: [{ status: "complete", items: [] }] };
@@ -310,7 +299,7 @@ describe("StarterPackHeaderChip", () => {
   });
 
   it("keeps the old result and offers Retry when the check fails", async () => {
-    save([source("library-nginx")]);
+    save([source("postgresql", "postgresql")]);
     fake.checkState = "error";
     await render();
     await byTest("header-starter-packs-refresh").trigger("click");

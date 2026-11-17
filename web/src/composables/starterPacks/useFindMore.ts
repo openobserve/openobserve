@@ -39,8 +39,8 @@ import {
 import { packs as allPacks } from "./usePackCatalog";
 import { matchAlerts, matchPack, readOrgStreams } from "./packMatchData";
 import type { StarterPack } from "./types";
-import { useBrowserMatches } from "./useBrowserMatches";
 import { useInstallRecords } from "./useInstallRecords";
+import { fitStreams } from "./useStarterPackMatcher";
 import { useStarterPacks } from "./useStarterPacks";
 import { queriesPerDay } from "./wouldFire";
 
@@ -141,6 +141,7 @@ export function useFindMoreCheck(org: string) {
       allPacks().map(async (pack) => ({
         pack,
         match: await matchPack(org, pack, streams, library),
+        fits: await fitStreams(org, pack, streams),
         records: await records.list(pack.id),
       })),
     );
@@ -182,7 +183,6 @@ export function useFindMore(org: string) {
   const runner = useFindMoreCheck(org);
   const installer = useStarterPacks(org);
   const { loadManifest } = useAlertLibrary();
-  const browser = useBrowserMatches(org);
   const result = ref<FindMoreResult | null>(null);
   const state = ref<"idle" | "checking" | "ready" | "error">("idle");
   const added = ref<FindMoreAdded[]>([]);
@@ -252,10 +252,7 @@ export function useFindMore(org: string) {
       const { done, complete } = await install(await packFor(source), source);
       added.value = [...added.value, done];
       // An incomplete install keeps the source listed; Undo still covers what was made.
-      if (complete) {
-        dropSource(source.id);
-        browser.markInstalled(source.id);
-      }
+      if (complete) dropSource(source.id);
       return complete;
     } catch {
       return false;

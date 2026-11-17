@@ -35,7 +35,7 @@ export interface BrowserInterrupted {
 export interface BrowserMatchCopy {
   /** Milliseconds since epoch of the last check that ran in this browser. */
   checkedAt: number;
-  /** Matches not yet set up (built-in packs and Library groups), same shape as Find more. */
+  /** Built-in packs not yet set up, same shape as Find more; Library groups stay on the Starter Packs page. */
   sources: FindMoreSource[];
   /** Built-in pack ids known to be installed at the last check. */
   installedPackIds: string[];
@@ -51,6 +51,9 @@ export const matchesKey = (org: string) => `o2.starterPacks.browserMatches.${org
 export const notNowKey = (org: string) => `o2.starterPacks.notNow.${org}`;
 
 const BUILT_IN_IDS = new Set(packs().map(({ id }) => id));
+
+const builtInOnly = (sources: FindMoreSource[]) =>
+  sources.filter(({ packId }) => !!packId && BUILT_IN_IDS.has(packId));
 
 // Shared by every caller in the tab, so a save on Home updates the header at once.
 const orgs = new Map<string, OrgState>();
@@ -78,11 +81,13 @@ const strings = (value: unknown): string[] =>
 const parseCopy = (value: unknown): BrowserMatchCopy | null => {
   const parsed = value as Partial<BrowserMatchCopy> | null;
   if (typeof parsed?.checkedAt !== "number" || !Array.isArray(parsed?.sources)) return null;
-  const sources = parsed.sources.filter(
-    (source): source is FindMoreSource =>
-      typeof source?.id === "string" &&
-      Array.isArray(source?.items) &&
-      Array.isArray(source?.streams),
+  const sources = builtInOnly(
+    parsed.sources.filter(
+      (source): source is FindMoreSource =>
+        typeof source?.id === "string" &&
+        Array.isArray(source?.items) &&
+        Array.isArray(source?.streams),
+    ),
   );
   const interrupted = typeof parsed.interrupted?.packId === "string" ? parsed.interrupted : null;
   return {
@@ -159,7 +164,7 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
   ) =>
     setCopy({
       checkedAt: Date.now(),
-      sources: result.sources,
+      sources: builtInOnly(result.sources),
       installedPackIds: [...new Set(installedPackIds)],
       interrupted,
     });
@@ -168,18 +173,14 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
     sources: FindMoreSource[],
     installedPackIds: string[],
     interrupted: BrowserInterrupted | null,
-  ) => {
-    const library = (copy.value?.sources ?? []).filter(
-      ({ packId }) => !packId || !BUILT_IN_IDS.has(packId),
-    );
-    // Home checks built-in packs only, so it never stands in for a full check.
+  ) =>
+    // Home's check is not a full check, so it keeps the last full check time.
     setCopy({
       checkedAt: copy.value?.checkedAt ?? Date.now(),
-      sources: [...sources, ...library],
+      sources: builtInOnly(sources),
       installedPackIds: [...new Set(installedPackIds)],
       interrupted,
     });
-  };
 
   const markInstalled = (sourceId: string, packId?: string) => {
     const current = copy.value;

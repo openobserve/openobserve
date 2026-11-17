@@ -66,6 +66,7 @@ const inputs = (overrides: Partial<FindMoreInputs> = {}): FindMoreInputs => {
           ]),
           ready: true,
         },
+        fits: ["kube_pod_status_phase"],
         records: [],
       },
     ],
@@ -103,6 +104,25 @@ describe("groupFindMore", () => {
     expect(nginx.items.map(({ id }) => id)).toEqual(["nginx/5xx", "nginx/slow"]);
     expect(nginx.streams).toEqual(["edge"]);
     expect(nginx.queriesPerDay).toBe(576);
+  });
+
+  it("names a pack's detection streams, not its alerts' streams", () => {
+    const [pack] = groupFindMore(inputs()).sources;
+    expect(pack.streams).toEqual(["kube_pod_status_phase"]);
+  });
+
+  it("leaves out a pack Home would not offer: a saved view alone, or no detected stream", () => {
+    const [row] = inputs().packs;
+    const viewOnly = { ...row.match, ready: false };
+    const unseen = { ...row, pack: { ...PACK, detector: undefined }, fits: [] };
+    const ids = (packs: FindMoreInputs["packs"]) =>
+      groupFindMore(inputs({ packs })).sources.map(({ id }) => id);
+    expect(ids([{ ...row, match: viewOnly }])).toEqual(["library-nginx"]);
+    expect(ids([unseen])).toEqual(["library-nginx"]);
+    expect(ids([{ ...unseen, pack: { ...PACK, detector: "kubernetes" } as StarterPack }])).toEqual([
+      "kubernetes",
+      "library-nginx",
+    ]);
   });
 
   it("leaves out items an install record or a Library install already holds", () => {
@@ -149,6 +169,7 @@ describe("groupFindMore", () => {
           {
             pack: PACK,
             match: { alerts: none, dashboards: none, views: none, ready: false },
+            fits: [],
             records: [],
           },
         ],

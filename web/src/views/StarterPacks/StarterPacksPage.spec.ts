@@ -62,7 +62,10 @@ vi.mock("@/composables/starterPacks/useFindMore", async () => {
           await new Promise<void>((resolve) => (fake.release = resolve));
           result.value = {
             checkedAt: 1,
-            sources: [{ id: "library-nginx", items: [] }],
+            sources: [
+              { id: "docker", packId: "docker", items: [], streams: [] },
+              { id: "library-nginx", items: [], streams: [] },
+            ],
             dismissed: 0,
           };
           state.value = "ready";
@@ -156,7 +159,7 @@ describe("StarterPacksPage", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="starter-packs-checking"]').exists()).toBe(false);
     const copy = useBrowserMatches("org").copy.value;
-    expect(copy?.sources.map(({ id }) => id)).toEqual(["library-nginx"]);
+    expect(copy?.sources.map(({ id }) => id)).toEqual(["docker"]);
     expect(copy?.installedPackIds).toEqual(["hosts"]);
   });
 

@@ -78,6 +78,29 @@ const readDetectNames = async (org: string, pack: StarterPack): Promise<StreamsB
 const typeOf = (streams: StreamsByType, name: string) =>
   Object.keys(streams).find((type) => streams[type]?.has(name)) ?? "metrics";
 
+const kubernetesFit = (metrics: string[], logs: string[]) => {
+  const present = DETECTION_STREAMS.filter((name) => metrics.includes(name));
+  return logs.includes(EVENTS_STREAM) ? [...present, EVENTS_STREAM] : present;
+};
+
+/** The org streams a pack's "Fits" line names; Home and the full match check both read them here. */
+export const fitStreams = (
+  org: string,
+  pack: StarterPack,
+  streams: StreamsByType,
+  force = false,
+): Promise<string[]> =>
+  pack.detector === "kubernetes"
+    ? Promise.resolve(
+        kubernetesFit([...(streams.metrics?.keys() ?? [])], [...(streams.logs?.keys() ?? [])]),
+      )
+    : detectedStreams(
+        pack,
+        streams,
+        (type, name) => readSchemaColumns(org, type, name, force),
+        (type, name) => readCachedColumns(org, type, name),
+      );
+
 /** Whether this org's data fits the pack, and for Kubernetes which clusters it has seen. */
 export function useStarterPackMatcher(
   org: string,
@@ -146,12 +169,7 @@ export function useStarterPackMatcher(
     found: string[];
   }> => {
     const streams = library ? await readOrgStreams(org) : await readDetectNames(org, pack);
-    const present = await detectedStreams(
-      pack,
-      streams,
-      (type, name) => readSchemaColumns(org, type, name, !library),
-      (type, name) => readCachedColumns(org, type, name),
-    );
+    const present = await fitStreams(org, pack, streams, !library);
     // Without a detected stream the pack cannot fit, so the Library match is not paid for.
     if (!present.length) return { next: "none", seen: [], found: [] };
     const matched = library
@@ -176,7 +194,7 @@ export function useStarterPackMatcher(
       present.map((name) => readSchemaColumns(org, "metrics", name, !library)),
     );
     const anchor = columns.findIndex((fields) => fields.length > 0);
-    const found = logs.includes(EVENTS_STREAM) ? [...present, EVENTS_STREAM] : present;
+    const found = kubernetesFit(metrics, logs);
     const matched =
       library && orgStreams ? (await matchPack(org, pack, orgStreams, library)).ready : anchor >= 0;
     if (matched) {

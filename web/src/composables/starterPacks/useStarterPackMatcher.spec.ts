@@ -2,11 +2,14 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 
+import { EVENTS_STREAM } from "@/views/Infrastructure/kubernetes2/kubernetesQueries";
+
 import type { StarterPack } from "./types";
 import { packById } from "./usePackCatalog";
 import {
   MATCH_PARTIAL_AFTER_MS,
   MATCH_POLL_MS,
+  fitStreams,
   useStarterPackMatcher,
 } from "./useStarterPackMatcher";
 
@@ -228,6 +231,36 @@ describe("useStarterPackMatcher", () => {
       const { api } = setup(false, packById("aws-cloudwatch")!);
       await api.check();
       expect(api.state.value).toBe("none");
+    });
+  });
+
+  describe("fitStreams", () => {
+    const byType = (logs: string[], metrics: string[] = []) => ({
+      logs: new Map(logs.map((name) => [name, 0])),
+      metrics: new Map(metrics.map((name) => [name, 0])),
+    });
+
+    it("names the Kubernetes streams the matcher found, events included", async () => {
+      fake.metrics = ["kube_pod_status_phase", "kube_pod_info"];
+      fake.logs = [EVENTS_STREAM];
+      fake.columns = { kube_pod_status_phase: ["k8s_cluster"] };
+      const { api } = setup();
+      await api.check();
+      const kubernetes = packById("kubernetes")!;
+      expect(await fitStreams("org", kubernetes, byType(fake.logs, fake.metrics))).toEqual(
+        api.streams.value,
+      );
+      expect(api.streams.value).toEqual(["kube_pod_status_phase", EVENTS_STREAM]);
+    });
+
+    it("names the streams a signal pack's matcher found", async () => {
+      const role = packById("aws-cloudwatch")!.roles![0];
+      fake.logs = ["web", "aws_metrics"];
+      fake.columns = { aws_metrics: role.fields, web: ["message"] };
+      const { api } = setup(false, packById("aws-cloudwatch")!);
+      await api.check();
+      const pack = packById("aws-cloudwatch")!;
+      expect(await fitStreams("org", pack, byType(fake.logs), true)).toEqual(api.streams.value);
     });
   });
 });
