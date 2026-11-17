@@ -312,6 +312,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :help="t('alerts.sections.watch.help')"
               @go="goToSection"
             >
+              <p
+                v-if="showsLibraryLink"
+                class="text-text-secondary m-0 pb-3 text-sm"
+                data-test="add-alert-library-line"
+              >
+                <i18n-t keypath="alerts.form.watch.library" tag="span" scope="global">
+                  <template #link>
+                    <OButton
+                      variant="link"
+                      data-test="add-alert-library-link"
+                      @click="goToAlertLibrary"
+                      >{{ t("alerts.form.watch.libraryLink") }}</OButton
+                    >
+                  </template>
+                </i18n-t>
+              </p>
               <OSettingRow
                 :label="t('alerts.sections.howItChecks')"
                 fill
@@ -328,38 +344,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OSettingRow>
               <div v-if="!isCompositeMode" data-test="add-alert-source-card" data-snap-stop>
-                <OSettingRow :label="t('alerts.sections.rows.streamTypeLabel')" required fill>
-                  <OChoiceCards
-                    :model-value="formData.stream_type"
-                    :options="streamTypeOptions"
-                    :label="t('alerts.streamType')"
-                    :disabled="beingUpdated || anomalyEditMode"
-                    data-test="add-alert-stream-type-cards"
-                    @update:model-value="onStreamTypeChange"
-                  />
-                </OSettingRow>
                 <OSettingRow
                   :label="t('alerts.sections.rows.streamLabel')"
                   :description="t('alerts.sections.rows.stream')"
                   required
                   fill
                 >
-                  <div class="max-w-75">
+                  <div class="flex min-w-0 flex-wrap items-center gap-2">
                     <OFormSelect
-                      ref="streamNameRef"
-                      name="stream_name"
-                      :aria-label="t('alerts.stream_name')"
-                      data-test="add-alert-stream-name-select-dropdown"
-                      :options="indexOptions"
-                      :loading="isFetchingStreams"
-                      class="w-full"
-                      :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
-                      @update:model-value="updateStreamFields($event)"
+                      ref="streamTypeRef"
+                      name="stream_type"
+                      :aria-label="t('alerts.streamType')"
+                      data-test="add-alert-stream-type-select-dropdown"
+                      :options="streamTypeOptions"
+                      :searchable="false"
+                      class="w-37.5 max-md:w-full"
+                      :disabled="beingUpdated || anomalyEditMode"
+                      @update:model-value="onStreamTypeChange"
                     />
-                    <OTooltip
-                      v-if="!formData.stream_type"
-                      :content="t('alerts.selectStreamTypeFirst')"
-                    />
+                    <div class="max-w-75 min-w-0 flex-1 max-md:max-w-none max-md:basis-full">
+                      <OFormSelect
+                        ref="streamNameRef"
+                        name="stream_name"
+                        :aria-label="t('alerts.stream_name')"
+                        data-test="add-alert-stream-name-select-dropdown"
+                        :options="indexOptions"
+                        :loading="isFetchingStreams"
+                        class="w-full"
+                        :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
+                        @update:model-value="updateStreamFields($event)"
+                      />
+                      <OTooltip
+                        v-if="!formData.stream_type"
+                        :content="t('alerts.selectStreamTypeFirst')"
+                      />
+                    </div>
                   </div>
                 </OSettingRow>
                 <AlertSampleEvents
@@ -1041,9 +1060,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import { defineComponent, computed, watch, provide, ref, reactive, onMounted } from "vue";
+import { defineComponent, computed, watch, provide, ref, reactive, onMounted, nextTick } from "vue";
 import { useStore } from "vuex";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -1275,6 +1293,19 @@ export default defineComponent({
       await calibrationHandoff.run();
     });
 
+    // A fresh alert arrives with its type and data chosen, so its first action is picking the stream.
+    onMounted(async () => {
+      await alertForm.formReady;
+      const opened = alertForm.router.currentRoute.value.query;
+      if (alertForm.beingUpdated.value || alertForm.anomalyEditMode.value || opened.prefill) return;
+      await nextTick();
+      document
+        .querySelector<HTMLElement>(
+          '[data-test="add-alert-stream-name-select-dropdown"] [role="combobox"]',
+        )
+        ?.focus({ preventScroll: true });
+    });
+
     const cancelEditor = async () => {
       if (await alertEditorDraft.draft.confirmLeave()) emit("cancel:hideform");
     };
@@ -1418,29 +1449,25 @@ export default defineComponent({
         : []),
     ]);
 
-    const streamTypeOptions = computed<ChoiceCardOption[]>(() => [
-      {
-        label: alertForm.t("alerts.sections.dataTypes.logs.label"),
-        description: alertForm.t("alerts.sections.dataTypes.logs.help"),
-        value: "logs",
-        icon: "search",
-        dataTest: "add-alert-stream-type-card-logs",
-      },
-      {
-        label: alertForm.t("alerts.sections.dataTypes.metrics.label"),
-        description: alertForm.t("alerts.sections.dataTypes.metrics.help"),
-        value: "metrics",
-        icon: "bar-chart",
-        dataTest: "add-alert-stream-type-card-metrics",
-      },
-      {
-        label: alertForm.t("alerts.sections.dataTypes.traces.label"),
-        description: alertForm.t("alerts.sections.dataTypes.traces.help"),
-        value: "traces",
-        icon: "account-tree",
-        dataTest: "add-alert-stream-type-card-traces",
-      },
-    ]);
+    const streamTypeOptions = computed<SelectOption[]>(() =>
+      (["logs", "metrics", "traces"] as const).map((type) => ({
+        label: alertForm.t(`alerts.sections.dataTypes.${type}.label`),
+        value: type,
+      })),
+    );
+
+    // Raw split (no trim), the same rule the alert list hides its Library button by.
+    const showsLibraryLink = computed(
+      () =>
+        !alertForm.beingUpdated.value &&
+        !alertForm.anomalyEditMode.value &&
+        !(store.state.zoConfig?.custom_hide_menus ?? "").split(",").includes("alertLibrary"),
+    );
+    const goToAlertLibrary = () =>
+      alertForm.router.push({
+        name: "alertLibrary",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
 
     // A preset writes an event count, so it only fits a scheduled builder alert being created.
     const showsConditionPresets = computed(() => {
@@ -1990,6 +2017,8 @@ export default defineComponent({
       anomalyCanCheckDataNow,
       alertTypeOptions,
       streamTypeOptions,
+      showsLibraryLink,
+      goToAlertLibrary,
       showsConditionPresets,
       conditionPresetOptions,
       activeConditionPreset,

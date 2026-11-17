@@ -23,6 +23,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, afterEach, beforeEach, onTestFinished } from "vitest";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -2066,6 +2067,61 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-rail-sentence"]').text()).toBe(
         "Alerts pager when its alerts match errors_high AND latency_high, at most once every 15 minutes.",
       );
+    });
+  });
+
+  describe("section 1: what to watch", () => {
+    afterEach(async () => {
+      store.state.zoConfig.custom_hide_menus = "";
+      await router.replace({ query: {} });
+    });
+
+    it("stream type is a dropdown that feeds the stream list", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-stream-type-cards"]').exists()).toBe(false);
+      const select = wrapper
+        .findAllComponents(OSelect)
+        .find((c: any) => c.attributes("data-test") === "add-alert-stream-type-select-dropdown");
+      getStreamsMock.mockClear();
+      select.vm.$emit("update:model-value", "metrics");
+      await flushPromises();
+      expect(wrapper.vm.form.state.values.stream_type).toBe("metrics");
+      expect(getStreamsMock).toHaveBeenCalledWith("metrics", false);
+    });
+
+    it.each([
+      ["create", {}, "", true],
+      ["edit", { isUpdated: true, modelValue: savedAlert() }, "", false],
+      ["create with the library hidden", {}, "alertLibrary", false],
+    ])("the Alert Library link on %s", async (_, props, hidden, shown) => {
+      store.state.zoConfig.custom_hide_menus = hidden;
+      const push = vi.spyOn(router, "push");
+      wrapper = mountAlert(props);
+      await flushPromises();
+      const link = wrapper.find('[data-test="add-alert-library-link"]');
+      expect(link.exists()).toBe(shown);
+      if (!shown) return;
+      await link.trigger("click");
+      expect(push).toHaveBeenCalledWith({
+        name: "alertLibrary",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    });
+
+    it.each([
+      ["a new alert", {}, {}, true],
+      ["an edit", { isUpdated: true, modelValue: savedAlert() }, {}, false],
+      ["a prefilled open", {}, { prefill: "logs" }, false],
+    ])("stream picker focus on %s", async (_, props, query, focused) => {
+      await router.replace({ query });
+      wrapper = mountAlert(props, { attachTo: document.body });
+      await flushPromises();
+      const picker = document.querySelector('[data-test="add-alert-stream-name-select-dropdown"]');
+      expect(!!picker?.contains(document.activeElement)).toBe(focused);
+      if (!focused) return;
+      expect(wrapper.vm.form.state.values.is_real_time).toBe("false");
+      expect(wrapper.vm.form.state.values.stream_type).toBe("logs");
     });
   });
 
