@@ -221,6 +221,10 @@ function sizeClamped(header: any): boolean {
   );
 }
 
+function headerPin(header: any): false | "left" | "right" {
+  return header.column.getIsPinned?.() ?? false;
+}
+
 function isAutoWidthColumn(header: any): boolean {
   return (header.column.columnDef.meta as any)?.autoWidth === true;
 }
@@ -582,7 +586,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           // Sortable's `filter` selector — this header can't start a drag, so it
           // must not advertise the move cursor the draggable <tr> sets either.
           header.id === pinnedFirstColumn ? 'o2-table-th-pinned-first cursor-default' : '',
-          header.column.getIsPinned?.() ? 'bg-table-header-bg' : '',
+          headerPin(header) ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -605,7 +609,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                     ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
                     : { width: headerSizeVar(header) }
                 : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
-          ...(header.column.getIsPinned?.() === 'left'
+          ...(headerPin(header) === 'left'
             ? {
                 position: 'sticky',
                 left: `${header.column.getStart?.('left') ?? 0}px`,
@@ -613,7 +617,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 boxShadow: 'var(--shadow-sticky-left)',
               }
             : {}),
-          ...(header.column.getIsPinned?.() === 'right'
+          ...(headerPin(header) === 'right'
             ? {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
@@ -657,11 +661,9 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           ]"
         >
           <!-- Sortable header -->
-          <OTooltip
+          <!-- Only while sorting is off: a tooltip trigger on the button mutes the header help bubble. -->
+          <template
             v-if="(header.column.columnDef.meta as any)?.sortable && isPlainLabelHeader(header)"
-            :content="sortDisabledReason"
-            :disabled="!(sortDisabled && sortDisabledReason)"
-            side="top"
           >
             <button
               type="button"
@@ -732,7 +734,12 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 />
               </span>
             </button>
-          </OTooltip>
+            <OTooltip
+              v-if="sortDisabled && sortDisabledReason"
+              :content="sortDisabledReason"
+              side="top"
+            />
+          </template>
 
           <!-- A button must not nest interactive content, so a component header sorts from a sibling button -->
           <template v-else-if="(header.column.columnDef.meta as any)?.sortable">
@@ -764,12 +771,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 {{ headerSubLabel(header) }}
               </OTruncatedText>
             </div>
-            <OTooltip
-              v-if="sortingEnabled"
-              :content="sortDisabledReason"
-              :disabled="!(sortDisabled && sortDisabledReason)"
-              side="top"
-            >
+            <template v-if="sortingEnabled">
               <button
                 type="button"
                 :class="[
@@ -809,7 +811,12 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   data-test-sort-direction="none"
                 />
               </button>
-            </OTooltip>
+              <OTooltip
+                v-if="sortDisabled && sortDisabledReason"
+                :content="sortDisabledReason"
+                side="top"
+              />
+            </template>
           </template>
 
           <!-- Non-sortable header -->
@@ -1030,7 +1037,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           compact ? 'group h-6' : dense ? 'group h-8' : 'group h-9',
           'border-table-header-border border-b',
-          header.column.getIsPinned?.() ? 'bg-table-header-bg' : '',
+          headerPin(header) ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -1053,7 +1060,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                     ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
                     : { width: headerSizeVar(header) }
                 : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
-          ...(header.column.getIsPinned?.() === 'left'
+          ...(headerPin(header) === 'left'
             ? {
                 position: 'sticky',
                 left: `${header.column.getStart?.('left') ?? 0}px`,
@@ -1061,7 +1068,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 boxShadow: 'var(--shadow-sticky-left)',
               }
             : {}),
-          ...(header.column.getIsPinned?.() === 'right'
+          ...(headerPin(header) === 'right'
             ? {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
@@ -1104,11 +1111,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             headerAlignClass(header),
           ]"
         >
-          <OTooltip
+          <template
             v-if="(header.column.columnDef.meta as any)?.sortable && isPlainLabelHeader(header)"
-            :content="sortDisabledReason"
-            :disabled="!(sortDisabled && sortDisabledReason)"
-            side="top"
           >
             <button
               type="button"
@@ -1176,7 +1180,12 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 />
               </template>
             </button>
-          </OTooltip>
+            <OTooltip
+              v-if="sortDisabled && sortDisabledReason"
+              :content="sortDisabledReason"
+              side="top"
+            />
+          </template>
           <template v-else-if="(header.column.columnDef.meta as any)?.sortable">
             <OTruncatedText
               :id="headerLabelId(header)"
@@ -1191,12 +1200,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             >
               <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
             </OTruncatedText>
-            <OTooltip
-              v-if="sortingEnabled"
-              :content="sortDisabledReason"
-              :disabled="!(sortDisabled && sortDisabledReason)"
-              side="top"
-            >
+            <template v-if="sortingEnabled">
               <button
                 type="button"
                 :class="[
@@ -1236,7 +1240,12 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   data-test-sort-direction="none"
                 />
               </button>
-            </OTooltip>
+              <OTooltip
+                v-if="sortDisabled && sortDisabledReason"
+                :content="sortDisabledReason"
+                side="top"
+              />
+            </template>
           </template>
           <OTruncatedText
             v-else

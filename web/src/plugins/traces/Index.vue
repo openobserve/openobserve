@@ -2492,8 +2492,37 @@ const applyStreamChange = async (newStream: string) => {
   };
   searchObj.data.editorValue = "";
   streamChangeDialog.value.show = false;
+  // With auto-run off no search writes the URL, and the catalog's Back and Forward follow the URL's stream.
+  if (isAutoRunOff() && activeTab.value === "services-catalog" && canWriteTracesUrl()) {
+    const query = {
+      ...router.currentRoute.value.query,
+      stream: newStream,
+      query: b64EncodeUnicode(""),
+    };
+    delete query.columns;
+    router.push({ query });
+  }
   await onChangeStream();
 };
+
+// Back and Forward across a catalog stream switch move the shared stream, so the Traces and Spans tabs agree.
+watch(
+  () => [router.currentRoute.value.name, router.currentRoute.value.query.stream] as const,
+  ([routeName, stream]) => {
+    if (routeName !== "traces" || !pageActive.value || !pageLoaded) return;
+    if (activeTab.value !== "services-catalog" || typeof stream !== "string") return;
+    if (stream === searchObj.data.stream.selectedStream.value) return;
+    if (!searchObj.data.stream.streamLists.some((s: any) => s.value === stream)) return;
+    searchObj.data.stream.selectedStream = { label: stream, value: stream };
+    // A stream switch clears the query, so undoing it brings back the query its entry was left with.
+    const query = router.currentRoute.value.query.query;
+    searchObj.data.editorValue = typeof query === "string" ? b64DecodeUnicode(query) || "" : "";
+    void extractFields().then(() => {
+      if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
+        restoreFilters(searchObj.data.editorValue);
+    });
+  },
+);
 
 const onChildStreamChangeRequest = (newStream: string) => {
   if (searchObj.data.editorValue?.trim()) {

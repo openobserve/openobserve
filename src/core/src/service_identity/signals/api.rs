@@ -439,10 +439,7 @@ pub async fn compare(
                 .find(|r| r.where_key == place && r.identity() == v)
         })
     } else {
-        registry
-            .iter()
-            .filter(|r| r.where_key == place && r.first_seen < a.first_seen)
-            .max_by_key(|r| r.first_seen)
+        crate::service_identity::api::previous_version(&registry, &place, &a.version, a.first_seen)
     };
     let canary = deploy
         .and_then(|d| {

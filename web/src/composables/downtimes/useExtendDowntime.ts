@@ -15,7 +15,8 @@
 
 import { useRouter } from "vue-router";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
-import { formatInTimeZone } from "date-fns-tz";
+import { getIntlLocale } from "@/locales";
+import { formatInZone } from "@/utils/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
@@ -35,9 +36,10 @@ export function useExtendDowntime() {
   // The zone the downtime pages show times in, read once so the dialog and its toast agree.
   const timezone = useViewerTimezone().value;
 
+  // The app's language and a 24-hour clock, as every downtime time reads.
   const endText = (micros?: number | null) =>
     micros
-      ? `${formatInTimeZone(new Date(micros / 1000), timezone, "d MMM HH:mm")} ${timezone}`
+      ? `${formatInZone(micros, timezone, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }, getIntlLocale())} ${timezone}`
       : "";
 
   const extend = async (

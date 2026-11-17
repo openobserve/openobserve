@@ -511,16 +511,6 @@ pub async fn search(
         res.hits.len()
     );
     if should_cache_results && search_results_have_hits {
-        // Determine if this is a non-timestamp histogram query
-        // Note: write_res.order_by_metadata contains the same ORDER BY info
-        let is_histogram_non_ts_order = c_resp.histogram_interval > 0
-            && !res.order_by_metadata.is_empty()
-            && res
-                .order_by_metadata
-                .first()
-                .map(|(field, _)| field != &c_resp.ts_column)
-                .unwrap_or(false);
-
         write_results(
             trace_id,
             &c_resp.ts_column,
@@ -531,7 +521,6 @@ pub async fn search(
             is_complex_query,
             c_resp.is_descending,
             req.clear_cache,
-            is_histogram_non_ts_order,
         )
         .await;
     }
@@ -598,7 +587,7 @@ pub async fn prepare_cache_response(
     }
 
     // Parse SQL first to get metadata needed for normalization
-    let query: SearchQuery = req.query.clone().into();
+    let query: SearchQuery = req.query.clone().try_into()?;
     let mut sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
@@ -648,7 +637,7 @@ pub async fn prepare_cache_response(
     let mut h = config::utils::hash::gxhash::new();
     let hashed_query = h.sum64(&hash_body.join(","));
 
-    let (mut ts_column, mut is_descending) =
+    let (mut ts_column, is_descending) =
         cacher::get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex_query).unwrap_or_default();
 
     // Refine ts_column for non-complex queries with SELECT * or missing _timestamp
@@ -689,8 +678,20 @@ pub async fn prepare_cache_response(
         sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
     }
 
-    // Refine is_descending for histogram queries with non-timestamp ORDER BY
-    is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
+    // #16650: a top-N ranked by another field cannot be split or reused across time ranges
+    if result_utils::is_ranked_by_non_timestamp(&sql.order_by, &ts_column) {
+        return Ok((
+            MultiCachedQueryResponse {
+                ts_column,
+                is_aggregate: is_complex_query,
+                is_descending,
+                order_by: sql.order_by,
+                limit: sql.limit,
+                ..Default::default()
+            },
+            true,
+        ));
+    }
 
     // Compute the complete file path once for both branches
     let base_file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
@@ -1053,7 +1054,6 @@ pub async fn write_results(
     is_aggregate: bool,
     is_descending: bool,
     clear_cache: bool,
-    is_histogram_non_ts_order: bool,
 ) {
     if res.hits.is_empty() {
         return;
@@ -1106,12 +1106,8 @@ pub async fn write_results(
     }
 
     // 6. filter the records to the accept time range
-    // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
-    // to find actual min/max timestamps, since results may not be time-ordered
     let mut res = deep_copy_response(res);
-    let is_time_ordered = !is_histogram_non_ts_order;
-    let (data_start_time, data_end_time) =
-        extract_timestamp_range(&res.hits, ts_column, is_time_ordered);
+    let (data_start_time, data_end_time) = extract_timestamp_range(&res.hits, ts_column);
     if data_start_time < accept_start_time || data_end_time > accept_end_time {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
@@ -1395,7 +1391,7 @@ pub async fn apply_regex_to_response(
         |_| {},
     )?;
 
-    let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
+    let query: proto::cluster_rpc::SearchQuery = req.query.clone().try_into()?;
     let sql = match crate::sql::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
@@ -1577,6 +1573,91 @@ mod tests {
                         assert!(prepared.file_path.is_empty());
                     }
                 }
+            }
+        }
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .remove(&format!("{org_id}/logs/t"));
+    }
+
+    #[tokio::test]
+    async fn test_prepare_skips_queries_not_ordered_by_time() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "ranked_order_eligibility";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_id}/logs/t"),
+            SchemaCache::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("k", DataType::Utf8, true),
+            ])),
+        );
+        let histogram =
+            "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM t GROUP BY ts";
+        let cases = [
+            (format!("{histogram} ORDER BY c DESC LIMIT 3"), "ts", false),
+            (
+                format!("{histogram} ORDER BY count(*) DESC LIMIT 3"),
+                "ts",
+                false,
+            ),
+            (format!("{histogram} ORDER BY 2 DESC LIMIT 3"), "ts", false),
+            (
+                format!("{histogram} ORDER BY count(*) DESC, ts ASC"),
+                "ts",
+                false,
+            ),
+            (
+                format!("{histogram} ORDER BY ts ASC, count(*) DESC"),
+                "ts",
+                true,
+            ),
+            (
+                "SELECT * FROM t ORDER BY k".to_string(),
+                "_timestamp",
+                false,
+            ),
+            (
+                "SELECT * FROM t ORDER BY _timestamp DESC".to_string(),
+                "_timestamp",
+                true,
+            ),
+            (format!("{histogram} ORDER BY ts DESC"), "ts", true),
+            (format!("{histogram} ORDER BY ts ASC, c DESC"), "ts", true),
+            (format!("{histogram} ORDER BY 1 ASC, 2 DESC"), "ts", true),
+        ];
+        for (sql, ts_column, eligible) in cases {
+            for use_cache in [false, true] {
+                let mut req = search::Request {
+                    query: search::Query {
+                        sql: sql.clone(),
+                        start_time: 1_735_689_600_000_000,
+                        end_time: 1_735_776_000_000_000,
+                        size: 100,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let (prepared, should_exec_query) = prepare_cache_response(
+                    "ranked_order_eligibility",
+                    org_id,
+                    StreamType::Logs,
+                    &mut req,
+                    use_cache,
+                )
+                .await
+                .unwrap();
+                let case = format!("sql={sql}, use_cache={use_cache}");
+                assert!(should_exec_query, "{case}");
+                assert_eq!(prepared.ts_column, ts_column, "{case}");
+                assert_eq!(!prepared.file_path.is_empty(), eligible, "{case}");
+                assert_eq!(
+                    prepared.cache_query_response,
+                    eligible && use_cache,
+                    "{case}"
+                );
             }
         }
         STREAM_SCHEMAS_LATEST
@@ -2069,7 +2150,7 @@ mod tests {
         );
         assert_eq!(alias_ts_of(&merged), vec![40, 30, 20, 10]);
         // write_results() takes the time range from the first and last hit
-        let (start, end) = result_utils::extract_timestamp_range(&merged.hits, "ts", true);
+        let (start, end) = result_utils::extract_timestamp_range(&merged.hits, "ts");
         assert_eq!((start, end), (10, 40));
     }
 }

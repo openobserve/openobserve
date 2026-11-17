@@ -13,23 +13,55 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-const SIGNAL_ORDER = ["logs", "metrics", "traces"];
+import { qualifiedName } from "@/types/serviceRef";
+import { sqlIn, sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
-/** Services as a reader counts them in the discovered list: one per display name, so two detected keys of one trace service count once. */
-export function serviceNameCount(
-  records: readonly { service_name: string; display_name?: string | null }[],
-) {
-  return new Set(records.map((record) => record.display_name || record.service_name)).size;
+const SIGNAL_ORDER = ["logs", "metrics", "traces"];
+const SERVICE_UNITS = ["service", "socket", "target", "slice"];
+// One pattern serves TS and SQL so both fold alike; [\s\S] spans newlines in both engines without a flag.
+const SERVICE_KEY_PATTERN = `^\\s*(?:([\\s\\S]*?\\S)\\s*\\.(?:${SERVICE_UNITS.join("|")})|([\\s\\S]*?))\\s*$`;
+const SERVICE_KEY_RE = new RegExp(SERVICE_KEY_PATTERN);
+
+interface NamedRecord {
+  service_name: string;
+  display_name?: string | null;
+  display_qualifier?: string | null;
+}
+
+/** The service a discovered record belongs to: its display name, kept apart from a same-named one by its qualifier. */
+export function serviceIdentityOf(record: NamedRecord) {
+  return qualifiedName(record.display_name || record.service_name, record.display_qualifier);
+}
+
+/** The name the service registries match by (backend service_key): trimmed, lowercased, one unit suffix off. */
+export function serviceKey(name: string) {
+  return name.toLowerCase().replace(SERVICE_KEY_RE, "$1$2");
+}
+
+/** serviceKey as a SQL expression over a span column, so a search groups every spelling of a service together. */
+export function serviceKeySql(column: string) {
+  return `regexp_replace(lower(${column}), '${SERVICE_KEY_PATTERN}', '\\1\\2')`;
+}
+
+/** A span filter on every raw spelling of one service, so a folded catalog row reads all of its spans. */
+export function serviceNamesSql(column: string, names: readonly string[]) {
+  const spellings = [...new Set(names)];
+  return spellings.length === 1
+    ? `${column} = ${sqlLiteral(spellings[0])}`
+    : sqlIn(column, spellings);
+}
+
+/** Services as a reader counts them in the discovered list: two detected keys of one qualified trace service count once. */
+export function serviceNameCount(records: readonly NamedRecord[]) {
+  return new Set(records.map(serviceIdentityOf)).size;
 }
 
 /** Services of the discovered list that carry one dimension value, counted like serviceNameCount so it never exceeds that count. */
 export function serviceValueCount(
-  records: readonly {
-    service_name: string;
-    display_name?: string | null;
+  records: readonly (NamedRecord & {
     all_dimensions?: Record<string, string> | null;
     disambiguation?: Record<string, string> | null;
-  }[],
+  })[],
   dimension: string,
   value: string,
 ) {

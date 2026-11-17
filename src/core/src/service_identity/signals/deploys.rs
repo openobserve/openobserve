@@ -498,21 +498,16 @@ pub(super) async fn detect(
                 .collect();
             updates.push(model(&entry, &full)?);
         }
-        put_scope_updates(updates, |mut updates| async move {
+        put_scope_updates(updates, |updates| async move {
             ownership.check().await?;
-            table::put_fenced_batch(
+            let updates = table::put_fenced_batch(
                 conn,
                 org,
                 &config::get_cluster_name(),
                 ownership.generation,
-                updates.clone(),
+                updates,
             )
             .await?;
-            for row in &mut updates {
-                *row = table::get(conn, org, &row.deploy_key)
-                    .await?
-                    .ok_or_else(|| anyhow::anyhow!("persisted deploy missing"))?;
-            }
             db::service_identity_sync::publish_chunked(
                 updates
                     .iter()

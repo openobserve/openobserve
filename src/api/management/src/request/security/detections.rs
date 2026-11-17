@@ -20,7 +20,10 @@ use axum::{
     extract::{Path, rejection::JsonRejection},
     response::Response,
 };
-use config::{meta::stream::StreamType, utils::json::Value};
+use config::{
+    meta::stream::StreamType,
+    utils::{json::Value, sql::quote_identifier},
+};
 use futures::{StreamExt, stream};
 use o2_enterprise::enterprise::security::{
     audit,
@@ -373,7 +376,12 @@ pub async fn preview_detection(
     let start = end - range_us;
     let settings = db::organization::read_org_setting(&org_id, |s| s.security_tuning.shared())
         .await
-        .unwrap_or_default();
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "[SECURITY] security tuning of org {org_id} unreadable, using defaults: {e}"
+            );
+            Default::default()
+        });
     let tuned = authoring::PreviewTuning::new(
         &settings,
         req.alert_id.as_deref(),
@@ -472,8 +480,8 @@ pub async fn preview_detection(
     let sql = tuned.sql(&sql, &stream, &fields);
     let count_sql = tuned.sql(
         &format!(
-            "SELECT COUNT(*) AS zo_n FROM \"{}\" WHERE {}",
-            stream.replace('"', "\"\""),
+            "SELECT COUNT(*) AS zo_n FROM {} WHERE {}",
+            quote_identifier(&stream),
             result.compiled.where_clause
         ),
         &stream,

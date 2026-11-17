@@ -4,12 +4,13 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import Controls from "./CatalogVersionControls.vue";
 import Counts from "./CatalogVersionControlsCounts.vue";
-import Band from "./CatalogVersionControlsBand.vue";
+import Notice from "./CatalogVersionNotice.vue";
 import Cell from "./CatalogVersionsCell.vue";
 import Chip from "./VerdictChip.vue";
 import Setup from "./NoVersionState.vue";
 import type { Scope, ServicesResponse, VerdictSummary } from "@/services/service_versions";
 import { formatStamp } from "./VersionSummaryTiles.format";
+import { catalogEnvCounts } from "@/plugins/traces/servicesCatalogVersions";
 import producer from "@/test/unit/fixtures/serviceVersions/producer.json";
 const open = vi.hoisted(() => vi.fn());
 vi.mock("@/enterprise/composables/useVersionCompareDrawer", () => ({
@@ -28,7 +29,10 @@ const global = {
       props: ["disabled"],
       template: '<div :aria-disabled="disabled"><slot name="trigger" /><slot /></div>',
     },
-    OSelectItem: { props: ["value", "label"], template: "<span>{{ label }}</span>" },
+    OSelectItem: {
+      props: ["value", "label", "disabled"],
+      template: '<span :data-disabled="String(Boolean(disabled))">{{ label }}</span>',
+    },
     OButton: {
       props: ["disabled"],
       emits: ["click"],
@@ -42,6 +46,7 @@ const global = {
     },
     OSkeleton: { template: "<div />" },
     OTooltip: { props: ["content"], template: '<i class="tip">{{ content }}</i>' },
+    OPopover: { template: '<div><slot name="trigger" /><slot /></div>' },
     ODialog: { props: ["open"], template: '<div v-if="open" data-test="dialog"><slot /></div>' },
     ServiceEnvChip: { props: ["identity"], template: "<b>{{ identity.env }}</b>" },
   },
@@ -74,19 +79,39 @@ const data = (): ServicesResponse => ({
   verdict_status: "ok",
   verdict_counts: { regressed: 2, watch: 1 },
 });
-const controls = (props = {}) =>
+const controls = (props: { data?: ServicesResponse } & Record<string, unknown> = {}) =>
   mount(Controls, {
+    props: {
+      data: data(),
+      state: "ready",
+      env: "",
+      verdict: "",
+      envCounts: catalogEnvCounts(
+        (props.data ?? data()).services.map((versionScope) => ({ versionScope })),
+      ),
+      ...props,
+    },
+    global,
+  });
+const notice = (props = {}) =>
+  mount(Notice, {
     props: { data: data(), state: "ready", env: "", verdict: "", ...props },
     global,
   });
-const band = (props = {}) =>
-  mount(Band, {
-    props: { data: data(), state: "ready", env: "", verdict: "", ...props },
-    global,
-  });
+// The trigger's cut-text helper mounts its own empty tooltip; only a stated reason counts here.
+const reasons = (wrapper: ReturnType<typeof controls>) =>
+  wrapper
+    .findAll(".tip")
+    .map((tip) => tip.text())
+    .filter(Boolean);
 describe("catalog filters", () => {
-  it.each(["loading", "locked", "error"] as const)("disables both filters while %s", (state) => {
+  it.each([
+    ["loading", "serviceVersions.catalog.any"],
+    ["locked", "serviceVersions.catalog.disabled"],
+    ["error", "serviceVersions.catalog.disabled"],
+  ] as const)("disables both filters while %s, the verdict trigger reading %s", (state, value) => {
     const wrapper = controls({ state });
+    expect(wrapper.get('[data-test="svcver-verdict-filter-value"]').text()).toBe(value);
     expect(wrapper.find('[data-test="svcver-verdict-filter"]').attributes("aria-disabled")).toBe(
       "true",
     );
@@ -103,7 +128,25 @@ describe("catalog filters", () => {
       "false",
     );
     expect(wrapper.text()).toContain("serviceVersions.catalog.disabled");
-    expect(wrapper.find(".tip").text()).toBe("serviceVersions.catalog.unavailable");
+    expect(reasons(wrapper)).toEqual(["serviceVersions.catalog.unavailable"]);
+  });
+  it("disables both filters and shows no picked value when spans record no env", () => {
+    const wrapper = controls({ noEnvStamps: true, env: "prod", verdict: "regressed" });
+    for (const id of ["svcver-env-filter", "svcver-verdict-filter"])
+      expect(wrapper.get(`[data-test="${id}"]`).attributes("aria-disabled")).toBe("true");
+    expect(reasons(wrapper)).toEqual(Array(2).fill("serviceVersions.catalog.noEnvStamps"));
+    expect(wrapper.get('[data-test="svcver-verdict-filter-value"]').text()).toBe(
+      "serviceVersions.catalog.any",
+    );
+    expect(wrapper.text()).toContain("serviceVersions.catalog.allEnvs");
+  });
+  it("names no spans in range over missing env stamps, and waits for the stream's rows", () => {
+    const empty = controls({ noSpans: true, noEnvStamps: true, envCounts: new Map() });
+    expect(reasons(empty)).toEqual(Array(2).fill("serviceVersions.catalog.noSpansInRange"));
+    const pending = controls({ envCounts: undefined });
+    for (const id of ["svcver-env-filter", "svcver-verdict-filter"])
+      expect(pending.get(`[data-test="${id}"]`).attributes("aria-disabled")).toBe("true");
+    expect(reasons(pending)).toEqual([]);
   });
   it("lists the design's verdict options and adds rare states only when present", () => {
     const wrapper = controls();
@@ -119,13 +162,17 @@ describe("catalog filters", () => {
     expect(preexisting.find('[data-test="svcver-verdict-option-pre_existing"]').exists()).toBe(
       true,
     );
+    // An option no shown service has gives an empty page, so only the current pick stays open.
+    const disabled = (id: string) =>
+      wrapper.get(`[data-test="svcver-verdict-option-${id}"]`).attributes("data-disabled");
+    expect([disabled("ok"), disabled("first_version")]).toEqual(["true", "false"]);
     expect(wrapper.find('[data-test="svcver-env-option-prod"]').exists()).toBe(true);
   });
   it("offers every env in the set and shows an env the scope was only also seen in", () => {
     const golden = structuredClone(producer.two_env.services) as ServicesResponse;
     const wrapper = controls({ env: "staging", data: { ...data(), ...golden } });
     expect(wrapper.find('[data-test="svcver-env-option-staging"]').exists()).toBe(true);
-    expect(wrapper.find("b").text()).toBe("staging");
+    expect(wrapper.get('[data-test="svcver-env-filter-value"]').text()).toBe("staging");
   });
 });
 describe("catalog verdict counts", () => {
@@ -164,78 +211,81 @@ describe("catalog verdict counts", () => {
     expect(wrapper.find('[data-test="svcver-catalog-counts"]').exists()).toBe(false);
   });
 });
-describe("catalog bands", () => {
-  it.each(["loading", "locked"] as const)("distinguishes %s from empty", (state) => {
-    const wrapper = band({ state });
-    expect(
-      wrapper
-        .find(`[data-test="svcver-catalog-${state === "locked" ? "denied" : state}"]`)
-        .exists(),
-    ).toBe(true);
-    expect(wrapper.find('[data-test="svcver-catalog-empty"]').exists()).toBe(false);
+describe("catalog notice beside the filters", () => {
+  const preexisting = { ...scope, newest_verdict: verdict({ state: "pre_existing" }) };
+  const untracked = { ...scope, tracking_started: false } as Scope;
+  const tracked = { ...scope, scope_key: "b", newest_verdict: verdict() };
+  const since = producer.services_tracking;
+  const noVersion = [tracked, { ...scope, scope_key: "a", newest_version: "" }];
+  const withServices = (services: Scope[], patch = {}) => ({
+    data: { ...data(), services, ...patch },
   });
-  it("leaves an empty org to the table's no-services state, with no notice of its own", () => {
-    const wrapper = band({ data: { ...data(), services: [] } });
-    expect(wrapper.find('[data-test="svcver-catalog-error"]').exists()).toBe(false);
-    expect(wrapper.get('[data-test="svcver-notice-slot"]').element.children).toHaveLength(0);
-    expect(wrapper.text()).not.toContain("serviceVersions.catalog.empty");
-  });
-  it("puts the registry failure above the table with Retry, naming both disabled filters", async () => {
-    const wrapper = band({ state: "error" });
-    const error = wrapper.get('[data-test="svcver-catalog-error"]');
-    expect(error.text()).toContain("versionsUnavailableTitle: version tracking did not respond");
-    expect(error.text()).toContain("Trace metrics below are current");
-    expect(error.text()).toContain("The Env and Deploy verdict filters are disabled");
-    expect(error.attributes("role")).toBe("alert");
-    expect(error.classes()).toContain("bg-status-error-bg");
-    await wrapper.get('[data-test="svcver-retry"]').trigger("click");
-    expect(wrapper.emitted("refresh")).toHaveLength(1);
-  });
-  it("names a verdict-only outage separately", () => {
-    const wrapper = band({
-      data: { ...data(), verdict_status: "unavailable" },
-    });
-    expect(wrapper.get('[data-test="svcver-catalog-error"]').text()).toContain(
-      "verdictsUnavailableTitle: trace metrics below are current",
-    );
-  });
-  it("shows the launch banner only when every versioned scope is pre-existing", () => {
-    const preexisting = { ...scope, newest_verdict: verdict({ state: "pre_existing" }) };
-    const wrapper = band({
-      data: {
-        ...data(),
-        services: [preexisting, { ...scope, scope_key: "none", newest_version: null }],
-      },
-    });
-    expect(wrapper.find('[data-test="svcver-launch-day"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="svcver-show-no-version"]').exists()).toBe(false);
-    expect(band().find('[data-test="svcver-launch-day"]').exists()).toBe(false);
-  });
-  it("counts no-version services and applies the filter from Show them", async () => {
-    const services = [
-      { ...scope, newest_verdict: verdict() },
-      { ...scope, scope_key: "a", newest_version: "" },
-      { ...scope, scope_key: "b", newest_version: null },
-    ];
-    const wrapper = band({ data: { ...data(), services } });
-    expect(wrapper.get('[data-test="svcver-no-version-band"]').text()).toContain(
-      'noVersionBandCount{"count":2} send no version, so they get',
-    );
-    await wrapper.get('[data-test="svcver-show-no-version"]').trigger("click");
-    expect(wrapper.emitted("verdict")).toEqual([["no_version"]]);
-  });
-  it("turns into the setup hint under the No version filter and opens the setup", async () => {
-    const services = [
-      { ...scope, newest_version: null },
-      { ...scope, newest_verdict: verdict() },
-    ];
-    const wrapper = band({ data: { ...data(), services }, verdict: "no_version", env: "prod" });
-    expect(wrapper.get('[data-test="svcver-no-version"]').text()).toContain(
-      '{"count":1,"total":2} prod service sends no version',
-    );
-    expect(wrapper.find('[data-test="svcver-no-version-setup"]').exists()).toBe(false);
-    await wrapper.get('[data-test="svcver-how-to-version"]').trigger("click");
-    expect(wrapper.find('[data-test="svcver-no-version-setup"]').exists()).toBe(true);
+  it.each([
+    ["loading", { state: "loading" }, "", ""],
+    ["an empty org", withServices([]), "", ""],
+    ["verdicts for another scope", withServices([untracked, tracked]), "", ""],
+    ["denied", { state: "locked" }, "chip:svcver-catalog-denied", "serviceVersions.compare.denied"],
+    ["failed", { state: "error" }, "chip:svcver-catalog-error", "catalog.versionsUnavailable{"],
+    [
+      "verdicts down",
+      { data: { ...data(), verdict_status: "unavailable" } },
+      "chip:svcver-catalog-error",
+      "catalog.verdictsUnavailable{",
+    ],
+    [
+      "warming up",
+      withServices([untracked], { tracking: { epoch: null, warmup_ends_at: null } }),
+      "icon:svcver-launch-day",
+      "serviceVersions.catalog.warmingUpNoEpoch",
+    ],
+    [
+      "all pre-existing",
+      withServices([preexisting], { tracking: since }),
+      "icon:svcver-launch-day",
+      `serviceVersions.sentence.preExistingSince{"epoch":"${formatStamp(since.epoch!)}"}`,
+    ],
+    [
+      "no version under its filter",
+      { ...withServices(noVersion), verdict: "no_version", env: "prod" },
+      "icon:svcver-no-version",
+      "catalog.noVersionHint{",
+    ],
+    [
+      "no-version services",
+      withServices(noVersion),
+      "icon:svcver-no-version-band",
+      "noVersionBand{",
+    ],
+  ])(
+    "shows %s in the reserved slot as its element, with its message said once",
+    (_state, props, element, tip) => {
+      const slot = notice(props).get('[data-test="svcver-notice-slot"]');
+      const chip = slot.find('[role="alert"]');
+      const icon = slot.find("button[aria-label]");
+      const shown = chip.exists() ? chip : icon;
+      const kind = chip.exists() ? "chip" : "icon";
+      expect(shown.exists() ? `${kind}:${shown.attributes("data-test")}` : "").toBe(element);
+      const tips = slot.findAll(".tip").map((t) => t.text());
+      if (kind === "chip") expect(tips.join("")).toContain(tip);
+      else if (icon.exists()) {
+        // The popover is the one surface for the text; a hover tooltip would repeat it.
+        expect(tips).toEqual([]);
+        expect(slot.text()).toContain(tip);
+        expect(icon.attributes("aria-label")).toContain(tip);
+      }
+    },
+  );
+  it("retries a failure and acts on the no-version notices from their popover", async () => {
+    const failed = notice({ state: "error" });
+    await failed.get('[data-test="svcver-retry"]').trigger("click");
+    expect(failed.emitted("refresh")).toHaveLength(1);
+    expect(notice({ state: "locked" }).find('[data-test="svcver-retry"]').exists()).toBe(false);
+    const band = notice(withServices(noVersion));
+    await band.get('[data-test="svcver-show-no-version"]').trigger("click");
+    expect(band.emitted("verdict")).toEqual([["no_version"]]);
+    const hint = notice({ ...withServices(noVersion), verdict: "no_version" });
+    await hint.get('[data-test="svcver-how-to-version"]').trigger("click");
+    expect(hint.find('[data-test="svcver-no-version-setup"]').exists()).toBe(true);
   });
 });
 describe("catalog version cells", () => {
@@ -331,7 +381,9 @@ describe("catalog version cells", () => {
     );
   });
   it("distinguishes unknown identity from a known no-version service", () => {
-    expect(mount(Cell, { global }).text()).toBe("—");
+    const unknown = mount(Cell, { props: { emptyReason: "Not reported" }, global });
+    expect(unknown.get('[data-test="svcver-cell-empty"] [aria-hidden="true"]').text()).toBe("—");
+    expect(unknown.get('[data-test="svcver-cell-empty"] .sr-only').text()).toBe("Not reported");
     expect(
       mount(Cell, {
         props: { scope: { ...scope, newest_version: "", active_versions: [""] } },
@@ -466,7 +518,13 @@ describe("no-version setup", () => {
 describe("real catalog selectors", () => {
   it("mounts the all options without invalid empty Reka values", async () => {
     const wrapper = mount(Controls, {
-      props: { data: data(), state: "ready", env: "", verdict: "" },
+      props: {
+        data: data(),
+        state: "ready",
+        env: "",
+        verdict: "",
+        envCounts: catalogEnvCounts([{ versionScope: scope }]),
+      },
       global: { ...global, stubs: { ...global.stubs, OSelect: false, OSelectItem: false } },
     });
     expect(wrapper.find('[data-test="svcver-env-filter-trigger"]').exists()).toBe(true);
@@ -475,11 +533,11 @@ describe("real catalog selectors", () => {
       .get('[data-test="svcver-verdict-filter-trigger"]')
       .trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
-    const option = document.querySelector('[data-test="svcver-verdict-option-no_version"]');
+    const option = document.querySelector('[data-test="svcver-verdict-option-first_version"]');
     expect(option).not.toBeNull();
     option?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await flushPromises();
-    expect(wrapper.emitted("verdict")).toEqual([["no_version"]]);
+    expect(wrapper.emitted("verdict")).toEqual([["first_version"]]);
     wrapper.unmount();
   });
 });
@@ -494,19 +552,11 @@ describe("deploy tracking warm-up", () => {
     mount(Cell, { props: { scope: preexisting, content: "verdict", tracking }, global })
       .get(".tip")
       .text();
-  it("says the one no-verdict sentence in the banner once the warm-up is over", () => {
-    const wrapper = band({
-      data: { ...data(), services: [preexisting], tracking: produced },
-    });
-    expect(wrapper.get('[data-test="svcver-launch-day"]').text()).toBe(
-      `serviceVersions.sentence.preExistingSince{"epoch":"${formatStamp(produced.epoch!)}"}`,
-    );
-  });
-  it("explains a Pre-existing chip seen during the warm-up with the banner's own sentence", () => {
+  it("explains a Pre-existing chip seen during the warm-up with the notice's own sentence", () => {
     expect(tip(warming)).toContain("serviceVersions.catalog.warmingUp");
     expect(tip(warming)).not.toContain("preExisting");
   });
-  it("leaves the no-verdict sentence to the banner while the banner shows it", () => {
+  it("leaves the no-verdict sentence to the notice while the notice shows it", () => {
     const cell = mount(Cell, {
       props: { scope: preexisting, content: "verdict", tracking: warming, explained: true },
       global,
@@ -523,20 +573,12 @@ describe("a scope deploy tracking has not reached yet", () => {
     const mark = cell.get('[data-test="svcver-verdict-scope-pre-tracking"]');
     expect(mark.get(".tip").text()).toBe("serviceVersions.catalog.warmingUpNoEpoch");
   });
-  it("says tracking is warming up, with no time, in the one banner when no scope is tracked", () => {
-    const wrapper = band({
-      data: { ...data(), services: [untracked], tracking: { epoch: null, warmup_ends_at: null } },
-    });
-    expect(wrapper.get('[data-test="svcver-launch-day"]').text()).toBe(
-      "serviceVersions.catalog.warmingUpNoEpoch",
-    );
-  });
-  it("names the warm-up end in the banner and the mark as soon as the org has an epoch", () => {
+  it("names the warm-up end in the notice and the mark as soon as the org has an epoch", () => {
     const epoch = Date.now() * 1000 - 10e6;
     const warmingOrg = { epoch, warmup_ends_at: epoch + 80e6 };
-    const wrapper = band({ data: { ...data(), services: [untracked], tracking: warmingOrg } });
+    const wrapper = notice({ data: { ...data(), services: [untracked], tracking: warmingOrg } });
     const time = formatStamp(warmingOrg.warmup_ends_at);
-    expect(wrapper.get('[data-test="svcver-launch-day"]').text()).toBe(
+    expect(wrapper.get('[data-test="svcver-launch-day"]').attributes("aria-label")).toBe(
       `serviceVersions.catalog.warmingUp{"time":"${time}"}`,
     );
     const cell = mount(Cell, {
@@ -546,15 +588,6 @@ describe("a scope deploy tracking has not reached yet", () => {
     expect(cell.get('[data-test="svcver-verdict-scope-pre-tracking"] .tip').text()).toBe(
       `serviceVersions.catalog.warmingUp{"time":"${time}"}`,
     );
-  });
-  it("keeps the banner off while another scope already has verdicts", () => {
-    const wrapper = band({
-      data: {
-        ...data(),
-        services: [untracked, { ...scope, scope_key: "b", newest_verdict: verdict() }],
-      },
-    });
-    expect(wrapper.find('[data-test="svcver-launch-day"]').exists()).toBe(false);
   });
 });
 describe("the version a catalog row shows", () => {

@@ -18,6 +18,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import i18n from "@/locales";
 
 // ── Mock data ───────────────────────────────────────────────────────────────
@@ -104,6 +105,8 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 // ── Import component under test (after all mocks) ───────────────────────────
 
 import orgService from "@/services/organizations";
+import { queryClient } from "@/composables/query/queryClient";
+import { fullConfigLoad } from "@/composables/useFullConfigLoad";
 import UsageTab from "./UsageTab.vue";
 
 // ── Mount factory ───────────────────────────────────────────────────────────
@@ -412,6 +415,34 @@ describe("UsageTab", () => {
       expect(orgService.get_organization_summary).toHaveBeenCalledWith("default");
     });
 
+    it("marks the org's full config loaded after the mount-time config refresh", async () => {
+      fullConfigLoad.loadedOrg = "";
+      const fetchSpy = vi.spyOn(queryClient, "fetchQuery").mockResolvedValue({ version: "v1" });
+      try {
+        wrapper = mountUsageTab();
+        await flushPromises();
+
+        expect(fullConfigLoad.loadedOrg).toBe("default");
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it("leaves the full config unmarked when the mount-time config refresh fails", async () => {
+      fullConfigLoad.loadedOrg = "";
+      const fetchSpy = vi.spyOn(queryClient, "fetchQuery").mockRejectedValue(new Error("down"));
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      try {
+        wrapper = mountUsageTab();
+        await flushPromises();
+
+        expect(fullConfigLoad.loadedOrg).toBe("");
+      } finally {
+        fetchSpy.mockRestore();
+        logSpy.mockRestore();
+      }
+    });
+
     it("should show a loading notification while fetching", async () => {
       wrapper = mountUsageTab();
       await flushPromises();
@@ -548,6 +579,23 @@ describe("UsageTab", () => {
 
       const btn = wrapper.findComponent('[data-test="home-usage-tab-view-alerts-btn"]');
       expect(String(btn.props("ariaLabel"))).toContain("Locked: needs");
+    });
+
+    it("opens every alert in every folder from the Alerts view button, as its counts do", async () => {
+      wrapper = mountUsageTab();
+      await flushPromises();
+      const alertLinks = wrapper
+        .findAllComponents('[data-test="usage-tab-router-link"]')
+        .map((l) => l.props("to"))
+        .filter((to: any) => to?.name === "alertList");
+      expect(alertLinks).toEqual([
+        expect.objectContaining({
+          query: expect.objectContaining({
+            state: ALERT_LIST_ALL_STATES,
+            all_folders: ALERT_LIST_ALL_FOLDERS,
+          }),
+        }),
+      ]);
     });
 
     it("renders every signal as a link when none is locked", async () => {

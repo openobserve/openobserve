@@ -16,16 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="w-full">
-    <!-- Toolbar: caption left, actions right — the module tab already titles the page -->
-    <div class="mb-2 flex items-center justify-between gap-4">
-      <OTruncatedText as="div" class="text-text-secondary text-xs">
-        {{ t("correlation.semanticFieldGroupsCaption") }}
-      </OTruncatedText>
-      <div class="flex shrink-0 items-center gap-2">
+    <OFormSection
+      variant="plain"
+      :title="t('correlation.fieldGroupsTitle')"
+      :description="t('correlation.semanticFieldGroupsCaption')"
+      data-test="correlation-semanticfieldgroup-section"
+    >
+      <template #actions>
         <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
           variant="outline"
-          size="sm"
+          size="sm-action"
           :disabled="localGroups.length === 0"
           @click="exportGroups"
           >{{ t("correlation.exportToJson") }}</OButton
@@ -33,90 +34,106 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="correlation-semanticfieldgroup-import-json-btn"
           variant="outline"
-          size="sm"
+          size="sm-action"
           @click="navigateToImport"
           >{{ t("correlation.importFromJson") }}</OButton
         >
         <OButton
           data-test="correlation-semanticfieldgroup-add-custom-group-btn"
-          variant="primary"
-          size="sm"
+          variant="outline"
+          size="sm-action"
           @click="addGroup"
           >{{ t("correlation.addCustomGroup") }}</OButton
         >
         <slot name="header-actions" />
-      </div>
-    </div>
-
-    <!-- Category strip + global search -->
-    <div v-if="categoryOptions.length > 0" class="mb-3 flex items-center gap-3">
-      <OTabs
-        :model-value="searchActive ? '' : (selectedCategory ?? '')"
-        dense
-        class="min-w-0 flex-1"
-        @update:model-value="onCategoryTabChange"
-      >
-        <OTab
-          v-for="opt in categoryTabs"
-          :key="opt.value"
-          :name="opt.value"
-          :data-test="`semantic-group-category-tab-${opt.value}`"
-          :class="searchActive && opt.count === 0 ? 'opacity-50' : ''"
+      </template>
+      <div class="-mx-4 -my-3">
+        <!-- Category strip + global search -->
+        <div
+          v-if="categoryOptions.length > 0"
+          class="border-border-default flex items-center gap-3 border-b px-4 py-2"
         >
-          <span>{{ opt.label }}</span>
-          <OBadge size="xs" variant="default-soft">{{ opt.count }}</OBadge>
-        </OTab>
-      </OTabs>
-      <OInput
-        data-test="semantic-group-search-input"
-        v-model="searchQuery"
-        type="search"
-        size="sm"
-        width="md"
-        clearable
-        :placeholder="t('correlation.searchGroupsPlaceholder')"
-        class="shrink-0"
-      >
-        <template #icon-left><OIcon name="search" size="sm" /></template>
-      </OInput>
-    </div>
+          <OTabs
+            :model-value="searchActive ? '' : (selectedCategory ?? '')"
+            dense
+            class="min-w-0 flex-1"
+            @update:model-value="onCategoryTabChange"
+          >
+            <OTab
+              v-for="opt in categoryTabs"
+              :key="opt.value"
+              :name="opt.value"
+              :data-test="`semantic-group-category-tab-${opt.value}`"
+              :class="searchActive && opt.count === 0 ? 'opacity-50' : ''"
+            >
+              <span>{{ opt.label }}</span>
+              <OBadge size="xs" variant="default-soft">{{ opt.count }}</OBadge>
+            </OTab>
+          </OTabs>
+          <OInput
+            data-test="semantic-group-search-input"
+            v-model="searchQuery"
+            type="search"
+            size="sm"
+            width="md"
+            clearable
+            :placeholder="t('correlation.searchGroupsPlaceholder')"
+            class="shrink-0"
+          >
+            <template #icon-left><OIcon name="search" size="sm" /></template>
+          </OInput>
+        </div>
 
-    <!-- Groups list: active category, or cross-category search results -->
-    <div v-if="visibleGroups.length > 0" class="mb-3 w-full overflow-x-hidden">
-      <SemanticGroupItem
-        v-for="(group, index) in visibleGroups"
-        :key="`${group.id}-${index}`"
-        :data-group-id="group.id"
-        :group="group"
-        :category-tag="searchActive ? raw(normalizeCategoryName(group.group || '')) : undefined"
-        :highlight-query="searchActive ? normalizedQuery : undefined"
-        @update="updateGroupByFilter(index, $event)"
-        @delete="removeGroupByFilter(index)"
-      />
-    </div>
-    <div v-else class="text-text-muted p-4 text-center">
-      <OIcon name="info" size="md" class="mb-2" />
-      <div v-if="searchActive" data-test="semantic-group-search-no-results">
-        {{ t("correlation.noSearchResults", { query: searchQuery.trim() }) }}
-      </div>
-      <div v-else>
-        {{
-          t("correlation.noSemanticGroupsInCategory", {
-            category: selectedCategory || t("correlation.other"),
-          })
-        }}
-      </div>
-    </div>
+        <!-- Groups list: active category, or cross-category search results -->
+        <div v-if="visibleGroups.length > 0" class="w-full overflow-x-hidden">
+          <!-- One heading row names the columns, so a group row carries no label of its own. -->
+          <div
+            class="text-text-secondary border-border-default grid grid-cols-[12.5rem_1fr_2rem] gap-4 border-b px-4 py-2 text-xs font-medium"
+          >
+            <span>{{ t("common.name") }}</span>
+            <span>{{ t("correlation.fieldNamesColumn") }}</span>
+            <span></span>
+          </div>
+          <SemanticGroupItem
+            v-for="(group, index) in visibleGroups"
+            :key="`${group.id}-${index}`"
+            :data-group-id="group.id"
+            :group="group"
+            :category-tag="searchActive ? raw(normalizeCategoryName(group.group || '')) : undefined"
+            :highlight-query="searchActive ? normalizedQuery : undefined"
+            @update="updateGroupByFilter(index, $event)"
+            @delete="removeGroupByFilter(index)"
+          />
+        </div>
+        <OEmptyState
+          v-else
+          size="inline"
+          icon="search"
+          :backdrop="false"
+          :title="
+            searchActive
+              ? t('correlation.noSearchResults', { query: searchQuery.trim() })
+              : t('correlation.noSemanticGroupsInCategory', {
+                  category: selectedCategory || t('correlation.other'),
+                })
+          "
+          :data-test="searchActive ? 'semantic-group-search-no-results' : undefined"
+        />
 
-    <!-- Total groups indicator -->
-    <div v-if="localGroups.length > 0" class="text-text-secondary mt-2 text-xs">
-      {{
-        t("correlation.showingGroups", {
-          filterGroupLength: visibleGroups.length,
-          localGroupLength: localGroups.length,
-        })
-      }}
-    </div>
+        <!-- Total groups indicator -->
+        <div
+          v-if="localGroups.length > 0"
+          class="text-text-secondary border-border-default border-t px-4 py-2 text-xs"
+        >
+          {{
+            t("correlation.showingGroups", {
+              filterGroupLength: visibleGroups.length,
+              localGroupLength: localGroups.length,
+            })
+          }}
+        </div>
+      </div>
+    </OFormSection>
 
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
     <div
@@ -166,6 +183,8 @@ import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -173,7 +192,6 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const store = useStore();
 const { t } = useI18nTyped();

@@ -532,26 +532,32 @@ describe("PrivateLocations", () => {
   });
 
   describe("delete button disabled state", () => {
-    it("delete button is enabled when monitors_count is 0", () => {
-      wrapper = makeWrapper({
-        locations: [makeLocation({ id: "loc-free", monitors_count: 0 })],
-      });
+    it.each([
+      { row: { monitors_count: 0 }, disabled: false, title: "synthetics.table.delete" },
+      {
+        row: { monitors_count: 3 },
+        disabled: true,
+        title: "synthetics.privateLocations.deleteBlocked",
+      },
+      // Only checks in folders the caller cannot list use it, so the shown count is 0.
+      {
+        row: { checks_count: 0, in_use: true },
+        disabled: true,
+        title: "synthetics.privateLocations.deleteBlockedHidden",
+      },
+      {
+        row: { checks_count: 0, in_use: false },
+        disabled: false,
+        title: "synthetics.table.delete",
+      },
+    ])("guards delete for $row", ({ row, disabled, title }) => {
+      wrapper = makeWrapper({ locations: [makeLocation({ id: "loc", ...row })] });
 
-      const deleteBtn = wrapper.find(
-        '[data-test="synthetics-private-locations-delete-btn-loc-free"]',
+      const deleteBtn = wrapper.findComponent(
+        '[data-test="synthetics-private-locations-delete-btn-loc"]',
       );
-      expect(deleteBtn.attributes("disabled")).toBeUndefined();
-    });
-
-    it("delete button is disabled when monitors_count > 0", () => {
-      wrapper = makeWrapper({
-        locations: [makeLocation({ id: "loc-busy", monitors_count: 3 })],
-      });
-
-      const deleteBtn = wrapper.find(
-        '[data-test="synthetics-private-locations-delete-btn-loc-busy"]',
-      );
-      expect(deleteBtn.attributes("disabled")).toBeDefined();
+      expect(deleteBtn.attributes("disabled") !== undefined).toBe(disabled);
+      expect(deleteBtn.props("title")).toBe(title);
     });
   });
 

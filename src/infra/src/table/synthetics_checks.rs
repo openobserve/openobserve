@@ -269,6 +269,29 @@ pub async fn list<C: ConnectionTrait>(
     Ok(checks)
 }
 
+/// Of `ids`, those in one of the folders with these primary keys.
+pub async fn ids_in_folders<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    ids: &[String],
+    folder_pks: &[String],
+) -> Result<std::collections::HashSet<String>, errors::Error> {
+    if ids.is_empty() || folder_pks.is_empty() {
+        return Ok(Default::default());
+    }
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.is_in(ids))
+        .filter(Column::FolderId.is_in(folder_pks))
+        .into_tuple::<String>()
+        .all(conn)
+        .await?
+        .into_iter()
+        .collect())
+}
+
 pub async fn count<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -335,6 +358,26 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
         }
     }
     Ok(out)
+}
+
+/// Location ids any synthetic in the org runs from, across every folder.
+pub async fn location_ids_in_use<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<std::collections::HashSet<String>, errors::Error> {
+    let rows: Vec<serde_json::Value> = Entity::find()
+        .select_only()
+        .column(Column::Locations)
+        .filter(Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    Ok(rows
+        .iter()
+        .filter_map(|locs| locs.as_array())
+        .flatten()
+        .filter_map(|v| v.as_str().map(String::from))
+        .collect())
 }
 
 /// Every synthetic in an org, fully decoded; fails closed on a bad row, unlike `list`.
@@ -1751,6 +1794,10 @@ impl ApplyCheckFilters for sea_orm::Select<Entity> {
         if let Some(folder_id) = &params.folder_id {
             q = q.filter(Column::FolderId.eq(folder_id.clone()));
         }
+        // An empty set renders as `1 = 2`, so no listable folder lists no check.
+        if let Some(folder_ids) = &params.listable_folder_ids {
+            q = q.filter(Column::FolderId.is_in(folder_ids.clone()));
+        }
         if let Some(check_type) = &params.check_type {
             q = q.filter(Column::SyntheticsType.eq(check_type_to_str(check_type)));
         }
@@ -2468,6 +2515,112 @@ pub(crate) mod tests {
         let am: ActiveModel = model.into();
         am.reset_all().insert(&db).await.unwrap();
         db
+    }
+
+    /// A cross-folder list holds only checks in listable folders, in the total and the page;
+    /// a public folder id resolves within its own org and folder type.
+    #[tokio::test]
+    async fn listable_folders_bound_the_count_and_the_page() {
+        use config::meta::folder::FolderType::{Alerts, Synthetics};
+        use sea_orm::Schema;
+
+        use crate::table::{entity::folders as f, folders as folder_table};
+
+        let db = db_with_one_check(0).await;
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(f::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        for (pk, org, slug, kind) in [
+            ("folder-1", "org1", "default", Synthetics),
+            ("folder-2", "org1", "team", Synthetics),
+            ("folder-3", "org1", "ops", Synthetics),
+            ("alert-pk", "org1", "team", Alerts),
+            ("other-pk", "org2", "team", Synthetics),
+        ] {
+            f::ActiveModel {
+                id: Set(pk.into()),
+                org: Set(org.into()),
+                folder_id: Set(slug.into()),
+                name: Set(slug.into()),
+                description: Set(None),
+                icon: Set(None),
+                r#type: Set(folder_table::folder_type_into_i16(kind)),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+            let check = Model {
+                id: format!("in-{pk}"),
+                name: format!("Check {pk}"),
+                folder_id: pk.into(),
+                locations: serde_json::json!([format!("loc-{pk}")]),
+                ..make_model()
+            };
+            ActiveModel::from(check)
+                .reset_all()
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        let cases: [(&[&str], &[&str], u64); 2] =
+            [(&["team", "ops"], &["in-folder-3"], 2), (&[], &[], 0)];
+        for (slugs, want, total) in cases {
+            let slugs: Vec<String> = slugs.iter().map(|s| s.to_string()).collect();
+            let pks = folder_table::get_pks_by_names(&db, "org1", &slugs, Synthetics)
+                .await
+                .unwrap();
+            let params = ListSyntheticsParams {
+                listable_folder_ids: Some(pks.clone()),
+                page: Some(1),
+                page_size: Some(1),
+                ..Default::default()
+            };
+            let mut ids: Vec<String> = list(&db, "org1", &params)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|c| c.id)
+                .collect();
+            ids.sort();
+            assert_eq!(ids, want, "{slugs:?}");
+            assert_eq!(
+                count(&db, "org1", &params).await.unwrap(),
+                total,
+                "{slugs:?}"
+            );
+            let all: Vec<String> = ["mon-1", "in-folder-2", "in-alert-pk"]
+                .map(String::from)
+                .into();
+            let mut visible: Vec<_> = ids_in_folders(&db, "org1", &all, &pks)
+                .await
+                .unwrap()
+                .into_iter()
+                .collect();
+            visible.sort();
+            let visible_want: &[&str] = if slugs.is_empty() {
+                &[]
+            } else {
+                &["in-folder-2"]
+            };
+            assert_eq!(visible, visible_want, "{slugs:?}");
+        }
+        // Delete guards read this, so it must not shrink to the caller's folders.
+        let mut in_use: Vec<_> = location_ids_in_use(&db, "org1")
+            .await
+            .unwrap()
+            .into_iter()
+            .collect();
+        in_use.sort();
+        let in_use_want = [
+            "aws-us-east-1",
+            "loc-alert-pk",
+            "loc-folder-1",
+            "loc-folder-2",
+            "loc-folder-3",
+            "loc-other-pk",
+        ];
+        assert_eq!(in_use, in_use_want);
     }
 
     /// The gap state is what makes each gap send one notice pair across restarts and nodes, so

@@ -21,7 +21,7 @@ import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { usePanelDrilldown } from "./usePanelDrilldown";
 
 vi.mock("@/utils/dashboard/convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn(),
+  prepareCustomChartRun: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
 

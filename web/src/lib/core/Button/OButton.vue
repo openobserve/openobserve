@@ -296,6 +296,13 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:opacity-80",
     "disabled:opacity-60",
   ].join(" "),
+  // link: an action that reads as a link inside running copy, at the copy's own size.
+  link: [
+    "bg-transparent border-0 text-text-link underline underline-offset-2",
+    "h-auto! p-0! align-baseline",
+    "enabled:hover:opacity-80",
+    "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
+  ].join(" "),
   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
   // Use for edition/tier badges that must stand out without being a heavy CTA.
   "outline-primary": [
@@ -419,6 +426,7 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "preview-action": "opacity-60",
   "webinar-dismiss": "opacity-60",
   "banner-dismiss": "opacity-60",
+  link: "opacity-60",
   "outline-primary": "opacity-50",
   dashed: "opacity-50",
   "pricing-chip": "opacity-60",

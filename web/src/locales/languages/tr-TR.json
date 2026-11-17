@@ -9871,7 +9871,6 @@
       "duplicatePanelId": "Yinelenen panel kimliği bulundu: {id}",
       "panelMissingLayoutI": "Panel {id} için layout.i değeri eksik",
       "duplicateLayoutI": "Sekme {tabId} içinde yinelenen layout.i değeri bulundu: {value}",
-      "customChartCallbacksDropped": "Özel grafik: Bu panelin kodundaki {count} fonksiyon geri çağrısı yok sayıldı. Kayıtlı grafik kodu uygulamada geri çağrıları çalıştıramaz; bunun yerine düz değerler kullanın. | Özel grafik: Bu panelin kodundaki {count} fonksiyon geri çağrısı yok sayıldı. Kayıtlı grafik kodu uygulamada geri çağrıları çalıştıramaz; bunun yerine düz değerler kullanın.",
       "unsafeCodeDetected": "Güvenli olmayan kod tespit edildi: {error}",
       "forbiddenFunctionCall": "'{name}()' kullanımına izin verilmiyor.",
       "forbiddenInsideSetTimeout": "'setTimeout()' içinde {name} kullanımına izin verilmiyor.",
@@ -10410,31 +10409,12 @@
     "hoursAgo": "{count} sa önce",
     "daysAgo": "{count} gün önce",
     "cards": {
-      "firingAlerts": "Tetiklenmiş uyarılar",
-      "failingRules": "Hata veren kurallar",
-      "openIncidents": "Açık vakalar",
-      "pipelineErrors": "İşlem hattı hataları",
-      "pipelinesOf": "/ {enabled} etkin",
-      "quietStreams": "Sessiz akışlar",
-      "firingNone": "Tetiklenen yok",
-      "noAlertRules": "Uyarı kuralı yok",
-      "noEnabledRules": "Etkin kural yok",
-      "failingNone": "Hata veren yok",
-      "failingNote": "Son değerlendirme hata verdi",
-      "incidentsNone": "Açık olan yok",
-      "noPipelines": "İşlem hattı yok",
-      "noStreams": "Akış yok",
-      "quietNote": "Son 7 gündür yazmıyor",
-      "criticalUnit": "{count} tanesi kritik seviyede",
-      "deliveryFailures": "Uyarı gönderim hataları",
-      "deliveryNote": "Tetiklenen ancak bildirimi iletilemeyen uyarılar",
-      "oldestFiring": "En eski tetiklenme: {age}"
+      "openIncidents": "Açık vakalar"
     },
     "state": {
       "tileForbidden": "Erişim yok",
       "tileLocked": "Kilitli",
       "tileError": "Yüklenemedi",
-      "tileUnavailable": "Kullanılamıyor",
       "sectionLocked": "Kurumsal lisansla kullanılabilir",
       "sectionForbidden": "Rolünüz bu verileri göremez. Erişim için bir kuruluş yöneticisinden izin isteyin."
     },
@@ -10556,20 +10536,6 @@
       "retry": "Yeniden dene"
     },
     "dataAsOf": "Veriler {time} itibarıyla",
-    "status": {
-      "attention": "Dikkat gerekiyor",
-      "checking": "Kontrol ediliyor…",
-      "partial": "Bazı kontroller yüklenemedi",
-      "clear": "Dikkat gereken bir durum yok",
-      "items": {
-        "firing": "{count} uyarı tetiklenmiş | {count} uyarı tetiklenmiş",
-        "failing": "{count} kural başarısız | {count} kural başarısız",
-        "incidents": "{count} açık vaka | {count} açık vaka",
-        "pipelines": "{count} hatalı işlem hattı | {count} hatalı işlem hattı",
-        "quiet": "{count} sessiz akış | {count} sessiz akış"
-      },
-      "unmonitored": "Henüz hiçbir şey izlenmiyor"
-    },
     "timeRange": {
       "heading": "Seçilen zaman aralığında"
     }
@@ -11545,68 +11511,6 @@
     }
   },
   "alerts": {
-    "firing": {
-      "title": "Tetiklenmiş",
-      "drawer": {
-        "openInLogs": "Günlüklerde Aç",
-        "partOfIncident": "Vakaya ait:",
-        "incidentAck": "Buradan üstlenmek tüm vakayı üstlenir.",
-        "incidentTakeOver": "Buradan devralmak tüm vakayı devralır.",
-        "now": "Şimdi",
-        "threshold": "eşik {value}",
-        "since": "{time} zamanından beri",
-        "flaps": "Durum değişimleri, son 6s",
-        "flapsUnit": "durum değişiklikleri",
-        "notified": "Bildirildi",
-        "notDeliveredTo": "{name}: teslim edilmedi",
-        "history": "Geçmiş",
-        "last2h": "son 2s",
-        "lastSpan": "son {span}",
-        "viewAll": "Tümünü görüntüle",
-        "historyEmpty": "Bu zaman aralığında çalıştırma yok.",
-        "historyFailed": "Geçmiş yüklenemedi.",
-        "barFiring": "{span} tetiklenmiş",
-        "barOk": "{span} sorunsuz",
-        "barUnknown": "{span} okunmadı",
-        "eventStarted": "Tetiklenmeye başladı",
-        "eventRecovered": "Düzeldi",
-        "eventNotified": "Bildirildi",
-        "eventNotifiedTo": "{names}: bildirildi",
-        "eventFailed": "Teslim edilmedi",
-        "eventFailedTo": "{names}: teslim edilmedi",
-        "soFar": "şu ana kadar {span}",
-        "lasted": "{span} sürdü",
-        "okFor": "{span} boyunca sorunsuz"
-      },
-      "chipCount": "{label} {count}",
-      "chipFiring": "Tetiklenmiş",
-      "chipAcked": "Üstlenildi",
-      "chipMuted": "Sessize alındı",
-      "chipFailed": "Teslim edilmedi",
-      "searchPlaceholder": "Uyarı ara",
-      "priorityAll": "Öncelik",
-      "priorityLabel": "Öncelik",
-      "priorityUnset": "Öncelik yok",
-      "folderAll": "Klasör: tümü",
-      "folderLabel": "Klasör",
-      "stale": "eski",
-      "refreshFailed": "Tetiklenmiş uyarılar yenilenemedi ({reason}). {time} itibarıyla veriler gösteriliyor.",
-      "refreshFailedReason": "istek başarısız oldu",
-      "statusUnavailable": "Uyarı durumu şu anda kullanılamıyor, bu nedenle tetiklenmiş uyarılar gösterilemiyor.",
-      "retry": "Yeniden dene",
-      "columnPriority": "Öncelik",
-      "columnState": "Durum",
-      "columnAlert": "Uyarı",
-      "columnFolder": "Klasör",
-      "columnFiringFor": "Tetiklenme süresi",
-      "acknowledgeCount": "Onayla {count}",
-      "mute": "Sessize al",
-      "clear": "Temizle",
-      "emptyFiring": "Tetiklenen yok",
-      "emptyAcked": "Onaylanan yok",
-      "emptyMuted": "Sessize alınan yok",
-      "emptyFailed": "İletilemeyen yok"
-    },
     "moreActions": "Diğer işlemler",
     "promRuleMode": "Kural modu",
     "promRulePreview": "{count} döndürülen seri şu anda eşleşiyor. Her seri, tetiklenmeden önce bekleme süresini tamamlamalıdır.",
@@ -12882,6 +12786,9 @@
         "alertStartTimeMillis": "Pencere başlangıç zamanı epoch milisaniye cinsinden",
         "alertEndTimeMillis": "Pencere bitiş zamanı epoch milisaniye cinsinden",
         "alertUrl": "İncelemek için OpenObserve'e dönüş bağlantısı",
+        "alertUrlLabel": "Ana bağlantının etiketi, örneğin \"View logs\"",
+        "alertDetailUrl": "Bu mesajı gönderen uyarının sayfasına bağlantı. Ana bağlantı o sayfayı zaten açıyorsa boştur.",
+        "alertDetailLabel": "Bu bağlantının etiketi, örneğin \"Open alert\". Bağlantı boşsa boştur.",
         "alertTriggerTime": "Uyarının tetiklendiği zaman (ISO 8601)",
         "alertTriggerTimeMillis": "Epoch milisaniye cinsinden tetikleme zamanı",
         "alertTriggerTimeSeconds": "Epoch saniye cinsinden tetikleme zamanı",
@@ -13415,7 +13322,10 @@
       "chartUnavailable": "Bu uyarının sorgusu için grafik mevcut değil.",
       "eventCount": "Olaylar",
       "notFoundTitle": "Uyarı bulunamadı",
-      "notFoundDescription": "Bu uyarı artık mevcut değil veya erişim izniniz yok. Silinmiş olabilir."
+      "notFoundDescription": "Bu uyarı artık mevcut değil veya erişim izniniz yok. Silinmiş olabilir.",
+      "noAccessTitle": "Bu uyarıya erişiminiz yok",
+      "noAccessDescription": "Bu klasördeki uyarıları okumak için bir yöneticiden izin isteyin.",
+      "loadFailedTitle": "Bu uyarı yüklenemedi"
     },
     "timeLabel": "Zaman",
     "unknownHttpStatus": "Bilinmiyor",
@@ -14472,6 +14382,10 @@
     "insertVariable": "Değişken ekle",
     "moreVariables": "+{count} daha",
     "viewAlertLinkLabel": "OpenObserve'de görüntüle",
+    "variableAlertUrlLabelDescription": "Ana bağlantının etiketi, örneğin \"View logs\"",
+    "variableAlertDetailUrlDescription": "Bu mesajı gönderen uyarının sayfasına bağlantı. Ana bağlantı o sayfayı zaten açıyorsa boştur.",
+    "variableAlertDetailLabelDescription": "Bu bağlantının etiketi, örneğin \"Open alert\". Bağlantı boşsa boştur.",
+    "slackLinksNotShown": "{count} bağlantı düğme olarak gösterilmiyor: {links} | {count} bağlantı düğme olarak gösterilmiyor: {links}",
     "moveUp": "Yukarı taşı",
     "moveDown": "Aşağı taşı",
     "fieldLabel": "Etiket",
@@ -22895,6 +22809,8 @@
       "noResults": "Aramanızla eşleşen simge yok",
       "groups": {
         "results": "Sonuçlar",
+        "icons": "Simgeler",
+        "monoLogos": "Logolar",
         "status": "Durum",
         "services": "Hizmetler",
         "ai": "AI",
@@ -23396,11 +23312,6 @@
       "failedToLoadToolset": "Araç seti yüklenemedi"
     },
     "alerts": {
-      "firing": {
-        "bulkResult": "{acked} onaylandı, {skipped} atlandı",
-        "bulkResultFailed": "{acked} kabul edildi, {skipped} atlandı, {failed} başarısız",
-        "bulkAllAcked": "{acked} onaylandı"
-      },
       "failedToNavigateToAlert": "Uyarıya gidilemedi",
       "alertNotFound": "Uyarı bulunamadı",
       "failedToLoadAlerts": "Uyarılar yüklenemedi",
@@ -28518,7 +28429,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Adım 0 · Sunucu ön koşulları",
+      "title": "Adım 1 · Sunucu ön koşulları",
       "subtitle": "Herhangi bir Slack işleminden önce bu sunucuda kontrol edilir",
       "columnSetting": "Ayar",
       "columnResult": "Sonuç",
@@ -28589,7 +28500,7 @@
       "back": "Geri",
       "finish": "Bitir",
       "connection": {
-        "title": "Adım 1 · Bağlantı",
+        "title": "Adım 2 · Bağlantı",
         "description": "Kontrol, Slack'e bu sunucudan üretim ortamının kullandığı aynı kod yolundan erişir.",
         "allPassed": "Slack'e bu sunucudan erişilebiliyor",
         "someFailed": "Slack'e bu sunucudan erişilemiyor. Proxy veya güvenlik duvarınızdan *.slack.com'a izin verin, ardından yeniden kontrol edin.",
@@ -28598,7 +28509,7 @@
         "socketHost": "WebSocket ana bilgisayarı {host}"
       },
       "create": {
-        "title": "Adım 2 · Uygulamayı oluştur",
+        "title": "Adım 3 · Uygulamayı oluştur",
         "modeLabel": "Bağlantı modu",
         "socket": "Socket Modu",
         "socketDescription": "Önerilir. Bağlantıyı OpenObserve açar, böylece Slack'in genel bir URL'ye ihtiyacı olmaz",
@@ -28627,7 +28538,7 @@
         "signingSecretRequired": "HTTP modu için imzalama gizli anahtarı gerekir"
       },
       "install": {
-        "title": "Adım 3 · Kurulum",
+        "title": "Adım 4 · Kurulum",
         "created": "Uygulama oluşturuldu · {appId}",
         "allowHint": "Slack'in kurulum ekranını açar: orada İzin Ver'e tıklayın. Bot token'ı Slack'ten kendiliğinden gelir; kopyalanacak bir şey yok.",
         "allow": "Slack'te İzin Ver",
@@ -28650,7 +28561,7 @@
         "appNotCreatedByO2": "Bu uygulamayı OpenObserve oluşturmadı; bu nedenle Slack'te kalır. Artık ihtiyacınız yoksa orada silin."
       },
       "test": {
-        "title": "Adım 4 · Test ve bağlama",
+        "title": "Adım 5 · Test ve bağlama",
         "run": "Kontrolleri çalıştır",
         "signIn": "Slack ile Oturum Açmayı test et",
         "signInPassed": "Slack ile Oturum Açma çalışıyor",

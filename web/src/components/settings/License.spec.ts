@@ -220,8 +220,26 @@ describe("License.vue", () => {
       await flushPromises();
     });
 
-    it('should display "No License Found" message when license is null', () => {
-      expect(wrapper.text()).toContain("No License Found");
+    it("renders markup in a translated contact message", async () => {
+      const locale = i18n.global.locale.value;
+      const original = i18n.global.getLocaleMessage(locale).about.contact_admin_license;
+      const setMessage = (contact_admin_license: unknown) =>
+        i18n.global.mergeLocaleMessage(locale, { about: { contact_admin_license } });
+      setMessage("Paste the key here, <strong>or:</strong>");
+      try {
+        wrapper.unmount();
+        wrapper = createWrapper();
+        await flushPromises();
+        expect(wrapper.text()).toContain("Paste the key here, or:");
+      } finally {
+        setMessage(original);
+      }
+    });
+
+    it('should display "No license found" message when license is null', () => {
+      expect(wrapper.text()).toContain("No license found");
+      expect(wrapper.text()).toContain("Without a license, ingestion is limited to");
+      expect(wrapper.text()).not.toContain("The current license allows");
     });
 
     it("should display installation ID", () => {
@@ -234,27 +252,27 @@ describe("License.vue", () => {
       expect(textarea.exists()).toBe(true);
     });
 
-    it('should show "Get License" button', () => {
+    it('should show "Get license" button', () => {
       const buttons = wrapper.findAll("button");
-      const getLicenseBtn = buttons.find((btn: any) => btn.text().includes("Get License"));
+      const getLicenseBtn = buttons.find((btn: any) => btn.text().includes("Get license"));
       expect(getLicenseBtn).toBeTruthy();
     });
 
-    it("keeps the Update License button enabled even when empty (R3 — schema-gated)", () => {
+    it("keeps the Update license button enabled even when empty (R3 — schema-gated)", () => {
       const updateBtn = wrapper
         .findAll("button")
-        .find((btn: any) => btn.text().includes("Update License"));
+        .find((btn: any) => btn.text().includes("Update license"));
       expect(updateBtn?.attributes("disabled")).toBeUndefined();
     });
 
-    it("should keep the Update License button enabled when a key is entered", async () => {
+    it("should keep the Update license button enabled when a key is entered", async () => {
       const textarea = wrapper.find("textarea");
       await textarea.setValue("new-license-key-value");
       await wrapper.vm.$nextTick();
 
       const updateBtn = wrapper
         .findAll("button")
-        .find((btn: any) => btn.text().includes("Update License"));
+        .find((btn: any) => btn.text().includes("Update license"));
       expect(updateBtn?.attributes("disabled")).toBeUndefined();
     });
 
@@ -295,7 +313,7 @@ describe("License.vue", () => {
     });
 
     it("should display license information when license exists", () => {
-      expect(wrapper.text()).toContain("License Information");
+      expect(wrapper.text()).toContain("License information");
       expect(wrapper.text()).toContain("license-123");
       expect(wrapper.text()).toContain("Test Company");
     });
@@ -322,15 +340,15 @@ describe("License.vue", () => {
       expect(wrapper.text()).toContain("*****");
     });
 
-    it('should show "Request new License" button', () => {
+    it('should show "Request new license" button', () => {
       const buttons = wrapper.findAll("button");
-      const requestBtn = buttons.find((btn: any) => btn.text().includes("Request new License"));
+      const requestBtn = buttons.find((btn: any) => btn.text().includes("Request new license"));
       expect(requestBtn).toBeTruthy();
     });
 
-    it('should show "Add New License Key" button', () => {
+    it('should show "Add new license key" button', () => {
       const buttons = wrapper.findAll("button");
-      const addBtn = buttons.find((btn: any) => btn.text().includes("Add New License Key"));
+      const addBtn = buttons.find((btn: any) => btn.text().includes("Add new license key"));
       expect(addBtn).toBeTruthy();
     });
 
@@ -338,7 +356,7 @@ describe("License.vue", () => {
       expect(wrapper.vm.showUpdateForm).toBe(false);
     });
 
-    it('should show update form when "Add New License Key" is clicked', async () => {
+    it('should show update form when "Add new license key" is clicked', async () => {
       wrapper.vm.showUpdateFormAndFocus();
       await wrapper.vm.$nextTick();
 
@@ -346,7 +364,7 @@ describe("License.vue", () => {
     });
   });
 
-  describe("Usage Information", () => {
+  describe("Usage information", () => {
     beforeEach(async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
@@ -354,7 +372,7 @@ describe("License.vue", () => {
     });
 
     it("should display usage information section", () => {
-      expect(wrapper.text()).toContain("Usage Information");
+      expect(wrapper.text()).toContain("Usage information");
       expect(wrapper.text()).toContain("50 GB of data ingestion per day");
     });
 
@@ -835,7 +853,7 @@ describe("License.vue", () => {
     });
   });
 
-  describe("Update License Functionality", () => {
+  describe("Update license Functionality", () => {
     afterEach(() => vi.useRealTimers());
 
     beforeEach(async () => {
@@ -978,7 +996,7 @@ describe("License.vue", () => {
 
     it("should pass title prop to ODialog", () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("License Key");
+      expect(dialog.props("title")).toBe("License key");
     });
 
     it('should pass size="md" prop to ODialog', () => {
@@ -993,9 +1011,9 @@ describe("License.vue", () => {
       expect(["", true]).toContain(dialog.props("persistent"));
     });
 
-    it('should pass primaryButtonLabel "Copy Key" to ODialog', () => {
+    it('should pass primaryButtonLabel "Copy key" to ODialog', () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Copy Key");
+      expect(dialog.props("primaryButtonLabel")).toBe("Copy key");
     });
 
     it('should pass secondaryButtonLabel "Cancel" to ODialog', () => {
@@ -1103,7 +1121,7 @@ describe("License.vue", () => {
     });
   });
 
-  describe("Get License Redirect", () => {
+  describe("Get license Redirect", () => {
     beforeEach(async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
@@ -1222,11 +1240,11 @@ describe("License.vue", () => {
     });
 
     it("should display formatted created date", () => {
-      expect(wrapper.text()).toContain("Created At");
+      expect(wrapper.text()).toContain("Created at");
     });
 
     it("should display formatted expiry date", () => {
-      expect(wrapper.text()).toContain("Expires At");
+      expect(wrapper.text()).toContain("Expires at");
     });
   });
 
@@ -1529,7 +1547,7 @@ describe("License.vue", () => {
       expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
     });
 
-    it("keeps Add New License Key enabled while the env key is in use", async () => {
+    it("keeps Add new license key enabled while the env key is in use", async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(
         createAxiosResponse({ ...withDecision({}), env_key_active: true, env_key_in_use: true }),
       );
@@ -1543,7 +1561,7 @@ describe("License.vue", () => {
       expect(wrapper.vm.showUpdateForm).toBe(true);
     });
 
-    it("keeps Add New License Key enabled without the env key", async () => {
+    it("keeps Add new license key enabled without the env key", async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(
         createAxiosResponse({ ...withDecision({}), env_key_active: false }),
       );
@@ -1743,7 +1761,7 @@ describe("License.vue", () => {
       expect(items("free")).toEqual(["alerts", "dashboards", "metering"]);
     });
 
-    it("request access opens the same license-server page as Request new License", async () => {
+    it("request access opens the same license-server page as Request new license", async () => {
       await mountWith({ features: ["sso"], feature_definition: featureDefinition });
       const open = vi.spyOn(window, "open").mockReturnValue(null);
 

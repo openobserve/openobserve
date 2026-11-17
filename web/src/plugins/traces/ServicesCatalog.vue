@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          sits exactly above the 230px left rail; the search + pills group starts
          exactly at the table's left edge (no gap between the two columns), so
          the toolbar columns line up with the body columns. -->
-    <div class="flex items-center py-2.5">
+    <div class="flex items-center py-2.5 max-xl:items-start">
       <!-- Stream selector — same 230px width as the left rail below it. -->
       <div data-test="services-catalog-stream-selector" class="w-rail flex-shrink-0">
         <OSelect
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Search + pills group — occupies the table's column (everything right
            of the rail). A left pad adds breathing room after the stream
            selector while the column's outer edge still aligns to the table. -->
-      <div class="flex min-w-0 flex-1 items-center gap-2 ps-2">
+      <div class="flex min-w-0 flex-1 items-center gap-2 ps-2 max-xl:flex-wrap">
         <CatalogVersionControls
           v-if="versionsEnabled"
           :data="registry.data.value"
@@ -53,11 +53,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :state="registryState"
           :env="versionEnv"
           :verdict="versionVerdict"
+          :no-env-stamps="noEnvStamps"
+          :no-spans="noSpans"
+          :env-counts="envCounts"
+          :env-total="envCounts && loadedFor?.rows.length"
           @env="versionEnv = $event"
           @verdict="versionVerdict = $event"
         />
+        <CatalogVersionNotice
+          v-if="versionsEnabled"
+          :data="registry.data.value"
+          :scopes="shownScopes"
+          :state="registryState"
+          :env="versionEnv"
+          :verdict="versionVerdict"
+          @verdict="versionVerdict = $event"
+          @refresh="registry.refetch()"
+        />
         <!-- Search input — grows to fill, aligning to the table below. -->
-        <div class="min-w-36 flex-[1_1_12rem]" data-test="services-catalog-filter-slot">
+        <div
+          class="min-w-48 flex-[1_1_14rem] max-xl:order-last max-xl:min-w-40 max-xl:basis-full"
+          data-test="services-catalog-filter-slot"
+        >
           <OSearchInput
             v-model="filterText"
             :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
@@ -71,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chipGroup"
           :class="
             versionsEnabled
-              ? 'relative flex w-lg min-w-40 shrink items-center justify-end gap-2'
+              ? 'relative flex w-lg min-w-16 shrink items-center justify-end gap-2 max-xl:min-w-0 max-xl:flex-1'
               : 'contents'
           "
           data-test="services-catalog-chip-group"
@@ -88,7 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             v-if="!isLoading && services.length > 0"
-            :class="versionsEnabled ? 'contents' : 'flex flex-shrink-0 items-center gap-2'"
+            :class="[
+              versionsEnabled ? 'contents' : 'flex flex-shrink-0 items-center gap-2',
+              { invisible: otherStreamRows },
+            ]"
             data-test="services-catalog-status-pills"
           >
             <div
@@ -117,7 +137,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             v-if="versionsEnabled"
             ref="moreChip"
-            :class="['inline-flex shrink-0', foldedList.length ? '' : 'invisible absolute end-0']"
+            :class="[
+              'inline-flex shrink-0',
+              foldedList.length ? '' : 'invisible absolute end-0',
+              { invisible: otherStreamRows },
+            ]"
             data-test="services-catalog-chips-more"
           >
             <OTag type="countChip" value="neutral" class="whitespace-nowrap">
@@ -203,6 +227,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div> -->
 
+      <div
+        v-if="redInsightsEnabled"
+        class="ms-2 flex h-8 w-28 shrink-0 items-center max-xl:w-12"
+        data-test="services-catalog-insights-slot"
+      >
+        <span v-if="insights.length > 0" class="bg-status-warning-bg rounded-default inline-flex">
+          <OPopover
+            v-model:open="insightsOpen"
+            align="end"
+            :aria-label="t('traces.servicesCatalog.insights.title')"
+          >
+            <template #trigger>
+              <OButton
+                variant="ghost-warning"
+                size="xs"
+                icon-left="warning"
+                :aria-label="insightsHint"
+                data-test="services-catalog-insights"
+              >
+                <span class="max-xl:hidden" data-test="services-catalog-insights-label">{{
+                  t(
+                    "traces.servicesCatalog.insights.count",
+                    { count: insights.length },
+                    insights.length,
+                  )
+                }}</span
+                ><span class="tabular-nums xl:hidden">{{ insights.length }}</span>
+                <OTooltip :content="insightsHint" />
+              </OButton>
+            </template>
+            <div class="flex max-h-80 flex-col overflow-y-auto py-1.5 text-xs">
+              <div
+                v-for="(entry, i) in insights"
+                :key="entry.key"
+                class="flex items-center gap-1.5 px-3 py-0.5 whitespace-nowrap"
+                :data-test="`services-catalog-insight-entry-${i}`"
+              >
+                <span class="text-text-heading font-medium">{{ entry.service }}</span>
+                <span class="text-text-secondary tabular-nums">{{
+                  formatInsightTime(entry.timestampUs)
+                }}</span>
+                <span class="text-text-secondary">{{
+                  t("traces.servicesCatalog.insights.scoreAboveThreshold", {
+                    signal: t(`traces.servicesCatalog.insights.signals.${entry.signal}`),
+                    percent: entry.deviationPercent.toFixed(1),
+                  })
+                }}</span>
+                <OButton
+                  variant="ghost-primary"
+                  size="xs"
+                  class="ms-auto"
+                  :data-test="`services-catalog-insight-traces-${i}`"
+                  @click="openInsightTraces(entry)"
+                >
+                  {{ t("traces.servicesCatalog.insights.viewTraces") }}
+                </OButton>
+                <OTooltip v-if="entry.folder && alertsLocked" :content="alertsLockedReason">
+                  <span class="inline-flex">
+                    <OButton
+                      variant="ghost-primary"
+                      size="xs"
+                      disabled
+                      icon-left="lock"
+                      :data-test="`services-catalog-insight-charts-${i}`"
+                    >
+                      {{ t("traces.servicesCatalog.insights.viewCharts") }}
+                    </OButton>
+                  </span>
+                </OTooltip>
+                <OButton
+                  v-else-if="entry.folder"
+                  variant="ghost-primary"
+                  size="xs"
+                  :data-test="`services-catalog-insight-charts-${i}`"
+                  @click="openInsightCharts(entry)"
+                >
+                  {{ t("traces.servicesCatalog.insights.viewCharts") }}
+                </OButton>
+              </div>
+            </div>
+          </OPopover>
+        </span>
+      </div>
       <!-- Column-visibility toggle + refresh — pinned to the right end of the
            filter bar so the catalog matches the other list pages (column
            toggle, then refresh). Wrapped in a real element with ms-2 because
@@ -218,80 +325,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-sm"
           icon-left="refresh"
-          :loading="isLoading"
+          :loading="isLoading || isSearching"
           data-test="services-catalog-refresh-btn"
           @click="refreshCatalog"
         >
           <OTooltip side="bottom" :content="t('common.refresh')" />
-        </OButton>
-      </div>
-    </div>
-
-    <CatalogVersionControlsBand
-      v-if="versionsEnabled"
-      :data="registry.data.value"
-      :scopes="shownScopes"
-      :state="registryState"
-      :env="versionEnv"
-      :verdict="versionVerdict"
-      @verdict="versionVerdict = $event"
-      @refresh="registry.refetch()"
-    />
-    <div
-      v-if="insights.length > 0"
-      class="border-border-default bg-surface-panel rounded-surface mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 border px-3 py-1.5 text-xs"
-      data-test="services-catalog-insights"
-    >
-      <span class="text-text-heading font-semibold">{{
-        t("traces.servicesCatalog.insights.title")
-      }}</span>
-      <div
-        v-for="(entry, i) in insights"
-        :key="entry.key"
-        class="flex items-center gap-1.5"
-        :data-test="`services-catalog-insight-entry-${i}`"
-      >
-        <span class="font-medium">{{ entry.service }}</span>
-        <span class="text-text-secondary">{{
-          t(`traces.servicesCatalog.insights.signals.${entry.signal}`)
-        }}</span>
-        <span class="text-text-secondary tabular-nums">{{
-          formatInsightTime(entry.timestampUs)
-        }}</span>
-        <span class="text-text-secondary tabular-nums">{{
-          t("traces.servicesCatalog.insights.scoreAbove", {
-            percent: entry.deviationPercent.toFixed(1),
-          })
-        }}</span>
-        <OButton
-          variant="ghost-primary"
-          size="xs"
-          :data-test="`services-catalog-insight-traces-${i}`"
-          @click="openInsightTraces(entry)"
-        >
-          {{ t("traces.servicesCatalog.insights.viewTraces") }}
-        </OButton>
-        <OTooltip v-if="entry.folder && alertsLocked" :content="alertsLockedReason">
-          <span class="inline-flex">
-            <OButton
-              variant="ghost-primary"
-              size="xs"
-              disabled
-              icon-left="lock"
-              :data-test="`services-catalog-insight-charts-${i}`"
-            >
-              {{ t("traces.servicesCatalog.insights.viewCharts") }}
-            </OButton>
-          </span>
-        </OTooltip>
-        <OButton
-          v-else-if="entry.folder"
-          variant="ghost-primary"
-          size="xs"
-          :data-test="`services-catalog-insight-charts-${i}`"
-          @click="openInsightCharts(entry)"
-        >
-          {{ t("traces.servicesCatalog.insights.viewCharts") }}
         </OButton>
       </div>
     </div>
@@ -314,6 +352,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="!isLoading && services.length > 0"
           class="catalog-type-filter overflow-y-auto px-1"
+          :class="{ invisible: otherStreamRows }"
+          data-test="services-catalog-type-rail"
         >
           <OTabs
             :orientation="isMobile ? 'horizontal' : 'vertical'"
@@ -374,6 +414,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
+      <div
+        v-else-if="filterEmpty"
+        class="flex flex-1 flex-col items-center justify-center"
+        data-test="services-catalog-filter-empty"
+      >
+        <OEmptyState
+          preset="no-services-catalog"
+          size="hero"
+          filtered
+          :title="t('serviceVersions.catalog.filterEmpty.title')"
+          :description="filterEmptyText"
+          @action="clearVersionFilters"
+        />
+      </div>
+
       <!-- Empty state (shown when not loading and no data) -->
       <div
         v-else-if="!isLoading && services.length === 0"
@@ -401,9 +456,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="oTableRef"
             :data="sortedServices"
             :columns="tableColumns"
-            :column-visibility="columnVisibility"
+            :column-visibility="shownColumnVisibility"
             row-key="id"
-            :loading="isLoading"
+            :loading="isLoading || isSearching"
+            :loading-reset-key="streamFilter"
             :row-height="versionsEnabled ? CATALOG_ROW_HEIGHT : undefined"
             :frame="false"
             :default-columns="false"
@@ -428,13 +484,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :identity="row.versionScope"
                 :service="row.versionScope.service"
                 :shown-env="chipEnv(row.versionScope, versionEnv)"
-                :hide-key="catalogEnvColumn(versionEnv).hideKey" /><span
+                :hide-key="catalogEnvColumn(versionEnv).hideKey"
+              /><CatalogVersionsCell
+                v-else-if="registryState === 'locked' && !row.infer_service_name"
+                state="locked"
+              /><span
                 v-else-if="registryState === 'error' && !row.infer_service_name"
                 class="text-text-muted text-xs"
                 data-test="svcver-env-unavailable"
                 >{{ raw("—")
                 }}<OTooltip :content="t('serviceVersions.catalog.cellUnavailable')" /></span
-            ></template>
+              ><OSkeleton
+                v-else-if="registryState === 'loading' && !row.infer_service_name"
+                class="h-5 w-16"
+                data-test="svcver-env-loading"
+              /><span v-else class="text-text-muted text-xs" data-test="svcver-env-none"
+                ><NotComparedMark v-if="cellReason(row)" :reason="cellReason(row)" /><template
+                  v-else
+                  >{{ raw("—") }}</template
+                ></span
+              ></template
+            >
             <template #cell-version_where="{ row }"
               ><span v-if="row.place?.none" class="text-xs" data-test="svcver-where-none"
                 ><NotComparedMark :reason="whereOutsideReason(t)" /></span
@@ -451,32 +521,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-secondary font-sans"
                   >{{ raw(" ") }}{{ t("serviceVersions.catalog.noCluster") }}</span
                 ></span
+              ><span v-else class="text-text-muted text-xs" data-test="svcver-where-unreported"
+                ><NotComparedMark v-if="cellReason(row)" :reason="cellReason(row)" /><template
+                  v-else
+                  >{{ raw("—") }}</template
+                ></span
               ></template
             >
             <template #cell-version_verdict="{ row }">
               <CatalogVersionsCell
                 :scope="row.versionScope"
-                :state="!versionsEnabled || row.infer_service_name ? 'locked' : registryState"
+                :state="row.infer_service_name ? 'ready' : registryState"
                 :unavailable="versionUnavailable"
                 :tracking="registry.data.value?.tracking"
                 :explained="versionSummary.launchDay"
+                :empty-reason="cellReason(row)"
                 content="verdict"
               />
             </template>
             <template #cell-version_deployed="{ row }">
               <CatalogVersionsCell
                 :scope="row.versionScope"
-                :state="!versionsEnabled || row.infer_service_name ? 'locked' : registryState"
+                :state="row.infer_service_name ? 'ready' : registryState"
                 :unavailable="versionUnavailable"
+                :empty-reason="cellReason(row)"
                 content="deployed"
               />
             </template>
-            <template v-if="versionsEnabled && footerNote" #footer-note>{{ footerNote }}</template>
+            <template v-if="footerNote" #footer-note
+              ><span
+                :class="rowsCapped ? 'text-status-warning-text' : ''"
+                data-test="services-catalog-footer-note"
+                >{{ footerNote }}</span
+              ></template
+            >
             <template #cell-service_versions="{ row }"
               ><CatalogVersionsCell
                 :scope="row.versionScope"
-                :state="!versionsEnabled || row.infer_service_name ? 'locked' : registryState"
+                :state="row.infer_service_name ? 'ready' : registryState"
                 :unavailable="versionUnavailable"
+                :empty-reason="cellReason(row)"
             /></template>
             <!-- A row with no requests has no health to report -->
             <template #cell-status="{ row }">
@@ -484,7 +568,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="healthWithheld(row)"
                 class="text-text-muted"
                 :data-test="`services-catalog-status-none-${row.service_name}`"
-                >{{ raw("—") }}<OTooltip :content="t('serviceVersions.catalog.healthNoTraffic')"
+                >{{ raw("—")
+                }}<OTooltip
+                  :content="
+                    t(
+                      row.total_requests === 0
+                        ? 'serviceVersions.catalog.healthNoRequests'
+                        : 'serviceVersions.catalog.healthNoTraffic',
+                    )
+                  "
               /></span>
               <OTag
                 v-else
@@ -540,7 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 :value="row.error_rate"
                 :max="columnMaxes.error_rate"
-                :label="raw(formatPercent(row.error_rate))"
+                :label="raw(errorRateLabel(row.error_rate, row.error_count))"
                 :variant="
                   row.error_rate > 10 ? 'danger' : row.error_rate > 5 ? 'warning' : 'default'
                 "
@@ -656,15 +748,16 @@ import ServiceEnvChip from "@/components/shared/ServiceEnvChip.vue";
 import { isAxiosError } from "axios";
 import { servicesQuery } from "@/services/service_versions.queries";
 import type { Scope } from "@/services/service_versions";
-import type { CatalogPlace } from "./servicesCatalogVersions";
+import type { CatalogPlace, CatalogVerdictFilter } from "./servicesCatalogVersions";
 import CatalogVersionsCell from "@/enterprise/components/ServiceVersions/CatalogVersionsCell.vue";
 import NotComparedMark from "@/enterprise/components/ServiceVersions/NotComparedMark.vue";
 import CatalogVersionControlsCounts from "@/enterprise/components/ServiceVersions/CatalogVersionControlsCounts.vue";
-import CatalogVersionControlsBand from "@/enterprise/components/ServiceVersions/CatalogVersionControlsBand.vue";
+import CatalogVersionNotice from "@/enterprise/components/ServiceVersions/CatalogVersionNotice.vue";
 import {
-  environmentPredicate,
-  catalogVerdictRank,
+  catalogEnvCounts,
+  mergeCatalogVersions,
   catalogMatches,
+  catalogFilterEmptyText,
   envCatalogRows,
   showsEnvColumn,
   catalogSummary,
@@ -679,13 +772,21 @@ import {
   servingHealthSql,
   servingStatus,
   servingIdle,
-  versionTrafficKey,
-  catalogColumnVisibility,
+  versionTrafficFrom,
   catalogEnvColumn,
+  catalogPanelRow,
+  catalogSpellings,
+  catalogCellReason,
+  sharedCellGap,
+  catalogVersionSort,
+  catalogFiltersFromQuery,
+  catalogFilterQuery,
+  catalogVerdictOptions,
+  catalogExtraVerdictOptions,
+  errorRateLabel,
   catalogRangeQuery,
   CATALOG_COLUMN_SIZES,
   CATALOG_ROW_HEIGHT,
-  CATALOG_SERVICE_MIN_SIZE,
   type VersionTraffic,
 } from "./servicesCatalogVersions";
 import { whereOutsideReason } from "@/utils/serviceVersionsCopy";
@@ -716,6 +817,8 @@ import {
 } from "@/utils/zincutils";
 import { getEffectiveTimeRange } from "@/utils/date";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -728,15 +831,15 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, type LocationQuery } from "vue-router";
 import { useServicePanelRoute } from "./composables/useServicePanelRoute";
-import searchService from "@/services/search";
 import config from "@/aws-exports";
 import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { useListViewState } from "@/composables/useListViewState";
 import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
+import { serviceKey, serviceKeySql } from "@/utils/serviceCount";
 
 const { t, locale } = useI18nTyped();
 const placeholderLine = (name: string) => {
@@ -744,11 +847,7 @@ const placeholderLine = (name: string) => {
   return key ? t(key) : "";
 };
 const { isMobile } = useBreakpoint();
-const { columnVisibility: savedVisibility, setColumnVisibility } =
-  useExternalColumnToggle("services-catalog");
-const columnVisibility = computed(() =>
-  catalogColumnVisibility(versionsEnabled, savedVisibility.value),
-);
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("services-catalog");
 const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();
 const { getStreams } = useStreams(t);
@@ -756,8 +855,15 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useH
 const store = useStore();
 const router = useRouter();
 const panelRoute = useServicePanelRoute();
-const versionEnv = ref("");
-const versionVerdict = ref("");
+// Env, verdict and category live in the URL, so a reload, a shared link and Back keep them.
+const urlFilters = catalogFiltersFromQuery(router.currentRoute.value?.query ?? {});
+const versionEnv = ref(urlFilters.env);
+const versionVerdict = ref(validVerdict(urlFilters.verdict));
+function validVerdict(value: string) {
+  return ([...catalogVerdictOptions, ...catalogExtraVerdictOptions] as string[]).includes(value)
+    ? value
+    : "";
+}
 const registry = useQuery(
   computed(() => ({
     ...servicesQuery(searchObj.organizationIdentifier, store.state.userInfo?.email || "", {}),
@@ -779,8 +885,13 @@ const registryState = computed(() => {
 const versionSummary = computed(() =>
   catalogSummary(registry.data.value, versionEnv.value, shownScopes.value),
 );
+// The cap is the one thing the pager cannot say, so it wins the footer over the sort note.
 const footerNote = computed(() => {
-  if (registryState.value !== "ready" || versionUnavailable.value) return "";
+  if (rowsCapped.value)
+    return t("traces.servicesCatalog.rowsCapped", {
+      count: CATALOG_ROWS.toLocaleString(String(locale.value)),
+    });
+  if (!versionsEnabled || registryState.value !== "ready" || versionUnavailable.value) return "";
   return catalogFooterNote(
     versionSummary.value,
     {
@@ -799,9 +910,14 @@ function refreshCatalog() {
 watch([versionEnv, versionVerdict], () => {
   currentPage.value = 1;
 });
-watch(versionEnv, () => {
-  void loadServicesCatalog();
-});
+const versionFiltersActive = computed(
+  () => versionsEnabled && Boolean(versionEnv.value || versionVerdict.value),
+);
+function clearVersionFilters() {
+  versionEnv.value = "";
+  versionVerdict.value = "";
+  filterText.value = "";
+}
 
 const emit = defineEmits<{
   "view-traces": [data: string | Record<string, any>];
@@ -833,6 +949,8 @@ interface ServiceRow {
   place?: CatalogPlace;
   id: string;
   service_name: string;
+  /** The raw span spellings an instrumented row folded into one. */
+  service_names?: string[];
   status: ServiceHealthStatus;
   total_requests: number;
   error_count: number;
@@ -897,6 +1015,35 @@ const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
 // The failed search's server message; shown instead of the empty state so a broken query never reads as "no services".
 const loadError = ref<I18nText | null>(null);
+const periodKey = computed(() => {
+  const datetime = searchObj.data.datetime;
+  return datetime.type === "relative"
+    ? `relative:${datetime.relativeTimePeriod}`
+    : `absolute:${datetime.startTime}:${datetime.endTime}`;
+});
+// The last complete load; Env and verdict filter its rows client-side, so its env counts match what a pick shows.
+const loadedFor = ref<{ stream: string; period: string; rows: ServiceRow[] } | null>(null);
+const rowsSettled = computed(
+  () =>
+    loadedFor.value?.stream === streamFilter.value?.replaceAll('"', "") &&
+    loadedFor.value?.period === periodKey.value,
+);
+// The previous stream's counts stay hidden, space kept, until the newly picked stream's rows land.
+const otherStreamRows = computed(
+  () => !!loadedFor.value && loadedFor.value.stream !== streamFilter.value?.replaceAll('"', ""),
+);
+const noEnvStamps = computed(() => {
+  if (!versionsEnabled) return false;
+  const flags = schemaFlags.value;
+  const stream = streamFilter.value?.replaceAll('"', "");
+  const ownFlags = flags?.stream === stream && flags.org === searchObj.organizationIdentifier;
+  if (ownFlags && !flags.hasWhereColumn) return true;
+  const rows = rowsSettled.value ? (loadedFor.value?.rows ?? []) : [];
+  return rows.length > 0 && !rows.some((row) => row.where_key);
+});
+const noSpans = computed(
+  () => versionsEnabled && rowsSettled.value && loadedFor.value?.rows.length === 0,
+);
 const viewState = useListViewState("servicesCatalog", {
   filterText: "",
   typeFilter: "service" as TypeFilter,
@@ -910,7 +1057,13 @@ const linkedService = router.currentRoute.value?.query?.service;
 const filterText = ref(
   typeof linkedService === "string" && linkedService ? linkedService : viewState.filterText,
 );
-const typeFilter = ref<TypeFilter>(viewState.typeFilter);
+const typeFilter = ref<TypeFilter>(
+  validType(urlFilters.type) ||
+    (urlFilters.env || urlFilters.verdict ? "service" : viewState.typeFilter),
+);
+function validType(value: string): TypeFilter | "" {
+  return (TYPE_FILTER_ORDER as string[]).includes(value) ? (value as TypeFilter) : "";
+}
 const currentPage = ref(viewState.currentPage);
 const rowsPerPage = ref(viewState.rowsPerPage);
 const rowsPerPageOptions = [10, 25, 50, 100];
@@ -935,6 +1088,71 @@ watch([filterText, typeFilter, currentPage, rowsPerPage, sortBy, sortOrder], () 
     sortOrder: sortOrder.value,
   });
 });
+// Back and Forward restore the stream and filters of that history entry; a kept-alive page ignores other routes.
+watch(
+  () => {
+    const route = router.currentRoute.value;
+    if (route?.name !== "traces") return "";
+    const stream = typeof route.query.stream === "string" ? route.query.stream : "";
+    return JSON.stringify({ ...catalogFiltersFromQuery(route.query), stream });
+  },
+  (key, oldKey) => {
+    if (!key) return;
+    const filters = JSON.parse(key) as ReturnType<typeof catalogFiltersFromQuery> & {
+      stream: string;
+    };
+    // Only a move of the URL's own stream counts: a filter-only write keeps whatever URL stream it found.
+    const lastStream = oldKey ? (JSON.parse(oldKey) as { stream: string }).stream : "";
+    if (
+      filters.stream !== lastStream &&
+      filters.stream !== streamFilter.value?.replaceAll('"', "") &&
+      availableStreams.value.includes(filters.stream)
+    ) {
+      streamFilter.value = filters.stream;
+      localStorage.setItem("servicesCatalog_streamFilter", filters.stream);
+    }
+    // A stream push carries the old entry's filters unchanged; the picks made since then win over them.
+    const last = oldKey ? (JSON.parse(oldKey) as typeof filters) : undefined;
+    if (!last || filters.env !== last.env) versionEnv.value = filters.env;
+    if (!last || filters.verdict !== last.verdict)
+      versionVerdict.value = validVerdict(filters.verdict);
+    if (!last || filters.type !== last.type)
+      typeFilter.value = validType(filters.type) || "service";
+  },
+);
+// Filter and range writes each carry the other's keys: two replaces in one tick both start from the old route.
+function withCatalogRange(query: LocationQuery) {
+  return catalogRangeQuery(query, searchObj.data.datetime);
+}
+function withCatalogFilters(query: LocationQuery) {
+  const filters = { env: versionEnv.value, verdict: versionVerdict.value, type: typeFilter.value };
+  return catalogFilterQuery(query, filters, "service");
+}
+watch(
+  [
+    versionEnv,
+    versionVerdict,
+    typeFilter,
+    streamFilter,
+    () => router.currentRoute.value?.query?.stream,
+  ],
+  ([env, verdict, type]) => {
+    const route = router.currentRoute.value;
+    if (route?.name !== "traces") return;
+    // While a stream switch is still navigating, the route holds the old stream; writing it would cancel the switch.
+    const urlStream = route.query.stream;
+    if (
+      typeof urlStream === "string" &&
+      urlStream !== streamFilter.value?.replaceAll('"', "") &&
+      availableStreams.value.includes(urlStream)
+    )
+      return;
+    const next = catalogFilterQuery(route.query, { env, verdict, type }, "service");
+    if (JSON.stringify(next) !== JSON.stringify(route.query))
+      void router.replace({ query: withCatalogRange(next) });
+  },
+  { immediate: true },
+);
 let pageRestored = false;
 watch(isLoading, (loadingNow) => {
   if (loadingNow || pageRestored) return;
@@ -967,6 +1185,14 @@ interface RedInsight {
   folder?: string;
 }
 const insights = ref<RedInsight[]>([]);
+const insightsOpen = ref(false);
+const insightsHint = computed(() =>
+  t(
+    "traces.servicesCatalog.insights.countHint",
+    { count: insights.value.length },
+    insights.value.length,
+  ),
+);
 let insightsRequest = 0;
 let catalogLoad = 0;
 // The RED insights job is enterprise-only, so OSS never fetches the _anomalies schema for it.
@@ -1012,14 +1238,26 @@ const selectedServiceNode = computed(() => {
   if (!selected) return null;
   // The serving-version read can land after the click, so the panel reads the row as it is now.
   const current = envServices.value.find((row) => row.id === selected.id);
-  return {
+  const node = {
     id: selected.id,
-    name: selected.service_name,
+    name: current?.service_name ?? selected.service_name,
     service_type: selected.infer_service_type,
+  };
+  // A picked place with no row here is scoped by the route, so the kept row's Health would describe another place.
+  const otherPlace =
+    !selected.infer_service_name &&
+    panelRoute.owns(node) &&
+    (selected.where_key || "") !== panelRoute.state.value.where;
+  return {
+    ...node,
+    ...(selected.infer_service_name
+      ? {}
+      : { service_names: catalogSpellings(services.value, selected.service_name) }),
     service_system: selected.infer_service_system,
     error_rate: selected.error_rate,
     health_status: current?.status ?? selected.status,
-    health_withheld: healthWithheld(current ?? selected),
+    health_withheld: otherPlace || healthWithheld(current ?? selected),
+    where_key: selected.where_key || "",
   };
 });
 
@@ -1046,11 +1284,29 @@ const versionTraffic = ref(new Map<string, VersionTraffic>());
 const versionTrafficComplete = ref(false);
 // A search without an explicit size stops at 1,000 hits; this read has one row per version.
 const VERSION_TRAFFIC_ROWS = 10_000;
+// The same silent 1,000-row stop applies to the catalog, so it asks for more and says when it hit the ask.
+const CATALOG_ROWS = 10_000;
+const rowsCapped = ref(false);
 const HEALTH_PILL_CLASSES = {
   critical: "text-service-health-critical bg-service-health-critical/12",
   warning: "text-service-health-warning bg-service-health-warning/12",
   degraded: "text-service-health-degraded bg-service-health-degraded/12",
 } as const;
+
+// The name is the row's key, so a hidden Service column persisted by an older build never applies.
+const shownColumnVisibility = computed(() => ({ ...columnVisibility.value, service_name: true }));
+// A dash every scopeless row shares is explained once, in each version column's header.
+const sharedGap = computed(() =>
+  registryState.value === "ready" ? sharedCellGap(filteredServices.value) : null,
+);
+const gapHeader = computed(() =>
+  sharedGap.value
+    ? { headerTooltip: t("serviceVersions.catalog.dashMeans", { reason: t(sharedGap.value) }) }
+    : undefined,
+);
+function cellReason(row: ServiceRow) {
+  return catalogCellReason(row, sharedGap.value, t);
+}
 
 // OTable column defs. Sorting is `server` mode on the table (it emits
 // sort-change; the catalog reorders `sortedServices` itself), so each sortable
@@ -1059,66 +1315,25 @@ const HEALTH_PILL_CLASSES = {
 const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "service_name",
-    hideable: true,
     header: t("traces.servicesCatalog.columns.serviceName"),
     accessorKey: "service_name",
     sortable: true,
     resizable: true,
-    size: versionsEnabled ? CATALOG_COLUMN_SIZES.service_name : 260,
-    minSize: versionsEnabled ? CATALOG_SERVICE_MIN_SIZE : 180,
+    size: 260,
+    minSize: 180,
     pinned: "left",
     meta: { align: "left", flex: true },
   },
-  ...(versionsEnabled && showsEnvColumn(versionScopes.value, versionEnv.value)
-    ? [
-        {
-          id: "version_env",
-          header: t("serviceVersions.catalog.env"),
-          size: catalogEnvColumn(versionEnv.value).size,
-        },
-      ]
-    : []),
-  ...(versionsEnabled
-    ? [
-        {
-          id: "version_where",
-          header: t("serviceVersions.catalog.where"),
-          size: CATALOG_COLUMN_SIZES.version_where,
-        },
-        {
-          id: "version_verdict",
-          header: t("serviceVersions.catalog.deployVerdict"),
-          size: CATALOG_COLUMN_SIZES.version_verdict,
-          sortable: true,
-        },
-        {
-          id: "service_versions",
-          header: t("serviceVersions.catalog.version"),
-          size: CATALOG_COLUMN_SIZES.service_versions,
-        },
-      ]
-    : []),
   {
     id: "status",
     hideable: true,
-    header: versionsEnabled
-      ? t("serviceVersions.catalog.health")
-      : t("traces.servicesCatalog.columns.status"),
+    header: t("traces.servicesCatalog.columns.status"),
     accessorKey: "status",
     sortable: true,
     resizable: true,
-    size: versionsEnabled ? CATALOG_COLUMN_SIZES.status : 110,
+    size: 110,
     meta: { align: "left" },
   },
-  ...(versionsEnabled
-    ? [
-        {
-          id: "version_deployed",
-          header: t("serviceVersions.catalog.deployedLabel"),
-          size: CATALOG_COLUMN_SIZES.version_deployed,
-        },
-      ]
-    : []),
   {
     id: "total_requests",
     hideable: true,
@@ -1126,7 +1341,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     accessorKey: "total_requests",
     sortable: true,
     resizable: true,
-    size: versionsEnabled ? CATALOG_COLUMN_SIZES.total_requests : 110,
+    size: 110,
     meta: { align: "right", headerTooltip: t("traces.servicesCatalog.columns.requestsTooltip") },
   },
   {
@@ -1136,7 +1351,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     accessorKey: "error_count",
     sortable: true,
     resizable: true,
-    size: versionsEnabled ? CATALOG_COLUMN_SIZES.error_count : 90,
+    size: 90,
     meta: { align: "right" },
   },
   {
@@ -1146,7 +1361,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     accessorKey: "error_rate",
     sortable: true,
     resizable: true,
-    size: versionsEnabled ? CATALOG_COLUMN_SIZES.error_rate : 130,
+    size: 130,
     meta: { align: "right" },
   },
   {
@@ -1166,7 +1381,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     accessorKey: "p95_latency_ns",
     sortable: true,
     resizable: true,
-    size: versionsEnabled ? CATALOG_COLUMN_SIZES.p95_latency_ns : 120,
+    size: 120,
     meta: { align: "right" },
   },
   {
@@ -1176,7 +1391,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     accessorKey: "p99_latency_ns",
     sortable: true,
     resizable: true,
-    size: versionsEnabled ? CATALOG_COLUMN_SIZES.p99_latency_ns : 120,
+    size: 120,
     meta: { align: "right" },
   },
   {
@@ -1199,6 +1414,52 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     size: 130,
     meta: { align: "right" },
   },
+  ...(versionsEnabled && showsEnvColumn(versionScopes.value, versionEnv.value)
+    ? [
+        {
+          id: "version_env",
+          hideable: true,
+          header: t("serviceVersions.catalog.env"),
+          size: catalogEnvColumn(versionEnv.value).size,
+          meta: gapHeader.value,
+        },
+      ]
+    : []),
+  ...(versionsEnabled
+    ? [
+        {
+          id: "version_where",
+          hideable: true,
+          header: t("serviceVersions.catalog.where"),
+          size: CATALOG_COLUMN_SIZES.version_where,
+          meta: gapHeader.value,
+        },
+        {
+          id: "service_versions",
+          hideable: true,
+          header: t("serviceVersions.catalog.version"),
+          size: CATALOG_COLUMN_SIZES.service_versions,
+          sortable: true,
+          meta: gapHeader.value,
+        },
+        {
+          id: "version_verdict",
+          hideable: true,
+          header: t("serviceVersions.catalog.deployVerdict"),
+          size: CATALOG_COLUMN_SIZES.version_verdict,
+          sortable: true,
+          meta: gapHeader.value,
+        },
+        {
+          id: "version_deployed",
+          hideable: true,
+          header: t("serviceVersions.catalog.deployedLabel"),
+          size: CATALOG_COLUMN_SIZES.version_deployed,
+          sortable: true,
+          meta: gapHeader.value,
+        },
+      ]
+    : []),
 ]);
 
 // Health pill counts are scoped to the active type tab so they reflect the
@@ -1243,6 +1504,32 @@ const envServices = computed(() =>
 );
 
 const shownScopes = computed(() => rowScopes(envServices.value));
+// Kept through a period reload of the same stream; undefined until the stream's first load completes.
+const envCounts = computed(() =>
+  loadedFor.value?.stream === streamFilter.value?.replaceAll('"', "")
+    ? catalogEnvCounts(mergeCatalogVersions(loadedFor.value.rows, versionScopes.value))
+    : undefined,
+);
+// A pick the newly loaded stream or period does not offer would filter on a value its menu no longer lists.
+const checkedFor = ref("");
+watch(
+  () =>
+    noEnvStamps.value
+      ? "no-stamps"
+      : rowsSettled.value && !isSearching.value && registryState.value === "ready"
+        ? `${loadedFor.value?.stream}|${loadedFor.value?.period}`
+        : "",
+  (key) => {
+    if (!key || key === checkedFor.value) return;
+    checkedFor.value = key;
+    if (key === "no-stamps" || !envCounts.value?.get(versionEnv.value)) versionEnv.value = "";
+    if (
+      key === "no-stamps" ||
+      !versionSummary.value.counts[versionVerdict.value as CatalogVerdictFilter]
+    )
+      versionVerdict.value = "";
+  },
+);
 const reservedCounts = ref<ReturnType<typeof catalogSummary>["counts"]>({});
 watch(
   () => [versionEnv.value, versionSummary.value] as const,
@@ -1252,19 +1539,22 @@ watch(
   { immediate: true },
 );
 
-// Rows matching the active type tab, before the text filter is applied.
-// "all" passes everything through; otherwise match the concrete category.
-// Used both for the table and to compute the search-pill "N of M" totals.
+// The rail and Health counts follow both version filters, so each count equals the rows its tab shows.
+const verdictServices = computed(() =>
+  envServices.value.filter((row) =>
+    catalogMatches(row, "", versionVerdict.value, registryState.value, versionUnavailable.value),
+  ),
+);
 const typeFilteredServices = computed(() =>
   typeFilter.value === "all"
-    ? envServices.value
-    : envServices.value.filter((s) => categoryOf(s) === typeFilter.value),
+    ? verdictServices.value
+    : verdictServices.value.filter((s) => categoryOf(s) === typeFilter.value),
 );
 const reservedHealth = ref({ critical: 0, warning: 0, degraded: 0 });
 watch(
-  () => [versionEnv.value, statusCounts.value] as const,
-  ([env, counts]) => {
-    if (!env) reservedHealth.value = counts;
+  () => [versionEnv.value || versionVerdict.value, statusCounts.value] as const,
+  ([filtered, counts]) => {
+    if (!filtered) reservedHealth.value = counts;
   },
   { immediate: true },
 );
@@ -1315,34 +1605,61 @@ const filteredServices = computed(() => {
   );
   if (!filterText?.value?.trim()) return byType;
   const q = filterText.value?.trim().toLowerCase();
-  return byType.filter((s) => s.service_name.toLowerCase().includes(q));
+  // A folded row shows one spelling, so a search or deep link by any other spelling must still find it.
+  return byType.filter((s) =>
+    [s.service_name, ...(s.service_names ?? [])].some((name) => name.toLowerCase().includes(q)),
+  );
 });
 
 // Count of entities per category, plus the "all" total, for the tab badges.
 const categoryCounts = computed<Record<TypeFilter, number>>(() => {
   const counts: Record<TypeFilter, number> = {
-    all: envServices.value.length,
+    all: verdictServices.value.length,
     service: 0,
     datastore: 0,
     queue: 0,
     external: 0,
     rpc: 0,
   };
-  for (const s of envServices.value) counts[categoryOf(s)]++;
+  for (const s of verdictServices.value) counts[categoryOf(s)]++;
   return counts;
 });
 
 // Show "all" + Services always (so the default tab never disappears), plus any
 // concrete category that has at least one entity.
-const visibleTypeFilters = computed(() =>
-  TYPE_FILTER_ORDER.filter((c) => c === "all" || c === "service" || categoryCounts.value[c] > 0),
+// Under an Env filter the rail keeps the unfiltered load's categories at 0, so a filter never removes its rows.
+const visibleTypeFilters = computed(() => {
+  const kept = versionEnv.value || versionVerdict.value ? services.value.map(categoryOf) : [];
+  return TYPE_FILTER_ORDER.filter(
+    (c) => c === "all" || c === "service" || categoryCounts.value[c] > 0 || kept.includes(c),
+  );
+});
+// Settled only: while a search runs the table shows its loader instead.
+const filterEmpty = computed(
+  () =>
+    (versionFiltersActive.value || Boolean(filterText.value?.trim())) &&
+    services.value.length > 0 &&
+    !isLoading.value &&
+    !isSearching.value &&
+    filteredServices.value.length === 0,
+);
+const filterEmptyText = computed(() =>
+  catalogFilterEmptyText(
+    {
+      env: versionsEnabled ? versionEnv.value : "",
+      verdict: versionsEnabled ? versionVerdict.value : "",
+      search: filterText.value,
+      locale: String(locale.value),
+    },
+    t,
+  ),
 );
 
 /** Rows belonging to a type-filter tab ("all" spans everything). */
 function rowsForFilter(filter: TypeFilter): ServiceRow[] {
   return filter === "all"
-    ? envServices.value
-    : envServices.value.filter((s) => categoryOf(s) === filter);
+    ? verdictServices.value
+    : verdictServices.value.filter((s) => categoryOf(s) === filter);
 }
 
 // Worst health status present in each tab's entities. Drives the tab's color
@@ -1411,15 +1728,16 @@ function onTypeFilterChange(value: string) {
   currentPage.value = 1;
 }
 
-// If the active type tab disappears (e.g. after switching to a stream with no
-// datastores), fall back to Services so the table never shows an orphaned empty
-// state for a hidden tab.
-watch(visibleTypeFilters, (tabs) => {
-  if (!tabs.includes(typeFilter.value)) {
-    typeFilter.value = "service";
-    currentPage.value = 1;
-  }
-});
+// A tab the settled rows lack falls back to Services; judged mid-load it would drop a linked category.
+watch(
+  () => (rowsSettled.value && !isLoading.value ? visibleTypeFilters.value : null),
+  (tabs) => {
+    if (tabs && !tabs.includes(typeFilter.value)) {
+      typeFilter.value = "service";
+      currentPage.value = 1;
+    }
+  },
+);
 
 const statusOrder: Record<string, number> = {
   healthy: 0,
@@ -1435,8 +1753,13 @@ const sortedServices = computed(() => {
   return arr.sort((a, b) => {
     let result: number;
 
-    if (sortBy.value === "version_verdict") {
-      result = catalogVerdictRank(a.versionScope) - catalogVerdictRank(b.versionScope);
+    const versionA = catalogVersionSort(sortBy.value, a.versionScope);
+    if (versionA !== null) {
+      const versionB = catalogVersionSort(sortBy.value, b.versionScope) ?? "";
+      result =
+        typeof versionA === "number" && typeof versionB === "number"
+          ? versionA - versionB
+          : String(versionA).localeCompare(String(versionB), undefined, { numeric: true });
     } else if (sortBy.value === "status") {
       result = (statusOrder[a.status] ?? 0) - (statusOrder[b.status] ?? 0);
     } else {
@@ -1453,10 +1776,6 @@ const sortedServices = computed(() => {
   });
 });
 
-function formatPercent(value: number): string {
-  return value.toFixed(2) + "%";
-}
-
 function formatLat(us: number): string {
   return formatTimeWithSuffix(us);
 }
@@ -1466,15 +1785,13 @@ watch(
   ([state, rows]) => {
     if (!versionsEnabled) return;
     if (!state.open) {
-      if (!selectedServiceRow.value?.infer_service_name) {
+      if (selectedServiceRow.value && routedRow(selectedServiceRow.value)) {
         showSidePanel.value = false;
         selectedServiceRow.value = null;
       }
       return;
     }
-    const row = rows.find(
-      (row) => row.service_name === state.service && (row.where_key || "") === state.where,
-    );
+    const row = catalogPanelRow(rows, state.service, state.where, state.kind, state.system);
     if (row) {
       selectedServiceRow.value = row;
       showSidePanel.value = true;
@@ -1482,9 +1799,21 @@ watch(
   },
   { immediate: true },
 );
+// A dependency row without a recorded kind cannot be told apart from a same-named service in the URL.
+function routedRow(row: ServiceRow) {
+  return !row.infer_service_name || Boolean(row.infer_service_type);
+}
 function handleRowClick(row: ServiceRow) {
-  if (versionsEnabled && !row.infer_service_name) {
-    void panelRoute.open(row.service_name, row.where_key || "");
+  if (versionsEnabled && routedRow(row)) {
+    void (row.infer_service_name
+      ? panelRoute.open(
+          row.service_name,
+          "",
+          "operations",
+          row.infer_service_type,
+          row.infer_service_system || "",
+        )
+      : panelRoute.open(row.service_name, row.where_key || ""));
     return;
   }
   if (selectedServiceRow.value?.id === row.id) {
@@ -1517,7 +1846,9 @@ const loadAvailableStreams = async () => {
     const res: any = await getStreams("traces", false, false);
     const streams = res?.list ?? [];
     availableStreams.value = streams.map((stream: any) => stream.name);
+    const linked = router.currentRoute.value?.query?.stream;
     streamFilter.value = resolveTraceStream(streams, [
+      typeof linked === "string" ? linked : "",
       searchObj.data.stream.selectedStream.value,
       storedStreamFilter,
       streamFilter.value,
@@ -1595,12 +1926,16 @@ function redAggregates(pred: string): string {
 
 function catalogSql(streamName: string, flags: StreamSchemaFlags): string {
   const requestPred = requestPredicate(flags.hasParentColumn);
+  // Spellings of one service share a registry key, so they are one row named by one of its spellings.
+  const key = serviceKeySql("service_name");
   if (!flags.hasInferColumns) {
     return `SELECT
-  service_name,
+  MIN(service_name) AS service_name,
+  array_agg(DISTINCT service_name) AS service_names,
 ${redAggregates(requestPred)}
 FROM "${streamName}"
-GROUP BY service_name
+GROUP BY
+  ${key}
 ORDER BY total_requests DESC`;
   }
   // infer_service_name is only set on CLIENT and PRODUCER spans (traces/inferred.rs).
@@ -1611,13 +1946,14 @@ ORDER BY total_requests DESC`;
   const systemExpr = flags.hasInferSystemColumn ? inferredColumn("infer_service_system") : null;
   const typeExpr = flags.hasInferTypeColumn ? inferredColumn("infer_service_type") : null;
   const groupBy = [
-    "COALESCE(NULLIF(infer_service_name, ''), service_name)",
+    `COALESCE(NULLIF(infer_service_name, ''), ${key})`,
     "NULLIF(infer_service_name, '')",
     systemExpr,
     typeExpr,
   ].filter((expr): expr is string => expr !== null);
   return `SELECT
-  COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
+  MIN(service_name) AS service_name,
+  array_agg(DISTINCT service_name) FILTER (WHERE NULLIF(infer_service_name, '') IS NULL) AS service_names,
   NULLIF(infer_service_name, '') AS _infer_service_name,
   ${systemExpr ?? "NULL"} AS _infer_service_system,
   ${typeExpr ?? "NULL"} AS _infer_service_type,
@@ -1663,8 +1999,13 @@ function toInsights(hits: any[]): RedInsight[] {
 }
 
 // A filter on a column the stream never wrote fails the whole query, so it is added per schema.
-function insightsSql(columns: Set<string>): string {
-  const clauses = ["stream_type = 'traces'", "anomaly_name LIKE 'RED %'", "is_anomaly = true"];
+function insightsSql(columns: Set<string>, stream: string): string {
+  const clauses = [
+    "stream_type = 'traces'",
+    `stream_name = '${stream.replaceAll("'", "''")}'`,
+    "anomaly_name LIKE 'RED %'",
+    "is_anomaly = true",
+  ];
   if (columns.has("is_absence")) clauses.push("(is_absence IS NULL OR is_absence = false)");
   // Rate is watched in both directions; errors and latency only matter going up.
   clauses.push(
@@ -1700,10 +2041,37 @@ async function managedFolders(org: string): Promise<Map<string, string>> {
   }
 }
 
+/** Every hit of a logs-stream SQL over `_search_stream`; rejects when the search fails. */
+function streamLogRows(org: string, sql: string, start_time: number, end_time: number) {
+  return new Promise<any[]>((resolve, reject) => {
+    let hits: any[] = [];
+    void fetchQueryDataWithHttpStream(
+      {
+        queryReq: { query: { sql, start_time, end_time, from: 0, size: 100 } },
+        type: "search",
+        pageType: "logs",
+        searchType: "ui",
+        traceId: generateTraceContext().traceId,
+        org_id: org,
+      },
+      {
+        data: (_payload: any, response: any) => {
+          if (response?.type !== "search_response_hits") return;
+          hits = hits.concat(response.content?.results?.hits ?? []);
+        },
+        error: (_payload: any, err: any) => reject(err),
+        complete: () => resolve(hits),
+        reset: () => (hits = []),
+      },
+    );
+  });
+}
+
 async function loadInsights() {
   const request = ++insightsRequest;
   const org = searchObj.organizationIdentifier;
-  const columns = redInsightsEnabled.value ? await anomaliesColumns(org) : null;
+  const stream = streamFilter.value?.replaceAll('"', "") || "";
+  const columns = redInsightsEnabled.value && stream ? await anomaliesColumns(org) : null;
   if (request !== insightsRequest) return;
   if (!columns) {
     insights.value = [];
@@ -1711,17 +2079,10 @@ async function loadInsights() {
   }
   const { start_time, end_time } = getTimeRange();
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: org,
-        query: {
-          query: { sql: insightsSql(columns), start_time, end_time, from: 0, size: 100 },
-        },
-        page_type: "logs",
-      },
-      "ui",
-    );
-    const entries = toInsights(res?.data?.hits ?? []);
+    const hits = await streamLogRows(org, insightsSql(columns, stream), start_time, end_time);
+    if (request !== insightsRequest) return;
+    // Partitions can land out of order, so the newest anomalies are picked after every batch is in.
+    const entries = toInsights(hits.sort((a, b) => Number(b._timestamp) - Number(a._timestamp)));
     const folders = entries.length ? await managedFolders(org) : new Map<string, string>();
     if (request !== insightsRequest) return;
     insights.value = entries.map((entry) => ({ ...entry, folder: folders.get(entry.anomalyId) }));
@@ -1735,6 +2096,7 @@ function formatInsightTime(timestampUs: number): string {
 }
 
 function openInsightTraces(entry: RedInsight) {
+  insightsOpen.value = false;
   emit("view-traces", {
     serviceName: entry.service,
     stream: entry.stream,
@@ -1744,6 +2106,7 @@ function openInsightTraces(entry: RedInsight) {
 }
 
 function openInsightCharts(entry: RedInsight) {
+  insightsOpen.value = false;
   router.push({
     name: "alertDetail",
     params: { alert_id: entry.anomalyId },
@@ -1775,18 +2138,7 @@ async function loadVersionTraffic(
       size: VERSION_TRAFFIC_ROWS,
     });
     if (load !== catalogLoad) return;
-    const traffic = new Map<string, VersionTraffic>();
-    for (const hit of hits)
-      traffic.set(
-        versionTrafficKey(
-          String(hit.service_name ?? ""),
-          String(hit.where_key ?? ""),
-          String(hit.version ?? ""),
-          hit.image == null ? null : String(hit.image),
-        ),
-        { requests: Number(hit.total_requests ?? 0), errors: Number(hit.error_count ?? 0) },
-      );
-    versionTraffic.value = traffic;
+    versionTraffic.value = versionTrafficFrom(hits);
     versionTrafficComplete.value = hits.length < VERSION_TRAFFIC_ROWS;
   } catch {
     if (load !== catalogLoad) return;
@@ -1844,6 +2196,7 @@ async function loadServicesCatalog() {
     schemaFlags.value = flags;
   }
   let sql = catalogSql(streamName, flags);
+  const period = periodKey.value;
   if (versionsEnabled && flags.hasWhereColumn && flags.hasVersionColumn)
     void loadVersionTraffic(load, org, streamName, flags, start_time, end_time);
   else {
@@ -1853,13 +2206,7 @@ async function loadServicesCatalog() {
   if (flags.hasWhereColumn) {
     sql = sql
       .replace("SELECT\n", "SELECT\n  o2_service_where AS where_key,\n")
-      .replace("GROUP BY service_name", "GROUP BY o2_service_where, service_name")
       .replace("GROUP BY\n", "GROUP BY\n  o2_service_where,\n");
-    const predicate = registry.data.value
-      ? environmentPredicate(registry.data.value, versionEnv.value)
-      : { sql: "", postfilter: false };
-    if (predicate.sql && (!predicate.postfilter || flags.hasEnvColumn))
-      sql = sql.replace("\nGROUP BY", `\nWHERE ${predicate.sql}\nGROUP BY`);
   }
 
   const traceId = generateTraceContext().traceId;
@@ -1895,7 +2242,7 @@ async function loadServicesCatalog() {
           start_time,
           end_time,
           from: 0,
-          size: -1,
+          size: CATALOG_ROWS,
         },
         encoding: "base64",
       },
@@ -1914,14 +2261,19 @@ async function loadServicesCatalog() {
         ) {
           const hits: any[] = response.content?.results?.hits ?? [];
           for (const hit of hits) {
-            const name = hit.service_name ?? "";
             const inferredName = hit._infer_service_name ?? undefined;
+            const name = inferredName ?? hit.service_name ?? "";
             const inferredSystem = hit._infer_service_system ?? undefined;
             const inferredType = hit._infer_service_type ?? undefined;
+            const spellings: string[] | undefined =
+              !inferredName && Array.isArray(hit.service_names)
+                ? hit.service_names.map(String)
+                : undefined;
+            // The shown spelling is MIN over the window and can change between loads; the folded key cannot.
             const id = JSON.stringify([
               hit.where_key || "",
               serviceRowId({
-                service_name: name,
+                service_name: inferredName ? name : serviceKey(name),
                 infer_service_name: inferredName,
                 infer_service_system: inferredSystem,
                 infer_service_type: inferredType,
@@ -1931,6 +2283,7 @@ async function loadServicesCatalog() {
               where_key: hit.where_key || "",
               id,
               service_name: name,
+              service_names: spellings,
               total_requests: hit.total_requests ?? 0,
               error_count: hit.error_count ?? 0,
               error_rate: hit.error_rate ?? 0,
@@ -1945,10 +2298,8 @@ async function loadServicesCatalog() {
               infer_service_system: inferredSystem,
               infer_service_type: inferredType,
             });
-            if (hit._is_real_service) realNames.add(name);
+            if (hit._is_real_service) (spellings ?? [name]).forEach((n) => realNames.add(n));
           }
-          // Metadata arrives before any hits, so publishing it would blank the previous rows mid-refresh.
-          if (hits.length > 0) publish();
         }
       },
       error: (_payload: any, err: any) => {
@@ -1965,8 +2316,10 @@ async function loadServicesCatalog() {
       },
       complete: () => {
         if (load !== catalogLoad) return;
-        // Publishing here also clears the previous search's rows when this one returned no batches.
+        // Each batch holds partial results, so the rows and every count drawn from them change once, here.
         publish();
+        rowsCapped.value = rows.size >= CATALOG_ROWS;
+        loadedFor.value = { stream: streamName, period, rows: services.value };
         syncSelectedRow();
         isLoading.value = false;
         isSearching.value = false;
@@ -2020,17 +2373,12 @@ watch(
 
 // The traces search writes the range into the URL only when it runs, and the catalog never runs it.
 watch(
-  () => {
-    const datetime = searchObj.data.datetime;
-    return datetime.type === "relative"
-      ? `relative:${datetime.relativeTimePeriod}`
-      : `absolute:${datetime.startTime}:${datetime.endTime}`;
-  },
+  periodKey,
   () => {
     const current = router.currentRoute.value.query;
     const next = catalogRangeQuery(current, searchObj.data.datetime);
     if (["period", "from", "to"].some((key) => current[key] !== next[key]))
-      void router.replace({ query: next });
+      void router.replace({ query: withCatalogFilters(next) });
   },
   { immediate: true },
 );

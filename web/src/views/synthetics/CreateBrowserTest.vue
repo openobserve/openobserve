@@ -93,6 +93,7 @@ import {
 } from "@/components/synthetics/CreateBrowserTest.schema";
 import { CHROME_UI_LABELS, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
+import { selectSyntheticsFolder, withCheckFolder } from "@/utils/synthetics/selectFolder";
 import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -354,6 +355,7 @@ const devices = ref<SyntheticsDevice[]>([]);
 const destinations = ref<string[]>([]);
 const folders = ref<SyntheticsFolder[]>([]);
 const foldersLoading = ref(false);
+const foldersLoaded = ref(false);
 
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
@@ -384,6 +386,7 @@ async function fetchFolders() {
     await waitForOrgIdentifier();
     const res = await getFoldersListByType(store, "synthetics");
     folders.value = (res ?? []) as SyntheticsFolder[];
+    foldersLoaded.value = true;
   } catch (err) {
     console.error("[synthetics] failed to load folders", err);
     folders.value = [];
@@ -599,6 +602,13 @@ const autoRecord = ref(false);
 
 /** The check as last loaded or saved, which is what server-side moves act on. */
 const savedCheck = ref<BrowserCheck | null>(null);
+const pickerFolders = computed(() =>
+  withCheckFolder(
+    folders.value,
+    props.editId ? savedCheck.value?.folder : undefined,
+    t("dashboard.currentFolderLabel"),
+  ),
+);
 /** The check as the server returned it, kept unmodified so its draft hash is stable. */
 let serverCheck: BrowserCheck | null = null;
 
@@ -606,7 +616,7 @@ const check = ref<BrowserCheck>({
   name: "",
   url: "",
   enabled: true,
-  folder: "default",
+  folder: "",
   tags: [],
   journey: [],
   schedule: { type: "interval", intervalValue: 5, intervalUnit: "minutes" },
@@ -700,36 +710,22 @@ watch(
   { immediate: true },
 );
 
-/**
- * Reconcile the selected folder against the folders this org actually has.
- *
- * `check.folder` arrives from `?folder=` (New Monitor opened inside a folder)
- * or from a stored check, and neither source is validated: a bookmarked link, a
- * folder deleted since, or a link from another org all leave an id no option can
- * resolve. The select then renders that id verbatim, and `persist` sends it
- * straight back as `?folder=` — which the server treats as authoritative for
- * both the destination folder and the RBAC gate, so the save fails on a folder
- * the author never picked. Fall back to the default folder and say why.
- *
- * Skipped while the list is empty: that means the fetch has not landed (or
- * failed), and a valid id must not be discarded on the strength of a list we
- * do not have.
- */
+// Only new checks fall back; a direct grant can reach a saved check in an unlisted folder.
 watch(
-  [folders, () => check.value.folder],
+  [folders, foldersLoaded, () => check.value.folder],
   () => {
-    if (!folders.value.length) return;
+    if (!foldersLoaded.value || props.editId) return;
     const folderId = check.value.folder;
-    if (!folderId || folders.value.some((f) => f.folderId === folderId)) return;
-    check.value = { ...check.value, folder: "default" };
-    // The unreachable folder could never be saved back, so the fallback is the baseline, not an edit.
-    if (savedCheck.value?.folder === folderId) {
-      savedCheck.value = { ...savedCheck.value, folder: "default" };
+    if (folders.value.some((f) => f.folderId === folderId)) return;
+    const folder = selectSyntheticsFolder(folders.value) ?? "";
+    if (folder === folderId) return;
+    check.value = { ...check.value, folder };
+    if (folderId) {
+      validationErrors.value = {
+        ...validationErrors.value,
+        folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
+      };
     }
-    validationErrors.value = {
-      ...validationErrors.value,
-      folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
-    };
   },
   { immediate: true },
 );
@@ -912,8 +908,10 @@ function dropDraftCarriedByQuery() {
   const comparable = (value: BrowserCheck) =>
     stableStringify({ ...value, url: (value.url ?? "").trim(), name: (value.name ?? "").trim() });
   // The draft is stored redacted, so the reloaded check is compared in the same form.
+  // Before the list lands no folder is picked, so only an unpicked or "default" draft folder is carried.
   const reloaded = redactCheckDraftSecrets({
     ...check.value,
+    folder: check.value.folder || (stored.folder === "default" ? stored.folder : ""),
     url: startUrl.value,
     name: checkName.value,
   }).data;
@@ -1281,6 +1279,14 @@ const extractAnchor = computed(() =>
   extractEligibilityResult.value.ok ? extractEligibilityResult.value.anchor : 0,
 );
 const extractVariables = computed(() => splitVariablesForChild(check.value, extractRange.value));
+// A direct grant can open a parent in an unlisted folder, which the picker cannot offer.
+const extractDefaultFolder = computed(() => {
+  const folder = check.value.folder;
+  // Until the list loads, the saved check's own folder is the only one known to be valid.
+  if (!foldersLoaded.value) return folder ?? "";
+  if (folder && folders.value.some((f) => f.folderId === folder)) return folder;
+  return selectSyntheticsFolder(folders.value) ?? "";
+});
 
 function openExtractDialog() {
   if (extractEligibilityResult.value.ok) showExtractDialog.value = true;
@@ -2318,7 +2324,7 @@ function onClearResults() {
               :browsers="browsers"
               :devices="devices"
               :destinations="destinations"
-              :folders="folders"
+              :folders="pickerFolders"
               :folders-loading="foldersLoading"
               :validation-errors="{ ...validationErrors, ...reentryErrors }"
               :variable-suggestions="variableSuggestions"
@@ -2508,7 +2514,7 @@ function onClearResults() {
           :executed-count="executedStepCount"
           :parent-name="check.name"
           :parent-starting-url="check.url"
-          :default-folder="check.folder ?? 'default'"
+          :default-folder="extractDefaultFolder"
           :folders="folders"
           :needs-schedule="check.locations.length === 0"
           :parent-locations="check.locations"

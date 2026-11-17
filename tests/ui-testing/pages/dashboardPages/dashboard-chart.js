@@ -22,6 +22,17 @@ export default class ChartTypeSelector {
     this.treatAsNonTimestampCheckbox = page.locator('[data-test="dynamic-function-popup-treat-as-non-timestamp"]');
     this.showFieldAsJsonCheckbox = page.locator('[data-test="dynamic-function-popup-show-field-as-json"]');
 
+    // Query builder axis drop zones
+    this.xAxisLayout = page.locator('[data-test="dashboard-x-layout"]');
+    this.yAxisLayout = page.locator('[data-test="dashboard-y-layout"]');
+    this.breakdownLayout = page.locator('[data-test="dashboard-b-layout"]');
+
+    // Chart picker item currently marked as selected, for a given chart type id
+    this.selectedChartTypeItem = (chartType) =>
+      page.locator(
+        `[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected="${chartType}"]`
+      );
+
     // Query type selectors
     this.sqlQueryTypeBtn = page.locator('[data-test="dashboard-sql-query-type"]');
     this.customQueryTypeBtn = page.locator('[data-test="dashboard-custom-query-type"]');
@@ -1000,5 +1011,28 @@ export default class ChartTypeSelector {
     if (!found) {
       throw new Error(`Expected JSON value "${expectedValue}" was not rendered`);
     }
+  }
+
+  /** Assert the chart picker marks the given chart type as selected. */
+  async expectChartTypeSelected(chartType) {
+    await expect(this.selectedChartTypeItem(chartType)).toHaveCount(1);
+  }
+
+  /** Assert the X axis drop zone is shown (visible = true) or not rendered at all (visible = false). */
+  async expectXAxisLayoutVisible(visible = true) {
+    if (visible) await expect(this.xAxisLayout).toBeVisible();
+    else await expect(this.xAxisLayout).toHaveCount(0);
+  }
+
+  /** Assert the Breakdown drop zone is visible, and optionally that it holds the given field. */
+  async expectBreakdownLayoutContains(field) {
+    await expect(this.breakdownLayout).toBeVisible();
+    if (field) await expect(this.breakdownLayout).toContainText(field);
+  }
+
+  /** Assert the Y axis holds the given field read raw, with no aggregation such as count(). */
+  async expectYAxisRawField(field) {
+    await expect(this.yAxisLayout).toContainText(field);
+    await expect(this.yAxisLayout).not.toContainText("count(");
   }
 }

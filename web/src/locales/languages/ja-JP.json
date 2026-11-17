@@ -9871,7 +9871,6 @@
       "duplicatePanelId": "重複するパネルIDが見つかりました: {id}",
       "panelMissingLayoutI": "パネル {id} に layout.i の値がありません",
       "duplicateLayoutI": "タブ {tabId} に重複する layout.i の値が見つかりました: {value}",
-      "customChartCallbacksDropped": "カスタムグラフ: このパネルのコード内の {count} 件の関数コールバックは無視されました。保存されたグラフコードはアプリ内でコールバックを実行できません。代わりにプレーンな値を使用してください。 | カスタムグラフ: このパネルのコード内の {count} 件の関数コールバックは無視されました。保存されたグラフコードはアプリ内でコールバックを実行できません。代わりにプレーンな値を使用してください。",
       "unsafeCodeDetected": "安全でないコードが検出されました: {error}",
       "forbiddenFunctionCall": "'{name}()' の使用は許可されていません。",
       "forbiddenInsideSetTimeout": "'setTimeout()' 内での {name} の使用は許可されていません。",
@@ -10410,31 +10409,12 @@
     "hoursAgo": "{count}時間前",
     "daysAgo": "{count}日前",
     "cards": {
-      "firingAlerts": "発火中のアラート",
-      "failingRules": "失敗しているルール",
-      "openIncidents": "未解決のインシデント",
-      "pipelineErrors": "パイプラインエラー",
-      "pipelinesOf": "うち {enabled} 件有効",
-      "quietStreams": "停止中のストリーム",
-      "firingNone": "発火なし",
-      "noAlertRules": "アラートルールなし",
-      "noEnabledRules": "有効なルールなし",
-      "failingNone": "失敗なし",
-      "failingNote": "前回の評価でエラー",
-      "incidentsNone": "未解決なし",
-      "noPipelines": "パイプラインなし",
-      "noStreams": "ストリームなし",
-      "quietNote": "過去 7 日間に書き込みが停止",
-      "criticalUnit": "クリティカルレベルが {count} 件",
-      "deliveryFailures": "アラート配信の失敗",
-      "deliveryNote": "発火したが通知できなかったアラート",
-      "oldestFiring": "最も古い発火から {age}"
+      "openIncidents": "未解決のインシデント"
     },
     "state": {
       "tileForbidden": "アクセス権限なし",
       "tileLocked": "ロック済み",
       "tileError": "読み込めませんでした",
-      "tileUnavailable": "利用できません",
       "sectionLocked": "エンタープライズライセンスで利用可能",
       "sectionForbidden": "お使いのロールではこのデータを表示できません。組織の管理者にアクセス権を依頼してください。"
     },
@@ -10556,20 +10536,6 @@
       "retry": "再試行"
     },
     "dataAsOf": "{time} 時点のデータ",
-    "status": {
-      "attention": "対応が必要",
-      "checking": "確認中…",
-      "partial": "一部のチェックを読み込めませんでした",
-      "clear": "対応が必要な項目はありません",
-      "items": {
-        "firing": "{count} 件のアラートが発火中 | {count} 件のアラートが発火中",
-        "failing": "{count} 件のルールが失敗しています | {count} 件のルールが失敗しています",
-        "incidents": "{count} 件のオープンなインシデント | {count} 件のオープンなインシデント",
-        "pipelines": "{count} 件のエラーのあるパイプライン | {count} 件のエラーのあるパイプライン",
-        "quiet": "{count} 件のデータのないストリーム | {count} 件のデータのないストリーム"
-      },
-      "unmonitored": "まだ何も監視されていません"
-    },
     "timeRange": {
       "heading": "選択した時間範囲内"
     }
@@ -11545,68 +11511,6 @@
     }
   },
   "alerts": {
-    "firing": {
-      "title": "発火",
-      "drawer": {
-        "openInLogs": "ログで開く",
-        "partOfIncident": "インシデントの一部:",
-        "incidentAck": "ここで確認応答すると、インシデント全体を確認応答したことになります。",
-        "incidentTakeOver": "ここで引き継ぐと、インシデント全体を引き継ぎます。",
-        "now": "現在",
-        "threshold": "しきい値 {value}",
-        "since": "{time} から",
-        "flaps": "フラップ、過去6時間",
-        "flapsUnit": "状態変化",
-        "notified": "通知済み",
-        "notDeliveredTo": "{name}: 未配信",
-        "history": "履歴",
-        "last2h": "過去2時間",
-        "lastSpan": "過去 {span}",
-        "viewAll": "すべて表示",
-        "historyEmpty": "この期間に実行はありません。",
-        "historyFailed": "履歴を読み込めませんでした。",
-        "barFiring": "{span} 発火",
-        "barOk": "{span} 正常",
-        "barUnknown": "{span} は未読み取り",
-        "eventStarted": "発火開始",
-        "eventRecovered": "復旧",
-        "eventNotified": "通知済み",
-        "eventNotifiedTo": "{names} に通知済み",
-        "eventFailed": "未配信",
-        "eventFailedTo": "{names} に未配信",
-        "soFar": "これまで {span}",
-        "lasted": "{span} 継続",
-        "okFor": "{span} 正常"
-      },
-      "chipCount": "{label} {count}",
-      "chipFiring": "発火",
-      "chipAcked": "確認応答済み",
-      "chipMuted": "ミュート済み",
-      "chipFailed": "未配信",
-      "searchPlaceholder": "アラートを検索",
-      "priorityAll": "優先度",
-      "priorityLabel": "優先度",
-      "priorityUnset": "優先度なし",
-      "folderAll": "フォルダー: すべて",
-      "folderLabel": "フォルダー",
-      "stale": "古い",
-      "refreshFailed": "発火中のアラートを更新できませんでした ({reason})。{time} のデータを表示しています。",
-      "refreshFailedReason": "リクエストに失敗しました",
-      "statusUnavailable": "現在アラートステータスを利用できないため、発火中のアラートを表示できません。",
-      "retry": "再試行",
-      "columnPriority": "優先度",
-      "columnState": "状態",
-      "columnAlert": "アラート",
-      "columnFolder": "フォルダー",
-      "columnFiringFor": "発火継続時間",
-      "acknowledgeCount": "{count} 件を担当する",
-      "mute": "ミュート",
-      "clear": "クリア",
-      "emptyFiring": "発火中のものはありません",
-      "emptyAcked": "担当済みのものはありません",
-      "emptyMuted": "ミュート済みのものはありません",
-      "emptyFailed": "未配信のものはありません"
-    },
     "moreActions": "その他のアクション",
     "promRuleMode": "ルールモード",
     "promRulePreview": "{count} 件の返されたシリーズが現在一致しています。各シリーズは発火する前に保留期間を完了する必要があります。",
@@ -12882,6 +12786,9 @@
         "alertStartTimeMillis": "ウィンドウ開始時刻（エポックミリ秒）",
         "alertEndTimeMillis": "ウィンドウ終了時刻（エポックミリ秒）",
         "alertUrl": "調査のためにOpenObserveに戻るリンク",
+        "alertUrlLabel": "メインリンクのラベル（例: \"View logs\"）",
+        "alertDetailUrl": "このメッセージを送信したアラートのページへのリンク。メインリンクがすでにそのページを開く場合は空です。",
+        "alertDetailLabel": "そのリンクのラベル（例: \"Open alert\"）。リンクが空の場合は空です。",
         "alertTriggerTime": "アラート発火時刻（ISO 8601）",
         "alertTriggerTimeMillis": "トリガー時刻（エポックミリ秒）",
         "alertTriggerTimeSeconds": "トリガー時刻（エポック秒）",
@@ -13415,7 +13322,10 @@
       "chartUnavailable": "このアラートのクエリのチャートは利用できません。",
       "eventCount": "イベント",
       "notFoundTitle": "アラートが見つかりません",
-      "notFoundDescription": "このアラートは存在しないか、アクセス権がない可能性があります。削除された可能性があります。"
+      "notFoundDescription": "このアラートは存在しないか、アクセス権がない可能性があります。削除された可能性があります。",
+      "noAccessTitle": "このアラートへのアクセス権がありません",
+      "noAccessDescription": "このフォルダーのアラートを読む権限を管理者に依頼してください。",
+      "loadFailedTitle": "このアラートを読み込めませんでした"
     },
     "timeLabel": "時刻",
     "unknownHttpStatus": "不明",
@@ -14472,6 +14382,10 @@
     "insertVariable": "変数を挿入",
     "moreVariables": "+{count} 件",
     "viewAlertLinkLabel": "OpenObserve で表示",
+    "variableAlertUrlLabelDescription": "メインリンクのラベル（例: \"View logs\"）",
+    "variableAlertDetailUrlDescription": "このメッセージを送信したアラートのページへのリンク。メインリンクがすでにそのページを開く場合は空です。",
+    "variableAlertDetailLabelDescription": "そのリンクのラベル（例: \"Open alert\"）。リンクが空の場合は空です。",
+    "slackLinksNotShown": "{count} 件のリンクはボタンとして表示されません: {links} | {count} 件のリンクはボタンとして表示されません: {links}",
     "moveUp": "上に移動",
     "moveDown": "下に移動",
     "fieldLabel": "ラベル",
@@ -22895,6 +22809,8 @@
       "noResults": "検索に一致するアイコンがありません",
       "groups": {
         "results": "結果",
+        "icons": "アイコン",
+        "monoLogos": "ロゴ",
         "status": "ステータス",
         "services": "サービス",
         "ai": "AI",
@@ -23396,11 +23312,6 @@
       "failedToLoadToolset": "ツールセットの読み込みに失敗しました"
     },
     "alerts": {
-      "firing": {
-        "bulkResult": "{acked} 件を担当し、{skipped} 件をスキップしました",
-        "bulkResultFailed": "{acked} 件確認済み、{skipped} 件スキップ、{failed} 件失敗",
-        "bulkAllAcked": "{acked} 件を担当しました"
-      },
       "failedToNavigateToAlert": "アラートへの移動に失敗しました",
       "alertNotFound": "アラートが見つかりません",
       "failedToLoadAlerts": "アラートの読み込みに失敗しました",
@@ -28518,7 +28429,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "ステップ 0 · サーバーの前提条件",
+      "title": "ステップ 1 · サーバーの前提条件",
       "subtitle": "Slack の設定前にこのサーバーでチェックされます",
       "columnSetting": "設定項目",
       "columnResult": "結果",
@@ -28589,7 +28500,7 @@
       "back": "戻る",
       "finish": "完了",
       "connection": {
-        "title": "ステップ 1 · 接続",
+        "title": "ステップ 2 · 接続",
         "description": "このチェックは、本番と同じコードパスでこのサーバーから Slack に到達します。",
         "allPassed": "このサーバーから Slack に到達できます",
         "someFailed": "このサーバーから Slack に到達できません。プロキシまたはファイアウォールで *.slack.com を許可してから、再チェックしてください。",
@@ -28598,7 +28509,7 @@
         "socketHost": "WebSocket ホスト {host}"
       },
       "create": {
-        "title": "ステップ 2 · アプリを作成",
+        "title": "ステップ 3 · アプリを作成",
         "modeLabel": "接続モード",
         "socket": "Socket Mode",
         "socketDescription": "推奨。OpenObserve が接続を開くため、Slack 側に公開 URL は不要です",
@@ -28627,7 +28538,7 @@
         "signingSecretRequired": "HTTPモードには署名シークレットが必要です"
       },
       "install": {
-        "title": "ステップ3 · インストール",
+        "title": "ステップ4 · インストール",
         "created": "アプリを作成しました · {appId}",
         "allowHint": "Slackのインストール画面が開きます。そこで「許可する」をクリックしてください。ボットトークンはSlackから自動的に返されるため、コピーする必要はありません。",
         "allow": "Slackで許可する",
@@ -28650,7 +28561,7 @@
         "appNotCreatedByO2": "このアプリはOpenObserveが作成したものではないため、Slackに残ります。不要になった場合はSlackで削除してください。"
       },
       "test": {
-        "title": "ステップ4 · テストとリンク",
+        "title": "ステップ5 · テストとリンク",
         "run": "チェックを実行",
         "signIn": "「Sign in with Slack」をテストする",
         "signInPassed": "「Sign in with Slack」は正常に動作します",

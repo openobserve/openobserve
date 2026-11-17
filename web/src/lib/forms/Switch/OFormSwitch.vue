@@ -4,7 +4,7 @@
 import { computed, inject } from "vue";
 import OSwitch from "./OSwitch.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import type { FormSwitchProps } from "./OFormSwitch.types";
 import type { SwitchValue } from "./OSwitch.types";
 
@@ -13,6 +13,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormSwitchProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormSwitch] must be rendered inside <OForm>. No form context found.");
@@ -32,6 +33,8 @@ const passthroughProps = computed(() => {
   if (props.uncheckedValue !== undefined) {
     out.uncheckedValue = props.uncheckedValue;
   }
+  if (props.offTone !== undefined) out.offTone = props.offTone;
+  if (props.stateText !== undefined) out.stateText = props.stateText;
   if (props.id !== undefined) out.id = props.id;
   if (props.name !== undefined) out.name = props.name;
   return out;
@@ -59,8 +62,8 @@ const passthroughProps = computed(() => {
             <slot name="tooltip" />
           </template>
         </OSwitch>
-        <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text text-xs">
-          {{ firstFieldError(field.state.meta.errors) }}
+        <div v-if="shown(field).message !== undefined" class="text-input-error-text text-xs">
+          {{ shown(field).message }}
         </div>
       </div>
     </template>

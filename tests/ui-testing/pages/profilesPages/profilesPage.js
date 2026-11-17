@@ -831,6 +831,11 @@ export class ProfilesPage {
     return this.page.evaluate(() => localStorage.getItem('o2_flame_zoom_hint_hidden'));
   }
 
+  // Stands in for a new browser tab, which starts without the tab-scoped close.
+  async forgetZoomHintClosedForTab() {
+    await this.page.evaluate(() => sessionStorage.removeItem('o2_flame_zoom_hint_closed'));
+  }
+
   async expectFrameMoreVisible() {
     await expect(this.page.locator(this.flameFrameMore)).toBeVisible();
   }

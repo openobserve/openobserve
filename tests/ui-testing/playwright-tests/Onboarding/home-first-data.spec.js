@@ -426,21 +426,11 @@ const SCREENS = [
         },
         async run({ page, orgId }) {
             await openHome(page, orgId, 'overview');
-            const tileValue = (key) => page.locator(`[data-test="overview-headline-${key}"] [data-test="overview-tile-value"]`);
-            const tileNote = (key) => page.locator(`[data-test="overview-headline-${key}"] [data-test="overview-tile-note"]`);
 
-            await expect(tid(page, 'overview-status-danger')).toBeVisible({ timeout: 30000 });
-            await expect(tid(page, 'overview-status-text')).toHaveText('Needs attention');
-            await expect(page.locator('[data-test^="overview-status-item-"]')).toHaveText(['1 alert firing']);
-            await expect(tid(page, 'overview-status-clear')).toHaveCount(0);
-
-            await expect(tileValue('firing')).toHaveText('1');
-            await expect(tileValue('failing')).toHaveText('0');
-            await expect(tileValue('delivery')).toHaveText('0');
-            await expect(tileValue('pipelines')).toHaveText('—');
-            await expect(tileNote('pipelines')).toHaveText('No access');
-            await expect(tileValue('quiet')).toHaveText('—');
-            await expect(tileNote('quiet')).toHaveText('Could not load');
+            await expect(tid(page, 'overview-data-health-value-failing')).toHaveText('0', {
+                timeout: 30000,
+            });
+            await expect(tid(page, 'overview-data-health-value-delivery')).toHaveText('0');
 
             await expect(tid(page, `overview-alerts-firing-${FIRING_RULE}`)).toBeVisible();
             await expect(tid(page, 'overview-alerts-error')).toHaveCount(0);
@@ -474,7 +464,6 @@ const SCREENS = [
             await expect(tid(page, 'overview-load-error-empty-state')).toHaveCount(0);
             await expect(tid(page, 'overview-load-error-retry-card')).toHaveCount(0);
             await expect(page.locator('[data-test$="-retry-btn"]')).toHaveCount(0);
-            await expect(tid(page, 'overview-headline-strip')).toHaveCount(0);
             await expect(page.locator('[data-test="home-page"] [data-test="refresh-button"]')).toHaveCount(0);
             await expectNoOverviewToolbar(page);
             await expect(page.locator('[data-test^="o-toast-"]')).toHaveCount(0);

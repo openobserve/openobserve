@@ -121,6 +121,52 @@ impl StreamKeyChecks {
     }
 }
 
+/// The `ZO_INGEST_ALLOWED_UPTO` / `ZO_INGEST_ALLOWED_IN_FUTURE` bounds, fixed once per request.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct IngestWindow {
+    pub(super) min_ts: i64,
+    pub(super) max_ts: i64,
+}
+
+impl IngestWindow {
+    pub(super) fn now() -> Self {
+        let limit = &get_config().limit;
+        let now = now_micros();
+        Self {
+            min_ts: now - limit.ingest_allowed_upto_micro,
+            max_ts: now + limit.ingest_allowed_in_future_micro,
+        }
+    }
+
+    /// Why a sample at `timestamp` (microseconds) must be dropped, `None` when it is in window.
+    pub(super) fn discard(self, timestamp: i64) -> Option<WindowDiscard> {
+        if timestamp < self.min_ts {
+            Some(WindowDiscard::TooOld)
+        } else if timestamp > self.max_ts {
+            Some(WindowDiscard::TooNew)
+        } else {
+            None
+        }
+    }
+}
+
+/// Which bound of the ingest window a dropped sample fell outside.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum WindowDiscard {
+    TooOld,
+    TooNew,
+}
+
+impl WindowDiscard {
+    pub(super) fn message(self) -> String {
+        match self {
+            Self::TooOld => schema::get_upto_discard_error(),
+            Self::TooNew => schema::get_future_discard_error(),
+        }
+        .to_string()
+    }
+}
+
 /// One stream's realtime alert work, sent only after its records are written.
 pub(super) struct StreamTriggers {
     triggers: TriggerAlertData,
@@ -858,5 +904,42 @@ mod tests {
         let written: usize = partitions.values().map(|p| p.records.len()).sum();
         assert_eq!(partitions.len(), 4);
         assert_eq!(written, timestamps.len());
+    }
+
+    #[test]
+    fn the_ingest_window_keeps_its_bounds_and_drops_what_lies_outside() {
+        let window = IngestWindow {
+            min_ts: 100,
+            max_ts: 200,
+        };
+        assert_eq!(window.discard(100), None);
+        assert_eq!(window.discard(150), None);
+        assert_eq!(window.discard(200), None);
+        assert_eq!(window.discard(99), Some(WindowDiscard::TooOld));
+        assert_eq!(window.discard(i64::MIN), Some(WindowDiscard::TooOld));
+        assert_eq!(window.discard(201), Some(WindowDiscard::TooNew));
+    }
+
+    #[test]
+    fn the_ingest_window_follows_the_configured_limits() {
+        let limit = &get_config().limit;
+        let before = now_micros();
+        let window = IngestWindow::now();
+        let after = now_micros();
+        assert!(window.min_ts >= before - limit.ingest_allowed_upto_micro);
+        assert!(window.min_ts <= after - limit.ingest_allowed_upto_micro);
+        assert!(window.max_ts >= before + limit.ingest_allowed_in_future_micro);
+        assert!(window.max_ts <= after + limit.ingest_allowed_in_future_micro);
+        assert_eq!(window.discard(before), None);
+    }
+
+    #[test]
+    fn a_window_discard_reuses_the_shared_policy_messages() {
+        let too_old = WindowDiscard::TooOld.message();
+        let too_new = WindowDiscard::TooNew.message();
+        assert_eq!(too_old, schema::get_upto_discard_error().to_string());
+        assert_eq!(too_new, schema::get_future_discard_error().to_string());
+        assert!(schema::is_window_discard_error(&anyhow::anyhow!(too_old)));
+        assert!(schema::is_window_discard_error(&anyhow::anyhow!(too_new)));
     }
 }

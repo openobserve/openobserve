@@ -9871,7 +9871,6 @@
       "duplicatePanelId": "Trovato ID pannello duplicato: {id}",
       "panelMissingLayoutI": "Al pannello {id} manca il valore layout.i",
       "duplicateLayoutI": "Trovato valore layout.i duplicato nella scheda {tabId}: {value}",
-      "customChartCallbacksDropped": "Grafico personalizzato: {count} callback di funzione nel codice di questo pannello è stato ignorato. Il codice salvato del grafico non può eseguire callback nell'app; usa invece valori semplici. | Grafico personalizzato: {count} callback di funzione nel codice di questo pannello sono stati ignorati. Il codice salvato del grafico non può eseguire callback nell'app; usa invece valori semplici.",
       "unsafeCodeDetected": "Rilevato codice non sicuro: {error}",
       "forbiddenFunctionCall": "L'uso di '{name}()' non è consentito.",
       "forbiddenInsideSetTimeout": "L'uso di {name} all'interno di 'setTimeout()' non è consentito.",
@@ -10410,31 +10409,12 @@
     "hoursAgo": "{count} h fa",
     "daysAgo": "{count} g fa",
     "cards": {
-      "firingAlerts": "Avvisi attivi",
-      "failingRules": "Regole in errore",
-      "openIncidents": "Incidenti aperti",
-      "pipelineErrors": "Errori delle pipeline",
-      "pipelinesOf": "di {enabled} abilitate",
-      "quietStreams": "Stream inattivi",
-      "firingNone": "Nessuno attivo",
-      "noAlertRules": "Nessuna regola di avviso",
-      "noEnabledRules": "Nessuna regola abilitata",
-      "failingNone": "Nessuna in errore",
-      "failingNote": "Errore nell'ultima valutazione",
-      "incidentsNone": "Nessuno aperto",
-      "noPipelines": "Nessuna pipeline",
-      "noStreams": "Nessuno stream",
-      "quietNote": "Nessuna scrittura negli ultimi 7 giorni",
-      "criticalUnit": "{count} a livello critico",
-      "deliveryFailures": "Errori di consegna degli avvisi",
-      "deliveryNote": "Avvisi attivati ma non notificati",
-      "oldestFiring": "Il più vecchio attivo da {age}"
+      "openIncidents": "Incidenti aperti"
     },
     "state": {
       "tileForbidden": "Nessun accesso",
       "tileLocked": "Bloccato",
       "tileError": "Impossibile caricare",
-      "tileUnavailable": "Non disponibile",
       "sectionLocked": "Disponibile con una licenza enterprise",
       "sectionForbidden": "Il tuo ruolo non può vedere questi dati. Chiedi l'accesso a un amministratore dell'organizzazione."
     },
@@ -10556,20 +10536,6 @@
       "retry": "Riprova"
     },
     "dataAsOf": "Dati aggiornati a {time}",
-    "status": {
-      "attention": "Richiede attenzione",
-      "checking": "Verifica in corso…",
-      "partial": "Impossibile caricare alcuni controlli",
-      "clear": "Niente richiede attenzione",
-      "items": {
-        "firing": "{count} avviso attivo | {count} avvisi attivi",
-        "failing": "{count} regola in errore | {count} regole in errore",
-        "incidents": "{count} incidente aperto | {count} incidenti aperti",
-        "pipelines": "{count} pipeline con errori | {count} pipeline con errori",
-        "quiet": "{count} stream inattivo | {count} stream inattivi"
-      },
-      "unmonitored": "Non è ancora monitorato nulla"
-    },
     "timeRange": {
       "heading": "Nell'intervallo di tempo selezionato"
     }
@@ -11545,68 +11511,6 @@
     }
   },
   "alerts": {
-    "firing": {
-      "title": "Attivi",
-      "drawer": {
-        "openInLogs": "Apri nei log",
-        "partOfIncident": "Parte dell'incidente:",
-        "incidentAck": "Prendere in carico qui significa prendere in carico l'intero incidente.",
-        "incidentTakeOver": "Prendere il controllo qui significa assumere il controllo dell'intero incidente.",
-        "now": "Ora",
-        "threshold": "soglia {value}",
-        "since": "da {time}",
-        "flaps": "Oscillazioni, ultime 6h",
-        "flapsUnit": "cambi di stato",
-        "notified": "Notificato",
-        "notDeliveredTo": "{name}: non consegnato",
-        "history": "Cronologia",
-        "last2h": "ultime 2h",
-        "lastSpan": "ultimi {span}",
-        "viewAll": "Visualizza tutto",
-        "historyEmpty": "Nessuna esecuzione in questa finestra.",
-        "historyFailed": "Impossibile caricare la cronologia.",
-        "barFiring": "{span} attivo",
-        "barOk": "{span} ok",
-        "barUnknown": "{span} non letto",
-        "eventStarted": "Attivazione iniziata",
-        "eventRecovered": "Ripristinato",
-        "eventNotified": "Notificato",
-        "eventNotifiedTo": "Notificato a {names}",
-        "eventFailed": "Non consegnato",
-        "eventFailedTo": "Non consegnato a {names}",
-        "soFar": "{span} finora",
-        "lasted": "durata {span}",
-        "okFor": "ok per {span}"
-      },
-      "chipCount": "{label} {count}",
-      "chipFiring": "Attivo",
-      "chipAcked": "Preso in carico",
-      "chipMuted": "Silenziato",
-      "chipFailed": "Non consegnato",
-      "searchPlaceholder": "Cerca avvisi",
-      "priorityAll": "Priorità",
-      "priorityLabel": "Priorità",
-      "priorityUnset": "Nessuna priorità",
-      "folderAll": "Cartella: tutte",
-      "folderLabel": "Cartella",
-      "stale": "obsoleto",
-      "refreshFailed": "Impossibile aggiornare gli avvisi attivi ({reason}). Visualizzazione dei dati da {time}.",
-      "refreshFailedReason": "richiesta non riuscita",
-      "statusUnavailable": "Lo stato degli avvisi non è disponibile in questo momento, quindi non è possibile mostrare gli avvisi attivi.",
-      "retry": "Riprova",
-      "columnPriority": "Priorità",
-      "columnState": "Stato",
-      "columnAlert": "Avviso",
-      "columnFolder": "Cartella",
-      "columnFiringFor": "Attivo da",
-      "acknowledgeCount": "Prendi in carico {count}",
-      "mute": "Silenzia",
-      "clear": "Rimuovi",
-      "emptyFiring": "Nessun avviso attivo",
-      "emptyAcked": "Nessun avviso preso in carico",
-      "emptyMuted": "Nessun avviso silenziato",
-      "emptyFailed": "Nessun invio non riuscito"
-    },
     "moreActions": "Altre azioni",
     "promRuleMode": "Modalità regola",
     "promRulePreview": "{count} serie restituite corrispondono ora. Ogni serie deve completare il periodo di attesa prima di attivarsi.",
@@ -12882,6 +12786,9 @@
         "alertStartTimeMillis": "Ora di inizio della finestra in millisecondi epoch",
         "alertEndTimeMillis": "Ora di fine della finestra in millisecondi epoch",
         "alertUrl": "Link a OpenObserve per indagare",
+        "alertUrlLabel": "Etichetta del link principale, ad esempio \"View logs\"",
+        "alertDetailUrl": "Link alla pagina dell'avviso che ha inviato questo messaggio. Vuoto quando il link principale apre già quella pagina.",
+        "alertDetailLabel": "Etichetta di quel link, ad esempio \"Open alert\". Vuota quando il link è vuoto.",
         "alertTriggerTime": "Quando è scattato l'avviso (ISO 8601)",
         "alertTriggerTimeMillis": "Orario di attivazione in millisecondi epoch",
         "alertTriggerTimeSeconds": "Orario di attivazione in secondi epoch",
@@ -13415,7 +13322,10 @@
       "chartUnavailable": "Nessun grafico disponibile per la query di questo avviso.",
       "eventCount": "Eventi",
       "notFoundTitle": "Avviso non trovato",
-      "notFoundDescription": "Questo avviso non esiste più, oppure non hai accesso ad esso. Potrebbe essere stato eliminato."
+      "notFoundDescription": "Questo avviso non esiste più, oppure non hai accesso ad esso. Potrebbe essere stato eliminato.",
+      "noAccessTitle": "Non hai accesso a questo avviso",
+      "noAccessDescription": "Chiedi a un amministratore il permesso di leggere gli avvisi in questa cartella.",
+      "loadFailedTitle": "Impossibile caricare questo avviso"
     },
     "timeLabel": "Tempo",
     "unknownHttpStatus": "Sconosciuto",
@@ -14472,6 +14382,10 @@
     "insertVariable": "Inserisci variabile",
     "moreVariables": "+{count} altri",
     "viewAlertLinkLabel": "Visualizza in OpenObserve",
+    "variableAlertUrlLabelDescription": "Etichetta del link principale, ad esempio \"View logs\"",
+    "variableAlertDetailUrlDescription": "Link alla pagina dell'avviso che ha inviato questo messaggio. Vuoto quando il link principale apre già quella pagina.",
+    "variableAlertDetailLabelDescription": "Etichetta di quel link, ad esempio \"Open alert\". Vuota quando il link è vuoto.",
+    "slackLinksNotShown": "{count} link non è mostrato come pulsante: {links} | {count} link non sono mostrati come pulsanti: {links}",
     "moveUp": "Sposta su",
     "moveDown": "Sposta giù",
     "fieldLabel": "Etichetta",
@@ -22895,6 +22809,8 @@
       "noResults": "Nessuna icona corrisponde alla tua ricerca",
       "groups": {
         "results": "Risultati",
+        "icons": "Icone",
+        "monoLogos": "Loghi",
         "status": "Stato",
         "services": "Servizi",
         "ai": "AI",
@@ -23396,11 +23312,6 @@
       "failedToLoadToolset": "Impossibile caricare il set di strumenti"
     },
     "alerts": {
-      "firing": {
-        "bulkResult": "{acked} presi in carico, {skipped} saltati",
-        "bulkResultFailed": "{acked} presi in carico, {skipped} saltati, {failed} non riusciti",
-        "bulkAllAcked": "{acked} presi in carico"
-      },
       "failedToNavigateToAlert": "Impossibile passare all'avviso",
       "alertNotFound": "Avviso non trovato",
       "failedToLoadAlerts": "Impossibile caricare gli avvisi",
@@ -28518,7 +28429,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Passo 0 · Prerequisiti del server",
+      "title": "Passo 1 · Prerequisiti del server",
       "subtitle": "Verificati su questo server prima di qualsiasi operazione su Slack",
       "columnSetting": "Impostazione",
       "columnResult": "Risultato",
@@ -28589,7 +28500,7 @@
       "back": "Indietro",
       "finish": "Completa",
       "connection": {
-        "title": "Passaggio 1 · Connessione",
+        "title": "Passaggio 2 · Connessione",
         "description": "La verifica raggiunge Slack da questo server tramite lo stesso percorso di codice usato in produzione.",
         "allPassed": "Slack è raggiungibile da questo server",
         "someFailed": "Slack non è raggiungibile da questo server. Consenti *.slack.com tramite il proxy o il firewall, quindi esegui di nuovo la verifica.",
@@ -28598,7 +28509,7 @@
         "socketHost": "Host WebSocket {host}"
       },
       "create": {
-        "title": "Passaggio 2 · Crea l'app",
+        "title": "Passaggio 3 · Crea l'app",
         "modeLabel": "Modalità di connessione",
         "socket": "Modalità Socket",
         "socketDescription": "Consigliata. OpenObserve apre la connessione, quindi Slack non richiede un URL pubblico",
@@ -28627,7 +28538,7 @@
         "signingSecretRequired": "La modalità HTTP richiede il signing secret"
       },
       "install": {
-        "title": "Passo 3 · Installa",
+        "title": "Passo 4 · Installa",
         "created": "App creata · {appId}",
         "allowHint": "Apre la schermata di installazione di Slack: fai clic su Consenti. Il token del bot arriva da Slack da solo; non c'è nulla da copiare.",
         "allow": "Consenti in Slack",
@@ -28650,7 +28561,7 @@
         "appNotCreatedByO2": "OpenObserve non ha creato questa app, quindi resta in Slack. Eliminala lì se non ti serve più."
       },
       "test": {
-        "title": "Passo 4 · Test e collegamento",
+        "title": "Passo 5 · Test e collegamento",
         "run": "Esegui i controlli",
         "signIn": "Prova Accedi con Slack",
         "signInPassed": "Accedi con Slack funziona",

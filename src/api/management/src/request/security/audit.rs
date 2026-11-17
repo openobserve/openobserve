@@ -22,6 +22,7 @@ use config::{
     META_ORG_ID,
     meta::{
         search::{Query as SearchQuery, Request as SearchRequest},
+        sql::MAX_OFFSET,
         stream::StreamType,
     },
     utils::time::now_micros,
@@ -192,7 +193,7 @@ async fn search_meta(
 }
 
 /// The defaulted, validated window and page of a request.
-fn page(query: &SecurityAuditQuery) -> Result<(i64, i64, i64, i64), &'static str> {
+fn page(query: &SecurityAuditQuery) -> Result<(i64, i64, i64, i64), String> {
     let end_time = query.end_time.unwrap_or_else(now_micros);
     // The whole trail the deployment keeps, so a change is listed until the audit stream drops it.
     let retention_days = config::get_config().compact.data_retention_days.max(1);
@@ -202,10 +203,13 @@ fn page(query: &SecurityAuditQuery) -> Result<(i64, i64, i64, i64), &'static str
     });
     validate_history_range(start_time, end_time)?;
     let from = query.from.unwrap_or(0);
-    if from < 0 {
-        return Err("from must not be negative");
+    if !(0..=MAX_OFFSET).contains(&from) {
+        return Err(format!("from must be between 0 and {MAX_OFFSET}"));
     }
-    let size = query.size.unwrap_or(DEFAULT_SIZE).clamp(1, MAX_SIZE);
+    let size = query.size.unwrap_or(DEFAULT_SIZE);
+    if !(1..=MAX_SIZE).contains(&size) {
+        return Err(format!("size must be between 1 and {MAX_SIZE}"));
+    }
     Ok((start_time, end_time, from, size))
 }
 
@@ -214,25 +218,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_page_validates_the_window_and_bounds_the_size() {
-        let query = |start: i64, end: i64, size: Option<i64>| SecurityAuditQuery {
-            start_time: Some(start),
-            end_time: Some(end),
-            from: None,
-            size,
-            include_reads: false,
-        };
-        assert_eq!(page(&query(1, 2, None)), Ok((1, 2, 0, DEFAULT_SIZE)));
-        assert_eq!(page(&query(1, 2, Some(9_999))).unwrap().3, MAX_SIZE);
-        assert_eq!(page(&query(1, 2, Some(-3))).unwrap().3, 1);
-        assert!(page(&query(i64::MIN, 2, None)).is_err());
-        assert!(page(&query(1, i64::MAX, None)).is_err());
-        assert!(page(&query(2, 1, None)).is_err());
-        let negative = SecurityAuditQuery {
-            from: Some(-1),
-            ..query(1, 2, None)
-        };
-        assert!(page(&negative).is_err());
+    fn test_page_validates_the_window_and_the_page() {
+        let query =
+            |start: i64, end: i64, from: Option<i64>, size: Option<i64>| SecurityAuditQuery {
+                start_time: Some(start),
+                end_time: Some(end),
+                from,
+                size,
+                include_reads: false,
+            };
+        assert_eq!(page(&query(1, 2, None, None)), Ok((1, 2, 0, DEFAULT_SIZE)));
+        assert_eq!(
+            page(&query(1, 2, Some(MAX_OFFSET), Some(MAX_SIZE))),
+            Ok((1, 2, MAX_OFFSET, MAX_SIZE))
+        );
+        assert!(page(&query(i64::MIN, 2, None, None)).is_err());
+        assert!(page(&query(1, i64::MAX, None, None)).is_err());
+        assert!(page(&query(2, 1, None, None)).is_err());
+        // 5582056768315 is the fuzzer input that wrapped to a negative 32-bit OFFSET.
+        for (from, size, param) in [
+            (-1, 10, "from"),
+            (MAX_OFFSET + 1, 10, "from"),
+            (5_582_056_768_315, 10, "from"),
+            (0, 0, "size"),
+            (0, -3, "size"),
+            (0, MAX_SIZE + 1, "size"),
+        ] {
+            let err = page(&query(1, 2, Some(from), Some(size))).unwrap_err();
+            assert!(err.starts_with(param), "{from}/{size}: {err}");
+        }
     }
 
     #[tokio::test]

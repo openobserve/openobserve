@@ -22,6 +22,7 @@ use config::{
     tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
 };
 use futures::future::join_all;
+use infra::runtime::TANTIVY_BUILD_RUNTIME;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use tantivy::indexer::merge_indices;
 use tokio::task::JoinHandle;
@@ -115,7 +116,7 @@ struct SegmentOutput {
 ///     │  ┌─ Parquet ── read metadata ─── num_row_groups → chunks
 ///     │  └─ Vortex  ── read row_count ── ÷ PARQUET_MAX_ROW_GROUP_SIZE → chunks
 ///     │
-///     ▼  spawn_blocking pool (concurrency = workers)
+///     ▼  TANTIVY_BUILD_RUNTIME blocking pool (concurrency = workers)
 ///   ┌──────────────────────┬──────────────────────┬─────────────────────┐
 ///   │ chunk_0              │ chunk_1              │ ...                 │
 ///   │ make_selector(0)     │ make_selector(1)     │                     │
@@ -153,10 +154,9 @@ where
         let selector = make_selector(0);
         let SegmentOutput {
             index, row_count, ..
-        } = tokio::task::spawn_blocking(move || {
-            build_segment(0, buf, selector, index_schema, tantivy_dir)
-        })
-        .await??;
+        } = TANTIVY_BUILD_RUNTIME
+            .spawn_blocking(move || build_segment(0, buf, selector, index_schema, tantivy_dir))
+            .await??;
         log::info!(
             "parallel::build_index: single chunk, rows={row_count}, elapsed={} ms",
             start.elapsed().as_millis()
@@ -174,7 +174,7 @@ where
         let buf_c = buf.clone();
         let index_schema_c = index_schema.clone();
         let selector = make_selector(chunk_idx);
-        tasks.push(tokio::task::spawn_blocking(move || {
+        tasks.push(TANTIVY_BUILD_RUNTIME.spawn_blocking(move || {
             let _permit = permit;
             let dir = ScratchDirectory::new()?;
             build_segment(chunk_idx, buf_c, selector, index_schema_c, dir)
@@ -197,11 +197,12 @@ where
     );
 
     let start = std::time::Instant::now();
-    let merged = tokio::task::spawn_blocking(move || {
-        merge_indices(&indices, tantivy_dir)
-            .map_err(|e| anyhow::anyhow!("merge_indices failed: {e}"))
-    })
-    .await??;
+    let merged = TANTIVY_BUILD_RUNTIME
+        .spawn_blocking(move || {
+            merge_indices(&indices, tantivy_dir)
+                .map_err(|e| anyhow::anyhow!("merge_indices failed: {e}"))
+        })
+        .await??;
 
     log::info!(
         "parallel::build_index: merged {num_chunks} segments, elapsed={} ms",

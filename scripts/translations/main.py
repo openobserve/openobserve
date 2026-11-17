@@ -18,6 +18,7 @@ Exit codes:
     1  bad usage / missing source
     2  --check only: translations are pending
     3  at least one string failed validation (retried on the next run)
+    4  the translation service refused the key or account, or is unreachable
 
 Environment:
     DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
@@ -31,6 +32,7 @@ import sys
 
 from translator import (
     SOURCE_LOCALE,
+    FatalTranslationError,
     build_locale,
     build_module_glossary,
     build_state,
@@ -142,11 +144,16 @@ def main():
         pending = collect_pending_leaves(source, existing, state)
         print(f"\nTranslating: {locale} ({len(pending)} strings pending)")
 
-        translated = (
-            translate_pending(pending, locale, build_module_glossary(source, existing))
-            if pending
-            else {}
-        )
+        try:
+            translated = (
+                translate_pending(pending, locale, build_module_glossary(source, existing))
+                if pending
+                else {}
+            )
+        except FatalTranslationError as exc:
+            print(f"::error::{exc}", flush=True)
+            set_trace_outcome("error", {"process.exit_code": 4})
+            sys.exit(4)
 
         target = build_locale(source, existing, state, translated, counters)
         locale_targets[locale] = target

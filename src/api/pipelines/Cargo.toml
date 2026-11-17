@@ -37,6 +37,7 @@ vectorscan = [
 [dependencies]
 ahash.workspace = true
 anyhow.workspace = true
+arrow-schema.workspace = true
 axum.workspace = true
 chrono.workspace = true
 common.workspace = true
@@ -63,3 +64,4 @@ utoipa.workspace = true
 [dev-dependencies]
 openobserve-core = { workspace = true, features = ["test-utils"] }
 tokio.workspace = true
+tower.workspace = true

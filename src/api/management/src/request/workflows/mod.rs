@@ -25,7 +25,6 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use common::utils::sql::escape_like;
 use config::{
     ider,
     meta::{
@@ -35,7 +34,7 @@ use config::{
         self_reporting::{error::NodeErrors, usage::TRIGGERS_STREAM},
         stream::StreamType,
     },
-    utils::time::now_micros,
+    utils::{sql::quote_like_pattern, time::now_micros},
 };
 use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use infra::table::{
@@ -44,9 +43,9 @@ use infra::table::{
     workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors, WorkflowTriggerEntity},
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
+use openobserve_core::{auth::UserEmail, self_reporting::triggers_schema as trigger_stream};
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -62,6 +61,18 @@ use crate::{
 
 /// Bounded because a move runs one OpenFGA check per id before authorizing anything.
 const MAX_MOVE_WORKFLOWS: usize = 100;
+
+const HISTORY_COLUMNS: [&str; 9] = [
+    "_timestamp",
+    "org",
+    "key",
+    "start_time",
+    "end_time",
+    "status",
+    "evaluation_took_in_secs",
+    "source_node",
+    "error",
+];
 
 #[derive(Deserialize)]
 pub struct WorkflowTestInput {
@@ -113,7 +124,9 @@ struct WorkflowHistoryRow {
     org: String,
     start_time: i64,
     end_time: i64,
+    #[serde(default, deserialize_with = "null_as_default")]
     evaluation_took_in_secs: f64,
+    #[serde(default, deserialize_with = "null_as_default")]
     source_node: String,
     key: String,
     #[serde(default)]
@@ -1214,7 +1227,16 @@ pub async fn get_workflow_history(
         }
     };
 
-    let data_sql = history_sql(&org_id, &workflow_id, start_time, end_time);
+    let schema = match trigger_stream::get(&org_id).await {
+        Ok(schema) => schema,
+        Err(e) => {
+            log::error!("Failed to read the workflow history schema: {e}");
+            return MetaHttpResponse::internal_error(format!(
+                "Failed to read the workflow history schema: {e}"
+            ));
+        }
+    };
+    let data_sql = history_sql(&org_id, &workflow_id, start_time, end_time, &schema);
 
     let data_req = SearchRequest {
         query: SearchQuery {
@@ -1490,18 +1512,30 @@ fn ledger_history_row(row: ledger_rows::Model) -> WorkflowHistoryRow {
     history
 }
 
-fn history_sql(org_id: &str, workflow_id: &str, start_time: i64, end_time: i64) -> String {
+fn history_sql(
+    org_id: &str,
+    workflow_id: &str,
+    start_time: i64,
+    end_time: i64,
+    schema: &arrow_schema::Schema,
+) -> String {
+    let columns = trigger_stream::present_columns(HISTORY_COLUMNS, schema);
     format!(
-        "SELECT _timestamp, org, key,  \
-         start_time, end_time, \
-         evaluation_took_in_secs, \
-         source_node, error, status \
-         FROM \"{TRIGGERS_STREAM}\" \
+        "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" \
          WHERE module = 'workflow' AND org = '{org_id}' \
-         AND key like '{}/%'\
+         AND key like {} \
          AND _timestamp >= {start_time} AND _timestamp <= {end_time}",
-        escape_like(workflow_id).replace("'", "''")
+        quote_like_pattern("", workflow_id, "/%")
     )
+}
+
+/// A search hit carries a column the stream has but this row left empty as JSON `null`.
+fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 /// Rows written before the stored-status fix say `succeeded` even when the run errored.
@@ -1853,11 +1887,56 @@ mod tests {
 
     #[test]
     fn the_history_query_selects_the_stored_status() {
-        let sql = history_sql("org1", "wf1", 1, 2);
+        let sql = history_sql("org1", "wf1", 1, 2, &arrow_schema::Schema::empty());
         let select = sql.split(" FROM ").next().unwrap();
         assert!(
             select.split(',').any(|column| column.trim() == "status"),
             "the history SELECT must return status, got {select}"
         );
+    }
+
+    #[test]
+    fn the_history_query_selects_only_the_optional_columns_the_stream_has() {
+        use arrow_schema::{DataType, Field, Schema};
+
+        let select = |schema: &Schema| {
+            let sql = history_sql("org1", "wf1", 1, 2, schema);
+            sql.split(" FROM ").next().unwrap().to_string()
+        };
+        let bare = select(&Schema::empty());
+        for missing in ["evaluation_took_in_secs", "source_node", "error"] {
+            assert!(!bare.contains(missing), "{missing} in {bare}");
+        }
+        let with_error = select(&Schema::new(vec![Field::new(
+            "error",
+            DataType::Utf8,
+            true,
+        )]));
+        assert!(with_error.ends_with(", error"), "{with_error}");
+        assert!(!with_error.contains("source_node"), "{with_error}");
+    }
+
+    #[test]
+    fn a_history_row_without_the_optional_columns_still_parses() {
+        let row: WorkflowHistoryRow = serde_json::from_value(serde_json::json!({
+            "_timestamp": 1, "org": "org1", "key": "wf1/run1",
+            "start_time": 1, "end_time": 2, "status": "succeeded"
+        }))
+        .unwrap();
+        assert_eq!(row.source_node, "");
+        assert!(row.evaluation_took_in_secs.abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn a_history_row_with_null_optional_columns_still_parses() {
+        let row: WorkflowHistoryRow = serde_json::from_value(serde_json::json!({
+            "_timestamp": 1, "org": "org1", "key": "wf1/run1",
+            "start_time": 1, "end_time": 2, "status": "succeeded",
+            "evaluation_took_in_secs": null, "source_node": null, "error": null
+        }))
+        .unwrap();
+        assert_eq!(row.source_node, "");
+        assert!(row.evaluation_took_in_secs.abs() < f64::EPSILON);
+        assert_eq!(row.error, None);
     }
 }

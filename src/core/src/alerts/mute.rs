@@ -515,8 +515,8 @@ fn quick_mute_request(
         show_banner: false,
         notifications: None,
         version: None,
-        alert_groups,
-        end_on_clear,
+        alert_groups: Some(alert_groups),
+        end_on_clear: Some(end_on_clear),
     }
 }
 
@@ -565,8 +565,8 @@ mod tests {
             reason: None,
             condition: None,
             targets: req.targets,
-            alert_groups: req.alert_groups,
-            end_on_clear: req.end_on_clear,
+            alert_groups: req.alert_groups.flatten(),
+            end_on_clear: req.end_on_clear.flatten(),
             source: Some(MuteSource::Slack),
             schedule: req.schedule,
             cancelled_at: None,

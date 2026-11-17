@@ -627,6 +627,15 @@ pub fn pw_version(password_hash: &str) -> String {
     format!("{:08x}", h.finish() as u32)
 }
 
+/// The one error of every OSS Notices and Custom Domains stub; the handler's
+/// `map_err` turns it into 403, and the OSS handlers return it before reading the body.
+#[cfg(not(feature = "enterprise"))]
+pub fn enterprise_required<T>() -> Result<T, anyhow::Error> {
+    Err(anyhow::anyhow!(
+        "enterprise: Notices and Custom Domains require an enterprise license"
+    ))
+}
+
 /// Real HMAC-SHA256 over a domain-separated message — the same primitive the
 /// chart signer uses. NOT a plain hash: an auth cookie needs a keyed MAC.
 fn unlock_mac(key: &[u8], slug: &str, pw_version: &str, exp: i64) -> String {
@@ -757,16 +766,6 @@ fn to_admin_view(
         component_count,
         components: None,
     }
-}
-
-/// Every OSS stub for a Notices/Custom-Domains function returns this same
-/// error so the handler's `map_err` can map it to one 403, regardless of
-/// which licensed action was attempted.
-#[cfg(not(feature = "enterprise"))]
-fn enterprise_required<T>() -> Result<T, anyhow::Error> {
-    Err(anyhow::anyhow!(
-        "enterprise: Notices and Custom Domains require an enterprise license"
-    ))
 }
 
 #[cfg(test)]

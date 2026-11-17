@@ -336,6 +336,7 @@ struct StreamSegments {
     total_original_size: i64,
     total_compressed_size: i64,
     oldest_registered_at: i64,
+    min_ts: i64, // 0 when no segment carries a timestamp
 }
 
 impl StreamSegments {
@@ -346,6 +347,13 @@ impl StreamSegments {
             .segments
             .iter()
             .map(|s| s.registered_at)
+            .min()
+            .unwrap_or(0);
+        self.min_ts = self
+            .segments
+            .iter()
+            .map(|s| s.meta.min_ts)
+            .filter(|ts| *ts > 0)
             .min()
             .unwrap_or(0);
     }
@@ -695,6 +703,13 @@ pub async fn get_stream_segments(
     r.get(key.as_str())
         .map(|v| v.segments.clone())
         .unwrap_or_default()
+}
+
+/// Oldest timestamp among the pending (not yet uploaded) segments of one stream.
+pub(crate) async fn pack_min_ts(org_id: &str, stream_type: &str, stream_name: &str) -> Option<i64> {
+    let key = segment_index_key(org_id, stream_type, stream_name);
+    let r = PACK_SEGMENTS.read().await;
+    r.get(key.as_str()).map(|v| v.min_ts).filter(|ts| *ts > 0)
 }
 
 /// Mark segments as consumed: remove them from the index and delete packs
@@ -1521,6 +1536,58 @@ mod tests {
                 .map(|v| v.segments.iter().all(|s| s.memtable_id != 77))
                 .unwrap_or(true)
         );
+    }
+
+    #[tokio::test]
+    async fn test_stream_segments_min_ts_after_register_and_consume() {
+        let (org, stream) = ("org_pack_min_ts", "stream_min");
+        let dir = tempfile::tempdir().unwrap();
+        let mut writer = PackWriter::new(0, 88, "metrics", 1024 * 1024);
+        writer.dir = dir.path().to_path_buf();
+        for (min_ts, data) in [
+            (300, b"seg-300".as_slice()),
+            (100, b"seg-100"),
+            (0, b"seg-0"),
+        ] {
+            writer
+                .append_segment(
+                    org,
+                    stream,
+                    "2026/07/27/08",
+                    data,
+                    &test_file_meta(min_ts, 400, 1, 10),
+                )
+                .await
+                .unwrap();
+        }
+        let (finished, ..) = writer.finish().await.unwrap();
+        let pack = &finished[0];
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+        assert_eq!(pack_min_ts(org, "metrics", stream).await, None);
+        register_pack(pack.path.clone(), &pack.footer, 1, &Default::default()).await;
+        assert_eq!(pack_min_ts(org, "metrics", stream).await, Some(100));
+        assert_eq!(pack_min_ts(org, "logs", stream).await, None);
+
+        let segs = get_stream_segments(org, "metrics", stream).await;
+        let consume = |min_ts: i64| {
+            segs.iter()
+                .filter(|s| s.meta.min_ts == min_ts)
+                .map(|s| (s.pack_path.clone(), s.meta.offset))
+                .collect::<Vec<_>>()
+        };
+        mark_segments_consumed(org, "metrics", stream, &consume(100))
+            .await
+            .unwrap();
+        assert_eq!(pack_min_ts(org, "metrics", stream).await, Some(300));
+        mark_segments_consumed(org, "metrics", stream, &consume(300))
+            .await
+            .unwrap();
+        assert_eq!(pack_min_ts(org, "metrics", stream).await, None);
+        mark_segments_consumed(org, "metrics", stream, &consume(0))
+            .await
+            .unwrap();
+        assert_eq!(pack_min_ts(org, "metrics", stream).await, None);
+        assert!(!pack.path.exists());
     }
 
     #[tokio::test]

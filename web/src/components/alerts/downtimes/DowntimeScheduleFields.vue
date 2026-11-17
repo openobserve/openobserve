@@ -16,8 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col gap-5" data-test="downtime-schedule">
+    <p v-if="locked" class="text-text-secondary text-xs" data-test="downtime-schedule-locked">
+      {{ t("alerts.downtimes.validation.lockedAfterStart") }}
+    </p>
     <OFormToggleGroup
       name="schedule.repeat"
+      :disabled="locked"
       data-test="downtime-schedule-repeat"
       @update:model-value="onRepeatChange"
     >
@@ -38,13 +42,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="schedule.start_date"
           :label="t('alerts.downtimes.scheduleForm.startDate')"
           required
+          :disabled="locked"
           data-test="downtime-schedule-start-date"
+          @update:model-value="onStartChange('start_date', $event)"
         />
         <OFormTime
           name="schedule.start_time"
           :label="t('alerts.downtimes.scheduleForm.startTime')"
           required
+          :disabled="locked"
           data-test="downtime-schedule-start-time"
+          @update:model-value="onStartChange('start_time', $event)"
         />
       </div>
       <div class="flex flex-wrap items-start gap-3 max-md:flex-col">
@@ -77,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="multiple"
         :label="t('alerts.downtimes.scheduleForm.days')"
         label-position="top"
+        :disabled="locked"
         data-test="downtime-schedule-weekdays"
       >
         <OToggleGroupItem
@@ -93,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="schedule.start_date"
         :label="t('alerts.downtimes.scheduleForm.startsOn')"
         required
+        :disabled="locked"
         data-test="downtime-schedule-starts-on"
       />
       <div class="flex flex-wrap items-start gap-3 max-md:flex-col">
@@ -100,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="schedule.start_time"
           :label="t('alerts.downtimes.scheduleForm.startsAt')"
           required
+          :disabled="locked"
           data-test="downtime-schedule-start-time"
         />
         <OFormInput
@@ -109,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :help-text="t('alerts.downtimes.scheduleForm.durationHelp')"
           width="sm"
           required
+          :disabled="locked"
           data-test="downtime-schedule-duration"
         />
       </div>
@@ -128,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       searchable
       required
       width="md"
+      :disabled="locked"
       data-test="downtime-schedule-timezone"
     />
 
@@ -148,8 +161,15 @@ import {
   type DowntimeFormValues,
 } from "@/utils/downtimes/downtimeForm";
 import type { Repeat } from "@/services/downtimes";
-import { ISO_WEEKDAYS, currentOrNextWindow, formatWindow } from "@/utils/downtimes/schedule";
+import {
+  ISO_WEEKDAYS,
+  currentOrNextWindow,
+  formatWindow,
+  localToUtcMicros,
+  utcMicrosToLocal,
+} from "@/utils/downtimes/schedule";
 import { canonicalTimezone } from "@/utils/timezoneAliases";
+import { getIntlLocale } from "@/locales";
 import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { endsInPast } from "./AddDowntime.schema";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
@@ -158,6 +178,9 @@ import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+
+// A started downtime keeps its schedule (D4): only the end and the until day stay editable.
+withDefaults(defineProps<{ locked?: boolean }>(), { locked: false });
 
 const { t } = useI18nTyped();
 const form = inject(FORM_CONTEXT_KEY, null);
@@ -173,6 +196,24 @@ const repeat = computed(() => schedule.value?.repeat);
 
 const REPEATS: readonly Repeat[] = ["none", "daily", "weekly"];
 
+// A start the user moves moves the end by the same amount; a loaded row or a reset moves nothing.
+// The control calls this before the form stores the new start, so `schedule` still holds the old one.
+const onStartChange = (part: "start_date" | "start_time", value: unknown) => {
+  const s = schedule.value;
+  if (!s || s.repeat !== "none" || typeof value !== "string" || value === s[part]) return;
+  const zone = s.timezone;
+  const oldStart = localToUtcMicros(s.start_date, s.start_time, zone);
+  const oldEnd = localToUtcMicros(s.end_date, s.end_time, zone);
+  const newStart =
+    part === "start_date"
+      ? localToUtcMicros(value, s.start_time, zone)
+      : localToUtcMicros(s.start_date, value, zone);
+  if (oldStart === null || oldEnd === null || newStart === null || oldEnd <= oldStart) return;
+  const end = utcMicrosToLocal(newStart + (oldEnd - oldStart), zone);
+  form.setFieldValue("schedule.end_date", end.date);
+  form.setFieldValue("schedule.end_time", end.time);
+};
+
 // Only a user pick resets the dates; a loaded row sets the repeat without passing through here.
 const onRepeatChange = (next: unknown) => {
   const picked = REPEATS.find((r) => r === next);
@@ -180,7 +221,9 @@ const onRepeatChange = (next: unknown) => {
   form.setFieldValue("schedule", scheduleForRepeat(schedule.value, picked, Date.now()));
 };
 
-const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" });
+// The app's language, not the browser's, as every downtime label reads.
+const locale = getIntlLocale();
+const weekdayFormat = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
 // 2024-01-01 is a Monday, so ISO day n is 2024-01-0n.
 const weekdays = ISO_WEEKDAYS.map((d) => ({
   value: d,
@@ -192,8 +235,8 @@ const nextWindowText = computed(() => {
   const built = buildSchedule(schedule.value);
   const window = currentOrNextWindow(built, Date.now() * 1000);
   if (!window) return t("alerts.downtimes.scheduleForm.noWindow");
-  const inZone = formatWindow(window, built.timezone, t);
-  const inUtc = formatWindow(window, "UTC", t);
+  const inZone = formatWindow(window, built.timezone, t, locale);
+  const inUtc = formatWindow(window, "UTC", t, locale);
   // Canonical only for display, so a stored `Etc/UTC` shows the window once.
   return canonicalTimezone(built.timezone) === "UTC"
     ? t("alerts.downtimes.scheduleForm.nextWindow", { window: inZone })

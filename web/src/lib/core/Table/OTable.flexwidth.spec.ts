@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { mount, config, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 
@@ -167,6 +167,114 @@ describe("OTable flex column width", () => {
     await flushPromises();
     expect(st.frozen).toBe(false);
     expect(st.allowHorizontalScroll).toBe(true);
+  });
+
+  it("keeps the actions column pinned and scrolls sideways while the columns overflow", async () => {
+    const rowActions = [{ id: "edit", label: "Edit", icon: "edit", onSelect: () => {} }];
+    const mountAt = async (width: number, props: Record<string, unknown> = {}) => {
+      const wrapper = mount(OTable, {
+        props: {
+          data,
+          columns,
+          rowActions,
+          enableColumnResize: true,
+          defaultColumns: false,
+          ...props,
+        } as any,
+      });
+      await flushPromises();
+      const st: any = (wrapper.vm.$ as any).setupState;
+      st.containerWidth = width;
+      await flushPromises();
+      const state = () => ({
+        pinned: ["th", "cell"].every((part) =>
+          /position:\s*sticky/.test(
+            wrapper.find(`[data-test="o2-table-${part}-actions"]`).attributes("style") || "",
+          ),
+        ),
+        scrolls: st.allowHorizontalScroll,
+      });
+      return { st, state };
+    };
+
+    expect((await mountAt(1000)).state()).toEqual({ pinned: true, scrolls: false });
+    expect((await mountAt(300)).state()).toEqual({ pinned: true, scrolls: true });
+
+    // A resize holds the filler at its filled width, so widening a sibling overflows a container the minimums fit.
+    const resized = await mountAt(1000);
+    resized.st.freezeFlexColumns();
+    resized.st.columnSizing = { ...resized.st.columnSizing, type: 400 };
+    await flushPromises();
+    expect(resized.state()).toEqual({ pinned: true, scrolls: true });
+
+    const elastic = [
+      { id: "name", header: "Name", accessorKey: "name", minSize: 160, meta: { autoWidth: true } },
+      { id: "type", header: "Type", accessorKey: "type", size: 700 },
+      { id: "actions", header: "Actions", isAction: true, size: 80 },
+    ];
+    const autoWidth = { columns: elastic, enableColumnResize: false };
+    expect((await mountAt(1000, autoWidth)).state()).toEqual({ pinned: true, scrolls: false });
+    const overflows = await mountAt(900, autoWidth);
+    expect(overflows.state()).toEqual({ pinned: true, scrolls: true });
+    expect(overflows.st.minTableWidth).toBeDefined();
+  });
+
+  // Regression: the measured fill raised each equal share to its column minimum, so unequal
+  // minimums summed past the pane and the trailing columns were clipped with no scrollbar.
+  it.each([
+    {
+      name: "unequal minimums that fit share the pane exactly",
+      mins: [110, 80, 96, 70, 90, 90, 104],
+      rendered: { type: 56 },
+      pane: 702,
+      scrolls: false,
+    },
+    {
+      name: "fixed columns rendered wider than declared leave the minimums no room",
+      mins: [160],
+      rendered: { type: 300 },
+      pane: 400,
+      scrolls: true,
+    },
+  ])("measured fill: $name", async ({ mins, rendered, pane, scrolls }) => {
+    const flexIds = mins.map((_, i) => `f${i}`);
+    const cols: OTableColumnDef[] = [
+      ...mins.map((minSize, i) => ({
+        id: flexIds[i],
+        header: flexIds[i],
+        accessorKey: "name",
+        size: 200,
+        minSize,
+        meta: { flex: true },
+      })),
+      { id: "type", header: "Type", accessorKey: "type", size: 56 },
+    ];
+    const widths: Record<string, number> = { "o2-table-th-type": rendered.type };
+    const clientWidth = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(pane);
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        return { width: widths[this.getAttribute("data-test") || ""] ?? 0 } as DOMRect;
+      });
+    try {
+      const wrapper = mount(OTable, {
+        props: { data, columns: cols, enableColumnResize: true, defaultColumns: false } as any,
+      });
+      await flushPromises();
+      const st: any = (wrapper.vm.$ as any).setupState;
+      st.containerWidth = pane;
+      await flushPromises();
+
+      const filled = flexIds.map((id) => colVar(wrapper, id));
+      filled.forEach((w, i) => expect(w).toBeGreaterThanOrEqual(mins[i]));
+      const total = filled.reduce((a, b) => a + b, 0) + rendered.type;
+      if (scrolls) expect(total).toBeGreaterThan(pane);
+      else expect(total).toBe(pane);
+      expect(st.allowHorizontalScroll).toBe(scrolls);
+    } finally {
+      clientWidth.mockRestore();
+      rect.mockRestore();
+    }
   });
 
   // Regression: a non-resizable table whose fixed columns alone overflow gave its

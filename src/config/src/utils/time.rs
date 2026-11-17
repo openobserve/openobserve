@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::LazyLock as Lazy;
+use std::{borrow::Cow, sync::LazyLock as Lazy};
 
 use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveDateTime, Offset, TimeZone, Utc};
 use chrono_tz::Tz;
@@ -165,32 +165,7 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
     };
     let s = t_separated.as_deref().unwrap_or(s);
     let ret = if s.contains('T') && !s.contains(' ') {
-        if s.len() == 19 {
-            let fmt = "%Y-%m-%dT%H:%M:%S";
-            NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
-        } else if s.contains('.') {
-            // Handle formats with decimal seconds: "2025-05-14T01:15:25.047"
-            let fraction = s.split('.').next_back().unwrap_or("");
-            // the zone is part of this text, so "12Z" and "12345Z" are as long as 3 and 6 digits
-            let zone_less = fraction.bytes().all(|b| b.is_ascii_digit());
-            // First check if it has milliseconds (3 decimal places)
-            if zone_less && fraction.len() == 3 {
-                let fmt = "%Y-%m-%dT%H:%M:%S%.3f";
-                NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
-            } else if zone_less && fraction.len() == 6 {
-                // Handle microseconds (6 decimal places)
-                let fmt = "%Y-%m-%dT%H:%M:%S%.6f";
-                NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
-            } else {
-                // Fall back to RFC3339 parsing for other decimal formats
-                let t = DateTime::parse_from_rfc3339(s)?;
-                t.into()
-            }
-        } else {
-            // Other formats with 'T' but no spaces or decimal points
-            let t = DateTime::parse_from_rfc3339(s)?;
-            t.into()
-        }
+        parse_iso8601(s)?
     } else {
         let t = DateTime::parse_from_rfc2822(s)?;
         t.into()
@@ -448,6 +423,24 @@ pub fn validate_time_range(start_time: i64, end_time: i64) -> Result<(), &'stati
     Ok(())
 }
 
+fn parse_iso8601(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
+    let s = if s.contains(',') {
+        Cow::Owned(s.replacen(',', ".", 1))
+    } else {
+        Cow::Borrowed(s)
+    };
+    if let Ok(t) = DateTime::parse_from_rfc3339(&s) {
+        return Ok(t.into());
+    }
+    if s.contains(char::is_whitespace) {
+        anyhow::bail!("invalid time format [string]");
+    }
+    if let Ok(t) = NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.f") {
+        return Ok(t.and_utc());
+    }
+    Ok(DateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.f%#z")?.into())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -496,7 +489,7 @@ mod tests {
             test_fn("2021-01-01T00:00:00.123456789-08:00").is_ok_and(|v| v == 1609488000123456)
         );
         assert!(test_fn("2021-01-01T00:00:00.123Z").is_ok_and(|v| v == 1609459200123000));
-        assert!(test_fn("2021-01-01T00:00:00.123456789").is_err());
+        assert!(test_fn("2021-01-01T00:00:00.123456789").is_ok_and(|v| v == 1609459200123456));
     }
 
     #[test]
@@ -533,6 +526,130 @@ mod tests {
         for (input, v_exp) in v_exp_arr {
             let got = parse_str_to_time(input).map(|v| v.timestamp_micros()).ok();
             assert_eq!(got, Some(v_exp), "{input}");
+        }
+    }
+
+    #[test]
+    fn test_parse_str_to_time_zone_less_fraction_lengths() {
+        let v_exp_arr = [
+            ("2021-01-01T00:00:00.1", 1609459200100000),
+            ("2021-01-01T00:00:00.12", 1609459200120000),
+            ("2021-01-01T00:00:00.123", 1609459200123000),
+            ("2021-01-01T00:00:00.1234", 1609459200123400),
+            ("2021-01-01T00:00:00.12345", 1609459200123450),
+            ("2021-01-01T00:00:00.123456", 1609459200123456),
+            ("2021-01-01T00:00:00.1234567", 1609459200123456),
+            ("2021-01-01T00:00:00.12345678", 1609459200123456),
+            ("2021-01-01T00:00:00.123456789", 1609459200123456),
+            ("2021-01-01 00:00:00.1", 1609459200100000),
+            ("2021-01-01 00:00:00.12345", 1609459200123450),
+            ("2021-01-01 00:00:00.123456789", 1609459200123456),
+        ];
+        for (input, v_exp) in v_exp_arr {
+            let got = parse_str_to_time(input).map(|v| v.timestamp_micros()).ok();
+            assert_eq!(got, Some(v_exp), "{input}");
+        }
+    }
+
+    #[test]
+    fn test_parse_str_to_time_offset_without_colon() {
+        let v_exp_arr = [
+            ("2021-01-01T00:00:00+0000", 1609459200000000),
+            ("2021-01-01T00:00:00+0800", 1609430400000000),
+            ("2021-01-01T00:00:00-0800", 1609488000000000),
+            ("2021-01-01T00:00:00+0530", 1609439400000000),
+            ("2021-01-01T00:00:00+08", 1609430400000000),
+            ("2021-01-01T00:00:00-08", 1609488000000000),
+            ("2021-01-01T00:00:00.123+0000", 1609459200123000),
+            ("2021-01-01T00:00:00.123456+0800", 1609430400123456),
+            ("2021-01-01T00:00:00.123456789-0800", 1609488000123456),
+            ("2021-01-01T00:00:00.5+08", 1609430400500000),
+            ("2021-01-01 00:00:00+0800", 1609430400000000),
+            ("2021-01-01 00:00:00.5+00", 1609459200500000),
+            ("2021-01-01 00:00:00.123456+00", 1609459200123456),
+        ];
+        for (input, v_exp) in v_exp_arr {
+            let got = parse_str_to_time(input).map(|v| v.timestamp_micros()).ok();
+            assert_eq!(got, Some(v_exp), "{input}");
+        }
+    }
+
+    #[test]
+    fn test_parse_str_to_time_comma_decimal_separator() {
+        let v_exp_arr = [
+            ("2021-01-01T00:00:00,123", 1609459200123000),
+            ("2021-01-01T00:00:00,123456789", 1609459200123456),
+            ("2021-01-01T00:00:00,123Z", 1609459200123000),
+            ("2021-01-01T00:00:00,123+08:00", 1609430400123000),
+            ("2021-01-01T00:00:00,123+0800", 1609430400123000),
+            ("2021-01-01 00:00:00,123", 1609459200123000),
+            ("2021-01-01 00:00:00,5", 1609459200500000),
+            ("2021-01-01T00:00:00,5z", 1609459200500000),
+            ("2021-01-01 00:00:00,5+00", 1609459200500000),
+        ];
+        for (input, v_exp) in v_exp_arr {
+            let got = parse_str_to_time(input).map(|v| v.timestamp_micros()).ok();
+            assert_eq!(got, Some(v_exp), "{input}");
+        }
+    }
+
+    #[test]
+    fn test_parse_str_to_time_rfc2822_with_comma_is_not_iso8601() {
+        let v_exp_arr = [
+            ("Thu, 4 Mar 2021 10:20:30 GMT", 1614853230000000),
+            ("Tue, 5 Jan 2021 00:00:00 +0800", 1609776000000000),
+        ];
+        for (input, v_exp) in v_exp_arr {
+            let got = parse_str_to_time(input).map(|v| v.timestamp_micros()).ok();
+            assert_eq!(got, Some(v_exp), "{input}");
+        }
+    }
+
+    #[test]
+    fn test_parse_str_to_time_rejects_malformed_iso8601() {
+        for input in [
+            "2021-01-01T00:00:00.",
+            "2021-01-01T00:00:00.Z",
+            "2021-01-01T00:00:00,",
+            "2021-01-01T00:00:00+",
+            "2021-01-01T00:00:00+8",
+            "2021-01-01T00:00:00+080",
+            "2021-01-01T00:00:00+08:0",
+            "2021-01-01T00:00:00+0860",
+            "2021-01-01T00:00:00+2500",
+            "2021-01-01T00:00:00ZZ",
+            "2021-01-01T00:00:00+0000Z",
+            "2021-01-01T00:00:00.1.2",
+            "2021-01-01T00:00:00,1,2",
+            "2021-01-01T00:00:00.1,2",
+            "2021-01-01T24:00:00.5",
+            "2021-02-30T00:00:00.5",
+            "2021-13-01T00:00:00.5",
+            "T00:00:00.5",
+            "2021-01-01T",
+            "\t2021-01-01T00:00:00.5",
+            "2021-01-01T\t00:00:00.5",
+            "2021-01-01T00:00:00.5\t+0800",
+            "2021-01-01T00:00:00.5\u{a0}",
+            "2021-01-01T\u{b}00:00:00.5",
+        ] {
+            assert!(parse_str_to_time(input).is_err(), "{input}");
+        }
+    }
+
+    #[test]
+    fn test_parse_timestamp_micro_from_value_iso8601_variants() {
+        let v_exp_arr = [
+            ("2021-01-01T00:00:00.5", 1609459200500000),
+            ("2021-01-01T00:00:00.123456789", 1609459200123456),
+            ("2021-01-01T00:00:00.123+0000", 1609459200123000),
+            ("2021-01-01 00:00:00,123", 1609459200123000),
+            ("2021-01-01 00:00:00.5+00", 1609459200500000),
+        ];
+        for (input, v_exp) in v_exp_arr {
+            let got =
+                parse_timestamp_micro_from_value(&json::Value::String(input.to_string())).ok();
+            assert_eq!(got, Some((v_exp, false)), "{input}");
         }
     }
 

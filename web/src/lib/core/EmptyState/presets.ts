@@ -29,7 +29,7 @@ import type { I18nKey } from "@/types/i18n";
 import type { IllustrationName } from "./illustrations";
 
 /** Tone of an empty state — drives subtle styling and signals intent. */
-export type EmptyStateVariant = "create" | "no-results" | "error" | "neutral";
+export type EmptyStateVariant = "create" | "no-results" | "error" | "warning" | "neutral";
 
 /** A rich action card (icon + title + description) shown in an empty state. */
 export interface EmptyStateAction {
@@ -791,6 +791,36 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-slack-channel-defaults": {
+    illustration: "board",
+    variant: "neutral",
+    titleKey: "emptyState.noSlackChannelDefaults.title",
+    descriptionKey: "emptyState.noSlackChannelDefaults.description",
+  },
+  "no-slack-linked-people": {
+    illustration: "users",
+    variant: "neutral",
+    titleKey: "emptyState.noSlackLinkedPeople.title",
+  },
+  "slack-not-connected": {
+    illustration: "connect",
+    variant: "neutral",
+    titleKey: "emptyState.slackNotConnected.title",
+  },
+  "no-announcement-banners": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noAnnouncementBanners.title",
+    descriptionKey: "emptyState.noAnnouncementBanners.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noAnnouncementBanners.action",
+        descriptionKey: "emptyState.noAnnouncementBanners.actionDesc",
+      },
+    ],
+  },
   "no-ai-toolsets": {
     illustration: "box",
     variant: "create",
@@ -908,6 +938,7 @@ export const emptyStatePresets = {
         id: "connect",
         icon: "call",
         titleKey: "emptyState.noPhoneProvider.action",
+        descriptionKey: "emptyState.noPhoneProvider.actionDesc",
       },
     ],
   },
@@ -1159,6 +1190,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-eval-templates": "emptyState.nouns.evalTemplates",
   "no-enrichment-tables": "emptyState.nouns.enrichmentTables",
   "no-cipher-keys": "emptyState.nouns.cipherKeys",
+  "no-announcement-banners": "emptyState.nouns.announcementBanners",
   "no-ai-toolsets": "emptyState.nouns.aiToolsets",
   "no-llm-providers": "emptyState.nouns.llmProviders",
   "no-source-maps": "emptyState.nouns.sourceMaps",

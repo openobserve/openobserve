@@ -32,7 +32,7 @@ use config::{
     utils::{
         base64,
         json::{Map, Value},
-        sql::quote_identifier,
+        sql::{quote_identifier, quote_like_pattern, quote_sql_string},
     },
 };
 use search::utils::is_permissable_function_error;
@@ -1767,21 +1767,20 @@ fn build_expr(
             } else {
                 cond.value.to_string()
             };
-            // Double up embedded single quotes so a value like "it's" can't
-            // terminate the SQL string literal early.
-            let val = val.replace('\'', "''");
+            let quoted = quote_sql_string(&val);
             match cond.operator {
-                Operator::EqualTo => format!("{field_alias} = '{val}'"),
-                Operator::NotEqualTo => format!("{field_alias} != '{val}'"),
-                Operator::GreaterThan => format!("{field_alias} > '{val}'"),
-                Operator::GreaterThanEquals => {
-                    format!("{field_alias} >= '{val}'")
-                }
-                Operator::LessThan => format!("{field_alias} < '{val}'"),
-                Operator::LessThanEquals => format!("{field_alias} <= '{val}'"),
-                Operator::Contains => format!("str_match({field_alias}, '{val}')"),
+                Operator::EqualTo => format!("{field_alias} = {quoted}"),
+                Operator::NotEqualTo => format!("{field_alias} != {quoted}"),
+                Operator::GreaterThan => format!("{field_alias} > {quoted}"),
+                Operator::GreaterThanEquals => format!("{field_alias} >= {quoted}"),
+                Operator::LessThan => format!("{field_alias} < {quoted}"),
+                Operator::LessThanEquals => format!("{field_alias} <= {quoted}"),
+                Operator::Contains => format!("str_match({field_alias}, {quoted})"),
                 Operator::NotContains => {
-                    format!("{field_alias} NOT LIKE '%{val}%'")
+                    format!(
+                        "{field_alias} NOT LIKE {}",
+                        quote_like_pattern("%", &val, "%")
+                    )
                 }
                 // Null checks returned above; keep the dead arm panic-free.
                 _ => {
@@ -1934,7 +1933,7 @@ fn build_case_insensitive_expr(
     } else {
         cond.value.to_string()
     };
-    let lowered = sql_string_literal(&raw.to_lowercase());
+    let lowered = quote_sql_string(&raw.to_lowercase());
     let op = match cond.operator {
         Operator::EqualTo => "=",
         Operator::NotEqualTo => "!=",
@@ -1944,20 +1943,20 @@ fn build_case_insensitive_expr(
         Operator::LessThanEquals => "<=",
         Operator::Contains => {
             return Ok(format!(
-                "str_match_ignore_case({field_alias}, '{}')",
-                sql_string_literal(&raw)
+                "str_match_ignore_case({field_alias}, {})",
+                quote_sql_string(&raw)
             ));
         }
         // NOT LIKE keeps the NULL-row semantics of the case-sensitive not_contains.
         Operator::NotContains => {
             return Ok(format!(
-                "lower({field_alias}) NOT LIKE '%{}%'",
-                sql_like_literal(&raw.to_lowercase())
+                "lower({field_alias}) NOT LIKE {}",
+                quote_like_pattern("%", &raw.to_lowercase(), "%")
             ));
         }
         _ => return Err(unsupported_operator(cond, field_type)),
     };
-    Ok(format!("lower({field_alias}) {op} '{lowered}'"))
+    Ok(format!("lower({field_alias}) {op} {lowered}"))
 }
 
 /// SQL for `in`, `not_in`, `starts_with`, `ends_with`, `re_match` and `re_not_match`.
@@ -1997,11 +1996,11 @@ fn build_extended_expr(
         }
         Operator::StartsWith | Operator::EndsWith if is_string_type => {
             let needle = scalar_sql_text(&cond.value);
-            let needle = sql_like_literal(&if fold { needle.to_lowercase() } else { needle });
+            let needle = if fold { needle.to_lowercase() } else { needle };
             Ok(if matches!(cond.operator, Operator::StartsWith) {
-                format!("{column} LIKE '{needle}%'")
+                format!("{column} LIKE {}", quote_like_pattern("", &needle, "%"))
             } else {
-                format!("{column} LIKE '%{needle}'")
+                format!("{column} LIKE {}", quote_like_pattern("%", &needle, ""))
             })
         }
         Operator::ReMatch | Operator::ReNotMatch if is_string_type => {
@@ -2018,8 +2017,8 @@ fn build_extended_expr(
                 "NOT "
             };
             Ok(format!(
-                "{negation}regexp_like({field_alias}, '{}')",
-                sql_string_literal(&pattern)
+                "{negation}regexp_like({field_alias}, {})",
+                quote_sql_string(&pattern)
             ))
         }
         _ => Err(unsupported_operator(cond, field_type)),
@@ -2046,7 +2045,7 @@ fn sql_list_literal(
             }
             let text = scalar_sql_text(item);
             let text = if fold { text.to_lowercase() } else { text };
-            Ok(format!("'{}'", sql_string_literal(&text)))
+            Ok(quote_sql_string(&text))
         }
         DataType::Int16 | DataType::Int32 | DataType::Int64 => match item {
             Value::Number(n) => match n.as_i64() {
@@ -2093,20 +2092,6 @@ fn scalar_sql_text(value: &Value) -> String {
         Value::String(s) => s.clone(),
         other => other.to_string(),
     }
-}
-
-/// Doubles single quotes so the value cannot end the SQL string literal.
-fn sql_string_literal(value: &str) -> String {
-    value.replace('\'', "''")
-}
-
-/// Backslash-escapes LIKE wildcards (DataFusion's default escape) and then the quotes.
-fn sql_like_literal(value: &str) -> String {
-    let escaped = value
-        .replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_");
-    sql_string_literal(&escaped)
 }
 
 fn unsupported_operator(cond: &Condition, field_type: &DataType) -> anyhow::Error {
@@ -3922,7 +3907,7 @@ mod tests {
                 Operator::NotContains,
                 json!("50%_x"),
                 &utf8,
-                r#""c" NOT LIKE '%50%_x%'"#,
+                r#""c" NOT LIKE '%50\%\_x%'"#,
             ),
             (
                 Operator::IsEmpty,
@@ -4040,6 +4025,46 @@ mod tests {
         );
         let cond = make_cond("c", Operator::StartsWith, json!("1"));
         assert!(build_expr(&cond, "", &DataType::Int64).is_err());
+    }
+
+    #[test]
+    fn test_build_expr_string_literals_survive_reserialisation() {
+        use config::utils::json::json;
+        use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
+
+        let parse = |sql: &str| Parser::parse_sql(&PostgreSqlDialect {}, sql).unwrap();
+        for value in [r"x\' OR 1=1 --", "a''b"] {
+            for (operator, ci) in [
+                (Operator::EqualTo, false),
+                (Operator::Contains, false),
+                (Operator::NotContains, false),
+                (Operator::StartsWith, false),
+                (Operator::EndsWith, false),
+                (Operator::In, false),
+                (Operator::ReMatch, false),
+                (Operator::EqualTo, true),
+                (Operator::Contains, true),
+                (Operator::NotContains, true),
+            ] {
+                let value = if matches!(operator, Operator::In) {
+                    json!([value])
+                } else {
+                    json!(value)
+                };
+                let cond = if ci {
+                    make_ci_cond("c", operator, value)
+                } else {
+                    make_cond("c", operator, value)
+                };
+                let sql = format!(
+                    "SELECT * FROM t WHERE {}",
+                    build_expr(&cond, "", &DataType::Utf8).unwrap()
+                );
+                let first = parse(&sql);
+                let reprinted = parse(&parse(&first[0].to_string())[0].to_string());
+                assert_eq!(first, reprinted, "{sql}");
+            }
+        }
     }
 
     #[test]

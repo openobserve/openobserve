@@ -164,8 +164,9 @@ jobs:
         run: |
           TODAY=$(date -u +%Y-%m-%d)
 
+          # Interface fragment: single-select/iteration nodes are otherwise empty and break ascii_downcase.
           FIELD_ID=$(gh api graphql \
-            -f query='query($project:ID!){node(id:$project){... on ProjectV2{fields(first:30){nodes{... on ProjectV2Field{id name}}}}}}' \
+            -f query='query($project:ID!){node(id:$project){... on ProjectV2{fields(first:30){nodes{... on ProjectV2FieldCommon{id name}}}}}}' \
             -f project="$PROJECT_ID" \
             --jq '[.data.node.fields.nodes[] | select(.name | ascii_downcase == "start date")] | .[0].id // empty')
 

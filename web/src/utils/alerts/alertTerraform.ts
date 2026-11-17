@@ -53,8 +53,8 @@ import {
 } from "@/utils/terraform/hcl";
 
 export interface AlertTerraformOptions {
-  /** Alert folder the export came from. Emitted only when it is not the default. */
-  folderId?: string;
+  /** Folder the export came from, or each alert's by position. Emitted only when it is not the default. */
+  folderId?: string | readonly string[];
 }
 
 // `=`, `!=`, `>`, `>=`, `<` and `<=` pass through; only the two word operators
@@ -187,10 +187,10 @@ function unsupportedReason(alert: Record<string, unknown>): TerraformUnsupported
 function alertResource(
   alert: Record<string, unknown>,
   label: string,
-  options: AlertTerraformOptions,
+  folder: string | undefined,
   dropped: Set<string>,
 ): string {
-  const folderId = options.folderId && options.folderId !== "default" ? options.folderId : null;
+  const folderId = folder && folder !== "default" ? folder : null;
   const query = (alert.query_condition ?? {}) as Record<string, unknown>;
 
   const nodes: Node[] = [
@@ -238,17 +238,16 @@ export function alertsToTerraform(
   const unsupported: TerraformUnsupportedItem[] = [];
   const resources: string[] = [];
 
-  for (const alert of alerts) {
-    if (!alert || typeof alert !== "object") continue;
+  alerts.forEach((alert, i) => {
+    if (!alert || typeof alert !== "object") return;
     const reason = unsupportedReason(alert);
     if (reason) {
       unsupported.push({ name: String(alert.name ?? ""), reason });
-      continue;
+      return;
     }
-    resources.push(
-      alertResource(alert, resourceLabel(alert.name, used, "alert"), options, dropped),
-    );
-  }
+    const folder = typeof options.folderId === "string" ? options.folderId : options.folderId?.[i];
+    resources.push(alertResource(alert, resourceLabel(alert.name, used, "alert"), folder, dropped));
+  });
 
   return { hcl: document(resources), unsupported, droppedFields: [...dropped].sort() };
 }

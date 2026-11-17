@@ -99,7 +99,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             .await
             .unwrap_or_default();
         let level = scheduling_level(stream_type, Some(&stream_settings), *offset);
-        if !super::is_past_hour(job_range_end(*offset, level)) {
+        if !super::is_past_hour(job_range_end(*offset, level), now_micros()) {
             need_done_ids.push(*job_id); // the data is not past its range, need to wait
             continue;
         }

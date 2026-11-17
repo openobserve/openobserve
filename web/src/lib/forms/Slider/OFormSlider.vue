@@ -4,7 +4,7 @@
 import { inject } from "vue";
 import OSlider from "./OSlider.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import type { FormSliderProps } from "./OFormSlider.types";
 
 defineOptions({ inheritAttrs: false });
@@ -12,6 +12,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormSliderProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormSlider] must be rendered inside <OForm>. No form context found.");
@@ -37,7 +38,7 @@ if (import.meta.env.DEV && !form) {
           :id="props.id"
           :name="props.name"
           :model-value="field.state.value"
-          :error="field.state.meta.errors.length > 0"
+          :error="shown(field).invalid"
           @update:model-value="
             (v: number) => {
               field.handleChange(v);
@@ -50,8 +51,8 @@ if (import.meta.env.DEV && !form) {
             <slot name="label" />
           </template>
         </OSlider>
-        <div v-if="field.state.meta.errors.length > 0" class="text-slider-error-text text-xs">
-          {{ firstFieldError(field.state.meta.errors) }}
+        <div v-if="shown(field).message !== undefined" class="text-slider-error-text text-xs">
+          {{ shown(field).message }}
         </div>
       </div>
     </template>

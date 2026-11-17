@@ -9871,7 +9871,6 @@
       "duplicatePanelId": "Tìm thấy ID panel trùng lặp: {id}",
       "panelMissingLayoutI": "Panel {id} thiếu giá trị layout.i",
       "duplicateLayoutI": "Tìm thấy giá trị layout.i trùng lặp trong tab {tabId}: {value}",
-      "customChartCallbacksDropped": "Biểu đồ tùy chỉnh: {count} hàm callback trong mã của panel này đã bị bỏ qua. Mã biểu đồ đã lưu không thể chạy callback trong ứng dụng; hãy dùng giá trị thường thay thế. | Biểu đồ tùy chỉnh: {count} hàm callback trong mã của panel này đã bị bỏ qua. Mã biểu đồ đã lưu không thể chạy callback trong ứng dụng; hãy dùng giá trị thường thay thế.",
       "unsafeCodeDetected": "Phát hiện mã không an toàn: {error}",
       "forbiddenFunctionCall": "Không được phép sử dụng '{name}()'.",
       "forbiddenInsideSetTimeout": "Không được phép sử dụng {name} bên trong 'setTimeout()'.",
@@ -10410,31 +10409,12 @@
     "hoursAgo": "{count} giờ trước",
     "daysAgo": "{count} ngày trước",
     "cards": {
-      "firingAlerts": "Cảnh báo đang kích hoạt",
-      "failingRules": "Quy tắc đang lỗi",
-      "openIncidents": "Sự cố đang mở",
-      "pipelineErrors": "Lỗi pipeline",
-      "pipelinesOf": "trong {enabled} đã bật",
-      "quietStreams": "Stream không hoạt động",
-      "firingNone": "Không có cảnh báo kích hoạt",
-      "noAlertRules": "Không có quy tắc cảnh báo",
-      "noEnabledRules": "Không có quy tắc nào được bật",
-      "failingNone": "Không có quy tắc lỗi",
-      "failingNote": "Lần đánh giá gần nhất bị lỗi",
-      "incidentsNone": "Không có sự cố đang mở",
-      "noPipelines": "Không có pipeline",
-      "noStreams": "Không có stream",
-      "quietNote": "Ngừng ghi dữ liệu trong 7 ngày qua",
-      "criticalUnit": "{count} ở mức nghiêm trọng",
-      "deliveryFailures": "Lỗi gửi cảnh báo",
-      "deliveryNote": "Cảnh báo đã kích hoạt nhưng không thể thông báo",
-      "oldestFiring": "Kích hoạt lâu nhất trong {age}"
+      "openIncidents": "Sự cố đang mở"
     },
     "state": {
       "tileForbidden": "Không có quyền truy cập",
       "tileLocked": "Đã khóa",
       "tileError": "Không thể tải",
-      "tileUnavailable": "Không khả dụng",
       "sectionLocked": "Khả dụng với giấy phép doanh nghiệp",
       "sectionForbidden": "Vai trò của bạn không thể xem dữ liệu này. Hãy yêu cầu quản trị viên tổ chức cấp quyền truy cập."
     },
@@ -10556,20 +10536,6 @@
       "retry": "Thử lại"
     },
     "dataAsOf": "Dữ liệu tính đến {time}",
-    "status": {
-      "attention": "Cần chú ý",
-      "checking": "Đang kiểm tra…",
-      "partial": "Không tải được một số kiểm tra",
-      "clear": "Không có gì cần chú ý",
-      "items": {
-        "firing": "{count} cảnh báo đang kích hoạt | {count} cảnh báo đang kích hoạt",
-        "failing": "{count} quy tắc bị lỗi | {count} quy tắc bị lỗi",
-        "incidents": "{count} sự cố đang mở | {count} sự cố đang mở",
-        "pipelines": "{count} pipeline có lỗi | {count} pipeline có lỗi",
-        "quiet": "{count} stream im lặng | {count} stream im lặng"
-      },
-      "unmonitored": "Chưa có gì được giám sát"
-    },
     "timeRange": {
       "heading": "Trong khoảng thời gian đã chọn"
     }
@@ -11545,68 +11511,6 @@
     }
   },
   "alerts": {
-    "firing": {
-      "title": "Đang kích hoạt",
-      "drawer": {
-        "openInLogs": "Mở trong Nhật ký",
-        "partOfIncident": "Thuộc sự cố:",
-        "incidentAck": "Tiếp nhận tại đây có nghĩa là tiếp nhận toàn bộ sự cố.",
-        "incidentTakeOver": "Nhận xử lý tại đây sẽ áp dụng cho toàn bộ sự cố.",
-        "now": "Bây giờ",
-        "threshold": "ngưỡng {value}",
-        "since": "kể từ {time}",
-        "flaps": "Số lần chuyển trạng thái, 6 giờ qua",
-        "flapsUnit": "lần chuyển trạng thái",
-        "notified": "Đã thông báo",
-        "notDeliveredTo": "{name}: chưa gửi được",
-        "history": "Lịch sử",
-        "last2h": "2 giờ qua",
-        "lastSpan": "{span} gần nhất",
-        "viewAll": "Xem tất cả",
-        "historyEmpty": "Không có lần chạy nào trong khoảng thời gian này.",
-        "historyFailed": "Không thể tải lịch sử.",
-        "barFiring": "{span} đang kích hoạt",
-        "barOk": "{span} bình thường",
-        "barUnknown": "{span} chưa đọc",
-        "eventStarted": "Bắt đầu kích hoạt",
-        "eventRecovered": "Đã phục hồi",
-        "eventNotified": "Đã thông báo",
-        "eventNotifiedTo": "Đã thông báo {names}",
-        "eventFailed": "Chưa gửi được",
-        "eventFailedTo": "Chưa gửi được tới {names}",
-        "soFar": "{span} cho đến nay",
-        "lasted": "kéo dài {span}",
-        "okFor": "bình thường trong {span}"
-      },
-      "chipCount": "{label} {count}",
-      "chipFiring": "Đang kích hoạt",
-      "chipAcked": "Đã tiếp nhận",
-      "chipMuted": "Đã tắt thông báo",
-      "chipFailed": "Chưa gửi được",
-      "searchPlaceholder": "Tìm kiếm cảnh báo",
-      "priorityAll": "Mức độ ưu tiên",
-      "priorityLabel": "Mức độ ưu tiên",
-      "priorityUnset": "Không có mức độ ưu tiên",
-      "folderAll": "Thư mục: tất cả",
-      "folderLabel": "Thư mục",
-      "stale": "cũ",
-      "refreshFailed": "Không thể làm mới cảnh báo đang kích hoạt ({reason}). Đang hiển thị dữ liệu từ {time}.",
-      "refreshFailedReason": "yêu cầu thất bại",
-      "statusUnavailable": "Trạng thái cảnh báo hiện không khả dụng, vì vậy không thể hiển thị cảnh báo đang kích hoạt.",
-      "retry": "Thử lại",
-      "columnPriority": "Mức độ ưu tiên",
-      "columnState": "Trạng thái",
-      "columnAlert": "Cảnh báo",
-      "columnFolder": "Thư mục",
-      "columnFiringFor": "Thời gian kích hoạt",
-      "acknowledgeCount": "Tiếp nhận {count}",
-      "mute": "Tạm tắt",
-      "clear": "Xóa",
-      "emptyFiring": "Không có cảnh báo nào đang kích hoạt",
-      "emptyAcked": "Không có cảnh báo nào đã được tiếp nhận",
-      "emptyMuted": "Không có cảnh báo nào đang bị tạm tắt",
-      "emptyFailed": "Không có thông báo nào chưa được gửi"
-    },
     "moreActions": "Thêm hành động",
     "promRuleMode": "Chế độ quy tắc",
     "promRulePreview": "{count} chuỗi trả về khớp hiện tại. Mỗi chuỗi phải hoàn thành khoảng thời gian chờ trước khi kích hoạt.",
@@ -12882,6 +12786,9 @@
         "alertStartTimeMillis": "Thời gian bắt đầu cửa sổ theo epoch mili giây",
         "alertEndTimeMillis": "Thời gian kết thúc cửa sổ theo epoch mili giây",
         "alertUrl": "Liên kết trở lại OpenObserve để điều tra",
+        "alertUrlLabel": "Nhãn của liên kết chính, ví dụ \"View logs\"",
+        "alertDetailUrl": "Liên kết đến trang của cảnh báo đã gửi tin nhắn này. Để trống khi liên kết chính đã mở trang đó.",
+        "alertDetailLabel": "Nhãn của liên kết đó, ví dụ \"Open alert\". Để trống khi liên kết trống.",
         "alertTriggerTime": "Thời điểm cảnh báo kích hoạt (ISO 8601)",
         "alertTriggerTimeMillis": "Thời gian kích hoạt theo epoch millis",
         "alertTriggerTimeSeconds": "Thời gian kích hoạt theo epoch giây",
@@ -13415,7 +13322,10 @@
       "chartUnavailable": "Không có biểu đồ nào cho truy vấn của cảnh báo này.",
       "eventCount": "Sự kiện",
       "notFoundTitle": "Không tìm thấy cảnh báo",
-      "notFoundDescription": "Cảnh báo này không còn tồn tại hoặc bạn không có quyền truy cập. Nó có thể đã bị xóa."
+      "notFoundDescription": "Cảnh báo này không còn tồn tại hoặc bạn không có quyền truy cập. Nó có thể đã bị xóa.",
+      "noAccessTitle": "Bạn không có quyền truy cập cảnh báo này",
+      "noAccessDescription": "Hãy yêu cầu quản trị viên cấp quyền đọc cảnh báo trong thư mục này.",
+      "loadFailedTitle": "Không thể tải cảnh báo này"
     },
     "timeLabel": "Thời gian",
     "unknownHttpStatus": "Không xác định",
@@ -14472,6 +14382,10 @@
     "insertVariable": "Chèn biến",
     "moreVariables": "+{count} nữa",
     "viewAlertLinkLabel": "Xem trong OpenObserve",
+    "variableAlertUrlLabelDescription": "Nhãn của liên kết chính, ví dụ \"View logs\"",
+    "variableAlertDetailUrlDescription": "Liên kết đến trang của cảnh báo đã gửi tin nhắn này. Để trống khi liên kết chính đã mở trang đó.",
+    "variableAlertDetailLabelDescription": "Nhãn của liên kết đó, ví dụ \"Open alert\". Để trống khi liên kết trống.",
+    "slackLinksNotShown": "{count} liên kết không hiển thị dưới dạng nút: {links} | {count} liên kết không hiển thị dưới dạng nút: {links}",
     "moveUp": "Di chuyển lên",
     "moveDown": "Di chuyển xuống",
     "fieldLabel": "Nhãn",
@@ -22895,6 +22809,8 @@
       "noResults": "Không có biểu tượng nào khớp với tìm kiếm của bạn",
       "groups": {
         "results": "Kết quả",
+        "icons": "Biểu tượng",
+        "monoLogos": "Logo",
         "status": "Trạng thái",
         "services": "Dịch vụ",
         "ai": "AI",
@@ -23396,11 +23312,6 @@
       "failedToLoadToolset": "Không thể tải bộ công cụ"
     },
     "alerts": {
-      "firing": {
-        "bulkResult": "{acked} đã tiếp nhận, {skipped} đã bỏ qua",
-        "bulkResultFailed": "{acked} đã xác nhận, {skipped} bỏ qua, {failed} thất bại",
-        "bulkAllAcked": "{acked} đã tiếp nhận"
-      },
       "failedToNavigateToAlert": "Không thể điều hướng đến cảnh báo",
       "alertNotFound": "Không tìm thấy cảnh báo",
       "failedToLoadAlerts": "Không thể tải danh sách cảnh báo",
@@ -28518,7 +28429,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Bước 0 · Điều kiện tiên quyết của máy chủ",
+      "title": "Bước 1 · Điều kiện tiên quyết của máy chủ",
       "subtitle": "Được kiểm tra trên máy chủ này trước khi thực hiện bất kỳ thao tác nào với Slack",
       "columnSetting": "Thiết lập",
       "columnResult": "Kết quả",
@@ -28589,7 +28500,7 @@
       "back": "Quay lại",
       "finish": "Hoàn tất",
       "connection": {
-        "title": "Bước 1 · Kết nối",
+        "title": "Bước 2 · Kết nối",
         "description": "Bước kiểm tra truy cập Slack từ máy chủ này qua đúng luồng mã mà môi trường production sử dụng.",
         "allPassed": "Có thể truy cập Slack từ máy chủ này",
         "someFailed": "Không thể truy cập Slack từ máy chủ này. Hãy cho phép *.slack.com đi qua proxy hoặc tường lửa, rồi Kiểm tra lại.",
@@ -28598,7 +28509,7 @@
         "socketHost": "Máy chủ WebSocket {host}"
       },
       "create": {
-        "title": "Bước 2 · Tạo ứng dụng",
+        "title": "Bước 3 · Tạo ứng dụng",
         "modeLabel": "Chế độ kết nối",
         "socket": "Chế độ Socket",
         "socketDescription": "Được khuyến nghị. OpenObserve mở kết nối, nên Slack không cần URL công khai",
@@ -28627,7 +28538,7 @@
         "signingSecretRequired": "Chế độ HTTP cần signing secret"
       },
       "install": {
-        "title": "Bước 3 · Cài đặt",
+        "title": "Bước 4 · Cài đặt",
         "created": "Đã tạo ứng dụng · {appId}",
         "allowHint": "Mở màn hình cài đặt của Slack: nhấp Cho phép tại đó. Bot token sẽ tự động được Slack trả về; không cần sao chép gì.",
         "allow": "Cho phép trong Slack",
@@ -28650,7 +28561,7 @@
         "appNotCreatedByO2": "OpenObserve không tạo ứng dụng này, nên ứng dụng vẫn ở lại trong Slack. Hãy xóa tại đó nếu bạn không còn cần đến."
       },
       "test": {
-        "title": "Bước 4 · Kiểm tra và liên kết",
+        "title": "Bước 5 · Kiểm tra và liên kết",
         "run": "Chạy kiểm tra",
         "signIn": "Kiểm tra Đăng nhập bằng Slack",
         "signInPassed": "Đăng nhập bằng Slack hoạt động",

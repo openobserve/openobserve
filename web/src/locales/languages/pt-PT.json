@@ -9871,7 +9871,6 @@
       "duplicatePanelId": "ID de painel duplicado encontrado: {id}",
       "panelMissingLayoutI": "Painel {id} está sem um valor layout.i",
       "duplicateLayoutI": "Valor layout.i duplicado encontrado no separador {tabId}: {value}",
-      "customChartCallbacksDropped": "Gráfico personalizado: {count} função de callback no código deste painel foi ignorada. O código do gráfico guardado não pode executar callbacks na aplicação; use valores simples em vez disso. | Gráfico personalizado: {count} funções de callback no código deste painel foram ignoradas. O código do gráfico guardado não pode executar callbacks na aplicação; use valores simples em vez disso.",
       "unsafeCodeDetected": "Código inseguro detetado: {error}",
       "forbiddenFunctionCall": "O uso de '{name}()' não é permitido.",
       "forbiddenInsideSetTimeout": "O uso de {name} dentro de 'setTimeout()' não é permitido.",
@@ -10410,31 +10409,12 @@
     "hoursAgo": "{count}h atrás",
     "daysAgo": "{count}d atrás",
     "cards": {
-      "firingAlerts": "Alertas disparados",
-      "failingRules": "Regras com falhas",
-      "openIncidents": "Incidentes abertos",
-      "pipelineErrors": "Erros de pipeline",
-      "pipelinesOf": "de {enabled} ativos",
-      "quietStreams": "Streams sem atividade",
-      "firingNone": "Nenhum disparado",
-      "noAlertRules": "Sem regras de alerta",
-      "noEnabledRules": "Sem regras ativadas",
-      "failingNone": "Nenhuma com falhas",
-      "failingNote": "A última avaliação deu erro",
-      "incidentsNone": "Nenhum aberto",
-      "noPipelines": "Sem pipelines",
-      "noStreams": "Sem streams",
-      "quietNote": "Deixou de escrever nos últimos 7 dias",
-      "criticalUnit": "{count} em nível crítico",
-      "deliveryFailures": "Falhas de entrega de alertas",
-      "deliveryNote": "Alertas que dispararam mas não conseguiram notificar",
-      "oldestFiring": "Disparado há mais tempo: {age}"
+      "openIncidents": "Incidentes abertos"
     },
     "state": {
       "tileForbidden": "Sem acesso",
       "tileLocked": "Bloqueado",
       "tileError": "Não foi possível carregar",
-      "tileUnavailable": "Não disponível",
       "sectionLocked": "Disponível com uma licença enterprise",
       "sectionForbidden": "A sua função não permite ver estes dados. Peça acesso a um administrador da organização."
     },
@@ -10556,20 +10536,6 @@
       "retry": "Tentar novamente"
     },
     "dataAsOf": "Dados de {time}",
-    "status": {
-      "attention": "Requer atenção",
-      "checking": "A verificar…",
-      "partial": "Não foi possível carregar algumas verificações",
-      "clear": "Nada requer atenção",
-      "items": {
-        "firing": "{count} alerta disparado | {count} alertas disparados",
-        "failing": "{count} regra com falha | {count} regras com falha",
-        "incidents": "{count} incidente em aberto | {count} incidentes em aberto",
-        "pipelines": "{count} pipeline com erros | {count} pipelines com erros",
-        "quiet": "{count} stream sem atividade | {count} streams sem atividade"
-      },
-      "unmonitored": "Ainda não há nada a ser monitorizado"
-    },
     "timeRange": {
       "heading": "No intervalo de tempo selecionado"
     }
@@ -11545,68 +11511,6 @@
     }
   },
   "alerts": {
-    "firing": {
-      "title": "Disparados",
-      "drawer": {
-        "openInLogs": "Abrir em Logs",
-        "partOfIncident": "Parte do incidente:",
-        "incidentAck": "Reconhecer aqui reconhece todo o incidente.",
-        "incidentTakeOver": "Assumir aqui assume todo o incidente.",
-        "now": "Agora",
-        "threshold": "limiar {value}",
-        "since": "desde {time}",
-        "flaps": "Oscilações, últimas 6h",
-        "flapsUnit": "alterações de estado",
-        "notified": "Notificado",
-        "notDeliveredTo": "{name}: não entregue",
-        "history": "Histórico",
-        "last2h": "últimas 2h",
-        "lastSpan": "último {span}",
-        "viewAll": "Ver tudo",
-        "historyEmpty": "Nenhuma execução neste intervalo.",
-        "historyFailed": "Não foi possível carregar o histórico.",
-        "barFiring": "{span} disparado",
-        "barOk": "{span} ok",
-        "barUnknown": "{span} não lido",
-        "eventStarted": "Começou a disparar",
-        "eventRecovered": "Recuperado",
-        "eventNotified": "Notificado",
-        "eventNotifiedTo": "Notificado {names}",
-        "eventFailed": "Não entregue",
-        "eventFailedTo": "Não entregue a {names}",
-        "soFar": "{span} até agora",
-        "lasted": "durou {span}",
-        "okFor": "ok durante {span}"
-      },
-      "chipCount": "{label} {count}",
-      "chipFiring": "Disparado",
-      "chipAcked": "Reconhecido",
-      "chipMuted": "Silenciado",
-      "chipFailed": "Não entregue",
-      "searchPlaceholder": "Pesquisar alertas",
-      "priorityAll": "Prioridade",
-      "priorityLabel": "Prioridade",
-      "priorityUnset": "Sem prioridade",
-      "folderAll": "Pasta: todas",
-      "folderLabel": "Pasta",
-      "stale": "desatualizado",
-      "refreshFailed": "Não foi possível atualizar os alertas disparados ({reason}). A mostrar dados de {time}.",
-      "refreshFailedReason": "o pedido falhou",
-      "statusUnavailable": "O estado dos alertas não está disponível neste momento, pelo que não é possível mostrar os alertas disparados.",
-      "retry": "Tentar novamente",
-      "columnPriority": "Prioridade",
-      "columnState": "Estado",
-      "columnAlert": "Alerta",
-      "columnFolder": "Pasta",
-      "columnFiringFor": "Disparado há",
-      "acknowledgeCount": "Reconhecer {count}",
-      "mute": "Silenciar",
-      "clear": "Limpar",
-      "emptyFiring": "Nada disparado",
-      "emptyAcked": "Nada reconhecido",
-      "emptyMuted": "Nada silenciado",
-      "emptyFailed": "Nada por entregar"
-    },
     "moreActions": "Mais ações",
     "promRuleMode": "Modo de regra",
     "promRulePreview": "{count} séries devolvidas correspondem agora. Cada série deve completar o período pendente antes de disparar.",
@@ -12882,6 +12786,9 @@
         "alertStartTimeMillis": "Hora de início da janela em milissegundos epoch",
         "alertEndTimeMillis": "Hora de fim da janela em milissegundos epoch",
         "alertUrl": "Ligação de volta ao OpenObserve para investigar",
+        "alertUrlLabel": "Etiqueta da ligação principal, por exemplo \"View logs\"",
+        "alertDetailUrl": "Ligação para a página do alerta que enviou esta mensagem. Vazia quando a ligação principal já abre essa página.",
+        "alertDetailLabel": "Etiqueta dessa ligação, por exemplo \"Open alert\". Vazia quando a ligação está vazia.",
         "alertTriggerTime": "Quando o alerta foi acionado (ISO 8601)",
         "alertTriggerTimeMillis": "Hora de acionamento em epoch millis",
         "alertTriggerTimeSeconds": "Hora de acionamento em epoch segundos",
@@ -13415,7 +13322,10 @@
       "chartUnavailable": "Nenhum gráfico disponível para a consulta deste alerta.",
       "eventCount": "Eventos",
       "notFoundTitle": "Alerta não encontrado",
-      "notFoundDescription": "Este alerta já não existe, ou não tem acesso a ele. Pode ter sido eliminado."
+      "notFoundDescription": "Este alerta já não existe, ou não tem acesso a ele. Pode ter sido eliminado.",
+      "noAccessTitle": "Não tem acesso a este alerta",
+      "noAccessDescription": "Peça a um administrador permissão para ler os alertas desta pasta.",
+      "loadFailedTitle": "Não foi possível carregar este alerta"
     },
     "timeLabel": "Hora",
     "unknownHttpStatus": "Desconhecido",
@@ -14472,6 +14382,10 @@
     "insertVariable": "Inserir variável",
     "moreVariables": "+{count} mais",
     "viewAlertLinkLabel": "Ver no OpenObserve",
+    "variableAlertUrlLabelDescription": "Etiqueta da ligação principal, por exemplo \"View logs\"",
+    "variableAlertDetailUrlDescription": "Ligação para a página do alerta que enviou esta mensagem. Vazia quando a ligação principal já abre essa página.",
+    "variableAlertDetailLabelDescription": "Etiqueta dessa ligação, por exemplo \"Open alert\". Vazia quando a ligação está vazia.",
+    "slackLinksNotShown": "{count} ligação não é mostrada como botão: {links} | {count} ligações não são mostradas como botões: {links}",
     "moveUp": "Mover para cima",
     "moveDown": "Mover para baixo",
     "fieldLabel": "Rótulo",
@@ -22895,6 +22809,8 @@
       "noResults": "Nenhum ícone corresponde à sua pesquisa",
       "groups": {
         "results": "Resultados",
+        "icons": "Ícones",
+        "monoLogos": "Logótipos",
         "status": "Estado",
         "services": "Serviços",
         "ai": "IA",
@@ -23396,11 +23312,6 @@
       "failedToLoadToolset": "Falha ao carregar o conjunto de ferramentas"
     },
     "alerts": {
-      "firing": {
-        "bulkResult": "{acked} reconhecidos, {skipped} ignorados",
-        "bulkResultFailed": "{acked} reconhecidos, {skipped} ignorados, {failed} falhados",
-        "bulkAllAcked": "{acked} reconhecidos"
-      },
       "failedToNavigateToAlert": "Falha ao navegar para o alerta",
       "alertNotFound": "Alerta não encontrado",
       "failedToLoadAlerts": "Falha ao carregar alertas",
@@ -28518,7 +28429,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Passo 0 · Pré-requisitos do servidor",
+      "title": "Passo 1 · Pré-requisitos do servidor",
       "subtitle": "Verificados neste servidor antes de qualquer trabalho no Slack",
       "columnSetting": "Definição",
       "columnResult": "Resultado",
@@ -28589,7 +28500,7 @@
       "back": "Retroceder",
       "finish": "Concluir",
       "connection": {
-        "title": "Passo 1 · Ligação",
+        "title": "Passo 2 · Ligação",
         "description": "A verificação chega ao Slack a partir deste servidor através do mesmo caminho de código que a produção utiliza.",
         "allPassed": "O Slack está acessível a partir deste servidor",
         "someFailed": "O Slack não está acessível a partir deste servidor. Permita *.slack.com através do seu proxy ou firewall e, em seguida, clique em Verificar novamente.",
@@ -28598,7 +28509,7 @@
         "socketHost": "Host WebSocket {host}"
       },
       "create": {
-        "title": "Passo 2 · Criar a aplicação",
+        "title": "Passo 3 · Criar a aplicação",
         "modeLabel": "Modo de ligação",
         "socket": "Modo Socket",
         "socketDescription": "Recomendado. O OpenObserve abre a ligação, pelo que o Slack não precisa de um URL público",
@@ -28627,7 +28538,7 @@
         "signingSecretRequired": "O modo HTTP requer o segredo de assinatura"
       },
       "install": {
-        "title": "Passo 3 · Instalação",
+        "title": "Passo 4 · Instalação",
         "created": "Aplicação criada · {appId}",
         "allowHint": "Abre o ecrã de instalação do Slack: clique em Permitir nesse ecrã. O token do bot é devolvido automaticamente pelo Slack; não há nada para copiar.",
         "allow": "Permitir no Slack",
@@ -28650,7 +28561,7 @@
         "appNotCreatedByO2": "O OpenObserve não criou esta aplicação, por isso ela permanece no Slack. Elimine-a no Slack se já não precisar dela."
       },
       "test": {
-        "title": "Passo 4 · Teste e associação",
+        "title": "Passo 5 · Teste e associação",
         "run": "Executar verificações",
         "signIn": "Testar início de sessão com o Slack",
         "signInPassed": "O início de sessão com o Slack funciona",

@@ -13,7 +13,10 @@ export const compareKeys = [
   "cmpImgA",
   "cmpImgB",
 ];
-export const panelKeys = ["panel", "panelSvc", "panelWhere"];
+// A dependency panel adds its kind and system, since a service and dependencies can share a name.
+export const PANEL_KIND_KEY = "panelKind";
+export const PANEL_SYSTEM_KEY = "panelSystem";
+export const panelKeys = ["panel", "panelSvc", "panelWhere", PANEL_KIND_KEY, PANEL_SYSTEM_KEY];
 export const queryText = (value: LocationQuery[string]) => (typeof value === "string" ? value : "");
 export function withoutKeys(query: LocationQuery, keys: string[]): LocationQueryRaw {
   return Object.fromEntries(Object.entries(query).filter(([key]) => !keys.includes(key)));

@@ -76,7 +76,7 @@ export class AlertManagement {
     }
 
     async openAlertListAndSearch(search, org = getOrgIdentifier()) {
-        await this.page.goto(`/web/alerts?org_identifier=${org}&folder=default`);
+        await this.page.goto(`/web/alerts?org_identifier=${org}&folder=default&state=all`);
         await this.searchAlert(search);
     }
 
@@ -520,7 +520,7 @@ export class AlertManagement {
 
         if (!isVisible) {
             const orgName = process.env["ORGNAME"] || 'default';
-            const alertsUrl = `/web/alerts?org_identifier=${orgName}`;
+            const alertsUrl = `/web/alerts?org_identifier=${orgName}&state=all`;
             await this.page.goto(alertsUrl);
             await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
             await this.page.waitForTimeout(2000);

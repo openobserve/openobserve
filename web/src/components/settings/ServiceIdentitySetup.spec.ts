@@ -247,6 +247,7 @@ describe("ServiceIdentitySetup", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+    queryClient.clear();
   });
 
   describe("initial render", () => {
@@ -261,6 +262,31 @@ describe("ServiceIdentitySetup", () => {
       expect(serviceStreamsService.getDimensionAnalytics).toHaveBeenCalledWith("test-org");
       expect(serviceStreamsService.getIdentityConfig).toHaveBeenCalledWith("test-org");
     });
+
+    it("reads analytics once when the page's semantic groups land during the first load", async () => {
+      wrapper = mountComponent();
+      await wrapper.setProps({ semanticGroups: [] });
+      await flushPromises();
+      expect(serviceStreamsService.getDimensionAnalytics).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads analytics again when a mapping is saved while the first read is in flight", async () => {
+      const summary = { dimensions: [], available_groups: [], service_field_sources: [] };
+      const saved = { group_id: "new-field", display_name: "New field", dimensions: [] };
+      let finishFirst: (value: unknown) => void = () => {};
+      vi.mocked(serviceStreamsService.getDimensionAnalytics)
+        .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)) as never)
+        .mockResolvedValueOnce({ data: { ...summary, available_groups: [saved] } } as never);
+      wrapper = mountComponent();
+      await flushPromises();
+      void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all("test-org") });
+      await wrapper.setProps({ semanticGroups: [saved] });
+      finishFirst({ data: summary });
+      await flushPromises();
+      expect((wrapper.vm as any).availableGroups.map((g: any) => g.group_id)).toEqual([
+        "new-field",
+      ]);
+    });
   });
 
   describe("loading state", () => {
@@ -268,8 +294,6 @@ describe("ServiceIdentitySetup", () => {
       // Before flushPromises the component is in loading=true state; the v-else
       // block containing the main content should not be present yet.
       wrapper = mountComponent();
-      // The save button and the add-distinguish-btn are both inside the v-else block
-      expect(wrapper.find('[data-test="service-identity-save-btn"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="service-identity-add-distinguish-btn"]').exists()).toBe(
         false,
       );
@@ -286,30 +310,26 @@ describe("ServiceIdentitySetup", () => {
     });
   });
 
-  describe("save button", () => {
-    it("should render the save button when at least one identity set is configured", async () => {
-      // The save button is inside the v-else block that renders when allConfiguredEnvs.length > 0
+  // The page's save bar drives this tab through the exposed state, save and discard.
+  describe("page save bar contract", () => {
+    it("reports a changed draft as dirty and discard puts the saved configuration back", async () => {
       vi.mocked(serviceStreamsService.getIdentityConfig).mockResolvedValueOnce({
         data: {
-          sets: [
-            {
-              id: "k8s",
-              label: "Kubernetes",
-              distinguish_by: ["k8s-namespace"],
-            },
-          ],
+          sets: [{ id: "k8s", label: "Kubernetes", distinguish_by: ["k8s-namespace"] }],
           tracked_alias_ids: ["k8s-namespace"],
         },
       });
       wrapper = mountComponent();
       await flushPromises();
-      expect(wrapper.find('[data-test="service-identity-save-btn"]').exists()).toBe(true);
-    });
+      const vm = wrapper.vm as any;
+      expect(vm.isDirty).toBe(false);
 
-    it("should not render save button while data is still loading", () => {
-      wrapper = mountComponent();
-      // loading=true: v-else branch (which contains the save btn) is hidden
-      expect(wrapper.find('[data-test="service-identity-save-btn"]').exists()).toBe(false);
+      vm.serviceOptional = true;
+      vm.setDistinguishBy = { k8s: ["k8s-namespace", "k8s-cluster"] };
+      expect(vm.isDirty).toBe(true);
+
+      vm.discardChanges();
+      expect(vm.isDirty).toBe(false);
     });
   });
 
@@ -446,11 +466,7 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      const servicesLink = wrapper
-        .findAll("a.config-link-btn")
-        .find((el) => el.text().includes("Go to Services"));
-      expect(servicesLink).toBeDefined();
-      await servicesLink!.trigger("click");
+      await wrapper.find('[data-test="service-identity-go-to-services"]').trigger("click");
 
       expect(wrapper.emitted("navigate-to-services")).toBeTruthy();
     });
@@ -550,7 +566,7 @@ describe("ServiceIdentitySetup", () => {
       ]);
     });
 
-    it("counts the service card out of the discovered services, by display name", async () => {
+    it("counts the service card out of the discovered services, by display name and qualifier", async () => {
       queryClient.clear();
       const response = analytics();
       Object.assign(response.data.dimensions[0], {
@@ -563,14 +579,15 @@ describe("ServiceIdentitySetup", () => {
           { service_name: row.service_name, display_name: row.display_name },
           { service_name: "legacy-key", display_name: row.display_name },
           { service_name: "nats" },
+          { service_name: "nats-eu", display_name: "nats", display_qualifier: "eu" },
         ],
       } as any);
       wrapper = mountComponent();
       await flushPromises();
       (wrapper.vm as any).openInsightDialog(row.service_name, "primary");
       await flushPromises();
-      expect((wrapper.vm as any).insightData.total).toBe(2);
-      expect((wrapper.vm as any).insightData.coverage).toBe(50);
+      expect((wrapper.vm as any).insightData.total).toBe(3);
+      expect((wrapper.vm as any).insightData.coverage).toBe(33);
       queryClient.clear();
     });
 

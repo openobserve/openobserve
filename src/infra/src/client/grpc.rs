@@ -638,6 +638,12 @@ mod tests {
             ) -> Result<Response<Self::DataStream>, Status> {
                 Ok(Response::new(futures::stream::empty()))
             }
+            async fn wal_min_ts(
+                &self,
+                _: Request<cluster_rpc::WalMinTsRequest>,
+            ) -> Result<Response<cluster_rpc::WalMinTsResponse>, Status> {
+                Err(Status::unimplemented("wal_min_ts"))
+            }
         }
         #[derive(Debug)]
         struct Peer(String);
@@ -853,6 +859,12 @@ mod tests {
                 _: Request<cluster_rpc::MetricsQueryRequest>,
             ) -> Result<Response<Self::DataStream>, Status> {
                 Ok(Response::new(futures::stream::empty()))
+            }
+            async fn wal_min_ts(
+                &self,
+                _: Request<cluster_rpc::WalMinTsRequest>,
+            ) -> Result<Response<cluster_rpc::WalMinTsResponse>, Status> {
+                Err(Status::unimplemented("wal_min_ts"))
             }
         }
         struct Visitor<'a>(&'a mut Fields);
