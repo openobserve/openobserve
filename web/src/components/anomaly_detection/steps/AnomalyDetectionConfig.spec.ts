@@ -33,6 +33,7 @@ import { computed, nextTick, reactive, ref } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import streamService from "@/services/stream";
 
@@ -1038,6 +1039,32 @@ describe("AnomalyDetectionConfig", () => {
 
     it("defaults a new config to 28 days", () => {
       expect(anomalyDetectionConfigDefaults(undefined).training_window_days).toBe(28);
+    });
+  });
+
+  describe("Measure and Learn from sentences — each part writes its saved field", () => {
+    it.each([
+      ["anomaly-measure-row", "anomaly-detection-function", "detection_function", "sum"],
+      [
+        "anomaly-measure-row",
+        "anomaly-detection-function-field",
+        "detection_function_field",
+        "took",
+      ],
+      ["anomaly-measure-row", "anomaly-histogram-interval-value", "histogram_interval_value", 15],
+      ["anomaly-measure-row", "anomaly-histogram-interval-unit", "histogram_interval_unit", "h"],
+      ["anomaly-training-window-row", "anomaly-training-window", "training_window_days", 14],
+    ])("%s: %s writes %s", async (row, part, field, value) => {
+      const { wrapper: w, config } = mountReturning({ detection_function: "avg" });
+      wrapper = w;
+      await flushPromises();
+      const control = wrapper.find(`[data-test="${row}"] [data-test="${part}"]`);
+
+      if (typeof value === "number") await control.find("input").setValue(String(value));
+      else control.findComponent(OSelect).vm.$emit("update:modelValue", value);
+      await flushPromises();
+
+      expect((config as Record<string, unknown>)[field]).toBe(value);
     });
   });
 

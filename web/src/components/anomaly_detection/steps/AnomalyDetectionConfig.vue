@@ -178,55 +178,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!sectionTargets?.anomalyCondition"
         >
           <OSettingRow
-            v-if="queryMode === 'filters'"
-            :label="t('alerts.detectionFunction')"
-            :info="t('alerts.anomaly.detectionFunctionTooltip')"
-            required
+            :label="t('alerts.form.anomaly.measure')"
             fill
-            data-test="anomaly-detection-function-row"
+            data-test="anomaly-measure-row"
           >
-            <!-- items-start: the field select grows downward with its own error, so centring would shift its neighbour. -->
-            <div class="flex flex-wrap items-start gap-2">
-              <OFormSelect
-                name="detection_function"
-                :options="detectionFunctions"
-                :aria-label="t('alerts.detectionFunction')"
-                data-test="anomaly-detection-function"
-                class="alert-v3-select max-w-27.5 min-w-27.5"
-                @update:model-value="onDetectionFunctionChange"
-              />
-              <OFormSelect
-                v-if="detectionFunction && detectionFunction !== 'count'"
-                name="detection_function_field"
-                :options="filteredDetectionFields"
-                :placeholder="
-                  detectionFunctionField ? raw('') : t('alerts.anomaly.fieldPlaceholder')
-                "
-                :loading="loadingFields"
-                :aria-label="t('alerts.anomaly.detectionFunctionField')"
-                data-test="anomaly-detection-function-field"
-                class="alert-v3-select max-w-50 min-w-35"
-              >
-                <template #empty>
-                  <div class="text-muted-foreground px-3 py-2">
-                    {{
-                      config.stream_name
-                        ? t("alerts.anomaly.noFieldsFound")
-                        : t("alerts.anomaly.selectStreamFirst")
-                    }}
-                  </div>
+            <!-- items-start: a part grows downward with its own error, so centring would shift its neighbours. -->
+            <div class="text-text-body flex flex-wrap items-start gap-2 text-sm">
+              <template v-if="queryMode === 'filters'">
+                <OFormSelect
+                  name="detection_function"
+                  :options="detectionFunctions"
+                  :aria-label="t('alerts.detectionFunction')"
+                  data-test="anomaly-detection-function"
+                  class="alert-v3-select max-w-27.5 min-w-27.5"
+                  @update:model-value="onDetectionFunctionChange"
+                />
+                <template v-if="detectionFunction && detectionFunction !== 'count'">
+                  <span class="flex min-h-8.5 items-center">{{ t("alerts.form.anomaly.of") }}</span>
+                  <OFormSelect
+                    name="detection_function_field"
+                    :options="filteredDetectionFields"
+                    :placeholder="
+                      detectionFunctionField ? raw('') : t('alerts.anomaly.fieldPlaceholder')
+                    "
+                    :loading="loadingFields"
+                    :aria-label="t('alerts.anomaly.detectionFunctionField')"
+                    data-test="anomaly-detection-function-field"
+                    class="alert-v3-select max-w-50 min-w-35"
+                  >
+                    <template #empty>
+                      <div class="text-muted-foreground px-3 py-2">
+                        {{
+                          config.stream_name
+                            ? t("alerts.anomaly.noFieldsFound")
+                            : t("alerts.anomaly.selectStreamFirst")
+                        }}
+                      </div>
+                    </template>
+                  </OFormSelect>
                 </template>
-              </OFormSelect>
-            </div>
-          </OSettingRow>
-          <OSettingRow
-            :label="t('alerts.anomaly.detectionResolution')"
-            :info="t('alerts.anomaly.detectionResolutionTooltip')"
-            required
-            fill
-            data-test="anomaly-detection-resolution-row"
-          >
-            <div class="flex items-center gap-2">
+              </template>
+              <code
+                v-else
+                class="flex min-h-8.5 items-center"
+                data-test="anomaly-measure-sql-value"
+                >{{ raw("value") }}</code
+              >
+              <span class="flex min-h-8.5 items-center">{{ t("alerts.form.anomaly.per") }}</span>
               <OFormInput
                 name="histogram_interval_value"
                 type="number"
@@ -235,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('alerts.anomaly.detectionResolution')"
                 data-test="anomaly-histogram-interval-value"
               >
-                <!-- Message rendered below at pair width — see histogramIntervalError. -->
+                <!-- Message rendered below at row width — see histogramIntervalError. -->
                 <template #error />
               </OFormInput>
               <OFormSelect
@@ -362,13 +360,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!sectionTargets?.anomalyTraining"
         >
           <OSettingRow
-            :label="t('alerts.trainingWindow')"
-            :info="t('alerts.anomaly.trainingWindowTooltip')"
-            required
+            :label="t('alerts.form.anomaly.learnFrom')"
+            :description="t('alerts.form.anomaly.trainingWindow')"
             fill
             data-test="anomaly-training-window-row"
           >
-            <div class="flex flex-wrap items-start gap-2">
+            <div class="text-text-body flex flex-wrap items-start gap-2 text-sm">
+              <span class="flex min-h-8.5 items-center">{{
+                t("alerts.form.anomaly.theLast")
+              }}</span>
               <OFormInput
                 name="training_window_days"
                 type="number"
