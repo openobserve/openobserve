@@ -32,6 +32,8 @@ export class RumPage {
         this.prettyLoadingText = page.getByText('Translating stack trace with source maps...');
         this.prettyUnavailableText = page.getByText('Source Maps Not Available');
         this.prettyTranslateFailedText = page.getByText(/Unable to translate stack trace/i);
+        this.prettyMobileUnsupportedState = page.locator('[data-test="rum-pretty-stack-trace-mobile-unsupported"]');
+        this.prettyUploadSourceMapsBtn = this.prettyUnavailableState.getByRole('button', { name: 'Upload Source Maps' });
 
         this.traceCard = page.locator('[data-test="error-viewer-trace-correlation"]');
         this.traceCardViewDetailsBtn = page.locator('[data-test="trace-correlation-card-view-details-btn"]');
@@ -377,6 +379,19 @@ export class RumPage {
     /** The translating spinner must be gone (not hung). */
     async expectPrettyLoadingResolved(timeoutMs = 30000) {
         await expect(this.prettyLoadingText).toHaveCount(0, { timeout: timeoutMs });
+    }
+
+    /** iOS and Android errors: JS source maps cannot help, so no upload is offered. */
+    async expectPrettyMobileUnsupported(timeoutMs = 30000) {
+        await expect(this.prettyMobileUnsupportedState).toBeVisible({ timeout: timeoutMs });
+        await expect(this.prettyMobileUnsupportedState).toContainText('Source maps do not apply to iOS and Android errors');
+        await expect(this.prettyUnavailableState).toHaveCount(0);
+        await expect(this.prettyUploadSourceMapsBtn).toHaveCount(0);
+    }
+
+    async expectPrettyUploadOffered(timeoutMs = 30000) {
+        await expect(this.prettyUploadSourceMapsBtn).toBeVisible({ timeout: timeoutMs });
+        await expect(this.prettyMobileUnsupportedState).toHaveCount(0);
     }
 
 }

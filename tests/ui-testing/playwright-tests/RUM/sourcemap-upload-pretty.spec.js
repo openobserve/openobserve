@@ -423,3 +423,43 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', () => {
     await pm.rumPage.expectPrettyLoadingResolved();
   });
 });
+
+test.describe('Pretty stack trace for mobile RUM errors (#16460)', () => {
+  test.beforeEach(async ({}, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+  });
+
+  test('iOS and Android errors show that source maps do not apply and offer no upload; a browser error still does', {
+    tag: ['@rum', '@sourcemapPretty', '@ui', '@P1'],
+  }, async ({ page }) => {
+    test.setTimeout(240000);
+    const pm = new PageManager(page);
+    const translateCalls = [];
+    page.on('request', (req) => {
+      if (req.url().includes('/sourcemaps/stacktrace')) translateCalls.push(req.url());
+    });
+
+    // The Pretty view keys off the event's top-level `source`, which the iOS and Android SDKs set.
+    const cases = [
+      { source: 'ios', service: `e2e-smap-ios-${RUN_ID}`, file: `main.ios-${RUN_ID}.js` },
+      { source: 'android', service: `e2e-smap-android-${RUN_ID}`, file: `main.android-${RUN_ID}.js` },
+      { source: 'browser', service: `e2e-smap-web-${RUN_ID}`, file: `main.web-${RUN_ID}.js` },
+    ];
+    for (const c of cases) {
+      await ingestFixtureErrors(page, [{ ...fixtureErrorEvent('typeError', c.service, 0, c.file), source: c.source }], c.service);
+    }
+
+    for (const c of cases.filter((m) => m.source !== 'browser')) {
+      await openErrorDetail(pm, c.service);
+      await pm.rumPage.clickPrettyTab();
+      await pm.rumPage.expectPrettyMobileUnsupported();
+      expect(translateCalls, `${c.source}: no stack translation is attempted`).toEqual([]);
+    }
+
+    const web = cases.find((c) => c.source === 'browser');
+    await openErrorDetail(pm, web.service);
+    await pm.rumPage.clickPrettyTab();
+    await pm.rumPage.expectPrettyUploadOffered();
+    expect(translateCalls.length, 'a browser error is still translated').toBeGreaterThan(0);
+  });
+});
