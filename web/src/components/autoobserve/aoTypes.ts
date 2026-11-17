@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nKey, I18nText } from "@/types/i18n";
-import type { AutoObserveCellState } from "@/services/autoobserve";
+import type { AutoObserveCellState, AutoObserveCoverageRow } from "@/services/autoobserve";
 import type { UnfoldCard } from "./unfold.types";
 
 export type HypothesisVerdict = "confirmed" | "ruled_out" | "open";
@@ -122,6 +122,10 @@ export interface CoverageRow {
   detectors?: number;
   // Live preview only: the engine row's identity, which the drawer's charts scope their queries by.
   identity?: LiveIdentity;
+  // Live preview only: events an hour over the streams the service owns; null when they are shared.
+  traffic?: number | null;
+  // Live preview only: the engine row a review list drafts the service's alerts from.
+  engine?: AutoObserveCoverageRow;
 }
 
 export interface LiveIdentity {

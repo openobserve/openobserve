@@ -113,6 +113,8 @@ export interface BulkReviewRequest {
   kind: BulkKind;
   rows: BulkRow[];
   title?: string;
+  /** The batched opener whose passed-over rows this review records; other reviews record none. */
+  batch?: string;
 }
 
 export interface FolderRef {
@@ -183,6 +185,11 @@ const state = reactive({
   existing: null as ExistingCheck,
   opener: null as HTMLElement | null,
 });
+
+// Rows a closed review left unticked or unbuildable, so a batched opener can offer the next ones.
+const passed = reactive(new Set<string>());
+const passKey = (org: string, batch: string, key: string): string =>
+  [org, batch, key].join("\u0000");
 
 // An older server has no such route: the rights stay unknown and the create itself refuses.
 const servedRights: RightsSource = (org) =>
@@ -281,6 +288,10 @@ export const usuallyFor = (
   kind: BulkKind,
   trafficPerHour: number | null | undefined,
 ): number | null => (kind === "no_data" ? (trafficPerHour ?? null) : null);
+
+// A failed read says nothing about the row, so a batched opener offers it again.
+const lookupFailed = (row: ReviewRow): boolean =>
+  row.block?.code === "existsFailed" || row.block?.code === "schemaFailed";
 
 const positive = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
@@ -610,6 +621,10 @@ const collapseDefaults = (): void => {
   );
 };
 
+/** Whether this session closed a review of `org`'s `batch` with the row unticked or unbuildable. */
+export const wasPassed = (org: string, batch: string, key: string): boolean =>
+  passed.has(passKey(org, batch, key));
+
 /** Opens the one review drawer; a no-op on builds without enterprise. */
 export const openBulkReview = (request: BulkReviewRequest): void => {
   if (config.isEnterprise !== "true" || request.rows.length === 0) return;
@@ -640,6 +655,17 @@ const stopLoads = (): void => {
 
 /** Closes the drawer and stops its loads, so no seven-day query runs for a review nobody sees. */
 export const closeBulkReview = (): void => {
+  const batch = state.request?.batch;
+  if (state.open && batch) {
+    const rows = reviewRows.value;
+    // A review of rows all passed before is a batch that started over, so a new round begins.
+    if (rows.every((row) => passed.has(passKey(state.org, batch, row.key))))
+      for (const key of passed)
+        if (key.startsWith(passKey(state.org, batch, ""))) passed.delete(key);
+    for (const row of rows)
+      if (!lookupFailed(row) && (!state.ticked.has(row.key) || !isAddable(row)))
+        passed.add(passKey(state.org, batch, row.key));
+  }
   state.open = false;
   stopLoads();
 };

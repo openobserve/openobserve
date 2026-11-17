@@ -389,6 +389,8 @@ const toRow = (
       trafficPerHour: row.traffic_per_hour ?? null,
     },
     status: { state, label: coverageWord(t, state) },
+    traffic: row.traffic_per_hour ?? null,
+    engine: row,
     extra: EXTRA_CLASSES.map((cls) => {
       const label = t(CLASS_LABEL[cls]);
       return { key: cls, label, cell: toCell(t, row.cells[cls], label, locale) };
