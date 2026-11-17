@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :sql-templates="sqlTemplates"
               @sql-stream-change="onSqlStreamChange"
               @open-spans-sql="onOpenSpansSql"
+              @sql-examples-open="(open: boolean) => (sqlExamplesOpen = open)"
             />
           </div>
         </template>
@@ -195,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="traces-search-error-message"
                         class="bg-card-glass-bg flex h-full flex-col"
                       >
-                        <!-- D4: the RED strip keeps its place above a failed query, each panel with its own state. -->
+                        <!-- The RED strip keeps its place above a failed query, each panel with its own state. -->
                         <TracesMetricsDashboard
                           v-if="searchObj.meta.sqlMode && searchObj.meta.searchMode === 'spans'"
                           v-show="searchObj.meta.showHistogram"
@@ -265,28 +266,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           illustration="query"
                           variant="neutral"
                           size="hero"
-                          :title="t('traces.sqlMode.statementInTraces.title')"
+                          :title="
+                            subqueryInTraces
+                              ? t('traces.sqlMode.statementInTraces.subqueryTitle')
+                              : t('traces.sqlMode.statementInTraces.title')
+                          "
                           :description="t('traces.sqlMode.statementInTraces.description')"
                           :action-label="t('traces.sqlMode.openInSpans')"
                           @action="onOpenStatementInSpans"
                         />
                       </div>
-                      <div
+                      <TracesSqlAwaitingRun
                         v-else-if="!searchObj.loadingStream && sqlAwaitingRun"
-                        class="bg-card-glass-bg h-full"
-                        data-test="traces-sql-awaiting-run"
-                      >
-                        <OEmptyState
-                          illustration="query"
-                          variant="neutral"
-                          size="hero"
-                          :title="t('traces.sqlMode.awaitingRun.spansTitle')"
-                          :description="t('traces.sqlMode.awaitingRun.description')"
-                          :action-label="t('emptyState.noQueryApplied.action')"
-                          action-icon="play-arrow"
-                          @action="() => searchData()"
-                        />
-                      </div>
+                        :show-charts="!!searchObj.meta.showHistogram"
+                        @run="() => searchData()"
+                      />
                       <div
                         v-else-if="
                           !searchObj.loadingStream &&
@@ -444,6 +438,9 @@ import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { applyFilterTerm } from "@/utils/traces/filterUtils";
 import {
   analyzeTracesSql,
+  buildTracesSql,
+  filterHasSubquery,
+  hasOwnCondition,
   insertTraceIdColumn,
   isRowQuery,
   mergesAcrossPartitions,
@@ -451,9 +448,11 @@ import {
   tracesFilterFromSql,
 } from "@/utils/traces/tracesSql";
 import { useTracesSqlTemplates } from "./composables/useTracesSqlTemplates";
+import { createStreamingHits } from "@/utils/traces/streamingHits";
 import { fieldsStoredInAll } from "@/utils/traces/tracesAllFields";
 import TracesSqlTemplateGallery from "./components/TracesSqlTemplateGallery.vue";
 import TracesSqlKeptLine from "./components/TracesSqlKeptLine.vue";
+import TracesSqlAwaitingRun from "./components/TracesSqlAwaitingRun.vue";
 import TracesSqlErrorState from "./components/TracesSqlErrorState.vue";
 import { ONE_HOUR_US } from "@/utils/traces/tracesSqlErrors";
 import {
@@ -611,19 +610,38 @@ watch([filterBuilderGrowth, isMobile], ([growth, mobile]) => {
   }
   autoSplitterHeight = target;
 });
-watch(scopeRowPx, (px, was) => {
-  splitterModel.value += px - was;
-  if (autoSplitterHeight) autoSplitterHeight += px - was;
-  onSplitterUpdate();
-});
+// The height multi-line SQL grew the bar to; null once the bar is back at its own height or was dragged.
+let sqlBarGrownTo: number | null = null;
+// Sync: the builder and SQL-line watchers read the new Scope row, so the heights they compare must already include it.
+watch(
+  scopeRowPx,
+  (px, was) => {
+    splitterModel.value += px - was;
+    if (sqlBarGrownTo !== null) sqlBarGrownTo += px - was;
+    if (autoSplitterHeight) autoSplitterHeight += px - was;
+    onSplitterUpdate();
+  },
+  { flush: "sync" },
+);
 const SQL_BAR_MAX_LINES = 6;
 const EDITOR_LINE_PX = 18;
 watch(
   () => (searchObj.meta.sqlMode ? String(searchObj.data.editorValue ?? "").split("\n").length : 0),
   (lines) => {
-    const fit = 90 + scopeRowPx() + (Math.min(lines, SQL_BAR_MAX_LINES) - 2) * EDITOR_LINE_PX;
-    if (splitterModel.value >= fit) return;
+    const base = 90 + scopeRowPx();
+    const fit = base + (Math.min(Math.max(lines, 2), SQL_BAR_MAX_LINES) - 2) * EDITOR_LINE_PX;
+    if (splitterModel.value < fit) {
+      splitterModel.value = fit;
+      sqlBarGrownTo = fit;
+      onSplitterUpdate();
+      return;
+    }
+    // Shrinks back only what SQL grew, so a bar the reader dragged keeps its height.
+    if (sqlBarGrownTo === null || splitterModel.value !== sqlBarGrownTo || fit >= sqlBarGrownTo) {
+      return;
+    }
     splitterModel.value = fit;
+    sqlBarGrownTo = fit > base ? fit : null;
     onSplitterUpdate();
   },
 );
@@ -703,6 +721,8 @@ let submittedScope = "";
 let groupsRunId = 0;
 // A Run in the Traces view with a statement in the filter sends nothing and shows this instead.
 const statementInTraces = ref(false);
+// The filter held IN (SELECT ...) rather than a statement, which the card names.
+const subqueryInTraces = ref(false);
 // A link's page applies to the first search after it is read; any later Run starts at page 1.
 let pendingUrlPage: number | null = null;
 let stopUrlSync = syncUrlViewState();
@@ -963,9 +983,11 @@ function dropKeptCount(results: any) {
 
 // Empty SQL waits for a template or typing; a statement in the Traces view filter gets its card instead.
 function runBlocked(): boolean {
-  statementInTraces.value =
-    searchObj.meta.searchMode === "traces" &&
-    isAuthoredStatement(String(searchObj.data.editorValue ?? ""));
+  const text = String(searchObj.data.editorValue ?? "");
+  const inTraces = searchObj.meta.searchMode === "traces";
+  const statement = inTraces && isAuthoredStatement(text);
+  subqueryInTraces.value = inTraces && !statement && filterHasSubquery(text, tracesParser.value);
+  statementInTraces.value = statement || subqueryInTraces.value;
   if (statementInTraces.value) {
     searchObj.data.errorMsg = "";
     return true;
@@ -1334,6 +1356,7 @@ async function getQueryData(
       !!submittedSql &&
       mergesAcrossPartitions(analyzeTracesSql(submittedSql, tracesParser.value));
     if (holdRows) tracesRequestState[searchTraceId].held = [];
+    const hitsStep = createStreamingHits();
 
     const showHits = (
       rawHits: any[],
@@ -1406,6 +1429,7 @@ async function getQueryData(
             }
 
             const rawHits: any[] = response.content?.results?.hits || [];
+            const step = hitsStep(response);
             if (rawHits.length === 0) return;
 
             // // Handle single-trace-id filter: auto-adjust time range on first hit batch
@@ -1429,9 +1453,12 @@ async function getQueryData(
             // }
 
             if (requestState.held) {
-              requestState.held.push(...rawHits);
+              if (step === "replace") requestState.held = [...rawHits];
+              else requestState.held.push(...rawHits);
               return;
             }
+            // A streaming aggregate's new partition is the whole answer so far.
+            if (step === "replace") requestState.hasWritten = false;
             showHits(rawHits, requestState);
           }
         },
@@ -2318,9 +2345,9 @@ const showViewResults = (run: boolean) => {
   if (run) getQueryData();
 };
 
-// The SQL switch in the Traces view: Spans with SQL on, nothing runs, and a way back.
+// The SQL switch in the Traces view: Spans with SQL on, nothing runs, and a way back; with SQL stored it is Back to SQL.
 const onOpenSpansSql = () => {
-  normalizeTracesView("spans", { kind: "sql" });
+  normalizeTracesView("spans", { kind: "sql", stored: true });
   showViewResults(false);
   toast({
     variant: "info",
@@ -2332,16 +2359,22 @@ const onOpenSpansSql = () => {
   });
 };
 
-// Back to SQL from the kept line: the stored SQL text, waiting for Run.
+// Back to SQL from the kept line: the stored SQL text, waiting for Run; a SELECT typed in the filter stays there.
 const onBackToSql = () => {
-  normalizeTracesView("spans", { kind: "sql" });
+  normalizeTracesView("spans", { kind: "sql", stored: true });
   showViewResults(false);
 };
 
-// Open in Spans view from the statement card: the typed text becomes the SQL text, not run.
+// Open in Spans view from the statement card: the typed text, or a SELECT around a subquery filter, becomes the SQL text, not run.
 const onOpenStatementInSpans = () => {
+  const typed = String(searchObj.data.editorValue ?? "");
+  const stream = selectedStreamName.value;
+  const text = subqueryInTraces.value
+    ? buildTracesSql(stream, resolveTracesFilter(typed, tracesParser.value, stream))
+    : typed;
   statementInTraces.value = false;
-  normalizeTracesView("spans", { kind: "sql", text: String(searchObj.data.editorValue ?? "") });
+  subqueryInTraces.value = false;
+  normalizeTracesView("spans", { kind: "sql", text });
   showViewResults(false);
 };
 
@@ -2433,7 +2466,15 @@ watch(sqlEditorEmpty, (empty) => {
   if (empty) sqlRanView.value = null;
 });
 
-const { sqlTemplates } = useTracesSqlTemplates();
+const isStreamSelected = computed(() => {
+  return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
+});
+
+// The Examples menu in the search bar is open, so its templates want service names.
+const sqlExamplesOpen = ref(false);
+const { sqlTemplates } = useTracesSqlTemplates(
+  () => (sqlEditorEmpty.value && isStreamSelected.value) || sqlExamplesOpen.value,
+);
 
 // Results shaped by typed SQL do not describe the filter that replaces it.
 watch(
@@ -2454,10 +2495,6 @@ const showSqlKeptLine = computed(
     isStreamSelected.value &&
     !searchObj.loadingStream,
 );
-
-const isStreamSelected = computed(() => {
-  return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
-});
 
 const onRemoveTracesFilter = () => {
   searchObj.data.editorValue = "";
@@ -2686,6 +2723,16 @@ const buildTracesWhereSQL = (): string => {
   return `SELECT * FROM ${typed?.fromClause || `"${streamName}"`} WHERE ${whereClause}`;
 };
 
+// In SQL mode a tick shows only the conditions the sidebar wrote; typed ones are the user's.
+const ownSqlFieldValues = (exclude: boolean): Record<string, string[]> => {
+  const sql = String(searchObj.data.editorValue ?? "");
+  const result: Record<string, string[]> = {};
+  for (const [field, own] of Object.entries(searchObj.data.stream.sqlFieldConditions ?? {})) {
+    if (own.exclude === exclude && hasOwnCondition(sql, own.text)) result[field] = [...own.values];
+  }
+  return result;
+};
+
 /**
  * Derives which field values are currently *included* in the active query.
  * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
@@ -2696,6 +2743,7 @@ const buildTracesWhereSQL = (): string => {
  * Used to pre-check the corresponding checkboxes (blue) in the field sidebar.
  */
 const activeIncludeFilterValues = computed((): Record<string, string[]> => {
+  if (searchObj.meta.sqlMode) return ownSqlFieldValues(false);
   const result: Record<string, string[]> = {};
   try {
     const fullSql = buildTracesWhereSQL();
@@ -2741,6 +2789,7 @@ const activeIncludeFilterValues = computed((): Record<string, string[]> => {
  * Used to pre-check the corresponding checkboxes (red) in the field sidebar.
  */
 const activeExcludeFilterValues = computed((): Record<string, string[]> => {
+  if (searchObj.meta.sqlMode) return ownSqlFieldValues(true);
   const result: Record<string, string[]> = {};
   try {
     const fullSql = buildTracesWhereSQL();
@@ -2836,7 +2885,7 @@ const onSqlStreamChange = async (stream: string) => {
 };
 
 const onSqlAddTraceId = () => {
-  const sql = insertTraceIdColumn(String(searchObj.data.queryResults?.sql ?? ""));
+  const sql = insertTraceIdColumn(String(searchObj.data.editorValue ?? ""));
   if (!sql) return;
   searchObj.data.editorValue = sql;
   searchBarRef.value?.setEditorValue?.(sql);

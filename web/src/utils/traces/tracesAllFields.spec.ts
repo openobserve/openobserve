@@ -35,6 +35,18 @@ describe("fieldsStoredInAll", () => {
     expect([...inAll.entries()]).toEqual([["http_status_code", "Int64"]]);
   });
 
+  it("lists a user field that only starts like a restored one, as ingestion packs it", () => {
+    const inAll = fieldsStoredInAll(
+      [
+        { name: "infer_service_name", type: "Utf8" },
+        { name: "infer_custom", type: "Utf8" },
+        { name: "o2_db_custom", type: "Utf8" },
+      ],
+      ["trace_id"],
+    );
+    expect([...inAll.keys()]).toEqual(["infer_custom", "o2_db_custom"]);
+  });
+
   it("lists one defined field with three extras as three fields in _all", () => {
     const inAll = fieldsStoredInAll(
       [

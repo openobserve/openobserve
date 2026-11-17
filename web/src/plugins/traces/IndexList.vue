@@ -473,13 +473,15 @@ export default defineComponent({
     const removeFieldFromWhereStr = (
       whereClause: string,
       fieldName: string,
-      qualified = false,
+      typedSql = false,
     ): string => {
       const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       // Typed SQL may qualify a column with its FROM alias, as d.status or "d"."status".
-      const qualifier = qualified ? `(?:(?:"[^"]+"|\\w+)\\.)?` : "";
-      const fieldPattern = new RegExp(`^${qualifier}"?${escaped}"?\\s*[=!<>]`, "i");
-      const multiPattern = new RegExp(`^\\(\\s*${qualifier}"?${escaped}"?\\s*[=!<>]`, "i");
+      const qualifier = typedSql ? `(?:(?:"[^"]+"|\\w+)\\.)?` : "";
+      // In typed SQL, IN and IS cover the conditions a sidebar tick writes.
+      const operator = typedSql ? `\\s*(?:[=!<>]|(?:not\\s+)?in\\b|is\\b)` : `\\s*[=!<>]`;
+      const fieldPattern = new RegExp(`^${qualifier}"?${escaped}"?${operator}`, "i");
+      const multiPattern = new RegExp(`^\\(\\s*${qualifier}"?${escaped}"?${operator}`, "i");
       const remaining = splitOnAnd(whereClause).filter((cond) => {
         const trimmed = cond.trim();
         return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
@@ -489,15 +491,18 @@ export default defineComponent({
 
     const buildFieldValuesSql = (fieldName: string): string => {
       const streamName = searchObj.data.stream.selectedStream.value;
-      // Typed SQL may alias its stream, and its WHERE refers to that alias.
-      const typed = searchObj.meta.sqlMode
+      // Typed SQL may alias its stream; a JOIN's names may belong to either side, and the values API drops a WITH query's WHERE, so both read the stream.
+      const analyzed = searchObj.meta.sqlMode
         ? analyzeTracesSql(searchObj.data.editorValue ?? "", tracesParser.value)
         : null;
+      const typed = analyzed?.join || analyzed?.withClause ? null : analyzed;
       // The whole editor value is the where clause — never split it on "|", the
       // split is quote-unaware and would truncate match_all('text | error').
       const whereClause = typed
         ? typed.where
-        : resolveTracesFilter(searchObj.data.editorValue, tracesParser.value, streamName);
+        : analyzed
+          ? ""
+          : resolveTracesFilter(searchObj.data.editorValue, tracesParser.value, streamName);
 
       let sql = `SELECT * FROM ${typed?.fromClause || `"${streamName}"`}`;
 
@@ -624,22 +629,13 @@ export default defineComponent({
       }
     };
 
-    // The ticked set replaces the field's typed conditions, so a second value is ORed rather than ANDed.
-    const sqlValuesCondition = (fieldName: string, values: string[], action: string) => {
-      const include = action === "include";
-      const parts = values.map((v) =>
-        v === "null"
-          ? `${fieldName} IS ${include ? "" : "NOT "}NULL`
-          : `${fieldName} ${include ? "=" : "!="} '${escapeSingleQuotes(v)}'`,
-      );
-      if (parts.length < 2) return parts[0] ?? "";
-      return include ? `(${parts.join(" OR ")})` : parts.join(" AND ");
-    };
-
     const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
       if (searchObj.meta.sqlMode) {
-        const condition = sqlValuesCondition(fieldName, values, action);
-        if (condition) searchObj.data.stream.sqlFieldFilter = { field: fieldName, condition };
+        searchObj.data.stream.sqlFieldFilter = {
+          field: fieldName,
+          values: [...values],
+          exclude: action !== "include",
+        };
         return;
       }
       const joinOp = action === "include" ? " or " : " and ";

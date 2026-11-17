@@ -45,8 +45,8 @@ export function useTracesSqlTemplateText() {
   return { templateName, templateDescription, groupName, groupedTemplates };
 }
 
-/** The Spans SQL templates for the current stream, with service names read from the stream. */
-export function useTracesSqlTemplates() {
+/** The Spans SQL templates for the current stream; service names are read only while `shown` says the gallery or Examples menu is open. */
+export function useTracesSqlTemplates(shown: () => boolean) {
   const store = useStore();
   const { t } = useI18nTyped();
   const { searchObj } = useTraces();
@@ -84,7 +84,7 @@ export function useTracesSqlTemplates() {
   watch(
     () =>
       [
-        searchObj.meta.sqlMode,
+        searchObj.meta.sqlMode && shown(),
         searchObj.meta.searchMode,
         searchObj.data.stream.selectedStream?.value,
         searchObj.data.datetime?.startTime,

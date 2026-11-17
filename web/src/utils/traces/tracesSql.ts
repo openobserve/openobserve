@@ -38,6 +38,9 @@ export interface TracesSqlInfo {
   distinct: boolean;
   hasLimit: boolean;
   limit: number | null;
+  hasOffset: boolean;
+  /** The WITH clause in front of the main SELECT, as typed; empty without one. */
+  withClause: string;
   fromSubquery: boolean;
   explain: boolean;
   selectNames: string[];
@@ -262,6 +265,8 @@ export function analyzeTracesSql(sql: string, parser: any): TracesSqlInfo {
   const selectNames = selectNamesOf(columns);
 
   const join = hasTop("join");
+  const withClause =
+    firstWord === "with" && selectIdx > 0 ? text.slice(0, top[selectIdx].start).trim() : "";
   return {
     isStatement,
     where,
@@ -276,6 +281,8 @@ export function analyzeTracesSql(sql: string, parser: any): TracesSqlInfo {
     distinct,
     hasLimit: limitIdx >= 0,
     limit,
+    hasOffset: hasTop("offset"),
+    withClause,
     fromSubquery,
     explain,
     selectNames,
@@ -295,6 +302,7 @@ export function isRowQuery(info: TracesSqlInfo): boolean {
     !info.aggregate &&
     !info.distinct &&
     !info.hasLimit &&
+    !info.hasOffset &&
     !info.fromSubquery &&
     info.stream !== null
   );
@@ -466,47 +474,72 @@ export function insertWhereCondition(sql: string, condition: string): string | n
   return `${text.slice(0, first.start)}${kept} AND ${condition}${text.slice(last.end)}`;
 }
 
-/** Swaps the top-level WHERE's value conditions on one field for `condition` (empty removes them); null when nothing changes. */
-export function replaceFieldConditions(
+/** The condition a sidebar tick writes for one field: = or IN for values, IS NULL for the null value. */
+export function fieldValuesCondition(ref: string, values: string[], exclude: boolean): string {
+  const listed = values.filter((v) => v !== "null").map((v) => `'${v.replaceAll("'", "''")}'`);
+  const list =
+    listed.length === 1
+      ? `${ref} ${exclude ? "!=" : "="} ${listed[0]}`
+      : listed.length > 1
+        ? `${ref} ${exclude ? "NOT IN" : "IN"} (${listed.join(",")})`
+        : "";
+  const nulls = values.includes("null") ? `${ref} IS ${exclude ? "NOT " : ""}NULL` : "";
+  if (!list || !nulls) return list || nulls;
+  return `(${list} ${exclude ? "AND" : "OR"} ${nulls})`;
+}
+
+/** True when `own` is a whole top-level AND part of the WHERE, with exactly that text. */
+export function hasOwnCondition(sql: string, own: string): boolean {
+  return ownConditionAt(sql ?? "", own) !== null;
+}
+
+/** Swaps the page's own condition for `next`, or removes it with its AND when `next` is empty; null when it is not there. */
+export function replaceOwnCondition(sql: string, own: string, next: string): string | null {
+  const text = sql ?? "";
+  const found = ownConditionAt(text, own);
+  if (!found) return null;
+  const { whereTok, parts, at } = found;
+  const part = parts[at].tokens;
+  const start = part[0].start;
+  const end = part[part.length - 1].end;
+  if (next) return `${text.slice(0, start)}${next}${text.slice(end)}`;
+  if (parts.length === 1) return `${text.slice(0, whereTok.start).trimEnd()}${text.slice(end)}`;
+  // Only the condition and one AND go, so the typed text around them stays as it was.
+  if (at === 0) return `${text.slice(0, start)}${text.slice(parts[1].tokens[0].start)}`;
+  const before = parts[at - 1].tokens;
+  return `${text.slice(0, before[before.length - 1].end)}${text.slice(end)}`;
+}
+
+/** True when the WHERE names the field anywhere outside the page's own condition. */
+export function fieldHasOtherCondition(
   sql: string,
   field: string,
-  condition: string,
+  own: string,
   ref?: string,
-): string | null {
+): boolean {
+  const clause = topLevelWhere(sql ?? "");
+  if (!clause?.whereTok) return false;
   const text = sql ?? "";
-  const clause = topLevelWhere(text);
-  const parts =
-    clause?.whereTok && !clause.body.some((tok) => tok.depth === 0 && isKeyword(tok, "or"))
-      ? splitTopAnd(clause.body)
-      : [];
-  const spellings = [field, ref ?? ""].filter(Boolean).map(spelling);
-  const families = parts.map((part) => fieldValueFamily(part.tokens, field, spellings));
-  const found = new Set(families.filter(Boolean));
-  if (!clause?.whereTok || found.size === 0) {
-    return condition ? insertWhereCondition(text, condition) : null;
-  }
-  // A typed mix of included and excluded values is the user's own; one tick must not rewrite it.
-  if (found.size > 1 || found.has("mixed")) return null;
-  const first = clause.body[0];
-  const last = clause.body[clause.body.length - 1];
-  const keptAt = families.findIndex((family) => family === null);
-  if (keptAt < 0) {
-    if (condition) return `${text.slice(0, first.start)}${condition}${text.slice(last.end)}`;
-    return `${text.slice(0, clause.whereTok.start).trimEnd()}${text.slice(last.end)}`;
-  }
-  // Only the removed conditions and their AND are cut, so comments and the user's spelling stay.
-  const cuts: [number, number][] = [];
-  if (keptAt > 0) cuts.push([first.start, parts[keptAt].and!.end]);
-  parts.forEach((part, i) => {
-    if (i > keptAt && families[i])
-      cuts.push([part.and!.start, part.tokens[part.tokens.length - 1].end]);
-  });
-  let out = condition ? `${text.slice(0, last.end)} AND ${condition}${text.slice(last.end)}` : text;
-  for (const [start, end] of cuts.reverse()) {
-    const spaced = /\s/.test(out[start - 1] ?? "") && (end >= out.length || /\s/.test(out[end]));
-    out = out.slice(0, spaced ? start - 1 : start) + out.slice(end);
-  }
-  return out;
+  const others = splitTopAnd(clause.body).filter(
+    (part) => text.slice(part.tokens[0].start, part.tokens[part.tokens.length - 1].end) !== own,
+  );
+  const name = field.toLowerCase();
+  const refSpelling = ref ? spelling(ref) : "";
+  return others.some(
+    (part) =>
+      part.tokens.some(
+        (tok) =>
+          (tok.kind === "word" && tok.text.toLowerCase() === name) ||
+          (tok.kind === "quoted" && tok.text === `"${field}"`),
+      ) ||
+      (!!refSpelling && spellingOf(part.tokens).includes(refSpelling)),
+  );
+}
+
+/** A filter holding a subquery, found with the parser so a SELECT inside a string never counts. */
+export function filterHasSubquery(filter: string, parser: any): boolean {
+  if (!filter.trim()) return false;
+  return containsSubquery(parseTracesSql(`SELECT * FROM "t" WHERE ${filter}`, parser).where);
 }
 
 /** True when the top-level GROUP BY is trace_id alone, so each result row is one trace. */
@@ -710,63 +743,26 @@ function spelling(text: string): string {
   return spellingOf(tokenize(text));
 }
 
-type ValueFamily = "include" | "exclude" | "mixed";
-
-// `field = v` / `IS NULL` include, `field != v` / `IS NOT NULL` exclude; a bracketed AND/OR of those takes their family.
-function fieldValueFamily(part: Token[], field: string, spellings: string[]): ValueFamily | null {
-  const close = isPunct(part[0], "(") ? matchingClose(part, part[0]) : undefined;
-  const inner = close === part[part.length - 1] ? part.slice(1, -1) : part;
-  if (inner.length === 0) return null;
-  const depth = inner[0].depth;
-  const atoms: Token[][] = [[]];
-  for (const tok of inner) {
-    if (tok.depth === depth && (isKeyword(tok, "and") || isKeyword(tok, "or"))) atoms.push([]);
-    else atoms[atoms.length - 1].push(tok);
-  }
-  const families = new Set(atoms.map((atom) => fieldValueAtomFamily(atom, field, spellings)));
-  if (families.has(null)) return null;
-  return families.size > 1 ? "mixed" : [...families][0];
+// The WHERE split into top-level AND parts, with the part whose text is exactly `own`; a top-level OR makes no part separable.
+function ownConditionAt(
+  text: string,
+  own: string,
+): { whereTok: Token; parts: { and: Token | null; tokens: Token[] }[]; at: number } | null {
+  const clause = topLevelWhere(text);
+  if (!own || !clause?.whereTok) return null;
+  if (clause.body.some((tok) => tok.depth === 0 && isKeyword(tok, "or"))) return null;
+  const parts = splitTopAnd(clause.body);
+  const at = parts.findIndex(
+    (part) => text.slice(part.tokens[0].start, part.tokens[part.tokens.length - 1].end) === own,
+  );
+  return at < 0 ? null : { whereTok: clause.whereTok, parts, at };
 }
 
-function fieldValueAtomFamily(
-  atom: Token[],
-  field: string,
-  spellings: string[],
-): ValueFamily | null {
-  if (atom.length === 0) return null;
-  const depth = atom[0].depth;
-  const opIdx = atom.findIndex(
-    (tok) =>
-      tok.depth === depth &&
-      (isKeyword(tok, "is") || (tok.kind === "punct" && "=!<>".includes(tok.text))),
-  );
-  if (opIdx <= 0) return null;
-  const lhs = atom.slice(0, opIdx);
-  const named =
-    (lhs.length === 1 || (lhs.length === 3 && isPunct(lhs[1], ".") && nameOf(lhs[0]) !== null)) &&
-    nameOf(lhs[lhs.length - 1]) === field;
-  if (!named && !spellings.includes(spellingOf(lhs))) return null;
-  const rest = atom.slice(opIdx);
-  if (isKeyword(rest[0], "is")) {
-    const negated = isKeyword(rest[1], "not");
-    const tail = rest.slice(negated ? 2 : 1);
-    if (tail.length !== 1 || !isKeyword(tail[0], "null")) return null;
-    return negated ? "exclude" : "include";
-  }
-  const opLen = rest.findIndex((tok) => tok.kind !== "punct");
-  const op = rest
-    .slice(0, opLen)
-    .map((tok) => tok.text)
-    .join("");
-  const value = rest.slice(opLen);
-  const literal =
-    value.length === 1 &&
-    (value[0].kind === "string" ||
-      value[0].kind === "number" ||
-      isKeyword(value[0], "true") ||
-      isKeyword(value[0], "false"));
-  if (!literal || !["=", "!=", "<>"].includes(op)) return null;
-  return op === "=" ? "include" : "exclude";
+function containsSubquery(node: any): boolean {
+  if (!node || typeof node !== "object") return false;
+  if (Array.isArray(node)) return node.some(containsSubquery);
+  if (node.ast || node.type === "select") return true;
+  return Object.values(node).some(containsSubquery);
 }
 
 // Subqueries ("ast") are their own statements, so their aggregates are not this query's.
@@ -1144,7 +1140,7 @@ function joinItem(text: string, tokens: Token[]): JoinItem | null {
   };
 }
 
-// R1 (d) for an inner join on trace_id; (a), the left WHERE alone, for any other join.
+// An inner join on trace_id keeps the left WHERE and the right side as a trace_id subquery; any other join keeps the left WHERE alone.
 function joinSpanSet(
   text: string,
   region: Token[],

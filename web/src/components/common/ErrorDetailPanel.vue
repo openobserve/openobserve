@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default max-h-52 overflow-y-auto border-t px-4 py-3"
         data-test="error-detail-body"
       >
-        <p class="text-text-secondary m-0 font-mono text-xs wrap-break-word whitespace-pre-wrap">
+        <p class="text-text-secondary m-0 font-mono text-xs break-all whitespace-pre-wrap">
           {{ detailBody }}
         </p>
       </div>

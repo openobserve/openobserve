@@ -178,7 +178,7 @@ const mockSearchObj: any = {
       ],
       filterField: "",
       addToFilter: "",
-      sqlFieldFilter: null as { field: string; condition: string } | null,
+      sqlFieldFilter: null as { field: string; values: string[]; exclude: boolean } | null,
       fieldValues: mockFieldValues,
     },
     editorValue: "",
@@ -905,30 +905,23 @@ describe("IndexList Component", () => {
       w.unmount();
     });
 
-    it("sends one condition for every ticked value, to replace the field's condition", async () => {
+    it("hands the ticked values to the search bar, which owns the condition it writes", async () => {
       mockSearchObj.meta.sqlMode = true;
       const w = mountIndexList({ activeIncludeFieldValues: { service_name: ["api"] } });
       await flushPromises();
       (w.vm as any).handleAddMultipleSearchTerms("service_name", ["api", "o'k"], "include");
       expect(mockSearchObj.data.stream.sqlFieldFilter).toEqual({
         field: "service_name",
-        condition: "(service_name = 'api' OR service_name = 'o''k')",
+        values: ["api", "o'k"],
+        exclude: false,
+      });
+      (w.vm as any).handleAddMultipleSearchTerms("service_name", ["a"], "exclude");
+      expect(mockSearchObj.data.stream.sqlFieldFilter).toEqual({
+        field: "service_name",
+        values: ["a"],
+        exclude: true,
       });
       expect(mockSearchObj.data.stream.addToFilter).toBe("");
-      w.unmount();
-    });
-
-    it("ANDs excluded values, ORs included ones, and reads null as IS NULL", async () => {
-      mockSearchObj.meta.sqlMode = true;
-      const w = mountIndexList({ activeIncludeFieldValues: { service_name: ["a", "b"] } });
-      await flushPromises();
-      const condition = () => mockSearchObj.data.stream.sqlFieldFilter?.condition;
-      (w.vm as any).handleAddMultipleSearchTerms("service_name", ["a", "b"], "exclude");
-      expect(condition()).toBe("service_name != 'a' AND service_name != 'b'");
-      (w.vm as any).handleAddMultipleSearchTerms("service_name", ["a"], "include");
-      expect(condition()).toBe("service_name = 'a'");
-      (w.vm as any).handleAddMultipleSearchTerms("service_name", ["null"], "exclude");
-      expect(condition()).toBe("service_name IS NOT NULL");
       w.unmount();
     });
   });
@@ -994,6 +987,58 @@ describe("IndexList Component", () => {
       await flushPromises();
       expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
         `SELECT * FROM "test_stream" d WHERE d.status = '1' AND (d.status = '2' OR d.status = '3')`,
+      );
+    });
+
+    it("drops the IN list a sidebar tick wrote for the opened field, so its other values still show", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "test_stream" WHERE a = 1 AND service_name IN ('x','y') AND service_name IS NOT NULL`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" WHERE a = 1`,
+      );
+    });
+
+    it("reads the stream alone for a CTE, as the values API drops the WHERE of a WITH query", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `WITH slow AS (SELECT * FROM "test_stream" WHERE duration > 5) SELECT * FROM slow WHERE status = '1' ORDER BY start_time`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream"`,
+      );
+    });
+
+    it("reads the stream alone for the duration percentiles of a CTE", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `WITH slow AS (SELECT * FROM "test_stream" WHERE duration > 5) SELECT * FROM slow WHERE status = '1'`;
+      fieldValuesApi.fetchPercentiles.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "duration" });
+      await flushPromises();
+      expect(fieldValuesApi.fetchPercentiles.mock.calls[0][0].whereClause).toBe("");
+    });
+
+    it("reads the stream alone for a JOIN, as its names could belong to either side", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT a.trace_id FROM "test_stream" a JOIN "test_stream" b ON a.trace_id = b.trace_id WHERE status = '1'`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream"`,
+      );
+    });
+
+    it("keeps the opened field's IN and IS conditions in filter mode, as before", async () => {
+      mockSearchObj.data.editorValue = `a = 1 AND service_name IN ('x','y') AND service_name IS NOT NULL`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" WHERE a = 1 AND service_name IN ('x','y') AND service_name IS NOT NULL`,
       );
     });
 

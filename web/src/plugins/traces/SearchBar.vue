@@ -784,7 +784,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>
         <div v-if="showSqlExamples" class="absolute end-2 top-1 z-2">
-          <ODropdown side="bottom" align="end">
+          <ODropdown
+            side="bottom"
+            align="end"
+            @update:open="(open: boolean) => $emit('sql-examples-open', open)"
+          >
             <template #trigger>
               <OButton
                 variant="outline"
@@ -879,8 +883,10 @@ import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { activeScopePredicate, isTracesScope, withScope } from "@/utils/traces/tracesScope";
 import {
   analyzeTracesSql,
+  fieldHasOtherCondition,
+  fieldValuesCondition,
   insertWhereCondition,
-  replaceFieldConditions,
+  replaceOwnCondition,
   withAllFieldRefs,
   withFieldUnits,
 } from "@/utils/traces/tracesSql";
@@ -1031,6 +1037,7 @@ export default defineComponent({
     "recent-restore",
     "sql-stream-change",
     "open-spans-sql",
+    "sql-examples-open",
   ],
   props: {
     fieldValues: {
@@ -1071,7 +1078,8 @@ export default defineComponent({
       tracesParser,
       sqlTexts,
       noteFilterText,
-      clearSqlText,
+      deleteSqlText,
+      resetSqlTexts,
       leaveSql,
       turnSqlOn,
       takeTypedSql,
@@ -1274,7 +1282,7 @@ export default defineComponent({
     };
 
     // Writes the edited SQL, runs it, and offers Undo that puts the exact previous text back.
-    const applySqlEdit = (before: string, after: string, message: string) => {
+    const applySqlEdit = (before: string, after: string, message: string, onUndo?: () => void) => {
       const write = (text: string) => {
         writeEditor(text);
         emit("searchdata");
@@ -1283,7 +1291,13 @@ export default defineComponent({
       toast({
         variant: "info",
         message,
-        action: { label: t("traces.sqlMode.undo"), handler: () => write(before) },
+        action: {
+          label: t("traces.sqlMode.undo"),
+          handler: () => {
+            onUndo?.();
+            write(before);
+          },
+        },
       });
     };
 
@@ -1298,23 +1312,35 @@ export default defineComponent({
       applySqlEdit(before, after, t("traces.sqlMode.conditionAdded", { condition }));
     };
 
-    // A sidebar tick sets the field's whole condition; an empty one removes it.
-    const setSqlFieldCondition = (field: string, term: string) => {
+    // A sidebar tick rewrites only the one condition it wrote for the field; typed conditions are never touched.
+    const setSqlFieldValues = (field: string, values: string[], exclude: boolean) => {
       const before = String(searchObj.data.editorValue ?? "");
-      const refs = allFieldRefs();
-      const condition = withAllFieldRefs(term, refs);
-      const after = replaceFieldConditions(before, field, condition, refs.get(field));
+      const ref = allFieldRefs().get(field);
+      const owned = searchObj.data.stream.sqlFieldConditions;
+      const previous = owned[field];
+      const next = fieldValuesCondition(ref ?? field, values, exclude);
+      let after = previous ? replaceOwnCondition(before, previous.text, next) : null;
+      if (after === null && next) after = insertWhereCondition(before, next);
       if (after === null) {
-        const message = condition
+        const message = next
           ? t("traces.sqlMode.putConditionInWhere")
           : t("traces.sqlMode.editWhereToRemove", { field });
         toast({ message, variant: "info" });
         return;
       }
-      const message = condition
-        ? t("traces.sqlMode.conditionAdded", { condition })
+      if (next) owned[field] = { text: next, values: [...values], exclude };
+      else delete owned[field];
+      const restore = () => {
+        if (previous) owned[field] = previous;
+        else delete owned[field];
+      };
+      const message = next
+        ? t("traces.sqlMode.conditionAdded", { condition: next })
         : t("traces.sqlMode.conditionRemoved", { field });
-      applySqlEdit(before, after, message);
+      applySqlEdit(before, after, message, restore);
+      if (next && fieldHasOtherCondition(after, field, next, ref)) {
+        toast({ message: t("traces.sqlMode.editWhereToRemove", { field }), variant: "info" });
+      }
     };
 
     watch(
@@ -1322,7 +1348,7 @@ export default defineComponent({
       (change) => {
         if (!change) return;
         searchObj.data.stream.sqlFieldFilter = null;
-        if (searchObj.meta.sqlMode) setSqlFieldCondition(change.field, change.condition);
+        if (searchObj.meta.sqlMode) setSqlFieldValues(change.field, change.values, change.exclude);
       },
     );
 
@@ -1399,9 +1425,7 @@ export default defineComponent({
       updateAutoComplete(value);
       // Deleting the SELECT turns SQL off, and what is left becomes the filter.
       if (searchObj.meta.sqlMode && value.trim() !== "" && !isAuthoredStatement(value)) {
-        sqlTexts.filter = "";
-        clearSqlText();
-        searchObj.meta.sqlMode = false;
+        deleteSqlText();
         return;
       }
       // The Traces view takes no SQL, so a statement typed there waits for Run and its card.
@@ -1457,7 +1481,6 @@ export default defineComponent({
         setEditorValue(searchObj.data.editorValue);
         return;
       }
-      sqlTexts.spansSql = false;
       leaveSql();
       setEditorValue(searchObj.data.editorValue);
       emit("searchdata");
@@ -1689,6 +1712,7 @@ export default defineComponent({
 
     const resetFilters = () => {
       appliedSavedView.value = null;
+      resetSqlTexts();
       searchObj.meta.sqlMode = false;
       searchObj.meta.scope = "all";
       searchObj.meta.groupBy = "";
@@ -2173,7 +2197,7 @@ export default defineComponent({
       groupedTemplates,
       writeEditor,
       insertSqlCondition,
-      setSqlFieldCondition,
+      setSqlFieldValues,
       tracesSavedViews,
       isSavingView,
       saveViewDialogOpen,
@@ -2229,7 +2253,7 @@ export default defineComponent({
       if (!fieldName) return;
       if (this.searchObj.meta.sqlMode) {
         this.searchObj.data.stream.removeFilterField = "";
-        this.setSqlFieldCondition(fieldName, "");
+        this.setSqlFieldValues(fieldName, [], false);
         return;
       }
       const newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);

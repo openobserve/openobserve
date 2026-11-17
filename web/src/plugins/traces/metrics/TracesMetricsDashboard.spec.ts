@@ -2007,21 +2007,23 @@ ORDER BY start_time DESC`;
       expect(panelHits("errors")[2]).toEqual({ time_bucket: "2026-10-06T10:00:20", error_rate: 3 });
     });
 
-    it("keeps only the latest batch when the server streams aggregates, so partitions are not counted twice", async () => {
+    it("keeps only the latest partition's answer when the server streams aggregates, so partitions are not counted twice", async () => {
       await remountWith(`SELECT * FROM "default" WHERE a = 1`);
       const call = stream.calls[0];
       const hitsEvent = (hits: unknown[]) => ({
         type: "search_response_hits",
         content: { results: { hits } },
       });
-      call.handlers.data(call.payload, {
+      const metadata = {
         type: "search_response_metadata",
         content: { results: { hits: [], streaming_aggs: true } },
-      });
+      };
+      call.handlers.data(call.payload, metadata);
       call.handlers.data(
         call.payload,
         hitsEvent([{ time_bucket: "2026-10-06T10:00:20", spans: 4, errors: 1 }]),
       );
+      call.handlers.data(call.payload, metadata);
       call.handlers.data(
         call.payload,
         hitsEvent([{ time_bucket: "2026-10-06T10:00:30", spans: 2, errors: 0 }]),

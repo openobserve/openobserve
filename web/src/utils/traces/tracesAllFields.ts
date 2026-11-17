@@ -13,9 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Trace ingestion puts these back as columns after packing (restore_derived_fields, restore_canonical_agent_fields).
-const RESTORED_PREFIXES = ["infer_", "o2_db_"];
+// Trace ingestion puts these back as columns after packing: ALL_DB_FIELDS, ALL_INFER_FIELDS and the canonical agent fields.
 const RESTORED_FIELDS = new Set([
+  "o2_db_fingerprint",
+  "o2_db_query_norm",
+  "o2_db_system",
+  "o2_db_namespace",
+  "o2_db_instance",
+  "o2_db_operation",
+  "o2_db_status_code",
+  "o2_db_user",
+  "o2_db_env",
+  "o2_db_stmt_class",
+  "o2_db_batch_multiplier",
+  "infer_service_name",
+  "infer_service_type",
+  "infer_service_system",
+  "infer_peer_key",
+  "infer_peer_port",
+  "infer_peer_ip",
+  "infer_self_key",
+  "infer_self_port",
+  "infer_self_ip",
   "gen_ai_agent_name",
   "gen_ai_agent_id",
   "gen_ai_agent_env",
@@ -33,7 +52,6 @@ export function fieldsStoredInAll(
   for (const field of schema) {
     const name = field.name;
     if (name.startsWith("_") || defined.has(name) || RESTORED_FIELDS.has(name)) continue;
-    if (RESTORED_PREFIXES.some((prefix) => name.startsWith(prefix))) continue;
     inAll.set(name, field.type ?? "");
   }
   return inAll;

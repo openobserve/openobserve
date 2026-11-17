@@ -44,6 +44,22 @@ const spansWithSql = (sql = GROUPED) => {
 };
 
 describe("two texts", () => {
+  it("forgets the sidebar's own conditions with the SQL text, so they never claim later text", () => {
+    const ctx = spansWithSql(`SELECT * FROM "default" WHERE service_name = 'api'`);
+    const own = { service_name: { text: "service_name = 'api'", values: ["api"], exclude: false } };
+    ctx.host.data.stream.sqlFieldConditions = { ...own };
+    ctx.leaveSql();
+    expect(ctx.host.data.stream.sqlFieldConditions).toEqual(own);
+    ctx.reset();
+    expect(ctx.host.data.stream.sqlFieldConditions).toEqual({});
+
+    const typed = spansWithSql(`SELECT * FROM "default" WHERE service_name = 'api'`);
+    typed.host.data.stream.sqlFieldConditions = { ...own };
+    typed.host.data.editorValue = "service_name = 'api'";
+    typed.deleteSqlText();
+    expect(typed.host.data.stream.sqlFieldConditions).toEqual({});
+  });
+
   it("pre-fills from the filter the first time, and brings the stored SQL text back after", () => {
     const ctx = setup();
     ctx.turnSqlOn();
@@ -124,13 +140,31 @@ describe("two texts", () => {
     expect(ctx.sqlTexts.filter).toBe("duration > 1");
   });
 
-  it("notes an empty filter only from a run, not from clearing the editor to type", () => {
+  it("notes a cleared filter, so a statement typed after it keeps the empty filter", () => {
     const ctx = setup();
     ctx.noteFilterText("a = 1");
     ctx.noteFilterText("");
-    expect(ctx.sqlTexts.filterBeforeStatement).toBe("a = 1");
-    ctx.noteFilterText("", true);
+    ctx.noteFilterText("S");
     expect(ctx.sqlTexts.filterBeforeStatement).toBe("");
+  });
+
+  it("does not note the first letters of a statement typed over the filter", () => {
+    const ctx = setup();
+    ctx.noteFilterText("a = 1");
+    ctx.noteFilterText("SEL");
+    expect(ctx.sqlTexts.filterBeforeStatement).toBe("a = 1");
+  });
+
+  it("deleting the SELECT turns SQL off, keeps what is left and gives back the folded scope", () => {
+    const ctx = setup();
+    ctx.host.meta.scope = "root";
+    ctx.turnSqlOn();
+    ctx.host.data.editorValue = "s";
+    ctx.deleteSqlText();
+    expect(ctx.host.meta.sqlMode).toBe(false);
+    expect(ctx.host.data.editorValue).toBe("s");
+    expect(ctx.host.meta.scope).toBe("root");
+    expect(ctx.sqlTexts.sql).toBe("");
   });
 
   it("forgets everything on reset", () => {
@@ -138,7 +172,7 @@ describe("two texts", () => {
     ctx.normalizeTracesView("traces", { kind: "move" });
     ctx.reset();
     expect(ctx.sqlTexts.sql).toBe("");
-    expect(ctx.sqlTexts.spansSql).toBe(false);
+    expect(ctx.sqlTexts.filterBeforeStatement).toBe("");
   });
 });
 
@@ -166,15 +200,23 @@ describe("normalizeTracesView: the seven paths", () => {
     expect(ctx.sqlTexts.filter).toBe("duration > 5");
   });
 
-  it("1: Spans left with SQL off comes back with SQL off, though the SQL text stays kept", () => {
+  it("1: a plain Spans click brings the stored SQL back, even when Spans was left with SQL off", () => {
     const ctx = spansWithSql();
-    ctx.sqlTexts.spansSql = false;
     ctx.leaveSql();
     ctx.normalizeTracesView("traces", { kind: "move" });
     expect(ctx.sqlTexts.sql).toBe(GROUPED);
     const out = ctx.normalizeTracesView("spans", { kind: "move" });
+    expect(out.waitForRun).toBe(true);
+    expect(ctx.host.meta.sqlMode).toBe(true);
+    expect(ctx.host.data.editorValue).toBe(GROUPED);
+  });
+
+  it("1: a plain Spans click with no stored SQL stays in filter mode", () => {
+    const ctx = setup("traces", "a = 1");
+    const out = ctx.normalizeTracesView("spans", { kind: "move" });
     expect(out.waitForRun).toBe(false);
     expect(ctx.host.meta.sqlMode).toBe(false);
+    expect(ctx.host.data.editorValue).toBe("a = 1");
   });
 
   it("3: Back or Forward to a Spans SQL entry shows the entry's SQL, waiting for Run", () => {
@@ -301,7 +343,7 @@ describe("normalizeTracesView: the seven paths", () => {
     ctx.normalizeTracesView("traces", { kind: "move" });
     expect(ctx.host.meta.sqlMode).toBe(false);
     expect(ctx.host.data.editorValue).toBe("service_name = 'api'");
-    expect(ctx.sqlTexts.spansSql).toBe(true);
+    expect(ctx.sqlTexts.sql).toBe(GROUPED);
   });
 });
 
@@ -355,6 +397,17 @@ describe("normalizeTracesView: moving into SQL", () => {
     ctx.normalizeTracesView("traces", { kind: "sql" });
     expect(ctx.host.data.editorValue).toBe(GROUPED);
     expect(ctx.sqlTexts.filter).toBe("span_status = 'ERROR'");
+  });
+
+  it("Back to SQL from the kept line brings the stored SQL, and a SELECT typed in Traces stays the filter", () => {
+    const ctx = spansWithSql();
+    ctx.normalizeTracesView("traces", { kind: "move" });
+    const typed = `SELECT trace_id FROM "default"`;
+    ctx.host.data.editorValue = typed;
+    const out = ctx.normalizeTracesView("traces", { kind: "sql", stored: true });
+    expect(out).toEqual({ view: "spans", waitForRun: true });
+    expect(ctx.host.data.editorValue).toBe(GROUPED);
+    expect(ctx.sqlTexts.filter).toBe(typed);
   });
 
   it("Open in Spans view: the typed text replaces the kept SQL, and the filter keeps its value from before", () => {

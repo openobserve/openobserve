@@ -17181,6 +17181,7 @@
       "sqlKept": "Your SQL is kept. Turn SQL on to get it back.",
       "statementInTraces": {
         "title": "The Traces view takes a filter, not a SELECT",
+        "subqueryTitle": "The Traces view cannot run a subquery",
         "description": "SQL runs in the Spans view."
       },
       "keptLine": {
@@ -17249,7 +17250,9 @@
       "inAllColumn": "in {column}",
       "awaitingRun": {
         "spansTitle": "Run the query to see results",
-        "description": "Nothing has run yet. Run query sends the SQL in the editor."
+        "description": "Nothing has run yet. Run query sends the SQL in the editor.",
+        "rate": "Rate",
+        "errors": "Errors"
       },
       "errors": {
         "fieldNotFoundTitle": "Field not found: {field}",

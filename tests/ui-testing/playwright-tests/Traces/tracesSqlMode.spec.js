@@ -103,9 +103,12 @@ test.describe("Traces SQL mode testcases", () => {
     await pm.tracesPage.setQueryEditorValue(FILTER);
     await pm.tracesPage.expectSqlMode(false);
 
-    await pm.tracesPage.toggleSqlModeFromToolbar();
+    const searches = await pm.tracesPage.countSearchStreams(async () => {
+      await pm.tracesPage.toggleSqlModeFromToolbar();
+      await pm.tracesPage.expectSqlMode(true);
+    });
 
-    await pm.tracesPage.expectSqlMode(true);
+    expect(searches).toBe(0);
     await pm.tracesPage.expectQueryEditorValue(PREFILLED);
     await expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 });
     await expect(pm.tracesPage.getToastMessage('SQL runs in the Spans view')).toBeVisible();
@@ -155,18 +158,68 @@ test.describe("Traces SQL mode testcases", () => {
     await pm.tracesPage.switchToTracesMode();
     await pm.tracesPage.setQueryEditorValue(GROUPED);
     await pm.tracesPage.expectSqlMode(false);
-    await pm.tracesPage.runSearch();
 
-    await expect(pm.tracesPage.getStatementInTracesCard()).toContainText(
-      'The Traces view takes a filter, not a SELECT',
-      { timeout: 10000 },
-    );
+    const searches = await pm.tracesPage.countSearchStreams(async () => {
+      await pm.tracesPage.runSearch();
+      await expect(pm.tracesPage.getStatementInTracesCard()).toContainText(
+        'The Traces view takes a filter, not a SELECT',
+        { timeout: 10000 },
+      );
+      await pm.tracesPage.openStatementInSpans();
+      await pm.tracesPage.expectSqlMode(true);
+    });
 
-    await pm.tracesPage.openStatementInSpans();
-
-    await pm.tracesPage.expectSqlMode(true);
+    expect(searches).toBe(0);
     await pm.tracesPage.expectQueryEditorValue(GROUPED);
     await expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 });
+  });
+
+  test("P2: A Traces filter holding IN (SELECT ...) sends nothing and names the subquery", {
+    tag: ['@tracesSqlMode', '@traces', '@query', '@P2', '@all']
+  }, async () => {
+    const subquery = `trace_id IN (SELECT trace_id FROM "default" WHERE ${FILTER})`;
+    await pm.tracesPage.switchToTracesMode();
+    await pm.tracesPage.setQueryEditorValue(subquery);
+
+    const searches = await pm.tracesPage.countSearchStreams(async () => {
+      await pm.tracesPage.runSearch();
+      await expect(pm.tracesPage.getStatementInTracesCard()).toContainText(
+        'The Traces view cannot run a subquery',
+        { timeout: 10000 },
+      );
+      await pm.tracesPage.openStatementInSpans();
+      await pm.tracesPage.expectSqlMode(true);
+    });
+
+    expect(searches).toBe(0);
+    await expect.poll(() => pm.tracesPage.getQueryEditorContent()).toContain(`WHERE ${subquery}`);
+    await expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 });
+  });
+
+  test("P1: Sidebar ticks in SQL mode write one IN condition, and unticking takes a value out", {
+    tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
+  }, async () => {
+    const base = `SELECT * FROM "default" ORDER BY start_time DESC`;
+    await pm.tracesPage.toggleSqlModeFromToolbar();
+    await pm.tracesPage.setQueryEditorValue(base);
+    await pm.tracesPage.setTimeRange('15m');
+    await pm.tracesPage.runSearch();
+    await pm.tracesPage.expectSearchResultsVisible();
+
+    await pm.tracesPage.expandTraceField('service_name');
+    const first = await pm.tracesPage.toggleSidebarValue('service_name', 0);
+    await pm.tracesPage.expectQueryEditorValue(
+      `SELECT * FROM "default" WHERE service_name = '${first}' ORDER BY start_time DESC`,
+    );
+    const second = await pm.tracesPage.toggleSidebarValue('service_name', 1);
+    await pm.tracesPage.expectQueryEditorValue(
+      `SELECT * FROM "default" WHERE service_name IN ('${first}','${second}') ORDER BY start_time DESC`,
+    );
+
+    await pm.tracesPage.toggleSidebarValue('service_name', first);
+    await pm.tracesPage.expectQueryEditorValue(
+      `SELECT * FROM "default" WHERE service_name = '${second}' ORDER BY start_time DESC`,
+    );
   });
 
   test("P1: An unknown column offers Did you mean, and the fix replaces it and runs", {

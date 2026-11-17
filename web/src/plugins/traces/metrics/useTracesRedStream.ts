@@ -17,6 +17,7 @@ import { onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
+import { createStreamingHits, mergeHits } from "@/utils/traces/streamingHits";
 
 export interface RedStreamRequest {
   sql: string;
@@ -48,8 +49,7 @@ export function useTracesRedStream() {
     const { traceId } = generateTraceContext();
     current = traceId;
     let hits: Record<string, unknown>[] = [];
-    // A streaming aggregate sends its running total each partition; anything else sends new rows.
-    let replace = false;
+    const step = createStreamingHits();
     fetchQueryDataWithHttpStream(
       {
         queryReq: {
@@ -71,14 +71,8 @@ export function useTracesRedStream() {
       {
         data: (_payload: unknown, response: any) => {
           if (current !== traceId) return;
-          const results = response?.content?.results;
-          if (response?.type === "search_response_metadata") {
-            replace ||= !!(results?.streaming_aggs ?? response?.content?.streaming_aggs);
-            return;
-          }
-          if (response?.type !== "search_response_hits") return;
-          const batch = results?.hits ?? response?.content?.hits ?? [];
-          hits = replace ? [...batch] : [...hits, ...batch];
+          const batch = response?.content?.results?.hits ?? response?.content?.hits ?? [];
+          hits = mergeHits(hits, batch, step(response));
         },
         error: (_payload: unknown, err: any) => {
           if (current !== traceId) return;

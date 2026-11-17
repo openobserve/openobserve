@@ -372,3 +372,52 @@ describe("useLLMStreamQuery — cancelAll", () => {
     expect(mockCancelStreamQuery).not.toHaveBeenCalled();
   });
 });
+
+describe("useLLMStreamQuery — executeQuery: streaming aggregates", () => {
+  const meta = (streamingAggs = false) => ({
+    type: "search_response_metadata",
+    content: { ...(streamingAggs ? { streaming_aggs: true } : {}), results: { hits: [] } },
+  });
+  const hits = (rows: unknown[]) => ({
+    type: "search_response_hits",
+    content: { results: { hits: rows } },
+  });
+  const run = (replies: unknown[], options?: { replaceStreamingAggs?: boolean }) => {
+    const { executeQuery } = useLLMStreamQuery();
+    const promise = executeQuery("SELECT 1", 1, 2, "traces", options);
+    const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1);
+    for (const reply of replies) handlers.data({}, reply);
+    handlers.complete({});
+    return promise;
+  };
+
+  it("keeps only each partition's running answer when asked to", async () => {
+    await expect(
+      run(
+        [
+          meta(true),
+          hits([{ v: "a", n: 1 }]),
+          meta(true),
+          hits([{ v: "a", n: 4 }]),
+          meta(true),
+          hits([]),
+        ],
+        {
+          replaceStreamingAggs: true,
+        },
+      ),
+    ).resolves.toEqual([{ v: "a", n: 4 }]);
+  });
+
+  it("replaces with each later chunk of one partition when asked to", async () => {
+    await expect(
+      run([meta(true), hits([{ v: "a" }]), hits([{ v: "b" }])], { replaceStreamingAggs: true }),
+    ).resolves.toEqual([{ v: "b" }]);
+  });
+
+  it("still joins every batch for callers that do not ask", async () => {
+    await expect(
+      run([meta(true), hits([{ v: "a" }]), meta(true), hits([{ v: "a" }])]),
+    ).resolves.toEqual([{ v: "a" }, { v: "a" }]);
+  });
+});

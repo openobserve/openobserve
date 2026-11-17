@@ -4033,6 +4033,38 @@ export class TracesPage {
     return this.page.locator('[data-test="traces-statement-in-traces"]');
   }
 
+  getSidebarValueRows(field) {
+    return this.page.locator(`[data-test^="logs-search-subfield-add-${field}-"]`);
+  }
+
+  // Ticks or unticks a sidebar value of an expanded field, by row index or by value, and returns its value.
+  async toggleSidebarValue(field, indexOrValue) {
+    const row =
+      typeof indexOrValue === 'number'
+        ? this.getSidebarValueRows(field).nth(indexOrValue)
+        : this.page.locator(`[data-test="logs-search-subfield-add-${field}-${indexOrValue}"]`);
+    await expect(row).toBeVisible({ timeout: 15000 });
+    const dataTest = (await row.getAttribute('data-test')) ?? '';
+    await row.getByRole('checkbox').click();
+    return dataTest.replace(`logs-search-subfield-add-${field}-`, '');
+  }
+
+  // Counts _search_stream requests the page sends while `action` runs.
+  async countSearchStreams(action) {
+    let searches = 0;
+    const onRequest = (request) => {
+      if (request.url().includes('_search_stream')) searches++;
+    };
+    this.page.on('request', onRequest);
+    try {
+      await action();
+      await this.page.waitForTimeout(1000);
+    } finally {
+      this.page.off('request', onRequest);
+    }
+    return searches;
+  }
+
   async openStatementInSpans() {
     await this.getStatementInTracesCard().getByRole('button').click();
   }
