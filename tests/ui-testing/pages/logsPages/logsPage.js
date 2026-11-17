@@ -5442,6 +5442,10 @@ export class LogsPage {
         await expect(this.page.locator(this.logTableColumnSource)).not.toHaveText(text);
     }
 
+    async expectLogTableColumnSourceToContainText(text) {
+        await expect(this.page.locator(this.logTableColumnSource)).toContainText(text, { timeout: 30000 });
+    }
+
     async selectStreamAndStreamTypeForLogs(stream) {
         // Click the OSelect wrapper to open the popover
         await this.page.locator('[data-test="log-search-index-list-select-stream"]').click();
