@@ -818,7 +818,7 @@ async function loadFolders() {
   await waitForOrgIdentifier();
   try {
     const folders = await getFoldersListByType(store, "synthetics");
-    const folder = selectSyntheticsFolder(folders, route.query.folder as string | undefined);
+    const folder = selectSyntheticsFolder(folders, route.query.folder);
     activeFolderId.value = folder ?? "";
     clearFolderFailure();
   } catch (err) {

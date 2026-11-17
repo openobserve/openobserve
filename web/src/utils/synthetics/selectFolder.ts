@@ -1,10 +1,14 @@
 import type { SyntheticsFolder } from "@/types/synthetics";
 
+/** `urlFolder` is a raw route query value: a repeated `?folder=` arrives as an array. */
 export function selectSyntheticsFolder(
   folders: readonly { folderId: string }[],
-  urlFolder?: string,
+  urlFolder?: unknown,
 ): string | undefined {
-  if (urlFolder?.trim()) return urlFolder;
+  const preferred = (Array.isArray(urlFolder) ? urlFolder : [urlFolder]).find(
+    (value): value is string => typeof value === "string" && value.trim() !== "",
+  );
+  if (preferred) return preferred;
   return folders.find((folder) => folder.folderId === "default")?.folderId ?? folders[0]?.folderId;
 }
 

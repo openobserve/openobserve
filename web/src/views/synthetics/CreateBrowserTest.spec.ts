@@ -1484,6 +1484,11 @@ describe("CreateBrowserTest", () => {
       (wrapper.vm as any).folders = [{ folderId: "folder-2", name: "Shared" }];
       await flushPromises();
       expect(dialog.props("defaultFolder")).toBe("folder-2");
+      // While the list is still loading, the saved check's own folder is the default.
+      (wrapper.vm as any).foldersLoaded = false;
+      (wrapper.vm as any).folders = [];
+      await flushPromises();
+      expect(dialog.props("defaultFolder")).toBe("folder-1");
       expect(dialog.props("needsSchedule")).toBe(false);
       expect(dialog.props("parentLocations")).toEqual(["us-east"]);
       expect(dialog.props("authoredCount")).toBe(5);

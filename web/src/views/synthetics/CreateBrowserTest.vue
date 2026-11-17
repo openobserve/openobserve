@@ -1282,6 +1282,8 @@ const extractVariables = computed(() => splitVariablesForChild(check.value, extr
 // A direct grant can open a parent in an unlisted folder, which the picker cannot offer.
 const extractDefaultFolder = computed(() => {
   const folder = check.value.folder;
+  // Until the list loads, the saved check's own folder is the only one known to be valid.
+  if (!foldersLoaded.value) return folder ?? "";
   if (folder && folders.value.some((f) => f.folderId === folder)) return folder;
   return selectSyntheticsFolder(folders.value) ?? "";
 });

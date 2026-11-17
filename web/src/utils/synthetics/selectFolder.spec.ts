@@ -8,6 +8,10 @@ it.each([
   { folders: ["team", "default"], url: "", expected: "default" },
   { folders: ["team"], url: "  ", expected: "team" },
   { folders: [], url: undefined, expected: undefined },
+  { folders: ["default"], url: ["team", "team"], expected: "team" },
+  { folders: ["default"], url: [null, " ", "team"], expected: "team" },
+  { folders: ["default"], url: [null], expected: "default" },
+  { folders: ["default"], url: null, expected: "default" },
 ])("selects $expected for folders $folders and URL $url", ({ folders, url, expected }) => {
   expect(
     selectSyntheticsFolder(
