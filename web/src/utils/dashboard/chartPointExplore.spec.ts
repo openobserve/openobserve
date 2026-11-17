@@ -18,6 +18,7 @@ import {
   correlationConfigured,
   fieldPredicate,
   filtersWhere,
+  funnelStageQuery,
   isTimeXField,
   logsAvailability,
   pointFamily,
@@ -249,6 +250,40 @@ describe("pointGroupFilters with several x and breakdown fields", () => {
     expect(pointGroupFilters(timed, { type: "line" }, "time", { seriesValue: "eu" }, [])).toEqual([
       { field: "region", value: "eu" },
     ]);
+  });
+});
+
+describe("funnelStageQuery", () => {
+  const stageQuery = (alias: string, extra: Record<string, unknown> = {}) => ({
+    fields: { x: [{ alias }] },
+    ...extra,
+  });
+  const schema = { queries: [stageQuery("x_axis_1"), stageQuery("x_axis_1")] };
+
+  it("returns the one query whose rows name the stage", () => {
+    const data = [[{ x_axis_1: "Visited" }], [{ x_axis_1: "Purchased" }]];
+    expect(funnelStageQuery(schema, data, "Purchased")).toBe(1);
+    expect(funnelStageQuery(schema, data, "Visited")).toBe(0);
+  });
+
+  it("returns null when several queries or none name the stage", () => {
+    const data = [[{ x_axis_1: "Visited" }], [{ x_axis_1: "Visited" }]];
+    expect(funnelStageQuery(schema, data, "Visited")).toBeNull();
+    expect(funnelStageQuery(schema, data, "Missing")).toBeNull();
+  });
+
+  it("ignores a hidden query, whose stages the funnel does not draw", () => {
+    const hidden = {
+      queries: [stageQuery("x_axis_1"), stageQuery("x_axis_1", { config: { hide: true } })],
+    };
+    const data = [[{ x_axis_1: "Visited" }], [{ x_axis_1: "Visited" }]];
+    expect(funnelStageQuery(hidden, data, "Visited")).toBe(0);
+  });
+
+  it("matches a numeric stage the way the funnel names it", () => {
+    expect(
+      funnelStageQuery({ queries: [stageQuery("x_axis_1")] }, [[{ x_axis_1: 404 }]], "404"),
+    ).toBe(0);
   });
 });
 

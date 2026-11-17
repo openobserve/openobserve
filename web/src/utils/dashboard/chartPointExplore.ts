@@ -232,6 +232,20 @@ export const correlationConfigured = (isEnterprise: unknown, zoConfig: any): boo
 export const isPathChart = (type: unknown): boolean =>
   typeof type === "string" && PATH_TYPES.includes(type);
 
+/** The one query whose rows name the clicked funnel stage; null when none or several do. */
+export const funnelStageQuery = (schema: any, data: unknown[], stage: unknown): number | null => {
+  const name = String(stage ?? "");
+  // A funnel adds every query's stages into one series, so the stage name is all that says which query it came from.
+  const owners = (schema?.queries ?? []).flatMap((query: any, index: number) => {
+    const field = query?.fields?.x?.[0];
+    const rows = data?.[index];
+    if (query?.config?.hide || !field || !Array.isArray(rows)) return [];
+    const named = rows.some((row: any) => String(getDataValue(row, field.alias) ?? "") === name);
+    return named ? [index] : [];
+  });
+  return owners.length === 1 ? owners[0] : null;
+};
+
 /** Whether a treemap or sunburst click opens the point menu, so it must not also zoom. */
 export const treeOpensPointMenu = (
   schema: any,

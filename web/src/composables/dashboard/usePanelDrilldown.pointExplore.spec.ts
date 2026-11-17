@@ -480,6 +480,88 @@ describe("usePanelDrilldown point menu", () => {
     });
   });
 
+  describe("multi-query funnel", () => {
+    const funnelDeps = () => {
+      const deps = makeDeps({ type: "funnel" });
+      deps.panelSchema.value.queries = [
+        {
+          fields: {
+            stream: "web_events",
+            stream_type: "logs",
+            x: [field("x_axis_1", "step")],
+            y: [field("y_axis_1", "count", { functionName: "count" })],
+            breakdown: [],
+          },
+          query: 'SELECT step AS x_axis_1 FROM "web_events"',
+        },
+        {
+          fields: {
+            stream: "orders",
+            stream_type: "logs",
+            x: [field("x_axis_1", "stage")],
+            y: [field("y_axis_1", "count", { functionName: "count" })],
+            breakdown: [],
+          },
+          query: 'SELECT stage AS x_axis_1 FROM "orders"',
+        },
+      ];
+      deps.data.value = [
+        [{ x_axis_1: "Visited", y_axis_1: 100 }],
+        [{ x_axis_1: "Purchased", y_axis_1: 12 }],
+      ];
+      deps.metadata.value = {
+        queries: [
+          { startTime: START * 1000, endTime: END * 1000 },
+          { startTime: START * 1000, endTime: END * 1000 },
+        ],
+      } as any;
+      deps.panelData.value = { options: { series: [{}] }, extras: {} } as any;
+      return deps;
+    };
+    const stageClick = (name: string) => ({
+      componentType: "series",
+      seriesIndex: 0,
+      dataIndex: 0,
+      name,
+      value: 1,
+    });
+
+    it("a stage from the second query opens that query's stream and stage field", async () => {
+      const deps = funnelDeps();
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick(stageClick("Purchased"));
+
+      expect(api.pointExplore.value?.target).toMatchObject({
+        queryIndex: 1,
+        stream: "orders",
+        timeSlice: "panelRange",
+        filters: [{ field: "stage", value: "Purchased" }],
+      });
+    });
+
+    it("a stage from the first query keeps the first query", async () => {
+      const deps = funnelDeps();
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick(stageClick("Visited"));
+
+      expect(api.pointExplore.value?.target).toMatchObject({
+        queryIndex: 0,
+        stream: "web_events",
+        filters: [{ field: "step", value: "Visited" }],
+      });
+    });
+
+    it("a stage both queries return opens no point section", async () => {
+      const deps = funnelDeps();
+      deps.data.value[1].push({ x_axis_1: "Visited", y_axis_1: 5 });
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick(stageClick("Visited"));
+
+      expect(api.pointExplore.value).toBeNull();
+      expect(menuOpen(deps)).toBe(false);
+    });
+  });
+
   describe("review round", () => {
     it("several x fields: every value is read off the clicked row's own axes", async () => {
       const deps = makeDeps({

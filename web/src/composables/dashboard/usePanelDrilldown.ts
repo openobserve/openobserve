@@ -53,6 +53,7 @@ import {
   filtersWhere,
   correlationConfigured,
   isHorizontalBarChart,
+  funnelStageQuery,
   isPathChart,
   isTimeXField,
   logsAvailability,
@@ -711,8 +712,11 @@ export function usePanelDrilldown({
       ? panelData.value?.options?.series?.[params.seriesIndex]
       : undefined;
 
-  const pointQueryIndex = (params: any): number => {
+  const pointQueryIndex = (params: any): number | null => {
     const queries = panelSchema.value?.queries ?? [];
+    if (panelSchema.value?.type === "funnel") {
+      return funnelStageQuery(panelSchema.value, data.value ?? [], params?.name);
+    }
     // A tile carries no query of its own; treeOpensPointMenu admits only one visible query.
     if (isPathChart(panelSchema.value?.type)) {
       return Math.max(
@@ -804,8 +808,8 @@ export function usePanelDrilldown({
   };
 
   // The range the clicked series' own query ran over; a time-shifted query ran over an earlier one.
-  const pointQueryRange = (params: any) => {
-    const meta = metadata?.value?.queries?.[pointSeries(params)?._queryIndex ?? 0];
+  const pointQueryRange = (resultIndex: number) => {
+    const meta = metadata?.value?.queries?.[resultIndex];
     const startTime = Number(meta?.startTime ?? 0);
     const endTime = Number(meta?.endTime ?? 0);
     return {
@@ -815,8 +819,8 @@ export function usePanelDrilldown({
     };
   };
 
-  const pointTimeRange = async (params: any, family: PointFamily) => {
-    const { range, shiftUs } = pointQueryRange(params);
+  const pointTimeRange = async (params: any, family: PointFamily, resultIndex: number) => {
+    const { range, shiftUs } = pointQueryRange(resultIndex);
     if (family === "category") return range ?? calculateTimeRange(null, intervalMicro.value);
     // An h-bar label is the raw histogram key, which no shift has moved.
     if (isHorizontalBarChart(panelSchema.value.type)) {
@@ -951,12 +955,20 @@ export function usePanelDrilldown({
       return false;
     }
     const queryIndex = pointQueryIndex(params);
+    // A funnel stage that several queries share has no single query to open.
+    if (queryIndex === null) {
+      pointExplore.value = null;
+      return false;
+    }
+    // A funnel's results are indexed by panel query; other charts' series carry their own result index.
+    const resultIndex =
+      schema.type === "funnel" ? queryIndex : (pointSeries(params)?._queryIndex ?? 0);
     const query = schema.queries?.[queryIndex];
     const customColumns =
       schema.queryType !== "promql" && query?.customQuery
         ? await customQueryColumns(queryIndex)
         : undefined;
-    const rows = data.value?.[pointSeries(params)?._queryIndex ?? 0];
+    const rows = data.value?.[resultIndex];
     const filters =
       schema.queryType === "promql"
         ? []
@@ -968,11 +980,11 @@ export function usePanelDrilldown({
             Array.isArray(rows) ? rows : undefined,
             customColumns,
           );
-    const range = await pointTimeRange(params, family);
+    const range = await pointTimeRange(params, family, resultIndex);
     const sameAs = (other: { startTime?: number; endTime?: number } | null) =>
       !!other && range.startTime === other.startTime && range.endTime === other.endTime;
     const wholeRange =
-      sameAs(pointQueryRange(params).range) ||
+      sameAs(pointQueryRange(resultIndex).range) ||
       sameAs({
         startTime: selectedTimeObj.value?.start_time?.getTime?.(),
         endTime: selectedTimeObj.value?.end_time?.getTime?.(),
