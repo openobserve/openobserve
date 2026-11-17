@@ -1333,11 +1333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="inlineStatusBarClass"
             >
               <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
-                <template v-if="inlineStatusState === 'sql-status-bar--error'">
-                  <OIcon class="shrink-0" name="error-outline" size="xs" />
-                  <OTruncatedText class="flex-1">{{ sqlQueryErrorMsg }}</OTruncatedText>
-                </template>
-                <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
+                <template v-if="inlineStatusState === 'sql-status-bar--hint'">
                   <OIcon class="shrink-0 opacity-60" name="edit" size="xs" />
                   <span>{{ t("alerts.queryConfig.writeQueryHint") }}</span>
                 </template>
@@ -1346,6 +1342,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("alerts.queryConfig.sqlEditorHint") }}</span>
                 </template>
               </div>
+            </div>
+
+            <div
+              v-if="localTab === 'sql' && sqlErrorText"
+              role="alert"
+              tabindex="-1"
+              class="text-status-error-text flex flex-wrap items-center gap-x-2 gap-y-1 text-xs outline-none"
+              data-test="add-alert-sql-error"
+            >
+              <OIcon class="shrink-0" name="error-outline" size="xs" />
+              <span class="min-w-0 break-words">{{ sqlErrorText }}</span>
+              <OButton
+                v-if="sqlColumnFix"
+                variant="link"
+                size="sm"
+                data-test="add-alert-sql-error-fix"
+                @click="applySqlColumnFix"
+              >
+                {{ t("alerts.form.sqlError.use", { match: raw(sqlColumnFix.match) }) }}
+              </OButton>
             </div>
 
             <OBanner
@@ -1966,7 +1982,6 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
 import ForecastAlertFields from "@/components/alerts/steps/ForecastAlertFields.vue";
 import {
@@ -1985,6 +2000,7 @@ import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { type QueryConfigMeta } from "./QueryConfig.schema";
 import { useTierVisibility } from "@/composables/alerts/useAlertSettingTiers";
+import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
 
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
@@ -1992,7 +2008,6 @@ export default defineComponent({
   name: "Step2QueryConfig",
   components: {
     OTag,
-    OTruncatedText,
     AlertMultiToggle,
     ForecastAlertFields,
     AlertQueryPreview,
@@ -2288,20 +2303,39 @@ export default defineComponent({
       getSuggestions();
     };
 
-    // Inline editor status bar state
+    // Inline editor status bar state; an error reads on its own line under the editor instead.
     const inlineStatusState = computed(() => {
-      if (props.sqlQueryErrorMsg?.trim()) return "sql-status-bar--error";
       const query = localTab.value === "sql" ? localSqlQuery.value : editorPromqlQuery.value;
       if (!query?.trim()) return "sql-status-bar--hint";
       return "sql-status-bar--idle";
     });
 
-    // Status-bar color/cursor per state (was CSS .sql-status-bar--*).
-    const inlineStatusBarClass = computed(() =>
-      inlineStatusState.value === "sql-status-bar--error"
-        ? "bg-status-error-bg text-status-error-text cursor-pointer"
-        : "bg-surface-subtle text-text-secondary cursor-default",
+    const inlineStatusBarClass = "bg-surface-subtle text-text-secondary cursor-default";
+
+    const columnNames = computed(() =>
+      (props.columns as any[])
+        .map((c: any) => (typeof c === "string" ? c : String(c?.value ?? "")))
+        .filter(Boolean),
     );
+    const sqlColumnFix = computed(() =>
+      props.sqlQueryErrorMsg?.trim()
+        ? unknownColumnFix(props.sqlQueryErrorMsg, localSqlQuery.value ?? "", columnNames.value)
+        : null,
+    );
+    const sqlErrorText = computed(() => {
+      const fix = sqlColumnFix.value;
+      if (!fix) return raw(props.sqlQueryErrorMsg?.trim());
+      const named = { column: raw(fix.column), match: raw(fix.match), line: fix.line ?? 0 };
+      return fix.line
+        ? t("alerts.form.sqlError.unknownColumn", named)
+        : t("alerts.form.sqlError.unknownColumnNoLine", named);
+    });
+    const applySqlColumnFix = () => {
+      const fix = sqlColumnFix.value;
+      if (!fix) return;
+      updateSqlQuery(applyColumnFix(localSqlQuery.value ?? "", fix.column, fix.match));
+      emit("validate-sql");
+    };
 
     // Placeholder flags for inline editors (show image when empty + not focused)
     const queryEditorPlaceholderFlag = ref(true);
@@ -4145,6 +4179,9 @@ export default defineComponent({
       onBlurInlineVrlEditor,
       inlineStatusState,
       inlineStatusBarClass,
+      sqlColumnFix,
+      sqlErrorText,
+      applySqlColumnFix,
       inlineQueryEditorRef,
       autoCompleteKeywords,
       autoCompleteSuggestions,

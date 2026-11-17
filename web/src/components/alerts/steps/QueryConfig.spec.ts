@@ -270,6 +270,7 @@ describe("QueryConfig.vue", () => {
     formOverrides: Record<string, any> = {},
     storeOverride?: any,
     onSubmit: (values: any) => void = () => {},
+    extraProvide: Record<string | symbol, unknown> = {},
   ) {
     const props = reactive({ ...baseQCProps(), ...qcOverrides });
     const theStore = storeOverride ?? mockStore;
@@ -290,7 +291,7 @@ describe("QueryConfig.vue", () => {
     const h = mount(Host, {
       global: {
         mocks: { $store: theStore },
-        provide: { store: theStore },
+        provide: { store: theStore, ...extraProvide },
         plugins: [i18n],
       },
     });
@@ -2234,6 +2235,37 @@ describe("QueryConfig.vue", () => {
   // effectiveKeywords returns autoCompleteKeywords verbatim whenever no context is
   // active, so such a test passes with the bug still present. The only honest probe
   // is to drive a real VALUE context and require Value-kind items to reach the editor.
+
+  describe("Condition section", () => {
+    const remount = (qc: Record<string, any>, form: Record<string, any> = {}, provide = {}) => {
+      host.unmount();
+      const { h, props } = mountHost(qc, form, undefined, () => {}, provide);
+      host = h;
+      qcProps = props;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+    };
+    const columns = ["service", "status"].map((c) => ({ label: c, value: c, type: "utf8" }));
+
+    it("an invalid SQL error shows under the editor with Use 'service'", async () => {
+      const sql = "SELECT *\nFROM t\nWHERE servce = 'a'";
+      remount(
+        {
+          tab: "sql",
+          sqlQuery: sql,
+          columns,
+          sqlQueryErrorMsg: "Schema error: No field named servce",
+        },
+        { query_condition: { ...hostDefaults().query_condition, type: "sql", sql } },
+      );
+      await flushPromises();
+      const error = host.find('[data-test="add-alert-sql-error"]');
+      expect(error.attributes("role")).toBe("alert");
+      await host.find('[data-test="add-alert-sql-error-fix"]').trigger("click");
+      expect(wrapper.emitted("update:sqlQuery")?.at(-1)).toEqual([
+        "SELECT *\nFROM t\nWHERE service = 'a'",
+      ]);
+    });
+  });
 
   describe("QueryConfig — N1 context keywords reach the inline editor", () => {
     let host: any;
