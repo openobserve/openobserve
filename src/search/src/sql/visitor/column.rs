@@ -33,6 +33,7 @@ pub struct ColumnVisitor<'a> {
     pub schemas: &'a HashMap<TableReference, Arc<SchemaCache>>,
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>, // field_name, order_by
+    pub leading_order_by_unrecorded: bool,
     pub offset: Option<i64>,
     pub limit: Option<i64>,
     pub is_wildcard: bool,
@@ -49,6 +50,7 @@ impl<'a> ColumnVisitor<'a> {
             schemas,
             group_by: Vec::new(),
             order_by: Vec::new(),
+            leading_order_by_unrecorded: false,
             offset: None,
             limit: None,
             is_wildcard: false,
@@ -119,6 +121,8 @@ impl VisitorMut for ColumnVisitor<'_> {
                             OrderBy::Desc
                         },
                     ));
+                } else if self.order_by.is_empty() {
+                    self.leading_order_by_unrecorded = true;
                 }
             }
         }
@@ -448,6 +452,29 @@ mod tests {
                 .iter()
                 .any(|(f, _)| f == "name" || f == "age")
         );
+    }
+
+    #[test]
+    fn test_column_visitor_flags_unrecorded_leading_order_by() {
+        let cases = [
+            ("ORDER BY count(*) DESC", true),
+            ("ORDER BY 2 DESC", true),
+            ("ORDER BY count(*) DESC, name", true),
+            ("ORDER BY name, count(*) DESC", false),
+            ("ORDER BY name", false),
+            ("", false),
+        ];
+        let schemas = make_schemas();
+        for (order, expected) in cases {
+            let sql = format!("SELECT name, count(*) FROM users GROUP BY name {order}");
+            let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+                .unwrap()
+                .pop()
+                .unwrap();
+            let mut visitor = ColumnVisitor::new(&schemas);
+            let _ = statement.visit(&mut visitor);
+            assert_eq!(visitor.leading_order_by_unrecorded, expected, "{order}");
+        }
     }
 
     #[test]

@@ -163,6 +163,7 @@ mod tests {
                 time_range: (0, 0),
                 group_by: Default::default(),
                 order_by,
+                leading_order_by_unrecorded: false,
                 histogram_interval,
                 timezone: None,
                 histogram_offset: Some(0),

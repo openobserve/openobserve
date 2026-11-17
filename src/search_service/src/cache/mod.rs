@@ -679,7 +679,9 @@ pub async fn prepare_cache_response(
     }
 
     // #16650: a top-N ranked by another field cannot be split or reused across time ranges
-    if result_utils::is_ranked_by_non_timestamp(&sql.order_by, &ts_column) {
+    if sql.leading_order_by_unrecorded
+        || result_utils::is_ranked_by_non_timestamp(&sql.order_by, &ts_column)
+    {
         return Ok((
             MultiCachedQueryResponse {
                 ts_column,
@@ -1599,6 +1601,22 @@ mod tests {
         let cases = [
             (format!("{histogram} ORDER BY c DESC LIMIT 3"), "ts", false),
             (
+                format!("{histogram} ORDER BY count(*) DESC LIMIT 3"),
+                "ts",
+                false,
+            ),
+            (format!("{histogram} ORDER BY 2 DESC LIMIT 3"), "ts", false),
+            (
+                format!("{histogram} ORDER BY count(*) DESC, ts ASC"),
+                "ts",
+                false,
+            ),
+            (
+                format!("{histogram} ORDER BY ts ASC, count(*) DESC"),
+                "ts",
+                true,
+            ),
+            (
                 "SELECT * FROM t ORDER BY k".to_string(),
                 "_timestamp",
                 false,
@@ -1634,7 +1652,6 @@ mod tests {
                 let case = format!("sql={sql}, use_cache={use_cache}");
                 assert!(should_exec_query, "{case}");
                 assert_eq!(prepared.ts_column, ts_column, "{case}");
-                assert!(!prepared.order_by.is_empty(), "{case}");
                 assert_eq!(!prepared.file_path.is_empty(), eligible, "{case}");
                 assert_eq!(
                     prepared.cache_query_response,

@@ -19,7 +19,6 @@ use ::search::{
 };
 use bytes::Bytes;
 use config::{
-    TIMESTAMP_COL_NAME,
     meta::{
         histogram_origin::histogram_bucket_offset, search::Response, sql::OrderBy,
         stream::StreamType,
@@ -133,29 +132,7 @@ pub async fn check_cache(
 
     let order_by = &sql.order_by;
 
-    // skip the queries with no timestamp column
-    if result_ts_col.is_empty() && (is_aggregate || !sql.group_by.is_empty()) {
-        return MultiCachedQueryResponse {
-            order_by: order_by.clone(),
-            ..Default::default()
-        };
-    }
-
-    // skip the count queries & queries first order by is not _timestamp field
-    if req.query.track_total_hits
-        || (!order_by.is_empty()
-            && order_by.first().as_ref().unwrap().0 != TIMESTAMP_COL_NAME
-            && !result_ts_col.is_empty()
-            && result_ts_col != order_by.first().as_ref().unwrap().0)
-    {
-        return MultiCachedQueryResponse {
-            order_by: order_by.clone(),
-            ..Default::default()
-        };
-    }
-
-    // Check ts_col again, if it is still empty, return default
-    if result_ts_col.is_empty() {
+    if req.query.track_total_hits || result_ts_col.is_empty() {
         return MultiCachedQueryResponse {
             order_by: order_by.clone(),
             ..Default::default()
@@ -176,10 +153,6 @@ pub async fn check_cache(
             order_by: order_by.clone(),
             ..Default::default()
         };
-    }
-
-    if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
-        return MultiCachedQueryResponse::default();
     }
 
     let mut multi_resp = MultiCachedQueryResponse {
@@ -933,6 +906,7 @@ mod tests {
 
     use arrow_schema::{Field, Schema};
     use config::{
+        TIMESTAMP_COL_NAME,
         meta::{
             search::{Query, Request, RequestEncoding, Response, ResponseTook, SearchEventType},
             sql::OrderBy,
@@ -1122,6 +1096,7 @@ mod tests {
             time_range: (0, 0),
             group_by: vec![],
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
+            leading_order_by_unrecorded: false,
             histogram_interval: None,
             timezone: None,
             histogram_offset: Some(0),
@@ -1170,6 +1145,7 @@ mod tests {
             time_range: (0, 0),
             group_by: vec![],
             order_by: vec![("_timestamp".to_string(), OrderBy::Asc)],
+            leading_order_by_unrecorded: false,
             histogram_interval: None,
             timezone: None,
             histogram_offset: Some(0),
@@ -1469,11 +1445,9 @@ mod tests {
             .insert(file_path.replace('/', "_"), vec![meta.clone()]);
     }
 
-    /// Reads four cached hourly buckets, stored in `stored_hours` order, for a request in half
-    /// hours.
+    /// Reads four cached hourly buckets for a request in half hours.
     async fn read_clipped_histogram(
         name: &str,
-        stored_hours: [i64; 4],
         (q_start, q_end): (i64, i64),
     ) -> Option<(Vec<i64>, i64, i64)> {
         let file_path = format!("clip_org/logs/clip_stream/{name}");
@@ -1484,9 +1458,9 @@ mod tests {
             is_descending: false,
         };
         let response = Response {
-            hits: stored_hours
+            hits: (0..4)
                 .map(|hour| json::json!({"ts": CLIP_START + hour * CLIP_HOUR, "count": 100}))
-                .to_vec(),
+                .collect(),
             total: 4,
             histogram_interval: Some(3600),
             ..Default::default()
@@ -1526,7 +1500,7 @@ mod tests {
             ("inside_one_bucket", (0, 1), None),
         ];
         for (name, range, expected) in cases {
-            let got = read_clipped_histogram(name, [0, 1, 2, 3], range).await;
+            let got = read_clipped_histogram(name, range).await;
             assert_eq!(got, expected, "{name}");
         }
     }
