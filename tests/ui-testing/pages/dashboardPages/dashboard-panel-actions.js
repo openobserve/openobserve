@@ -605,6 +605,18 @@ export default class DashboardactionPage {
   }
 
   /**
+   * Wait for a Custom Chart panel to render; it draws inside a sandboxed iframe, not in [data-test="chart-renderer"].
+   * @param {Function} expect - Playwright expect function
+   * @param {number} timeout
+   */
+  async expectSandboxChartRendered(expect, timeout = 20000) {
+    const frame = this.page
+      .frameLocator('[data-test="dashboard-custom-chart-sandbox"] iframe')
+      .first();
+    await expect(frame.locator("#chart[_echarts_instance_]")).toBeVisible({ timeout });
+  }
+
+  /**
    * Wait for the dashboard table panel to render AND contain at least one
    * populated data cell. Encapsulates a `page.waitForFunction` scoped to the
    * `data-test="dashboard-panel-table"` host (approved evaluate pattern) so

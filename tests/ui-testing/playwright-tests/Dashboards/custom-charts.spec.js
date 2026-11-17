@@ -99,7 +99,7 @@ test.describe("Custom Charts Tests", () => {
     // line.json is SAFE ECharts code (no forbidden identifiers), so Apply must
     // actually render the chart — NOT surface a validation/empty-query error.
     // (Previously this test only waited 3s and asserted nothing.)
-    await pm.dashboardPanelActions.expectCustomChartRendered(expect);
+    await pm.dashboardPanelActions.expectSandboxChartRendered(expect);
     await expect(pm.dashboardPage.getUnsafeCodeText()).toBeHidden();
     await expect(pm.dashboardPage.getPleaseEnterQueryText()).toBeHidden();
 
