@@ -27,7 +27,9 @@ use o2_enterprise::enterprise::autoobserve::{
 use openobserve_core::{
     auth::check_permissions,
     authz::{active_checker, readable_service_records},
+    autoobserve::causes::deploy::{EVIDENCE, EVIDENCE_OVERFLOW},
     background_access::rbac_enforced,
+    service_identity::access,
 };
 
 use super::{readable_streams, readable_subjects};
@@ -35,6 +37,7 @@ use crate::request::{organization::require_credential_access, security::security
 
 const PIPELINE_CHECK_CONCURRENCY: usize = 16;
 const FLEET_CHECK_CONCURRENCY: usize = 16;
+const EVIDENCE_CHECK_CONCURRENCY: usize = 16;
 
 /// The read check each subject kind's own GET route makes.
 #[async_trait]
@@ -48,6 +51,8 @@ pub trait ReadRights: Send + Sync {
     async fn ingestion_tokens(&self) -> bool;
     /// One answer per service name.
     async fn services(&self, names: Vec<String>) -> Vec<bool>;
+    /// The Versions tab's deploy check: every evidence stream readable, a cut list org-wide.
+    async fn evidence(&self, streams: &[String], overflow: bool) -> bool;
     async fn security(&self) -> bool;
 }
 
@@ -150,6 +155,12 @@ impl ReadRights for LiveRights<'_> {
         names.iter().map(|n| readable.contains(n)).collect()
     }
 
+    async fn evidence(&self, streams: &[String], overflow: bool) -> bool {
+        let admin = access::org_wide_read(self.org_id, self.user_id).await;
+        !streams.is_empty()
+            && access::evidence(self.org_id, self.user_id, streams, overflow, admin).await
+    }
+
     async fn security(&self) -> bool {
         security_allowed(self.org_id, self.user_id, "GET").await
     }
@@ -206,7 +217,16 @@ pub async fn resolve_with<R: ReadRights>(rights: &R, subjects: &[EntityRef]) -> 
     readable.extend(fleets.into_iter().filter_map(|(s, ok)| ok.then_some(s)));
     if !services.is_empty() {
         let (subjects, names): (Vec<_>, Vec<_>) = services.into_iter().unzip();
-        keep(&mut readable, subjects, rights.services(names).await);
+        let listed = rights.services(names).await;
+        let services: Vec<(EntityRef, bool)> = stream::iter(subjects.into_iter().zip(listed))
+            .map(|(s, ok)| async move {
+                let ok = ok && evidence_readable(rights, &s).await;
+                (s, ok)
+            })
+            .buffer_unordered(EVIDENCE_CHECK_CONCURRENCY)
+            .collect()
+            .await;
+        readable.extend(services.into_iter().filter_map(|(s, ok)| ok.then_some(s)));
     }
     if !tokens.is_empty() && rights.ingestion_tokens().await {
         readable.extend(tokens);
@@ -215,6 +235,18 @@ pub async fn resolve_with<R: ReadRights>(rights: &R, subjects: &[EntityRef]) -> 
         readable,
         security: rights.security().await,
         names_allowed: true,
+    }
+}
+
+/// A deploy's subject names its evidence; a service subject without it needs only the list check.
+async fn evidence_readable<R: ReadRights>(rights: &R, subject: &EntityRef) -> bool {
+    let Some(listed) = subject.key_dims.get(EVIDENCE) else {
+        return true;
+    };
+    let overflow = subject.key_dims.contains_key(EVIDENCE_OVERFLOW);
+    match serde_json::from_str::<Vec<String>>(listed) {
+        Ok(streams) => rights.evidence(&streams, overflow).await,
+        Err(_) => false,
     }
 }
 
@@ -279,6 +311,10 @@ mod tests {
             names.iter().map(|n| self.grants(n)).collect()
         }
 
+        async fn evidence(&self, streams: &[String], overflow: bool) -> bool {
+            !overflow && !streams.is_empty() && streams.iter().all(|s| self.grants(s))
+        }
+
         async fn security(&self) -> bool {
             self.security
         }
@@ -295,6 +331,12 @@ mod tests {
         EntityRef::new(kinds::SERVICE, &[(dims::SERVICE_NAME, name)])
     }
 
+    const PUBLIC: &str = r#"["traces/public"]"#;
+
+    fn deploy(evidence: &[(&str, bool)]) -> EntityRef {
+        openobserve_core::autoobserve::causes::deploy::scoped("checkout", evidence)
+    }
+
     fn by_id(kind: &str, id: &str) -> EntityRef {
         EntityRef::new(kind, &[(dims::ENTITY_ID, id)])
     }
@@ -303,7 +345,15 @@ mod tests {
     async fn each_subject_is_readable_only_through_its_own_kinds_check() {
         let rights = FakeRights {
             allowed: [
-                "logs/app", "a1", "p1", "tokens", "f1", "d1", "app", "checkout",
+                "logs/app",
+                "a1",
+                "p1",
+                "tokens",
+                "f1",
+                "d1",
+                "app",
+                "checkout",
+                "traces/public",
             ]
             .into(),
             security: true,
@@ -332,6 +382,26 @@ mod tests {
                 false,
             ),
             ("unknown kind", by_id(kinds::DASHBOARD, "d1"), false),
+            (
+                "deploy with readable evidence",
+                deploy(&[(PUBLIC, false)]),
+                true,
+            ),
+            (
+                "deploy whose verdict reads an unreadable stream",
+                deploy(&[(PUBLIC, false), (r#"["traces/private"]"#, false)]),
+                false,
+            ),
+            (
+                "deploy with overflowed evidence",
+                deploy(&[(PUBLIC, true)]),
+                false,
+            ),
+            (
+                "deploy with unreadable evidence",
+                deploy(&[("not json", false)]),
+                false,
+            ),
         ];
         let subjects: Vec<EntityRef> = cases.iter().map(|(_, s, _)| s.clone()).collect();
         let set = resolve_with(&rights, &subjects).await;

@@ -31,6 +31,9 @@ use super::{failed, issue_streams, link};
 const PROVIDER: &str = "deploys";
 const ROWS: u64 = 50;
 const VERDICT_READS: usize = 3;
+/// Subject dims holding the evidence streams the viewer must read, as `source_streams` stores them.
+pub const EVIDENCE: &str = "evidence_streams";
+pub const EVIDENCE_OVERFLOW: &str = "evidence_overflow";
 
 pub async fn read(ask: &ChangeAsk) -> (Checked, Vec<ChangeRecord>) {
     let streams = issue_streams(ask);
@@ -41,6 +44,31 @@ pub async fn read(ask: &ChangeAsk) -> (Checked, Vec<ChangeRecord>) {
         Ok(answer) => answer,
         Err(e) => failed(PROVIDER, &ask.org, e),
     }
+}
+
+/// The service, scoped to the evidence its Versions tab requires readable before showing a deploy.
+/// Each pair is a stored `source_streams` list and its overflow flag; an unreadable list overflows.
+pub fn scoped(service: &str, evidence: &[(&str, bool)]) -> EntityRef {
+    let mut streams = BTreeSet::new();
+    let mut overflow = false;
+    for (listed, cut) in evidence {
+        match serde_json::from_str::<Vec<String>>(listed) {
+            Ok(listed) => streams.extend(listed),
+            Err(_) => overflow = true,
+        }
+        overflow |= cut;
+    }
+    let streams = serde_json::to_string(&streams).unwrap_or_default();
+    let mut subject = EntityRef::new(
+        kinds::SERVICE,
+        &[(dims::SERVICE_NAME, service), (EVIDENCE, &streams)],
+    );
+    if overflow {
+        subject
+            .key_dims
+            .insert(EVIDENCE_OVERFLOW.to_string(), true.to_string());
+    }
+    subject
 }
 
 async fn deploys(
@@ -67,6 +95,13 @@ async fn deploys(
             // The deploy is the cause; a verdict that cannot be read only leaves it unjudged.
             match service_version_verdicts::get(conn, &ask.org, key).await {
                 Ok(Some(v)) => {
+                    record.subject = scoped(
+                        &row.service_name,
+                        &[
+                            (row.source_streams.as_str(), row.source_streams_overflow),
+                            (v.source_streams.as_str(), v.source_streams_overflow),
+                        ],
+                    );
                     record.facts.insert("verdict".to_string(), v.verdict);
                 }
                 Ok(None) => {}
@@ -111,7 +146,10 @@ fn record(row: &Model, streams: &BTreeSet<EntityRef>) -> Option<ChangeRecord> {
         at: row.at,
         until: None,
         actor: None,
-        subject: EntityRef::new(kinds::SERVICE, &[(dims::SERVICE_NAME, service)]),
+        subject: scoped(
+            service,
+            &[(row.source_streams.as_str(), row.source_streams_overflow)],
+        ),
         subject_name: service.to_string(),
         affects,
         link: link_kind,
