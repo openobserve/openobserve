@@ -833,11 +833,14 @@ describe("AddAlert (OForm owner)", () => {
       }
     });
 
-    it("blocks a cron save when the expression is invalid", async () => {
+    it.each([
+      ["unparseable", "not-a-cron"],
+      ["5 fields, not the 6 the server needs", "0 9 * * 1-5"],
+    ])("blocks a cron save when the expression is %s", async (_, cron) => {
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
       const form = wrapper.vm.form;
-      seedCron(form, "not-a-cron");
+      seedCron(form, cron);
 
       await form.handleSubmit();
       await flushPromises();
@@ -847,6 +850,9 @@ describe("AddAlert (OForm owner)", () => {
         expect.objectContaining({ message: "Invalid cron expression" }),
       );
       expect(focusedTestId()).toBe("add-alert-section-schedule-title");
+      expect(wrapper.get('[data-test="o-section-nav-item-schedule"]').text()).toContain(
+        i18n.global.t("alerts.sections.needsFix", { count: 1 }, 1),
+      );
     });
 
     it("blocks a cron save when the timezone is missing (inline-only, NO toast)", async () => {
@@ -2181,7 +2187,7 @@ describe("AddAlert (OForm owner)", () => {
         threshold: 3,
         silence: 90,
         frequency_type: "cron",
-        cron: "0 9 * * 1-5",
+        cron: "0 0 9 * * 1-5",
         timezone: "Europe/Berlin",
       };
       wrapper = mountAlert({

@@ -141,6 +141,9 @@ import {
 
 // ─── Default Values ─────────────────────────────────────────────────────────
 
+/** The scheduler parses cron with seconds, so it rejects the usual 5-field form. */
+export const isSixFieldCron = (cron: string): boolean => cron.trim().split(/\s+/).length === 6;
+
 export const defaultAlertValue: any = () => {
   return {
     name: "",
@@ -2408,6 +2411,12 @@ export function useAlertForm(
       if (!tc.cron || !tc.timezone) {
         activeTab.value = "condition";
         hooks.showSection?.("schedule");
+        return false;
+      }
+      if (!isSixFieldCron(tc.cron)) {
+        activeTab.value = "condition";
+        hooks.showSection?.("schedule");
+        toast({ variant: "error", message: t("alerts.queryConfig.invalidCronExpression") });
         return false;
       }
       try {

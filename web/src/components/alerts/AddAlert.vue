@@ -1134,7 +1134,12 @@ import PreviewAlert from "./PreviewAlert.vue";
 import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.vue";
 import AnomalyDataPreview from "@/components/anomaly_detection/AnomalyDataPreview.vue";
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
-import { useAlertForm, defaultAlertValue, type AlertFormEmit } from "@/composables/useAlertForm";
+import {
+  useAlertForm,
+  defaultAlertValue,
+  isSixFieldCron,
+  type AlertFormEmit,
+} from "@/composables/useAlertForm";
 import { useAlertEditorDraft } from "@/composables/alerts/useAlertEditorDraft";
 import { useCalibrationHandoff } from "@/composables/alerts/useCalibrationHandoff";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
@@ -1849,7 +1854,7 @@ export default defineComponent({
     const cronSaveProblem = computed(() => {
       const tc = alertForm.formData.value?.trigger_condition;
       if (tc?.frequency_type !== "cron") return false;
-      if (!tc.cron || !tc.timezone) return true;
+      if (!tc.cron || !tc.timezone || !isSixFieldCron(tc.cron)) return true;
       try {
         const seconds = getCronIntervalDifferenceInSeconds(tc.cron);
         return (
