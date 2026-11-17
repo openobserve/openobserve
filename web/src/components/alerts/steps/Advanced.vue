@@ -52,87 +52,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSettingRow
                 v-if="tierShows('template')"
                 :label="t('alerts.plain.messageTemplate')"
+                :class="denseRow"
                 fill
-                ><div class="flex flex-col items-start gap-1">
-                  <div class="flex items-center gap-2">
-                    <OFormSelect
-                      name="template"
-                      :aria-label="t('alerts.template')"
-                      :options="formattedTemplates"
-                      clearable
-                      :placeholder="t('alerts.advanced.selectTemplate')"
-                      class="max-w-75 min-w-60"
-                      data-test="advanced-template-override-select"
-                    >
-                      <template #empty>{{ t("alerts.advanced.noTemplatesAvailable") }}</template>
-                    </OFormSelect>
-                    <OButton
-                      variant="ghost"
-                      size="icon-circle-sm"
-                      :title="t('alerts.advanced.refreshTemplates')"
-                      data-test="advanced-template-refresh-btn"
-                      @click="$emit('refresh:templates')"
-                    >
-                      <OIcon name="refresh" size="sm" />
-                    </OButton>
-                  </div>
+                ><div class="flex items-center gap-2">
+                  <OFormSelect
+                    name="template"
+                    :aria-label="t('alerts.template')"
+                    :options="formattedTemplates"
+                    clearable
+                    :placeholder="t('alerts.advanced.selectTemplate')"
+                    class="max-w-75 min-w-60"
+                    data-test="advanced-template-override-select"
+                  >
+                    <template #empty>{{ t("alerts.advanced.noTemplatesAvailable") }}</template>
+                  </OFormSelect>
+                  <OButton
+                    variant="ghost"
+                    size="icon-circle-sm"
+                    :title="t('alerts.advanced.refreshTemplates')"
+                    data-test="advanced-template-refresh-btn"
+                    @click="$emit('refresh:templates')"
+                  >
+                    <OIcon name="refresh" size="sm" />
+                  </OButton>
                   <OButton
                     data-test="advanced-template-info-btn"
                     variant="ghost-primary"
-                    size="xs"
-                    class="gap-1 font-medium"
+                    size="icon-circle-sm"
+                    :title="t('alerts.alertSettings.helpLearnMore')"
                     @click="openHelp('template')"
                   >
-                    <OIcon name="help" size="xs" />
-                    <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
-                  </OButton>
-                </div></OSettingRow
-              >
+                    <OIcon name="help" size="sm" />
+                  </OButton></div
+              ></OSettingRow>
 
               <OSettingRow
                 v-if="tierShows('rowTemplate')"
                 :label="t('alerts.plain.rowTemplate')"
-                :description="t('alerts.sections.rows.rowTemplate')"
+                :class="denseRow"
+                :info="t('alerts.sections.rows.rowTemplate')"
                 fill
               >
-                <div class="flex flex-col gap-2">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                      <span class="text-text-secondary text-xs">{{
-                        t("alerts.advanced.templateType")
-                      }}</span>
-                      <OFormToggleGroup
-                        data-test="add-alert-row-template-type-toggle"
-                        name="row_template_type"
-                      >
-                        <OToggleGroupItem value="String" size="sm">
-                          <template #icon-left><OIcon name="title" size="sm" /></template>
-                          {{ t("alerts.advanced.templateTypeString") }}
-                        </OToggleGroupItem>
-                        <OToggleGroupItem value="Json" size="sm">
-                          <template #icon-left><OIcon name="data-object" size="sm" /></template>
-                          {{ t("alerts.advanced.templateTypeJson") }}
-                        </OToggleGroupItem>
-                      </OFormToggleGroup>
-                    </div>
+                <div class="flex flex-col gap-1">
+                  <div class="flex items-start gap-2">
+                    <OFormToggleGroup
+                      data-test="add-alert-row-template-type-toggle"
+                      name="row_template_type"
+                      :aria-label="t('alerts.form.rowTemplateType')"
+                    >
+                      <OToggleGroupItem value="String" size="sm">
+                        <template #icon-left><OIcon name="title" size="sm" /></template>
+                        {{ t("alerts.advanced.templateTypeString") }}
+                      </OToggleGroupItem>
+                      <OToggleGroupItem value="Json" size="sm">
+                        <template #icon-left><OIcon name="data-object" size="sm" /></template>
+                        {{ t("alerts.advanced.templateTypeJson") }}
+                      </OToggleGroupItem>
+                    </OFormToggleGroup>
+                    <OFormTextarea
+                      :aria-label="t('alerts.row')"
+                      data-test="add-alert-row-input-textarea"
+                      name="row_template"
+                      :placeholder="rowTemplatePlaceholder"
+                      autogrow
+                      class="min-w-0 flex-1"
+                    />
                     <OButton
                       data-test="add-alert-row-input-info-btn"
                       variant="ghost-primary"
-                      size="xs"
-                      class="gap-1 font-medium"
+                      size="icon-circle-sm"
+                      :title="t('alerts.alertSettings.helpLearnMore')"
                       @click="openHelp('rowTemplate')"
                     >
-                      <OIcon name="help" size="xs" />
-                      <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
+                      <OIcon name="help" size="sm" />
                     </OButton>
                   </div>
-                  <OFormTextarea
-                    :aria-label="t('alerts.row')"
-                    data-test="add-alert-row-input-textarea"
-                    name="row_template"
-                    :placeholder="rowTemplatePlaceholder"
-                    :rows="4"
-                  />
                   <span
                     v-if="isForecastMode"
                     class="text-text-secondary mt-1 block text-xs"
@@ -142,80 +136,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </OSettingRow>
 
-              <OSettingRow v-if="tierShows('variables')" :label="t('alerts.plain.variables')" fill
-                ><div class="flex flex-col items-start gap-1">
-                  <template v-if="!variableRows.length">
-                    <OButton
-                      data-test="alert-variables-add-btn"
-                      variant="outline"
-                      size="sm"
-                      @click="addVariable"
-                    >
-                      <span>{{ t("alerts.plain.addVariable") }}</span>
-                    </OButton>
-                  </template>
-                  <template v-else>
-                    <!-- Rule ①: repeatable key/value rows are FORM-OWNED. Each row's
+              <OSettingRow
+                v-if="tierShows('variables')"
+                :label="t('alerts.plain.variables')"
+                :class="denseRow"
+                fill
+                ><div class="flex items-start gap-2">
+                  <div class="flex flex-col items-start gap-1">
+                    <template v-if="!variableRows.length">
+                      <OButton
+                        data-test="alert-variables-add-btn"
+                        variant="outline"
+                        size="sm"
+                        @click="addVariable"
+                      >
+                        <span>{{ t("alerts.plain.addVariable") }}</span>
+                      </OButton>
+                    </template>
+                    <template v-else>
+                      <!-- Rule ①: repeatable key/value rows are FORM-OWNED. Each row's
                  fields bind by INDEX-based `name=` (`context_attributes[i].*`),
                  so the v-for `:key` MUST be the array INDEX — a stable-id/uuid
                  `:key` would leave surviving rows bound to their OLD index after a
                  mid-list delete (inputs shift/blank while data stays correct).
                  Proven by the delete test in Advanced.spec.ts. -->
-                    <div
-                      v-for="(variable, index) in variableRows"
-                      :key="index"
-                      class="mb-2 flex items-center gap-2"
-                      :data-test="`alert-variables-${index + 1}`"
-                    >
-                      <OFormInput
-                        :aria-label="t('common.name')"
-                        data-test="alert-variables-key-input"
-                        :name="`context_attributes[${index}].key`"
-                        :placeholder="t('common.name')"
-                        class="min-w-35"
-                      />
-                      <OFormInput
-                        :aria-label="t('common.value')"
-                        data-test="alert-variables-value-input"
-                        :name="`context_attributes[${index}].value`"
-                        :placeholder="t('common.value')"
-                        class="min-w-50"
-                      />
-                      <OButton
-                        data-test="alert-variables-delete-variable-btn"
-                        variant="ghost"
-                        size="icon-circle-sm"
-                        :aria-label="t('common.delete')"
-                        @click="removeVariable(index)"
+                      <div
+                        v-for="(variable, index) in variableRows"
+                        :key="index"
+                        class="mb-2 flex items-center gap-2"
+                        :data-test="`alert-variables-${index + 1}`"
                       >
-                        <OIcon name="delete-outline" size="sm" />
-                      </OButton>
-                      <OButton
-                        :aria-label="t('common.add')"
-                        data-test="alert-variables-add-variable-btn"
-                        v-if="index === variableRows.length - 1"
-                        variant="ghost"
-                        size="icon-circle-sm"
-                        @click="addVariable"
-                      >
-                        <OIcon name="add" size="sm" />
-                      </OButton>
-                    </div>
-                  </template>
+                        <OFormInput
+                          :aria-label="t('common.name')"
+                          data-test="alert-variables-key-input"
+                          :name="`context_attributes[${index}].key`"
+                          :placeholder="t('common.name')"
+                          class="min-w-35"
+                        />
+                        <OFormInput
+                          :aria-label="t('common.value')"
+                          data-test="alert-variables-value-input"
+                          :name="`context_attributes[${index}].value`"
+                          :placeholder="t('common.value')"
+                          class="min-w-50"
+                        />
+                        <OButton
+                          data-test="alert-variables-delete-variable-btn"
+                          variant="ghost"
+                          size="icon-circle-sm"
+                          :aria-label="t('common.delete')"
+                          @click="removeVariable(index)"
+                        >
+                          <OIcon name="delete-outline" size="sm" />
+                        </OButton>
+                        <OButton
+                          :aria-label="t('common.add')"
+                          data-test="alert-variables-add-variable-btn"
+                          v-if="index === variableRows.length - 1"
+                          variant="ghost"
+                          size="icon-circle-sm"
+                          @click="addVariable"
+                        >
+                          <OIcon name="add" size="sm" />
+                        </OButton>
+                      </div>
+                    </template>
+                  </div>
                   <OButton
                     data-test="advanced-variables-info-btn"
                     variant="ghost-primary"
-                    size="xs"
-                    class="gap-1 font-medium"
+                    size="icon-circle-sm"
+                    :title="t('alerts.alertSettings.helpLearnMore')"
                     @click="openHelp('variables')"
                   >
-                    <OIcon name="help" size="xs" />
-                    <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
-                  </OButton>
-                </div></OSettingRow
-              >
-            </div></Teleport
-          >
+                    <OIcon name="help" size="sm" />
+                  </OButton></div
+              ></OSettingRow></div
+          ></Teleport>
 
           <div class="flex flex-col">
             <OSettingRow
@@ -260,6 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="(oncallEnabled && tierShows('oncall')) || oncallTeamLocked"
                 :label="t('alerts.oncallTeam')"
                 :info="oncallTeamLocked ? undefined : t('alerts.oncallTeamTooltip')"
+                :class="denseRow"
                 fill
               >
                 <div class="flex items-center gap-2">
@@ -589,8 +587,12 @@ export default defineComponent({
       tiers?.conceal("description");
     };
 
+    // Section 3 stacks up to ten rows, so its rows sit closer than a bare row's default.
+    const denseRow = computed(() => (props.sectionTargets ? "py-1!" : ""));
+
     return {
       tierShows,
+      denseRow,
       descriptionFocused,
       removeDescription,
       raw,

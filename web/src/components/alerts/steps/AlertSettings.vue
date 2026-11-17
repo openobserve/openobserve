@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("alerts.form.schedule.lookingAt")
                 }}</span>
                 <div class="flex items-center">
-                  <div class="w-21.75">
+                  <div class="w-16">
                     <OFormInput
                       :aria-label="t('alerts.period')"
                       name="trigger_condition.period"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OFormInput>
                   </div>
                   <div
-                    class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-12 items-center justify-center px-2"
+                    class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 items-center justify-center px-2"
                   >
                     {{ t("alerts.form.units.min") }}
                   </div>
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :setting-row="!!sectionTargets"
             :list="!!sectionTargets"
             ref="destinationsFieldRef"
-            :class="sectionTargets ? '' : isScheduled ? 'me-2 mb-4!' : 'mb-4 pb-4'"
+            :class="sectionTargets ? denseRow : isScheduled ? 'me-2 mb-4!' : 'mb-4 pb-4'"
             :destinations="destinations"
             :workflows="workflows"
             :destination-options="formattedDestinations"
@@ -183,7 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSettingRow
             ref="silenceFieldRef"
             :label="t('alerts.form.remind.label')"
-            :description="t('alerts.form.remind.help')"
+            :info="t('alerts.form.remind.help')"
+            :class="denseRow"
             fill
           >
             <div class="me-2 flex w-fit flex-col gap-1">
@@ -239,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="createsIncident && !incidentSwitchOpen"
               :label="t('alerts.form.incident.label')"
               data-test="add-alert-incident-row"
+              :class="denseRow"
               changeable
               removable
               @change="incidentSwitchOpen = true"
@@ -250,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               :label="t('alerts.plain.openIncident')"
               :info="t('alerts.alertSettings.createsIncidentTooltip')"
+              :class="denseRow"
               fill
             >
               <OFormSwitch
@@ -264,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <AlertSentenceRow
                 v-if="!incidentTitleOpen"
                 data-test="add-alert-incident-title-row"
+                :class="denseRow"
                 changeable
                 @change="openIncidentTitle"
               >
@@ -283,6 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="incidentTitleRowRef"
                 :label="t('alerts.alertSettings.incidentTitleTemplate')"
                 :info="t('alerts.alertSettings.incidentTitleTemplateTooltip')"
+                :class="denseRow"
                 fill
               >
                 <div class="flex w-100 flex-col gap-1 max-md:w-full">
@@ -321,6 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t('alerts.alertSettings.notifyOnRecoveryNeedsDestination')
                   : t('alerts.alertSettings.notifyOnRecoveryTooltip')
               "
+              :class="denseRow"
               fill
             >
               <div class="flex flex-col gap-1">
@@ -364,7 +370,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :wrap="!!sectionTargets"
               :setting-row="!!sectionTargets"
               v-if="formData?.notify_on_recovery && !notifiesNobody && tierShows('recovery')"
-              :class="sectionTargets ? '' : 'me-2 mb-4!'"
+              :class="sectionTargets ? denseRow : 'me-2 mb-4!'"
+              data-test="alert-settings-recovery-destinations"
               :destinations="recoveryDestinations"
               :workflows="[]"
               :destination-options="formattedDestinations"
@@ -381,6 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="keepFiringForFieldRef"
               :label="t('alerts.form.keepFiring.label')"
               :info="t('alerts.alertSettings.keepFiringForTooltip')"
+              :class="denseRow"
               fill
             >
               <div class="flex flex-col gap-1">
@@ -432,6 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="repeatSuppressionAvailable && tierShows('suppressRepeats')"
               :label="t('alerts.alertSettings.suppressRepeats')"
               :info="t('alerts.alertSettings.suppressRepeatsTooltip')"
+              :class="denseRow"
               fill
             >
               <OFormSwitch
@@ -987,8 +996,11 @@ export default defineComponent({
         ]
       : [];
     onBeforeUnmount(() => unregister.forEach((off) => off()));
+    // Section 3 stacks up to ten rows, so its rows sit closer than a bare row's default.
+    const denseRow = computed(() => (props.sectionTargets ? "py-1!" : ""));
 
     return {
+      denseRow,
       tierShows,
       fv,
       isScheduled,
