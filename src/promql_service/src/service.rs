@@ -64,7 +64,7 @@ impl From<MetricsQueryRequest> for proto::cluster_rpc::MetricsQueryRequest {
             regions: req.regions,
             clusters: req.clusters,
             is_super_cluster: false,
-            wal_since: 0,
+            wal_start_time: 0,
         }
     }
 }

@@ -551,7 +551,7 @@ pub struct MetricsQueryRequest {
     pub search_event_context: ::core::option::Option<SearchEventContext>,
     /// time from which groups read the WAL, probed in this cluster; 0 = unknown, read the whole ingest window
     #[prost(int64, tag = "15")]
-    pub wal_since: i64,
+    pub wal_start_time: i64,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]

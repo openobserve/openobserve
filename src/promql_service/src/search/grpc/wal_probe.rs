@@ -37,7 +37,7 @@ static CACHE: LazyLock<RwAHashMap<String, (Option<i64>, Instant)>> =
     LazyLock::new(Default::default);
 
 /// The time from which the streams' groups must read the WAL, 0 when an ingester could not tell.
-pub(crate) async fn wal_since(trace_id: &str, org_id: &str, streams: &HashSet<String>) -> i64 {
+pub(crate) async fn wal_start_time(trace_id: &str, org_id: &str, streams: &HashSet<String>) -> i64 {
     let mut oldest = None;
     let mut missing = Vec::new();
     {

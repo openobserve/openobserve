@@ -181,7 +181,7 @@ pub async fn search(
 
         // 2. generate search group with max records stream
         let start_ts = std::time::Instant::now();
-        let wal_floor = request_floor(req.wal_since);
+        let wal_floor = request_floor(req.wal_start_time);
         // no cut without streaming, or with an `@` pin on the WAL
         let cut = if cfg.search.feature_metrics_streaming_agg_enabled
             && !query.query_exemplars
@@ -362,12 +362,13 @@ pub async fn data(
 
     // 3. search each group
     // a super-cluster peer cannot see this cluster's ingesters, so it never sends a probe result
-    let wal_since = if req.wal_since == 0 && wal_probe::needs_probe(&plan.window, start, end) {
-        wal_probe::wal_since(&trace_id, org_id, &plan.streams).await
-    } else {
-        req.wal_since
-    };
-    let wal_floor = request_floor(wal_since);
+    let wal_start_time =
+        if req.wal_start_time == 0 && wal_probe::needs_probe(&plan.window, start, end) {
+            wal_probe::wal_start_time(&trace_id, org_id, &plan.streams).await
+        } else {
+            req.wal_start_time
+        };
+    let wal_floor = request_floor(wal_start_time);
     for (start, end) in group {
         let mut req = req.clone();
         req.need_wal = plan.window.reaches(end, wal_floor);
@@ -707,9 +708,9 @@ pub(crate) async fn query_streams(
 }
 
 /// The floor a request's groups read the WAL from, the widest when its sender did not probe.
-pub(crate) fn request_floor(wal_since: i64) -> i64 {
-    if wal_since > 0 {
-        wal_since
+pub(crate) fn request_floor(wal_start_time: i64) -> i64 {
+    if wal_start_time > 0 {
+        wal_start_time
     } else {
         wal_floor()
     }
