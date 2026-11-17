@@ -22,13 +22,22 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
-import { defineComponent, inject, nextTick, type Ref } from "vue";
+import { defineComponent, inject, nextTick, ref, type Ref } from "vue";
 import { createStore } from "vuex";
 import { z } from "zod";
 import i18n from "@/locales";
 import config from "@/aws-exports";
 import AlertSettings from "./AlertSettings.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { AlertSettingId } from "@/components/alerts/alertSettingTiers";
+import type { AlertSuggestionId } from "@/components/alerts/alertSuggestions";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
+import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
   makeAlertSettingsShape,
@@ -156,7 +165,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     await host.find('[data-test="alert-settings-silence-duration-input"] input').setValue("7");
     await flushPromises();
 
-    expect(parentForm.state.values.trigger_condition.silence).toBe("7");
+    expect(parentForm.state.values.trigger_condition.silence).toBe(7);
   });
 
   it("the parent handleSubmit surfaces the step's field errors", async () => {
@@ -202,10 +211,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     }
   });
 
-  it("passes submit when valid — string number input coerces via the schema", async () => {
-    // Rewritten from the old standalone "emits silence/period as NUMBERS" test:
-    // the schema's z.coerce accepts the raw STRING the input holds; the payload
-    // coercion is owned by getAlertPayload (covered by AddAlert.spec.ts).
+  it("passes submit when valid — the remind row stores a number", async () => {
     const host = mountDescendant("true", { destinations: ["dest-a"] });
     const parentForm = hostForm(host);
 
@@ -216,7 +222,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     await flushPromises();
 
     expect(parentForm.state.isValid).toBe(true);
-    expect(parentForm.state.values.trigger_condition.silence).toBe("5");
+    expect(parentForm.state.values.trigger_condition.silence).toBe(5);
   });
 
   it("blocks submit when silence is negative (schema ≥ 0)", async () => {
@@ -449,11 +455,10 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(host.find('[data-test="alert-settings-period-input"]').exists()).toBe(true);
   });
 
-  it("marks look-back and cooldown as required, as before", () => {
-    const host = mountDescendant("false");
-    const text = host.text();
-    expect(text).toContain("Look back over *");
-    expect(text).toContain("Quiet after alerting *");
+  it("marks the look-back as required, as before", () => {
+    expect(mountDescendant("false").text()).toContain(
+      `${t("alerts.form.schedule.lookingAtRow")} *`,
+    );
   });
 
   it("preserves every data-test (scheduled branch)", () => {
@@ -614,7 +619,7 @@ describe("AlertSettings — incident title preview", () => {
     config.isEnterprise = original;
   });
 
-  it("fills alert fields and keeps row placeholders as chips", () => {
+  it("fills alert fields and keeps row placeholders as chips", async () => {
     config.isEnterprise = "true";
     const host = mount(
       defineComponent({
@@ -640,6 +645,7 @@ describe("AlertSettings — incident title preview", () => {
       }),
       { global: { plugins: [makeStore({ incidents_enabled: true }), i18n] } },
     );
+    await host.find('[data-test="add-alert-incident-title-row-change"]').trigger("click");
     expect(host.find('[data-test="alert-incident-title-preview"]').text()).toContain(
       "HighErrors: {service} on {host}",
     );
@@ -829,5 +835,225 @@ describe("AlertSettings — combined destinations + workflows target control", (
   it("shows the no-destination note under the control before any submit", () => {
     const host = mountDescendant("true");
     expect(host.text()).toContain(NO_DESTINATION_NOTE);
+  });
+});
+
+// ── Sectioned editor: tiers, sentence rows and units (phase 1) ───────────────
+describe("AlertSettings — notify and timing in their sections", () => {
+  const original = { isEnterprise: config.isEnterprise };
+  afterEach(() => {
+    config.isEnterprise = original.isEnterprise;
+    document.body.innerHTML = "";
+  });
+
+  const SLOTS = ["settingsNotify", "settingsNotifyMore", "settingsSchedule", "settingsHold"];
+  function mountSectioned(
+    isRealTime: string,
+    defaults: Record<string, any> = {},
+    opts: { reveal?: AlertSettingId[]; showAll?: boolean; destinations?: string[] } = {},
+  ) {
+    const targets = Object.fromEntries(
+      SLOTS.map((slot) => [slot, document.body.appendChild(document.createElement("div"))]),
+    );
+    const tiers = useAlertSettingTiers({
+      available: () => true,
+      isSet: () => false,
+      showAll: ref(opts.showAll ?? false),
+    });
+    (opts.reveal ?? []).forEach(tiers.reveal);
+    const applied: Partial<Record<AlertSuggestionId, () => void>> = {};
+    const suggestions = {
+      current: () => null,
+      add: vi.fn(),
+      notNow: vi.fn(),
+      onApply: (id: AlertSuggestionId, handler: () => void) => {
+        applied[id] = handler;
+        return () => {};
+      },
+    };
+    const host = mount(
+      defineComponent({
+        components: { OForm, AlertSettings },
+        setup: () => ({
+          schema: parentSchema,
+          defaultValues: {
+            trigger_condition: { silence: 10, period: 10, frequency: 5, frequency_type: "minutes" },
+            destinations: opts.destinations ?? [],
+            creates_incident: false,
+            ...defaults,
+          },
+          targets,
+          isRealTime,
+          destinations: opts.destinations ?? [],
+        }),
+        template: `
+          <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+            <AlertSettings :form-data="defaultValues" :is-real-time="isRealTime"
+              :destinations="destinations" :section-targets="targets" />
+          </OForm>
+        `,
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [makeStore({ incidents_enabled: true }), i18n],
+          provide: {
+            [ALERT_SETTING_TIERS_KEY as symbol]: tiers,
+            [ALERT_SUGGESTIONS_KEY as symbol]: suggestions,
+          },
+        },
+      },
+    );
+    const values = () => hostForm(host).state.values;
+    const inSlot = (slot: string, dataTest: string) =>
+      !!targets[slot].querySelector(`[data-test="${dataTest}"]`);
+    return { host, tiers, applied, values, inSlot, targets };
+  }
+  const unitSelect = (host: VueWrapper, dataTest: string) =>
+    host.findAllComponents(OSelect).find((s) => s.attributes("data-test") === dataTest)!;
+  const amountInput = (host: VueWrapper, dataTest: string) =>
+    host.findAllComponents(OInput).find((i) => i.attributes("data-test") === dataTest)!;
+
+  it.each(["false", "true", "composite"])(
+    "Remind at most every is in Who to tell (is_real_time %s)",
+    (kind) => {
+      const { inSlot } = mountSectioned(kind);
+      expect(inSlot("settingsNotify", "alert-settings-silence-duration-input")).toBe(true);
+      expect(inSlot("settingsSchedule", "alert-settings-silence-duration-input")).toBe(false);
+    },
+  );
+
+  it.each([
+    [90, "90", "min"],
+    [240, "4", "h"],
+  ])(
+    "an untouched remind row shows silence %d as %s %s and writes nothing",
+    (silence, amount, unit) => {
+      const { host, values } = mountSectioned("true", {
+        trigger_condition: { silence, period: 10, frequency: 5 },
+      });
+      expect(amountInput(host, "alert-settings-silence-duration-input").props("modelValue")).toBe(
+        Number(amount),
+      );
+      expect(unitSelect(host, "alert-settings-silence-unit-select").props("modelValue")).toBe(unit);
+      expect(values().trigger_condition.silence).toBe(silence);
+      expect(host.findComponent(AlertSettings).emitted("update:trigger")).toBeUndefined();
+    },
+  );
+
+  it("4 h saves silence 240", async () => {
+    const { host, values } = mountSectioned("true");
+    await unitSelect(host, "alert-settings-silence-unit-select").vm.$emit("update:modelValue", "h");
+    await amountInput(host, "alert-settings-silence-duration-input").vm.$emit(
+      "update:modelValue",
+      "4",
+    );
+    expect(values().trigger_condition.silence).toBe(240);
+  });
+
+  it("keep firing 90 s shows 90 seconds and 2 min saves 120", async () => {
+    const { host, values } = mountSectioned(
+      "false",
+      { keep_firing_for: 90 },
+      { reveal: ["keepFiring"] },
+    );
+    const input = () => amountInput(host, "alert-settings-keep-firing-for-input");
+    const unit = () => unitSelect(host, "alert-settings-keep-firing-unit-select");
+    expect([input().props("modelValue"), unit().props("modelValue")]).toEqual([90, "seconds"]);
+    await unit().vm.$emit("update:modelValue", "min");
+    expect(values().keep_firing_for).toBe(90);
+    await input().vm.$emit("update:modelValue", "2");
+    expect(values().keep_firing_for).toBe(120);
+  });
+
+  it("an incident reads as a sentence with its title row", async () => {
+    config.isEnterprise = "true";
+    const { host, values, inSlot } = mountSectioned(
+      "false",
+      { creates_incident: true },
+      {
+        reveal: ["createsIncident"],
+      },
+    );
+    expect(inSlot("settingsNotifyMore", "add-alert-incident-row")).toBe(true);
+    expect(inSlot("settingsNotifyMore", "add-alert-incident-title-row")).toBe(true);
+    expect(inSlot("settingsNotifyMore", "alert-creates-incident-toggle")).toBe(false);
+
+    (document.querySelector('[data-test="add-alert-incident-row-remove"]') as HTMLElement).click();
+    await flushPromises();
+    expect(values().creates_incident).toBe(false);
+    expect(inSlot("settingsNotifyMore", "add-alert-incident-title-row")).toBe(false);
+    expect(inSlot("settingsNotifyMore", "add-alert-incident-row")).toBe(false);
+    host.unmount();
+  });
+
+  it("recovery fields stay hidden while recovery is off, even with Show all", () => {
+    const { inSlot } = mountSectioned(
+      "false",
+      { notify_on_recovery: false },
+      {
+        showAll: true,
+        destinations: ["dest-a"],
+      },
+    );
+    expect(inSlot("settingsNotifyMore", "alert-notify-on-recovery-toggle")).toBe(true);
+    expect(inSlot("settingsNotifyMore", "alert-notify-on-recovery-plan-dest-a")).toBe(false);
+    expect(document.body.textContent).not.toContain(t("alerts.alertSettings.recoveryDestinations"));
+  });
+
+  it("the recovery, keep-firing and Must last suggestions apply their values", () => {
+    const { applied, values } = mountSectioned("false");
+    applied.recovery!();
+    applied.keepFiring!();
+    applied.holdFor!();
+    expect(values().notify_on_recovery).toBe(true);
+    expect(values().keep_firing_for).toBe(600);
+    expect(values().pending_period_sec).toBe(10);
+  });
+
+  it("Must last shows as a sentence once set and Remove clears it", async () => {
+    const { tiers, values, inSlot } = mountSectioned(
+      "false",
+      {
+        pending_period_sec: 10,
+        _ui: { pendingPeriod: 10 },
+      },
+      { reveal: ["holdFor"] },
+    );
+    expect(inSlot("settingsHold", "add-alert-hold-for-row")).toBe(true);
+
+    (document.querySelector('[data-test="add-alert-hold-for-row-remove"]') as HTMLElement).click();
+    await flushPromises();
+    expect(values().pending_period_sec).toBe(0);
+    expect(inSlot("settingsHold", "add-alert-hold-for-row")).toBe(false);
+    expect(tiers.view("condition").more.map((d) => d.id)).toContain("holdFor");
+  });
+
+  it("composite Must last lives in the condition section", () => {
+    const { inSlot } = mountSectioned("composite", {}, { reveal: ["holdFor"] });
+    expect(inSlot("settingsHold", "add-alert-hold-for-row")).toBe(true);
+    expect(inSlot("settingsSchedule", "alert-settings-pending-period-input")).toBe(false);
+  });
+
+  it.each([
+    ["minutes", false],
+    ["cron", true],
+  ])("the look-back sits beside Check every, or in its own row with cron (%s)", (type, row) => {
+    const { inSlot, targets } = mountSectioned("false", {
+      trigger_condition: {
+        silence: 10,
+        period: 60,
+        frequency: 5,
+        frequency_type: type,
+        cron: "0 9 * * 1-5",
+      },
+    });
+    expect(inSlot("settingsSchedule", "alert-settings-period-input")).toBe(true);
+    expect(inSlot("settingsSchedule", "alert-settings-period-row")).toBe(row);
+    expect(
+      targets.settingsSchedule.textContent?.includes(
+        t("alerts.form.schedule.cron", { period: 60 }),
+      ),
+    ).toBe(row);
   });
 });
