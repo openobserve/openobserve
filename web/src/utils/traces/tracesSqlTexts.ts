@@ -101,12 +101,19 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
     host.data.editorValue = sql;
   };
 
-  // An untouched pre-fill says nothing the filter does not, so it goes, and the scope it folded in comes back.
-  const dropUntouchedPrefill = () => {
-    if (sqlTexts.prefill === null || sqlTexts.sql !== sqlTexts.prefill) return;
+  // An abandoned pre-fill gives back the scope it folded in, if the select still shows All spans.
+  const giveBackPrefillScope = () => {
     if (sqlTexts.scopeBeforePrefill !== null && host.meta.scope === "all") {
       host.meta.scope = sqlTexts.scopeBeforePrefill;
     }
+    sqlTexts.prefill = null;
+    sqlTexts.scopeBeforePrefill = null;
+  };
+
+  // An untouched or erased pre-fill says nothing the filter does not, so it goes.
+  const dropUntouchedPrefill = () => {
+    if (sqlTexts.prefill === null || (sqlTexts.sql && sqlTexts.sql !== sqlTexts.prefill)) return;
+    giveBackPrefillScope();
     clearSqlText();
   };
 
@@ -118,7 +125,6 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
     host.data.editorValue = sqlTexts.filter;
     sqlTexts.filter = "";
     sqlTexts.sql = sql.trim() ? sql : "";
-    if (!sqlTexts.sql) sqlTexts.prefill = null;
     dropUntouchedPrefill();
   };
 
@@ -167,6 +173,7 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
     if (host.meta.sqlMode) {
       // SQL still on never left the screen, unless a history entry brings its own SQL over the staged text.
       if (!entrySql?.trim() || entrySql === typed) return false;
+      if (sqlTexts.prefill !== null && typed === sqlTexts.prefill) giveBackPrefillScope();
       showSql(entrySql, sqlTexts.filter);
       return true;
     }

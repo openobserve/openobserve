@@ -64,15 +64,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-latency-heatmap-loading"
       />
       <div
-        v-else-if="status === 'error' || status === 'unavailable'"
-        class="text-status-error-text flex h-full items-center justify-center px-2 text-center text-sm"
-        :data-test="`traces-latency-heatmap-${status}`"
+        v-else-if="status === 'error'"
+        class="flex h-full flex-col items-center justify-center gap-1 px-2 text-center text-sm"
+        data-test="traces-latency-heatmap-error"
       >
-        {{
-          status === "error"
-            ? t("traces.latencyHeatmap.loadFailed")
-            : t("traces.latencyHeatmap.unavailable")
-        }}
+        <span class="text-status-error-text">{{ t("traces.latencyHeatmap.loadFailed") }}</span>
+        <span v-if="errorText" class="text-text-secondary line-clamp-2 text-xs">{{
+          errorText
+        }}</span>
+        <OButton
+          variant="outline"
+          size="sm"
+          data-test="traces-latency-heatmap-retry"
+          @click="load(request)"
+        >
+          {{ t("common.retry") }}
+        </OButton>
       </div>
       <OEmptyState
         v-else-if="status === 'empty'"
@@ -202,7 +209,6 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useTheme from "@/composables/useTheme";
 import { useAiIcon } from "@/composables/useAiIcon";
-import searchService from "@/services/search";
 import PanelBar from "@/components/common/PanelBar.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
@@ -231,8 +237,10 @@ import {
   type HeatmapCellRange,
   type LatencyHeatmapCell,
   type LatencyHeatmapGrid,
+  type LatencyHeatmapHit,
   type LatencyHeatmapSelection,
 } from "./latencyHeatmap";
+import { useTracesRedStream } from "./useTracesRedStream";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -249,6 +257,8 @@ export interface LatencyHeatmapRequest {
   sql: string;
   startTime: number;
   endTime: number;
+  intervalSec: number;
+  size: number;
 }
 
 // Another stream's grid is never kept under this one, even dimmed.
@@ -284,7 +294,8 @@ const MINUTE_US = 60 * 1_000_000;
 const GRID = { left: 52, right: 8, top: 8, bottom: 22 };
 const DAY_US = 24 * 3600 * 1_000_000;
 
-const status = ref<"idle" | "loading" | "ready" | "empty" | "unavailable" | "error">("idle");
+const status = ref<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+const errorText = ref("");
 const grid = shallowRef<LatencyHeatmapGrid | null>(null);
 const colorBy = ref<LatencyHeatmapColorBy>("spans");
 // The box the user drew, kept in grid cells; it shows only while the parent holds its selection.
@@ -301,26 +312,22 @@ watch(status, (now) => {
   if (now !== "ready") chartPainted.value = false;
 });
 
-let controller: AbortController | null = null;
 let shownStream: string | undefined;
 let drawnSource: string | undefined;
+const redStream = useTracesRedStream();
 
-const isCanceled = (e: any) => e?.name === "CanceledError" || e?.code === "ERR_CANCELED";
-
-async function load(request: LatencyHeatmapRequest | null) {
-  controller?.abort();
-  controller = null;
+function load(request: LatencyHeatmapRequest | null) {
+  redStream.cancel();
   refetching.value = false;
   drawn.value = null;
   popoverOpen.value = false;
   filtered.value = false;
+  errorText.value = "";
   if (!request) {
     grid.value = null;
     status.value = "idle";
     return;
   }
-  const mine = new AbortController();
-  controller = mine;
   const requestSource = props.source;
   const sameStream = props.stream === shownStream;
   shownStream = props.stream;
@@ -329,64 +336,41 @@ async function load(request: LatencyHeatmapRequest | null) {
   } else {
     grid.value = null;
     status.value = "loading";
+    chartPainted.value = false;
   }
-  try {
-    // Not a TanStack query: search reads are excluded from client caching (ui-architect data-fetching); the server cache still applies.
-    const res: any = await searchService.search({
-      org_identifier: store.state.selectedOrganization?.identifier,
-      query: {
-        query: {
-          sql: request.sql,
-          start_time: request.startTime,
-          end_time: request.endTime,
-          from: 0,
-          size: -1,
-        },
-      },
-      page_type: "traces",
-      signal: mine.signal,
-    });
-    if (controller !== mine) return;
-    const hits = res?.data?.hits ?? [];
-    const intervalSec = res?.data?.histogram_interval;
-    if (hits.length >= HEATMAP_ROW_LIMIT) {
-      console.warn("Latency heatmap reached its row limit; the grid may be truncated");
-    }
-    if (!hits.length) {
-      grid.value = null;
-      status.value = "empty";
+  redStream.run(
+    request,
+    (hits) => {
+      refetching.value = false;
+      if (hits.length >= HEATMAP_ROW_LIMIT) {
+        console.warn("Latency heatmap reached its row limit; the grid may be truncated");
+      }
+      grid.value = buildHeatmapGrid(
+        hits as unknown as LatencyHeatmapHit[],
+        request.intervalSec,
+        request.startTime,
+        request.endTime,
+      );
+      status.value = grid.value ? "ready" : "empty";
       drawnSource = requestSource;
-      return;
-    }
-    if (!intervalSec) {
+    },
+    (message) => {
+      const keepDrawn = refetching.value && requestSource === drawnSource;
+      refetching.value = false;
+      // A failed refresh keeps what was drawn at full opacity; the results header reports the failure (ruling 18).
+      if (keepDrawn) {
+        emit("refresh-failed");
+        return;
+      }
       grid.value = null;
-      status.value = "unavailable";
-      return;
-    }
-    grid.value = buildHeatmapGrid(hits, intervalSec, request.startTime, request.endTime);
-    status.value = grid.value ? "ready" : "empty";
-    drawnSource = requestSource;
-  } catch (e: any) {
-    if (isCanceled(e) || controller !== mine) return;
-    // A failed refresh keeps what was drawn at full opacity; the results header reports the failure (ruling 18).
-    if (refetching.value && requestSource === drawnSource) {
-      emit("refresh-failed");
-      return;
-    }
-    grid.value = null;
-    status.value = "error";
-  } finally {
-    if (controller === mine) refetching.value = false;
-  }
+      errorText.value = message;
+      status.value = "error";
+    },
+  );
 }
 
 // A new request object every search, so an identical re-run still refetches.
 watch(() => props.request, load, { immediate: true });
-
-onBeforeUnmount(() => {
-  controller?.abort();
-  controller = null;
-});
 
 const columnLabels = computed(() => {
   const g = grid.value;

@@ -17,7 +17,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vite
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
-import searchService from "@/services/search";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const { tokenColors, labelOverride, viewport } = vi.hoisted(() => ({
   tokenColors: { "--color-latency-p95": "#0a4ce8" } as Record<string, string>,
@@ -48,8 +48,22 @@ vi.mock("@/utils/timezone", async (importOriginal) => {
   };
 });
 
-vi.mock("@/services/search", () => ({
-  default: { search: vi.fn() },
+// Each call waits for the test to answer it, unless `answer` is set.
+const stream = vi.hoisted(() => ({
+  calls: [] as { payload: any; handlers: any }[],
+  cancel: vi.fn(),
+  answer: null as null | ((call: { payload: any; handlers: any }) => void),
+}));
+
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: (payload: any, handlers: any) => {
+      const call = { payload, handlers };
+      stream.calls.push(call);
+      stream.answer?.(call);
+    },
+    cancelStreamQueryBasedOnRequestId: stream.cancel,
+  }),
 }));
 
 vi.mock("@/utils/chartTheme", async (importOriginal) => {
@@ -74,8 +88,6 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
 import { chartColor } from "@/utils/chartTheme";
 import TracesLatencyHeatmap from "./TracesLatencyHeatmap.vue";
 
-const search = vi.mocked(searchService.search);
-
 const S = 1_000_000;
 const START = Date.UTC(2026, 9, 6, 10, 0, 0) * 1000;
 const END = START + 60 * S;
@@ -85,7 +97,25 @@ const HITS = [
   { x_axis: "2026-10-06T10:00:20", duration_bucket: 18, span_count: 3, error_count: 0 },
 ];
 
-const respond = (data: Record<string, unknown>) => search.mockResolvedValue({ data } as any);
+const deliver = (call: { payload: any; handlers: any }, hits: unknown[], meta = {}) => {
+  call.handlers.data(call.payload, {
+    type: "search_response_metadata",
+    content: { results: { ...meta } },
+  });
+  call.handlers.data(call.payload, {
+    type: "search_response_hits",
+    content: { results: { hits } },
+  });
+  call.handlers.complete(call.payload, {});
+};
+
+const respond = (data: { hits: unknown[] }) => {
+  stream.answer = (call) => deliver(call, data.hits);
+};
+
+const fail = (message = "boom") => {
+  stream.answer = (call) => call.handlers.error(call.payload, { content: { message } });
+};
 
 const makeStore = () =>
   createStore({
@@ -98,7 +128,13 @@ const makeStore = () =>
 
 let store = makeStore();
 
-const request = (sql = "SELECT 1") => ({ sql, startTime: START, endTime: END });
+const request = (sql = "SELECT 1", intervalSec = 10, size = -1) => ({
+  sql,
+  startTime: START,
+  endTime: END,
+  intervalSec,
+  size,
+});
 
 const settle = async () => {
   for (let i = 0; i < 6; i++) await flushPromises();
@@ -138,8 +174,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   store = makeStore();
-  search.mockReset();
-  respond({ hits: HITS, histogram_interval: 10 });
+  stream.calls.length = 0;
+  stream.cancel.mockReset();
+  respond({ hits: HITS });
   tokenColors["--color-latency-p95"] = "#0a4ce8";
   tokenColors["--color-status-error-text"] = "#cc3645";
   tokenColors["--color-chart-band"] = "#737373";
@@ -155,7 +192,7 @@ afterEach(() => {
 describe("TracesLatencyHeatmap", () => {
   describe("states", () => {
     it("shows the spinner while the search is in flight", async () => {
-      search.mockReturnValue(new Promise(() => {}) as any);
+      stream.answer = null;
       wrapper = await mountHeatmap();
       expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(true);
       expect(wrapper.findComponent({ name: "ChartRenderer" }).exists()).toBe(false);
@@ -163,8 +200,7 @@ describe("TracesLatencyHeatmap", () => {
 
     it("keeps the drawn grid at full opacity through a re-run, under its panel line", async () => {
       wrapper = await mountHeatmap();
-      let answer!: (v: any) => void;
-      search.mockReturnValueOnce(new Promise((r) => (answer = r)) as any);
+      stream.answer = null;
       await wrapper.setProps({ request: request("SELECT 2") });
       await settle();
 
@@ -176,7 +212,7 @@ describe("TracesLatencyHeatmap", () => {
       await new Promise((r) => setTimeout(r, 160));
       expect(body.classes()).not.toContain("opacity-60");
 
-      answer({ data: { hits: HITS, histogram_interval: 10 } });
+      deliver(stream.calls.at(-1)!, HITS);
       await settle();
       expect(body.attributes("aria-busy")).toBeUndefined();
       expect(panelLine(wrapper).props("loading")).toBe(false);
@@ -184,8 +220,7 @@ describe("TracesLatencyHeatmap", () => {
     });
 
     it("draws the dashboard panel line on its header edge through the first load and each re-run, and none once drawn", async () => {
-      let first!: (v: any) => void;
-      search.mockReturnValueOnce(new Promise((r) => (first = r)) as any);
+      stream.answer = null;
       wrapper = await mountHeatmap();
       const line = panelLine(wrapper);
       expect(line.element.parentElement?.getAttribute("data-test")).toBe(
@@ -199,24 +234,22 @@ describe("TracesLatencyHeatmap", () => {
       });
       expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(true);
 
-      first({ data: { hits: HITS, histogram_interval: 10 } });
+      deliver(stream.calls.at(-1)!, HITS);
       await settle();
       expect(panelLine(wrapper).props("loading")).toBe(false);
 
-      let again!: (v: any) => void;
-      search.mockReturnValueOnce(new Promise((r) => (again = r)) as any);
       await wrapper.setProps({ request: request("SELECT 2") });
       await settle();
       expect(panelLine(wrapper).props("loading")).toBe(true);
 
-      again({ data: { hits: HITS, histogram_interval: 10 } });
+      deliver(stream.calls.at(-1)!, HITS);
       await settle();
       expect(panelLine(wrapper).props("loading")).toBe(false);
     });
 
     it("never keeps another stream's grid while the new stream's loads", async () => {
       wrapper = await mountHeatmap({ request: request(), stream: "a" });
-      search.mockReturnValueOnce(new Promise(() => {}) as any);
+      stream.answer = null;
       await wrapper.setProps({ request: request("SELECT 2"), stream: "b" });
       await settle();
 
@@ -227,15 +260,15 @@ describe("TracesLatencyHeatmap", () => {
     it("keeps the drawn grid at full opacity when the re-run fails", async () => {
       wrapper = await mountHeatmap();
       const drawn = options(wrapper);
-      let fail!: (e: unknown) => void;
-      search.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)) as any);
+      stream.answer = null;
       await wrapper.setProps({ request: request("SELECT 2") });
       await settle();
       await new Promise((r) => setTimeout(r, 160));
       const body = wrapper.find('[data-test="traces-latency-heatmap-body"]');
       expect(body.classes()).not.toContain("opacity-60");
 
-      fail(new Error("boom"));
+      const call = stream.calls.at(-1)!;
+      call.handlers.error(call.payload, { content: { message: "boom" } });
       await settle();
       expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
@@ -249,9 +282,7 @@ describe("TracesLatencyHeatmap", () => {
     it("reports a refused re-run (4xx) to the page and keeps the grid", async () => {
       wrapper = await mountHeatmap();
       const drawn = options(wrapper);
-      search.mockRejectedValueOnce({
-        response: { status: 400, data: { code: 400, message: "Bad Request" } },
-      });
+      fail("Bad Request");
       await wrapper.setProps({ request: request("SELECT 2") });
       await settle();
 
@@ -262,7 +293,7 @@ describe("TracesLatencyHeatmap", () => {
 
     it("shows the error state, not the previous query's grid, when a same-stream re-run of a new query fails", async () => {
       wrapper = await mountHeatmap({ request: request(), stream: "a", source: "a|spans|q1" });
-      search.mockRejectedValueOnce(new Error("boom"));
+      fail();
       await wrapper.setProps({ request: request("SELECT 2"), source: "a|spans|q2" });
       await settle();
 
@@ -273,7 +304,7 @@ describe("TracesLatencyHeatmap", () => {
 
     it("keeps the grid when a re-run of the same query fails", async () => {
       wrapper = await mountHeatmap({ request: request(), stream: "a", source: "a|spans|q1" });
-      search.mockRejectedValueOnce(new Error("boom"));
+      fail();
       await wrapper.setProps({ request: request("SELECT 2"), source: "a|spans|q1" });
       await settle();
 
@@ -282,9 +313,9 @@ describe("TracesLatencyHeatmap", () => {
     });
 
     it("keeps the empty state when a re-run over no data fails", async () => {
-      respond({ hits: [], histogram_interval: 10 });
+      respond({ hits: [] });
       wrapper = await mountHeatmap();
-      search.mockRejectedValueOnce(new Error("boom"));
+      fail();
       await wrapper.setProps({ request: request("SELECT 2") });
       await settle();
 
@@ -295,7 +326,7 @@ describe("TracesLatencyHeatmap", () => {
 
     it("shows the error state when another stream's first load fails", async () => {
       wrapper = await mountHeatmap({ request: request(), stream: "a" });
-      search.mockRejectedValueOnce(new Error("boom"));
+      fail();
       await wrapper.setProps({ request: request("SELECT 2"), stream: "b" });
       await settle();
 
@@ -334,7 +365,7 @@ describe("TracesLatencyHeatmap", () => {
     });
 
     it("draws a blank Loading chart box, not a spinner or skeleton, before its first grid", async () => {
-      search.mockReturnValue(new Promise(() => {}) as any);
+      stream.answer = null;
       wrapper = await mountHeatmap();
       const loading = wrapper.find('[data-test="traces-latency-heatmap-loading"]');
       expect(loading.attributes("role")).toBe("img");
@@ -344,7 +375,7 @@ describe("TracesLatencyHeatmap", () => {
     });
 
     it("renders the empty state component for no hits", async () => {
-      respond({ hits: [], histogram_interval: 10 });
+      respond({ hits: [] });
       wrapper = await mountHeatmap();
       const empty = wrapper.find('[data-test="traces-latency-heatmap-no-data"]');
       expect(empty.exists()).toBe(true);
@@ -352,41 +383,35 @@ describe("TracesLatencyHeatmap", () => {
       expect(empty.text()).toContain(i18n.global.t("traces.latencyHeatmap.noData"));
     });
 
-    it("renders the error state when the search rejects", async () => {
-      search.mockRejectedValue(new Error("boom"));
+    it("renders the error state with the server message and a Retry that runs it again", async () => {
+      fail("Resources exhausted");
       wrapper = await mountHeatmap();
       const error = wrapper.find('[data-test="traces-latency-heatmap-error"]');
       expect(error.exists()).toBe(true);
-      expect(error.text()).toBe(i18n.global.t("traces.latencyHeatmap.loadFailed"));
+      expect(error.text()).toContain(i18n.global.t("traces.latencyHeatmap.loadFailed"));
+      expect(error.text()).toContain("Resources exhausted");
+
+      respond({ hits: HITS });
+      await wrapper.find('[data-test="traces-latency-heatmap-retry"]').trigger("click");
+      await settle();
+      expect(stream.calls).toHaveLength(2);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
     });
 
-    it("stays ready on the newer grid when the superseded search later rejects as canceled", async () => {
-      let rejectFirst!: (e: unknown) => void;
-      let resolveSecond!: (v: any) => void;
-      search
-        .mockReturnValueOnce(new Promise((_, reject) => (rejectFirst = reject)) as any)
-        .mockReturnValueOnce(new Promise((r) => (resolveSecond = r)) as any);
+    it("stays ready on the newer grid when the superseded search later fails", async () => {
+      stream.answer = null;
       wrapper = await mountHeatmap();
       await wrapper.setProps({ request: request("SELECT 2") });
       await settle();
 
-      resolveSecond({ data: { hits: HITS, histogram_interval: 10 } });
+      deliver(stream.calls[1], HITS);
       await settle();
-      rejectFirst(Object.assign(new Error("canceled"), { name: "CanceledError" }));
+      stream.calls[0].handlers.error(stream.calls[0].payload, { content: { message: "canceled" } });
       await settle();
 
       expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
       expect(options(wrapper).yAxis.data).toEqual(["100ms", "200ms", "500ms"]);
-    });
-
-    it("renders the unavailable state and no chart without a histogram interval", async () => {
-      respond({ hits: HITS });
-      wrapper = await mountHeatmap();
-      const unavailable = wrapper.find('[data-test="traces-latency-heatmap-unavailable"]');
-      expect(unavailable.exists()).toBe(true);
-      expect(unavailable.text()).toBe(i18n.global.t("traces.latencyHeatmap.unavailable"));
-      expect(wrapper.findComponent({ name: "ChartRenderer" }).exists()).toBe(false);
     });
 
     it("renders the chart when data arrives, under the Duration title", async () => {
@@ -399,49 +424,66 @@ describe("TracesLatencyHeatmap", () => {
   });
 
   describe("fetching", () => {
-    it("sends the request's SQL and range as a one-shot traces search", async () => {
-      wrapper = await mountHeatmap();
-      const call = search.mock.calls[0][0] as any;
-      expect(call.org_identifier).toBe("test-org");
-      expect(call.page_type).toBe("traces");
-      expect(call.query.query).toEqual({
-        sql: "SELECT 1",
-        start_time: START,
-        end_time: END,
-        from: 0,
-        size: -1,
+    it("sends the request's SQL, range and size over the streaming search", async () => {
+      wrapper = await mountHeatmap({ request: request("SELECT 1", 10, -999) });
+      const { payload } = stream.calls[0];
+      expect(payload.org_id).toBe("test-org");
+      expect(payload.type).toBe("search");
+      expect(payload.pageType).toBe("traces");
+      expect(payload.queryReq).toEqual({
+        query: {
+          sql: b64EncodeUnicode("SELECT 1"),
+          start_time: START,
+          end_time: END,
+          from: 0,
+          size: -999,
+        },
+        encoding: "base64",
       });
-      expect(call.signal).toBeInstanceOf(AbortSignal);
+      expect(typeof payload.traceId).toBe("string");
     });
 
-    it("aborts the previous call and refetches for a new request object with identical fields", async () => {
-      search.mockReturnValue(new Promise(() => {}) as any);
+    it("adds up the hits of every partition", async () => {
+      stream.answer = (call) => {
+        call.handlers.data(call.payload, {
+          type: "search_response_hits",
+          content: { results: { hits: [HITS[0]] } },
+        });
+        call.handlers.data(call.payload, {
+          type: "search_response_hits",
+          content: { results: { hits: [HITS[1]] } },
+        });
+        call.handlers.complete(call.payload, {});
+      };
       wrapper = await mountHeatmap();
-      const first = (search.mock.calls[0][0] as any).signal as AbortSignal;
+      expect(
+        options(wrapper)
+          .series[0].data.map((c: number[]) => c[3])
+          .sort(),
+      ).toEqual([3, 40]);
+    });
+
+    it("cancels the previous call and refetches for a new request object with identical fields", async () => {
+      stream.answer = null;
+      wrapper = await mountHeatmap();
+      const first = stream.calls[0].payload.traceId;
       await wrapper.setProps({ request: request() });
       await settle();
-      expect(search).toHaveBeenCalledTimes(2);
-      expect(first.aborted).toBe(true);
+      expect(stream.calls).toHaveLength(2);
+      expect(stream.cancel).toHaveBeenCalledWith({ trace_id: first, org_id: "test-org" });
     });
 
-    it("keeps the newer request's grid when the superseded one resolves last", async () => {
-      let resolveFirst!: (v: any) => void;
-      let resolveSecond!: (v: any) => void;
-      search
-        .mockReturnValueOnce(new Promise((r) => (resolveFirst = r)) as any)
-        .mockReturnValueOnce(new Promise((r) => (resolveSecond = r)) as any);
+    it("keeps the newer request's grid when the superseded one answers last", async () => {
+      stream.answer = null;
       wrapper = await mountHeatmap();
       await wrapper.setProps({ request: request("SELECT 2") });
       await settle();
 
-      resolveSecond({
-        data: {
-          hits: [{ x_axis: "2026-10-06T10:00:10", duration_bucket: 20, span_count: 5 }],
-          histogram_interval: 10,
-        },
-      });
+      deliver(stream.calls[1], [
+        { x_axis: "2026-10-06T10:00:10", duration_bucket: 20, span_count: 5 },
+      ]);
       await settle();
-      resolveFirst({ data: { hits: HITS, histogram_interval: 10 } });
+      deliver(stream.calls[0], HITS);
       await settle();
 
       expect(options(wrapper).yAxis.data).toEqual(["2s"]);
@@ -512,8 +554,7 @@ describe("TracesLatencyHeatmap", () => {
     });
 
     it("labels columns to the minute for minute buckets, like the Rate chart", async () => {
-      respond({ hits: HITS, histogram_interval: 60 });
-      wrapper = await mountHeatmap();
+      wrapper = await mountHeatmap({ request: request("SELECT 1", 60) });
       expect(options(wrapper).xAxis.data[0]).toMatch(/^\d{2}:\d{2}$/);
     });
 
@@ -553,7 +594,6 @@ describe("TracesLatencyHeatmap", () => {
     it("shows an open range for the top bucket", async () => {
       respond({
         hits: [{ x_axis: "2026-10-06T10:00:10", duration_bucket: 28, span_count: 1 }],
-        histogram_interval: 10,
       });
       wrapper = await mountHeatmap();
       const html: string = options(wrapper).tooltip.formatter({ data: cellWithCount(wrapper, 1) });
@@ -903,7 +943,6 @@ describe("TracesLatencyHeatmap", () => {
     it("groups the span count's digits, as the Drill down panel does", async () => {
       respond({
         hits: [{ ...HITS[0], span_count: 460_122 }, HITS[1]],
-        histogram_interval: 10,
       });
       wrapper = await mountAttached();
       await drawBox();

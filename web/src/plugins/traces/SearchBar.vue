@@ -943,6 +943,7 @@ import { pageValuesSetting, pageValuesWindow } from "@/composables/fieldValueSto
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
+  tracesEditorIsStaged,
   tracesQueryNotRun,
   tracesRunIsStaged,
   tracesToolbarLayout,
@@ -1133,9 +1134,7 @@ export default defineComponent({
     // Pending when auto-run is off and the state differs from the last Run, or the editor differs from the last applied query.
     const showRunQueryPending = computed(() => {
       if (tracesRunIsStaged(searchObj, store.state.zoConfig?.auto_query_enabled)) return true;
-      const applied: unknown = searchObj.data.appliedEditorValue;
-      if (typeof applied !== "string") return false;
-      return String(searchObj.data.editorValue ?? "").trim() !== applied.trim();
+      return tracesEditorIsStaged(searchObj);
     });
     // The URL already carries the staged edit, so a link before Run would share a query nobody ran.
     const shareReason = computed(() =>

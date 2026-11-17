@@ -227,6 +227,19 @@ const mockSearchObj = {
   runQuery: false,
 };
 
+// The RED strip has its own spec; here only its mount point and event wiring matter.
+vi.mock("@/plugins/traces/metrics/TracesMetricsDashboard.vue", async () => {
+  const { defineComponent, h } = await import("vue");
+  return {
+    __esModule: true,
+    default: defineComponent({
+      name: "TracesMetricsDashboard",
+      emits: ["time-range-selected", "editor-filter-set", "editor-filter-run", "send-to-ai-chat"],
+      setup: () => () => h("div", { "data-test": "traces-metrics-dashboard-stub" }),
+    }),
+  };
+});
+
 vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
 }));
@@ -5503,11 +5516,11 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.queryResults.hits ?? []).toEqual([]);
     });
 
-    it("keeps the server's histogram eligibility on the results", async () => {
+    it("does not copy the server's histogram eligibility, which no longer gates the RED charts", async () => {
       await mountSql();
       const { handlers } = await runSql(`SELECT * FROM "default" LIMIT 5`);
       await finish(handlers, [{ trace_id: "t", span_id: "s" }], { is_histogram_eligible: false });
-      expect(mockSearchObj.data.queryResults.is_histogram_eligible).toBe(false);
+      expect(mockSearchObj.data.queryResults.is_histogram_eligible).toBeUndefined();
     });
 
     const useRealParser = async () => {
@@ -5817,6 +5830,20 @@ describe("Index.vue (Main Traces Page)", () => {
       },
     );
 
+    it("runs Spans SQL again on a return when only trailing whitespace was added since its run", async () => {
+      await mountSql();
+      mockSearchObj.searchApplied = true;
+      const { handlers } = await runSql(big);
+      await finish(handlers, [{ trace_id: "t" }]);
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockSearchObj.data.editorValue = `${big}\n `;
+      wrapper.vm.onSearchModeChange("service-graph");
+      wrapper.vm.onSearchModeChange("spans");
+      await redraw();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(false);
+    });
+
     it("keeps Spans SQL edited since its run waiting for Run on a return from the service graph", async () => {
       await mountSql();
       mockSearchObj.searchApplied = true;
@@ -6016,6 +6043,38 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(state.props("errorMsg")).toBe("unknown field 'servce_name'");
       expect(state.props("suggestions")).toEqual(["service_name"]);
       expect(state.props("query")).toBe(`SELECT servce_name FROM "default"`);
+    });
+
+    it("keeps the RED strip above a failed query and handles its events like the results do", async () => {
+      await mountSql();
+      await failRun(`SELECT servce_name FROM "default"`, {
+        code: 20004,
+        message: "unknown field 'servce_name'",
+      });
+      await vi.waitFor(async () => {
+        for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+        await nextTick();
+        expect(
+          wrapper
+            .find('[data-test="traces-search-error-message"]')
+            .findComponent({ name: "TracesMetricsDashboard" })
+            .exists(),
+        ).toBe(true);
+      });
+      const dashboard = wrapper.findComponent({ name: "TracesMetricsDashboard" });
+      const handoff = { message: "why slow" };
+      dashboard.vm.$emit("send-to-ai-chat", handoff);
+      expect(wrapper.emitted("sendToAiChat")?.at(-1)).toEqual([handoff, true]);
+      dashboard.vm.$emit("editor-filter-set", "duration > 5");
+      expect(mockSearchObj.data.editorValue).toBe("duration > 5");
+      mockSearchObj.meta.showHistogram = false;
+      await nextTick();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      const hidden = wrapper.findComponent({ name: "TracesMetricsDashboard" });
+      expect(hidden.vm).toBe(dashboard.vm);
+      expect(hidden.isVisible()).toBe(false);
+      mockSearchObj.meta.showHistogram = true;
     });
 
     it("keeps the filter-mode error as it was", async () => {

@@ -28,7 +28,8 @@ export const TOP_BUCKET = DURATION_BOUNDS_US.length;
 export const HEATMAP_ROW_LIMIT = 20000;
 
 export interface LatencyHeatmapHit {
-  x_axis: string;
+  /** A histogram() time string, or microseconds from a modulo bucket. */
+  x_axis: string | number;
   duration_bucket: number;
   span_count: number;
   error_count: number;
@@ -100,21 +101,27 @@ export function buildLatencyHeatmapSql(
   filters: string[],
   interval: string,
   fromClause = `"${streamName}"`,
+  bucket = `histogram(_timestamp, '${interval}')`,
 ): string {
   const whens = DURATION_BOUNDS_US.map((bound, k) => `WHEN duration < ${bound} THEN ${k}`).join(
     " ",
   );
   const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
   return (
-    `SELECT histogram(_timestamp, '${interval}') AS x_axis, CASE ${whens} ELSE ${TOP_BUCKET} END AS duration_bucket, ` +
+    `SELECT ${bucket} AS x_axis, CASE ${whens} ELSE ${TOP_BUCKET} END AS duration_bucket, ` +
     `count(*) AS span_count, sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count ` +
     `FROM ${fromClause}${where} ` +
     `GROUP BY x_axis, duration_bucket LIMIT ${HEATMAP_ROW_LIMIT}`
   );
 }
 
-// The histogram x_axis is a zone-less UTC timestamp string.
-const parseBucketUs = (xAxis: string): number => new Date(`${xAxis}Z`).getTime() * 1000;
+/** A bucket start in microseconds, from histogram()'s zone-less UTC string or a modulo bucket's number. */
+export function parseBucketUs(bucket: unknown): number {
+  if (typeof bucket === "number") return bucket;
+  const text = String(bucket ?? "");
+  if (/^\d+$/.test(text)) return Number(text);
+  return new Date(`${text}Z`).getTime() * 1000;
+}
 
 export function buildHeatmapGrid(
   hits: LatencyHeatmapHit[],

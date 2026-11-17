@@ -18,8 +18,9 @@ import {
   analyzeTracesSql,
   buildTracesSql,
   canAddTraceId,
+  deriveSpanSet,
+  histogramLosesSpans,
   insertTraceIdColumn,
-  isRedEligible,
   matchAllToStrMatch,
   missingStreamAfterFrom,
   replaceSqlIdentifier,
@@ -177,37 +178,283 @@ describe("analyzeTracesSql: query features", () => {
   });
 });
 
-describe("isRowQuery / isRedEligible", () => {
-  it("accepts a plain query and a subquery in WHERE", () => {
-    expect(isRedEligible(info(`SELECT * FROM "a" WHERE b = 1`))).toBe(true);
-    expect(isRedEligible(info(`SELECT * FROM "a" WHERE t IN (SELECT t FROM "a" GROUP BY t)`))).toBe(
-      true,
-    );
-    expect(isRedEligible(info(`SELECT trace_id, duration FROM "a" WHERE b = 1`))).toBe(true);
-  });
-
-  it("collapses for GROUP BY, aggregates, JOIN, WITH, UNION, LIMIT and DISTINCT", () => {
-    for (const sql of [
-      `SELECT x, count(*) FROM "a" GROUP BY x`,
-      `SELECT count(*) FROM "a"`,
-      `SELECT * FROM "a" JOIN "b" ON a.x = b.x`,
-      `WITH t AS (SELECT * FROM "a") SELECT * FROM t`,
-      `SELECT x FROM "a" UNION SELECT x FROM "b"`,
-      `SELECT * FROM "a" LIMIT 10`,
-      `SELECT DISTINCT x FROM "a"`,
-    ]) {
-      expect(isRedEligible(info(sql)), sql).toBe(false);
-    }
-  });
-
-  it("collapses when the server says the query is not eligible", () => {
-    expect(isRedEligible(info(`SELECT * FROM "a"`), false)).toBe(false);
-    expect(isRedEligible(info(`SELECT * FROM "a"`), true)).toBe(true);
-  });
-
+describe("isRowQuery", () => {
   it("is a row query only when each row is one span", () => {
-    expect(isRowQuery(info(`SELECT * FROM "a"`))).toBe(true);
+    expect(isRowQuery(info(`SELECT * FROM "a" WHERE b = 1`))).toBe(true);
+    expect(isRowQuery(info(`SELECT x, count(*) FROM "a" GROUP BY x`))).toBe(false);
     expect(isRowQuery(info(`SELECT * FROM (SELECT * FROM "a")`))).toBe(false);
+  });
+});
+
+describe("deriveSpanSet: the RED span-set ladder", () => {
+  const traces = (name: string) => name === "default";
+  const derive = (sql: string) => deriveSpanSet(sql, parser, { isTracesStream: traces });
+  const set = (sql: string) => {
+    const result = derive(sql);
+    if (result.kind !== "set") throw new Error(`no span set for ${sql}: ${result.reason}`);
+    return result;
+  };
+
+  it("rule 2: slices the top-level WHERE and drops ORDER BY, LIMIT and OFFSET", () => {
+    const s = set(
+      `SELECT * FROM "default" WHERE service_name = 'q' ORDER BY duration DESC LIMIT 10 OFFSET 5`,
+    );
+    expect(s).toMatchObject({
+      subject: "matched",
+      with: "",
+      from: `"default"`,
+      where: "service_name = 'q'",
+      keepsSubquery: false,
+    });
+    expect(s.dropped).toEqual(["orderBy", "limit", "offset"]);
+  });
+
+  it("rule 2: drops a window function and QUALIFY, which the parser cannot read", () => {
+    const s = set(
+      `SELECT *, row_number() OVER (PARTITION BY operation_name ORDER BY duration DESC) AS rn FROM "default" WHERE service_name = 'q' QUALIFY rn = 1`,
+    );
+    expect(s.where).toBe("service_name = 'q'");
+    expect(s.dropped).toEqual(["window", "qualify"]);
+  });
+
+  it("rule 2: a plain WHERE drops nothing", () => {
+    expect(set(`SELECT * FROM "default" WHERE a = 1`).dropped).toEqual([]);
+  });
+
+  it("keeps comments and strings in the WHERE out of the clause detection", () => {
+    const s = set(
+      `SELECT * FROM "default" WHERE note = 'group by x limit 1' -- order by y\n AND b = 2`,
+    );
+    expect(s.where).toMatch(/^note = 'group by x limit 1'\s+AND b = 2$/);
+    expect(s.dropped).toEqual([]);
+  });
+
+  it("rule 3: GROUP BY and HAVING are not applied", () => {
+    const s = set(
+      `SELECT service_name, count(*) AS spans FROM "default" WHERE span_status = 'ERROR' GROUP BY service_name HAVING count(*) > 100 ORDER BY spans DESC LIMIT 3`,
+    );
+    expect(s.where).toBe("span_status = 'ERROR'");
+    expect(s.dropped).toEqual(["groupBy", "having", "orderBy", "limit"]);
+  });
+
+  it("rule 4: DISTINCT is not applied", () => {
+    const s = set(`SELECT DISTINCT service_name FROM "default" WHERE span_status = 'ERROR'`);
+    expect(s.dropped).toEqual(["distinct"]);
+  });
+
+  it("rule 6: a final SELECT over a CTE keeps the WITH and reads FROM the CTE", () => {
+    const s = set(
+      `WITH slow AS (SELECT * FROM "default" WHERE duration > 1000000) SELECT service_name, count(*) AS c FROM slow WHERE service_name <> 'x' GROUP BY service_name`,
+    );
+    expect(s).toMatchObject({
+      subject: "cte",
+      cte: "slow",
+      with: `WITH slow AS (SELECT * FROM "default" WHERE duration > 1000000)`,
+      from: "slow",
+      where: "service_name <> 'x'",
+      keepsSubquery: true,
+    });
+    expect(s.dropped).toEqual(["groupBy"]);
+  });
+
+  it("rule 6: a CTE body that aggregates gives the body's WHERE on its stream", () => {
+    const s = set(
+      `WITH per AS (SELECT service_name, count(*) AS c FROM "default" WHERE duration > 5 GROUP BY service_name) SELECT * FROM per WHERE c > 10`,
+    );
+    expect(s).toMatchObject({
+      subject: "cte",
+      cte: "per",
+      with: "",
+      from: `"default"`,
+      where: "duration > 5",
+      keepsSubquery: false,
+    });
+    expect(s.dropped).toEqual(["groupBy", "outerWhere"]);
+  });
+
+  it("rule 7: a CTE used as a filter keeps the WITH and the WHERE that reads it", () => {
+    const s = set(
+      `WITH bad AS (SELECT trace_id FROM "default" WHERE span_status = 'ERROR') SELECT _timestamp, trace_id FROM "default" WHERE service_name = 'querier' AND trace_id IN (SELECT trace_id FROM bad)`,
+    );
+    expect(s).toMatchObject({
+      subject: "matched",
+      with: `WITH bad AS (SELECT trace_id FROM "default" WHERE span_status = 'ERROR')`,
+      from: `"default"`,
+      where: "service_name = 'querier' AND trace_id IN (SELECT trace_id FROM bad)",
+      keepsSubquery: true,
+    });
+    expect(s.dropped).toEqual([]);
+  });
+
+  it("rule 6: a CTE named like its stream reads the stream inside its body", () => {
+    const s = set(
+      `WITH "default" AS (SELECT * FROM "default" WHERE service_name = 'api') SELECT * FROM "default" WHERE duration > 5`,
+    );
+    expect(s).toMatchObject({
+      subject: "cte",
+      cte: "default",
+      with: `WITH "default" AS (SELECT * FROM "default" WHERE service_name = 'api')`,
+      from: `"default"`,
+      where: "duration > 5",
+      keepsSubquery: true,
+    });
+  });
+
+  it("rule 6: WITH RECURSIVE gives no span set", () => {
+    expect(derive(`WITH RECURSIVE t AS (SELECT * FROM t) SELECT * FROM t`)).toMatchObject({
+      kind: "none",
+    });
+  });
+
+  it("rule 6: a CTE body cannot read a CTE defined after it", () => {
+    expect(
+      derive(`WITH a AS (SELECT * FROM b), b AS (SELECT * FROM a) SELECT * FROM a WHERE x = 1`),
+    ).toMatchObject({ kind: "none" });
+  });
+
+  it("rule 8: UNION ALL on one stream ORs the branch WHEREs", () => {
+    const s = set(
+      `SELECT trace_id, service_name FROM "default" WHERE span_status = 'ERROR' UNION ALL SELECT trace_id, service_name FROM default WHERE service_name = 'alertmanager'`,
+    );
+    expect(s).toMatchObject({
+      subject: "branches",
+      branches: 2,
+      from: `"default"`,
+      where: "(span_status = 'ERROR') OR (service_name = 'alertmanager')",
+    });
+  });
+
+  it("rule 8: a branch with no WHERE matches every span", () => {
+    expect(set(`SELECT a FROM "default" WHERE b = 1 UNION SELECT a FROM "default"`).where).toBe("");
+  });
+
+  it("rule 14: UNION across streams and INTERSECT give no span set", () => {
+    expect(derive(`SELECT a FROM "default" UNION SELECT a FROM "other"`)).toMatchObject({
+      kind: "none",
+    });
+    expect(derive(`SELECT a FROM "default" INTERSECT SELECT a FROM "default"`)).toMatchObject({
+      kind: "none",
+      reason: "shape",
+    });
+  });
+
+  it("rule 9 (d): a trace_id join keeps left spans in traces where the right side matched", () => {
+    const s = set(
+      `SELECT p._timestamp, p.trace_id, c.operation_name AS child_op FROM "default" p JOIN "default" c ON c.trace_id = p.trace_id AND c.reference_parent_span_id = p.span_id WHERE p.service_name = 'alertmanager' AND c.service_name = 'querier'`,
+    );
+    expect(s).toMatchObject({
+      subject: "joinMatched",
+      from: `"default" p`,
+      where: `p.service_name = 'alertmanager' AND p.trace_id IN (SELECT DISTINCT c.trace_id FROM "default" c WHERE c.service_name = 'querier')`,
+      keepsSubquery: true,
+    });
+    expect(s.dropped).toEqual([]);
+  });
+
+  it("rule 9 (d): a WHERE comparing both sides is not applied", () => {
+    const s = set(
+      `SELECT * FROM "default" p INNER JOIN "default" c ON p.trace_id = c.trace_id WHERE p.service_name <> c.service_name AND c.duration > 5`,
+    );
+    expect(s.where).toBe(
+      `p.trace_id IN (SELECT DISTINCT c.trace_id FROM "default" c WHERE c.duration > 5)`,
+    );
+    expect(s.dropped).toEqual(["bothSidesWhere"]);
+  });
+
+  it("rule 9 (a): a join on another key keeps the left WHERE only", () => {
+    const s = set(
+      `SELECT * FROM "default" p JOIN "default" c ON c.reference_parent_span_id = p.span_id WHERE p.service_name = 'a' AND c.service_name BETWEEN 'b' AND 'c'`,
+    );
+    expect(s).toMatchObject({
+      subject: "joinLeft",
+      from: `"default" p`,
+      where: "p.service_name = 'a'",
+      keepsSubquery: false,
+    });
+    expect(s.dropped).toEqual(["join"]);
+  });
+
+  it("rule 10: a subquery in the WHERE is kept, with the stream name inside it verbatim", () => {
+    const s = set(
+      `SELECT _timestamp, trace_id FROM "default" WHERE service_name = 'querier' AND trace_id IN (SELECT trace_id FROM default WHERE span_status = 'ERROR')`,
+    );
+    expect(s.where).toBe(
+      "service_name = 'querier' AND trace_id IN (SELECT trace_id FROM default WHERE span_status = 'ERROR')",
+    );
+    expect(s).toMatchObject({ subject: "matched", keepsSubquery: true });
+    expect(s.dropped).toEqual([]);
+  });
+
+  it("rule 11: a FROM subquery gives the inner WHERE and drops an outer WHERE on a computed column", () => {
+    const s = set(
+      `SELECT * FROM (SELECT _timestamp, trace_id, row_number() OVER (PARTITION BY service_name ORDER BY duration DESC) AS rn FROM "default" WHERE span_status = 'ERROR') WHERE rn <= 3`,
+    );
+    expect(s).toMatchObject({
+      subject: "inner",
+      from: `"default"`,
+      where: "span_status = 'ERROR'",
+    });
+    expect(s.dropped).toEqual(["window", "outerWhere"]);
+  });
+
+  it("rule 11: an outer WHERE on a stream column is kept", () => {
+    const s = set(
+      `SELECT * FROM (SELECT * FROM "default" WHERE span_status = 'ERROR') WHERE service_name = 'a'`,
+    );
+    expect(s.where).toBe("(span_status = 'ERROR') AND (service_name = 'a')");
+    expect(s.dropped).toEqual([]);
+  });
+
+  it("rule 14: a FROM that is not a traces stream names the stream", () => {
+    expect(derive(`SELECT * FROM "k8s_events" WHERE reason = 'Failed'`)).toEqual({
+      kind: "none",
+      reason: "notTraces",
+      stream: "k8s_events",
+    });
+  });
+
+  it("rule 14: text the parser cannot read gives no span set", () => {
+    expect(derive(`SELECT * FROM "default" WHERE (a = `)).toMatchObject({
+      kind: "none",
+      reason: "unreadable",
+    });
+    expect(derive(`service_name = 'a'`)).toMatchObject({ kind: "none", reason: "unreadable" });
+  });
+
+  it("treats every stream as a traces stream when no list is given", () => {
+    expect(deriveSpanSet(`SELECT * FROM "any" WHERE a = 1`, parser).kind).toBe("set");
+  });
+});
+
+describe("histogramLosesSpans", () => {
+  it("warns on histogram() with a subquery or a CTE", () => {
+    expect(
+      histogramLosesSpans(
+        `SELECT histogram(_timestamp) AS t, count(*) FROM "default" WHERE trace_id IN (SELECT trace_id FROM "default") GROUP BY t`,
+      ),
+    ).toBe(true);
+    expect(
+      histogramLosesSpans(
+        `WITH x AS (SELECT * FROM "default") SELECT histogram(_timestamp) AS t, count(*) FROM x GROUP BY t`,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not warn on a JOIN, on histogram() alone, or on a subquery alone", () => {
+    expect(
+      histogramLosesSpans(
+        `SELECT histogram(p._timestamp) AS t, count(*) FROM "default" p JOIN "default" c ON p.trace_id = c.trace_id GROUP BY t`,
+      ),
+    ).toBe(false);
+    expect(histogramLosesSpans(`SELECT histogram(_timestamp) AS t FROM "default" GROUP BY t`)).toBe(
+      false,
+    );
+    expect(
+      histogramLosesSpans(`SELECT * FROM "default" WHERE a IN (SELECT a FROM "default")`),
+    ).toBe(false);
+    expect(histogramLosesSpans(`SELECT 'histogram(' FROM "default" WHERE a IN (SELECT 1)`)).toBe(
+      false,
+    );
   });
 });
 

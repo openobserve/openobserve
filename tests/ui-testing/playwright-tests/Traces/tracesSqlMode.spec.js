@@ -59,7 +59,7 @@ test.describe("Traces SQL mode testcases", () => {
     await pm.tracesPage.expectQueryEditorValue(PREFILLED);
   });
 
-  test("P1: A GROUP BY query shows its result columns and no RED charts", {
+  test("P1: A GROUP BY query shows its result columns and keeps the RED charts with a caption", {
     tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
   }, async () => {
     await pm.tracesPage.toggleSqlModeFromToolbar();
@@ -72,8 +72,8 @@ test.describe("Traces SQL mode testcases", () => {
     await expect(table).toBeVisible({ timeout: 20000 });
     await expect(table).toContainText('service_name');
     await expect(table).toContainText('spans');
-    await expect(pm.tracesPage.getRedUnavailableIcon()).toBeVisible();
-    await expect(pm.tracesPage.getRedMetricsDashboard()).toHaveCount(0);
+    await expect(pm.tracesPage.getRedMetricsDashboard()).toBeVisible();
+    await expect(pm.tracesPage.getRedCaption()).toContainText('GROUP BY not applied', { timeout: 20000 });
   });
 
   test("P1: Turning SQL mode off shows and runs the filter with no dialog, and keeps the SQL", {

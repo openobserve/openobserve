@@ -124,15 +124,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTag>
         <span
-          v-if="!redAvailable && searchObj.meta.showHistogram"
-          class="text-warning ms-1 inline-flex shrink-0 cursor-help"
-          tabindex="0"
-          data-test="traces-red-unavailable-icon"
-        >
-          <OIcon name="info-outline" size="sm" />
-          <OTooltip :content="t('traces.sqlMode.redUnavailable')" side="top" align="center" />
-        </span>
-        <span
           v-if="sqlInfo && searchObj.data.queryResults?.is_partial === true"
           class="text-warning ms-1 inline-flex shrink-0 cursor-help"
           tabindex="0"
@@ -230,9 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <TracesMetricsDashboard
           v-show="searchObj.meta.showHistogram"
-          v-if="
-            searchObj.data.stream.selectedStream.value && searchObj.searchApplied && redAvailable
-          "
+          v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
           ref="metricsDashboardRef"
           class="sticky start-0 z-1"
           :streamName="searchObj.data.stream.selectedStream.value"
@@ -251,6 +240,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <TracesMetricsPlaceholder v-else-if="pending && searchObj.meta.showHistogram" />
 
+        <OBanner
+          v-if="histogramLoss"
+          variant="warning"
+          dense
+          class="mx-1 my-1"
+          data-test="traces-sql-histogram-loss-warning"
+        >
+          {{ t("traces.sqlMode.histogramLossWarning") }}
+        </OBanner>
         <OEmptyState
           v-if="matchAllFix"
           illustration="trace"
@@ -372,7 +370,7 @@ import { buildResultColumns, fillLastColumn } from "./composables/useTracesTable
 import {
   analyzeTracesSql,
   canAddTraceId,
-  isRedEligible,
+  histogramLosesSpans,
   isRowQuery,
   matchAllToStrMatch,
   MATCH_ALL_FALLBACK_FIELD,
@@ -390,6 +388,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import TracesMetricsPlaceholder from "./metrics/TracesMetricsPlaceholder.vue";
 import ORegionStatus from "@/lib/feedback/RegionStatus/ORegionStatus.vue";
@@ -412,6 +411,7 @@ export default defineComponent({
     OSelect,
     OPagination,
     OTag,
+    OBanner,
     OSkeleton,
     ORegionStatus,
     TracesSearchResultList,
@@ -660,10 +660,8 @@ export default defineComponent({
       if (searchObj.meta.searchMode !== "spans") return null;
       return typeof sql === "string" && sql ? analyzeTracesSql(sql, tracesParser.value) : null;
     });
-    const redAvailable = computed(
-      () =>
-        !sqlInfo.value ||
-        isRedEligible(sqlInfo.value, searchObj.data.queryResults?.is_histogram_eligible),
+    const histogramLoss = computed(
+      () => !!sqlInfo.value && histogramLosesSpans(searchObj.data.queryResults?.sql ?? ""),
     );
     const sqlRowsOnly = computed(() => !!sqlInfo.value && !isRowQuery(sqlInfo.value));
     const sqlKeys = computed(() =>
@@ -894,7 +892,7 @@ export default defineComponent({
       traceDetailsHref,
       traceByIdHref,
       openTraceById,
-      redAvailable,
+      histogramLoss,
       sqlInfo,
       sqlRowsOnly,
       sqlShape,

@@ -883,6 +883,7 @@ describe("SearchResult in a kept-alive page", () => {
     });
     const sqlTable = () => wrapper.findComponent({ name: "TracesSqlResultTable" });
     const redIcon = () => wrapper.find('[data-test="traces-red-unavailable-icon"]');
+    const lossWarning = () => wrapper.find('[data-test="traces-sql-histogram-loss-warning"]');
     const dashboard = () => wrapper.find('[data-test="traces-metrics-dashboard"]');
     const showResults = async (sql: string, hits: any[], extra: Record<string, unknown> = {}) => {
       (mockSearchObj.meta as any).sqlMode = true;
@@ -912,13 +913,13 @@ describe("SearchResult in a kept-alive page", () => {
       expect(wrapper.find('[data-test="o2-table-column-toggle-btn"]').exists()).toBe(false);
     });
 
-    it("collapses the RED charts with an info icon and counts the rows for a GROUP BY", async () => {
+    it("keeps the RED charts and counts the rows for a GROUP BY", async () => {
       await showResults(`SELECT service_name, count(*) AS n FROM "default" GROUP BY service_name`, [
         { n: 4, service_name: "api" },
         { n: 2, service_name: "db" },
       ]);
-      expect(dashboard().exists()).toBe(false);
-      expect(redIcon().exists()).toBe(true);
+      expect(dashboard().exists()).toBe(true);
+      expect(redIcon().exists()).toBe(false);
       expect(wrapper.find('[data-test="traces-sql-rows-count"]').text()).toBe("2 rows");
       expect(wrapper.find('[data-test="traces-count-badge"]').exists()).toBe(false);
       expect(sqlTable().props("shape")).toBe("rows");
@@ -933,24 +934,43 @@ describe("SearchResult in a kept-alive page", () => {
     it("keeps the RED charts and the span table for a plain query", async () => {
       await showResults(`SELECT * FROM "default" WHERE a = 1`, [{ trace_id: "t", span_id: "s" }]);
       expect(dashboard().exists()).toBe(true);
-      expect(redIcon().exists()).toBe(false);
       expect(sqlTable().exists()).toBe(false);
       expect(wrapper.findComponent({ name: "TracesSearchResultList" }).exists()).toBe(true);
     });
 
-    it("collapses when the server reports the query is not histogram eligible", async () => {
+    it.each([
+      `SELECT * FROM "default" LIMIT 10`,
+      `SELECT a FROM "default" UNION SELECT a FROM "default"`,
+      `SELECT * FROM "default" p JOIN "default" c ON p.trace_id = c.trace_id`,
+      `WITH t AS (SELECT * FROM "default") SELECT * FROM t`,
+      `SELECT DISTINCT a FROM "default"`,
+    ])("never unmounts the RED charts for %s", async (sql) => {
+      await showResults(sql, [{ a: 1 }]);
+      expect(dashboard().exists()).toBe(true);
+    });
+
+    it("keeps the RED charts when the server says the query is not histogram eligible", async () => {
       await showResults(`SELECT * FROM "default"`, [{ trace_id: "t", span_id: "s" }], {
         is_histogram_eligible: false,
       });
-      expect(dashboard().exists()).toBe(false);
-      expect(redIcon().exists()).toBe(true);
+      expect(dashboard().exists()).toBe(true);
     });
 
-    it("hides the info icon while the RED band is switched off", async () => {
-      mockSearchObj.meta.showHistogram = false;
-      await showResults(`SELECT count(*) AS n FROM "default"`, [{ n: 1 }]);
-      expect(redIcon().exists()).toBe(false);
-      mockSearchObj.meta.showHistogram = true;
+    it("warns that histogram() over a subquery or CTE can lose spans", async () => {
+      await showResults(
+        `SELECT histogram(_timestamp) AS t, count(*) AS n FROM "default" WHERE trace_id IN (SELECT trace_id FROM "default") GROUP BY t`,
+        [{ t: "2026-01-01T00:00:00", n: 1 }],
+      );
+      expect(lossWarning().exists()).toBe(true);
+      expect(lossWarning().text()).toBe("This query shape can lose spans across time partitions");
+    });
+
+    it("does not warn for histogram() over a JOIN", async () => {
+      await showResults(
+        `SELECT histogram(p._timestamp) AS t, count(*) AS n FROM "default" p JOIN "default" c ON p.trace_id = c.trace_id GROUP BY t`,
+        [{ t: "2026-01-01T00:00:00", n: 1 }],
+      );
+      expect(lossWarning().exists()).toBe(false);
     });
 
     it("opens a trace row by trace_id inside the page time range", async () => {
