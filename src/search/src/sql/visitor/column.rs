@@ -109,17 +109,20 @@ impl VisitorMut for ColumnVisitor<'_> {
             for order in exprs.iter_mut() {
                 let mut name_visitor = FieldNameVisitor::new();
                 let _ = order.expr.visit(&mut name_visitor);
-                if name_visitor.field_names.len() == 1 {
-                    let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
-                    self.order_by.push((
-                        expr_name,
-                        if order.options.asc.unwrap_or(true) {
-                            OrderBy::Asc
-                        } else {
-                            OrderBy::Desc
-                        },
-                    ));
-                }
+                // a key that is no single column keeps its text, so only "no ORDER BY" is empty
+                let expr_name = if name_visitor.field_names.len() == 1 {
+                    name_visitor.field_names.iter().next().unwrap().to_string()
+                } else {
+                    order.expr.to_string()
+                };
+                self.order_by.push((
+                    expr_name,
+                    if order.options.asc.unwrap_or(true) {
+                        OrderBy::Asc
+                    } else {
+                        OrderBy::Desc
+                    },
+                ));
             }
         }
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
@@ -392,6 +395,40 @@ mod tests {
     }
 
     #[test]
+    fn test_column_visitor_records_every_order_by_key() {
+        let cases = [
+            ("", vec![]),
+            ("ORDER BY lower(name)", vec![("name", OrderBy::Asc)]),
+            ("ORDER BY count(*) DESC", vec![("count(*)", OrderBy::Desc)]),
+            ("ORDER BY 2 DESC", vec![("2", OrderBy::Desc)]),
+            ("ORDER BY name || age", vec![("name || age", OrderBy::Asc)]),
+            (
+                "ORDER BY count(*) DESC, name",
+                vec![("count(*)", OrderBy::Desc), ("name", OrderBy::Asc)],
+            ),
+            (
+                "ORDER BY name, count(*) DESC",
+                vec![("name", OrderBy::Asc), ("count(*)", OrderBy::Desc)],
+            ),
+        ];
+        for (order_by, expected) in cases {
+            let sql = format!("SELECT name, count(*) AS c FROM users GROUP BY name {order_by}");
+            let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+                .unwrap()
+                .pop()
+                .unwrap();
+            let schemas = make_schemas();
+            let mut visitor = ColumnVisitor::new(&schemas);
+            let _ = statement.visit(&mut visitor);
+            let expected: Vec<_> = expected
+                .into_iter()
+                .map(|(field, order)| (field.to_string(), order))
+                .collect();
+            assert_eq!(visitor.order_by, expected, "{sql}");
+        }
+    }
+
+    #[test]
     fn test_column_visitor_no_tests_when_no_schema_match() {
         let sql = "SELECT unknown_col FROM users";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
@@ -428,8 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn test_column_visitor_order_by_compound_expr_skipped() {
-        // ORDER BY expression with multiple fields → field_names.len() != 1 → order_by skipped
+    fn test_column_visitor_order_by_multiple_keys() {
         let sql = "SELECT name FROM users ORDER BY name, age";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()

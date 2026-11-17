@@ -1599,6 +1599,17 @@ mod tests {
         let cases = [
             (format!("{histogram} ORDER BY c DESC LIMIT 3"), "ts", false),
             (
+                format!("{histogram} ORDER BY count(*) DESC LIMIT 3"),
+                "ts",
+                false,
+            ),
+            (format!("{histogram} ORDER BY 2 DESC LIMIT 3"), "ts", false),
+            (
+                format!("{histogram} ORDER BY count(*) DESC, ts ASC"),
+                "ts",
+                false,
+            ),
+            (
                 format!("{histogram} ORDER BY ts ASC, count(*) DESC"),
                 "ts",
                 true,
