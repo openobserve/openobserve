@@ -28,7 +28,7 @@ use proto::cluster_rpc;
 
 use crate::{
     cache::{cacher::get_ts_col_order_by, result_utils::is_ts_order_field},
-    partition::aggregate::is_streaming_aggregate,
+    partition::aggregate::{is_ranked_histogram, is_streaming_aggregate},
     sql::Sql,
 };
 
@@ -65,7 +65,11 @@ impl PartitionSqlContext {
         let is_explain = is_explain_query(&req.sql);
         let is_complex = is_complex_query(&req.sql).unwrap_or(false);
         let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex).map(|(v, _)| v);
-        let is_streaming_agg = is_streaming_aggregate(&req.sql, ts_column.as_deref());
+        let is_streaming_agg = is_streaming_aggregate(
+            &req.sql,
+            ts_column.as_deref(),
+            is_ranked_histogram(&sql, ts_column.as_deref()),
+        );
         let apply_over_hits = req.query_fn.as_ref().is_some_and(|v| {
             !v.is_empty()
                 && RESULT_ARRAY.is_match(&base64::decode_url(v).unwrap_or_else(|_| v.to_string()))
@@ -355,6 +359,122 @@ mod tests {
         let order_by = parse_order_by(sql);
         assert_eq!(order_by[0].0, "_timestamp");
         assert!(!mk(order_by, false, None, None).detect_non_ts_order_by());
+    }
+
+    // ── streaming aggregation cache admission ─────────────────────────────────
+
+    async fn ctx_for(sql: &str, timezone: Option<&str>) -> PartitionSqlContext {
+        use arrow_schema::{DataType, Field, Schema};
+        let schema = Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("service", DataType::Utf8, true),
+        ]);
+        infra::db_init().await.unwrap();
+        infra::schema::merge(
+            "ranked_hist_test",
+            "default",
+            StreamType::Logs,
+            &schema,
+            Some(1_700_000_000_000_000),
+        )
+        .await
+        .unwrap();
+        let req = SearchPartitionRequest {
+            sql: sql.to_string(),
+            start_time: 1_700_000_000_000_000,
+            end_time: 1_700_086_400_000_000,
+            encoding: Default::default(),
+            regions: vec![],
+            clusters: vec![],
+            query_fn: None,
+            streaming_output: true,
+            histogram_interval: 0,
+            sampling_ratio: None,
+            search_type: None,
+            timezone: timezone.map(str::to_string),
+        };
+        PartitionSqlContext::new(&req, "ranked_hist_test", StreamType::Logs)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_ranked_histogram_uses_streaming_aggs() {
+        for sql in [
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY c DESC LIMIT 3"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY c ASC LIMIT 3"#,
+            r#"SELECT histogram(_timestamp, '1 hour') AS ts, service, count(*) AS c FROM "default" GROUP BY ts, service ORDER BY c DESC, ts DESC LIMIT 5"#,
+            r#"SELECT histogram(_timestamp) AS "x_axis_1", count(*) AS "y_axis_1" FROM "default" GROUP BY "x_axis_1" ORDER BY "y_axis_1" DESC"#,
+        ] {
+            let ctx = ctx_for(sql, None).await;
+            assert!(ctx.ts_column.is_some(), "{sql}");
+            assert!(ctx.is_streaming_aggregate, "{sql}");
+            assert!(!ctx.use_single_partition, "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_time_ordered_histogram_keeps_result_cache() {
+        for sql in [
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY ts DESC"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY ts ASC, c DESC LIMIT 3"#,
+            r#"SELECT histogram(_timestamp) AS "x_axis_1", count(*) AS "y_axis_1" FROM "default" GROUP BY "x_axis_1" ORDER BY "x_axis_1" ASC"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts"#,
+        ] {
+            let ctx = ctx_for(sql, None).await;
+            assert!(ctx.ts_column.is_some(), "{sql}");
+            assert!(!ctx.is_streaming_aggregate, "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_histogram_cardinality_skips_time_column() {
+        let sql = r#"SELECT histogram(_timestamp, '1 hour') AS ts, service, count(*) AS c FROM "default" GROUP BY ts, service ORDER BY c DESC LIMIT 5"#;
+        let ctx = ctx_for(sql, None).await;
+        let raw = crate::sql::visitor::group_by::get_group_by_fields(&ctx.sql)
+            .await
+            .unwrap();
+        assert!(raw.contains(&TIMESTAMP_COL_NAME.to_string()), "{raw:?}");
+        let fields = crate::partition::aggregate::cardinality_fields(&ctx.sql)
+            .await
+            .unwrap();
+        assert_eq!(fields, vec!["service".to_string()]);
+
+        let sql = r#"SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY c DESC LIMIT 5"#;
+        let ctx = ctx_for(sql, None).await;
+        let fields = crate::partition::aggregate::cardinality_fields(&ctx.sql)
+            .await
+            .unwrap();
+        assert!(fields.is_empty(), "{fields:?}");
+    }
+
+    #[tokio::test]
+    async fn test_ranked_histogram_non_utc_skips_streaming_aggs() {
+        let sql = r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" GROUP BY ts ORDER BY c DESC LIMIT 3"#;
+        let ctx = ctx_for(sql, Some("Asia/Kolkata")).await;
+        assert_ne!(ctx.sql.histogram_offset, Some(0));
+        assert!(ctx.use_single_partition);
+        let req = SearchPartitionRequest {
+            sql: sql.to_string(),
+            start_time: 1_700_000_000_000_000,
+            end_time: 1_700_086_400_000_000,
+            encoding: Default::default(),
+            regions: vec![],
+            clusters: vec![],
+            query_fn: None,
+            streaming_output: true,
+            histogram_interval: 0,
+            sampling_ratio: None,
+            search_type: None,
+            timezone: Some("Asia/Kolkata".to_string()),
+        };
+        let (streaming_aggs, streaming_id, strategy) =
+            crate::partition::aggregate::prepare_streaming_aggregate("t", &req, &ctx, true)
+                .await
+                .unwrap();
+        assert!(!streaming_aggs);
+        assert!(streaming_id.is_none());
+        assert!(strategy.is_none());
     }
 
     #[test]
