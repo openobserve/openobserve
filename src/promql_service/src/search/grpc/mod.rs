@@ -230,7 +230,8 @@ pub async fn search(
             req.query.as_mut().unwrap().end = end;
             let resp = search_inner(&req, query_tracker).await?;
             log::info!(
-                "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
+                "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] need_wal: {}, get resp, took: {} ms",
+                req.need_wal,
                 start_ts.elapsed().as_millis()
             );
             results.push(resp);
@@ -376,7 +377,8 @@ pub async fn data(
         req.query.as_mut().unwrap().end = end;
         let resp = search_inner(&req, query_tracker).await?;
         log::info!(
-            "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] get resp, took: {} ms",
+            "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] need_wal: {}, get resp, took: {} ms",
+            req.need_wal,
             start_ts.elapsed().as_millis()
         );
         if let Err(e) = data_tx.send(resp).await {
@@ -575,6 +577,15 @@ fn scan_contexts(
     ctxs
 }
 
+/// The floor a request's groups read the WAL from, the widest when its sender did not probe.
+fn request_floor(wal_start_time: i64) -> i64 {
+    if wal_start_time > 0 {
+        wal_start_time
+    } else {
+        wal_floor()
+    }
+}
+
 /// The grid-aligned cut before the WAL head, `None` when the range does not straddle it.
 fn wal_cut(start: i64, end: i64, step: i64, ahead: i64, wal_head: i64) -> Option<i64> {
     // a group ending before the cut still reads `ahead` past its end, which must stay off the head
@@ -705,15 +716,6 @@ pub(crate) async fn query_streams(
         mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
     }
     Ok(mapped)
-}
-
-/// The floor a request's groups read the WAL from, the widest when its sender did not probe.
-pub(crate) fn request_floor(wal_start_time: i64) -> i64 {
-    if wal_start_time > 0 {
-        wal_start_time
-    } else {
-        wal_floor()
-    }
 }
 
 pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: value::Value) {

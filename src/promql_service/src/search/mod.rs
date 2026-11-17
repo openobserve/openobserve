@@ -426,7 +426,6 @@ async fn search_in_cluster(
     } else {
         0
     };
-    let wal_floor = grpc::request_floor(wal_start_time);
 
     // make cluster request
     let mut tasks = Vec::with_capacity(nodes.len());
@@ -448,16 +447,11 @@ async fn search_in_cluster(
         let req_query = req.query.as_mut().unwrap();
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
-        if window.reaches(req_query.end, wal_floor) {
-            req.need_wal = true;
-        }
-        let req_need_wal = req.need_wal;
         worker_start += worker_dt;
 
         log::info!(
-            "[trace_id {trace_id}] promql->search->partition: node: {}, need_wal: {}, time_range: [{},{})",
+            "[trace_id {trace_id}] promql->search->partition: node: {}, wal_start_time: {wal_start_time}, time_range: [{},{})",
             node.grpc_addr,
-            req_need_wal,
             req_query.start,
             req_query.end,
         );
@@ -489,7 +483,7 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {req_need_wal}, files: {}, scan_size: {} mb, took: {} ms",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, files: {}, scan_size: {} mb, took: {} ms",
                     node.get_grpc_addr(),
                     scan_stats.files,
                     scan_stats.original_size,
