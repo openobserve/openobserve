@@ -19,7 +19,7 @@ import { convertMultiSQLData } from "./convertSQLData";
 import { convertPromQLData } from "./convertPromQLData";
 
 vi.mock("./convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn(),
+  prepareCustomChartRun: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
 

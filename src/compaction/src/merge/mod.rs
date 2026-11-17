@@ -15,8 +15,8 @@
 
 mod file;
 mod job;
-mod metrics;
-mod plan;
+mod partition;
+mod policy;
 mod stream;
 
 pub use file::merge_files;

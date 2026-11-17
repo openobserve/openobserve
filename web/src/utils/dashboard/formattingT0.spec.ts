@@ -39,7 +39,7 @@ import { createSeriesOverrideLookup, toSeriesOverrideEntry } from "./seriesOverr
 import { TableConverter } from "./promql/convertPromQLTableChart";
 
 vi.mock("./convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn(),
+  prepareCustomChartRun: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
 

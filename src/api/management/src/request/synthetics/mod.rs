@@ -74,6 +74,7 @@ impl From<ListSyntheticsQuery> for config::meta::synthetics::ListSyntheticsParam
     fn from(q: ListSyntheticsQuery) -> Self {
         Self {
             folder_id: q.folder,
+            listable_folder_ids: None,
             check_type: q.check_type,
             enabled: q.enabled,
             location: q.location,
@@ -614,8 +615,24 @@ pub async fn job_upload(
 pub async fn list_synthetics(
     Path(org_id): Path<String>,
     Query(query): Query<ListSyntheticsQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let params: config::meta::synthetics::ListSyntheticsParams = query.into();
+    #[cfg(feature = "enterprise")]
+    let params = match listable_synthetics_folders(
+        &org_id,
+        &user_email.user_id,
+        params.folder_id.as_deref(),
+        false,
+    )
+    .await
+    {
+        Ok(listable_folder_ids) => config::meta::synthetics::ListSyntheticsParams {
+            listable_folder_ids,
+            ..params
+        },
+        Err(resp) => return resp,
+    };
     match openobserve_synthetics::service::list_synthetics(&org_id, &params).await {
         Ok(mut resp) => {
             last_check::enrich(&org_id, &mut resp.checks).await;
@@ -627,6 +644,90 @@ pub async fn list_synthetics(
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                 .into_response()
         }
+    }
+}
+
+/// The synthetics folders the caller may list; the route gate skips a list naming no folder.
+#[cfg(feature = "enterprise")]
+async fn listable_synthetics_folders(
+    org_id: &str,
+    user_id: &str,
+    folder: Option<&str>,
+    allow_empty: bool,
+) -> Result<Option<Vec<String>>, Response> {
+    let folder_type = o2_openfga::meta::mapping::OFGA_MODELS
+        .get("synthetic_folder")
+        .map_or("synthetic_folder", |model| model.key);
+    let listable = db::authz::listable_folders(org_id, user_id, folder_type)
+        .await
+        .map_err(|e| MetaHttpResponse::forbidden(e.to_string()))?;
+    admit_listable(listable, folder, allow_empty).map_err(MetaHttpResponse::forbidden)
+}
+
+/// `Err` says which list access is missing; `None` (every folder) admits any request.
+#[cfg(any(feature = "enterprise", test))]
+fn admit_listable(
+    listable: Option<Vec<String>>,
+    folder: Option<&str>,
+    allow_empty: bool,
+) -> Result<Option<Vec<String>>, &'static str> {
+    let Some(folders) = listable else {
+        return Ok(None);
+    };
+    if folders.is_empty() && !allow_empty {
+        return Err("You cannot list any synthetics folder; ask an admin for list access to one.");
+    }
+    if folder.is_some_and(|folder| !folders.iter().any(|f| f == folder)) {
+        return Err("You cannot list this synthetics folder; ask an admin for list access to it.");
+    }
+    Ok(Some(folders))
+}
+
+/// The synthetics folders the caller may list, whatever `list_only_permitted` says.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+pub(crate) async fn listable_folders(
+    org_id: &str,
+    user_id: Option<&str>,
+) -> Result<Vec<config::meta::folder::Folder>, Response> {
+    #[cfg(feature = "enterprise")]
+    let listable =
+        listable_synthetics_folders(org_id, user_id.unwrap_or_default(), None, false).await?;
+    #[cfg(not(feature = "enterprise"))]
+    let listable: Option<Vec<String>> = None;
+    let mut folders =
+        infra::table::folders::list_folders(org_id, config::meta::folder::FolderType::Synthetics)
+            .await
+            .map_err(MetaHttpResponse::internal_error)?;
+    if lacks_listable_default(&folders, listable.as_deref()) {
+        let default = openobserve_synthetics::service::create_default_synthetics_folder(org_id)
+            .await
+            .map_err(MetaHttpResponse::internal_error)?;
+        folders.insert(0, default);
+    }
+    Ok(retain_listable(folders, listable.as_deref()))
+}
+
+/// `default` is minted on first use, so a caller who may list it must not miss it before then.
+fn lacks_listable_default(
+    folders: &[config::meta::folder::Folder],
+    listable: Option<&[String]>,
+) -> bool {
+    let default = config::meta::folder::DEFAULT_FOLDER;
+    !folders.iter().any(|folder| folder.folder_id == default)
+        && listable.is_none_or(|ids| ids.iter().any(|id| id == default))
+}
+
+/// Keeps the folders `listable` names; `None` keeps every folder.
+fn retain_listable(
+    folders: Vec<config::meta::folder::Folder>,
+    listable: Option<&[String]>,
+) -> Vec<config::meta::folder::Folder> {
+    match listable {
+        None => folders,
+        Some(ids) => folders
+            .into_iter()
+            .filter(|folder| ids.contains(&folder.folder_id))
+            .collect(),
     }
 }
 
@@ -2512,8 +2613,20 @@ pub async fn delete_location(
         ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"}))
     )
 )]
-pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
-    match openobserve_synthetics::service::list_locations_for_org(&_org_id).await {
+pub async fn list_locations(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    // A direct grant on one check opens its editor, which needs every location to pick from.
+    let listable = match listable_synthetics_folders(&org_id, &user_email.user_id, None, true).await
+    {
+        Ok(listable) => listable,
+        Err(resp) => return resp,
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let listable = None;
+    match openobserve_synthetics::service::list_locations_for_org(&org_id, listable).await {
         Ok(capabilities) => MetaHttpResponse::json(capabilities),
         Err(e) => {
             tracing::error!("[synthetics] list_locations: {e}");
@@ -2531,7 +2644,47 @@ mod tests {
         service::composition::CompositionError as CE,
     };
 
-    use super::{ReferencedByQuery, composition_error_response, stamp_undefined_placeholders};
+    use super::{
+        ReferencedByQuery, admit_listable, composition_error_response, lacks_listable_default,
+        retain_listable, stamp_undefined_placeholders,
+    };
+
+    #[test]
+    fn listing_needs_a_listable_folder_and_shows_only_listable_ones() {
+        let team = || Some(vec!["team".to_string()]);
+        assert_eq!(admit_listable(None, None, false), Ok(None));
+        assert_eq!(admit_listable(None, Some("any"), false), Ok(None));
+        assert_eq!(admit_listable(team(), None, false), Ok(team()));
+        assert_eq!(admit_listable(team(), Some("team"), false), Ok(team()));
+        assert!(admit_listable(team(), Some("default"), false).is_err());
+        assert!(admit_listable(Some(vec![]), None, false).is_err());
+        // Locations admit an empty set: an editor opened by a check grant needs the picker.
+        assert_eq!(admit_listable(Some(vec![]), None, true), Ok(Some(vec![])));
+        assert_eq!(admit_listable(team(), None, true), Ok(team()));
+
+        let folders = || {
+            ["default", "team"].map(|id| config::meta::folder::Folder {
+                folder_id: id.to_string(),
+                ..Default::default()
+            })
+        };
+        let ids = |listable: Option<&[String]>| {
+            retain_listable(folders().into(), listable)
+                .into_iter()
+                .map(|folder| folder.folder_id)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ids(None), ["default", "team"]);
+        assert_eq!(ids(team().as_deref()), ["team"]);
+
+        let all = folders();
+        let only_team = &all[1..];
+        let with_default = Some(vec!["default".to_string()]);
+        assert!(lacks_listable_default(only_team, None));
+        assert!(lacks_listable_default(only_team, with_default.as_deref()));
+        assert!(!lacks_listable_default(only_team, team().as_deref()));
+        assert!(!lacks_listable_default(&all, None));
+    }
 
     #[cfg(feature = "enterprise")]
     #[test]

@@ -156,11 +156,11 @@ pub fn view_from(
     }
 }
 
-/// The alert's page in OpenObserve, the message's Open button.
+/// The alert's detail page, the button of a stored message that has no labelled data button.
 pub fn open_url(org_id: &str, alert_id: &str) -> String {
     let cfg = config::get_config();
     format!(
-        "{}{}/web/alerts?org_identifier={org_id}&alert_id={alert_id}",
+        "{}{}/web/alerts/detail/{alert_id}?org_identifier={org_id}",
         cfg.common.web_url, cfg.common.base_uri
     )
 }

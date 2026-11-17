@@ -14,12 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { ActiveDowntime } from "@/services/downtimes";
-import type { AckAlertRequest, AlertListAck } from "@/ts/interfaces/alert";
-
-export type FiringState = "firing" | "acked" | "muted" | "failed";
-export type FiringStateTag = "firing" | "notify_failed" | "acknowledged" | "muted";
-
-export type FiringCounts = Record<FiringState, number>;
+import type { AlertListAck } from "@/ts/interfaces/alert";
+import { isFiringOutcome, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 
 export interface FiringRow {
   alert_id: string;
@@ -76,39 +72,32 @@ export interface FiringSignals {
   groups_firing?: number | null;
 }
 
+/** The fields the ack rule reads, `multi_alert` being whether the alert evaluates per group now. */
+export interface AckSignals {
+  multi_alert?: boolean;
+  groups_firing?: number | null;
+  groups_firing_is_lower_bound?: boolean | null;
+  ack?: Pick<AlertListAck, "groups_acked"> | null;
+}
+
+/** The fields the list row's operational state and state rail read. */
+export interface RailSignals extends FiringSignals, AckSignals {
+  is_real_time?: boolean | string;
+  status?: unknown;
+  status_unavailable?: boolean;
+}
+
+export type AlertOperationalState = "active" | "paused" | "failed";
+
+export type AlertRailState = "failed" | "firing" | "acknowledged" | "paused" | "active";
+
 export interface FiringPage {
   list: FiringRow[];
   /** The run state could not be read, so every row's live fields are blank. */
   status_unavailable?: boolean;
 }
 
-export interface FiringFilters {
-  search: string;
-  /** "all", "unset", or a priority id "1".."5". */
-  priority: string;
-  /** "all", or a folder name. */
-  folder: string;
-}
-
-const MINUTE_MS = 60_000;
-const HOUR_MINUTES = 60;
-const DAY_MINUTES = 1440;
-
-export const durationLabel = (elapsedMs: number): string => {
-  const minutes = Math.floor(elapsedMs / MINUTE_MS);
-  if (minutes < 1) return "<1m";
-  if (minutes < HOUR_MINUTES) return `${minutes}m`;
-  if (minutes < DAY_MINUTES) {
-    const rest = String(minutes % HOUR_MINUTES).padStart(2, "0");
-    return `${Math.floor(minutes / HOUR_MINUTES)}h ${rest}m`;
-  }
-  const hours = Math.floor((minutes % DAY_MINUTES) / HOUR_MINUTES);
-  return `${Math.floor(minutes / DAY_MINUTES)}d ${hours}h`;
-};
-
-/** Firing for, from `firing_started_at` only; `last_outcome_since` resets on a failed delivery. */
-export const firingForLabel = (startedAtMicros: number | undefined, nowMs: number): string =>
-  startedAtMicros === undefined ? "—" : durationLabel(nowMs - startedAtMicros / 1000);
+export const FIRING_CLOCK_MS = 30_000;
 
 // Disabling keeps the stored firing on purpose, so the list is what hides it.
 const isLive = (row: FiringSignals): boolean => row.enabled !== false;
@@ -121,101 +110,29 @@ export const isFiringNow = (row: FiringSignals): boolean =>
     row.firing_started_at != null ||
     (row.last_outcome === "error" && (row.groups_firing ?? 0) > 0));
 
-const isNotDelivered = (row: FiringRow): boolean =>
-  isLive(row) && row.last_outcome === "notify_failed";
-
-// Partly acked stays actionable: a page keeps paging while any group is unacked.
-const isFullyAcked = (row: FiringRow): boolean => {
-  const acked = row.ack?.groups_acked ?? 0;
-  if (acked <= 0) return false;
-  if (row.groups_firing == null) return true;
-  return row.groups_firing_is_lower_bound !== true && acked >= row.groups_firing;
-};
-
-/** Which views a row belongs to; they overlap, so a row can be in several. */
-export const isInState = (row: FiringRow, state: FiringState): boolean => {
-  const muted = row.active_downtime != null;
-  switch (state) {
-    case "firing":
-      return isFiringNow(row) && !isFullyAcked(row) && !muted;
-    case "acked":
-      return isFiringNow(row) && isFullyAcked(row);
-    case "muted":
-      return isFiringNow(row) && muted;
-    case "failed":
-      return isNotDelivered(row);
-  }
-};
-
-export const countStates = (rows: FiringRow[]): FiringCounts => {
-  const count = (state: FiringState) => rows.filter((row) => isInState(row, state)).length;
-  return {
-    firing: count("firing"),
-    acked: count("acked"),
-    muted: count("muted"),
-    failed: count("failed"),
-  };
-};
-
-const compare = <T extends number | string>(a: T, b: T): number => (a < b ? -1 : a > b ? 1 : 0);
-
-const compareOptional = (a: number | null | undefined, b: number | null | undefined): number => {
-  if (a == null || b == null) return Number(a == null) - Number(b == null);
-  return compare(a, b);
-};
-
-/** Not delivered, then P1..P5 with unset last, then the earliest firing with unknown last. */
-export const compareTriage = (a: FiringRow, b: FiringRow): number =>
-  Number(isNotDelivered(b)) - Number(isNotDelivered(a)) ||
-  compareOptional(a.priority, b.priority) ||
-  compareOptional(a.firing_started_at, b.firing_started_at) ||
-  compare(a.name, b.name) ||
-  compare(a.folder_name, b.folder_name) ||
-  compare(a.alert_id, b.alert_id);
-
-/** One view's rows in triage order. */
-export const rowsInState = (rows: FiringRow[], state: FiringState): FiringRow[] =>
-  rows.filter((row) => isInState(row, state)).sort(compareTriage);
-
-// Views overlap, so the chip decides the word: an acked failed delivery is listed under both.
-export const stateTag = (row: FiringRow, state: FiringState): FiringStateTag => {
-  if (state === "muted") return "muted";
-  if (state === "acked") return "acknowledged";
-  return isNotDelivered(row) ? "notify_failed" : "firing";
-};
-
-const isMultiAlert = (row: FiringRow): boolean =>
-  !!row.condition?.promql_multi_alert || !!row.condition?.aggregation?.multi_alert;
-
-/** Whether an ack can change anything; a multi-alert stays open while a firing group is unacked. */
-export const canAcknowledge = (row: FiringRow): boolean => {
-  if (row.alert_type === "anomaly_detection") return false;
+/** Whether an ack can change anything; a lower-bound group count may hide groups still unacked. */
+export const ackCanChange = (row: AckSignals): boolean => {
   if (!row.ack) return true;
-  if (!isMultiAlert(row) || row.groups_firing == null) return false;
-  return !!row.groups_firing_is_lower_bound || row.ack.groups_acked < row.groups_firing;
+  if (!row.multi_alert || row.groups_firing == null) return false;
+  return !!row.groups_firing_is_lower_bound || (row.ack.groups_acked ?? 0) < row.groups_firing;
 };
 
-export const ackBody = (row: FiringRow): AckAlertRequest => {
-  if (isMultiAlert(row)) return { all_groups: true };
-  return row.firing_started_at == null
-    ? { group_key: "" }
-    : { group_key: "", firing_started_at: row.firing_started_at };
+/** Failed is an anomaly whose model training failed; otherwise enabled is active and disabled paused. */
+export const alertOperationalState = (row: RailSignals): AlertOperationalState => {
+  if (row?.is_real_time === "anomaly" && String(row?.status).toLowerCase() === "failed")
+    return "failed";
+  return row?.enabled ? "active" : "paused";
 };
 
-const matchesPriority = (row: FiringRow, priority: string): boolean => {
-  if (priority === "all") return true;
-  if (priority === "unset") return row.priority === undefined || row.priority === null;
-  return String(row.priority) === priority;
-};
+/** Counts muted firings too, and an open firing whose latest evaluation errored before any recovery. */
+export const isFiringListRow = (row: FiringSignals): boolean =>
+  (shouldShowRunOutcome(row?.enabled, row?.last_outcome) && isFiringOutcome(row?.last_outcome)) ||
+  (!!row?.enabled && isFiringNow(row));
 
-export const filterRows = (rows: FiringRow[], filters: FiringFilters): FiringRow[] => {
-  const term = filters.search.trim().toLowerCase();
-  return rows.filter(
-    (row) =>
-      matchesPriority(row, filters.priority) &&
-      (filters.folder === "all" || row.folder_name === filters.folder) &&
-      (!term ||
-        row.name.toLowerCase().includes(term) ||
-        (row.stream_name ?? "").toLowerCase().includes(term)),
-  );
+/** An unknown run state shows no firing, so a stale firing never reads as live. */
+export const alertRailState = (row: RailSignals, statusUnavailable: boolean): AlertRailState => {
+  const state = alertOperationalState(row);
+  if (state !== "active") return state;
+  if (statusUnavailable || row.status_unavailable || !isFiringListRow(row)) return "active";
+  return row.ack && !ackCanChange(row) ? "acknowledged" : "firing";
 };

@@ -4,6 +4,14 @@ use sea_orm::DatabaseConnection;
 
 use super::{composition, composition_lock, *};
 
+/// What a list row may show about the children it references.
+struct ChildFacts {
+    counts: HashMap<String, usize>,
+    nested: HashSet<String>,
+    /// Children in folders the caller cannot list: their step counts stay unshown.
+    hidden: HashSet<String>,
+}
+
 // ── Synthetics CRUD ──────────────────────────────────────────────────────────────
 
 /// Creates a synthetic. If `folder_id` is empty or "default", auto-create the
@@ -287,23 +295,7 @@ pub async fn list_synthetics(
     params: &ListSyntheticsParams,
 ) -> anyhow::Result<SyntheticListResponse> {
     let conn = get_orm_client_rw().await;
-
-    // synthetics_checks.folder_id stores the KSUID PK (folders.id), not the slug
-    // (folders.folder_id). Resolve any slug → PK before filtering. Falls back to the
-    // original value if get_pk_by_name returns None (value is already a KSUID PK).
-    let resolved;
-    let params = if let Some(folder_slug) = &params.folder_id {
-        let pk = folders::get_pk_by_name(org_id, folder_slug, FolderType::Synthetics)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        resolved = ListSyntheticsParams {
-            folder_id: pk.or_else(|| Some(folder_slug.clone())),
-            ..params.clone()
-        };
-        &resolved
-    } else {
-        params
-    };
+    let params = &with_folder_pks(conn, org_id, params).await?;
 
     let total = synthetics_checks::count(conn, org_id, params)
         .await
@@ -333,6 +325,24 @@ pub async fn list_synthetics(
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .into_keys()
         .collect();
+    let hidden = match &params.listable_folder_ids {
+        Some(folder_pks) => {
+            let visible = synthetics_checks::ids_in_folders(conn, org_id, &child_ids, folder_pks)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            counts
+                .keys()
+                .filter(|id| !visible.contains(*id))
+                .cloned()
+                .collect()
+        }
+        None => HashSet::new(),
+    };
+    let children = ChildFacts {
+        counts,
+        nested,
+        hidden,
+    };
     let used_by: HashMap<String, i32> = synthetics_refs::list_parents_for_many(conn, org_id, &ids)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
@@ -378,9 +388,8 @@ pub async fn list_synthetics(
             m.check_type == SyntheticType::Browser,
             &own,
             &refs,
-            &counts,
+            &children,
             &used_by,
-            &nested,
         );
         items.push(SyntheticListItem {
             id: m.id,
@@ -607,6 +616,27 @@ pub async fn run_synthetic_now(org_id: &str, id: &str) -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("[synthetics] run_synthetic_now advance_schedule: {e}"))
 }
 
+/// synthetics_checks.folder_id stores the folder PK (folders.id), so public folder ids resolve to
+/// it; a `folder_id` with no folder of that name is kept as given, being a PK already.
+pub(super) async fn with_folder_pks(
+    conn: &DatabaseConnection,
+    org_id: &str,
+    params: &ListSyntheticsParams,
+) -> anyhow::Result<ListSyntheticsParams> {
+    let mut resolved = params.clone();
+    if let Some(folder_slug) = &params.folder_id {
+        let pk = folders::get_pk_by_name(org_id, folder_slug, FolderType::Synthetics)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        resolved.folder_id = pk.or_else(|| Some(folder_slug.clone()));
+    }
+    if let Some(slugs) = &params.listable_folder_ids {
+        let pks = folders::get_pks_by_names(conn, org_id, slugs, FolderType::Synthetics).await?;
+        resolved.listable_folder_ids = Some(pks);
+    }
+    Ok(resolved)
+}
+
 // A completed mutation must not surface as an unlock failure: the lock expires on its own.
 async fn release_composition_guard(guard: composition_lock::CompositionGuard, org_id: &str) {
     if let Err(e) = guard.release().await {
@@ -821,39 +851,35 @@ fn composition_fields(
     is_browser: bool,
     own: &HashMap<String, usize>,
     refs: &HashMap<String, Vec<String>>,
-    counts: &HashMap<String, usize>,
+    children: &ChildFacts,
     used_by: &HashMap<String, i32>,
-    nested: &HashSet<String>,
 ) -> (Option<i32>, i32, Option<i32>, Option<ReferenceState>) {
     let referenced_by = used_by.get(id).copied().unwrap_or(0);
     if !is_browser {
         return (None, referenced_by, None, None);
     }
     let own_steps = own.get(id).copied().unwrap_or(0);
-    let expanded = match refs.get(id) {
-        Some(children) => {
-            config::meta::synthetics_composition::expanded_step_count(own_steps, children, counts)
-        }
-        None => own_steps,
-    };
-    let references = refs
-        .get(id)
-        .map_or(0, |c| i32::try_from(c.len()).unwrap_or(i32::MAX));
-    let reference_state = refs.get(id).filter(|c| !c.is_empty()).map(|children| {
-        if children.iter().any(|c| !counts.contains_key(c)) {
+    let held = refs.get(id).map_or(&[][..], Vec::as_slice);
+    let expanded = config::meta::synthetics_composition::expanded_step_count(
+        own_steps,
+        held,
+        &children.counts,
+    );
+    let references = i32::try_from(held.len()).unwrap_or(i32::MAX);
+    let reference_state = (!held.is_empty()).then(|| {
+        if held.iter().any(|c| !children.counts.contains_key(c)) {
             ReferenceState::Missing
-        } else if children.iter().any(|c| nested.contains(c)) {
+        } else if held.iter().any(|c| children.nested.contains(c)) {
+            // Shown even for a hidden child: expansion rejects the parent either way.
             ReferenceState::Nested
         } else {
             ReferenceState::Ok
         }
     });
-    (
-        Some(i32::try_from(expanded).unwrap_or(i32::MAX)),
-        referenced_by,
-        Some(references),
-        reference_state,
-    )
+    // A total would reveal a hidden child's step count; null already reads as "not known".
+    let steps = (!held.iter().any(|c| children.hidden.contains(c)))
+        .then(|| i32::try_from(expanded).unwrap_or(i32::MAX));
+    (steps, referenced_by, Some(references), reference_state)
 }
 
 #[cfg(test)]
@@ -870,7 +896,7 @@ mod tests {
     use infra::table::{synthetics_checks, synthetics_refs};
 
     use super::{
-        composition_fields, create_synthetic_under_lock, delete_synthetic_under_lock,
+        ChildFacts, composition_fields, create_synthetic_under_lock, delete_synthetic_under_lock,
         delete_synthetics_bulk_under_lock, holds_browser_check, keep_stored_settings,
         keep_stored_type, needs_composition_lock, run_composition_mutation,
     };
@@ -994,22 +1020,40 @@ mod tests {
         let used_by = HashMap::from([("a".to_string(), 2i32)]);
         // `elsewhere` is not on this page, so only the second refs call knows it holds a subtest.
         let nested = HashSet::from(["elsewhere".to_string()]);
-        let row = |id: &str, browser: bool| {
-            composition_fields(id, browser, &own, &refs, &counts, &used_by, &nested)
+        let mut children = ChildFacts {
+            counts,
+            nested,
+            hidden: HashSet::new(),
         };
+        let row = |id: &str, browser: bool, children: &ChildFacts| {
+            composition_fields(id, browser, &own, &refs, children, &used_by)
+        };
+        let row_of = |id: &str, browser: bool| row(id, browser, &children);
         assert_eq!(
-            row("p", true),
+            row_of("p", true),
             (Some(16), 0, Some(1), Some(ReferenceState::Ok))
         );
-        assert_eq!(row("a", true), (Some(13), 2, Some(0), None));
+        assert_eq!(row_of("a", true), (Some(13), 2, Some(0), None));
         assert_eq!(
-            row("q", true),
+            row_of("q", true),
             (Some(28), 0, Some(2), Some(ReferenceState::Ok))
         );
-        assert_eq!(row("h", false), (None, 0, None, None));
-        assert_eq!(row("m", true).3, Some(ReferenceState::Missing));
-        assert_eq!(row("n", true).3, Some(ReferenceState::Nested));
-        assert_eq!(row("b", true).3, Some(ReferenceState::Missing));
+        assert_eq!(row_of("h", false), (None, 0, None, None));
+        assert_eq!(row_of("m", true).3, Some(ReferenceState::Missing));
+        assert_eq!(row_of("n", true).3, Some(ReferenceState::Nested));
+        assert_eq!(row_of("b", true).3, Some(ReferenceState::Missing));
+
+        // A hidden child hides its steps, but its nesting still blocks the parent from running.
+        children.hidden = HashSet::from(["a".to_string(), "elsewhere".to_string()]);
+        assert_eq!(
+            row("p", true, &children),
+            (None, 0, Some(1), Some(ReferenceState::Ok))
+        );
+        assert_eq!(
+            row("n", true, &children),
+            (None, 0, Some(1), Some(ReferenceState::Nested))
+        );
+        assert_eq!(row("b", true, &children).3, Some(ReferenceState::Missing));
     }
 
     // The delete path drains `synthetics_jobs`, so it needs that table too.
