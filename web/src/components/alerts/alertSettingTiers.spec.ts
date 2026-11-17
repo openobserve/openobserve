@@ -1,6 +1,10 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect } from "vitest";
+import { mount } from "@vue/test-utils";
+import i18n from "@/locales";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import AlertTierLinks from "./AlertTierLinks.vue";
 import {
   ALERT_SETTING_TIERS,
   alertTierContext,
@@ -82,6 +86,45 @@ describe("sectionTierView: the More options line per mockup screen", () => {
 
   it("lists every unset setting on the line, never cutting it (Review Focus 4)", () => {
     expect(sectionTierView("notify", state(ctx(ALL_ON))).more).toHaveLength(4);
+  });
+});
+
+describe("AlertTierLinks: the More options line names every unset rare setting", () => {
+  it.each<[string, Partial<AlertTierContext>, AlertSettingId[]]>([
+    ["filters", {}, []],
+    ["filters, aggregate, Must last set", { aggregate: true }, ["holdFor"]],
+    ["SQL", { shape: "sql" }, []],
+    ["PromQL", { shape: "promql" }, []],
+    ["real-time", { kind: "realtime" }, []],
+    ["anomaly", { kind: "anomaly", shape: "anomaly" }, []],
+    ["composite, tags set", { kind: "composite", shape: "composite" }, ["tags"]],
+  ])("%s", (_name, over, set) => {
+    const c = ctx({ ...over, ...ALL_ON });
+    for (const section of SECTIONS) {
+      const unset = ALERT_SETTING_TIERS.filter(
+        (d) =>
+          d.section === section &&
+          d.tier !== "add" &&
+          tierAvailable(d.id, c) &&
+          !set.includes(d.id),
+      );
+      const view = sectionTierView(section, state(c, { isSet: (id) => set.includes(id) }));
+      const wrapper = mount(AlertTierLinks, {
+        props: { section, view },
+        global: { plugins: [i18n] },
+      });
+      const names = wrapper.find(`[data-test="add-alert-section-${section}-more-names"]`);
+      expect(names.exists()).toBe(unset.length > 0);
+      if (!unset.length) continue;
+      expect(wrapper.get(`[data-test="add-alert-section-${section}-more"]`).text()).toContain(
+        `(${unset.length})`,
+      );
+      for (const d of unset) expect(names.text()).toContain(i18n.global.t(d.nameKey));
+      for (const id of set) expect(view.more.map((d) => d.id)).not.toContain(id);
+      expect(names.text()).not.toMatch(/…|\+\d+ more/);
+      expect(names.findComponent(OTruncatedText).exists()).toBe(false);
+      wrapper.unmount();
+    }
   });
 });
 
