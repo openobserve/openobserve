@@ -34,10 +34,7 @@ use infra::cache::{
 use crate::{
     cache::{
         MultiCachedQueryResponse,
-        result_utils::{
-            extract_timestamp_range, get_ts_value, is_ranked_by_non_timestamp, is_timestamp_field,
-            is_ts_order_field,
-        },
+        result_utils::{extract_timestamp_range, get_ts_value, is_ts_order_field},
     },
     sql::Sql,
 };
@@ -144,16 +141,10 @@ pub async fn check_cache(
         };
     }
 
-    // Check if query contains histogram function
-    let is_histogram_query = sql.histogram_interval.is_some();
-
     // skip the count queries & queries first order by is not _timestamp field
-    // Exception: Allow histogram queries even if ORDER BY is not on timestamp,
-    // because histogram is plotted based on timestamp
     if req.query.track_total_hits
         || (!order_by.is_empty()
             && order_by.first().as_ref().unwrap().0 != TIMESTAMP_COL_NAME
-            && !is_histogram_query
             && !result_ts_col.is_empty()
             && result_ts_col != order_by.first().as_ref().unwrap().0)
     {
@@ -191,9 +182,6 @@ pub async fn check_cache(
         return MultiCachedQueryResponse::default();
     }
 
-    let is_histogram_non_ts_order =
-        is_histogram_query && is_ranked_by_non_timestamp(order_by, result_ts_col);
-
     let mut multi_resp = MultiCachedQueryResponse {
         trace_id: trace_id.to_string(),
         is_aggregate,
@@ -222,7 +210,6 @@ pub async fn check_cache(
                 ts_column: result_ts_col.to_string(),
                 histogram_interval,
                 is_descending,
-                is_histogram_non_ts_order,
             },
         )
         .await;
@@ -307,7 +294,6 @@ pub async fn check_cache(
                 ts_column: result_ts_col.to_string(),
                 histogram_interval,
                 is_descending,
-                is_histogram_non_ts_order,
             },
             None,
         )
@@ -362,7 +348,6 @@ pub async fn check_cache(
 
                 // older rows can only rank after a full page when the newest rows come first
                 if is_descending
-                    && !is_histogram_non_ts_order
                     && cached_resp.cached_response.total == (sql.limit as usize)
                     && cached_resp.response_end_time == req.query.end_time
                 {
@@ -481,9 +466,8 @@ pub async fn get_cached_results(
         }
     };
 
-    let is_time_ordered = !cache_req.is_histogram_non_ts_order;
     let (data_start_time, data_end_time) =
-        extract_timestamp_range(&cached_response.hits, &cache_req.ts_column, is_time_ordered);
+        extract_timestamp_range(&cached_response.hits, &cache_req.ts_column);
     let histogram_interval = cached_response.histogram_interval.unwrap_or_default() * 1_000_000;
     let exceeds_end = if histogram_interval > 0 {
         data_end_time + histogram_interval > cache_req.q_end_time
@@ -491,10 +475,6 @@ pub async fn get_cached_results(
         data_end_time >= cache_req.q_end_time
     };
     if data_start_time < cache_req.q_start_time || exceeds_end {
-        // Clipping ranked hits cannot prove complete coverage of the remaining time range.
-        if cache_req.is_histogram_non_ts_order && histogram_interval > 0 {
-            return None;
-        }
         cached_response.hits.retain(|hit| {
             let hit_ts = get_ts_value(&cache_req.ts_column, hit);
             let within_end = if histogram_interval > 0 {
@@ -508,7 +488,7 @@ pub async fn get_cached_results(
             return None;
         }
         let (start_time, end_time) =
-            extract_timestamp_range(&cached_response.hits, &cache_req.ts_column, is_time_ordered);
+            extract_timestamp_range(&cached_response.hits, &cache_req.ts_column);
         matching_meta.start_time = start_time;
         matching_meta.end_time = end_time + histogram_interval;
     }
@@ -724,50 +704,6 @@ pub fn compute_cache_file_path(
     }
 
     file_path
-}
-
-/// Refines is_descending for histogram queries with non-timestamp ORDER BY.
-///
-/// For histogram queries, if ORDER BY is not on the timestamp column,
-/// we use ascending as the default for cache operations.
-///
-/// # Arguments
-/// * `sql` - Parsed SQL query
-/// * `ts_column` - The timestamp column name
-/// * `initial_is_descending` - The initial is_descending value from ORDER BY
-///
-/// # Returns
-/// Refined is_descending value
-pub fn refine_is_descending_for_histogram(
-    sql: &Sql,
-    ts_column: &str,
-    initial_is_descending: bool,
-) -> bool {
-    let is_histogram_query = sql.histogram_interval.is_some();
-
-    if !is_histogram_query || sql.order_by.is_empty() {
-        return initial_is_descending;
-    }
-
-    // Check if ORDER BY includes the timestamp column
-    let mut found_ts_order = false;
-    let mut refined_is_descending = initial_is_descending;
-
-    for (field, order) in &sql.order_by {
-        if is_timestamp_field(field, ts_column) {
-            refined_is_descending = order == &OrderBy::Desc;
-            found_ts_order = true;
-            break;
-        }
-    }
-
-    // For histogram queries ordered by non-timestamp columns (e.g., ORDER BY count),
-    // use ascending as default
-    if !found_ts_order {
-        refined_is_descending = false;
-    }
-
-    refined_is_descending
 }
 
 enum DeletionCriteria {
@@ -1397,7 +1333,6 @@ mod tests {
             ts_column: "_timestamp".to_string(),
             histogram_interval: 0,
             is_descending: false,
-            is_histogram_non_ts_order: false,
         };
         let res = get_cached_results("heal_trace", file_path, cache_req, None).await;
         assert!(res.is_none());
@@ -1434,7 +1369,6 @@ mod tests {
             ts_column: "_timestamp".to_string(),
             histogram_interval: thirty_days,
             is_descending: false,
-            is_histogram_non_ts_order: false,
         };
         let res = get_cached_results("grid_trace", file_path, cache_req, None).await;
         assert!(res.is_none());
@@ -1540,7 +1474,6 @@ mod tests {
     async fn read_clipped_histogram(
         name: &str,
         stored_hours: [i64; 4],
-        is_histogram_non_ts_order: bool,
         (q_start, q_end): (i64, i64),
     ) -> Option<(Vec<i64>, i64, i64)> {
         let file_path = format!("clip_org/logs/clip_stream/{name}");
@@ -1566,7 +1499,6 @@ mod tests {
             ts_column: "ts".to_string(),
             histogram_interval: CLIP_HOUR,
             is_descending: false,
-            is_histogram_non_ts_order,
         };
         let cached = get_cached_results("clip_trace", &file_path, cache_req, None).await?;
         let hours = cached
@@ -1594,19 +1526,8 @@ mod tests {
             ("inside_one_bucket", (0, 1), None),
         ];
         for (name, range, expected) in cases {
-            let got = read_clipped_histogram(name, [0, 1, 2, 3], false, range).await;
+            let got = read_clipped_histogram(name, [0, 1, 2, 3], range).await;
             assert_eq!(got, expected, "{name}");
-        }
-    }
-
-    #[tokio::test]
-    async fn test_get_cached_results_never_clips_ranked_histogram() {
-        let stored = [2, 0, 3, 1];
-        let unchanged = read_clipped_histogram("ranked_unchanged", stored, true, (0, 8)).await;
-        assert_eq!(unchanged, Some((stored.to_vec(), 0, 4)));
-        for (name, range) in [("ranked_end", (0, 7)), ("ranked_start", (1, 8))] {
-            let clipped = read_clipped_histogram(name, stored, true, range).await;
-            assert_eq!(clipped, None, "{name}");
         }
     }
 
@@ -1635,7 +1556,6 @@ mod tests {
             ts_column: "_timestamp".to_string(),
             histogram_interval: 0,
             is_descending: false,
-            is_histogram_non_ts_order: false,
         };
         let cached = get_cached_results("clip_trace", file_path, cache_req, None)
             .await
