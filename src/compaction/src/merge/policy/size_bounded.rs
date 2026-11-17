@@ -82,8 +82,11 @@ fn size_bounded_groups(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Vec<F
         new_file_size += file.meta.original_size;
         new_file_list.push(file.clone());
     }
-    // Incremental rounds leave the unfilled trailing group for later arrivals to avoid write
-    // amplification. The scheduled hour-end pass seals whatever is left.
+    // The trailing batch is always below max_file_size (the loop flushes a group
+    // only when adding the next file would exceed it). In incremental mode we do
+    // NOT seal this remainder: more files will arrive in the still-open hour, and
+    // sealing now would force re-merging it later (write amplification). Carry it
+    // to the next round; the scheduled hour-end pass seals whatever is left.
     if new_file_list.len() > 1 && !limits.is_incremental {
         groups.push(new_file_list);
     }

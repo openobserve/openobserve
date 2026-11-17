@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Closed metrics hours merge late files or rewrite fragmented hours, pre-merging over the cap.
-//! Fully indexed hours can skip; legacy files keep classic size-bounded merges.
+//! Closed hour of a metrics-index stream: its hash-ordered files become indexed files. Nothing
+//! merges when every file is indexed, the late files alone while fragmentation is low, else the
+//! whole hour; an hour over the merge-group cap is pre-merged into hash-merged files first.
 
 use std::sync::Arc;
 
@@ -38,11 +39,14 @@ const METRICS_INDEX_REWRITE_SLACK: usize = 4;
 enum MetricsIndexMergeScope {
     /// Leaves the hour unchanged when indexed-file fragmentation is within the size target.
     Skip,
-    /// Merge only late, non-indexed files; existing indexed files stay.
-    /// Their hash ranges may overlap, which readers handle per file.
+    /// Merge only the late, non-indexed files into one new indexed file;
+    /// existing indexed files stay. Their hash ranges may overlap, which
+    /// readers handle per file.
     LateFilesOnly,
-    /// Wait for late-file fragments to accumulate before a full rewrite, amortizing its cost.
-    /// A larger size target can lower the ideal count; the old-data sweep re-enqueues such hours.
+    /// Too many indexed files: rewrite the whole hour. Reached by late
+    /// merges piling up fragments (amortizes their full-rewrite cost) or by
+    /// a raised `max_file_size` shrinking the ideal count (such hours are
+    /// re-enqueued by the old-data sweep).
     WholeHour,
 }
 
@@ -330,6 +334,9 @@ mod tests {
         assert_eq!(sizes, [[10, 30, 30]], "the largest group waits alone");
     }
 
+    /// A closed hour with legacy and hash-ordered files: the legacy files get
+    /// their classic size-bounded merge, the hash files one indexed batch, and
+    /// no batch mixes the layouts (that would sort the whole hour).
     #[tokio::test]
     async fn test_plan_batches_keeps_legacy_metrics_out_of_the_indexed_merge() {
         let files = vec![
