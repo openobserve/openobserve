@@ -100,6 +100,7 @@ export interface QueryVariableSelectionConfig {
   isVariablePartialLoaded?: boolean;
   selectAllValueForMultiSelect?: string;
   customMultiSelectValue?: string[];
+  queryCapped?: boolean;
 }
 
 export type PromVariableQuery =
@@ -422,6 +423,13 @@ export const isQueryVariableAllPending = (
   !!variable?.multiSelect &&
   holdsAll(variable) &&
   variable?.isVariablePartialLoaded === false;
+
+/** True while "All" stands for a list cut at max records, so panels miss the values past the cut. */
+export const isQueryVariableAllCapped = (variable?: QueryVariableSelectionConfig | null): boolean =>
+  isCustomQueryVariable(variable) &&
+  !!variable?.multiSelect &&
+  holdsAll(variable) &&
+  !!variable?.queryCapped;
 
 /** Keeps the picks still in the new options, else falls back to the configured default like a fresh load. */
 export const reconcileQueryVariableValue = (

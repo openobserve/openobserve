@@ -172,6 +172,31 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
     wrapper.unmount();
   });
 
+  it("warns instead when All is picked on the capped list, as All covers only those values", async () => {
+    streamReturns([{ svc: "a" }, { svc: "b" }, { svc: "c" }]);
+    const wrapper = mountSelector({
+      variablesConfig: {
+        list: [
+          regionVariable,
+          {
+            ...sqlServiceVariable,
+            multiSelect: true,
+            selectAllValueForMultiSelect: "all",
+            query_data: { ...sqlServiceVariable.query_data, max_record_size: 2 },
+          },
+        ],
+      },
+      initialVariableValues: { value: {} },
+    });
+    await flushPromises();
+    expect(resolveQueryVariableValue(findVariable(wrapper, "service"))).toEqual(["a", "b"]);
+    expect(wrapper.find('[data-test="variable-query-all-capped-service"]').text()).toBe(
+      "All includes only the first 2 values",
+    );
+    expect(wrapper.find('[data-test="variable-query-capped-service"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   describe("with the variables manager", () => {
     const promNamespace = {
       name: "namespace",

@@ -263,6 +263,24 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     await qv.expectOptionValues("svc", fx.ALL_SERVICES);
   });
 
+  test("All on a custom list cut at max records warns that it covers only the listed values", async ({ page }) => {
+    const qv = new PageManager(page).dashboardQueryVariable;
+    const svc = customSql(`SELECT DISTINCT service_name FROM "${S}" ORDER BY service_name`, { max_record_size: 2 });
+    const id = await createDashboard([{ ...svc, multiSelect: true, selectAllValueForMultiSelect: "all" }], "service_name IN ($svc)");
+    const queries = fx.trackQueries(page);
+    await qv.openDashboard(fx.dashboardUrl(id));
+
+    const warning = page.locator('[data-test="variable-query-all-capped-svc"]');
+    const hint = page.locator('[data-test="variable-query-capped-svc"]');
+    await expect(warning).toHaveText("All includes only the first 2 values", { timeout: 45000 });
+    await expect(hint).toBeHidden();
+    await fx.waitForSearch(queries, /service_name IN \('auth', ?'cart'\)/, { timeout: 45000 });
+
+    await qv.selectOptions("svc", ["auth"]);
+    await expect(warning).toBeHidden();
+    await expect(hint).toHaveText("Showing the first 2 values");
+  });
+
   test("multi-select, default value choices, All and hide on dashboard work for a custom SQL variable", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const id = await startCustomVariable(qv, { panelWhere: "service_name IN ($svc)" });

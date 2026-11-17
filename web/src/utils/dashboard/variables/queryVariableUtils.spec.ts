@@ -31,6 +31,7 @@ import {
   getVariableFilterValues,
   isExplicitQuerySelection,
   isCustomQueryVariable,
+  isQueryVariableAllCapped,
   isQueryVariableAllPending,
   mapSqlRowsToOptions,
   defaultSqlValueColumn,
@@ -727,6 +728,17 @@ describe("query variable 'All'", () => {
     expect(isExplicitQuerySelection(SELECT_ALL_VALUE)).toBe(false);
     expect(isExplicitQuerySelection([])).toBe(false);
     expect(isExplicitQuerySelection(null)).toBe(false);
+  });
+
+  it("is capped only while All is picked on a custom list cut at max records", () => {
+    const capped = { ...svc, queryCapped: true };
+    expect(isQueryVariableAllCapped(capped)).toBe(true);
+    expect(isQueryVariableAllCapped({ ...capped, queryCapped: false })).toBe(false);
+    expect(isQueryVariableAllCapped({ ...capped, value: ["checkout"] })).toBe(false);
+    expect(isQueryVariableAllCapped({ ...capped, multiSelect: false })).toBe(false);
+    expect(
+      isQueryVariableAllCapped({ ...capped, query_data: { query_type: "promql", field: "job" } }),
+    ).toBe(false);
   });
 
   it("is pending only until the variable has loaded", () => {
