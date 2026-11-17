@@ -1153,6 +1153,21 @@ describe("AddTemplate - applies to", () => {
     );
   });
 
+  it("keeps the recovery_reason note with its description when the server sends variable groups", async () => {
+    const w = await mountComp();
+    await w
+      .findComponent({ name: "TemplatePreviewPanel" })
+      .vm.$emit("variable-groups", [{ name: "common", variables: ["alert_name"] }]);
+    (w.vm as any).variableGuideOpen = true;
+    await flushPromises();
+    const note = w.find('[data-test="add-template-variable-recovery-reason"]');
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toContain("recovery_reason");
+    expect(note.text()).toContain(
+      String(i18n.global.t("alert_templates.variableRecoveryReasonDescription")),
+    );
+  });
+
   it("fills the variable guide groups from the preview response", async () => {
     const w = await mountComp();
     await selectCustomMode(w);

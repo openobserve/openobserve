@@ -229,6 +229,10 @@ const builtInVars: { name: string; desc: I18nText }[] = [
   { name: "alert_type", desc: t("alerts.alertSettings.builtInVars.alertType") },
   { name: "alert_status", desc: t("alerts.alertSettings.builtInVars.alertStatus") },
   { name: "episode_id", desc: t("alerts.alertSettings.builtInVars.episodeId") },
+  {
+    name: "recovery_reason",
+    desc: t("alerts.alertSettings.builtInVars.recoveryReason"),
+  },
   { name: "alert_period", desc: t("alerts.alertSettings.builtInVars.alertPeriod") },
   { name: "alert_operator", desc: t("alerts.alertSettings.builtInVars.alertOperator") },
   { name: "alert_threshold", desc: t("alerts.alertSettings.builtInVars.alertThreshold") },

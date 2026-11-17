@@ -217,6 +217,18 @@ describe("AlertSettingsHelpDrawer", () => {
     expect(chips.some((c) => c.text() === "{alert_end_time_millis}")).toBe(true);
   });
 
+  it("advertises {recovery_reason} next to {episode_id} with its description", async () => {
+    w = mountDrawer({ topic: "variables" });
+    await w.find('[data-test="help-builtin-toggle"]').trigger("click");
+    const chips = w.findAll('[data-test="help-builtin-var"]');
+    const names = chips.map((c) => c.text());
+    const at = names.indexOf("{recovery_reason}");
+    expect(at).toBe(names.indexOf("{episode_id}") + 1);
+    expect(chips[at].attributes("title")).toBe(
+      (en as any).alerts.alertSettings.builtInVars.recoveryReason,
+    );
+  });
+
   it("teaches the WHY with a before/after comparison", () => {
     w = mountDrawer({ topic: "variables" });
     const why = w.find('[data-test="help-why"]');
