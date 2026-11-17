@@ -107,6 +107,77 @@ describe("useSyntheticResults", () => {
     );
   });
 
+  it("pairs confirm jobs with the run they re-tested only when the window has one", async () => {
+    getStreamMock.mockImplementation(async (name: string) => {
+      if (name !== "synthetics_results") throw new Error("no stream");
+      return { schema: [{ name: "trigger_type" }, { name: "run_id" }, { name: "device" }] };
+    });
+    const key = "2026-01-01T00:00:00";
+    const ts = Date.UTC(2026, 0, 1) * 1000;
+    const pair = (device: string, status: string, trigger: string) => ({
+      ts,
+      status,
+      trigger_type: trigger,
+      run_id: "r1",
+      location: "us",
+      device,
+      engine: "",
+      environment: "",
+    });
+    executeQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes("histogram(")) {
+        return [{ ts: key, total_runs: 4, passed_runs: 2, failed_runs: 2, confirm_runs: 2 }];
+      }
+      if (sql.includes("SELECT DISTINCT run_id")) return [{ run_id: "r1" }];
+      if (sql.includes("run_id IN")) {
+        return [
+          pair("desktop", "passed", "schedule"),
+          pair("mobile", "failed", "schedule"),
+          pair("desktop", "passed", "confirm"),
+          pair("mobile", "failed", "confirm"),
+        ];
+      }
+      return [];
+    });
+    const { kpi, fetchAll } = useSyntheticResults(t);
+    await fetchAll("mon-1", ts, ts + 60_000_000);
+    // Desktop up, mobile down: one result per device, not 2 of 2 from the row estimate.
+    expect(kpi.value.uptimePct).toBe(50);
+
+    // No confirm rows: no extra query.
+    executeQuery.mockReset();
+    executeQuery.mockResolvedValue([]);
+    await fetchAll("mon-1", ts, ts + 60_000_000);
+    expect(executeQuery.mock.calls.some((c) => String(c[0]).includes("DISTINCT run_id"))).toBe(
+      false,
+    );
+  });
+
+  it("keeps the row estimate when the pair query fails", async () => {
+    getStreamMock.mockImplementation(async () => ({
+      schema: [{ name: "trigger_type" }, { name: "run_id" }],
+    }));
+    executeQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes("histogram(")) {
+        return [
+          {
+            ts: "2026-01-01T00:00:00",
+            total_runs: 2,
+            passed_runs: 1,
+            failed_runs: 1,
+            confirm_runs: 1,
+          },
+        ];
+      }
+      if (sql.includes("DISTINCT run_id")) throw new Error("search failed");
+      return [];
+    });
+    const { kpi, kpiError, fetchAll } = useSyntheticResults(t);
+    await fetchAll("mon-1", 1, 100);
+    expect(kpi.value.uptimePct).toBe(100);
+    expect(kpiError.value).toBeNull();
+  });
+
   it("issues the step queries only from fetchSteps", async () => {
     executeQuery.mockResolvedValue([]);
     const { fetchSteps } = useSyntheticResults();

@@ -40,6 +40,9 @@ import {
   mapHistogram,
   mapHistogramSplit,
   deriveKpiFromHistogram,
+  applyConfirmPairs,
+  buildConfirmPairRowsSql,
+  buildConfirmRunIdsSql,
   mapRun,
   evidenceOriginTs,
   evidenceSeverity,
@@ -1879,6 +1882,124 @@ describe("confirm jobs in uptime", () => {
       start + 60_000_000,
     );
     expect(bucket.uptimePct).toBe(100);
+  });
+
+  describe("pairs of a confirm job and the run it re-tested", () => {
+    const start = Date.UTC(2026, 0, 1) * 1000; // micros
+    const key = new Date(start / 1000).toISOString().slice(0, 19);
+    const nextKey = new Date(start / 1000 + 60_000).toISOString().slice(0, 19);
+    const row = (
+      tsOffsetSec: number,
+      device: string,
+      status: string,
+      trigger = "schedule",
+      environment = "",
+    ) => ({
+      ts: start + tsOffsetSec * 1_000_000,
+      status,
+      trigger_type: trigger,
+      run_id: "r1",
+      location: "us",
+      device,
+      engine: "chromium",
+      environment,
+    });
+
+    it("should show 50% when desktop passes, mobile fails, and the confirm job repeats both", () => {
+      // The reviewer's case: 4 rows, 2 up, 2 confirm rows. The row estimate gives 100%.
+      const histogram = [
+        { ts: key, total_runs: 4, passed_runs: 2, failed_runs: 2, confirm_runs: 2 },
+      ];
+      expect(deriveKpiFromHistogram(histogram, null, null).uptimePct).toBe(100);
+
+      const pairs = [
+        row(0, "desktop", "passed"),
+        row(0, "mobile", "failed"),
+        row(30, "desktop", "passed", "confirm"),
+        row(30, "mobile", "failed", "confirm"),
+      ];
+      const fixed = applyConfirmPairs(histogram, pairs, false);
+      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(50);
+      expect(mapHistogram(fixed, start, start + 60_000_000)[0].uptimePct).toBe(50);
+      // The run counts the tiles show do not change.
+      expect(deriveKpiFromHistogram(fixed, null, null).totalRuns).toBe(4);
+    });
+
+    it("should take the confirm answer when mobile passes on the re-test", () => {
+      const histogram = [
+        { ts: key, total_runs: 4, passed_runs: 3, failed_runs: 1, confirm_runs: 2 },
+      ];
+      const pairs = [
+        row(0, "desktop", "passed"),
+        row(0, "mobile", "failed"),
+        row(30, "desktop", "passed", "confirm"),
+        row(30, "mobile", "passed", "confirm"),
+      ];
+      const fixed = applyConfirmPairs(histogram, pairs, false);
+      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(100);
+    });
+
+    it("should keep the original answer when the confirm job could not test the site", () => {
+      const histogram = [
+        { ts: key, total_runs: 2, passed_runs: 0, failed_runs: 1, error_runs: 1, confirm_runs: 0 },
+      ];
+      const pairs = [row(0, "mobile", "failed"), row(30, "mobile", "error", "confirm")];
+      const fixed = applyConfirmPairs(histogram, pairs, false);
+      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(0);
+      expect(fixed[0].measured_delta).toBe(0);
+    });
+
+    it("should count a pair that spans two buckets once, in the bucket of the original", () => {
+      const histogram = [
+        { ts: key, total_runs: 2, passed_runs: 1, failed_runs: 1, confirm_runs: 0 },
+        { ts: nextKey, total_runs: 2, passed_runs: 1, failed_runs: 1, confirm_runs: 2 },
+      ];
+      const pairs = [
+        row(50, "desktop", "passed"),
+        row(50, "mobile", "failed"),
+        row(70, "desktop", "passed", "confirm"),
+        row(70, "mobile", "failed", "confirm"),
+      ];
+      const fixed = applyConfirmPairs(histogram, pairs, false);
+      const buckets = mapHistogram(fixed, start, start + 120_000_000);
+      expect(buckets[0].uptimePct).toBe(50);
+      // The second bucket held only the confirm rows, which now count in the first.
+      expect(buckets[1].uptimePct).toBeNull();
+      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(50);
+    });
+
+    it("should correct each environment on its own when the chart splits by environment", () => {
+      const histogram = [
+        {
+          ts: key,
+          environment: "prod",
+          total_runs: 4,
+          passed_runs: 2,
+          failed_runs: 2,
+          confirm_runs: 2,
+        },
+        { ts: key, environment: "stage", total_runs: 1, passed_runs: 1, confirm_runs: 0 },
+      ];
+      const pairs = [
+        row(0, "desktop", "passed", "schedule", "prod"),
+        row(0, "mobile", "failed", "schedule", "prod"),
+        row(30, "desktop", "passed", "confirm", "prod"),
+        row(30, "mobile", "failed", "confirm", "prod"),
+      ];
+      const fixed = applyConfirmPairs(histogram, pairs, true);
+      const { blended, byEnv } = mapHistogramSplit(fixed, start, start + 60_000_000);
+      expect(byEnv.get("prod")![0].uptimePct).toBe(50);
+      expect(byEnv.get("stage")![0].uptimePct).toBe(100);
+      // 2 of 3 results: prod desktop, prod mobile, stage.
+      expect(blended[0].uptimePct).toBeCloseTo(66.667, 2);
+    });
+
+    it("should name the runs in the pair query and select absent fields as literals", () => {
+      expect(buildConfirmRunIdsSql("m")).toContain("trigger_type = 'confirm'");
+      const sql = buildConfirmPairRowsSql("m", ["r1", "o'k"], new Set(["run_id", "trigger_type"]));
+      expect(sql).toContain("run_id IN ('r1', 'o''k')");
+      expect(sql).toContain("'' as device");
+    });
   });
 
   it("should ask for confirm rows only when the stream has the field", () => {
