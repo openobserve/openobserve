@@ -14,14 +14,12 @@ import os
 import time
 import uuid
 from collections import Counter
-from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
 
 from support.client import OpenObserveClient
-from support.factories import unique_name
 from support.wait import wait_until
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -81,13 +79,6 @@ HOUR = 3_600_000_000
 MINUTE = 60_000_000
 
 
-@pytest.fixture
-def cache_stream(client: OpenObserveClient) -> Generator[str, None, None]:
-    name = unique_name("pytest_rcache")
-    yield name
-    client.streams.delete(name)
-
-
 def _seed(client: OpenObserveClient, stream: str, stamps: list[int]) -> None:
     """Ingest one row per stamp and wait until every row is searchable."""
     resp = client.post(f"{stream}/_json", json=[{"_timestamp": ts, "i": i} for i, ts in enumerate(stamps)])
@@ -139,14 +130,14 @@ def _expected_buckets(stamps: list[int], start: int, end: int, step: int, offset
     ids=["histogram-argument", "request-timezone"],
 )
 def test_cached_non_utc_day_histogram_keeps_local_bucket_edges(
-    client: OpenObserveClient, cache_stream: str, histogram_tz: str | None, request_tz: str | None
+    client: OpenObserveClient, temp_stream_name: str, histogram_tz: str | None, request_tz: str | None
 ):
     """#16539 / #16641: a non-UTC '1 day' histogram served with use_cache must match the uncached zone-aligned buckets, newest first."""
     now = int(time.time()) * 1_000_000
     stamps = [now - 40 * HOUR + k * 30 * MINUTE for k in range(80)]
-    _seed(client, cache_stream, stamps)
+    _seed(client, temp_stream_name, stamps)
     tz_arg = f", {histogram_tz}" if histogram_tz else ""
-    sql = f"SELECT histogram(_timestamp, '1 day'{tz_arg}) AS ts, count(*) AS c FROM \"{cache_stream}\" GROUP BY ts"
+    sql = f"SELECT histogram(_timestamp, '1 day'{tz_arg}) AS ts, count(*) AS c FROM \"{temp_stream_name}\" GROUP BY ts"
     extra = {"timezone": request_tz} if request_tz else {}
     ist = int(timedelta(hours=5, minutes=30).total_seconds()) * 1_000_000
     day = 24 * HOUR
@@ -162,12 +153,12 @@ def test_cached_non_utc_day_histogram_keeps_local_bucket_edges(
     assert cached == uncached, f"use_cache changed the buckets: cached={cached} uncached={uncached}"
 
 
-def test_cached_histogram_reuses_only_whole_buckets_inside_the_range(client: OpenObserveClient, cache_stream: str):
+def test_cached_histogram_reuses_only_whole_buckets_inside_the_range(client: OpenObserveClient, temp_stream_name: str):
     """#16644: a range ending mid-bucket reused the cached whole-bucket count for its last bucket."""
     top = int(time.time()) // 3600 * HOUR
     stamps = [top - 6 * HOUR + k * 10 * MINUTE for k in range(24)]
-    _seed(client, cache_stream, stamps)
-    sql = f"SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM \"{cache_stream}\" GROUP BY ts ORDER BY ts DESC"
+    _seed(client, temp_stream_name, stamps)
+    sql = f"SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM \"{temp_stream_name}\" GROUP BY ts ORDER BY ts DESC"
 
     full = (top - 6 * HOUR, top - 2 * HOUR)
     hits, _ = _search(client, sql, *full, True)
@@ -183,12 +174,12 @@ def test_cached_histogram_reuses_only_whole_buckets_inside_the_range(client: Ope
     assert _search(client, sql, *clipped, False)[0] == expected
 
 
-def test_cached_ascending_limit_query_returns_the_earlier_prefix(client: OpenObserveClient, cache_stream: str):
+def test_cached_ascending_limit_query_returns_the_earlier_prefix(client: OpenObserveClient, temp_stream_name: str):
     """#16651: an earlier start on a cached ORDER BY _timestamp ASC LIMIT query kept the cached first rows."""
     top = int(time.time()) // 3600 * HOUR
     stamps = [top - 3 * HOUR + k * MINUTE for k in range(120)]
-    _seed(client, cache_stream, stamps)
-    sql = f'SELECT _timestamp FROM "{cache_stream}" ORDER BY _timestamp ASC LIMIT 5'
+    _seed(client, temp_stream_name, stamps)
+    sql = f'SELECT _timestamp FROM "{temp_stream_name}" ORDER BY _timestamp ASC LIMIT 5'
 
     later = (top - 2 * HOUR, top - HOUR)
     hits, _ = _search(client, sql, *later, True)
@@ -202,14 +193,14 @@ def test_cached_ascending_limit_query_returns_the_earlier_prefix(client: OpenObs
     assert [h["_timestamp"] for h in _search(client, sql, *earlier, False)[0]] == expected
 
 
-def test_ranked_histogram_with_cache_equals_the_uncached_result(client: OpenObserveClient, cache_stream: str):
+def test_ranked_histogram_with_cache_equals_the_uncached_result(client: OpenObserveClient, temp_stream_name: str):
     """#16650: a top-3 histogram ranked by count merged a cached narrower range into a wrong top 3."""
     top = int(time.time()) // 3600 * HOUR
     per_hour = {10: 9, 9: 8, 8: 7, 7: 1, 6: 2, 5: 6, 4: 3, 3: 5, 2: 4}
     stamps = [top - h * HOUR + k * MINUTE for h, n in per_hour.items() for k in range(n)]
-    _seed(client, cache_stream, stamps)
-    by_time = f"SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM \"{cache_stream}\" GROUP BY ts ORDER BY ts DESC"
-    ranked = f"SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM \"{cache_stream}\" GROUP BY ts ORDER BY c DESC LIMIT 3"
+    _seed(client, temp_stream_name, stamps)
+    by_time = f"SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM \"{temp_stream_name}\" GROUP BY ts ORDER BY ts DESC"
+    ranked = f"SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM \"{temp_stream_name}\" GROUP BY ts ORDER BY c DESC LIMIT 3"
 
     narrow = (top - 6 * HOUR, top - HOUR)
     wide = (top - 10 * HOUR, top - HOUR)
