@@ -508,10 +508,8 @@ describe.each(packs)("author JS (custom_chart) — %s pack", (_packId, manifest)
   });
 
   it("every customChartContent assigns a BARE `option`", () => {
-    // The sandbox runs the code in a block inside `__o2UserChart(data, echarts, context, o2)` and
-    // then reads a FREE `option` identifier from the enclosing scope
-    // (customChartSandbox.ts userChartScript). `const option = ...` binds inside the block,
-    // so `return option` throws ReferenceError and the panel paints nothing.
+    // Keeps curated code in the bare form the bundled templates use; the sandbox (userChartScript in
+    // customChartSandbox.ts) accepts a declared `option` too, so this guards consistency, not a crash.
     for (const panel of chartPanels) {
       const ast = parse(String(panel.customChartContent));
       let declared = false;

@@ -604,11 +604,7 @@ export default class DashboardactionPage {
       .toBe(true);
   }
 
-  /**
-   * Wait for a Custom Chart panel to render; it draws inside a sandboxed iframe, not in [data-test="chart-renderer"].
-   * @param {Function} expect - Playwright expect function
-   * @param {number} timeout
-   */
+  /** Waits for a Custom Chart panel, which draws inside a sandboxed iframe, not in [data-test="chart-renderer"]. */
   async expectSandboxChartRendered(expect, timeout = 20000) {
     const frame = this.page
       .frameLocator('[data-test="dashboard-custom-chart-sandbox"] iframe')

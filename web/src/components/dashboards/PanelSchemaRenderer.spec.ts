@@ -1334,13 +1334,13 @@ describe("PanelSchemaRenderer", () => {
         expect(wrapper.vm.errorDetail.message).toBe("");
       });
 
-      it("keeps a chart error through a theme change and clears it for new data", async () => {
+      it("keeps a chart error over the still-mounted renderer until a later run of it reports", async () => {
         const isFirstLoadSettled = ref(false);
         const data = ref<any[]>([]);
         vi.mocked(usePanelDataLoader).mockReturnValueOnce(
           loaderWith({ isFirstLoadSettled, data }) as any,
         );
-        const code = 'throw new Error("pt boom");';
+        const code = "option = { title: { text: data[1][0].x } };";
         vi.mocked(convertPanelData).mockImplementation(async (_schema, chartData) => ({
           chartType: "custom_chart",
           run: { code, data: chartData, panelId: "panel-1" },
@@ -1358,7 +1358,10 @@ describe("PanelSchemaRenderer", () => {
               ...defaultProps.panelSchema,
               type: "custom_chart",
               customChartContent: code,
-              queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+              queries: [
+                { query: "SELECT 1", customQuery: true, fields: {}, config: {} },
+                { query: "SELECT 2", customQuery: true, fields: {}, config: {} },
+              ],
             },
           },
           {
@@ -1366,40 +1369,52 @@ describe("PanelSchemaRenderer", () => {
               CustomChartSandboxRenderer: {
                 name: "CustomChartSandboxRenderer",
                 props: ["run"],
-                emits: ["error"],
+                emits: ["error", "rendered"],
                 template: '<div data-test="custom-chart-renderer"></div>',
               },
             },
           },
         );
+        const renderer = () => wrapper.findComponent({ name: "CustomChartSandboxRenderer" });
         await flushPromises();
         data.value = [[{ count: 1 }]];
         isFirstLoadSettled.value = true;
         await flushPromises();
-        const renderer = wrapper.findComponent({ name: "CustomChartSandboxRenderer" });
-        renderer.vm.$emit(
-          "error",
-          { message: "Execution Error: pt boom", code: "" },
-          renderer.props("run"),
-        );
-        await flushPromises();
-
-        store.state.theme = "dark";
+        const firstRun = renderer().props("run");
+        renderer().vm.$emit("error", { message: "Execution Error: pt boom", code: "" }, firstRun);
         await flushPromises();
 
         expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
-        expect(wrapper.find('[data-test="custom-chart-renderer"]').exists()).toBe(false);
+        expect(renderer().exists()).toBe(true);
+        expect(renderer().element.parentElement!.style.display).toBe("none");
 
-        data.value = [[{ count: 2 }]];
+        // A theme change sends a new run to the hidden renderer and keeps the error until it reports.
+        store.state.theme = "dark";
+        await flushPromises();
+        const themedRun = renderer().props("run");
+        expect(themedRun).not.toBe(firstRun);
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+        renderer().vm.$emit("error", { message: "Execution Error: pt boom", code: "" }, themedRun);
+        await flushPromises();
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+
+        // The second query streams into the same data array; its run renders, which clears the error.
+        data.value[1] = [{ x: "second query arrived" }];
+        await flushPromises();
+        const streamedRun = renderer().props("run");
+        expect(streamedRun.data[1]).toEqual([{ x: "second query arrived" }]);
+        renderer().vm.$emit("rendered", firstRun);
+        await flushPromises();
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+
+        renderer().vm.$emit("rendered", streamedRun);
         await flushPromises();
 
         expect(wrapper.vm.errorDetail.message).toBe("");
-        expect(
-          wrapper.findComponent({ name: "CustomChartSandboxRenderer" }).props("run").data,
-        ).toEqual([[{ count: 2 }]]);
+        expect(renderer().element.parentElement!.style.display).toBe("");
       });
 
-      it("clears a thrown chart error for good once corrected code renders, with the real sandbox renderer", async () => {
+      it("clears a thrown chart error once corrected code renders, with the real sandbox renderer", async () => {
         type Handler = ((event: { data: unknown }) => void) | null;
         class FakePort {
           other!: FakePort;
@@ -1434,8 +1449,8 @@ describe("PanelSchemaRenderer", () => {
         const { default: RealSandboxRenderer } = await vi.importActual<any>(
           "@/components/dashboards/panels/CustomChartSandboxRenderer.vue",
         );
-        // Plays the frame side: the ready handshake, then the given answer to the frame's first run.
-        const answerRun = async (answer: Record<string, unknown>) => {
+        // Plays the frame side: the ready handshake, then the given answer to the given run.
+        const answerRun = async (runId: number, answer: Record<string, unknown>) => {
           const iframe = wrapper.find("iframe").element as HTMLIFrameElement;
           const post = vi.spyOn(iframe.contentWindow!, "postMessage");
           const token = /token: "([0-9a-f]{32})"/.exec(iframe.srcdoc)![1];
@@ -1448,7 +1463,7 @@ describe("PanelSchemaRenderer", () => {
           await flushPromises();
           const port = post.mock.calls[0][2]![0] as unknown as FakePort;
           port.onmessage = () => {};
-          port.postMessage({ ...answer, runId: 1 });
+          port.postMessage({ ...answer, runId });
           await flushPromises();
         };
 
@@ -1462,7 +1477,6 @@ describe("PanelSchemaRenderer", () => {
           data: [[{ count: 1 }]],
           panelId: "panel-1",
         };
-        // Every conversion, including ones a resize triggers, returns the current result.
         let converted: unknown = Promise.resolve({ chartType: "custom_chart", run: throwing });
         vi.mocked(convertPanelData).mockImplementation(() => converted as any);
         onTestFinished(() => {
@@ -1488,28 +1502,78 @@ describe("PanelSchemaRenderer", () => {
         data.value = [[{ count: 1 }]];
         isFirstLoadSettled.value = true;
         await flushPromises();
-        await answerRun({ type: "error", message: "Execution Error: pt boom" });
+        await answerRun(1, { type: "error", message: "Execution Error: pt boom" });
         expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
-        expect(wrapper.find("iframe").exists()).toBe(false);
-
-        let landCorrected!: (value: unknown) => void;
-        converted = new Promise((resolve) => (landCorrected = resolve));
-        data.value = [[{ count: 2 }]];
-        await flushPromises();
-        // The cleared error remounts the renderer; the failed run must not execute again.
-        expect(wrapper.vm.errorDetail.message).toBe("");
-        expect(wrapper.find("iframe").exists()).toBe(false);
+        expect(wrapper.find("iframe").exists()).toBe(true);
 
         const corrected = { code: "var option = {};", data: [[{ count: 2 }]], panelId: "panel-1" };
-        landCorrected({ chartType: "custom_chart", run: corrected });
+        converted = Promise.resolve({ chartType: "custom_chart", run: corrected });
+        data.value = [[{ count: 2 }]];
         await flushPromises();
         expect((wrapper.find("iframe").element as HTMLIFrameElement).srcdoc).toContain(
           "var option = {};",
         );
-        await answerRun({ type: "rendered" });
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+        await answerRun(2, { type: "rendered" });
 
         expect(wrapper.vm.errorDetail.message).toBe("");
         expect(wrapper.emitted("error")!.at(-1)![0].message).toBe("");
+      });
+
+      it("leaves a custom chart to resize itself instead of re-running its code", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const observers: ResizeObserverCallback[] = [];
+        const RealObserver = globalThis.ResizeObserver;
+        globalThis.ResizeObserver = class {
+          constructor(callback: ResizeObserverCallback) {
+            observers.push(callback);
+          }
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        } as unknown as typeof ResizeObserver;
+        onTestFinished(() => {
+          globalThis.ResizeObserver = RealObserver;
+        });
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame"] });
+        onTestFinished(() => {
+          vi.useRealTimers();
+        });
+        vi.mocked(convertPanelData).mockResolvedValue({
+          chartType: "custom_chart",
+          run: { code: "option = {};", data: [[{ count: 1 }]], panelId: "panel-1" },
+        } as any);
+        onTestFinished(() => {
+          vi.mocked(convertPanelData).mockResolvedValue({
+            chartType: "line",
+            options: {},
+            extras: { isTimeSeries: true },
+          } as any);
+        });
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {};",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        const calls = vi.mocked(convertPanelData).mock.calls.length;
+        expect(observers.length).toBeGreaterThan(0);
+
+        observers.forEach((callback) => callback([], {} as ResizeObserver));
+        await vi.runAllTimersAsync();
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBe(calls);
       });
 
       it("keeps the rendered chart and shows no error when the chart run is skipped", async () => {

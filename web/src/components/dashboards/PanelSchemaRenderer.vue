@@ -22,7 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="relative h-full" ref="chartPanelRef" :class="chartPanelClass">
       <div
-        v-if="!errorDetail?.message && !isAwaitingFirstLoad"
+        v-if="(!errorDetail?.message || showsCustomChartError) && !isAwaitingFirstLoad"
+        v-show="!errorDetail?.message"
         :style="{ height: chartPanelHeight, width: '100%' }"
       >
         <MapsRenderer
@@ -122,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :run="customChartRun"
           class="flex h-full w-full flex-col"
           @error="onCustomChartError"
+          @rendered="onCustomChartRendered"
         />
         <ChartRenderer
           v-else
@@ -1555,28 +1557,30 @@ export default defineComponent({
     // Conversions can resolve out of order; only the most recently started may land.
     let conversionGeneration = 0;
     let customChartRunSkipped = false;
-    // Clearing the error remounts the renderer; re-running the failed run would re-set the error after Apply cleared it.
-    const failedCustomChartRun = shallowRef<CustomChartRun | null>(null);
-    const customChartRun = computed<CustomChartRun | null>(() => {
-      const run = panelData.value?.chartType === "custom_chart" ? panelData.value.run : null;
-      return run && toRaw(run) !== failedCustomChartRun.value ? run : null;
-    });
+    const customChartRun = computed<CustomChartRun | null>(() =>
+      panelData.value?.chartType === "custom_chart" ? (panelData.value.run ?? null) : null,
+    );
+    // The renderer stays mounted under its own error, so only the next run's result replaces or clears it.
+    const customChartError = shallowRef<{ message: string; code: string } | null>(null);
+    const showsCustomChartError = computed(
+      () => !!errorDetail.value?.message && toRaw(errorDetail.value) === customChartError.value,
+    );
+    const errorBlocksConversion = () =>
+      !!errorDetail.value?.message && !showsCustomChartError.value;
+    const isCurrentCustomChartRun = (run: CustomChartRun | null) =>
+      !!run && toRaw(run) === toRaw(customChartRun.value);
     const onCustomChartError = (
       detail: { message: string; code: string },
       run: CustomChartRun | null,
     ) => {
-      if (!run || toRaw(run) !== toRaw(customChartRun.value)) return;
-      failedCustomChartRun.value = toRaw(run);
+      if (!isCurrentCustomChartRun(run)) return;
+      customChartError.value = detail;
       errorDetail.value = detail;
     };
-    // The error arrives from the frame only after a re-run, so a theme or timezone change must not clear one that would recur.
-    const failsLikeLastCustomChartRun = () => {
-      const failed = failedCustomChartRun.value;
-      return (
-        !!failed &&
-        failed.code === (panelSchema.value?.customChartContent ?? "") &&
-        toRaw(failed.data) === toRaw(filteredData.value)
-      );
+    const onCustomChartRendered = (run: CustomChartRun | null) => {
+      if (isCurrentCustomChartRun(run) && showsCustomChartError.value) {
+        errorDetail.value = { message: "", code: "" };
+      }
     };
     const convertPanelDataCommon = async (applyOverlay = false) => {
       // Converting the empty pre-load buffer would publish an empty result to the header and curated tiles.
@@ -1596,11 +1600,10 @@ export default defineComponent({
         return;
       }
 
-      if (!errorDetail?.value?.message && validatePanelData?.value?.length === 0) {
+      if (!errorBlocksConversion() && validatePanelData?.value?.length === 0) {
         const generation = ++conversionGeneration;
         // A stream error set while awaiting is newer than this conversion's data.
-        const superseded = () =>
-          generation !== conversionGeneration || !!errorDetail?.value?.message;
+        const superseded = () => generation !== conversionGeneration || errorBlocksConversion();
         try {
           const result = await convertPanelData(
             filteredPanelSchema.value,
@@ -1730,10 +1733,13 @@ export default defineComponent({
           regionJoin.value = panelData.value?.extras?.regionJoin ?? null;
           sankeyNotice.value = panelData.value?.extras?.sankeyNotice ?? null;
 
-          errorDetail.value = {
-            message: "",
-            code: "",
-          };
+          // A new run reports its own outcome; with no run left there is nothing to report it.
+          if (!showsCustomChartError.value || !customChartRun.value) {
+            errorDetail.value = {
+              message: "",
+              code: "",
+            };
+          }
         } catch (error: any) {
           if (superseded()) return;
           if (error instanceof CustomChartSkippedError) {
@@ -1801,7 +1807,7 @@ export default defineComponent({
         }
 
         if (
-          !errorDetail?.value?.message &&
+          !errorBlocksConversion() &&
           validatePanelData?.value?.length === 0 &&
           data.value?.length
         ) {
@@ -1895,7 +1901,7 @@ export default defineComponent({
           }
           emit("updated:vrlFunctionFieldList", perQueryFields);
         }
-        if (panelData.value.chartType == "custom_chart" && !failsLikeLastCustomChartRun())
+        if (panelData.value.chartType == "custom_chart" && !showsCustomChartError.value)
           errorDetail.value = {
             message: "",
             code: "",
@@ -2018,6 +2024,8 @@ export default defineComponent({
 
     // Listen for layout changes to update chart dimensions
     const handleWindowLayoutChanges = async () => {
+      // The frame resizes its own chart; a new run would re-run the code and drop the user's zoom and legend picks.
+      if (panelSchema.value?.type === "custom_chart") return;
       if (chartPanelRef.value) {
         await nextTick();
         await convertPanelDataCommon();
@@ -2773,6 +2781,8 @@ export default defineComponent({
       panelData,
       customChartRun,
       onCustomChartError,
+      onCustomChartRendered,
+      showsCustomChartError,
       noData,
       noDataTitle,
       customNoDataText,

@@ -103,7 +103,7 @@ describe("CustomChartSandboxRenderer", () => {
     const { received } = await connect();
     const runMessage = received.find((message) => message.type === "run");
     expect(JSON.parse(runMessage.data)).toEqual([[{ v: 1 }]]);
-    expect(received.find((message) => message.type === "appearance").dark).toBe(false);
+    expect(runMessage.appearance.dark).toBe(false);
   });
 
   it("emits the frame's error in the shape the panel shows, with the run it belongs to", async () => {
@@ -164,14 +164,31 @@ describe("CustomChartSandboxRenderer", () => {
     expect(received.at(-1)).toEqual({ type: "clear" });
   });
 
-  it("sends the dark look when the app theme changes", async () => {
+  it("sends the dark look with the run a theme change brings, and draws only once for it", async () => {
     wrapper = mountRenderer();
     const { received } = await connect();
+    const before = received.length;
 
     store.state.theme = "dark";
     await flushPromises();
+    expect(received.slice(before)).toEqual([]);
 
-    expect(received.at(-1)).toMatchObject({ type: "appearance", dark: true });
+    await wrapper.setProps({ run: run() });
+    await flushPromises();
+
+    const after = received.slice(before);
+    expect(after.map((message) => message.type)).toEqual(["run"]);
+    expect(after[0].appearance).toMatchObject({ dark: true, pixelRatio: expect.any(Number) });
+  });
+
+  it("emits rendered with the run it belongs to", async () => {
+    const drawn = run();
+    wrapper = mountRenderer({ run: drawn });
+    const { port } = await connect();
+
+    port.postMessage({ type: "rendered", runId: 1 });
+
+    expect(wrapper.emitted("rendered")).toEqual([[drawn]]);
   });
 
   it("marks this panel as hovered when the frame reports the pointer", async () => {

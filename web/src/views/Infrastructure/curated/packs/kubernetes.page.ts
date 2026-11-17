@@ -365,7 +365,6 @@ option = {
   // Read back by \`finished\` from the live chart option, so the handler and the seeded grid share one source.
   o2_layout: { axisLeft: AXIS_LEFT, axisTop: AXIS_TOP, axisBottom: AXIS_BOTTOM, axisRight: AXIS_RIGHT },
   o2_events: {
-    // Announces the pick and lets CuratedPageView route it: location.assign here would tear down and reload the whole SPA.
     // The option is built before the chart has a size, so the square is solved HERE, where a live chart exists.
     // \`finished\` fires after every render including every resize(), which is what makes this responsive at all.
     finished: function (params, chart) {

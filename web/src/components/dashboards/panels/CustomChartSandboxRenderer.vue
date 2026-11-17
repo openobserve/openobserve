@@ -25,6 +25,10 @@ import { useTheme } from "@/composables/useTheme";
 import { getFontSans } from "@/utils/fonts";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import {
+  currentDevicePixelRatio,
+  useDevicePixelRatioChange,
+} from "@/composables/useDevicePixelRatio";
+import {
   CUSTOM_CHART_DRILLDOWN_EVENTS,
   createCustomChartSandbox,
   type CustomChartAppearance,
@@ -43,6 +47,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   error: [detail: { message: string; code: string }, run: CustomChartRun | null];
+  rendered: [run: CustomChartRun | null];
 }>();
 
 const { t } = useI18nTyped();
@@ -58,6 +63,7 @@ const appearance = (): CustomChartAppearance => ({
   dark: isDark.value,
   palette: getColorPalette(),
   fontFamily: getFontSans(),
+  pixelRatio: currentDevicePixelRatio(),
 });
 
 const onDrilldown = (drilldown: CustomChartDrilldown) => {
@@ -88,6 +94,7 @@ onMounted(() => {
     hostRef.value,
     {
       onError: (message) => emit("error", { message, code: "" }, props.run),
+      onRendered: () => emit("rendered", props.run),
       onDrilldown,
       onPointer,
     },
@@ -96,8 +103,9 @@ onMounted(() => {
   render();
 });
 
+// A theme change arrives as a new run (its context carries the theme), so only the pixel ratio is pushed on its own.
 watch(() => props.run, render);
-watch(isDark, () => sandbox?.setAppearance(appearance()));
+useDevicePixelRatioChange(() => sandbox?.setAppearance(appearance()));
 
 onUnmounted(() => {
   sandbox?.destroy();

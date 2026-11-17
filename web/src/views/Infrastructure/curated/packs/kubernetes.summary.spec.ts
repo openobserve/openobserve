@@ -612,10 +612,8 @@ describe("summary — the author JS is real, safe, and shaped for the sandbox", 
   });
 
   it("assigns a BARE `option`, never a declared one", () => {
-    // The sandbox runs the code in a block inside `__o2UserChart(data, echarts, context, o2)` and
-    // then reads a FREE `option` identifier from the enclosing scope
-    // (customChartSandbox.ts userChartScript). `const option = ...` binds inside the block,
-    // so `return option` throws ReferenceError and the panel shows nothing.
+    // Keeps curated code in the bare form the bundled templates use; the sandbox (userChartScript in
+    // customChartSandbox.ts) accepts a declared `option` too, so this guards consistency, not a crash.
     const code = chartCode(PANEL_ID);
     const ast = parse(code);
     let declared = false;

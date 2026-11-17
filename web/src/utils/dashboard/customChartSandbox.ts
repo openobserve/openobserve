@@ -37,6 +37,9 @@ const MAX_DRILLDOWN_VALUE_LENGTH = 512;
 
 const GL_CHART_PATTERN = /[A-Za-z]+(?:3D|GL)\b|\bglobe\b/;
 
+// Keys pressed in a focused frame never reach the app, so the panel hover shortcuts (PanelContainer) are forwarded; nothing else is.
+const FORWARDED_KEYS = ["v", "V", "i", "I", "e", "E", "d", "D", "Delete", "Backspace"];
+
 /** One run of a panel's chart code: the frame is rebuilt only when `code` changes. */
 export interface CustomChartRun {
   code: string;
@@ -50,6 +53,7 @@ export interface CustomChartAppearance {
   dark: boolean;
   palette: string[];
   fontFamily: string;
+  pixelRatio: number;
 }
 
 /** Drilldowns chart code may request with `o2.drilldown(name, detail)`; anything else is dropped. */
@@ -64,13 +68,22 @@ export interface CustomChartDrilldown {
   detail: { cluster: string };
 }
 
+// The only detail each drilldown may carry; every name in CUSTOM_CHART_DRILLDOWN_EVENTS needs an entry here.
+const DRILLDOWN_DETAIL: Record<
+  CustomChartDrilldownName,
+  (detail: Record<string, unknown>) => CustomChartDrilldown["detail"] | null
+> = {
+  cluster: ({ cluster }) => (isDrilldownValue(cluster) ? { cluster } : null),
+};
+
 export type SandboxMessage =
   | { type: "started"; runId: number }
   | { type: "executed"; runId: number }
   | { type: "rendered"; runId: number }
   | { type: "error"; runId: number; message: string }
   | { type: "drilldown"; drilldown: CustomChartDrilldown }
-  | { type: "pointer" };
+  | { type: "pointer" }
+  | { type: "key"; key: string };
 
 export interface CustomChartSandboxHandlers {
   onError: (message: string) => void;
@@ -144,7 +157,7 @@ export const buildSandboxDocument = (options: {
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${scriptSrc}; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
-<style>:root { color-scheme: ${dark ? "dark" : "light"}; } html, body, #chart { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }</style>
+<style>:root { color-scheme: ${dark ? "dark" : "light"}; } html, body, #chart { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; } .pixelated canvas { image-rendering: pixelated; } @media print { .pixelated canvas { image-rendering: auto; } }</style>
 </head>
 <body>
 <div id="chart"></div>
@@ -170,6 +183,9 @@ export const parseSandboxMessage = (data: unknown): SandboxMessage | null => {
     return { type: "error", runId: data.runId, message: data.message.slice(0, MAX_ERROR_LENGTH) };
   }
   if (data.type === "pointer") return { type: "pointer" };
+  if (data.type === "key" && typeof data.key === "string" && FORWARDED_KEYS.includes(data.key)) {
+    return { type: "key", key: data.key };
+  }
   if (data.type === "drilldown") {
     const drilldown = parseDrilldown(data.name, data.detail);
     return drilldown ? { type: "drilldown", drilldown } : null;
@@ -186,6 +202,8 @@ export const guardLoops = (code: string, guard: string): string => {
     return code;
   }
   const started = `${guard}t`;
+  // Per loop, so an inner loop that restarts every pass cannot swallow its outer loop's checks.
+  const ticks = `${guard}n`;
   const inserts: { at: number; depth: number; text: string }[] = [];
   const close = (at: number) => inserts.push({ at, depth: -1, text: "}" });
   const onLoop = (node: LoopStatement, _state: unknown, ancestors: acorn.AnyNode[]) => {
@@ -194,9 +212,9 @@ export const guardLoops = (code: string, guard: string): string => {
     let depth = ancestors.length - 1;
     while (depth > 0 && ancestors[depth - 1].type === "LabeledStatement") depth--;
     const target = ancestors[depth];
-    inserts.push({ at: target.start, depth, text: `{let ${started}=${guard}();` });
+    inserts.push({ at: target.start, depth, text: `{let ${started}=${guard}(),${ticks}=0;` });
     close(target.end);
-    const check = `${guard}(${started});`;
+    const check = `${guard}(${started},++${ticks});`;
     if (body.type === "BlockStatement") {
       inserts.push({ at: body.start + 1, depth: depth + 0.5, text: check });
     } else {
@@ -283,6 +301,10 @@ export const createCustomChartSandbox = (
       handlers.onPointer?.();
       return;
     }
+    if (message.type === "key") {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: message.key, cancelable: true }));
+      return;
+    }
     if (message.type === "started") {
       armWatchdog(message.runId);
       return;
@@ -327,6 +349,13 @@ export const createCustomChartSandbox = (
     };
     target.channel.port1.onmessage = onPortMessage;
     window.addEventListener("message", target.onWindowMessage);
+    // A second load means chart code reloaded or navigated the frame: the new document never connects.
+    let loads = 0;
+    iframe.addEventListener("load", () => {
+      if (++loads === 1 || frame !== target) return;
+      destroyFrame();
+      handlers.onError(gt("dashboard.customChartRenderer.errorExecutingCode"));
+    });
     iframe.srcdoc = buildSandboxDocument({
       code,
       nonce: randomHex(),
@@ -346,24 +375,27 @@ export const createCustomChartSandbox = (
 
   const sandbox: CustomChartSandbox = {
     render(run, nextAppearance) {
-      const validationError = validateUserCode(run.code ?? "");
-      if (validationError) {
-        handlers.onError(gt("dashboard.utils.unsafeCodeDetected", { error: validationError }));
-        return;
-      }
       if (!frame || frame.code !== run.code) {
+        // Only code that gets a new frame is checked; a frame only ever holds code that passed.
+        const validationError = validateUserCode(run.code ?? "");
+        if (validationError) {
+          handlers.onError(gt("dashboard.utils.unsafeCodeDetected", { error: validationError }));
+          return;
+        }
         destroyFrame();
         appearanceKey = "";
         frame = createFrame(run.code, nextAppearance.dark);
       }
-      postAppearance(frame, nextAppearance);
       const runId = ++runSeq;
       activeRunId = runId;
+      appearanceKey = JSON.stringify(nextAppearance);
+      // The look rides on the run, so a theme change draws once instead of first repainting the old chart.
       send(frame, {
         type: "run",
         runId,
         data: JSON.stringify(run.data ?? null),
         context: JSON.stringify(run.context ?? {}),
+        appearance: { ...nextAppearance, palette: [...nextAppearance.palette] },
       });
     },
     setAppearance(nextAppearance) {
@@ -434,13 +466,17 @@ const untrackSandbox = (sandbox: CustomChartSandbox) => {
 };
 
 const parseDrilldown = (name: unknown, detail: unknown): CustomChartDrilldown | null => {
-  if (name !== "cluster" || !isRecord(detail)) return null;
-  const cluster = detail.cluster;
-  if (typeof cluster !== "string" || !cluster || cluster.length > MAX_DRILLDOWN_VALUE_LENGTH) {
-    return null;
-  }
-  return { name, detail: { cluster } };
+  if (!isDrilldownName(name) || !isRecord(detail)) return null;
+  const parsed = DRILLDOWN_DETAIL[name](detail);
+  return parsed ? { name, detail: parsed } : null;
 };
+
+const isDrilldownName = (name: unknown): name is CustomChartDrilldownName =>
+  typeof name === "string" &&
+  Object.prototype.hasOwnProperty.call(CUSTOM_CHART_DRILLDOWN_EVENTS, name);
+
+const isDrilldownValue = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && value.length <= MAX_DRILLDOWN_VALUE_LENGTH;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -455,26 +491,26 @@ const toScriptJson = (value: unknown): string => JSON.stringify(value).replace(/
 const escapeInlineScript = (code: string): string =>
   code.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--");
 
-// Declared per call so a bare `option =` cannot outlive its run on the reused frame; the block keeps a user `let option` legal.
+// The outer `var` keeps a bare `option =` from outliving its run on the reused frame; returning inside
+// the block also returns a user `const`/`let option`, and the newline ends a trailing line comment.
 const userChartScript = (
   code: string,
 ): string => `function __o2UserChart(data, echarts, context, o2) {
   var option;
   {
 ${escapeInlineScript(code)}
-  }
   return option;
+  }
 }`;
 
 // Runs inside the frame; it reads globals only, since it is shipped as text.
 const sandboxRuntime = (messagesJson: string, guard: string): string => `(function () {
   var messages = ${messagesJson};
   var clock = performance.now.bind(performance);
-  var guardTicks = 0;
   Object.defineProperty(window, "${guard}", {
-    value: function (started) {
+    value: function (started, ticks) {
       if (started === undefined) return clock();
-      if ((++guardTicks & 1023) === 0 && clock() - started > ${LOOP_GUARD_LIMIT_MS}) {
+      if ((ticks & 1023) === 0 && clock() - started > ${LOOP_GUARD_LIMIT_MS}) {
         throw new Error(messages.executionTimeout);
       }
     },
@@ -482,7 +518,8 @@ const sandboxRuntime = (messagesJson: string, guard: string): string => `(functi
   var port = null;
   var chart = null;
   var chartDark = null;
-  var appearance = { dark: false, palette: [], fontFamily: "" };
+  var chartRatio = null;
+  var appearance = { dark: false, palette: [], fontFamily: "", pixelRatio: 1 };
   var lastOption = null;
   var boundEvents = [];
   var deferred = false;
@@ -563,13 +600,19 @@ const sandboxRuntime = (messagesJson: string, guard: string): string => `(functi
     }
     deferred = false;
     try {
-      if (chart && chartDark !== appearance.dark) {
+      if (chart && (chartDark !== appearance.dark || chartRatio !== appearance.pixelRatio)) {
         chart.dispose();
         chart = null;
       }
       if (!chart) {
-        chart = window.echarts.init(el, appearance.dark ? "dark" : undefined, { renderer: "canvas" });
+        chart = window.echarts.init(el, appearance.dark ? "dark" : undefined, {
+          renderer: "canvas",
+          devicePixelRatio: appearance.pixelRatio,
+        });
         chartDark = appearance.dark;
+        chartRatio = appearance.pixelRatio;
+        // A fractional ratio makes the browser resample the canvas, which blurs it.
+        el.className = appearance.pixelRatio % 1 === 0 ? "" : "pixelated";
       } else {
         chart.clear();
       }
@@ -591,6 +634,9 @@ const sandboxRuntime = (messagesJson: string, guard: string): string => `(functi
       var data = JSON.parse(message.data);
       var context = deepFreeze(JSON.parse(message.context || "{}"));
       option = window.__o2UserChart(data, window.echarts, context, o2);
+      // Same wording as the engine's ReferenceError, which is what a missing option threw before.
+      if (option === undefined || option === null) throw new ReferenceError("option is not defined");
+      if (typeof option !== "object") throw new TypeError("option is not an object");
       post({ type: "executed", runId: runId });
     } catch (err) {
       finish(runId, messages.executionErrorPrefix + (err && err.message !== undefined ? err.message : String(err)));
@@ -604,7 +650,7 @@ const sandboxRuntime = (messagesJson: string, guard: string): string => `(functi
         finish(runId, messages.cspViolationBlocked);
         return;
       }
-      lastOption = option && typeof option === "object" ? option : {};
+      lastOption = option;
       if (!draw()) {
         finish(runId, messages.renderError);
         return;
@@ -639,22 +685,30 @@ const sandboxRuntime = (messagesJson: string, guard: string): string => `(functi
       fontReady = face.load().catch(function () {});
     } catch (err) {}
   };
+  var applyAppearance = function (look) {
+    var ratio = look.pixelRatio;
+    appearance = {
+      dark: look.dark === true,
+      palette: Array.isArray(look.palette) ? look.palette.map(String) : [],
+      fontFamily: typeof look.fontFamily === "string" ? look.fontFamily : "",
+      pixelRatio: typeof ratio === "number" && isFinite(ratio) && ratio >= 1 ? ratio : 1,
+    };
+    document.documentElement.style.colorScheme = appearance.dark ? "dark" : "light";
+  };
   var handle = function (message) {
     if (!message || typeof message !== "object") return;
     if (message.type === "init") {
       loadFont(message.font);
     } else if (message.type === "appearance") {
-      appearance = {
-        dark: message.dark === true,
-        palette: Array.isArray(message.palette) ? message.palette.map(String) : [],
-        fontFamily: typeof message.fontFamily === "string" ? message.fontFamily : "",
-      };
-      document.documentElement.style.colorScheme = appearance.dark ? "dark" : "light";
+      applyAppearance(message);
       enqueue(function () {
         if (lastOption) draw();
       });
     } else if (message.type === "run") {
       enqueue(function () {
+        if (message.appearance && typeof message.appearance === "object") {
+          applyAppearance(message.appearance);
+        }
         return run(message);
       });
     } else if (message.type === "hideTip") {
@@ -679,6 +733,11 @@ const sandboxRuntime = (messagesJson: string, guard: string): string => `(functi
   });
   document.documentElement.addEventListener("mouseleave", hideTip);
   document.addEventListener("pointermove", reportPointer);
+  document.addEventListener("keydown", function (event) {
+    if (!port || event.ctrlKey || event.altKey || event.metaKey) return;
+    if (${JSON.stringify(FORWARDED_KEYS)}.indexOf(event.key) === -1) return;
+    port.postMessage({ type: "key", key: event.key });
+  });
   window.addEventListener("resize", function () {
     if (deferred) draw();
     else if (chart) chart.resize();

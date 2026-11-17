@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import fs from "fs";
 import { flushPromises } from "@vue/test-utils";
+import * as convertCustomChartData from "./convertCustomChartData";
 import {
   LOOP_GUARD_LIMIT_MS,
   SANDBOX_RUN_TIMEOUT_MS,
@@ -63,11 +64,17 @@ class FakeMessageChannel {
   }
 }
 
-const LIGHT: CustomChartAppearance = { dark: false, palette: ["#111"], fontFamily: "Geist" };
+const LIGHT: CustomChartAppearance = {
+  dark: false,
+  palette: ["#111"],
+  fontFamily: "Geist",
+  pixelRatio: 1,
+};
 const DARK: CustomChartAppearance = {
   dark: true,
   palette: ["#abc", "#def"],
   fontFamily: "Geist",
+  pixelRatio: 1,
 };
 
 const scriptsOf = (doc: string): string[] =>
@@ -80,6 +87,7 @@ const settle = async () => {
 
 interface FakeChart {
   theme: string | undefined;
+  initOptions: { devicePixelRatio?: number } | undefined;
   handlers: Record<string, (params: unknown) => void>;
   setOption: ReturnType<typeof vi.fn>;
   clear: ReturnType<typeof vi.fn>;
@@ -97,25 +105,28 @@ const bootFrame = (code: string) => {
   );
   const charts: FakeChart[] = [];
   const echarts = {
-    init: vi.fn((_el: unknown, theme: string | undefined) => {
-      const chart: FakeChart = {
-        theme,
-        handlers: {},
-        setOption: vi.fn(),
-        clear: vi.fn(),
-        dispose: vi.fn(),
-        resize: vi.fn(),
-        dispatchAction: vi.fn(),
-        on: vi.fn((name: string, fn: (params: unknown) => void) => {
-          chart.handlers[name] = fn;
-        }),
-        off: vi.fn((name: string) => {
-          delete chart.handlers[name];
-        }),
-      };
-      charts.push(chart);
-      return chart;
-    }),
+    init: vi.fn(
+      (_el: unknown, theme: string | undefined, initOptions?: { devicePixelRatio?: number }) => {
+        const chart: FakeChart = {
+          theme,
+          initOptions,
+          handlers: {},
+          setOption: vi.fn(),
+          clear: vi.fn(),
+          dispose: vi.fn(),
+          resize: vi.fn(),
+          dispatchAction: vi.fn(),
+          on: vi.fn((name: string, fn: (params: unknown) => void) => {
+            chart.handlers[name] = fn;
+          }),
+          off: vi.fn((name: string) => {
+            delete chart.handlers[name];
+          }),
+        };
+        charts.push(chart);
+        return chart;
+      },
+    ),
   };
   const listeners: Record<string, ((event?: any) => void)[]> = {};
   const docListeners: Record<string, ((event?: any) => void)[]> = {};
@@ -126,7 +137,7 @@ const bootFrame = (code: string) => {
     addEventListener: (type: string, fn: (event?: any) => void) =>
       (listeners[type] ??= []).push(fn),
   };
-  const el = { clientWidth: 800, clientHeight: 400 };
+  const el = { clientWidth: 800, clientHeight: 400, className: "" };
   const frameDocument = {
     getElementById: () => el,
     addEventListener: (type: string, fn: (event?: any) => void) =>
@@ -305,8 +316,97 @@ describe("sandbox runtime", () => {
     frame.run(2, [[]]);
     await settle();
 
+    expect(frame.charts[0].setOption).toHaveBeenCalledTimes(1);
     expect(frame.charts[0].setOption.mock.calls[0][0].title).toEqual({ text: "first run" });
-    expect(frame.charts[0].setOption.mock.calls[1][0].title).toBeUndefined();
+    expect(frame.sent.at(-1)).toEqual({
+      type: "error",
+      runId: 2,
+      message: "Execution Error: option is not defined",
+    });
+  });
+
+  it.each([
+    ["const", "const option = { series: [{ type: 'bar', data: [1] }] };"],
+    ["let", "let option = { series: [{ type: 'bar', data: [1] }] };"],
+    ["var", "var option = { series: [{ type: 'bar', data: [1] }] };"],
+    ["a bare assignment", "option = { series: [{ type: 'bar', data: [1] }] }; // trailing comment"],
+  ])("draws an option set with %s", async (_form, code) => {
+    const frame = bootFrame(code);
+    frame.send({ type: "appearance", ...LIGHT });
+    frame.run(1);
+    await settle();
+
+    expect(frame.charts[0].setOption.mock.calls[0][0].series).toEqual([{ type: "bar", data: [1] }]);
+    expect(frame.sent).toEqual([{ type: "rendered", runId: 1 }]);
+  });
+
+  it.each([
+    ["never sets option", "var chart = 1;", "option is not defined"],
+    ["sets it to a number", "option = 5;", "option is not an object"],
+  ])("reports an error instead of an empty chart when the code %s", async (_case, code, error) => {
+    const frame = bootFrame(code);
+    frame.send({ type: "appearance", ...LIGHT });
+    frame.run(1);
+    await settle();
+
+    expect(frame.charts).toHaveLength(0);
+    expect(frame.sent).toEqual([{ type: "error", runId: 1, message: `Execution Error: ${error}` }]);
+  });
+
+  it("stops an endless loop whose body restarts a short inner loop", async () => {
+    let now = 0;
+    let reads = 0;
+    // Bails out instead of hanging the test run if the guard ever misses the outer loop again.
+    const clock = vi.spyOn(performance, "now").mockImplementation(() => {
+      if (++reads > 3_000_000) throw new Error("the loop escaped its guard");
+      return (now += 1);
+    });
+    onTestFinished(() => clock.mockRestore());
+    const frame = bootFrame(
+      "var i = 0; while (i < 1) { for (var k in { a: 1 }) {} }\nvar option = {};",
+    );
+    frame.send({ type: "appearance", ...LIGHT });
+    frame.run(1);
+    await settle();
+
+    expect(frame.sent).toEqual([
+      {
+        type: "error",
+        runId: 1,
+        message: "Execution Error: Execution Timeout: Script took too long to run",
+      },
+    ]);
+  });
+
+  it("forwards only the panel shortcut keys pressed in the frame, without modifiers", async () => {
+    const frame = bootFrame("var option = {};");
+    frame.fireDocument("keydown", { key: "v" });
+    frame.fireDocument("keydown", { key: "Delete" });
+    frame.fireDocument("keydown", { key: "e", ctrlKey: true });
+    frame.fireDocument("keydown", { key: "x" });
+    frame.fireDocument("keydown", { key: "Enter" });
+
+    expect(frame.sent).toEqual([
+      { type: "key", key: "v" },
+      { type: "key", key: "Delete" },
+    ]);
+  });
+
+  it("draws at the app's pixel ratio and pixelates a fractional one", async () => {
+    const frame = bootFrame("var option = {};");
+    frame.send({ type: "appearance", ...LIGHT, pixelRatio: 1.25 });
+    frame.run(1);
+    await settle();
+
+    expect(frame.charts[0].initOptions?.devicePixelRatio).toBe(1.25);
+    expect(frame.el.className).toBe("pixelated");
+
+    frame.send({ type: "appearance", ...LIGHT, pixelRatio: 2 });
+    await settle();
+
+    expect(frame.charts[0].dispose).toHaveBeenCalled();
+    expect(frame.charts[1].initOptions?.devicePixelRatio).toBe(2);
+    expect(frame.el.className).toBe("");
   });
 
   it("unbinds an o2_events handler that a later run of the same code no longer defines", async () => {
@@ -577,6 +677,12 @@ describe("sandbox runtime", () => {
 });
 
 describe("parseSandboxMessage", () => {
+  it("accepts a forwarded key only if it is a panel shortcut", () => {
+    expect(parseSandboxMessage({ type: "key", key: "v" })).toEqual({ type: "key", key: "v" });
+    expect(parseSandboxMessage({ type: "key", key: "Escape" })).toBeNull();
+    expect(parseSandboxMessage({ type: "key", key: 1 })).toBeNull();
+  });
+
   it("accepts the known message types", () => {
     expect(parseSandboxMessage({ type: "pointer", x: 1 })).toEqual({ type: "pointer" });
     expect(parseSandboxMessage({ type: "rendered", runId: 1 })).toEqual({
@@ -692,10 +798,10 @@ describe("createCustomChartSandbox", () => {
 
     expect(post).toHaveBeenCalledTimes(1);
     expect(post.mock.calls[0][0]).toEqual({ type: "connect" });
-    expect(received.map((message) => message.type)).toEqual(["init", "appearance", "run"]);
+    expect(received.map((message) => message.type)).toEqual(["init", "run"]);
     expect(received[0].font.family).toBe("Geist");
     expect(received[0].font.data).toBeInstanceOf(ArrayBuffer);
-    expect(received[2]).toMatchObject({ runId: 1, data: "[[42]]" });
+    expect(received[1]).toMatchObject({ runId: 1, data: "[[42]]", appearance: LIGHT });
   });
 
   it("re-runs the same code in the same frame, and rebuilds it only when the code changes", async () => {
@@ -714,6 +820,46 @@ describe("createCustomChartSandbox", () => {
     const frames = host.querySelectorAll("iframe");
     expect(frames).toHaveLength(1);
     expect(frames[0]).not.toBe(first);
+  });
+
+  it("replays a shortcut key forwarded by the frame on the app window", async () => {
+    const sandbox = make(host, handlers());
+    sandbox.render(run(), LIGHT);
+    const { port } = await connect(host.querySelector("iframe")!);
+    const keys: string[] = [];
+    const onKey = (event: KeyboardEvent) => keys.push(event.key);
+    window.addEventListener("keydown", onKey);
+    onTestFinished(() => window.removeEventListener("keydown", onKey));
+
+    port!.postMessage({ type: "key", key: "e" });
+    port!.postMessage({ type: "key", key: "Enter" });
+
+    expect(keys).toEqual(["e"]);
+  });
+
+  it("reports an error when chart code reloads or navigates its frame", async () => {
+    const h = handlers();
+    const sandbox = make(host, h);
+    sandbox.render(run(), LIGHT);
+    const iframe = host.querySelector("iframe")!;
+    // jsdom, like a browser, fires the srcdoc's own first load when the frame is attached.
+    await connect(iframe);
+    expect(h.onError).not.toHaveBeenCalled();
+
+    iframe.dispatchEvent(new Event("load"));
+
+    expect(h.onError).toHaveBeenCalledWith("Error while executing the code");
+    expect(host.querySelector("iframe")).toBeNull();
+  });
+
+  it("checks the code once per frame, not on every run of it", () => {
+    const validate = vi.spyOn(convertCustomChartData, "validateUserCode");
+    const sandbox = make(host, handlers());
+    sandbox.render(run("var option = {};", [[1]]), LIGHT);
+    sandbox.render(run("var option = {};", [[2]]), LIGHT);
+    sandbox.render(run("var option = { title: {} };", [[2]]), LIGHT);
+
+    expect(validate).toHaveBeenCalledTimes(2);
   });
 
   it("ignores a ready message from another window or with the wrong token", async () => {
@@ -851,16 +997,35 @@ describe("createCustomChartSandbox", () => {
     expect(host.querySelector("iframe")).toBeNull();
   });
 
-  it("sends the look again only when it changes", async () => {
+  it("sends a look of its own only when it differs from the one the last run carried", async () => {
     const sandbox = make(host, handlers());
     sandbox.render(run(), LIGHT);
     const { received } = await connect(host.querySelector("iframe")!);
 
     sandbox.setAppearance(LIGHT);
-    sandbox.setAppearance(DARK);
+    sandbox.setAppearance({ ...LIGHT, pixelRatio: 2 });
 
     const looks = received.filter((message) => message.type === "appearance");
-    expect(looks.map((message) => message.dark)).toEqual([false, true]);
+    expect(looks.map((message) => message.pixelRatio)).toEqual([2]);
+  });
+
+  it("draws once for a run whose look changed, not first repainting the old chart", async () => {
+    const frame = bootFrame("var option = { series: [{ type: 'bar', data: data[0] }] };");
+    frame.run(1, [[1]]);
+    await settle();
+    frame.send({
+      type: "run",
+      runId: 2,
+      data: JSON.stringify([[2]]),
+      context: "{}",
+      appearance: DARK,
+    });
+    await settle();
+
+    expect(frame.charts).toHaveLength(2);
+    expect(frame.charts[1].theme).toBe("dark");
+    expect(frame.charts[1].setOption).toHaveBeenCalledTimes(1);
+    expect(frame.charts[1].setOption.mock.calls[0][0].series[0].data).toEqual([2]);
   });
 
   it("asks a connected frame to hide its tooltip and never queues the request", async () => {
@@ -871,12 +1036,7 @@ describe("createCustomChartSandbox", () => {
     const { received } = await connect(host.querySelector("iframe")!);
     sandbox.hideTooltip();
 
-    expect(received.map((message) => message.type)).toEqual([
-      "init",
-      "appearance",
-      "run",
-      "hideTip",
-    ]);
+    expect(received.map((message) => message.type)).toEqual(["init", "run", "hideTip"]);
   });
 
   // Each sandbox in its own host, connected, with what the parent sends it collected.
@@ -987,6 +1147,23 @@ describe("guardLoops", () => {
 
     expect(guard.mock.calls.filter((args) => args.length === 0)).toHaveLength(2);
     expect(guard.mock.calls.filter((args) => args[0] !== undefined)).toHaveLength(4);
+  });
+
+  it("counts each loop's passes on its own, so a restarting inner loop cannot hide the outer one", () => {
+    const guarded = guardLoops(
+      "var out = 0; while (out < 3) { out++; for (var k in { a: 1 }) {} }",
+      "g",
+    );
+    const started: number[] = [];
+    const guard = vi.fn((start?: number, _ticks?: number) => {
+      if (start !== undefined) return undefined;
+      started.push(started.length + 1);
+      return started.length;
+    });
+    evaluate(guarded, guard);
+
+    const outerTicks = guard.mock.calls.filter(([start]) => start === 1).map(([, ticks]) => ticks);
+    expect(outerTicks).toEqual([1, 2, 3]);
   });
 
   it("leaves code it cannot parse unchanged", () => {
