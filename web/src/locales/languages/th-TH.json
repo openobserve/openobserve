@@ -2230,7 +2230,6 @@
     "ancestorHint": "Caller of the zoomed frame. Click to zoom out to it.",
     "copyFunctionName": "Copy function name",
     "focusBlock": "Focus block",
-    "searchForFunction": "Search for this function",
     "showInFlameGraph": "Show in Flame Graph",
     "focusInFlameGraph": "Focus in Flame Graph",
     "functionActions": "Actions for {name}",

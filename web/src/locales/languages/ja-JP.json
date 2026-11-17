@@ -2230,7 +2230,6 @@
     "ancestorHint": "ズームしたフレームの呼び出し元です。クリックすると、そこまでズームアウトします。",
     "copyFunctionName": "関数名をコピー",
     "focusBlock": "ブロックにフォーカス",
-    "searchForFunction": "この関数を検索",
     "showInFlameGraph": "フレームグラフで表示",
     "focusInFlameGraph": "フレームグラフでフォーカス",
     "functionActions": "{name} の操作",

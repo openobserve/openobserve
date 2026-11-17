@@ -2230,7 +2230,6 @@
     "ancestorHint": "확대된 프레임의 호출자입니다. 클릭하면 해당 프레임까지 축소됩니다.",
     "copyFunctionName": "함수 이름 복사",
     "focusBlock": "블록에 포커스",
-    "searchForFunction": "이 함수 검색",
     "showInFlameGraph": "플레임 그래프에서 보기",
     "focusInFlameGraph": "플레임 그래프에서 포커스",
     "functionActions": "{name} 작업",

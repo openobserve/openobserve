@@ -2230,7 +2230,6 @@
     "ancestorHint": "Funkcja wywołująca powiększoną ramkę. Kliknij, aby pomniejszyć do niej.",
     "copyFunctionName": "Kopiuj nazwę funkcji",
     "focusBlock": "Skup na bloku",
-    "searchForFunction": "Szukaj tej funkcji",
     "showInFlameGraph": "Pokaż na wykresie płomieniowym",
     "focusInFlameGraph": "Skup się na wykresie płomieniowym",
     "functionActions": "Akcje dla {name}",

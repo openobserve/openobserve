@@ -122,6 +122,16 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.hoverRunAndExpectTooltip('Pick a stream and a profile type with data in this time range');
   });
 
+  test('A disabled Run stays keyboard focusable and announces why it is unavailable', { tag: ['@all', '@profiles', '@P2'] }, async () => {
+    await pm.profilesPage.mockApi('meta', {
+      json: { data_sources: [], services: ['checkout'], profile_types: [], label_names: [], took: 1 },
+    });
+    await pm.profilesPage.gotoRef(ref);
+    await pm.profilesPage.expectRunDisabled();
+    await pm.profilesPage.focusRunButton();
+    await pm.profilesPage.expectRunReasonAnnounced('Pick a stream and a profile type with data in this time range');
+  });
+
   test('With Auto Run on a change runs at once, and the switch turns it off', { tag: ['@all', '@profiles', '@P1'] }, async () => {
     await pm.profilesPage.mockServerConfig({ autoQuery: true });
     await pm.profilesPage.gotoRef(ref);

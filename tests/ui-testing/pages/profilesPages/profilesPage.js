@@ -46,6 +46,7 @@ export class ProfilesPage {
     this.dateBtn = '[data-test="profiles-date-picker"] [data-test="date-time-btn"]';
     this.shareBtn = '[data-test="profiles-share-btn"]';
     this.runBtn = '[data-test="profiles-run-query"]';
+    this.runWrap = '[data-test="profiles-run-wrap"]';
     this.cancelBtn = '[data-test="profiles-cancel-query"]';
     this.runOptionsBtn = '[data-test="profiles-run-options"]';
     this.autoRunToggle = '[data-test="profiles-auto-run-toggle"]';
@@ -399,8 +400,37 @@ export class ProfilesPage {
   }
 
   async hoverRunAndExpectTooltip(text) {
-    await this.page.locator(this.runBtn).hover({ force: true });
+    await this.page.locator(this.runWrap).hover();
     await expect(this.page.locator('[data-test="o-tooltip-content"]').filter({ hasText: text })).toBeVisible();
+  }
+
+  async focusRunButton() {
+    await this.page.locator(this.runBtn).focus();
+  }
+
+  async expectRunReasonAnnounced(text) {
+    await expect(this.page.locator(this.runBtn)).toHaveAttribute('aria-describedby', 'profiles-run-reason');
+    await expect(this.page.locator('[data-test="profiles-run-reason"]')).toHaveText(text);
+  }
+
+  async focusFlamePlot() {
+    await this.page.locator(this.flamePlot).first().focus();
+  }
+
+  async pressKey(key) {
+    await this.page.keyboard.press(key);
+  }
+
+  async expectFlameAnnounce(pattern) {
+    await expect(this.page.locator('[data-test="flame-graph-announce"]')).toHaveText(pattern);
+  }
+
+  async expectFlameFocusMarkerVisible(visible) {
+    await expect(this.page.locator('[data-test="flame-graph-focus-marker"]')).toHaveCount(visible ? 1 : 0);
+  }
+
+  async expectFlamePlotFocused() {
+    await expect(this.page.locator(this.flamePlot).first()).toBeFocused();
   }
 
   async expectRunOptionsHidden() {

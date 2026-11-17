@@ -2230,7 +2230,6 @@
     "ancestorHint": "Aanroeper van het ingezoomde frame. Klik om erop uit te zoomen.",
     "copyFunctionName": "Functienaam kopiëren",
     "focusBlock": "Blok focussen",
-    "searchForFunction": "Deze functie zoeken",
     "showInFlameGraph": "Tonen in flame graph",
     "focusInFlameGraph": "Focussen in flame graph",
     "functionActions": "Acties voor {name}",

@@ -2230,7 +2230,6 @@
     "ancestorHint": "Llamador del marco ampliado. Haz clic para alejar hasta él.",
     "copyFunctionName": "Copiar nombre de la función",
     "focusBlock": "Enfocar bloque",
-    "searchForFunction": "Buscar esta función",
     "showInFlameGraph": "Mostrar en el gráfico de llamas",
     "focusInFlameGraph": "Enfocar en el gráfico de llamas",
     "functionActions": "Acciones para {name}",

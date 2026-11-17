@@ -2230,7 +2230,6 @@
     "ancestorHint": "Appelant de la frame zoomée. Cliquez pour dézoomer jusqu'à celle-ci.",
     "copyFunctionName": "Copier le nom de la fonction",
     "focusBlock": "Cibler le bloc",
-    "searchForFunction": "Rechercher cette fonction",
     "showInFlameGraph": "Afficher dans le flame graph",
     "focusInFlameGraph": "Cibler dans le flame graph",
     "functionActions": "Actions pour {name}",

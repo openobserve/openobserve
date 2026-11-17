@@ -207,7 +207,12 @@ describe("Profiles page", () => {
     },
   });
 
+  const twoServicesMeta = {
+    data: { ...profileMetaResponse.data, services: ["service-a", "service-b"] },
+  };
+
   beforeEach(() => {
+    localStorage.clear();
     vi.clearAllMocks();
     // Most tests expect a changed input to run the query, which needs Auto Run on (server flag plus switch).
     store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: true };
@@ -228,6 +233,203 @@ describe("Profiles page", () => {
     mocks.tagValues.mockResolvedValue({
       data: { tag: "k8s_pod_name", values: ["pod-a", "pod-b"], took: 1 },
     });
+  });
+
+  it("puts Share after Run query in the page actions", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    const html = wrapper.html();
+    expect(html.indexOf("profiles-run-wrap")).toBeGreaterThan(-1);
+    expect(html.indexOf("profiles-share-btn")).toBeGreaterThan(html.indexOf("profiles-run-wrap"));
+  });
+
+  it("restores the last service picked for a stream", async () => {
+    mocks.meta.mockResolvedValue(twoServicesMeta);
+    const wrapper = mountPage();
+    await settle();
+    wrapper
+      .findComponent('[data-test="profiles-service-select"]')
+      .vm.$emit("update:modelValue", "service-b");
+    await settle();
+    wrapper.unmount();
+
+    const again = mountPage();
+    await settle();
+    expect(
+      (again.find('[data-test="profiles-service-select"] select').element as HTMLSelectElement)
+        .value,
+    ).toBe("service-b");
+  });
+
+  it("drops a remembered service the stream no longer lists", async () => {
+    localStorage.setItem(`profiles_service_${orgIdentifier}_profiles-a`, "gone");
+    mocks.meta.mockResolvedValue(twoServicesMeta);
+    const wrapper = mountPage();
+    await settle();
+
+    expect(
+      (wrapper.find('[data-test="profiles-service-select"] select').element as HTMLSelectElement)
+        .value,
+    ).toBe("service-a");
+    expect(mocks.meta.mock.lastCall?.[2]).toMatchObject({ service_name: "service-a" });
+  });
+
+  it("keeps the unavailable Run button focusable and describes it with the reason", async () => {
+    const wrapper = mountPage();
+    await settle();
+    const run = () => wrapper.get('[data-test="profiles-run-query"]');
+    expect(wrapper.get('[data-test="profiles-run-wrap"]').attributes("tabindex")).toBeUndefined();
+    expect(run().attributes("aria-disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="profiles-run-reason"]').exists()).toBe(false);
+
+    mocks.meta.mockResolvedValue({ data: { ...profileMetaResponse.data, profile_types: [] } });
+    const empty = mountPage();
+    await settle();
+    const emptyRun = empty.get('[data-test="profiles-run-query"]');
+    expect(empty.get('[data-test="profiles-run-wrap"]').attributes("tabindex")).toBeUndefined();
+    expect(emptyRun.attributes("focusable-unavailable")).toBeDefined();
+    expect(emptyRun.attributes("description-id")).toBe("profiles-run-reason");
+    expect(empty.get("#profiles-run-reason").text()).toBe(
+      "Pick a stream and a profile type with data in this time range",
+    );
+    expect(emptyRun.find("span[content]").attributes("content")).toBe(
+      "Pick a stream and a profile type with data in this time range",
+    );
+  });
+
+  it("explains Self and Total in the Top table headers without a cores note", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+    await wrapper.find('[data-test="profiles-view-top"]').trigger("click");
+    await nextTick();
+
+    const tooltips = () =>
+      Object.fromEntries(
+        (wrapper.findComponent({ name: "OTable" }).props("columns") as any[]).map((column) => [
+          column.id,
+          column.meta?.headerTooltip,
+        ]),
+      );
+    expect(tooltips().self).toBe("Spent in this function itself, not in the functions it calls.");
+    expect(tooltips().total).toBe("Spent in this function and in everything it calls.");
+    expect(tooltips().selfPercent).toBe("Self as a share of all samples in this view.");
+  });
+
+  it("names a Go contentions profile type as lock contention", async () => {
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "contentions", unit: "count" }],
+      },
+    });
+    const wrapper = mountPage();
+    await settle();
+    expect(wrapper.get('[data-test="profiles-type-select"] select').text()).toBe(
+      "Lock contention (count)",
+    );
+  });
+
+  it("gives a nanosecond series no y-axis name, as its ticks already carry the unit", async () => {
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        profile_types: [{ type: "delay", unit: "nanoseconds" }],
+      },
+    });
+    mocks.series.mockResolvedValue({
+      data: {
+        ...seriesResponse.data,
+        unit: "nanoseconds",
+        series: [
+          { timestamp: 60_000_000, value: 6e9 },
+          { timestamp: 120_000_000, value: 6e9 },
+        ],
+      },
+    });
+    mocks.merge.mockResolvedValue({ data: { ...mergeResponse.data, unit: "nanoseconds" } });
+    const wrapper = mountPage();
+    await settle();
+    const options = wrapper.findComponent({ name: "ChartRendererStub" }).props("data").options;
+    expect(options.yAxis.name).toBeUndefined();
+  });
+
+  it("draws the table scroll fade only while the table region overflows sideways and is not at the end", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+    const scroller = wrapper.get('[data-test="profiles-view-body"]');
+    expect(scroller.classes()).toContain("max-md:overflow-x-auto");
+    const fade = () => wrapper.find('[data-test="profiles-scroll-fade"]');
+    const metrics = (scrollWidth: number, scrollLeft: number) => {
+      Object.defineProperty(scroller.element, "scrollWidth", {
+        value: scrollWidth,
+        configurable: true,
+      });
+      Object.defineProperty(scroller.element, "clientWidth", { value: 300, configurable: true });
+      scroller.element.scrollLeft = scrollLeft;
+    };
+
+    metrics(300, 0);
+    await scroller.trigger("scroll");
+    expect(fade().exists()).toBe(false);
+    metrics(600, 0);
+    await scroller.trigger("scroll");
+    expect(fade().exists()).toBe(true);
+    expect(scroller.element.contains(fade().element)).toBe(false);
+    metrics(600, 300);
+    await scroller.trigger("scroll");
+    expect(fade().exists()).toBe(false);
+  });
+
+  it("draws the scroll cue for the Tree table, which scrolls inside its own box", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+    await wrapper.get('[data-test="profiles-view-tree"]').trigger("click");
+    await settle();
+    const inner = wrapper.get(
+      '[data-test="profiles-stack-table"] [data-test="o2-table-scroll-container"]',
+    );
+    Object.defineProperty(inner.element, "scrollWidth", { value: 600, configurable: true });
+    Object.defineProperty(inner.element, "clientWidth", { value: 300, configurable: true });
+    await inner.trigger("scroll");
+    const fade = () => wrapper.find('[data-test="profiles-scroll-fade"]');
+    expect(fade().exists()).toBe(true);
+    inner.element.scrollLeft = -300;
+    await inner.trigger("scroll");
+    expect(fade().exists()).toBe(false);
+  });
+
+  it("re-measures the table overflow when the expanded tree rows change", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+    const scroller = wrapper.get('[data-test="profiles-view-body"]');
+    Object.defineProperty(scroller.element, "scrollWidth", { value: 600, configurable: true });
+    Object.defineProperty(scroller.element, "clientWidth", { value: 300, configurable: true });
+    (wrapper.vm as unknown as { expandedStackIds: string[] }).expandedStackIds = ["root"];
+    await settle();
+    expect(wrapper.find('[data-test="profiles-scroll-fade"]').exists()).toBe(true);
+  });
+
+  it("lets the page title overflow so the Beta badge is not clipped", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+    expect(wrapper.attributes("title-overflow")).toBe("visible");
+  });
+
+  it("lets the search summary truncate so the expand button stays in the header", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+    await wrapper.find('[data-test="profiles-search-functions"]').setValue("fn");
+    await nextTick();
+    const summary = wrapper.get('[data-test="profiles-search-summary"]');
+    expect(summary.classes()).toEqual(expect.arrayContaining(["min-w-0", "truncate"]));
+    expect(summary.classes()).not.toContain("whitespace-nowrap");
+    expect(wrapper.get('[data-test="profiles-results-expand"]').classes()).toContain("shrink-0");
   });
 
   it("shows an explicit stream selector and loads the first stream by default", async () => {
@@ -395,7 +597,7 @@ describe("Profiles page", () => {
     const select = wrapper.get('[data-test="profiles-type-select"] select');
     expect(select.findAll("option").map((option) => option.text())).toEqual([
       "CPU samples (count)",
-      "alloc_space (bytes)",
+      "Allocated memory (bytes)",
     ]);
     expect((select.element as HTMLSelectElement).value).toBe("samples\u0000count");
     expect(mocks.merge.mock.calls[0][2]).toMatchObject({
@@ -467,6 +669,7 @@ describe("Profiles page", () => {
         [120_000, 0.1],
       ]);
       expect(options.tooltip.valueFormatter(0.42)).toBe("0.42 cores");
+      expect(options.yAxis.name).toBe("cores");
       expect(wrapper.get('[data-test="profiles-top-table"]').text()).toContain("10 ns");
     },
   );
@@ -858,7 +1061,7 @@ describe("Profiles page", () => {
     const select = wrapper.find('[data-test="profiles-type-select"] select');
     expect((select.element as HTMLSelectElement).value).toBe("inuse_space\u0000bytes");
     const labels = select.findAll("option").map((option) => option.text());
-    expect(labels).toEqual(["inuse_space (bytes)"]);
+    expect(labels).toEqual(["Memory in use (bytes)"]);
   });
 
   it("uses sentence case like Logs and Traces, with no dot before Label filters", async () => {
@@ -1434,9 +1637,9 @@ describe("Profiles page", () => {
     await pickWindow("5m");
     const run = wrapper.find('[data-test="profiles-run-query"]');
     expect(run.attributes("disabled")).toBeDefined();
-    expect(run.find("span[content]").attributes("content")).toBe(
-      "Pick a stream and a profile type with data in this time range",
-    );
+    expect(
+      wrapper.find('[data-test="profiles-run-wrap"] span[content]').attributes("content"),
+    ).toBe("Pick a stream and a profile type with data in this time range");
 
     empty = false;
     await pickWindow("1h");
@@ -1527,6 +1730,43 @@ describe("Profiles page", () => {
           .value,
       ).toBe("service-b");
       expect(lastMerge()[2]).toMatchObject({ service_name: "service-b" });
+    });
+
+    it("keeps a search typed while meta loads, in the URL and in the table filter", async () => {
+      // A seeded search is what the typed one must win over; without the replay the seed comes back.
+      route.query = { stream: "profiles-a", search: "seeded" };
+      const names = deferred<typeof streamResponse>();
+      mocks.nameList.mockReturnValueOnce(names.promise);
+      const meta = deferred<unknown>();
+      mocks.meta.mockReturnValueOnce(meta.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+
+      await wrapper.find('[data-test="profiles-search-functions"]').setValue("json");
+      names.resolve(streamResponse);
+      meta.resolve(profileMetaResponse);
+      await flushPromises();
+
+      expect(
+        (wrapper.find('[data-test="profiles-search-functions"]').element as HTMLInputElement).value,
+      ).toBe("json");
+      expect(router.replace.mock.lastCall?.[0].query).toMatchObject({ search: "json" });
+    });
+
+    it("keeps a search typed over a seeded one while meta loads", async () => {
+      route.query = { stream: "profiles-a", search: "seeded" };
+      const names = deferred<typeof streamResponse>();
+      mocks.nameList.mockReturnValueOnce(names.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+
+      await wrapper.find('[data-test="profiles-search-functions"]').setValue("json");
+      names.resolve(streamResponse);
+      await flushPromises();
+
+      expect(
+        (wrapper.find('[data-test="profiles-search-functions"]').element as HTMLInputElement).value,
+      ).toBe("json");
     });
 
     it("queries the window picked while meta loads", async () => {

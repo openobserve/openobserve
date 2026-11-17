@@ -2230,7 +2230,6 @@
     "ancestorHint": "Chiamante del frame ingrandito. Fai clic per ridurre lo zoom fino a esso.",
     "copyFunctionName": "Copia nome funzione",
     "focusBlock": "Blocco a fuoco",
-    "searchForFunction": "Cerca questa funzione",
     "showInFlameGraph": "Mostra nel flame graph",
     "focusInFlameGraph": "Metti a fuoco nel flame graph",
     "functionActions": "Azioni per {name}",

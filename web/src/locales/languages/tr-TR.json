@@ -2230,7 +2230,6 @@
     "ancestorHint": "Yakınlaştırılmış çerçevenin çağıranı. Bu çerçeveye uzaklaştırmak için tıklayın.",
     "copyFunctionName": "Fonksiyon adını kopyala",
     "focusBlock": "Bloğa odaklan",
-    "searchForFunction": "Bu fonksiyonu ara",
     "showInFlameGraph": "Alev grafiğinde göster",
     "focusInFlameGraph": "Alev grafiğinde odakla",
     "functionActions": "{name} için işlemler",

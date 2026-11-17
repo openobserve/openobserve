@@ -2230,7 +2230,6 @@
     "ancestorHint": "Вызывающая функция увеличенного фрейма. Нажмите, чтобы уменьшить масштаб до неё.",
     "copyFunctionName": "Скопировать имя функции",
     "focusBlock": "Фокус на блоке",
-    "searchForFunction": "Найти эту функцию",
     "showInFlameGraph": "Показать на флейм-графе",
     "focusInFlameGraph": "Сфокусировать на флейм-графе",
     "functionActions": "Действия для {name}",

@@ -2230,7 +2230,6 @@
     "ancestorHint": "已縮放畫面的呼叫者。點擊以縮小至該處。",
     "copyFunctionName": "複製函式名稱",
     "focusBlock": "聚焦區塊",
-    "searchForFunction": "搜尋此函式",
     "showInFlameGraph": "在火焰圖中顯示",
     "focusInFlameGraph": "在火焰圖中聚焦",
     "functionActions": "{name} 的操作",

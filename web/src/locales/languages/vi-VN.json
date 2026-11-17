@@ -2230,7 +2230,6 @@
     "ancestorHint": "Bên gọi của khung đang được phóng to. Nhấp để thu nhỏ về khung đó.",
     "copyFunctionName": "Sao chép tên hàm",
     "focusBlock": "Tập trung vào khối",
-    "searchForFunction": "Tìm kiếm hàm này",
     "showInFlameGraph": "Hiển thị trong biểu đồ ngọn lửa",
     "focusInFlameGraph": "Tập trung trong biểu đồ ngọn lửa",
     "functionActions": "Thao tác cho {name}",

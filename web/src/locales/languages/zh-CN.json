@@ -2230,7 +2230,6 @@
     "ancestorHint": "被缩放帧的调用方。点击可缩小到该帧。",
     "copyFunctionName": "复制函数名",
     "focusBlock": "聚焦区块",
-    "searchForFunction": "搜索此函数",
     "showInFlameGraph": "在火焰图中显示",
     "focusInFlameGraph": "在火焰图中聚焦",
     "functionActions": "{name} 的操作",
