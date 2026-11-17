@@ -1495,6 +1495,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn of_two_marks_on_a_resolved_notice_only_the_first_writes() {
+        let db = notices_db().await;
+        // Resolved already, so a mark keeps state and resolved_at and only the empty-mark
+        // guard stops the second one.
+        let before = status_page_notices::Model {
+            state: 2,
+            resolved_at: Some(50),
+            ..open_notice()
+        };
+        let am: status_page_notices::ActiveModel = before.clone().into();
+        am.reset_all().insert(&db).await.unwrap();
+
+        let keep = |m: status_page_notices::Model| status_page_notices::Model {
+            resolved_at: Some(50),
+            ..m
+        };
+        let first = keep(marked(&before, "a@b.c", 100, 7));
+        let second = keep(marked(&before, "x@y.z", 101, 9));
+        assert!(
+            mark_notice_false_alarm_on(&db, &before, &first)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !mark_notice_false_alarm_on(&db, &before, &second)
+                .await
+                .unwrap(),
+            "the second mark must not overwrite the first"
+        );
+        let n = status_page_notices::Entity::find_by_id("n1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(n.false_alarm_by.as_deref(), Some("a@b.c"));
+        assert_eq!(n.false_alarm_at, Some(100));
+        assert_eq!(n.false_alarm_recovered_at, Some(7));
+        assert_eq!((n.state, n.resolved_at), (2, Some(50)));
+    }
+
+    #[tokio::test]
     async fn a_mark_from_a_read_before_a_tick_resolved_the_notice_does_not_write() {
         let db = notices_db().await;
         let before = open_notice();
