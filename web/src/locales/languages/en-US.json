@@ -32971,7 +32971,8 @@
         "service": "Service",
         "stream": "Stream",
         "firesWhen": "Fires when",
-        "usually": "Usually"
+        "usually": "Usually",
+        "check": "Check"
       },
       "tickGroup": "Tick every alert in {group}",
       "tickRow": "Tick {service}, {alert}",
@@ -33066,7 +33067,12 @@
       "undone": "{count} alert removed. | {count} alerts removed.",
       "undoFailed": "{failed} of {total} alerts couldn't be removed. Remove them from Alerts.",
       "more": "{count} more",
-      "usuallyLatency": "p95 {value} ms"
+      "usuallyLatency": "p95 {value} ms",
+      "waiting": {
+        "measuring": "Measuring {waiting} of {count} alert… | Measuring {waiting} of {count} alerts…",
+        "checking": "Checking {waiting} of {count} alert… | Checking {waiting} of {count} alerts…",
+        "both": "Checking {checking} and measuring {measuring} of {count} alerts…"
+      }
     },
     "decisions": {
       "reasons": {
@@ -33445,8 +33451,10 @@
       "latencySuffix": "ms (p95)",
       "errorsReason": "AutoObserve found no usual error count for {service} over the last 7 days. Set a threshold to add this alert.",
       "latencyReason": "AutoObserve found no usual latency for {service} over the last 7 days. Set a threshold to add this alert.",
-      "measuring": "Measuring the usual level over the last 7 days…",
+      "measuring": "Measuring the usual level over 7 days…",
       "noUsual": "None in 7 days",
+      "notMeasured": "Not measured",
+      "timedOut": "Measuring took too long. Set a threshold.",
       "placeholder": "Set a threshold",
       "placeholderShort": "Set value",
       "required": "Set a threshold",

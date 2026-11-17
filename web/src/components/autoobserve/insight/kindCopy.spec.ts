@@ -109,7 +109,7 @@ describe("coverage gap card (flagged surface 1)", () => {
     expect(target.request.rows.map((r) => [r.kind, r.scope.stream.name, r.usually])).toEqual([
       ["errors", "ingest_c", null],
       ["latency", "default", null],
-      ["no_data", "ingest_c", null],
+      ["no_data", "ingest_c", 47],
     ]);
   });
 

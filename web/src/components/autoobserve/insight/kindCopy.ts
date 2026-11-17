@@ -32,7 +32,7 @@ import {
 import { draftTarget } from "./targets/alertDraft";
 import { logsForSources } from "./targets/logsTargets";
 import { notifyOf, teamOf } from "./targets/ownership";
-import type { BulkKind, BulkRow } from "./bulk/useBulkReview";
+import { usuallyFor, type BulkKind, type BulkRow } from "./bulk/useBulkReview";
 import { addedNote, serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
 import { noMatchLine } from "./bulk/bulkCopy";
 import { knownMatch } from "./targets/scopeMatch";
@@ -247,12 +247,11 @@ const addedChip = (t: TranslateFn): NonNullable<KindCopy["chip"]> => ({
   tone: "info",
 });
 
-// Errors and latency rows carry no usual level: the review list measures it over 7 days when it opens.
 const bulkRow = (row: AutoObserveCoverageRow, kind: BulkKind): BulkRow => ({
   key: `${row.service_id}:${kind}`,
   kind,
   scope: scopeOf(row, draftStream(row, kind)),
-  usually: null,
+  usually: usuallyFor(kind, row.traffic_per_hour),
   ...ownership(row.service_name),
   ...(alertIdsOf(row).length ? { alertIds: alertIdsOf(row) } : {}),
   ...(kind === "latency" ? { inputs: { durationField: "duration", p95Ms: null } } : {}),

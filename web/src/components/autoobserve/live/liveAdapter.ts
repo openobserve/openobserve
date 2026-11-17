@@ -386,6 +386,7 @@ const toRow = (
       cluster: row.cluster,
       namespace: row.namespace,
       streams: row.streams ?? [],
+      trafficPerHour: row.traffic_per_hour ?? null,
     },
     status: { state, label: coverageWord(t, state) },
     extra: EXTRA_CLASSES.map((cls) => {
