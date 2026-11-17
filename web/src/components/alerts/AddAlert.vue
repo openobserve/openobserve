@@ -622,7 +622,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col" data-snap-stop>
                 <OSettingRow
                   v-if="formData.is_real_time === 'false' && !isCronSchedule"
-                  :label="t('alerts.sections.rows.checkEvery')"
+                  :label="t('alerts.queryConfig.checkEvery')"
                   fill
                   data-test="add-alert-schedule-row"
                   data-snap-stop
@@ -687,6 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSettingRow
                   v-if="beingUpdated || anomalyEditMode"
                   :label="t('alerts.sections.details.name')"
+                  class="py-1!"
                   fill
                   data-snap-stop
                 >
@@ -701,6 +702,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   :label="t('alerts.sections.details.name')"
                   :description="t('alerts.sections.rows.name')"
+                  class="py-1!"
                   fill
                   data-snap-stop
                 >
@@ -750,6 +752,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OSettingRow>
                 <OSettingRow
                   :label="t('alerts.sections.details.folder')"
+                  class="py-1!"
                   fill
                   data-test="add-alert-details-folder-row"
                   data-snap-stop
@@ -774,7 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-show="!isAnomalyMode"
                   :ref="(el) => setSectionTarget('advancedDetails', el)"
-                  class="empty:hidden"
+                  class="empty:hidden [&>*]:py-1!"
                   data-snap-stop
                 />
                 <div v-show="!isAnomalyMode" data-snap-stop>

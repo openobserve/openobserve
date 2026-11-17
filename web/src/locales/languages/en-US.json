@@ -12264,7 +12264,6 @@
         "whichEventsFiltered": "Only events that match these filters count.",
         "whichEventsSql": "Write a query. The rows it returns are what the alert looks at.",
         "whichEventsPromql": "Write a PromQL query. The value it returns is what the alert looks at.",
-        "checkEvery": "Check every",
         "rowTemplate": "How each matching row reads in the message",
         "descriptionPlaceholder": "Optional. What should someone do when this fires?",
         "name": "Shown in the alert list and in notifications"
