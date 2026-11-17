@@ -147,27 +147,31 @@ async fn build_blooms(window: &MergeWindow, outcome: RoundOutcome) {
     }
 }
 
-/// Marks the job done, re-arms it for another round, or leaves it Running for the retry.
+/// Marks the job done, or re-arms it when the range needs another round.
 async fn settle_job(window: &MergeWindow, job_id: i64, needs_another_round: bool) {
     let stream = window.stream_key();
     let date_start = &window.date_start;
-    // the range settled mid-round: stay Running so check_running_jobs re-arms a whole-range retry
-    if window.is_incremental && crate::is_past_hour(window.job_end, now_micros()) {
-        log::warn!(
-            "[COMPACTOR] merge_by_stream [{stream}] range of {date_start} settled during the incremental round, job {job_id} is left for the retry"
-        );
-    } else if needs_another_round {
+    // Running -> Pending directly: passing through Done would let a dump job take the range first
+    let settled_mid_round =
+        window.is_incremental && crate::is_past_hour(window.job_end, now_micros());
+    if settled_mid_round || needs_another_round {
         log::info!(
-            "[COMPACTOR] merge_by_stream [{stream}] {date_start} needs another merge round, job {job_id} is re-armed"
+            "[COMPACTOR] merge_by_stream [{stream}] {date_start} needs another merge round (settled mid-round: {settled_mid_round}), job {job_id} is re-armed"
         );
         if let Err(e) = infra_file_list::set_job_pending(&[job_id], 0, None).await {
             log::error!("[COMPACTOR] set_job_pending failed: {e}");
         }
-    } else if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
+        return;
+    }
+
+    if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
         log::error!("[COMPACTOR] set_job_done failed: {e}");
-    } else if window.is_incremental
+        return;
+    }
+    // re-read the clock: the range may settle while set_job_done runs,
+    // and the scheduled add_job does nothing on a Running row
+    if window.is_incremental
         && crate::is_past_hour(window.job_end, now_micros())
-        // add_job does nothing on a Running row, so the scheduled pass may have just missed this one
         && let Err(e) = infra_file_list::add_job(
             &window.org_id,
             window.stream_type,
