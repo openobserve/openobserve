@@ -172,10 +172,6 @@ pub fn trim_quotes(s: &str) -> String {
         .to_string()
 }
 
-pub fn is_value(e: &Expr) -> bool {
-    matches!(e, Expr::Value(_))
-}
-
 pub fn is_field(e: &Expr) -> bool {
     matches!(e, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
 }
@@ -334,17 +330,6 @@ mod tests {
         for (input, expected) in inp_exp_arr {
             assert_eq!(trim_quotes(input), expected);
         }
-    }
-
-    #[test]
-    fn test_is_value() {
-        // Test value expression
-        let value_expr = Expr::Value(Value::Number("123".to_string(), false).into());
-        assert!(is_value(&value_expr));
-
-        // Test non-value expression
-        let ident_expr = Expr::Identifier(Ident::new("field".to_string()));
-        assert!(!is_value(&ident_expr));
     }
 
     #[test]
