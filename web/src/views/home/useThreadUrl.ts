@@ -43,10 +43,11 @@ export function useThreadUrl(
   store: ThreadUrlStore,
   route: RouteLocationNormalizedLoaded,
   router: Router,
+  host = "home",
 ): void {
-  const thread = () => (route.name === "home" ? threadParam(route.query) : null);
+  const thread = () => (route.name === host ? threadParam(route.query) : null);
   const replace = (sid: string | null) =>
-    void router.replace(fullThreadLocation(sid, route.query)).catch(() => undefined);
+    void router.replace(fullThreadLocation(sid, route.query, host)).catch(() => undefined);
 
   watch(
     () => {
@@ -73,14 +74,17 @@ export function useThreadUrl(
 }
 
 /** Home's wiring: follows the store once the lazily loaded assistant chunk arrives. */
-export function useThreadUrlSync(assistant: Promise<{ assistantStore: ThreadUrlStore }>): void {
+export function useThreadUrlSync(
+  assistant: Promise<{ assistantStore: ThreadUrlStore }>,
+  host = "home",
+): void {
   const route = useRoute();
   const router = useRouter();
   const scope = effectScope();
   onScopeDispose(() => scope.stop());
   void assistant.then(
     ({ assistantStore }) => {
-      if (scope.active) scope.run(() => useThreadUrl(assistantStore, route, router));
+      if (scope.active) scope.run(() => useThreadUrl(assistantStore, route, router, host));
     },
     () => undefined,
   );

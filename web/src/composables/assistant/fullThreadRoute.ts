@@ -36,6 +36,12 @@ export const HOME_TAB_QUERY_KEY = "tab";
 
 export const AI_HOME_TAB = "ai";
 
+/** Routes that draw a thread at Full density on their own page; `/assistant` redirects to the one mounted. */
+const THREAD_HOSTS: ReadonlySet<unknown> = new Set(["home", "autobotInvestigate"]);
+
+/** The route a Full density thread opens on: Home, unless a page that hosts its own is mounted. */
+export const threadHost = /* @__PURE__ */ shallowRef<string>("home");
+
 interface RouteLike {
   name?: unknown;
   query?: LocationQuery | Record<string, unknown>;
@@ -53,13 +59,15 @@ export function threadParam(
 
 /** True on the Full density view, which is Home's AI tab with `?thread=`. */
 export function isFullThreadRoute(route: RouteLike | null | undefined): boolean {
-  return route?.name === "home" && threadParam(route.query) !== null;
+  return THREAD_HOSTS.has(route?.name) && threadParam(route?.query) !== null;
 }
 
 /** True while Home's Ask box is on screen; Home keeps its tab in state, not always in `?tab=`, so the mounted box is the signal. */
 export function isHomeAskShown(route: RouteLike | null | undefined): boolean {
   return (
-    route?.name === "home" && threadParam(route.query) === null && overviewFocusListening.value
+    THREAD_HOSTS.has(route?.name) &&
+    threadParam(route?.query) === null &&
+    overviewFocusListening.value
   );
 }
 
@@ -67,11 +75,10 @@ export function isHomeAskShown(route: RouteLike | null | undefined): boolean {
 export function fullThreadLocation(
   sid: string | null,
   query: LocationQuery | LocationQueryRaw = {},
+  host: string = threadHost.value,
 ): RouteLocationRaw {
-  return {
-    name: "home",
-    query: { ...query, [HOME_TAB_QUERY_KEY]: AI_HOME_TAB, [THREAD_QUERY_KEY]: sid ?? "" },
-  };
+  const tab = host === "home" ? { [HOME_TAB_QUERY_KEY]: AI_HOME_TAB } : {};
+  return { name: host, query: { ...query, ...tab, [THREAD_QUERY_KEY]: sid ?? "" } };
 }
 
 /** The same query without the thread key, so the AI tab goes back to its briefing. */
@@ -84,7 +91,7 @@ export function withoutThread(query: LocationQuery): LocationQuery {
 /** The query a push to Home's full view carries: Home keeps its own keys; any other page passes only its org, so its own filters never leak into Home. */
 export function homeQueryFrom(route: RouteLike | null | undefined): LocationQuery {
   const query = (route?.query ?? {}) as LocationQuery;
-  if (route?.name === "home") return withoutThread(query);
+  if (THREAD_HOSTS.has(route?.name)) return withoutThread(query);
   return query.org_identifier === undefined ? {} : { org_identifier: query.org_identifier };
 }
 
@@ -113,6 +120,9 @@ export async function pushFromThread(
 }
 
 /** Home's AI tab back on its Ask box, focused: where a chat on Home starts over. */
-export function homeAskLocation(query: LocationQuery): RouteLocationRaw {
-  return { name: "home", query: { ...withoutThread(query), focus: "ask" } };
+export function homeAskLocation(
+  query: LocationQuery,
+  host: string = threadHost.value,
+): RouteLocationRaw {
+  return { name: host, query: { ...withoutThread(query), focus: "ask" } };
 }

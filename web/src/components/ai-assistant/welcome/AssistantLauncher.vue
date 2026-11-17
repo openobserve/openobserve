@@ -163,7 +163,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     align="start"
                     @change="timeOverride = $event"
                   />
-                  <AssistantLauncherAgent v-model="agent" :disabled="fieldLoading" />
+                  <AssistantLauncherAgent
+                    v-model="agent"
+                    :fixed="fixedAgent"
+                    :disabled="fieldLoading"
+                  />
                 </span>
                 <AssistantAutoNavToggle v-if="!voice.mine.value" v-model="autoNavigation" />
               </template>
@@ -470,6 +474,10 @@ const props = withDefaults(
   defineProps<{
     /** `overview` is Home's ask field alone; `card` adds a heading, starters and recent chats. */
     layout?: "card" | "overview";
+    /** Every line goes to this agent, and the pill offers no other. */
+    fixedAgent?: AgentId;
+    /** Replaces the rotating example prompts with one fixed hint. */
+    askPlaceholder?: I18nText;
   }>(),
   { layout: "card" },
 );
@@ -578,7 +586,12 @@ const mentionsOn = computed(() => fieldReady.value);
 // An idle, empty field types example prompts as on main's Home; focus, a draft or a chip brings back the plain hint.
 const focused = ref(false);
 const typing = computed(
-  () => fieldReady.value && !focused.value && !text.value && trayChips.value.length === 0,
+  () =>
+    !props.askPlaceholder &&
+    fieldReady.value &&
+    !focused.value &&
+    !text.value &&
+    trayChips.value.length === 0,
 );
 const { placeholder: typed } = useTypewriterPlaceholder(
   computed(() => [
@@ -588,8 +601,10 @@ const { placeholder: typed } = useTypewriterPlaceholder(
   ]),
   { enabled: typing, typeSpeedMs: 85, eraseSpeedMs: 45, holdMs: 2800, initialDelayMs: 500 },
 );
-const placeholder = computed(() =>
-  typing.value ? raw(typed.value) : t("assistant.composer.placeholderAt"),
+const placeholder = computed(
+  () =>
+    props.askPlaceholder ??
+    (typing.value ? raw(typed.value) : t("assistant.composer.placeholderAt")),
 );
 
 const coarse = ref(!!globalThis.matchMedia?.("(pointer: coarse)")?.matches);
@@ -844,7 +859,7 @@ function ask(stage: boolean): void {
   text.value = "";
   const time = sendRange();
   const chips = mentionChips.value;
-  const picked = agent.value;
+  const picked = props.fixedAgent ?? agent.value;
   mentionChips.value = [];
   images.value = [];
   agent.value = null;

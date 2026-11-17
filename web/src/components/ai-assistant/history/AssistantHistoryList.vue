@@ -40,18 +40,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="assistant-history-tools"
     >
       <OSearchInput
-        :model-value="history.filter.value.q"
+        :model-value="searchText"
         size="sm"
-        :placeholder="t('assistant.history.search')"
+        :placeholder="
+          investigationsOnly
+            ? t('assistant.history.searchInvestigations')
+            : t('assistant.history.search')
+        "
         :debounce="SEARCH_DEBOUNCE_MS"
         clearable
         :aria-controls="drawn.length ? listId : undefined"
         :class="['min-w-0 flex-1', bare && BARE_SEARCH_CLASS]"
         data-test="assistant-history-search"
-        @update:model-value="(q) => history.setFilter({ q })"
+        @update:model-value="setSearch"
         @keydown="onSearchKey"
       />
-      <ODropdown align="end" @update:open="onMenuOpen">
+      <ODropdown v-if="!investigationsOnly" align="end" @update:open="onMenuOpen">
         <template #trigger>
           <AssistantIconButton
             :label="t('assistant.history.listMenu')"
@@ -143,7 +147,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="scroller"
       :class="['flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto', bare && '-mx-3 px-3']"
     >
-      <h2 v-if="mode === 'rail'" class="sr-only">{{ t("assistant.history.title") }}</h2>
+      <h2 v-if="mode === 'rail'" class="sr-only">
+        {{
+          investigationsOnly
+            ? t("assistant.history.filter.investigations")
+            : t("assistant.history.title")
+        }}
+      </h2>
       <OText v-if="keptNotice" variant="meta" as="p" data-test="assistant-history-kept">
         {{ t("assistant.history.localOnly.keptOnSignOut") }}
       </OText>
@@ -281,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="inline"
           :backdrop="false"
           :title="t('assistant.history.filterEmpty')"
-          :action-label="t('assistant.history.filter.all')"
+          :action-label="investigationsOnly ? undefined : t('assistant.history.filter.all')"
           data-test="assistant-history-filter-empty"
           @action="clearFilters"
         />
@@ -477,6 +487,8 @@ export interface AssistantHistoryListProps {
   narrow?: boolean;
   /** On the page's own backdrop (Home): no panel surface or band, pill search and filters, one-line rows and footer. */
   bare?: boolean;
+  /** Only investigations, with no filter controls; its search stays local so the shared stored filter is untouched. */
+  investigationsOnly?: boolean;
 }
 
 /** Filter joins the tools from this many chats, or while one is active. */
@@ -648,8 +660,14 @@ const narrow = computed(() => {
   if (props.mode !== "panel") return false;
   return props.container === "window" ? props.narrow : widthRem.value < NARROW_REM;
 });
-const query = computed(() => history.filter.value.q.trim());
-const titlesOnly = computed(() => history.searchPartial.value);
+const localSearch = ref("");
+const searchText = computed(() =>
+  props.investigationsOnly ? localSearch.value : history.filter.value.q,
+);
+const query = computed(() => searchText.value.trim());
+const titlesOnly = computed(() =>
+  props.investigationsOnly ? !!query.value && history.hasMore.value : history.searchPartial.value,
+);
 // The end line carries Load older while a title search has more to read.
 const endScope = computed(() => titlesOnly.value && drawn.value.length > 0);
 const sharesOffered = computed(
@@ -663,6 +681,7 @@ const menuViews = computed(() => {
   const server = history.mode.value === "server";
   const f = "assistant.history.filter";
   const list: { id: HistoryView; label: I18nText; icon: IconName }[] = [];
+  if (props.investigationsOnly) return list;
   if (offersAgents.value)
     list.push({
       id: "investigations",
@@ -678,6 +697,7 @@ const activeMenuView = computed(() => menuViews.value.find((item) => item.id ===
 const localView = ref<"all" | "auto_runs">("all");
 // Shared and Investigations live in the stored filter, so a reload keeps them; the rest are this list's own.
 const view = computed<HistoryView>(() => {
+  if (props.investigationsOnly) return "investigations";
   const { kind, agent } = history.filter.value;
   if (kind === "shared") return "shared";
   if (agent === "investigator") return "investigations";
@@ -717,7 +737,17 @@ const liveRows = computed<HistoryRow[]>(() => {
   const listed = new Set(history.rows.value.map((row) => row.sid));
   return runs.rows.value.filter((row) => !listed.has(row.sid) && isCounted(row)).map(rowOfRun);
 });
+// Titles only: the shared filter's server search and content match key off the stored query, which this list leaves alone.
+const investigationRows = computed<HistoryRow[]>(() => {
+  const needle = query.value.toLowerCase();
+  return history.rows.value.filter(
+    (row) =>
+      runAgentKey(row.agentType) === "investigator" &&
+      (!needle || String(row.title).toLowerCase().includes(needle)),
+  );
+});
 const shownRows = computed<HistoryRow[]>(() => {
+  if (props.investigationsOnly) return investigationRows.value;
   if (query.value || narrowed.value) return history.visible.value;
   const seen = new Set(history.visible.value.map((row) => row.sid));
   const drafts = history.drafts.value.filter((row) => !seen.has(row.sid));
@@ -796,9 +826,10 @@ onMounted(() => {
   // A filter stored before the filter row existed has no control left to clear it.
   const stored = history.filter.value;
   if (
-    stored.kind === "pinned" ||
-    stored.started ||
-    (stored.agent && stored.agent !== "investigator")
+    !props.investigationsOnly &&
+    (stored.kind === "pinned" ||
+      stored.started ||
+      (stored.agent && stored.agent !== "investigator"))
   )
     setView("all");
   trackAssistant("ai_history_open", { placement: props.mode });
@@ -943,18 +974,23 @@ function onSearchKey(event: KeyboardEvent): void {
   if (event.key === "ArrowDown") {
     event.preventDefault();
     keys.focusFirst();
-  } else if (event.key === "Escape" && history.filter.value.q) {
+  } else if (event.key === "Escape" && searchText.value) {
     event.stopPropagation();
     event.preventDefault();
-    history.setFilter({ q: "" });
+    setSearch("");
   } else if (event.key === "Escape" && props.mode === "rail") {
     event.preventDefault();
     emit("close");
   }
 }
 
+function setSearch(q: string): void {
+  if (props.investigationsOnly) localSearch.value = q;
+  else history.setFilter({ q });
+}
+
 function clearSearch(): void {
-  history.setFilter({ q: "" });
+  setSearch("");
   focusSearch();
 }
 

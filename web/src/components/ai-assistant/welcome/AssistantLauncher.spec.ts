@@ -291,6 +291,26 @@ describe("AssistantLauncher", () => {
     expect(open.mock.calls[1][0]).not.toHaveProperty("agent");
   });
 
+  it("sends every line to a fixed agent, whose chip cannot change, under the given hint", async () => {
+    const { wrapper } = setupOn({
+      layout: "overview",
+      fixedAgent: "sre",
+      askPlaceholder: "Describe what went wrong",
+    });
+    fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
+    await flushPromises();
+    const agentChip = wrapper.get('[data-test="assistant-launcher-agent"]');
+    expect(agentChip.attributes("data-agent")).toBe("sre");
+    expect(agentChip.element.tagName).not.toBe("BUTTON");
+    expect(input(wrapper).attributes("placeholder")).toBe("Describe what went wrong");
+    for (const line of ["why did checkout fail?", "and now?"]) {
+      await input(wrapper).setValue(line);
+      await input(wrapper).trigger("keydown", { key: "Enter" });
+      await flushPromises();
+    }
+    expect(open.mock.calls.map((call) => call[0].agent)).toEqual(["sre", "sre"]);
+  });
+
   it("sends the typed line on Enter as a new chat in the full view (HOME-01)", async () => {
     const { wrapper } = setup();
     await input(wrapper).setValue("why 5xx?");

@@ -66,7 +66,7 @@ export function leaveFullThreadRoute(router: Router, route: RouteLocationNormali
   if (!isFullThreadRoute(route)) return;
   const back = window.history.state?.back;
   // Home's own query (period, org) stays; only the thread key goes.
-  const home = { name: "home", query: withoutThread(route.query) };
+  const home = { name: String(route.name), query: withoutThread(route.query) };
   if (typeof back !== "string") return void router.push(home);
   if (!isFullThreadRoute(router.resolve(back))) return router.back();
   const steps = stepsPastFullChats(router);

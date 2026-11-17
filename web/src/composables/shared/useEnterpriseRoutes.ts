@@ -403,6 +403,13 @@ const useEnterpriseRoutes = () => {
       },
       beforeEnter: withFeatureGate("incidents", routeGuard),
     }),
+    withLicenseFeature("ai_assistant", {
+      path: "investigate",
+      name: "autobotInvestigate",
+      component: () => import("@/views/AutobotInvestigate.vue"),
+      meta: { titleKey: "menu.autobotInvestigate" },
+      beforeEnter: routeGuard,
+    }),
   );
 
   if (config.isEnterprise == "true") {

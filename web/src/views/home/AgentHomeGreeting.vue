@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </i18n-t>
       <h2 v-else :class="HEADING_CLASS" data-test="agent-home-greeting-text">
-        {{ greeting }}
+        {{ investigate ? t("autobotInvestigate.greeting") : greeting }}
       </h2>
     </div>
   </div>
@@ -59,6 +59,11 @@ import { useTheme } from "@/composables/useTheme";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 
+const props = defineProps<{
+  /** The investigate page asks what to look into instead of greeting by time of day. */
+  investigate?: boolean;
+}>();
+
 const HEADING_CLASS = "text-text-heading text-3xl leading-tight font-semibold max-md:text-2xl";
 
 const { t } = useI18nTyped();
@@ -69,5 +74,9 @@ const logoSrc = computed(() =>
 );
 const { greeting, displayName, period } = useGreeting(() => vuex?.state.userInfo?.email);
 // The name sits in the translated sentence as a slot, so the language still decides where it goes.
-const namedKey = computed<I18nKey>(() => `aiAssistant.greetingNamed.${period.value}`);
+const namedKey = computed<I18nKey>(() =>
+  props.investigate
+    ? "autobotInvestigate.greetingNamed"
+    : `aiAssistant.greetingNamed.${period.value}`,
+);
 </script>

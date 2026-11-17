@@ -22,12 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="grid grid-cols-1 gap-2 @sm:grid-cols-2 @2xl:grid-cols-4">
       <button
-        v-for="card in CAPABILITY_CARDS"
+        v-for="card in cards"
         :key="card.id"
         type="button"
         class="rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 flex min-w-0 cursor-pointer items-center gap-2 border px-2.5 py-2 text-left transition-[border-color,box-shadow,translate] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:ring-2 focus-visible:outline-none"
         :data-test="`assistant-home-capability-${card.id}`"
-        @click="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
+        @click="emit('select', t(card.prompt))"
       >
         <span
           class="rounded-default inline-flex size-7 shrink-0 items-center justify-center"
@@ -36,12 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon :name="card.icon" size="sm" :class="card.iconColorClass" />
         </span>
         <span class="text-text-heading min-w-0 text-sm leading-tight font-medium">
-          {{ t(`aiAssistant.capabilities.${card.id}.title`) }}
+          {{ t(card.title) }}
         </span>
-        <OTooltip :content="t(`aiAssistant.capabilities.${card.id}.description`)" />
+        <OTooltip :content="t(card.description)" />
       </button>
     </div>
-    <PromptSuggestions @select="emit('select', $event)" />
+    <PromptSuggestions v-if="prompts" @select="emit('select', $event)" />
   </div>
 </template>
 
@@ -51,7 +51,12 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import PromptSuggestions from "./PromptSuggestions.vue";
-import { CAPABILITY_CARDS } from "./welcomeContent";
+import { CAPABILITY_CARDS, type CapabilityCard } from "./welcomeContent";
+
+withDefaults(defineProps<{ cards?: CapabilityCard[]; prompts?: boolean }>(), {
+  cards: () => CAPABILITY_CARDS,
+  prompts: true,
+});
 
 const { t } = useI18nTyped();
 

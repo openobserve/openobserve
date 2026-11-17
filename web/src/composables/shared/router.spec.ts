@@ -16,6 +16,7 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { createMemoryHistory, createRouter, type RouteRecordRaw } from "vue-router";
 import useRoutes from "./router";
+import { threadHost } from "@/composables/assistant/fullThreadRoute";
 import Login from "@/views/Login.vue";
 import store from "@/stores";
 import { routeGuard } from "@/utils/zincutils";
@@ -2049,6 +2050,26 @@ describe("useRoutes (router.ts)", () => {
         (r: any) => r.name !== "assistant" && /^\/?assistant/.test(r.path ?? ""),
       );
       expect(others).toEqual([]);
+    });
+
+    it("opens an /assistant chat on the page that hosts its own thread, else on Home", () => {
+      const route: any = useRoutes().homeChildRoutes.find((r: any) => r.name === "assistant");
+      const to = { params: { chatId: "s1" }, query: { org_identifier: "default" } };
+      expect(route.redirect(to)).toEqual({
+        name: "home",
+        params: {},
+        query: { org_identifier: "default", tab: "ai", thread: "s1" },
+      });
+      threadHost.value = "autobotInvestigate";
+      try {
+        expect(route.redirect(to)).toEqual({
+          name: "autobotInvestigate",
+          params: {},
+          query: { org_identifier: "default", thread: "s1" },
+        });
+      } finally {
+        threadHost.value = "home";
+      }
     });
 
     it("registers /close-tab outside the layout, authenticated", () => {

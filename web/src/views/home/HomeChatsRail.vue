@@ -20,7 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-8 shrink-0 items-center gap-1 px-3" data-test="home-chats-rail-header">
       <!-- The list names itself with a hidden heading, so the visible title is not read twice -->
       <span aria-hidden="true" class="text-text-heading min-w-0 flex-1 text-sm font-medium">
-        {{ t("assistant.history.title") }}
+        {{
+          investigations
+            ? t("assistant.history.filter.investigations")
+            : t("assistant.history.title")
+        }}
       </span>
       <AssistantIconButton
         :label="t('assistant.thread.newChat')"
@@ -33,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       mode="rail"
       bare
       container="full_view"
+      :investigations-only="investigations"
       :current-sid="thread ? store.state.shell.activeSid : null"
       class="min-h-0 flex-1"
       @close="onClose"
@@ -58,6 +63,8 @@ import { useI18nTyped } from "@/types/i18n";
 const props = defineProps<{
   /** Beside a chat open on Home: that chat is marked, and New chat goes back to the Ask box. */
   thread?: boolean;
+  /** The investigate page: only investigations, with no filter controls. */
+  investigations?: boolean;
 }>();
 
 const emit = defineEmits<{ close: [] }>();

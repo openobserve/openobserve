@@ -82,13 +82,14 @@ async function setup({
   persistence = false,
   patchHistory = (history: AssistantHistory) => history,
   thread = false,
+  investigations = false,
 } = {}) {
   fake.current = fakeAssistant("available", { persistence }, {}, 80, true);
   for (const row of seed) fake.current.db.rows.set(row.id, structuredClone(row));
   fake.current.history = patchHistory(fake.current.history);
   const router = fakeRouter();
   const wrapper = mount(HomeChatsRail, {
-    props: { thread },
+    props: { thread, investigations },
     global: { plugins: [router, fakeVuex()], stubs: historyStubs },
     attachTo: document.body,
   });
@@ -275,5 +276,42 @@ describe("HomeChatsRail", () => {
     );
     await wrapper.get('[data-test="assistant-history-error-retry"]').trigger("click");
     expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("on the investigate page lists only investigations, with no filter controls, and leaves the stored filter alone", async () => {
+    vi.spyOn(assistant, "listChats").mockResolvedValue({
+      chats: [
+        chat(1, NOW - HOUR, { title: "Checkout latency", agent_type: "sre" }),
+        chat(2, NOW - 2 * HOUR, { title: "Write a query", agent_type: "o2-ai" }),
+        chat(3, NOW - 3 * HOUR, { title: "Error spike", agent_type: "sre" }),
+      ],
+    });
+    const { wrapper } = await setup({
+      persistence: true,
+      investigations: true,
+      patchHistory: (history) => {
+        history.setFilter({ kind: "shared", q: "" });
+        return history;
+      },
+    });
+    const history = fake.current!.history;
+    const stored = { ...history.filter.value };
+    expect(wrapper.get('[data-test="home-chats-rail-header"]').text()).toBe("Investigations");
+    expect(
+      wrapper.get('[data-test="assistant-history-search"] input').attributes("placeholder"),
+    ).toBe("Search Investigations");
+    expect(wrapper.find('[data-test="assistant-history-list-menu"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-history-filter-active"]').exists()).toBe(false);
+    expect(rows(wrapper).map((row) => row.text())).toEqual([
+      expect.stringContaining("Checkout latency"),
+      expect.stringContaining("Error spike"),
+    ]);
+    await wrapper.get('[data-test="assistant-history-search"] input').setValue("spike");
+    await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_MS + 50));
+    await flushPromises();
+    expect(rows(wrapper).map((row) => row.text())).toEqual([
+      expect.stringContaining("Error spike"),
+    ]);
+    expect(history.filter.value).toEqual(stored);
   });
 });

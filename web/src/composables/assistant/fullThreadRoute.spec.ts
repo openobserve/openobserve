@@ -19,7 +19,15 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
 
 import { makeEnv } from "./actions/__tests__/actionEnv";
-import { homeQueryFrom, isHomeAskShown, pushFromThread } from "./fullThreadRoute";
+import {
+  fullThreadLocation,
+  homeAskLocation,
+  homeQueryFrom,
+  isFullThreadRoute,
+  isHomeAskShown,
+  pushFromThread,
+  threadHost,
+} from "./fullThreadRoute";
 
 describe("pushFromThread", () => {
   // The full view closes itself on the way out, as AssistantView's leave guard does.
@@ -101,5 +109,27 @@ describe("homeQueryFrom", () => {
     expect(
       homeQueryFrom({ name: "home", query: { period: "7d", org_identifier: "acme", thread: "x" } }),
     ).toEqual({ period: "7d", org_identifier: "acme" });
+  });
+});
+
+describe("a page that hosts its own thread", () => {
+  it("keeps the chat, New chat and its own keys on that page while it is mounted", () => {
+    const route = { name: "autobotInvestigate", query: { org_identifier: "acme", thread: "x" } };
+    threadHost.value = "autobotInvestigate";
+    try {
+      expect(isFullThreadRoute(route)).toBe(true);
+      expect(homeQueryFrom(route)).toEqual({ org_identifier: "acme" });
+      expect(fullThreadLocation("y", { org_identifier: "acme" })).toEqual({
+        name: "autobotInvestigate",
+        query: { org_identifier: "acme", thread: "y" },
+      });
+      expect(homeAskLocation(route.query)).toEqual({
+        name: "autobotInvestigate",
+        query: { org_identifier: "acme", focus: "ask" },
+      });
+    } finally {
+      threadHost.value = "home";
+    }
+    expect(fullThreadLocation("y")).toEqual({ name: "home", query: { tab: "ai", thread: "y" } });
   });
 });

@@ -15,7 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <template v-if="shown">
+  <OTag
+    v-if="fixed"
+    type="assistantContext"
+    :label="agentName(fixed, t)"
+    :icon="agentGlyph[fixed]"
+    class="h-7 shrink-0"
+    data-test="assistant-launcher-agent"
+    :data-agent="fixed"
+    data-fixed=""
+  >
+    <template v-if="!layout.agentIconOnly">{{ agentName(fixed, t) }}</template>
+    <OTooltip v-if="layout.agentIconOnly" :content="agentName(fixed, t)" />
+  </OTag>
+  <template v-else-if="shown">
     <ODropdown
       v-model:open="menuOpen"
       side="top"
@@ -145,7 +158,7 @@ interface Row {
   askAdmin: boolean;
 }
 
-withDefaults(defineProps<{ disabled?: boolean }>(), { disabled: false });
+withDefaults(defineProps<{ disabled?: boolean; fixed?: AgentId }>(), { disabled: false });
 
 /** The agent the line goes to; `null` is the default agent. */
 const agent = defineModel<AgentId | null>({ default: null });

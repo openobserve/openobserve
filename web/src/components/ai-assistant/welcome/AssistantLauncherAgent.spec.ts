@@ -63,10 +63,10 @@ const stubs = {
   OTooltip: { props: ["content"], template: '<span data-test="tooltip">{{ content }}</span>' },
 };
 
-function setup(roster: CapabilityAgent[] = ROSTER, agent: AgentId | null = null) {
+function setup(roster: CapabilityAgent[] = ROSTER, agent: AgentId | null = null, fixed?: AgentId) {
   fake.current = fakeAssistant("available", { agents: roster });
   return mount(AssistantLauncherAgent, {
-    props: { modelValue: agent },
+    props: { modelValue: agent, ...(fixed && { fixed }) },
     global: { plugins: [fakeVuex()], stubs },
     attachTo: document.body,
   });
@@ -122,5 +122,16 @@ describe("AssistantLauncherAgent", () => {
     await wrapper.setProps({ modelValue: "sre" });
     await option(wrapper, "o2-ai").trigger("click");
     expect(wrapper.emitted("update:modelValue")).toEqual([["sre"], [null]]);
+  });
+
+  it("names a fixed agent with no menu or chevron, even when the roster offers no choice", () => {
+    for (const roster of [ROSTER, [ROSTER[0]]]) {
+      const wrapper = setup(roster, null, "sre");
+      expect(chip(wrapper).text()).toBe(`${brandNames.autobotInvestigate}`);
+      expect(chip(wrapper).attributes("data-agent")).toBe("sre");
+      expect(chip(wrapper).element.tagName).not.toBe("BUTTON");
+      expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(0);
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    }
   });
 });

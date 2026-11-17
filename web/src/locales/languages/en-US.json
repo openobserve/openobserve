@@ -2094,6 +2094,7 @@
     "synthetic": "Synthetics",
     "experience": "Experience",
     "slos": "SLOs",
+    "autobotInvestigate": "@:{'brand.autobotInvestigate'}",
     "reliability": "Reliability",
     "onCall": "On-Call",
     "response": "Response",
@@ -10486,6 +10487,33 @@
     "wellCategory": "Category",
     "value": "Value"
   },
+  "autobotInvestigate": {
+    "greeting": "What should we investigate?",
+    "greetingNamed": "What should we investigate, {name}?",
+    "placeholder": "Describe what went wrong, or paste an alert or incident link",
+    "cards": {
+      "whyAlertFired": {
+        "title": "Why Did My Alert Fire?",
+        "description": "Pick an alert. @:{'brand.autobot'} checks the data behind it and explains the cause.",
+        "prompt": "Why did my last alert fire?"
+      },
+      "investigateIncident": {
+        "title": "Investigate An Incident",
+        "description": "Find what changed, which services are hit, and where it started.",
+        "prompt": "Help me investigate my latest incident"
+      },
+      "errorSpike": {
+        "title": "Find The Cause Of An Error Spike",
+        "description": "Compare errors before and after the spike, by service and message.",
+        "prompt": "Find the cause of the latest error spike"
+      },
+      "slowService": {
+        "title": "Check A Slow Service",
+        "description": "Look at traces and latency to find the slow step.",
+        "prompt": "Find which service is slow and why"
+      }
+    }
+  },
   "home": {
     "alertsOverviewSection": "Alerts overview section",
     "pipelinesOverviewSection": "Pipelines overview section",
@@ -12214,6 +12242,7 @@
       "rename": "Rename",
       "rowMenu": "Actions for {title}",
       "search": "Search chats",
+      "searchInvestigations": "Search Investigations",
       "serverError": "Couldn't load your chats",
       "serverErrorCached": "Showing chats saved in this browser · Couldn't reach the server",
       "sharedLinks": "Shared links",
