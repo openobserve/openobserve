@@ -102,7 +102,7 @@ mod tests {
     };
 
     use super::{
-        super::{MergePolicy, MergeWindow, is_incremental, tests::*},
+        super::{MergePolicy, MergeWindow, tests::*},
         *,
     };
 
@@ -127,12 +127,13 @@ mod tests {
         let hourly = PartitionTimeLevel::Hourly;
         let daily = PartitionTimeLevel::Daily;
         let now = day() + day_micros(2);
-        for (label, offset, level, now, rules, end, step) in [
+        for (label, offset, level, now, incremental, rules, end, step) in [
             (
                 "midnight day",
                 day(),
                 hourly,
                 now,
+                false,
                 vec![&older, &newer],
                 "23",
                 Some(60),
@@ -142,6 +143,7 @@ mod tests {
                 day(),
                 hourly,
                 now,
+                false,
                 vec![&older],
                 "00",
                 Some(300),
@@ -151,6 +153,7 @@ mod tests {
                 day() + hour_micros(5),
                 hourly,
                 now,
+                false,
                 vec![&older, &newer],
                 "05",
                 Some(300),
@@ -160,6 +163,7 @@ mod tests {
                 day() + hour_micros(5),
                 daily,
                 now,
+                false,
                 vec![&older, &newer],
                 "23",
                 Some(60),
@@ -169,6 +173,7 @@ mod tests {
                 day(),
                 daily,
                 now,
+                false,
                 vec![&older],
                 "23",
                 None,
@@ -178,14 +183,14 @@ mod tests {
                 day(),
                 hourly,
                 day() + hour_micros(1) + 10,
+                true,
                 vec![&zero_age],
                 "00",
                 None,
             ),
-            ("no rule", day(), hourly, now, Vec::new(), "00", None),
+            ("no rule", day(), hourly, now, false, Vec::new(), "00", None),
         ] {
             let stream = StreamParams::new("default", "cpu", StreamType::Metrics);
-            let incremental = is_incremental(job_range_end(offset, level), now, 10);
             let (read_level, rule) =
                 select_from_rules(stream.stream_type, offset, level, incremental, now, &rules)
                     .unwrap_or_else(|| {
@@ -263,18 +268,11 @@ mod tests {
         let end = job_range_end(offset, hourly);
         for delta in [-1, 0, 1] {
             let now = end + hour_micros(1) + delta;
-            let incremental = is_incremental(end, now, 10);
-            let (read_level, rule) = select_from_rules(
-                stream.stream_type,
-                offset,
-                hourly,
-                incremental,
-                now,
-                &[&rule],
-            )
-            .unwrap_or_else(|| (hourly, MergeRule::for_stream(&stream, &schema, incremental)));
+            let (read_level, rule) =
+                select_from_rules(stream.stream_type, offset, hourly, false, now, &[&rule])
+                    .unwrap_or_else(|| (hourly, MergeRule::for_stream(&stream, &schema, false)));
             let policy = MergePolicy {
-                window: MergeWindow::new(&stream, offset, hourly, read_level, incremental),
+                window: MergeWindow::new(&stream, offset, hourly, read_level, false),
                 rule,
             };
             assert_eq!(matches!(policy.rule, MergeRule::Downsampling(_)), delta > 0);

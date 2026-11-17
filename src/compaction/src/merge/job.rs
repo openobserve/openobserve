@@ -18,7 +18,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
-    utils::time::{day_micros, hour_micros},
+    utils::time::{day_micros, hour_micros, now_micros},
 };
 use infra::{
     cluster::get_node_by_uuid,
@@ -112,7 +112,7 @@ pub async fn generate_job_by_stream(
     let settings = get_settings(org_id, stream_name, stream_type).await;
     let level = scheduling_level(stream_type, settings.as_deref(), offset);
     let (job_offset, job_end) = job_range(offset, level);
-    if !crate::is_past_hour(job_end) {
+    if !crate::is_past_hour(job_end, now_micros()) {
         return Ok(()); // the time is future, just wait
     }
 

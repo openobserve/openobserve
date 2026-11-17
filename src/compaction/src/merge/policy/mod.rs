@@ -33,7 +33,7 @@ use config::{
     meta::stream::{
         FileKey, MergeStrategy, PartitionTimeLevel, StreamParams, StreamSettings, StreamType,
     },
-    utils::time::{hour_micros, now_micros},
+    utils::time::hour_micros,
 };
 use infra::schema::get_partition_time_level_at;
 use metrics_index::{MetricsFileLayout, metrics_index_stream};
@@ -110,16 +110,12 @@ impl MergePolicy {
         schema: &Schema,
         settings: Option<&StreamSettings>,
         offset: i64,
+        now: i64,
     ) -> Self {
         let offset = offset - offset % hour_micros(1);
         let job_level = scheduling_level(stream.stream_type, settings, offset);
         let partition_level = get_partition_time_level_at(stream.stream_type, settings, offset);
-        let now = now_micros();
-        let is_incremental = is_incremental(
-            job_range_end(offset, job_level),
-            now,
-            crate::settle_micros(),
-        );
+        let is_incremental = !crate::is_past_hour(job_range_end(offset, job_level), now);
         let (read_level, rule) =
             MergeRule::select(stream, schema, offset, partition_level, is_incremental, now);
         let window = MergeWindow::new(stream, offset, job_level, read_level, is_incremental);
@@ -272,12 +268,6 @@ fn date_range(offset: i64, level: PartitionTimeLevel) -> (String, String) {
     }
 }
 
-fn is_incremental(job_end: i64, now: i64, settle_delay: i64) -> bool {
-    let hour = hour_micros(1);
-    let end = job_end - job_end % hour + hour;
-    now - end <= settle_delay
-}
-
 /// Legacy metrics files never join a hash-ordered batch: sorting them would
 /// be a full sort of the hour. Returns `(hash-ordered files, legacy files)`.
 fn split_legacy_metrics(files: Vec<FileKey>) -> (Vec<FileKey>, Vec<FileKey>) {
@@ -406,22 +396,19 @@ mod tests {
             .timestamp_micros()
     }
 
-    fn resolve_at(
+    fn resolve_with_level(
         stream: &StreamParams,
         schema: &Schema,
         offset: i64,
         partition_level: PartitionTimeLevel,
         now: i64,
     ) -> MergePolicy {
-        let job_level = if stream.stream_type.support_dynamic_partition() {
-            partition_level
-        } else {
-            PartitionTimeLevel::Hourly
-        };
-        let is_incremental = is_incremental(job_range_end(offset, job_level), now, 10);
-        let window = MergeWindow::new(stream, offset, job_level, partition_level, is_incremental);
-        let rule = MergeRule::for_stream(stream, schema, is_incremental);
-        MergePolicy { window, rule }
+        let mut settings = StreamSettings::default();
+        settings.partition_time_level.changes = vec![PartitionTimeLevelChange {
+            since: day(),
+            level: partition_level,
+        }];
+        MergePolicy::resolve(stream, schema, Some(&settings), offset, now)
     }
 
     pub(super) fn indexed_schema() -> Schema {
@@ -437,12 +424,12 @@ mod tests {
         let plain = Schema::empty();
         let hashed = indexed_schema();
         let resolve = |stream_type, name, schema, closed| {
-            resolve_at(
+            resolve_with_level(
                 &StreamParams::new("default", name, stream_type),
                 schema,
                 day(),
                 PartitionTimeLevel::Hourly,
-                day() + hour_micros(1) + 10 + i64::from(closed),
+                day() + hour_micros(1) + crate::settle_micros() + i64::from(closed),
             )
         };
         assert!(matches!(
@@ -510,7 +497,7 @@ mod tests {
                 "05",
             ),
         ] {
-            let policy = resolve_at(
+            let policy = resolve_with_level(
                 &StreamParams::new("default", "cpu", stream_type),
                 &plain,
                 offset,
@@ -531,15 +518,16 @@ mod tests {
     #[test]
     fn test_resolve_settle_boundary_uses_the_scheduled_job_end() {
         let schema = indexed_schema();
+        let settle_delay = crate::settle_micros();
         for job_level in [PartitionTimeLevel::Hourly, PartitionTimeLevel::Daily] {
             let job_end = job_range_end(day(), job_level);
             for (delta, incremental) in [(-1, true), (0, true), (1, false)] {
-                let policy = resolve_at(
+                let policy = resolve_with_level(
                     &StreamParams::new("default", "cpu", StreamType::Metrics),
                     &schema,
                     day(),
                     job_level,
-                    job_end + 1 + 10 + delta,
+                    job_end + 1 + settle_delay + delta,
                 );
                 assert_eq!(policy.window().is_incremental, incremental);
                 assert_eq!(policy.window().job_end, job_end);
@@ -582,6 +570,7 @@ mod tests {
                 &plain,
                 Some(&settings),
                 offset,
+                day() + day_micros(2),
             );
             assert_eq!(policy.window().date_end, expected_end);
             assert_eq!(policy.window().merges_by_day, merges_by_day);
@@ -597,6 +586,7 @@ mod tests {
             &plain,
             Some(&settings),
             day() + hour_micros(5),
+            day() + day_micros(2),
         );
         assert_eq!(policy.window().date_end, "2026/08/18/23");
         assert_eq!(policy.window().job_end, day() + hour_micros(6) - 1);

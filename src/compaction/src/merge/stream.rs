@@ -22,6 +22,7 @@ use ::datafusion::arrow::datatypes::Schema;
 use config::{
     meta::stream::{FileKey, StreamParams, StreamType},
     metrics,
+    utils::time::now_micros,
 };
 use infra::{file_list as infra_file_list, schema};
 use search_service::file_list;
@@ -43,6 +44,7 @@ pub async fn merge_by_stream(
     offset: i64,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
+    let now = now_micros();
 
     let schema = schema::get(org_id, stream_name, stream_type).await?;
     if schema == Schema::empty() {
@@ -61,6 +63,7 @@ pub async fn merge_by_stream(
         &schema,
         settings.as_deref(),
         offset,
+        now,
     ));
     let files = query_window_files(&policy).await?;
     if files.is_empty() {
@@ -149,7 +152,7 @@ async fn settle_job(window: &MergeWindow, job_id: i64, needs_another_round: bool
     let stream = window.stream_key();
     let date_start = &window.date_start;
     // the range settled mid-round: stay Running so check_running_jobs re-arms a whole-range retry
-    if window.is_incremental && crate::is_past_hour(window.job_end) {
+    if window.is_incremental && crate::is_past_hour(window.job_end, now_micros()) {
         log::warn!(
             "[COMPACTOR] merge_by_stream [{stream}] range of {date_start} settled during the incremental round, job {job_id} is left for the retry"
         );
@@ -163,7 +166,7 @@ async fn settle_job(window: &MergeWindow, job_id: i64, needs_another_round: bool
     } else if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
         log::error!("[COMPACTOR] set_job_done failed: {e}");
     } else if window.is_incremental
-        && crate::is_past_hour(window.job_end)
+        && crate::is_past_hour(window.job_end, now_micros())
         // add_job does nothing on a Running row, so the scheduled pass may have just missed this one
         && let Err(e) = infra_file_list::add_job(
             &window.org_id,
