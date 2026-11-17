@@ -889,111 +889,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OSettingRow>
                 </div></Teleport
               >
-
-              <Teleport
-                :to="sectionTargets?.querySchedule"
-                :disabled="!sectionTargets?.querySchedule"
-              >
-                <!-- Check every row -->
-                <OSettingRow
-                  :label="t('alerts.queryConfig.checkEvery')"
-                  required
-                  :description="t('alerts.sections.rows.checkEvery')"
-                  fill
-                >
-                  <div class="flex flex-col gap-1">
-                    <div class="flex items-center gap-2 max-md:flex-wrap">
-                      <!-- Minutes/hours mode: number input -->
-                      <template v-if="frequencyMode !== 'cron'">
-                        <OFormInput
-                          :aria-label="t('alerts.queryConfig.checkEvery')"
-                          name="_ui.checkEvery"
-                          data-test="alert-check-every-input"
-                          type="number"
-                          class="max-w-25 min-w-25"
-                          min="1"
-                          @update:model-value="onCheckEveryChange($event)"
-                          @blur="restoreDefaultFrequency"
-                        >
-                          <!-- Message rendered below at row width — see checkEveryError. -->
-                          <template #error />
-                        </OFormInput>
-                      </template>
-                      <!-- Cron mode: expression input + timezone (Rule ②: form-owned
-                       by `name=`, no v-model mirror). -->
-                      <template v-else>
-                        <OFormInput
-                          :aria-label="t('alerts.queryConfig.cron')"
-                          name="trigger_condition.cron"
-                          data-test="alert-cron-input"
-                          :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
-                          class="max-w-25 min-w-25"
-                          @update:model-value="onCronExpressionChange"
-                        />
-                      </template>
-
-                      <!-- Unit dropdown: minutes / hours / cron -->
-                      <OSelect
-                        :aria-label="
-                          t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })
-                        "
-                        class="max-w-25 min-w-20"
-                        :model-value="frequencyMode"
-                        data-test="alert-check-every-unit-select"
-                        :options="frequencyUnitOptions"
-                        labelKey="label"
-                        valueKey="value"
-                        :searchable="false"
-                        @update:model-value="onFrequencyUnitChange"
-                      />
-
-                      <!-- Timezone (only for cron, inline) -->
-                      <template v-if="frequencyMode === 'cron'">
-                        <span class="inline-block max-w-37.5 min-w-37.5">
-                          <OFormSelect
-                            :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
-                            name="trigger_condition.timezone"
-                            data-test="alert-cron-timezone-select"
-                            :options="timezoneSelectOptions"
-                            searchable
-                            :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
-                            class="max-w-37.5 min-w-37.5"
-                            @update:model-value="onCronTimezoneChange"
-                          />
-                          <OTooltip
-                            v-if="cronTimezone"
-                            :content="raw(cronTimezone)"
-                            side="bottom"
-                          />
-                        </span>
-                      </template>
-                    </div>
-
-                    <!-- Cron description + error -->
-                    <div
-                      v-if="frequencyMode !== 'cron' && checkEveryError"
-                      class="text-input-error-text text-xs"
-                      data-test="alert-check-every-error"
-                      role="alert"
-                    >
-                      {{ checkEveryError }}
-                    </div>
-                    <div
-                      v-if="frequencyMode === 'cron' && cronDescription && !cronError"
-                      class="text-2xs ms-0 italic"
-                      :class="'text-text-secondary'"
-                    >
-                      {{ cronDescription }}
-                    </div>
-                    <div
-                      v-if="frequencyMode === 'cron' && cronError"
-                      class="text-status-error-text text-2xs ms-0"
-                    >
-                      {{ cronError }}
-                    </div>
-                  </div>
-                </OSettingRow>
-              </Teleport>
             </div>
 
             <div
@@ -1286,104 +1181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-sql-having-clause-warning"
             />
 
-            <!-- SQL/PromQL condition rows (scheduled only): Check every + Alert if in one block -->
             <div v-if="isRealTime === 'false'" class="mt-2 flex flex-col gap-0 px-1">
-              <Teleport
-                :to="sectionTargets?.querySchedule"
-                :disabled="!sectionTargets?.querySchedule"
-              >
-                <!-- Check every -->
-                <OSettingRow
-                  :label="t('alerts.queryConfig.checkEvery')"
-                  required
-                  :description="t('alerts.sections.rows.checkEvery')"
-                  fill
-                >
-                  <div class="flex flex-col gap-1">
-                    <div class="flex items-center gap-2">
-                      <template v-if="frequencyMode !== 'cron'">
-                        <OFormInput
-                          :aria-label="t('alerts.queryConfig.checkEvery')"
-                          name="_ui.checkEvery"
-                          data-test="alert-check-every-input"
-                          type="number"
-                          class="max-w-25 min-w-25"
-                          min="1"
-                          @update:model-value="onCheckEveryChange($event)"
-                          @blur="restoreDefaultFrequency"
-                        >
-                          <!-- Message rendered below at row width — see checkEveryError. -->
-                          <template #error />
-                        </OFormInput>
-                      </template>
-                      <template v-else>
-                        <OFormInput
-                          :aria-label="t('alerts.queryConfig.cron')"
-                          name="trigger_condition.cron"
-                          data-test="alert-cron-input"
-                          :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
-                          class="max-w-25 min-w-25"
-                          @update:model-value="onCronExpressionChange"
-                        />
-                      </template>
-                      <OSelect
-                        :aria-label="
-                          t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })
-                        "
-                        class="max-w-25 min-w-20"
-                        :model-value="frequencyMode"
-                        data-test="alert-check-every-unit-select"
-                        :options="frequencyUnitOptions"
-                        labelKey="label"
-                        valueKey="value"
-                        :searchable="false"
-                        @update:model-value="onFrequencyUnitChange"
-                      />
-                      <template v-if="frequencyMode === 'cron'">
-                        <span class="inline-block max-w-37.5 min-w-37.5">
-                          <OFormSelect
-                            :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
-                            name="trigger_condition.timezone"
-                            data-test="alert-cron-timezone-select"
-                            :options="timezoneSelectOptions"
-                            searchable
-                            :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
-                            class="max-w-37.5 min-w-37.5"
-                            @update:model-value="onCronTimezoneChange"
-                          />
-                          <OTooltip
-                            v-if="cronTimezone"
-                            :content="raw(cronTimezone)"
-                            side="bottom"
-                          />
-                        </span>
-                      </template>
-                    </div>
-                    <div
-                      v-if="frequencyMode !== 'cron' && checkEveryError"
-                      class="text-input-error-text text-xs"
-                      data-test="alert-check-every-error"
-                      role="alert"
-                    >
-                      {{ checkEveryError }}
-                    </div>
-                    <div
-                      v-if="frequencyMode === 'cron' && cronDescription && !cronError"
-                      class="text-2xs italic"
-                      :class="'text-text-secondary'"
-                    >
-                      {{ cronDescription }}
-                    </div>
-                    <div
-                      v-if="frequencyMode === 'cron' && cronError"
-                      class="text-status-error-text text-2xs"
-                    >
-                      {{ cronError }}
-                    </div>
-                  </div>
-                </OSettingRow>
-              </Teleport>
-
               <Teleport
                 :to="sectionTargets?.queryCondition"
                 :disabled="!sectionTargets?.queryCondition"
@@ -1799,6 +1597,118 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
+
+        <!-- Section 4's row carries the "Check every" label, so the controls render bare. -->
+        <Teleport
+          v-if="isRealTime === 'false'"
+          :to="sectionTargets?.querySchedule"
+          :disabled="!sectionTargets?.querySchedule"
+        >
+          <template v-if="frequencyMode !== 'cron'">
+            <div class="flex flex-col gap-1">
+              <OFormInput
+                :aria-label="t('alerts.queryConfig.checkEvery')"
+                name="_ui.checkEvery"
+                data-test="alert-check-every-input"
+                type="number"
+                class="max-w-25 min-w-25"
+                min="1"
+                @update:model-value="onCheckEveryChange($event)"
+                @blur="restoreDefaultFrequency"
+              >
+                <template #error />
+              </OFormInput>
+              <div
+                v-if="checkEveryError"
+                class="text-input-error-text text-xs"
+                data-test="alert-check-every-error"
+                role="alert"
+              >
+                {{ checkEveryError }}
+              </div>
+            </div>
+            <OSelect
+              :aria-label="t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })"
+              class="max-w-25 min-w-20"
+              :model-value="frequencyMode"
+              data-test="alert-check-every-unit-select"
+              :options="frequencyUnitOptions"
+              labelKey="label"
+              valueKey="value"
+              :searchable="false"
+              @update:model-value="onFrequencyUnitChange"
+            />
+            <div class="order-last basis-full">
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                icon-left="add"
+                data-test="add-alert-add-cron"
+                @click="useCronSchedule"
+              >
+                {{ t("alerts.tiers.add.cron") }}
+              </OButton>
+            </div>
+          </template>
+          <OSettingRow
+            v-else
+            :label="t('alerts.form.schedule.cronRow')"
+            fill
+            data-test="add-alert-cron-row"
+          >
+            <div class="flex flex-col gap-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <OFormInput
+                  :aria-label="t('alerts.queryConfig.cron')"
+                  name="trigger_condition.cron"
+                  data-test="alert-cron-input"
+                  :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
+                  class="max-w-37.5 min-w-37.5"
+                  @update:model-value="onCronExpressionChange"
+                />
+                <span class="text-text-secondary text-sm">{{
+                  t("alerts.form.schedule.cronIn")
+                }}</span>
+                <span class="inline-block max-w-37.5 min-w-37.5">
+                  <OFormSelect
+                    :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
+                    name="trigger_condition.timezone"
+                    data-test="alert-cron-timezone-select"
+                    :options="timezoneSelectOptions"
+                    searchable
+                    :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
+                    class="max-w-37.5 min-w-37.5"
+                    @update:model-value="onCronTimezoneChange"
+                  />
+                  <OTooltip v-if="cronTimezone" :content="raw(cronTimezone)" side="bottom" />
+                </span>
+                <OButton
+                  variant="ghost-primary"
+                  size="sm"
+                  data-test="add-alert-cron-row-remove"
+                  @click="removeCronSchedule"
+                >
+                  {{ t("common.remove") }}
+                </OButton>
+              </div>
+              <div
+                v-if="cronDescription && !cronError"
+                class="text-text-secondary text-xs"
+                data-test="alert-cron-description"
+              >
+                {{ cronDescription }}
+              </div>
+              <div
+                v-if="cronError"
+                class="text-status-error-text text-xs"
+                role="alert"
+                data-test="alert-cron-error"
+              >
+                {{ cronError }}
+              </div>
+            </div>
+          </OSettingRow>
+        </Teleport>
       </div>
     </div>
 
@@ -3334,10 +3244,10 @@ export default defineComponent({
 
     // computed() so the labels re-resolve on a locale change; the `value`s are
     // the frequency-mode identifiers and stay literal.
+    // Cron is reached from its own "+ Use a cron schedule" link, not the unit list.
     const frequencyUnitOptions = computed(() => [
       { label: t("common.minutes"), value: "minutes" },
       { label: t("common.hours"), value: "hours" },
-      { label: t("alerts.queryConfig.cron"), value: "cron" },
     ]);
 
     const onFrequencyUnitChange = (modelValue: SelectModelValue) => {
@@ -3393,6 +3303,21 @@ export default defineComponent({
         }
       }
       emitTriggerUpdate();
+    };
+
+    let minutesBeforeCron: number | null = null;
+    const useCronSchedule = () => {
+      minutesBeforeCron = Number(fv("trigger_condition.frequency")) || null;
+      onFrequencyUnitChange("cron");
+    };
+    const removeCronSchedule = () => {
+      onFrequencyUnitChange("minutes");
+      if (minutesBeforeCron) {
+        checkEveryFrequency.value = minutesBeforeCron;
+        setStoredFrequency(minutesBeforeCron);
+        emitTriggerUpdate();
+      }
+      minutesBeforeCron = null;
     };
 
     // The `name=` binding owns the write, but this handler runs BEFORE the
@@ -4380,6 +4305,8 @@ export default defineComponent({
       filteredTimezones,
       timezoneSelectOptions,
       onFrequencyUnitChange,
+      useCronSchedule,
+      removeCronSchedule,
       frequencyUnitOptions,
       onCronExpressionChange,
       onCronTimezoneChange,

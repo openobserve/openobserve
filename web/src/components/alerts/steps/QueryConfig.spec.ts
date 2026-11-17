@@ -2511,6 +2511,30 @@ describe("QueryConfig.vue", () => {
       expect([v.trigger_condition.operator, v.trigger_condition.threshold]).toEqual([">", 5]);
     });
 
+    it("+ Use a cron schedule turns the row into Run on cron with a timezone, and Remove returns to the minutes it had", async () => {
+      remount({ ...sectioned });
+      await host.find('[data-test="add-alert-add-cron"]').trigger("click");
+      await flushPromises();
+      expect(hostForm().state.values.trigger_condition.frequency_type).toBe("cron");
+      expect(host.find('[data-test="add-alert-cron-row"]').exists()).toBe(true);
+      expect(host.find('[data-test="alert-cron-timezone-select"]').exists()).toBe(true);
+      await host.find('[data-test="add-alert-cron-row-remove"]').trigger("click");
+      await flushPromises();
+      const tc = hostForm().state.values.trigger_condition;
+      expect([tc.frequency_type, tc.frequency, wrapper.vm.frequencyMode]).toEqual([
+        "minutes",
+        10,
+        "minutes",
+      ]);
+    });
+
+    it("the unit select offers minutes and hours only", () => {
+      expect(wrapper.vm.frequencyUnitOptions.map((o: any) => o.value)).toEqual([
+        "minutes",
+        "hours",
+      ]);
+    });
+
     it("an invalid SQL error shows under the editor with Use 'service'", async () => {
       const sql = "SELECT *\nFROM t\nWHERE servce = 'a'";
       remount(
