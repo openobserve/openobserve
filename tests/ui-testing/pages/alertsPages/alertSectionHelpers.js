@@ -118,6 +118,11 @@ export async function openAlertFilterBuilder(page) {
     return false;
 }
 
+/** A blocked Save no longer toasts; its label counts the issues ("Fix 1 issue"). */
+export async function expectSaveNamesIssues(page) {
+    await expect(page.locator('[data-test="add-alert-submit-btn"]').first()).toHaveText(/Fix \d+ issues?/, { timeout: 15000 });
+}
+
 /** Scrolls a control into view and waits out the scroll event; an OSelect opened in the same frame as a scroll closes again. */
 export async function settleIntoView(page, locator) {
     await locator.first().scrollIntoViewIfNeeded();
@@ -178,6 +183,8 @@ export async function pickAlertDestination(page, destinationName) {
         return;
     }
     await page.locator(DESTINATION_TRIGGER).first().click();
+    const search = page.locator('[data-test="alert-destinations-select-search"]');
+    if (await search.count()) await search.fill(destinationName);
     const choice = page.getByRole('option', { name: destinationName, exact: true });
     await choice.waitFor({ state: 'visible', timeout: 15000 });
     await choice.click();

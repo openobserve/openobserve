@@ -6,6 +6,7 @@ const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js
 import {
   ALERT_NAME_FIELD,
   expandAlertSettingGroups,
+  expectSaveNamesIssues,
   fillAlertName,
   goToAlertSection,
   openAlertFilterBuilder,
@@ -87,6 +88,9 @@ export class AlertSaveQueryModePage {
   async #pickFromDropdown(trigger, optionName) {
     await settleIntoView(this.page, this.page.locator(trigger));
     await this.page.locator(trigger).click();
+    // The option list is virtual: an option past the rendered window is not in the DOM until filtered.
+    const search = this.page.locator(trigger.replace(/-trigger"\]$/, '-search"]'));
+    if (await search.count()) await search.fill(optionName);
     const choice = this.page.getByRole('option', { name: optionName, exact: true });
     await choice.waitFor({ state: 'visible', timeout: 15000 });
     await choice.click();
@@ -290,9 +294,7 @@ export class AlertSaveQueryModePage {
   }
 
   async expectValidationToast() {
-    await expect(
-      this.page.getByText('Please fix the highlighted fields before saving.').first(),
-    ).toBeVisible({ timeout: 15000 });
+    await expectSaveNamesIssues(this.page);
   }
 
   async expectDetailConditionCountOnly() {

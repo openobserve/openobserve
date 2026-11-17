@@ -431,6 +431,9 @@ export class AlertsFormValidationPage {
     testLogger.info('Selecting alert wizard stream name: ' + streamName);
     await this.page.locator(this.wizardStreamNameDropdown).click();
     await this.page.locator(this.wizardStreamNamePopover).waitFor({ state: 'visible', timeout: 10000 });
+    // The option list is virtual: a stream past the rendered window is not in the DOM until filtered.
+    const search = this.page.locator('[data-test="add-alert-stream-name-select-dropdown-search"]');
+    if (await search.count()) await search.fill(streamName);
     await this.getWizardStreamNameOption(streamName).click();
   }
 

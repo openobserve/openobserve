@@ -100,9 +100,7 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.save();
 
       await expect(pm.anomalyDetectionPage.getNameErrorLocator()).toHaveText('Anomaly name is required.');
-      await expect(
-        pm.anomalyDetectionPage.getToastLocator(/fix the highlighted fields/i),
-      ).toBeVisible();
+      await pm.anomalyDetectionPage.expectSaveNamesIssues();
 
       await pm.anomalyDetectionPage.cancel();
     });

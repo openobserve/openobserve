@@ -34,6 +34,7 @@ const { cleanupTestAnomalies: apiCleanupTestAnomalies } = require('../../playwri
 const { discardEditorDraftIfAsked } = require('../alertsPages/editorDraftHelpers.js');
 const {
     expandAlertSettingGroups,
+    expectSaveNamesIssues,
     fillAlertName,
     goToAlertSection,
     openAlertFilterBuilder,
@@ -87,7 +88,7 @@ class AnomalyDetectionPage {
             customSqlRequiredError: '[data-test="anomaly-custom-sql-required-error"]',
             customSqlTimestampError: '[data-test="anomaly-custom-sql-timestamp-alias-error"]',
             detectionFunction: '[data-test="anomaly-detection-function"]',
-            detectionFunctionInfo: '[data-test="anomaly-detection-function-row-info"]',
+            detectionFunctionInfo: '[data-test="anomaly-measure-row-info"]',
             detectionFunctionField: '[data-test="anomaly-detection-function-field"]',
             histogramIntervalValue: '[data-test="anomaly-histogram-interval-value"]',
             histogramIntervalUnit: '[data-test="anomaly-histogram-interval-unit"]',
@@ -834,6 +835,10 @@ class AnomalyDetectionPage {
 
     getSaveBtnLocator() {
         return this.page.locator(this.selectors.saveBtn);
+    }
+
+    async expectSaveNamesIssues() {
+        await expectSaveNamesIssues(this.page);
     }
 
     getNameErrorLocator() {

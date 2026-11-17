@@ -214,7 +214,7 @@ test.describe('Composite alerts — builder', {
   test('C3b · group buttons append parentheses', async ({ page }) => {
     const [a, b, c] = await children(page, 'c3b', 3);
     await openBuilderWith(page, [a, b, c]);
-    await pm.compositeAlertsPage.fillExpression('A &&');
+    await pm.compositeAlertsPage.fillExpression('A AND');
 
     await pm.compositeAlertsPage.expressionOpenGroup().click();
     await pm.compositeAlertsPage.expressionInsert(b.id).click();
