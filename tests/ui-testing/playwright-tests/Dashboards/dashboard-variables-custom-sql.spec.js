@@ -263,22 +263,29 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     await qv.expectOptionValues("svc", fx.ALL_SERVICES);
   });
 
-  test("All on a custom list cut at max records warns that it covers only the listed values", async ({ page }) => {
+  test("All on a custom list cut at max records leaves the panel and a child variable unfiltered", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const svc = customSql(`SELECT DISTINCT service_name FROM "${S}" ORDER BY service_name`, { max_record_size: 2 });
-    const id = await createDashboard([{ ...svc, multiSelect: true, selectAllValueForMultiSelect: "all" }], "service_name IN ($svc)");
+    const ns = fx.queryValuesVariable("ns", {
+      stream_type: "logs", stream: S, field: "k8s_namespace", max_record_size: null,
+      filter: [{ name: "service_name", operator: "=", value: "$svc" }],
+    });
+    const id = await createDashboard([{ ...svc, multiSelect: true, selectAllValueForMultiSelect: "all" }, ns], "service_name IN ($svc)");
     const queries = fx.trackQueries(page);
     await qv.openDashboard(fx.dashboardUrl(id));
 
-    const warning = page.locator('[data-test="variable-query-all-capped-svc"]');
+    const allHint = page.locator('[data-test="variable-query-all-capped-svc"]');
     const hint = page.locator('[data-test="variable-query-capped-svc"]');
-    await expect(warning).toHaveText("All includes only the first 2 values", { timeout: 45000 });
+    await expect(allHint).toHaveText("All also matches values not listed", { timeout: 45000 });
     await expect(hint).toBeHidden();
-    await fx.waitForSearch(queries, /service_name IN \('auth', ?'cart'\)/, { timeout: 45000 });
+    await fx.waitForSearch(queries, /service_name IN \('_o2_all_'\)/, { timeout: 45000 });
+    // Only auth and cart are listed; their namespaces alone would be default and checkout.
+    await qv.expectOptionValues("ns", ["checkout", "default", "monitoring", "payments", "search"]);
 
     await qv.selectOptions("svc", ["auth"]);
-    await expect(warning).toBeHidden();
+    await expect(allHint).toBeHidden();
     await expect(hint).toHaveText("Showing the first 2 values");
+    await qv.expectOptionValues("ns", ["default"]);
   });
 
   test("multi-select, default value choices, All and hide on dashboard work for a custom SQL variable", async ({ page }) => {

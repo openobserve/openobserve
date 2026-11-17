@@ -46,13 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="isQueryVariableAllCapped(item) && !item.queryError"
-          class="text-status-warning-text me-4 flex w-0 min-w-full items-center gap-1 text-xs"
+          class="text-text-secondary text-xs"
           :data-test="`variable-query-all-capped-${item.name}`"
         >
-          <OIcon name="warning-amber" size="xs" class="shrink-0" />
-          <OTruncatedText class="min-w-0 flex-1">{{
-            t("dashboard.queryVariable.cappedAllHint", { count: getQueryVariableMaxRecords(item) })
-          }}</OTruncatedText>
+          {{ t("dashboard.queryVariable.cappedAllHint") }}
         </div>
         <div
           v-else-if="usesQueryVariableLoader(item) && item.queryCapped && !item.queryError"

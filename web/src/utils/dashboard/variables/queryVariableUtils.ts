@@ -394,12 +394,14 @@ export const getQueryVariableAllValues = (
 ): string[] | undefined => {
   if (!isCustomQueryVariable(variable) || !variable?.multiSelect || !holdsAll(variable))
     return undefined;
+  // A capped list leaves values out, so All keeps the placeholder the backend drops as no filter.
+  if (variable.queryCapped) return undefined;
   const values = listedOptionValues(variable);
   if (values.length) return values;
   return hasNoListedValues(variable) ? [QUERY_VARIABLE_NO_VALUES] : undefined;
 };
 
-/** The value panels and child queries should see: "All" on a query variable becomes its listed options. */
+/** The value panels and child queries see: "All" becomes the listed options unless the list is capped. */
 export const resolveQueryVariableValue = (variable: QueryVariableSelectionConfig): any => {
   const allValues = getQueryVariableAllValues(variable);
   if (allValues) return allValues;
@@ -424,7 +426,7 @@ export const isQueryVariableAllPending = (
   holdsAll(variable) &&
   variable?.isVariablePartialLoaded === false;
 
-/** True while "All" stands for a list cut at max records, so panels miss the values past the cut. */
+/** True while "All" is picked on a list cut at max records, so it matches values the list does not show. */
 export const isQueryVariableAllCapped = (variable?: QueryVariableSelectionConfig | null): boolean =>
   isCustomQueryVariable(variable) &&
   !!variable?.multiSelect &&

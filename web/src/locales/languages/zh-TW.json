@@ -9388,7 +9388,7 @@
       "promqlOperatorUnsupported": "Not available for PromQL",
       "promqlFiltersAndOnly": "PromQL filters support AND only. Remove OR and groups, or switch to SQL.",
       "cappedHint": "Showing the first {count} values",
-      "cappedAllHint": "All includes only the first {count} values",
+      "cappedAllHint": "All also matches values not listed",
       "loadFailedReason": "Could not load values: {reason}",
       "undefinedVariables": "Not defined on this dashboard: {names}. These placeholders are sent to the query as written.",
       "unknownError": "Unknown error",

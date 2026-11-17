@@ -730,6 +730,18 @@ describe("query variable 'All'", () => {
     expect(isExplicitQuerySelection(null)).toBe(false);
   });
 
+  it("keeps the unfiltered placeholder once the list is capped, so unlisted values still match", () => {
+    const capped = { ...svc, queryCapped: true };
+    expect(getQueryVariableAllValues(capped)).toBeUndefined();
+    expect(resolveQueryVariableValue(capped)).toEqual([SELECT_ALL_VALUE]);
+    const parents = [{ name: "svc", ...capped, isVariablePartialLoaded: true }];
+    expect(substituteQueryVariables("WHERE s IN ($svc)", parents, "sql")).toBe(
+      `WHERE s IN ('${SELECT_ALL_VALUE}')`,
+    );
+    expect(substituteQueryVariables('up{s=~"$svc"}', parents, "promql")).toBe('up{s=~".*"}');
+    expect(resolveQueryVariableValue({ ...capped, value: ["checkout"] })).toEqual(["checkout"]);
+  });
+
   it("is capped only while All is picked on a custom list cut at max records", () => {
     const capped = { ...svc, queryCapped: true };
     expect(isQueryVariableAllCapped(capped)).toBe(true);

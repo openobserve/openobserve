@@ -19,6 +19,7 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import {
   QUERY_VARIABLE_NO_VALUES,
@@ -172,7 +173,7 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
     wrapper.unmount();
   });
 
-  it("warns instead when All is picked on the capped list, as All covers only those values", async () => {
+  it("keeps All unfiltered on a capped list and says it also matches values not listed", async () => {
     streamReturns([{ svc: "a" }, { svc: "b" }, { svc: "c" }]);
     const wrapper = mountSelector({
       variablesConfig: {
@@ -189,10 +190,10 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
       initialVariableValues: { value: {} },
     });
     await flushPromises();
-    expect(resolveQueryVariableValue(findVariable(wrapper, "service"))).toEqual(["a", "b"]);
-    expect(wrapper.find('[data-test="variable-query-all-capped-service"]').text()).toBe(
-      "All includes only the first 2 values",
-    );
+    expect(resolveQueryVariableValue(findVariable(wrapper, "service"))).toEqual([SELECT_ALL_VALUE]);
+    const hint = wrapper.find('[data-test="variable-query-all-capped-service"]');
+    expect(hint.text()).toBe("All also matches values not listed");
+    expect(hint.classes()).toContain("text-text-secondary");
     expect(wrapper.find('[data-test="variable-query-capped-service"]').exists()).toBe(false);
     wrapper.unmount();
   });
