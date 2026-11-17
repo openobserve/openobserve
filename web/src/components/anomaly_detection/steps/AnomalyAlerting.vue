@@ -25,72 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <OSettingRow
-        :label="t('alerts.priority')"
-        :info="t('alerts.priorityTooltip')"
-        data-test="anomaly-priority-row"
-        fill
-      >
-        <OSelect
-          v-model="configModel.priority"
-          :options="priorityOptions"
-          labelKey="label"
-          valueKey="value"
-          :searchable="false"
-          clearable
-          width="xs"
-          :placeholder="t('alerts.priorityUnset')"
-          :aria-label="t('alerts.priority')"
-          data-test="anomaly-priority-select"
-        />
-      </OSettingRow>
-
-      <OSettingRow
-        :label="t('alerts.tags')"
-        :info="t('alerts.tagsTooltip')"
-        data-test="anomaly-tags-row"
-        fill
-      >
-        <div class="max-w-105">
-          <OTagInput
-            v-model="tagsModel"
-            :aria-label="t('alerts.tags')"
-            :placeholder="t('alerts.placeholders.addTag')"
-            data-test="anomaly-tags-input"
-          />
-        </div>
-      </OSettingRow>
-
-      <OSettingRow
-        :label="t('alerts.anomaly.notifications')"
-        :info="t('alerts.anomaly.notificationsTooltip')"
-        data-test="anomaly-notifications-row"
-        fill
-      >
-        <div class="flex min-h-9 items-center">
-          <span id="anomaly-alert-enabled-heading" class="sr-only">{{
-            t("alerts.anomaly.notifications")
-          }}</span>
-          <OSwitch
-            id="anomaly-alert-enabled-switch"
-            v-model="configModel.alert_enabled"
-            off-tone="neutral"
-            aria-labelledby="anomaly-alert-enabled-heading anomaly-alert-enabled-switch-label"
-            :label="
-              config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')
-            "
-            data-test="anomaly-alert-enabled"
-          />
-        </div>
-        <div
-          v-if="!config.alert_enabled"
-          class="text-text-secondary mt-1 text-xs"
-          data-test="anomaly-notifications-disabled-note"
-        >
-          {{ t("alerts.anomaly.disabledNotificationsInfo") }}
-        </div>
-      </OSettingRow>
-
-      <OSettingRow
         v-if="config.alert_enabled"
         :label="t('alerts.destination')"
         data-test="anomaly-destination-row"
@@ -167,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OSettingRow>
 
       <OSettingRow
-        v-if="config.alert_enabled"
+        v-if="config.alert_enabled && tierShows('anomalyTemplate')"
         :label="t('alerts.templateOverride.label')"
         data-test="anomaly-template-row"
         fill
@@ -183,90 +117,159 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OSettingRow>
 
+      <AlertSentenceRow
+        v-if="!config.alert_enabled"
+        :label="t('alerts.anomaly.notifications')"
+        :description="t('alerts.anomaly.disabledNotificationsInfo')"
+        data-test="anomaly-record-only-row"
+        removable
+        @remove="stopRecordOnly"
+      >
+        {{ t("alerts.tiers.names.anomalyRecordOnly") }}
+      </AlertSentenceRow>
       <OSettingRow
-        :label="t('alerts.anomaly.alertDirection')"
-        :info="t('alerts.anomaly.alertDirectionTooltip')"
-        data-test="anomaly-alert-direction-row"
+        v-else-if="tierShows('anomalyRecordOnly')"
+        :label="t('alerts.tiers.names.anomalyRecordOnly')"
+        data-test="anomaly-notifications-row"
         fill
       >
-        <OSelect
-          v-model="directionModel"
-          :options="directionOptions"
-          labelKey="label"
-          valueKey="value"
-          :searchable="false"
-          width="sm"
-          :aria-label="t('alerts.anomaly.alertDirection')"
-          data-test="anomaly-alert-direction"
-        />
-      </OSettingRow>
-
-      <OSettingRow
-        :label="t('alerts.anomaly.windowShare')"
-        :info="t('alerts.anomaly.windowShareTooltip')"
-        data-test="anomaly-window-share-row"
-        fill
-      >
-        <div class="flex flex-col gap-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <div class="w-36">
-              <OInput
-                v-model="configModel.alert_window_buckets"
-                type="number"
-                :model-modifiers="{ number: true }"
-                :prefix="t('alerts.anomaly.windowBucketsPrefix')"
-                :suffix="t('alerts.anomaly.windowBucketsSuffix')"
-                :aria-label="t('alerts.anomaly.windowBuckets')"
-                :placeholder="raw('1')"
-                :error="!!windowShareErrors.buckets"
-                data-test="anomaly-window-buckets"
-              />
-            </div>
-            <div class="w-33">
-              <OInput
-                v-model="configModel.alert_window_fire_pct"
-                type="number"
-                :model-modifiers="{ number: true }"
-                :prefix="t('alerts.anomaly.windowFirePrefix')"
-                :suffix="percentSuffix"
-                :aria-label="t('alerts.anomaly.windowFirePct')"
-                :placeholder="raw('100')"
-                :error="!!windowShareErrors.fire"
-                data-test="anomaly-window-fire-pct"
-              />
-            </div>
-            <div class="min-w-58 flex-1">
-              <OInput
-                v-model="configModel.alert_window_recover_pct"
-                type="number"
-                :model-modifiers="{ number: true }"
-                :prefix="t('alerts.anomaly.windowRecoverPrefix')"
-                :suffix="percentSuffix"
-                :aria-label="t('alerts.anomaly.windowRecoverPct')"
-                :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
-                :error="!!windowShareErrors.recover"
-                data-test="anomaly-window-recover-pct"
-              />
-            </div>
-          </div>
-          <div
-            v-for="message in windowShareMessages"
-            :key="message"
-            class="text-input-error-text text-xs"
-            data-test="anomaly-window-share-error"
-            role="alert"
-          >
-            {{ message }}
-          </div>
-          <span
-            v-if="!windowShareMessages.length"
-            class="text-text-secondary text-xs"
-            data-test="anomaly-window-share-hint"
-          >
-            {{ windowShareHint }}
-          </span>
+        <div class="flex min-h-9 items-center">
+          <OSwitch
+            :model-value="!config.alert_enabled"
+            off-tone="neutral"
+            :aria-label="t('alerts.tiers.names.anomalyRecordOnly')"
+            data-test="anomaly-alert-enabled"
+            @update:model-value="setRecordOnly(Boolean($event))"
+          />
         </div>
       </OSettingRow>
+
+      <Teleport
+        :to="sectionTargets?.anomalyConditionMore"
+        :disabled="!sectionTargets?.anomalyConditionMore"
+      >
+        <OSettingRow
+          v-if="tierShows('anomalyDirection')"
+          :label="t('alerts.tiers.names.anomalyDirection')"
+          :info="t('alerts.anomaly.alertDirectionTooltip')"
+          data-test="anomaly-alert-direction-row"
+          fill
+        >
+          <OSelect
+            v-model="directionModel"
+            :options="directionOptions"
+            labelKey="label"
+            valueKey="value"
+            :searchable="false"
+            width="sm"
+            :aria-label="t('alerts.anomaly.alertDirection')"
+            data-test="anomaly-alert-direction"
+          />
+        </OSettingRow>
+
+        <OSettingRow
+          v-if="tierShows('anomalyWindow')"
+          :label="t('alerts.tiers.names.anomalyWindow')"
+          :info="t('alerts.anomaly.windowShareTooltip')"
+          data-test="anomaly-window-share-row"
+          fill
+        >
+          <div class="flex flex-col gap-1">
+            <i18n-t
+              keypath="alerts.form.anomaly.windowSentence"
+              tag="div"
+              class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm"
+              data-test="anomaly-window-sentence"
+            >
+              <template #fire>
+                <OInput
+                  v-model="configModel.alert_window_fire_pct"
+                  type="number"
+                  :model-modifiers="{ number: true }"
+                  class="w-20"
+                  :aria-label="t('alerts.anomaly.windowFirePct')"
+                  :placeholder="raw('100')"
+                  :error="!!windowShareErrors.fire"
+                  data-test="anomaly-window-fire-pct"
+                />
+              </template>
+              <template #buckets>
+                <OInput
+                  v-model="configModel.alert_window_buckets"
+                  type="number"
+                  :model-modifiers="{ number: true }"
+                  class="w-20"
+                  :aria-label="t('alerts.anomaly.windowBuckets')"
+                  :placeholder="raw('1')"
+                  :error="!!windowShareErrors.buckets"
+                  data-test="anomaly-window-buckets"
+                />
+              </template>
+              <template #recover>
+                <OInput
+                  v-model="configModel.alert_window_recover_pct"
+                  type="number"
+                  :model-modifiers="{ number: true }"
+                  class="w-32"
+                  :aria-label="t('alerts.anomaly.windowRecoverPct')"
+                  :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
+                  :error="!!windowShareErrors.recover"
+                  data-test="anomaly-window-recover-pct"
+                />
+              </template>
+            </i18n-t>
+            <div
+              v-for="message in windowShareMessages"
+              :key="message"
+              class="text-input-error-text text-xs"
+              data-test="anomaly-window-share-error"
+              role="alert"
+            >
+              {{ message }}
+            </div>
+          </div>
+        </OSettingRow>
+      </Teleport>
+
+      <Teleport :to="sectionTargets?.anomalyDetails" :disabled="!sectionTargets?.anomalyDetails">
+        <OSettingRow
+          v-if="tierShows('anomalyPriority')"
+          :label="t('alerts.priority')"
+          :info="t('alerts.priorityTooltip')"
+          data-test="anomaly-priority-row"
+          fill
+        >
+          <OSelect
+            v-model="configModel.priority"
+            :options="priorityOptions"
+            labelKey="label"
+            valueKey="value"
+            :searchable="false"
+            clearable
+            width="xs"
+            :placeholder="t('alerts.priorityUnset')"
+            :aria-label="t('alerts.priority')"
+            data-test="anomaly-priority-select"
+          />
+        </OSettingRow>
+
+        <OSettingRow
+          v-if="tierShows('anomalyTags')"
+          :label="t('alerts.tags')"
+          :info="t('alerts.tagsTooltip')"
+          data-test="anomaly-tags-row"
+          fill
+        >
+          <div class="max-w-105">
+            <OTagInput
+              v-model="tagsModel"
+              :aria-label="t('alerts.tags')"
+              :placeholder="t('alerts.placeholders.addTag')"
+              data-test="anomaly-tags-input"
+            />
+          </div>
+        </OSettingRow>
+      </Teleport>
     </div>
   </div>
 </template>
@@ -286,13 +289,14 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
 import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
+import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useTierVisibility,
+} from "@/composables/alerts/useAlertSettingTiers";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
-import {
-  ANOMALY_DIRECTION_KEYS,
-  anomalyWindowShareEffective,
-  anomalyWindowShareErrors,
-} from "./AnomalyDetectionConfig.schema";
+import { ANOMALY_DIRECTION_KEYS, anomalyWindowShareErrors } from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
   name: "AnomalyAlerting",
@@ -306,6 +310,7 @@ export default defineComponent({
     OTag,
     OSettingRow,
     TemplateOverridePicker,
+    AlertSentenceRow,
   },
 
   props: {
@@ -331,7 +336,8 @@ export default defineComponent({
     const store = useStore();
     // The sectioned alert editor provides this; its rows sit flat on the page instead of in a card.
     const bare = inject(SETTING_ROW_BARE_KEY, false);
-    const percentSuffix = raw("%");
+    const tierShows = useTierVisibility();
+    const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
 
     // Alias for the config prop; same reference, mutation stays identical.
     const configModel = computed(() => props.config);
@@ -380,10 +386,6 @@ export default defineComponent({
         .map((key) => t(key as any)),
     );
 
-    const windowShareHint = computed(() =>
-      t("alerts.anomaly.windowShareHint", anomalyWindowShareEffective(props.config)),
-    );
-
     // One name reads better than "1 destination"; more than one is a count.
     const destinationStatus = computed(() => {
       const ids = props.config.alert_destination_ids;
@@ -429,6 +431,16 @@ export default defineComponent({
       configModel.value.template_error = null;
     };
 
+    const setRecordOnly = (on: boolean) => {
+      configModel.value.alert_enabled = !on;
+    };
+
+    // Turning notifications back on returns the setting to its More options line.
+    const stopRecordOnly = () => {
+      setRecordOnly(false);
+      tiers?.conceal("anomalyRecordOnly");
+    };
+
     const openAddDestination = () => {
       const route = router.resolve({
         name: "alertDestinations",
@@ -442,7 +454,9 @@ export default defineComponent({
       raw,
       store,
       bare,
-      percentSuffix,
+      tierShows,
+      setRecordOnly,
+      stopRecordOnly,
       configModel,
       priorityOptions,
       tagsModel,
@@ -455,7 +469,6 @@ export default defineComponent({
       directionModel,
       windowShareErrors,
       windowShareMessages,
-      windowShareHint,
     };
   },
 });

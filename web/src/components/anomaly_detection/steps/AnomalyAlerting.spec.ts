@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { reactive, ref } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -35,6 +36,16 @@ vi.mock("@/services/alert_templates", () => ({
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import templateService from "@/services/alert_templates";
 import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
+import {
+  alertTierContext,
+  tierAvailable,
+  tierIsSet,
+  type AlertSettingId,
+} from "@/components/alerts/alertSettingTiers";
 
 const makeConfig = (overrides: Record<string, any> = {}) => ({
   alert_enabled: true,
@@ -165,26 +176,12 @@ describe("AnomalyAlerting - direction and window share", () => {
     expect(config.alert_direction).toBe("above");
   });
 
-  it("states the rule with the server defaults filled in for blank inputs", async () => {
-    const w = await mountComp({
-      config: makeConfig({
-        alert_window_buckets: 5,
-        alert_window_fire_pct: 80,
-        alert_window_recover_pct: null,
-      }),
-    });
-    expect(w.find('[data-test="anomaly-window-share-hint"]').text()).toBe(
-      t("alerts.anomaly.windowShareHint", { buckets: 5, fire: 80, recover: 80 }),
-    );
-  });
-
-  it("flags a recover share above the fire share instead of stating the rule", async () => {
+  it("flags a recover share above the fire share", async () => {
     const w = await mountComp({
       config: makeConfig({ alert_window_fire_pct: 50, alert_window_recover_pct: 60 }),
     });
     const errors = w.findAll('[data-test="anomaly-window-share-error"]');
     expect(errors.map((e) => e.text())).toEqual([t("alerts.anomaly.windowRecoverRange")]);
-    expect(w.find('[data-test="anomaly-window-share-hint"]').exists()).toBe(false);
   });
 
   it("flags a bucket count below 1", async () => {
@@ -192,17 +189,6 @@ describe("AnomalyAlerting - direction and window share", () => {
     expect(w.find('[data-test="anomaly-window-share-error"]').text()).toBe(
       t("alerts.anomaly.windowBucketsRange"),
     );
-  });
-
-  it("names the notifications switch after its row label and state", async () => {
-    const w = await mountComp({ config: makeConfig({ alert_enabled: true }) });
-    const btn = w.find('[role="switch"]');
-    const name = btn
-      .attributes("aria-labelledby")!
-      .split(" ")
-      .map((id) => w.find(`#${id}`).text())
-      .join(" ");
-    expect(name).toBe("Notifications Enabled");
   });
 });
 
@@ -228,13 +214,13 @@ describe("AnomalyAlerting - template override", () => {
 
 describe("AnomalyAlerting - setting rows", () => {
   const rowTests = [
-    "anomaly-priority-row",
-    "anomaly-tags-row",
-    "anomaly-notifications-row",
     "anomaly-destination-row",
     "anomaly-template-row",
+    "anomaly-notifications-row",
     "anomaly-alert-direction-row",
     "anomaly-window-share-row",
+    "anomaly-priority-row",
+    "anomaly-tags-row",
   ];
 
   it("lays every setting out as a flat row inside the sectioned editor", async () => {
@@ -250,17 +236,14 @@ describe("AnomalyAlerting - setting rows", () => {
     expect(w.find(".step-content").classes()).toContain("border");
   });
 
-  it("puts the three window share inputs in one row, each named for screen readers", async () => {
+  it("puts the three window share inputs in one sentence, each named for screen readers", async () => {
     const w = await mountComp();
-    const row = w.find('[data-test="anomaly-window-share-row"]');
-    const inputs = row.findAll("input");
+    const inputs = w.find('[data-test="anomaly-window-sentence"]').findAll("input");
     expect(inputs.map((i) => i.attributes("aria-label"))).toEqual([
-      i18n.global.t("alerts.anomaly.windowBuckets"),
       i18n.global.t("alerts.anomaly.windowFirePct"),
+      i18n.global.t("alerts.anomaly.windowBuckets"),
       i18n.global.t("alerts.anomaly.windowRecoverPct"),
     ]);
-    expect(row.text()).toContain(i18n.global.t("alerts.anomaly.windowBucketsPrefix"));
-    expect(row.text()).toContain(i18n.global.t("alerts.anomaly.windowBucketsSuffix"));
   });
 
   it("writes a typed bucket count back into the config as a number", async () => {
@@ -276,5 +259,77 @@ describe("AnomalyAlerting - setting rows", () => {
     await w.find('[data-test="anomaly-add-destination"]').trigger("click");
     expect(openSpy).toHaveBeenCalledWith("/alerts/destinations", "_blank");
     openSpy.mockRestore();
+  });
+});
+
+describe("AnomalyAlerting - in the sectioned editor", () => {
+  const anomalyCtx = alertTierContext({
+    isRealTime: "anomaly",
+    aggregate: false,
+    incidentsEnabled: false,
+    oncallEnabled: false,
+    suppressRepeatsEnabled: false,
+  });
+
+  async function mountSectioned(overrides: Record<string, any> = {}) {
+    const config = reactive(makeConfig(overrides));
+    const targets = {
+      anomalyConditionMore: document.createElement("div"),
+      anomalyDetails: document.createElement("div"),
+    };
+    const tiers = useAlertSettingTiers({
+      available: (id) => tierAvailable(id, anomalyCtx),
+      isSet: (id) => tierIsSet(id, { form: {}, anomaly: config }),
+      showAll: ref(false),
+    });
+    const w = await mountComp(
+      { config, sectionTargets: targets },
+      { [ALERT_SETTING_TIERS_KEY]: tiers, [SETTING_ROW_BARE_KEY]: true },
+    );
+    return { w, config, targets, tiers };
+  }
+
+  it.each<[AlertSettingId, string, "anomalyConditionMore" | "anomalyDetails"]>([
+    ["anomalyDirection", "anomaly-alert-direction-row", "anomalyConditionMore"],
+    ["anomalyWindow", "anomaly-window-share-row", "anomalyConditionMore"],
+    ["anomalyPriority", "anomaly-priority-row", "anomalyDetails"],
+    ["anomalyTags", "anomaly-tags-row", "anomalyDetails"],
+  ])("%s renders in its own section only after More options", async (id, row, slot) => {
+    const { w, targets, tiers } = await mountSectioned();
+    expect(targets[slot].querySelector(`[data-test="${row}"]`)).toBeNull();
+    tiers.reveal(id);
+    await flushPromises();
+    expect(targets[slot].querySelector(`[data-test="${row}"]`)).not.toBeNull();
+    expect(w.find(`[data-test="${row}"]`).exists()).toBe(false);
+  });
+
+  it("record only replaces the destination rows, and Remove brings them back", async () => {
+    const { w, config, tiers } = await mountSectioned();
+    expect(w.find('[data-test="anomaly-notifications-row"]').exists()).toBe(false);
+    tiers.reveal("anomalyRecordOnly");
+    await flushPromises();
+    const toggle = w.find('[data-test="anomaly-notifications-row"] [role="switch"]');
+    expect(toggle.attributes("aria-label")).toBe(
+      i18n.global.t("alerts.tiers.names.anomalyRecordOnly"),
+    );
+    await toggle.trigger("click");
+    await flushPromises();
+    expect(config.alert_enabled).toBe(false);
+    expect(w.find('[data-test="anomaly-destination-row"]').exists()).toBe(false);
+    expect(w.find('[data-test="anomaly-record-only-row"]').exists()).toBe(true);
+
+    await w.find('[data-test="anomaly-record-only-row-remove"]').trigger("click");
+    await flushPromises();
+    expect(config.alert_enabled).toBe(true);
+    expect(w.find('[data-test="anomaly-destination-row"]').exists()).toBe(true);
+    expect(tiers.isVisible("anomalyRecordOnly")).toBe(false);
+  });
+
+  it("shows the template row only once its message link added it", async () => {
+    const { w, tiers } = await mountSectioned();
+    expect(w.find('[data-test="anomaly-template-row"]').exists()).toBe(false);
+    tiers.reveal("anomalyTemplate");
+    await flushPromises();
+    expect(w.find('[data-test="anomaly-template-row"]').exists()).toBe(true);
   });
 });
