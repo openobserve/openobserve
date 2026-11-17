@@ -29,7 +29,7 @@ use chrono::{TimeZone, Utc};
 #[cfg(feature = "enterprise")]
 use config::meta::promql::DownsamplingRule;
 use config::{
-    Config,
+    get_config,
     meta::stream::{
         FileKey, MergeStrategy, PartitionTimeLevel, StreamParams, StreamSettings, StreamType,
     },
@@ -45,8 +45,8 @@ use super::job::{job_range_end, scheduling_level};
 pub(super) type PlannedBatch = (Vec<FileKey>, MergeMode);
 
 /// The size rules one merge round batches files under.
-pub(super) struct BatchLimits<'a> {
-    pub strategy: &'a MergeStrategy,
+pub(super) struct BatchLimits {
+    pub strategy: MergeStrategy,
     pub max_file_size: usize,
     pub max_group_files: usize,
     /// The hour is still open: an unfilled trailing group waits for more files.
@@ -57,14 +57,11 @@ pub(super) struct BatchLimits<'a> {
     pub max_merge_groups: usize,
 }
 
-impl<'a> BatchLimits<'a> {
-    pub(super) fn from_config(
-        cfg: &Config,
-        strategy: &'a MergeStrategy,
-        is_incremental: bool,
-    ) -> Self {
+impl BatchLimits {
+    pub(super) fn from_config(is_incremental: bool) -> Self {
+        let cfg = get_config();
         Self {
-            strategy,
+            strategy: MergeStrategy::from(&cfg.compact.strategy),
             max_file_size: cfg.compact.max_file_size,
             max_group_files: cfg.compact.max_group_files,
             is_incremental,
@@ -127,9 +124,10 @@ impl MergePolicy {
     pub(super) async fn plan(
         &self,
         files: Vec<FileKey>,
-        limits: &BatchLimits<'_>,
+        limits: &BatchLimits,
         schema: &Arc<Schema>,
     ) -> RoundPlan {
+        let files = sort_for_strategy(files, &limits.strategy);
         let mut plan = match &self.rule {
             MergeRule::SizeBounded(mode) => size_bounded::plan(&files, limits, mode),
             MergeRule::MetricsOpenHour => metrics_open_hour::plan(files, limits),
@@ -212,10 +210,10 @@ impl MergeRule {
 /// Stream identity, scheduling state and file-query dates for one merge job.
 /// The query range may be wider than the scheduled job range.
 #[derive(Debug)]
-pub(super) struct MergeWindow {
-    pub(super) org_id: String,
-    pub(super) stream_type: StreamType,
-    pub(super) stream_name: String,
+pub(crate) struct MergeWindow {
+    pub(crate) org_id: String,
+    pub(crate) stream_type: StreamType,
+    pub(crate) stream_name: String,
     pub(super) offset: i64,
     pub(super) job_end: i64,
     pub(super) is_incremental: bool,
@@ -277,10 +275,10 @@ fn split_legacy_metrics(files: Vec<FileKey>) -> (Vec<FileKey>, Vec<FileKey>) {
 }
 
 /// The classic size-bounded merges the legacy files of a metrics-index hour keep.
-fn legacy_batches(mut files: Vec<FileKey>, limits: &BatchLimits<'_>) -> Vec<PlannedBatch> {
+fn legacy_batches(mut files: Vec<FileKey>, limits: &BatchLimits) -> Vec<PlannedBatch> {
     // a whole-hour query lists every file; the classic merge never rewrites the full-sized ones
     files.retain(|f| f.meta.original_size <= limits.merge_max_original_size);
-    size_bounded::batches(&files, limits, &MergeMode::Classic)
+    size_bounded::plan(&files, limits, &MergeMode::Classic).batches
 }
 
 /// `files` in chunks of at most `max_files` (0: one chunk); a lone trailing file is left out.
@@ -294,6 +292,43 @@ fn mergeable_chunks(files: Vec<FileKey>, max_files: usize) -> Vec<Vec<FileKey>> 
         .filter(|chunk| chunk.len() > 1)
         .map(<[FileKey]>::to_vec)
         .collect()
+}
+
+fn sort_for_strategy(mut files: Vec<FileKey>, strategy: &MergeStrategy) -> Vec<FileKey> {
+    match strategy {
+        MergeStrategy::FileSize => files.sort_by_key(|k| k.meta.original_size),
+        MergeStrategy::FileTime => files.sort_by_key(|k| k.meta.min_ts),
+        MergeStrategy::TimeRange => files = sort_by_time_range(files),
+    }
+    files
+}
+
+fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
+    let files_num = file_list.len();
+    file_list.sort_by_key(|f| f.meta.min_ts);
+    let mut groups: Vec<Vec<FileKey>> = Vec::with_capacity(files_num);
+    for file in file_list {
+        let mut inserted = None;
+        for (i, group) in groups.iter().enumerate() {
+            if group
+                .last()
+                .is_some_and(|f| file.meta.min_ts >= f.meta.max_ts)
+            {
+                inserted = Some(i);
+                break;
+            }
+        }
+        if let Some(i) = inserted {
+            groups[i].push(file);
+        } else {
+            groups.push(vec![file]);
+        }
+    }
+    let mut files = Vec::with_capacity(files_num);
+    for group in groups {
+        files.extend(group);
+    }
+    files
 }
 
 #[cfg(test)]
@@ -336,9 +371,9 @@ mod tests {
         strategy: &MergeStrategy,
         max_group_files: usize,
         is_incremental: bool,
-    ) -> BatchLimits<'_> {
+    ) -> BatchLimits {
         BatchLimits {
-            strategy,
+            strategy: strategy.clone(),
             max_file_size: 1000,
             max_group_files,
             is_incremental,
@@ -591,5 +626,76 @@ mod tests {
         assert_eq!(policy.window().date_end, "2026/08/18/23");
         assert_eq!(policy.window().job_end, day() + hour_micros(6) - 1);
         assert!(!policy.window().merges_by_day);
+    }
+
+    fn sorted_positions(ranges: &[(i64, i64)]) -> Vec<usize> {
+        let files = ranges
+            .iter()
+            .enumerate()
+            .map(|(i, (min_ts, max_ts))| create_file_key(&i.to_string(), *min_ts, *max_ts, 1024))
+            .collect();
+        sort_by_time_range(files)
+            .iter()
+            .map(|f| f.key.parse().unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn test_sort_by_time_range_orders_non_overlapping_files_by_time() {
+        assert!(sorted_positions(&[]).is_empty());
+        assert_eq!(sorted_positions(&[(42, 42)]), [0]);
+        // a file starting where the previous one ends does not overlap it
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (2000, 3000), (3000, 4000)]),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            sorted_positions(&[(4000, 5000), (3000, 4000), (2000, 3000), (1000, 2000)]),
+            [3, 2, 1, 0]
+        );
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (5000, 6000), (3000, 4000)]),
+            [0, 2, 1]
+        );
+        assert_eq!(
+            sorted_positions(&[(-2000, -1000), (-1000, 0), (0, 1000)]),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            sorted_positions(&[(1000, 1000), (1000, 2000), (2000, 2000)]),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            sorted_positions(&[
+                (i64::MAX - 1000, i64::MAX),
+                (i64::MIN, i64::MIN),
+                (i64::MIN, 0)
+            ]),
+            [1, 2, 0]
+        );
+    }
+
+    #[test]
+    fn test_sort_by_time_range_chains_overlapping_files() {
+        // one unit of overlap opens a second chain; the next file rejoins the first
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (1999, 3000), (2000, 2500)]),
+            [0, 2, 1]
+        );
+        // two interleaved chains come out one after the other
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (1500, 2500), (2000, 3000), (2500, 3500)]),
+            [0, 2, 1, 3]
+        );
+        // a file joins the first chain it fits
+        assert_eq!(
+            sorted_positions(&[(100, 200), (150, 300), (200, 400), (300, 500), (600, 700)]),
+            [0, 2, 4, 1, 3]
+        );
+        // files of one range are a chain each, in input order
+        assert_eq!(sorted_positions(&[(500, 1500); 4]), [0, 1, 2, 3]);
+        assert_eq!(sorted_positions(&[(1000, 3000), (1000, 2000)]), [0, 1]);
+        // an inverted range is kept, not dropped
+        assert_eq!(sorted_positions(&[(1000, 3000), (5000, 2000)]), [0, 1]);
     }
 }

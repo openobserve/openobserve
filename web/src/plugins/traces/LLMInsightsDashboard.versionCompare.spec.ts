@@ -24,7 +24,8 @@
 // vi.mock() calls — hoisted above imports.
 // ---------------------------------------------------------------------------
 
-const mockFetchAll = vi.fn(async () => {});
+// Like the real composable: resolves to this call's snapshot.
+const mockFetchAll = vi.fn(async () => ({ kpi: {}, sparklines: {} }));
 const mockCancelAll = vi.fn();
 const mockGetStreams = vi.fn().mockResolvedValue({
   list: [{ name: "default", settings: { is_llm_stream: true } }],
@@ -66,6 +67,7 @@ vi.mock("./composables/useLLMInsights", () => ({
     sparklines: mockSparklines,
     loading: mockLoading,
     p95Loading: mockP95Loading,
+    p95Unavailable: ref(false),
     error: mockError,
     hasLoadedOnce: mockHasLoadedOnce,
     availableStreams: mockAvailableStreams,
@@ -406,10 +408,13 @@ describe("LLMInsightsDashboard — compare mode surfaces", () => {
     // Exit restores the single-select body — emit VersionCompareView's real
     // @exit event directly (equivalent to clicking VersionCompareBar's exit
     // button, which is covered by VersionCompareBar's own component spec).
+    mockCancelAll.mockClear();
     await wrapper.findComponent({ name: "VersionCompareView" }).vm.$emit("exit");
     await flushPromises();
 
     expect(wrapper.find('[data-test="llm-insights-compare-view"]').exists()).toBe(false);
+    // Exit cancels both arms' queries, so a run in flight cannot write into the next compare.
+    expect(mockCancelAll).toHaveBeenCalledTimes(2);
   });
 
   it("auto-exits compare mode when the agent name changes — no stale comparison lingers", async () => {
