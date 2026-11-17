@@ -12,22 +12,16 @@ const mountTimeline = (frequency: number, period: number) =>
   });
 
 describe("AlertCheckTimeline", () => {
-  it("says how often it checks and how much data each check reads", () => {
-    const wrapper = mountTimeline(10, 30);
+  it.each([
+    [10, 30, "overlap", 20],
+    [10, 10, "equal", 0],
+    [10, 5, "gaps", 5],
+  ] as const)("every %i min looking at %i min reads as %s", (frequency, period, kind, minutes) => {
+    const wrapper = mountTimeline(frequency, period);
     expect(wrapper.get('[data-test="add-alert-check-timeline-caption"]').text()).toBe(
-      "Every 10 min we read the last 30 min of data.",
+      i18n.global.t(`alerts.form.schedule.${kind}`, { period, minutes }),
     );
-    expect(wrapper.text()).toContain("Now");
-    expect(wrapper.text()).toContain("40 min ago");
-  });
-
-  it("warns when events can fall between two checks", () => {
-    expect(mountTimeline(10, 5).find('[data-test="add-alert-check-timeline-gap"]').exists()).toBe(
-      true,
-    );
-    expect(mountTimeline(10, 10).find('[data-test="add-alert-check-timeline-gap"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.text()).toContain(i18n.global.t("alerts.sections.timeline.now"));
   });
 
   it("draws the read window back from now, stopping at the edge of the line", () => {

@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import { scheduleOverlap, type ScheduleOverlapKind } from "@/utils/alerts/scheduleOverlap";
 
 const props = defineProps<{
   /** Minutes between checks. */
@@ -32,6 +33,11 @@ const MID = HEIGHT / 2;
 const TICKS = 5;
 const STEP = WIDTH / TICKS;
 const NOW_X = WIDTH - STEP / 2;
+const CAPTION: Record<ScheduleOverlapKind, I18nKey> = {
+  overlap: "alerts.form.schedule.overlap",
+  equal: "alerts.form.schedule.equal",
+  gaps: "alerts.form.schedule.gaps",
+};
 
 const { t } = useI18nTyped();
 
@@ -51,7 +57,7 @@ const ticks = computed(() =>
 const bandStart = computed(() =>
   Math.max(0, NOW_X - (props.period / Math.max(props.frequency, 1)) * STEP),
 );
-const hasGaps = computed(() => props.period < props.frequency);
+const overlap = computed(() => scheduleOverlap(props.period, props.frequency));
 </script>
 
 <template>
@@ -84,14 +90,7 @@ const hasGaps = computed(() => props.period < props.frequency);
       <span v-for="tick in ticks" :key="tick.x">{{ tick.label }}</span>
     </div>
     <p class="text-text-body m-0 mt-2 text-sm" data-test="add-alert-check-timeline-caption">
-      {{ t("alerts.sections.timeline.caption", { frequency, period }) }}
-    </p>
-    <p
-      v-if="hasGaps"
-      class="text-text-secondary m-0 mt-1 text-xs"
-      data-test="add-alert-check-timeline-gap"
-    >
-      {{ t("alerts.sections.timeline.gap") }}
+      {{ t(CAPTION[overlap.kind], { period, minutes: overlap.minutes }) }}
     </p>
   </OSettingRow>
 </template>
