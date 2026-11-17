@@ -69,7 +69,7 @@ test.describe('Clone Alert dialog testcases', {
   // The default folder accumulates alerts across parallel runs, so a row is
   // only addressable after searching for it.
   async function openAlertList(page, name) {
-    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&folder=default`);
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&folder=default&state=all`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await pm.alertsPage.searchAlert(name);
   }

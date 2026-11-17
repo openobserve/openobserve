@@ -359,6 +359,12 @@ mod tests {
         ) -> Result<Response<Self::DataStream>, Status> {
             Ok(Response::new(futures::stream::empty()))
         }
+        async fn wal_min_ts(
+            &self,
+            _: Request<cluster_rpc::WalMinTsRequest>,
+        ) -> Result<Response<cluster_rpc::WalMinTsResponse>, Status> {
+            Err(Status::unimplemented("wal_min_ts"))
+        }
     }
 
     struct WarnRecorder(Arc<Mutex<usize>>);

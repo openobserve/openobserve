@@ -31,6 +31,7 @@ import {
   hasMetricsOverrideParams,
 } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES, redirectHeatmaps } from "@/utils/rum/productAnalyticsRoutes";
+import { ALERT_LIST_ALL_FOLDERS } from "@/utils/alerts/alertListLink";
 import { endSignedInSession } from "@/utils/drafts/signOutFlow";
 import { silenceUnloadPrompts } from "@/utils/sessionServices";
 import {
@@ -203,7 +204,6 @@ const LogStream = () => import("@/views/LogStream.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const PublicDashboardLinks = () => import("@/views/Dashboards/PublicLinks.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
-const FiringAlerts = () => import("@/components/alerts/FiringAlerts.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
@@ -1009,16 +1009,20 @@ const useRoutes = () => {
       },
     },
     {
+      // Old Firing bookmarks land on the same rows: the list's Firing tile across every folder.
       path: "alerts/firing",
-      name: "alertFiring",
-      component: FiringAlerts,
-      meta: {
-        titleKey: "alerts.firing.title",
-        licenseFeature: "alerts",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
+      redirect: (to: any) =>
+        // A bookmark naming one alert opens that alert's page, where its firing detail lives.
+        typeof to.query.alert === "string" && to.query.alert
+          ? {
+              name: "alertDetail",
+              params: { alert_id: to.query.alert },
+              query: { org_identifier: to.query.org_identifier },
+            }
+          : {
+              name: "alertList",
+              query: { ...to.query, state: "firing", all_folders: ALERT_LIST_ALL_FOLDERS },
+            },
     },
     {
       // Notification destinations and templates: alerting configuration, so

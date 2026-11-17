@@ -126,6 +126,21 @@ fn get_table_idx(thread_id: usize, org_id: &str, stream_name: &str) -> usize {
     }
 }
 
+fn stream_bucket_indices(org_id: &str, stream_name: &str) -> Vec<usize> {
+    let cfg = get_config();
+    if cfg.limit.mem_table_bucket_num <= 1 {
+        return vec![get_table_idx(0, org_id, stream_name)];
+    }
+    let mut indices = Vec::with_capacity(cfg.limit.mem_table_bucket_num);
+    for thread_id in 0..cfg.limit.http_worker_num {
+        let idx = get_table_idx(thread_id, org_id, stream_name);
+        if !indices.contains(&idx) {
+            indices.push(idx);
+        }
+    }
+    indices
+}
+
 /// Get a writer for a given org_id and stream_type
 pub async fn get_writer(
     thread_id: usize,
@@ -197,13 +212,7 @@ pub async fn read_from_memtable(
     // slow path
     let mut ids = HashSet::new();
     let mut batches = Vec::new();
-    let mut visited = HashSet::with_capacity(cfg.limit.mem_table_bucket_num);
-    for thread_id in 0..cfg.limit.http_worker_num {
-        let idx = get_table_idx(thread_id, org_id, stream_name);
-        if visited.contains(&idx) {
-            continue;
-        }
-        visited.insert(idx);
+    for idx in stream_bucket_indices(org_id, stream_name) {
         let key = WriterKey::new(idx, org_id, stream_type);
         let w = WRITERS[idx].read().await;
         if let Some(r) = w.get(&key)
@@ -216,6 +225,25 @@ pub async fn read_from_memtable(
         }
     }
     Ok((ids, batches))
+}
+
+/// Oldest timestamp held by the current memtables of a stream, across all its writer buckets.
+pub(crate) async fn memtable_min_ts(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+) -> Option<i64> {
+    let mut min_ts = None;
+    for idx in stream_bucket_indices(org_id, stream_name) {
+        let key = WriterKey::new(idx, org_id, stream_type);
+        let w = WRITERS[idx].read().await;
+        if let Some(r) = w.get(&key)
+            && let Some(ts) = r.memtable.read().await.min_ts(org_id, stream_name)
+        {
+            min_ts = Some(min_ts.map_or(ts, |m: i64| m.min(ts)));
+        }
+    }
+    min_ts
 }
 
 pub async fn check_ttl() -> Result<()> {
@@ -768,6 +796,63 @@ mod tests {
 
         assert_ne!(writer.memtable.read().await.id(), old_id);
         assert!(IMMUTABLES.write().await.swap_remove(&old_wal).is_some());
+        let new_wal = writer.wal.read().await.path().clone();
+        let _ = std::fs::remove_file(old_wal);
+        let _ = std::fs::remove_file(new_wal);
+    }
+
+    async fn write_ts(writer: &Writer, org_id: &str, stream: &str, ts: Vec<i64>) {
+        use arrow::{array::Int64Array, record_batch::RecordBatch};
+        use arrow_schema::{DataType, Field};
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            config::TIMESTAMP_COL_NAME,
+            DataType::Int64,
+            false,
+        )]));
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int64Array::from(ts))]).unwrap();
+        let batch = crate::entry::RecordBatchEntry::new("metrics".into(), batch, 10, 10);
+        let entry = Entry {
+            org_id: org_id.into(),
+            stream: stream.into(),
+            schema_key: "hash_a".into(),
+            partition_key: "2026/10/15/00".into(),
+            ..Entry::new()
+        };
+        writer
+            .memtable
+            .write()
+            .await
+            .write(schema, entry, batch)
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_wal_min_ts_covers_memtable_and_immutable() {
+        let (org, stream) = ("wal_min_ts_org", "wal_min_ts_stream");
+        assert_eq!(crate::wal_min_ts(org, "metrics", stream).await, None);
+
+        let writer = get_writer(0, org, "metrics", stream).await;
+        write_ts(&writer, org, stream, vec![900, 400]).await;
+        assert_eq!(memtable_min_ts(org, "metrics", stream).await, Some(400));
+        assert_eq!(memtable_min_ts(org, "metrics", "other").await, None);
+
+        let old_wal = writer.wal.read().await.path().clone();
+        writer
+            .rotate_locked(writer.wal.write().await)
+            .await
+            .unwrap();
+        assert_eq!(memtable_min_ts(org, "metrics", stream).await, None);
+        assert_eq!(crate::wal_min_ts(org, "metrics", stream).await, Some(400));
+
+        write_ts(&writer, org, stream, vec![500, 200]).await;
+        assert_eq!(crate::wal_min_ts(org, "metrics", stream).await, Some(200));
+        assert_eq!(crate::wal_min_ts(org, "logs", stream).await, None);
+
+        assert!(IMMUTABLES.write().await.swap_remove(&old_wal).is_some());
+        assert_eq!(crate::wal_min_ts(org, "metrics", stream).await, Some(200));
+        WRITERS[writer.idx].write().await.remove(&writer.key);
         let new_wal = writer.wal.read().await.path().clone();
         let _ = std::fs::remove_file(old_wal);
         let _ = std::fs::remove_file(new_wal);

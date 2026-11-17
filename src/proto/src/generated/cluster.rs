@@ -511,6 +511,19 @@ pub mod event_server {
         const NAME: &'static str = SERVICE_NAME;
     }
 }
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct WalMinTsRequest {
+    #[prost(string, tag = "1")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag = "2")]
+    pub streams: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct WalMinTsResponse {
+    /// key: stream name, 0 means nothing unflushed
+    #[prost(map = "string, int64", tag = "1")]
+    pub min_ts: ::std::collections::HashMap<::prost::alloc::string::String, i64>,
+}
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct MetricsQueryRequest {
@@ -755,6 +768,28 @@ pub mod metrics_client {
             req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "Data"));
             self.inner.server_streaming(req, path, codec).await
         }
+        /// Oldest timestamp of each metrics stream's data not yet uploaded by this node, from metadata only
+        pub async fn wal_min_ts(
+            &mut self,
+            request: impl tonic::IntoRequest<super::WalMinTsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::WalMinTsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/cluster.Metrics/WalMinTs");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "WalMinTs"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -788,6 +823,14 @@ pub mod metrics_server {
             &self,
             request: tonic::Request<super::MetricsQueryRequest>,
         ) -> std::result::Result<tonic::Response<Self::DataStream>, tonic::Status>;
+        /// Oldest timestamp of each metrics stream's data not yet uploaded by this node, from metadata only
+        async fn wal_min_ts(
+            &self,
+            request: tonic::Request<super::WalMinTsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::WalMinTsResponse>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct MetricsServer<T> {
@@ -952,6 +995,49 @@ pub mod metrics_server {
                                 max_encoding_message_size,
                             );
                         let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Metrics/WalMinTs" => {
+                    #[allow(non_camel_case_types)]
+                    struct WalMinTsSvc<T: Metrics>(pub Arc<T>);
+                    impl<T: Metrics> tonic::server::UnaryService<super::WalMinTsRequest>
+                    for WalMinTsSvc<T> {
+                        type Response = super::WalMinTsResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::WalMinTsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Metrics>::wal_min_ts(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = WalMinTsSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)

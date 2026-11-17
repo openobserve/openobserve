@@ -158,7 +158,7 @@ describe("ExtractSubtestDialog", () => {
     wrapper?.unmount();
   });
 
-  it("renders the seeded name and the parent's folder", () => {
+  it("renders the seeded name and the parent's folder", async () => {
     wrapper = mountDialog();
 
     expect(field(wrapper, "name").props("modelValue")).toBe("Checkout — Open login");
@@ -166,6 +166,14 @@ describe("ExtractSubtestDialog", () => {
     expect(folder.props("modelValue")).toBe("folder-2");
     expect(optionValues(folder)).toEqual(["folder-1", "folder-2"]);
     expect(fieldNames(wrapper)).toEqual(["name", "folder"]);
+
+    // A default that changes after opening is followed until the user picks a folder.
+    await wrapper.setProps({ defaultFolder: "folder-1" });
+    expect(field(wrapper, "folder").props("modelValue")).toBe("folder-1");
+    field(wrapper, "folder").vm.$emit("update:modelValue", "folder-2");
+    await flushPromises();
+    await wrapper.setProps({ defaultFolder: "folder-3" });
+    expect(field(wrapper, "folder").props("modelValue")).toBe("folder-2");
   });
 
   it("asks for locations and frequency, all locations preselected, when the parent has none", () => {

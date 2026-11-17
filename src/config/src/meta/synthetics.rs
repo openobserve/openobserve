@@ -708,6 +708,10 @@ pub enum ReferenceState {
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ListSyntheticsParams {
     pub folder_id: Option<String>,
+    /// Folders the caller may list; `None` is every folder. The handler answers 403 rather than
+    /// pass an empty set.
+    #[serde(skip)]
+    pub listable_folder_ids: Option<Vec<String>>,
     pub check_type: Option<SyntheticType>,
     pub enabled: Option<bool>,
     pub location: Option<String>,

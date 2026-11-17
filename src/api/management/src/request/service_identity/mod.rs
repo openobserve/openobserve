@@ -344,7 +344,7 @@ pub async fn list_aliases(
     responses(
         (status = 201, description = "Alias created", content_type = "application/json", body = ServiceAlias),
         (status = 400, description = "Invalid alias"),
-        (status = 409, description = "Display-name collision"),
+        (status = 409, description = "Display-name collision, or a rename of a name the service's traces report"),
         (status = 403, description = "Forbidden"),
     ),
     extensions(

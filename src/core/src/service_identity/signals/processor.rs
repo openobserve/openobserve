@@ -60,9 +60,21 @@ const RUN_BUDGET_WINDOWS: i64 = 6;
 const MAX_AUTO_LANES: usize = 16;
 // Rows per search page of a window read; more pages are read in order.
 const PAGE_SIZE: usize = 100_000;
+const SPAN_COLUMNS: [&str; 4] = ["service_name", "span_kind", "span_status", "duration"];
+const SKIP_IDLE: &str = "no recent trace or RUM data and no verdict work";
+const SKIP_NOT_ALLOWED: &str = "org is being deleted, blocked or outside its trial";
+// An info line names at most this many orgs; the rest are counted.
+const MAX_LOGGED_ORGS: usize = 20;
 
 // Scopes with rollup rows since their org's last evaluation; an org absent here is evaluated whole.
 static DIRTY: LazyLock<Mutex<HashMap<String, BTreeSet<String>>>> = LazyLock::new(Default::default);
+// Each skipped org's last logged reason, so info logs only orgs whose reason changed.
+static SKIPPED: LazyLock<Mutex<BTreeMap<String, &'static str>>> = LazyLock::new(Default::default);
+// The live owner a skipped tick last logged, so a long skip logs once.
+static SKIP_OWNER: LazyLock<Mutex<Option<String>>> = LazyLock::new(Default::default);
+// Trace streams logged as lacking span columns, logged again only after they had them.
+static MISSING_COLUMNS: LazyLock<Mutex<HashSet<(String, String)>>> =
+    LazyLock::new(Default::default);
 
 #[derive(Default)]
 pub struct WindowOutput {
@@ -282,10 +294,12 @@ async fn process_org_window_body(
             cluster: config::get_cluster_name(),
         };
         if *kind == StreamType::Traces {
-            if !["service_name", "span_kind", "span_status", "duration"]
-                .iter()
-                .all(|col| cols.contains(*col))
-            {
+            let missing: Vec<&str> = SPAN_COLUMNS
+                .into_iter()
+                .filter(|col| !cols.contains(*col))
+                .collect();
+            note_missing_columns(org, stream, &missing);
+            if !missing.is_empty() {
                 continue;
             }
             trace_rows(org, &cols, &ctx, &identity, &mut out).await?;
@@ -323,6 +337,19 @@ async fn process_org_window_body(
         }
     }
     Ok((out, ring))
+}
+
+fn note_missing_columns(org: &str, stream: &str, missing: &[&str]) {
+    let key = (org.to_string(), stream.to_string());
+    let mut logged = MISSING_COLUMNS.lock().expect("service signal column skips");
+    if missing.is_empty() {
+        logged.remove(&key);
+    } else if logged.insert(key) {
+        log::info!(
+            "[ServiceSignals] org={org} stream={stream} skipped: no {} column",
+            missing.join(", ")
+        );
+    }
 }
 
 /// One search gives T1 and endpoint detail (folded T2), a second the pods (T3).
@@ -432,6 +459,7 @@ async fn rum_rows(
 async fn tick_locked(now: i64, ownership: &Ownership<'_>) -> Result<(), anyhow::Error> {
     let (offset, owner) = db::service_signals::get_offset().await?;
     let decision = claim_decision(&owner, &LOCAL_NODE.uuid, node_alive(&owner).await);
+    note_skip((decision == ClaimDecision::Skip).then_some(owner.as_str()));
     if decision == ClaimDecision::Skip {
         return Ok(());
     }
@@ -589,10 +617,21 @@ async fn tick_locked(now: i64, ownership: &Ownership<'_>) -> Result<(), anyhow::
     failed.map_or(Ok(()), Err)
 }
 
+fn note_skip(owner: Option<&str>) {
+    let mut last = SKIP_OWNER.lock().expect("service signal skip owner");
+    if last.as_deref() == owner {
+        return;
+    }
+    if let Some(owner) = owner {
+        log::info!("[ServiceSignals] tick skipped: node {owner} owns the windows and is alive");
+    }
+    *last = owner.map(str::to_string);
+}
+
 /// Allowed orgs with trace or RUM data since `start` or with verdict work, and every org.
 async fn service_sources(start: i64, end: i64) -> (Sources, BTreeSet<String>) {
     let known = known_sources().await;
-    let every = known.keys().cloned().collect();
+    let every: BTreeSet<String> = known.keys().cloned().collect();
     let work = match super::deploys::orgs_with_work(end).await {
         Ok(work) => Some(work),
         Err(error) => {
@@ -600,14 +639,23 @@ async fn service_sources(start: i64, end: i64) -> (Sources, BTreeSet<String>) {
             None
         }
     };
-    let mut orgs = select_sources(known, work.as_ref(), start - stats_lag_micros());
+    let since = start - stats_lag_micros();
+    let mut orgs = select_sources(known, work.as_ref(), &seen_since(since).await, since);
     retain_service_sources(&mut orgs);
+    let mut skipped: BTreeMap<String, &'static str> = every
+        .iter()
+        .filter(|org| !orgs.contains_key(*org))
+        .map(|org| (org.clone(), SKIP_IDLE))
+        .collect();
     let mut allowed = BTreeMap::new();
     for (org, streams) in orgs {
         if org_allowed(&org).await {
             allowed.insert(org, streams);
+        } else {
+            skipped.insert(org, SKIP_NOT_ALLOWED);
         }
     }
+    log_skipped(skipped);
     (allowed, every)
 }
 
@@ -633,13 +681,20 @@ async fn known_sources() -> Sources {
     orgs
 }
 
-/// Without verdict work every known org runs; with it, orgs with data since `since` or with work.
-fn select_sources(mut known: Sources, work: Option<&BTreeSet<String>>, since: i64) -> Sources {
+/// Without verdict work every known org runs; with it, orgs with work, `seen` or data since
+/// `since`.
+fn select_sources(
+    mut known: Sources,
+    work: Option<&BTreeSet<String>>,
+    seen: &BTreeSet<String>,
+    since: i64,
+) -> Sources {
     let Some(work) = work else {
         return known;
     };
     known.retain(|org, streams| {
         work.contains(org)
+            || seen.contains(org)
             || streams.iter().any(|(stream, kind)| {
                 has_data_since(
                     &infra::cache::stats::get_stream_stats(org, stream, *kind),
@@ -653,6 +708,45 @@ fn select_sources(mut known: Sources, work: Option<&BTreeSet<String>>, since: i6
 /// A stream without stats has not persisted a file yet, so it counts as active.
 fn has_data_since(stats: &StreamStats, since: i64) -> bool {
     stats.doc_time_max == 0 || stats.doc_time_max >= since
+}
+
+/// Orgs whose services were seen at ingest since `since`, which stream stats can trail.
+async fn seen_since(since: i64) -> BTreeSet<String> {
+    let conn = infra::db::get_orm_client_rw().await;
+    match infra::table::service_where_summary::orgs_seen_since(conn, since).await {
+        Ok(orgs) => orgs,
+        Err(error) => {
+            log::warn!(
+                "[ServiceSignals] service summaries unavailable; using stream stats: {error}"
+            );
+            BTreeSet::new()
+        }
+    }
+}
+
+/// Logs every skipped org at debug, and at info the orgs newly skipped or skipped for a new reason.
+fn log_skipped(skipped: BTreeMap<String, &'static str>) {
+    let mut last = SKIPPED.lock().expect("service signal skips");
+    let mut changed: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for (org, reason) in &skipped {
+        log::debug!("[ServiceSignals] org={org} skipped: {reason}");
+        if last.get(org) != Some(reason) {
+            changed.entry(reason).or_default().push(org);
+        }
+    }
+    for (reason, orgs) in changed {
+        let more = orgs.len().saturating_sub(MAX_LOGGED_ORGS);
+        let tail = if more > 0 {
+            format!(" and {more} more")
+        } else {
+            String::new()
+        };
+        log::info!(
+            "[ServiceSignals] skipped ({reason}): {}{tail}",
+            orgs[..orgs.len() - more].join(", ")
+        );
+    }
+    *last = skipped;
 }
 
 /// How far the cached stats' newest data time can trail ingestion on this node.
@@ -671,7 +765,8 @@ fn org_lanes(cpus: usize) -> usize {
     cpus.clamp(1, MAX_AUTO_LANES)
 }
 
-/// A new org starts at the current window; an org tracked under the shared cursor resumes there.
+/// A new org starts at its first span's window within the backlog limit, else the current one;
+/// an org tracked under the shared cursor resumes there.
 fn plan_org(
     org: &str,
     own: Option<i64>,
@@ -679,11 +774,16 @@ fn plan_org(
     shared: i64,
     horizon: i64,
     interval: i64,
+    first: Option<i64>,
 ) -> OrgPlan {
+    let current = align_down(horizon, interval) - interval;
     let start = match own {
         Some(offset) => offset,
         None if tracked => shared,
-        None => align_down(horizon, interval) - interval,
+        None => first.map_or(current, |first| {
+            let oldest = align_down(horizon - MAX_BACKLOG_MICROS, interval) + interval;
+            align_down(first, interval).clamp(oldest, current)
+        }),
     };
     let (start, jumped) = initial_offset(start, horizon, interval, MAX_BACKLOG_MICROS);
     // A jump persists only when a window closes, so the current window runs.
@@ -701,11 +801,33 @@ fn plan_org(
     }
 }
 
-/// An org without a cursor starts at the current window, or resumes at `shared` once tracked.
+/// Only an untracked org with no cursor backfills, so only it reads its first span's window.
 async fn plan_for(org: &str, shared: i64, horizon: i64, interval: i64) -> anyhow::Result<OrgPlan> {
     let own = db::service_signals::get_org_offset(org).await?;
     let tracked = own.is_none() && super::deploys::has_epoch(org).await?;
-    Ok(plan_org(org, own, tracked, shared, horizon, interval))
+    let first = if own.is_none() && !tracked {
+        first_seen(org).await
+    } else {
+        None
+    };
+    Ok(plan_org(
+        org, own, tracked, shared, horizon, interval, first,
+    ))
+}
+
+/// When the org's services were first seen at ingest, so its earlier spans are rolled up too.
+async fn first_seen(org: &str) -> Option<i64> {
+    match db::service_identity::get_cached_summaries(org).await {
+        Ok(rows) => rows
+            .iter()
+            .map(|row| row.first_seen)
+            .filter(|at| *at > 0)
+            .min(),
+        Err(error) => {
+            log::warn!("[ServiceSignals] org={org} first seen unknown, starting now: {error}");
+            None
+        }
+    }
 }
 
 /// Runs the fresh lane first, then fewest pending windows first, and orgs found meanwhile.
@@ -915,10 +1037,21 @@ fn ordered_query(sql: &str, first: &Value) -> Result<String, anyhow::Error> {
                     | "error_message"
                     | "error_handling"
                     | "page"
+                    | "image"
+                    | "image_id"
+                    | "presence_window"
+                    | "namespace"
+                    | "pod"
+                    | "container"
+                    | "k8s_cluster"
             ) || (name.as_str() == "env" && first.get("where_key").is_none())
         })
         .map(|name| format!("\"{}\"", name.replace('"', "\"\"")))
         .collect();
+    anyhow::ensure!(
+        !columns.is_empty(),
+        "a paged read has no group column to order by"
+    );
     columns.sort();
     Ok(format!(
         "SELECT * FROM ({sql}) AS rollup_groups ORDER BY {}",
@@ -1301,29 +1434,9 @@ mod tests {
 
     #[tokio::test]
     async fn rollup_pagination_writes_every_group_beyond_page_size() {
-        let session = datafusion::prelude::SessionContext::new();
         let sql = "SELECT service, 'env:prod' AS where_key, 'v1' AS version, 'op' AS operation, COUNT(*) AS requests FROM (VALUES ('e'), ('d'), ('c'), ('b'), ('a')) AS input(service) GROUP BY service";
-        let ordered = ordered_query(sql, &serde_json::json!({"service":"e", "where_key":"env:prod", "version":"v1", "operation":"op", "requests":1})).unwrap();
-        let rows = collect_pages(2, |from| {
-            let session = &session;
-            let ordered = &ordered;
-            async move {
-                let batches = session
-                    .sql(ordered)
-                    .await?
-                    .limit(from, Some(2))?
-                    .collect()
-                    .await?;
-                Ok(config::utils::arrow::record_batches_to_json_rows(
-                    &batches.iter().collect::<Vec<_>>(),
-                )?
-                .into_iter()
-                .map(Value::Object)
-                .collect())
-            }
-        })
-        .await
-        .unwrap();
+        let first = serde_json::json!({"service":"e", "where_key":"env:prod", "version":"v1", "operation":"op", "requests":1});
+        let rows = local_pages(sql, &first, 2).await;
         assert_eq!(rows.len(), 5);
         assert_eq!(
             rows.iter()
@@ -1344,6 +1457,44 @@ mod tests {
             .map(SignalRow::to_json)
             .collect();
         assert_eq!(written.len(), 5);
+    }
+
+    #[tokio::test]
+    async fn pod_image_reads_page_by_their_own_columns() {
+        let sql = "SELECT DISTINCT 0 AS presence_window, 'ns' AS namespace, pod, 'app' AS container, image, CAST(NULL AS VARCHAR) AS image_id, 'c1' AS k8s_cluster FROM (VALUES ('p2', 'i1'), ('p1', 'i2'), ('p1', 'i1')) AS input(pod, image)";
+        let first = serde_json::json!({"presence_window": 0, "namespace": "ns", "pod": "p2", "container": "app", "image": "i1", "image_id": null, "k8s_cluster": "c1"});
+        let rows = local_pages(sql, &first, 1).await;
+        let mut pods: Vec<_> = rows
+            .iter()
+            .map(|row| (row["pod"].as_str().unwrap(), row["image"].as_str().unwrap()))
+            .collect();
+        pods.sort_unstable();
+        assert_eq!(pods, [("p1", "i1"), ("p1", "i2"), ("p2", "i1")]);
+    }
+
+    async fn local_pages(sql: &str, first: &Value, page: usize) -> Vec<Value> {
+        let session = datafusion::prelude::SessionContext::new();
+        let ordered = ordered_query(sql, first).unwrap();
+        collect_pages(page, |from| {
+            let session = &session;
+            let ordered = &ordered;
+            async move {
+                let batches = session
+                    .sql(ordered)
+                    .await?
+                    .limit(from, Some(page))?
+                    .collect()
+                    .await?;
+                Ok(config::utils::arrow::record_batches_to_json_rows(
+                    &batches.iter().collect::<Vec<_>>(),
+                )?
+                .into_iter()
+                .map(Value::Object)
+                .collect())
+            }
+        })
+        .await
+        .unwrap()
     }
 
     #[test]
@@ -1729,16 +1880,31 @@ mod tests {
     }
 
     #[test]
-    fn a_new_org_starts_at_the_current_window_and_a_tracked_one_resumes() {
+    fn a_new_org_starts_at_its_first_span_window_and_a_tracked_one_resumes() {
         let interval = 10 * SECOND_MICRO_SECS;
         let horizon = 1_700_000_005 * SECOND_MICRO_SECS;
         let latest = align_down(horizon, interval);
         let shared = latest - 50 * interval;
-        let ends = |own, tracked| plan_org("org", own, tracked, shared, horizon, interval).ends;
+        let plan =
+            |own, tracked, first| plan_org("org", own, tracked, shared, horizon, interval, first);
+        let ends = |own, tracked| plan(own, tracked, None).ends;
         assert_eq!(ends(None, false), vec![latest]);
-        assert!(plan_org("org", None, false, shared, horizon, interval).fresh);
-        assert!(!plan_org("org", None, true, shared, horizon, interval).fresh);
-        assert!(!plan_org("org", Some(latest), false, shared, horizon, interval).fresh);
+        assert_eq!(
+            plan(None, false, Some(latest - 3 * interval + 1)).ends,
+            vec![latest - 2 * interval, latest - interval, latest]
+        );
+        let capped = plan(None, false, Some(latest - 2 * MAX_BACKLOG_MICROS)).ends;
+        assert_eq!(
+            capped[0],
+            align_down(horizon - MAX_BACKLOG_MICROS, interval) + 2 * interval
+        );
+        assert_eq!(
+            plan(None, false, Some(horizon + interval)).ends,
+            vec![latest]
+        );
+        assert!(plan(None, false, None).fresh);
+        assert!(!plan(None, true, None).fresh);
+        assert!(!plan(Some(latest), false, None).fresh);
         let resumed = ends(None, true);
         assert_eq!((resumed.len(), resumed.last()), (50, Some(&latest)));
         assert!(ends(Some(latest), true).is_empty());
@@ -1758,7 +1924,7 @@ mod tests {
         let mut horizon = 1_700_000_005 * SECOND_MICRO_SECS;
         let mut own = Some(horizon - MAX_BACKLOG_MICROS - 7 * interval);
         for _ in 0..3 {
-            let ends = plan_org("org", own, true, 0, horizon, interval).ends;
+            let ends = plan_org("org", own, true, 0, horizon, interval, None).ends;
             assert_eq!(ends, vec![align_down(horizon, interval)]);
             own = ends.last().copied();
             horizon += interval;
@@ -1795,6 +1961,12 @@ mod tests {
                 since - 48 * hour,
             ),
             ("o2sel_idle", "default", StreamType::Traces, since - 1),
+            (
+                "o2sel_seen",
+                "default",
+                StreamType::Traces,
+                since - 48 * hour,
+            ),
             ("o2sel_idle", "_rumdata", StreamType::Logs, since - hour),
             ("o2sel_rum_app", "_rumdata", StreamType::Logs, since),
         ] {
@@ -1806,24 +1978,27 @@ mod tests {
             ("o2sel_idle", vec![traces("default"), rum.clone()]),
             ("o2sel_logs_only", vec![]),
             ("o2sel_rum_app", vec![rum.clone()]),
+            ("o2sel_seen", vec![traces("default")]),
             ("o2sel_unflushed", vec![traces("default")]),
         ]
         .into_iter()
         .map(|(org, streams)| (org.to_string(), streams))
         .collect();
         let work: BTreeSet<String> = ["o2sel_judged".to_string()].into_iter().collect();
-        let selected = select_sources(known.clone(), Some(&work), since);
+        let seen: BTreeSet<String> = ["o2sel_seen".to_string()].into_iter().collect();
+        let selected = select_sources(known.clone(), Some(&work), &seen, since);
         assert_eq!(
             selected.keys().map(String::as_str).collect::<Vec<_>>(),
             [
                 "o2sel_busy",
                 "o2sel_judged",
                 "o2sel_rum_app",
+                "o2sel_seen",
                 "o2sel_unflushed"
             ]
         );
         assert_eq!(selected["o2sel_busy"], [traces("default"), traces("old")]);
-        assert_eq!(select_sources(known.clone(), None, since), known);
+        assert_eq!(select_sources(known.clone(), None, &seen, since), known);
     }
 
     #[test]
@@ -1856,7 +2031,7 @@ mod tests {
                 )
             })
             .collect();
-        let selected = select_sources(known, Some(&BTreeSet::new()), since);
+        let selected = select_sources(known, Some(&BTreeSet::new()), &BTreeSet::new(), since);
         assert_eq!(
             selected.keys().map(String::as_str).collect::<Vec<_>>(),
             ["o2usage_off_active"]

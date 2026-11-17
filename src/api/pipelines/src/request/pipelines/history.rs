@@ -19,14 +19,13 @@ use axum::{
     response::Response,
 };
 use chrono::{Duration, Utc};
-use common::utils::sql::escape_like;
 use config::{
     meta::{
         search::{Query as SearchQuery, Request as SearchRequest},
         self_reporting::usage::TRIGGERS_STREAM,
         stream::StreamType,
     },
-    utils::time::now_micros,
+    utils::{sql::quote_like_pattern, time::now_micros},
 };
 #[cfg(feature = "enterprise")]
 use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
@@ -377,8 +376,8 @@ pub async fn get_pipeline_history(
     // The key field contains the pipeline ID in the format "pipeline_name/pipeline_id"
     if let Some(ref pipeline_id) = query.pipeline_id {
         // We need to filter where key starts with the pipeline ID
-        let escaped_name = escape_like(pipeline_id);
-        where_clause.push_str(&format!(" AND key LIKE '%/{escaped_name}%'"));
+        let pattern = quote_like_pattern("%/", pipeline_id, "%");
+        where_clause.push_str(&format!(" AND key LIKE {pattern}"));
     } else if let Some(permitted_ids) = permitted_pipeline_ids {
         // Filter by permitted pipelines only
         if permitted_ids.is_empty() {
@@ -393,10 +392,7 @@ pub async fn get_pipeline_history(
 
         let pipeline_filter = permitted_ids
             .iter()
-            .map(|id| {
-                let escaped_id = escape_like(id);
-                format!("key LIKE '%{}%'", escaped_id.replace("'", "''"))
-            })
+            .map(|id| format!("key LIKE {}", quote_like_pattern("%", id, "%")))
             .collect::<Vec<_>>()
             .join(" OR ");
         where_clause.push_str(&format!(" AND ({pipeline_filter})"));

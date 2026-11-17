@@ -10,6 +10,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { fenceAlertWrite } from "@/services/alerts.readFence";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
   readEditorDraft,
   writeEditorDraft,
@@ -200,67 +201,38 @@ describe("AddAlertView.vue", () => {
     expect(wrapper.vm.destinations).toEqual([]);
   });
 
-  it("should navigate to alert list on handleUpdateList", async () => {
-    vi.mocked(destinationService.list).mockResolvedValue({
-      data: [{ id: 1, name: "Destination 1" }],
-    } as any);
+  it.each(["update:list", "cancel:hideform"])(
+    "opens the unfiltered alert list on %s, so the alert is in view",
+    async (event) => {
+      vi.mocked(destinationService.list).mockResolvedValue({
+        data: [{ id: 1, name: "Destination 1" }],
+      } as any);
 
-    const pushSpy = vi.spyOn(router, "push");
+      const pushSpy = vi.spyOn(router, "push");
 
-    const wrapper = mount(AddAlertView, {
-      global: {
-        plugins: [store, router],
-        stubs: {
-          AddAlert: {
-            name: "AddAlert",
-            template: '<div class="add-alert-stub" @update:list="$emit(\'update:list\')"></div>',
-          },
+      const wrapper = mount(AddAlertView, {
+        global: {
+          plugins: [store, router],
+          stubs: { AddAlert: { name: "AddAlert", template: '<div class="add-alert-stub"></div>' } },
         },
-      },
-    });
+      });
 
-    await flushPromises();
+      await flushPromises();
 
-    wrapper.findComponent({ name: "AddAlert" }).vm.$emit("update:list");
-    await flushPromises();
+      wrapper.findComponent({ name: "AddAlert" }).vm.$emit(event);
+      await flushPromises();
 
-    expect(pushSpy).toHaveBeenCalledWith({
-      name: "alertList",
-      query: {
-        org_identifier: "test-org",
-        folder: "default",
-        tab: "all",
-      },
-    });
-  });
-
-  it("should navigate back on handleCancel", async () => {
-    vi.mocked(destinationService.list).mockResolvedValue({
-      data: [{ id: 1, name: "Destination 1" }],
-    } as any);
-
-    const backSpy = vi.spyOn(router, "back");
-
-    const wrapper = mount(AddAlertView, {
-      global: {
-        plugins: [store, router],
-        stubs: {
-          AddAlert: {
-            name: "AddAlert",
-            template:
-              '<div class="add-alert-stub" @cancel:hideform="$emit(\'cancel:hideform\')"></div>',
-          },
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "alertList",
+        query: {
+          org_identifier: "test-org",
+          folder: "default",
+          tab: "all",
+          state: ALERT_LIST_ALL_STATES,
         },
-      },
-    });
-
-    await flushPromises();
-
-    wrapper.findComponent({ name: "AddAlert" }).vm.$emit("cancel:hideform");
-    await flushPromises();
-
-    expect(backSpy).toHaveBeenCalled();
-  });
+      });
+    },
+  );
 
   it("should refresh destinations when event is emitted", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
