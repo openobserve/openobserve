@@ -2125,6 +2125,66 @@ describe("AddAlert (OForm owner)", () => {
     });
   });
 
+  describe("section 1 folds to a summary line", () => {
+    it("edit opens on section 2 with section 1 locked", async () => {
+      wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      await flushPromises();
+      expect(wrapper.vm.activeSection).toBe("condition");
+      expect(scrollToSection).toHaveBeenCalledWith("condition");
+      expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(false);
+      const summary = wrapper.get('[data-test="add-alert-watch-summary"]');
+      expect(summary.text()).toContain("app_logs");
+      expect(summary.find('[data-test="add-alert-watch-summary-locked"]').exists()).toBe(true);
+      expect(summary.find('[data-test="add-alert-watch-summary-change"]').exists()).toBe(false);
+    });
+
+    it("create collapses section 1 after moving on and Change reopens it", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      wrapper.vm.activeSection = "condition";
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(true);
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      wrapper.vm.activeSection = "condition";
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(false);
+      await wrapper.get('[data-test="add-alert-watch-summary-change"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-watch-summary"]').exists()).toBe(false);
+    });
+
+    it("saving an untouched edit sends the loaded trigger values", async () => {
+      const trigger = {
+        period: 10,
+        operator: ">=",
+        frequency: 10,
+        threshold: 3,
+        silence: 90,
+        frequency_type: "cron",
+        cron: "0 9 * * 1-5",
+        timezone: "Europe/Berlin",
+      };
+      wrapper = mountAlert({
+        isUpdated: true,
+        modelValue: savedAlert({ trigger_condition: { ...trigger }, keep_firing_for: 45 }),
+        destinations: [{ name: "email" }],
+      });
+      await flushPromises();
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+      const payload = (alertsService.update_by_alert_id as any).mock.calls[0][1];
+      expect(payload.trigger_condition).toMatchObject(trigger);
+      expect(payload.keep_firing_for).toBe(45);
+    });
+  });
+
   // ── Error focus across sections ───────────────────────────────────────────
   // focusOnFirstError skips messages with a null offsetParent, so a slice the
   // current alert type hides is never focused into the void.

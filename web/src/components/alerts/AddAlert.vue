@@ -305,6 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-alert-sections"
           >
             <AlertFormSection
+              v-if="!watchCollapsed"
               id="watch"
               :current="activeSection === 'watch'"
               :index="1"
@@ -397,6 +398,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :help="conditionHelp"
               @go="goToSection"
             >
+              <template v-if="watchCollapsed" #lead>
+                <p
+                  class="text-text-body m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+                  data-test="add-alert-watch-summary"
+                >
+                  <span>{{ watchSummary }}</span>
+                  <span
+                    v-if="isEditing"
+                    class="text-text-secondary inline-flex items-center gap-1"
+                    data-test="add-alert-watch-summary-locked"
+                  >
+                    <OIcon name="lock" size="xs" />
+                    {{ t("alerts.form.watch.locked") }}
+                  </span>
+                  <OButton
+                    v-else
+                    variant="link"
+                    data-test="add-alert-watch-summary-change"
+                    @click="expandWatch"
+                    >{{ t("alerts.form.change") }}</OButton
+                  >
+                </p>
+              </template>
               <div
                 v-if="beingUpdated"
                 v-show="!isAnomalyMode && !isCompositeMode"
@@ -1271,7 +1295,15 @@ export default defineComponent({
       emit(event as Parameters<typeof emit>[0], ...args);
     }) as AlertFormEmit;
     const snapScrollRef = ref<OSnapScrollExpose | null>(null);
-    const goToSection = (id: string) => snapScrollRef.value?.scrollToSection(id);
+    // A folded section 1 lives on section 2's summary line, which is where a jump to it lands.
+    const goToSection = (id: string) => {
+      if (id === "watch" && watchCollapsed.value) {
+        if (isEditing.value) snapScrollRef.value?.scrollToSection("condition");
+        else expandWatch();
+        return;
+      }
+      snapScrollRef.value?.scrollToSection(id);
+    };
     const alertForm = useAlertForm(props, formEmit, { showSection: goToSection });
     const alertEditorDraft = useAlertEditorDraft({
       form: alertForm,
@@ -1297,7 +1329,12 @@ export default defineComponent({
     onMounted(async () => {
       await alertForm.formReady;
       const opened = alertForm.router.currentRoute.value.query;
-      if (alertForm.beingUpdated.value || alertForm.anomalyEditMode.value || opened.prefill) return;
+      if (alertForm.beingUpdated.value || alertForm.anomalyEditMode.value) {
+        activeSection.value = "condition";
+        snapScrollRef.value?.scrollToSection("condition");
+        return;
+      }
+      if (opened.prefill) return;
       await nextTick();
       document
         .querySelector<HTMLElement>(
@@ -1593,8 +1630,39 @@ export default defineComponent({
     const { lgUp } = useBreakpoint();
     const activeSection = ref<AlertSectionId>("watch");
     const visitedSections = ref<ReadonlySet<AlertSectionId>>(new Set());
-    watch(activeSection, (_, left) => {
+    const leftWatch = ref(false);
+    watch(activeSection, (now, left) => {
       visitedSections.value = new Set([...visitedSections.value, left]);
+      if (left === "watch" && now !== "watch" && alertForm.formData.value.stream_name) {
+        leftWatch.value = true;
+      }
+    });
+
+    const isEditing = computed(
+      () => alertForm.beingUpdated.value || alertForm.anomalyEditMode.value,
+    );
+    // Section 1 cannot change after the alert is created, so an edit always shows it folded.
+    const watchCollapsed = computed(() => isEditing.value || leftWatch.value);
+    const expandWatch = () => {
+      leftWatch.value = false;
+      void nextTick(() => snapScrollRef.value?.scrollToSection("watch"));
+    };
+    // Folding removes the content above, so the view is put back on the section the user moved to.
+    watch(watchCollapsed, (folded) => {
+      if (folded && !isEditing.value) {
+        void nextTick(() => snapScrollRef.value?.scrollToSection(activeSection.value));
+      }
+    });
+    const watchSummary = computed(() => {
+      const fd = alertForm.formData.value;
+      const how = alertTypeOptions.value.find((o) => o.value === String(fd.is_real_time))?.label;
+      if (isCompositeMode.value || !how) return how ?? "";
+      const type = streamTypeOptions.value.find((o) => o.value === fd.stream_type)?.label;
+      return alertForm.t("alerts.form.watch.summary", {
+        type: type ?? raw(fd.stream_type),
+        stream: raw(fd.stream_name),
+        how,
+      });
     });
 
     // Creating walks forward, so Next holds the one primary action until the last step.
@@ -2031,6 +2099,10 @@ export default defineComponent({
       snapScrollRef,
       activeSection,
       goToSection,
+      isEditing,
+      watchCollapsed,
+      watchSummary,
+      expandWatch,
       ALERT_SECTIONS,
       guidesToNext,
       sectionTargets,
