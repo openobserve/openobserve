@@ -13971,7 +13971,6 @@
     },
     "anomaly": {
       "addFilter": "Add filter",
-      "addNewDestination": "Add New Destination",
       "alertDirection": "Alert direction",
       "alertDirectionTooltip": "Which side of the expected band can send an alert. The chart still marks every point outside the band, and missing data always alerts.",
       "bandCaption": "Band: expected ± {k}σ",
@@ -24001,7 +24000,6 @@
       "usedByCount": "Used by {count} test | Used by {count} tests"
     },
     "scheduleAlert": {
-      "addNewDestination": "Add New Destination",
       "alertedIfFails": "Alerted if test fails",
       "alertedIfFailsSuffix": "times.",
       "alerts": "Alerts",

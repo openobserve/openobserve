@@ -82,10 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="sm"
+            icon-left="add"
             data-test="anomaly-add-destination"
             @click="openAddDestination"
           >
-            {{ t("alerts.anomaly.addNewDestination") }}
+            {{ t("alerts.alertSettings.addNewDestination") }}
           </OButton>
         </div>
         <p
