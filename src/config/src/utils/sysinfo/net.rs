@@ -141,11 +141,18 @@ pub fn get_tcp_conn_resets() -> usize {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "linux")]
+    use std::net::{TcpListener, TcpStream};
+
     use super::*;
 
     #[test]
     #[cfg(target_os = "linux")]
     fn test_sysinfo_get_tcp_connections() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let _client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (_server, _) = listener.accept().unwrap();
+
         assert!(get_tcp_connections(None) > 0);
         assert!(get_tcp_connections(Some(TcpConnState::Established)) > 0);
     }
