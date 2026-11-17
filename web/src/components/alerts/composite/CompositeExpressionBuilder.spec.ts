@@ -10,6 +10,11 @@ import { describe, expect, it } from "vitest";
 
 import CompositeExpressionBuilder from "./CompositeExpressionBuilder.vue";
 import i18n from "@/locales";
+import { ref } from "vue";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
 
 type SelectedChild = {
   alert_id: string;
@@ -106,5 +111,30 @@ describe("CompositeExpressionBuilder", () => {
       expect(control.attributes("aria-label")).toBeTruthy();
       expect(control.attributes("tabindex") ?? "0").not.toBe("-1");
     }
+  });
+
+  it("waits to show the expression error while the caller says there was no input yet", () => {
+    const wrapper = mount(CompositeExpressionBuilder, {
+      props: { modelValue: "", selectedChildren: [], showErrors: false },
+      global: { plugins: [i18n] },
+    });
+    expect(wrapper.find('[data-test="alerts-composite-expression-error"]').exists()).toBe(false);
+  });
+
+  it("opens the raw expression in place from its Write the expression yourself link", async () => {
+    const tiers = useAlertSettingTiers({
+      available: (id) => id === "compositeExpression",
+      isSet: () => false,
+      showAll: ref(false),
+    });
+    const wrapper = mount(CompositeExpressionBuilder, {
+      props: { modelValue: "{id-a} && {id-b}", selectedChildren: selectedChildren.slice(0, 2) },
+      global: { plugins: [i18n], provide: { [ALERT_SETTING_TIERS_KEY]: tiers } },
+    });
+    const raw = () => wrapper.find('[data-test="alerts-composite-expression-advanced"]');
+    expect(raw().exists()).toBe(false);
+    await wrapper.find('[data-test="add-alert-add-compositeExpression"]').trigger("click");
+    expect(raw().exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-alert-add-compositeExpression"]').exists()).toBe(false);
   });
 });

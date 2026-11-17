@@ -1,12 +1,16 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, inject, onMounted, ref, watch } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import CompositeExpressionPills from "./CompositeExpressionPills.vue";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useTierVisibility,
+} from "@/composables/alerts/useAlertSettingTiers";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   type CompositeChildOption,
@@ -20,10 +24,13 @@ const props = withDefaults(
   defineProps<{
     modelValue?: string;
     selectedChildren?: CompositeChildOption[];
+    /** False until the caller has input or a Save attempt, so a fresh form opens without an error. */
+    showErrors?: boolean;
   }>(),
   {
     modelValue: "",
     selectedChildren: () => [],
+    showErrors: true,
   },
 );
 
@@ -34,7 +41,8 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 let autoExpressionApplied = false;
-const advancedOpen = ref(false);
+const tierShows = useTierVisibility();
+const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
 
 const effectiveExpression = computed(() =>
   props.modelValue.trim() || props.selectedChildren.length !== 2
@@ -193,27 +201,26 @@ onMounted(maybeApplyDefault);
     </div>
 
     <div
-      v-if="!validation.valid"
+      v-if="showErrors && !validation.valid"
       class="text-status-error-text text-xs"
       data-test="alerts-composite-expression-error"
     >
       {{ t("alerts.composite.invalidExpression") }}
     </div>
 
-    <div class="flex flex-col gap-2">
-      <OButton
-        variant="ghost-muted"
-        size="xs"
-        icon-left="code"
-        class="self-start"
-        data-test="alerts-composite-expression-advanced-toggle"
-        :aria-expanded="advancedOpen"
-        @click="advancedOpen = !advancedOpen"
-      >
-        {{ t("alerts.composite.advancedExpression") }}
-      </OButton>
+    <OButton
+      v-if="!tierShows('compositeExpression')"
+      variant="ghost-primary"
+      size="sm"
+      icon-left="add"
+      class="self-start"
+      data-test="add-alert-add-compositeExpression"
+      @click="tiers?.reveal('compositeExpression')"
+    >
+      {{ t("alerts.tiers.add.compositeExpression") }}
+    </OButton>
+    <div v-else class="flex flex-col gap-2">
       <OTextarea
-        v-if="advancedOpen"
         :model-value="modelValue"
         :aria-label="t('alerts.composite.advancedExpression')"
         data-test="alerts-composite-expression-advanced"

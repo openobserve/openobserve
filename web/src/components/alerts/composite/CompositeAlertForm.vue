@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
 
 import CompositeAlertPreview from "./CompositeAlertPreview.vue";
 import CompositeChildSelector from "./CompositeChildSelector.vue";
@@ -10,6 +10,9 @@ import alertsService from "@/services/alerts";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import { useTierVisibility } from "@/composables/alerts/useAlertSettingTiers";
 import type {
   CompositeAlertChild,
   CompositeAlertDraft,
@@ -53,11 +56,18 @@ const preview = ref<CompositeAlertValidationResponse | null>(null);
 let validationSequence = 0;
 
 const draft = computed(() => props.modelValue as unknown as CompositeAlertDraft);
+const tierShows = useTierVisibility();
+// Problems wait for the first child or Save attempt; without an enclosing form they show at once.
+const enclosingForm = inject(FORM_CONTEXT_KEY, null);
+const submitAttempted = enclosingForm
+  ? enclosingForm.useStore((s: { submissionAttempts: number }) => s.submissionAttempts > 0)
+  : ref(true);
 const selectedChildren = computed<CompositeChildOption[]>(() => {
   const children = draft.value.children ?? [];
   return children.map((child) => child as CompositeChildOption);
 });
 const selectedIds = computed(() => selectedChildren.value.map((child) => child.alert_id));
+const showProblems = computed(() => selectedIds.value.length > 0 || submitAttempted.value);
 const summaryExpression = computed(() => {
   const lettered = rawToLettered(
     draft.value.composite_condition.expression,
@@ -213,11 +223,13 @@ watch(
           <CompositeExpressionBuilder
             :model-value="draft.composite_condition.expression"
             :selected-children="selectedChildren"
+            :show-errors="showProblems"
             @update:model-value="updateCondition({ expression: $event })"
           />
         </OSettingRow>
 
         <OSettingRow
+          v-if="tierShows('compositeWarningCounts')"
           :label="t('alerts.composite.warningCountsAsFiring')"
           data-test="alerts-composite-warning-row"
         >
@@ -231,6 +243,7 @@ watch(
         </OSettingRow>
 
         <OSettingRow
+          v-if="tierShows('compositeStalePolicy')"
           :label="t('alerts.composite.stalePolicy')"
           data-test="alerts-composite-stale-policy-row"
         >
@@ -272,10 +285,18 @@ watch(
               :selected-children="selectedChildren"
             />
             <div
-              v-else
+              v-else-if="showProblems"
               class="text-text-secondary flex items-center justify-center gap-2 py-6 text-sm"
             >
               {{ t("alerts.composite.invalidExpression") }}
+            </div>
+            <div
+              v-else
+              class="text-text-secondary flex flex-col items-center justify-center gap-2 py-6 text-center text-sm"
+              data-test="alerts-composite-preview-empty"
+            >
+              <OIcon name="query-stats" size="lg" class="opacity-20" />
+              {{ t("alerts.composite.noChildren") }}
             </div>
           </div>
         </div>

@@ -7,11 +7,23 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { computed, reactive, ref } from "vue";
 
 import CompositeAlertForm from "./CompositeAlertForm.vue";
 import CompositeAlertPreview from "./CompositeAlertPreview.vue";
 import alertsService from "@/services/alerts";
 import i18n from "@/locales";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
+import {
+  alertTierContext,
+  tierAvailable,
+  tierIsSet,
+  type AlertSettingId,
+} from "@/components/alerts/alertSettingTiers";
 
 vi.mock("@/services/alerts", () => ({
   default: { validateComposite: vi.fn() },
@@ -238,5 +250,65 @@ describe("CompositeAlertForm", () => {
 
     expect(wrapper.emitted("validation")?.at(-1)?.[0]).toEqual({ valid: false });
     expect(wrapper.findComponent(CompositeAlertPreview).exists()).toBe(false);
+  });
+});
+
+describe("CompositeAlertForm in the sectioned editor", () => {
+  const ctx = alertTierContext({
+    isRealTime: "composite",
+    aggregate: false,
+    incidentsEnabled: false,
+    oncallEnabled: false,
+    suppressRepeatsEnabled: false,
+  });
+  const empty = () =>
+    draft({
+      children: [],
+      composite_condition: {
+        expression: "",
+        warning_counts_as_firing: true,
+        stale_child_policy: "use_last_state",
+      },
+    });
+
+  const mountSectioned = (modelValue: ReturnType<typeof draft>) => {
+    const formState = reactive({ submissionAttempts: 0 });
+    const form = {
+      useStore: (pick: (s: typeof formState) => unknown) => computed(() => pick(formState)),
+    };
+    const tiers = useAlertSettingTiers({
+      available: (id) => tierAvailable(id, ctx),
+      isSet: (id) => tierIsSet(id, { form: modelValue, anomaly: null }),
+      showAll: ref(false),
+    });
+    const wrapper = mount(CompositeAlertForm, {
+      props: { modelValue, folderId: "default", availableChildren: children },
+      global: {
+        plugins: [i18n],
+        provide: { [FORM_CONTEXT_KEY]: form, [ALERT_SETTING_TIERS_KEY]: tiers },
+      },
+    });
+    return { wrapper, formState, tiers };
+  };
+
+  it("shows no composite error before any input, and shows it once Save was tried", async () => {
+    const { wrapper, formState } = mountSectioned(empty());
+    await flushPromises();
+    const invalid = i18n.global.t("alerts.composite.invalidExpression");
+    expect(wrapper.text()).not.toContain(invalid);
+    formState.submissionAttempts = 1;
+    await flushPromises();
+    expect(wrapper.text()).toContain(invalid);
+  });
+
+  it.each<[AlertSettingId, string]>([
+    ["compositeWarningCounts", "alerts-composite-warning-row"],
+    ["compositeStalePolicy", "alerts-composite-stale-policy-row"],
+  ])("%s is hidden until added", async (id, row) => {
+    const { wrapper, tiers } = mountSectioned(draft());
+    expect(wrapper.find(`[data-test="${row}"]`).exists()).toBe(false);
+    tiers.reveal(id);
+    await flushPromises();
+    expect(wrapper.find(`[data-test="${row}"]`).exists()).toBe(true);
   });
 });
