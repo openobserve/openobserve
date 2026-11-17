@@ -9952,10 +9952,7 @@
       "wholeRange": "Whole range {start}–{end}",
       "detail": "{slice} · {filters}",
       "tracesForService": "Traces for service {service} · {slice}",
-      "findingService": "Finding the service for this point…",
-      "logsNeedLogsStream": "Logs open only for SQL charts on a logs stream",
-      "noTraceCorrelation": "No trace correlation for this stream",
-      "needsGroupBy": "Group this chart by a field such as service to find its traces"
+      "findingService": "Finding the service for this point…"
     },
     "logExplorer": {
       "title": "Logs Explorer",

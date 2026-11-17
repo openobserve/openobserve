@@ -315,21 +315,14 @@ describe("usePanelDrilldown point menu", () => {
   });
 
   describe("View logs and View traces availability", () => {
-    it("PromQL: logs off with its reason; traces off without correlation", async () => {
+    it("PromQL without correlation: neither item can open, so no point section and no menu", async () => {
       const deps = makeDeps({ streamType: "metrics" });
       deps.panelSchema.value.queryType = "promql";
       const api = usePanelDrilldown(deps as any);
       await api.onChartClick(lineClick);
 
-      expect(api.pointExplore.value?.target.filters).toEqual([]);
-      expect(api.pointExplore.value?.logs).toEqual({
-        state: "disabled",
-        detail: "Logs open only for SQL charts on a logs stream",
-      });
-      expect(api.pointExplore.value?.traces).toEqual({
-        state: "disabled",
-        detail: "No trace correlation for this stream",
-      });
+      expect(api.pointExplore.value).toBeNull();
+      expect(menuOpen(deps)).toBe(false);
     });
 
     it("a traces stream opens the Traces page in a new tab with the slice and filters", async () => {
@@ -358,12 +351,13 @@ describe("usePanelDrilldown point menu", () => {
       );
     });
 
-    it("OSS: a logs chart's traces item is off and no correlation is asked for", async () => {
+    it("OSS: a logs chart hides View traces and asks no correlation", async () => {
       const deps = makeDeps();
       const api = usePanelDrilldown(deps as any);
       await api.onChartClick(lineClick);
 
-      expect(api.pointExplore.value?.traces.detail).toBe("No trace correlation for this stream");
+      expect(api.pointExplore.value?.logs.state).toBe("enabled");
+      expect(api.pointExplore.value?.traces.state).toBe("hidden");
       expect(deps.findRelatedTelemetry).not.toHaveBeenCalled();
       api.openPointTraces();
       expect(openSpy).not.toHaveBeenCalled();
@@ -411,7 +405,7 @@ describe("usePanelDrilldown point menu", () => {
       });
     });
 
-    it("enterprise: no matching service turns the traces item off with its reason", async () => {
+    it("enterprise: no matching service hides View traces and keeps View logs", async () => {
       appConfig.isEnterprise = "true";
       const deps = makeDeps();
       deps.findRelatedTelemetry.mockResolvedValue(null);
@@ -419,21 +413,47 @@ describe("usePanelDrilldown point menu", () => {
       await api.onChartClick(lineClick);
       await flushPromises();
 
-      expect(api.pointExplore.value?.traces).toEqual({
-        state: "disabled",
-        detail: "No trace correlation for this stream",
-      });
+      expect(api.pointExplore.value?.traces.state).toBe("hidden");
+      expect(api.pointExplore.value?.logs.state).toBe("enabled");
+      expect(menuOpen(deps)).toBe(true);
     });
 
-    it("enterprise: a chart with no group-by values asks for a group-by to correlate", async () => {
+    it("enterprise: no matching service on a chart without View logs closes the empty menu", async () => {
+      appConfig.isEnterprise = "true";
+      const deps = makeDeps({ streamType: "metrics" });
+      let settle: (value: unknown) => void = () => undefined;
+      deps.findRelatedTelemetry.mockImplementation(
+        () => new Promise((resolve) => (settle = resolve)),
+      );
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick(lineClick);
+      expect(menuOpen(deps)).toBe(true);
+      settle(null);
+      await flushPromises();
+
+      expect(api.pointExplore.value).toBeNull();
+      expect(menuOpen(deps)).toBe(false);
+    });
+
+    it("enterprise: a miss that lands before the menu opens leaves no empty menu", async () => {
+      appConfig.isEnterprise = "true";
+      const deps = makeDeps({ streamType: "metrics" });
+      deps.findRelatedTelemetry.mockResolvedValue(null);
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick(lineClick);
+      await flushPromises();
+
+      expect(api.pointExplore.value).toBeNull();
+      expect(menuOpen(deps)).toBe(false);
+    });
+
+    it("enterprise: a chart with no group-by values hides View traces without correlating", async () => {
       appConfig.isEnterprise = "true";
       const deps = makeDeps({ fields: { breakdown: [] } });
       const api = usePanelDrilldown(deps as any);
       await api.onChartClick(lineClick);
 
-      expect(api.pointExplore.value?.traces.detail).toBe(
-        "Group this chart by a field such as service to find its traces",
-      );
+      expect(api.pointExplore.value?.traces.state).toBe("hidden");
       expect(deps.findRelatedTelemetry).not.toHaveBeenCalled();
     });
 
@@ -456,7 +476,7 @@ describe("usePanelDrilldown point menu", () => {
       });
       await flushPromises();
 
-      expect(api.pointExplore.value?.traces.state).toBe("disabled");
+      expect(api.pointExplore.value?.traces.state).toBe("hidden");
     });
   });
 

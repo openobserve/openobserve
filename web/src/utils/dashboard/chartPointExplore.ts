@@ -23,12 +23,11 @@ export interface FieldFilter {
   value: string | number | null;
 }
 
-/** One View logs / View traces row of the point menu; `detail` is its slice or why it is off. */
+/** One View logs / View traces row of the point menu; `detail` is its slice or its lock reason. */
 export interface PointExploreItem {
-  state: "enabled" | "disabled" | "pending";
+  // A license lock stays visible so the user learns what the plan lacks; any other gap is hidden.
+  state: "enabled" | "pending" | "locked" | "hidden";
   detail: I18nText;
-  // Only a licence lock shows the lock icon; a chart that lacks data shows a neutral one.
-  locked?: boolean;
 }
 
 /** The slice a clicked point explores, in microseconds. */

@@ -61,7 +61,6 @@ import {
   tracesAvailability,
   tracesPageQuery,
   treeOpensPointMenu,
-  type ExploreBlock,
   type PointClick,
   type PointExplore,
   type PointExploreItem,
@@ -831,15 +830,11 @@ export function usePanelDrilldown({
         })
       : sliceText(target);
 
-  const blockedItem = (reason: ExploreBlock): PointExploreItem => ({
-    state: "disabled",
-    detail: t(`panel.pointExplore.${reason}`),
-  });
+  const hiddenItem: PointExploreItem = { state: "hidden", detail: "" };
 
   const lockedItem = (feature: string): PointExploreItem => ({
-    state: "disabled",
+    state: "locked",
     detail: licenseLocks.lockedReason(feature),
-    locked: true,
   });
 
   const logsItem = (target: PointTarget): PointExploreItem => {
@@ -849,7 +844,7 @@ export function usePanelDrilldown({
       isLocked: licenseLocks.isLocked,
     });
     if (availability.kind === "locked") return lockedItem(availability.feature);
-    if (availability.kind === "blocked") return blockedItem(availability.reason);
+    if (availability.kind === "blocked") return hiddenItem;
     return { state: "enabled", detail: pointDetail(target) };
   };
 
@@ -865,7 +860,7 @@ export function usePanelDrilldown({
       isLocked: licenseLocks.isLocked,
     });
     if (availability.kind === "locked") return lockedItem(availability.feature);
-    if (availability.kind === "blocked") return blockedItem(availability.reason);
+    if (availability.kind === "blocked") return hiddenItem;
     if (availability.kind === "correlate") {
       return { state: "pending", detail: t("panel.pointExplore.findingService") };
     }
@@ -890,7 +885,13 @@ export function usePanelDrilldown({
     const data = result?.correlationData;
     const traceStream = data?.related_streams?.traces?.[0];
     if (!data || !traceStream?.stream_name) {
-      pointExplore.value = { ...pointExplore.value, traces: blockedItem("noTraceCorrelation") };
+      if (pointExplore.value.logs.state !== "hidden") {
+        pointExplore.value = { ...pointExplore.value, traces: hiddenItem };
+        return;
+      }
+      // Nothing is left in the point section, so a menu with no drilldowns would open empty.
+      pointExplore.value = null;
+      if (!drilldownArray.value.length) hidePopupsAndOverlays();
       return;
     }
     const streamFilters = Object.entries(traceStream.filters ?? {}).map(([field, value]) => ({
@@ -974,9 +975,14 @@ export function usePanelDrilldown({
     };
     if (request !== pointRequest) return false;
     const traces = tracesItem(target);
+    const logs = logsItem(target);
+    if (logs.state === "hidden" && traces.state === "hidden") {
+      pointExplore.value = null;
+      return false;
+    }
     pointExplore.value = {
       target,
-      logs: logsItem(target),
+      logs,
       traces,
       tracesTarget:
         traces.state === "enabled"
@@ -1052,7 +1058,9 @@ export function usePanelDrilldown({
     const annotationOnly = hasAnnotation && isRowTimeline(panelSchema.value.type);
     // Only a series item is a data point; an annotation marker keeps its own popup.
     const isDataPoint = (params?.componentType ?? "series") === "series";
-    const hasPointExplore = isDataPoint && (await preparePointExplore(params));
+    // A fast correlation miss can clear the section before the menu opens.
+    const hasPointExplore =
+      isDataPoint && (await preparePointExplore(params)) && !!pointExplore.value;
     if (!isDataPoint) pointExplore.value = null;
     const shouldShowDrilldown =
       !annotationOnly && (hasDrilldown || crossLinkItems.length > 0 || hasPointExplore);

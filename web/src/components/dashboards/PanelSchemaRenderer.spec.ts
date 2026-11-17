@@ -850,24 +850,23 @@ describe("PanelSchemaRenderer", () => {
     };
     const item = (id: string) => wrapper.find(`[data-test="drilldown-menu-item-${id}"]`);
 
-    it("a line point with no drilldowns opens the menu with only View logs and View traces", async () => {
+    it("a line point with no drilldowns lists View logs and a pending View traces", async () => {
       await clickPoint();
       expect(item("view-logs").exists()).toBe(true);
       expect(item("view-logs").text()).toContain("View logs at this time");
       expect(wrapper.find('[data-test="drilldown-menu-item-view-logs-detail"]').text()).toContain(
         "svc=cart",
       );
-      expect(item("view-traces").exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="drilldown-menu-item-view-traces-unavailable"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-pending"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-lock"]').exists()).toBe(
         false,
       );
       expect(wrapper.vm.drilldownArray).toEqual([]);
     });
 
-    it("shows the lock icon only when the item is license-locked", async () => {
+    it("keeps a license-locked item visible with its lock and reason", async () => {
       const zoConfig = store.state.zoConfig as any;
       const previous = zoConfig.features;
       zoConfig.features = { traces: "locked" };
@@ -877,8 +876,8 @@ describe("PanelSchemaRenderer", () => {
           true,
         );
         expect(
-          wrapper.find('[data-test="drilldown-menu-item-view-traces-unavailable"]').exists(),
-        ).toBe(false);
+          wrapper.find('[data-test="drilldown-menu-item-view-traces-reason"]').text(),
+        ).toContain("Locked: needs");
       } finally {
         zoConfig.features = previous;
       }
@@ -905,7 +904,7 @@ describe("PanelSchemaRenderer", () => {
       const ids = wrapper
         .findAll('[data-test="drilldown-menu"] [data-test^="drilldown-menu-item-"]')
         .map((el) => el.attributes("data-test"))
-        .filter((id) => !/-(detail|reason|lock|unavailable)$/.test(id!));
+        .filter((id) => !/-(detail|reason|lock|pending)$/.test(id!));
       expect(ids).toEqual([
         "drilldown-menu-item-view-logs",
         "drilldown-menu-item-view-traces",

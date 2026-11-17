@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`drilldown-menu-item-${item.id}`"
             >
               <OIcon
-                v-if="item.locked"
+                v-if="item.state === 'locked'"
                 size="xs"
                 class="text-icon-locked me-2"
                 name="lock"
@@ -280,8 +280,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 size="xs"
                 class="me-2"
-                :name="item.state === 'pending' ? 'hourglass-empty' : 'info-outline'"
-                :data-test="`drilldown-menu-item-${item.id}-unavailable`"
+                name="hourglass-empty"
+                :data-test="`drilldown-menu-item-${item.id}-pending`"
               />
               <span class="flex min-w-0 flex-col">
                 <span class="select-none">{{ item.label }}</span>
@@ -2480,7 +2480,7 @@ export default defineComponent({
           ...explore.traces,
           open: openPointTraces,
         },
-      ];
+      ].filter((item) => item.state !== "hidden");
     });
 
     // A chart or table click opens the drilldown menu, so it does nothing where drilldowns are off.
