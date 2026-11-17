@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSwitch
             id="anomaly-alert-enabled-switch"
             v-model="configModel.alert_enabled"
+            off-tone="neutral"
             aria-labelledby="anomaly-alert-enabled-heading anomaly-alert-enabled-switch-label"
             :label="
               config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')

@@ -1149,7 +1149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSwitch
                       v-if="localTab === 'sql' && !showVrl"
                       v-model="showVrl"
+                      :label="t('alerts.queryConfig.vrlToggle')"
+                      label-position="left"
+                      off-tone="neutral"
                       :aria-label="t('alerts.queryConfig.showVrlEditor')"
+                      data-test="alert-vrl-toggle"
                     >
                       <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" />
                     </OSwitch>
@@ -1279,7 +1283,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OSelect>
                       <OSwitch
                         v-model="showVrl"
+                        :label="t('alerts.queryConfig.vrlToggle')"
+                        label-position="left"
+                        off-tone="neutral"
                         :aria-label="t('alerts.queryConfig.hideVrlEditor')"
+                        data-test="alert-vrl-toggle"
                       >
                         <OTooltip :content="t('alerts.queryConfig.hideVrlEditor')" />
                       </OSwitch>
@@ -1703,6 +1711,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OFormSwitch
                       name="query_condition.promql_rule_mode"
+                      off-tone="neutral"
                       :label="t('alerts.promRuleMode')"
                       data-test="alert-prom-rule-mode"
                       @update:model-value="onPromRuleModeChange"

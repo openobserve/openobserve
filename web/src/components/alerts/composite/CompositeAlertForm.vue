@@ -223,6 +223,7 @@ watch(
         >
           <OSwitch
             :model-value="draft.composite_condition.warning_counts_as_firing"
+            off-tone="neutral"
             :aria-label="t('alerts.composite.warningCountsAsFiring')"
             data-test="alerts-composite-warning-counts-as-firing"
             @update:model-value="updateCondition({ warning_counts_as_firing: Boolean($event) })"
