@@ -950,6 +950,71 @@ export default class DashboardactionPage {
     }, scopeSelector);
   }
 
+  /**
+   * What a state timeline panel drew, read from its live chart option.
+   * The custom series carries one `[start, end, rowIndex, styleIndex]` per segment
+   * (styleIndex -1 is a "no data" stretch); the hidden line series holds one point
+   * per distinct sample time, which is what the crosshair snaps to.
+   * @returns {Promise<{rows: Array<Array<{start: number, end: number}>>, sampleTimes: number}|null>}
+   *   rows[i] lists row i's data segments (no-data stretches left out)
+   */
+  async getStateTimelineLayout(scopeSelector = this.chartRendererSelector) {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    if (!chart) return null;
+    const segmentSeries = chart.series.find((s) => s.type === "custom" && s.points.length > 0);
+    const sampleSeries = chart.series.find((s) => s.type === "line");
+    const rows = [];
+    for (const [start, end, rowIndex, styleIndex] of segmentSeries?.points ?? []) {
+      rows[rowIndex] ??= [];
+      if (styleIndex !== -1) rows[rowIndex].push({ start, end });
+    }
+    return { rows: Array.from(rows, (row) => row ?? []), sampleTimes: sampleSeries?.points.length ?? 0 };
+  }
+
+  /**
+   * Poll until the state timeline draws `rowCount` rows with data, then return its layout.
+   * Freshly ingested samples can miss the first query, so this retries instead of reading once.
+   */
+  async waitForStateTimelineLayout(rowCount, scopeSelector = this.chartRendererSelector) {
+    let layout = null;
+    await expect
+      .poll(
+        async () => {
+          layout = await this.getStateTimelineLayout(scopeSelector);
+          return layout ? layout.rows.filter((row) => row.length > 0).length : 0;
+        },
+        { timeout: 30000, message: `state timeline never drew ${rowCount} rows with data` },
+      )
+      .toBe(rowCount);
+    return layout;
+  }
+
+  /** Apply the panel, wait for it to render, and return the state timeline layout. */
+  async applyAndGetStateTimelineLayout(rowCount) {
+    await this.applyDashboardBtn();
+    await this.waitForChartToRender();
+    return this.waitForStateTimelineLayout(rowCount);
+  }
+
+  /**
+   * Bands: each row's samples hold one state, so equal neighbours must be joined —
+   * fewer segments than samples, and at least one segment wider than a bucket.
+   */
+  expectStateTimelineBands(layout, bucketMs) {
+    for (const row of layout.rows) {
+      expect(row.length).toBeLessThan(layout.sampleTimes);
+      expect(row.some((segment) => segment.end - segment.start > bucketMs)).toBe(true);
+    }
+  }
+
+  /** Cells: one cell per sample, none wider than its bucket, even though neighbours are equal. */
+  expectStateTimelineCells(layout, bucketMs) {
+    for (const row of layout.rows) {
+      expect(row.length).toBe(layout.sampleTimes);
+      expect(row.every((segment) => segment.end - segment.start <= bucketMs)).toBe(true);
+    }
+  }
+
   async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {
     const charts = await this.getChartOptionSnapshots(scopeSelector);
     if (charts.length !== 1) return [`expected one rendered chart, found ${charts.length}`];

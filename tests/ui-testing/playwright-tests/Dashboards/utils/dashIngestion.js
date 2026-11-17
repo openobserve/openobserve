@@ -250,5 +250,48 @@ const ingestionForSankey = async (streamName = "sankey_data") => {
   }
 };
 
+/**
+ * One sample per host every `stepSeconds`, aligned to that step and ending one step ago.
+ * Each host keeps a single `state_code`, so equal neighbours exist for Bands to join, and
+ * with the 10 s buckets of "Last 15 minutes" every bucket in the run holds a sample.
+ * Re-ingesting only adds samples at the same aligned times, so max(state_code) never changes.
+ */
+export const ingestionForStateTimeline = async (
+  page,
+  streamName = "e2e_state_timeline",
+  {
+    hosts = [
+      { host: "st-host-a", state_code: 1 },
+      { host: "st-host-b", state_code: 3 },
+    ],
+    samples = 30,
+    stepSeconds = 10,
+  } = {},
+) => {
+  if (!process.env["INGESTION_URL"]) {
+    throw new Error("Required environment variables are not set");
+  }
+
+  const stepMs = stepSeconds * 1000;
+  const lastMs = Math.floor(Date.now() / stepMs) * stepMs - stepMs;
+  const records = [];
+  for (let i = 0; i < samples; i++) {
+    const timestampUs = (lastMs - i * stepMs) * 1000;
+    for (const { host, state_code } of hosts) {
+      records.push({ host, state_code, _timestamp: timestampUs });
+    }
+  }
+
+  const fetchResponse = await postWithRetry(page, streamName, records, "State timeline ingestion");
+  if (!fetchResponse.ok) {
+    const body = await fetchResponse.text().catch(() => "");
+    throw new Error(
+      `HTTP error! status: ${fetchResponse.status}, response: ${body.slice(0, 200)}`
+    );
+  }
+  testLogger.info("State timeline data ingested", { streamName, records: records.length });
+  return await fetchResponse.json();
+};
+
 // Export only the required functions
 export { ingestionForMaps, ingestionForDashboardChartJson, ingestionForSankey, getAuthToken, removeUTFCharacters };

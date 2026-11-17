@@ -166,6 +166,22 @@ export default class DashboardPanelConfigs {
     this.barGaugeOrientationTrigger = page.locator('[data-test="dashboard-config-bar_gauge_orientation-trigger"]');
     this.barGaugeShowUnfilled = page.locator('[data-test="dashboard-config-bar_gauge_show_unfilled"]');
 
+    //State timeline locators
+    // Base test ids of the state timeline OSelects / toggle group; "-trigger" and "-option" derive from them.
+    this.stateTimelineDisplayId = "dashboard-config-state_timeline_display";
+    this.stateTimelineRowSortId = "dashboard-config-state-timeline-row-sort";
+    this.stateTimelineTooltipModeId = "dashboard-config-state-timeline-tooltip-mode";
+    this.stateValueAlignId = "dashboard-config-state_value_align";
+    this.stateTimelineDisplay = page.locator(`[data-test="${this.stateTimelineDisplayId}"]`);
+    this.stateTimelineDisplayTrigger = page.locator(`[data-test="${this.stateTimelineDisplayId}-trigger"]`);
+    this.stateTimelineRowSort = page.locator(`[data-test="${this.stateTimelineRowSortId}"]`);
+    this.stateTimelineRowSortTrigger = page.locator(`[data-test="${this.stateTimelineRowSortId}-trigger"]`);
+    this.stateTimelineTooltipMode = page.locator(`[data-test="${this.stateTimelineTooltipModeId}"]`);
+    this.stateTimelineTooltipModeTrigger = page.locator(`[data-test="${this.stateTimelineTooltipModeId}-trigger"]`);
+    this.stateTimelineShowStateText = page.locator('[data-test="dashboard-config-state-timeline-show-state-text"]');
+    this.stateValueAlign = page.locator(`[data-test="${this.stateValueAlignId}"]`);
+    this.stateValueAlignOptions = page.locator(`[data-test="${this.stateValueAlignId}-option"]`);
+
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
 
@@ -1341,6 +1357,55 @@ export default class DashboardPanelConfigs {
 
   async selectBarGaugeOrientation(label) {
     await this.selectConfigOption("dashboard-config-bar_gauge_orientation", label);
+  }
+
+  // ========== State timeline ==========
+
+  async selectStateTimelineDisplay(label) {
+    await this.selectConfigOption(this.stateTimelineDisplayId, label);
+  }
+
+  async selectStateTimelineRowSort(label) {
+    await this.selectConfigOption(this.stateTimelineRowSortId, label);
+  }
+
+  async selectStateTimelineTooltipMode(label) {
+    await this.selectConfigOption(this.stateTimelineTooltipModeId, label);
+  }
+
+  /** Option labels of the Display select, in the order the dropdown lists them. */
+  async getStateTimelineDisplayOptionLabels() {
+    return this.getConfigSelectOptionLabels(this.stateTimelineDisplayId);
+  }
+
+  /** Option labels of the "Sort rows by" select, in the order the dropdown lists them. */
+  async getStateTimelineRowSortOptionLabels() {
+    return this.getConfigSelectOptionLabels(this.stateTimelineRowSortId);
+  }
+
+  /** Option labels of the "Tooltip shows" select, in the order the dropdown lists them. */
+  async getStateTimelineTooltipModeOptionLabels() {
+    return this.getConfigSelectOptionLabels(this.stateTimelineTooltipModeId);
+  }
+
+  /** Pick a state text alignment item and wait for the group to report its value. */
+  async selectStateValueAlign(label, value) {
+    await this.scrollSidebarToElement(this.stateValueAlign);
+    await this._clickVirtualOption(this.stateValueAlignId, label);
+    await expect(this.stateValueAlign).toHaveAttribute("data-test-selected-value", value);
+  }
+
+  /** Assert the state text alignment's committed value, retrying while a reopened panel hydrates. */
+  async expectStateValueAlign(value) {
+    await this.scrollSidebarToElement(this.stateValueAlign);
+    await expect(this.stateValueAlign).toHaveAttribute("data-test-selected-value", value, { timeout: 15000 });
+  }
+
+  /** Labels of the state text alignment items; the Default item names the mode's fallback. */
+  async getStateValueAlignOptionLabels() {
+    await this.scrollSidebarToElement(this.stateValueAlign);
+    await this.stateValueAlignOptions.first().waitFor({ state: "visible", timeout: 10000 });
+    return this.stateValueAlignOptions.evaluateAll((els) => els.map((el) => el.getAttribute("data-test-label")));
   }
 
   /** Assert a config OSelect's committed value, retrying while a reopened panel hydrates. */
