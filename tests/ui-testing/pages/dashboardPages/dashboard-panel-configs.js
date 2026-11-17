@@ -1383,22 +1383,18 @@ export default class DashboardPanelConfigs {
     await this.selectConfigOption(this.stateTimelineTooltipModeId, label);
   }
 
-  /** Option labels of the Display select, in the order the dropdown lists them. */
   async getStateTimelineDisplayOptionLabels() {
     return this.getConfigSelectOptionLabels(this.stateTimelineDisplayId);
   }
 
-  /** Option labels of the "Sort rows by" select, in the order the dropdown lists them. */
   async getStateTimelineRowSortOptionLabels() {
     return this.getConfigSelectOptionLabels(this.stateTimelineRowSortId);
   }
 
-  /** Option labels of the "Tooltip shows" select, in the order the dropdown lists them. */
   async getStateTimelineTooltipModeOptionLabels() {
     return this.getConfigSelectOptionLabels(this.stateTimelineTooltipModeId);
   }
 
-  /** Pick a state text alignment item and wait for the group to report its value. */
   async selectStateValueAlign(label, value) {
     await this.scrollSidebarToElement(this.stateValueAlign);
     await this._clickVirtualOption(this.stateValueAlignId, label);

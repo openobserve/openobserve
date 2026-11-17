@@ -1002,14 +1002,8 @@ export default class DashboardactionPage {
     }, scopeSelector);
   }
 
-  /**
-   * What a state timeline panel drew, read from its live chart option.
-   * The custom series carries one `[start, end, rowIndex, styleIndex]` per segment
-   * (styleIndex -1 is a "no data" stretch); the hidden line series holds one point
-   * per distinct sample time, which is what the crosshair snaps to.
-   * @returns {Promise<{rows: Array<Array<{start: number, end: number}>>, sampleTimes: number}|null>}
-   *   rows[i] lists row i's data segments (no-data stretches left out)
-   */
+  // Segments are [start, end, rowIndex, styleIndex] with styleIndex -1 for "no data" (dropped here);
+  // the hidden line series has one point per distinct sample time.
   async getStateTimelineLayout(scopeSelector = this.chartRendererSelector) {
     const [chart] = await this.getChartOptionSnapshots(scopeSelector);
     if (!chart) return null;
@@ -1023,10 +1017,7 @@ export default class DashboardactionPage {
     return { rows: Array.from(rows, (row) => row ?? []), sampleTimes: sampleSeries?.points.length ?? 0 };
   }
 
-  /**
-   * Poll until the state timeline draws `rowCount` rows with data, then return its layout.
-   * Freshly ingested samples can miss the first query, so this retries instead of reading once.
-   */
+  // Polls because freshly ingested samples can miss the panel's first query.
   async waitForStateTimelineLayout(rowCount, scopeSelector = this.chartRendererSelector) {
     let layout = null;
     await expect
@@ -1041,17 +1032,13 @@ export default class DashboardactionPage {
     return layout;
   }
 
-  /** Apply the panel, wait for it to render, and return the state timeline layout. */
   async applyAndGetStateTimelineLayout(rowCount) {
     await this.applyDashboardBtn();
     await this.waitForChartToRender();
     return this.waitForStateTimelineLayout(rowCount);
   }
 
-  /**
-   * Bands: each row's samples hold one state, so equal neighbours must be joined —
-   * fewer segments than samples, and at least one segment wider than a bucket.
-   */
+  // Each seeded row holds one state, so Bands must join neighbours into segments wider than a bucket.
   expectStateTimelineBands(layout, bucketMs) {
     for (const row of layout.rows) {
       expect(row.length).toBeLessThan(layout.sampleTimes);
@@ -1059,7 +1046,7 @@ export default class DashboardactionPage {
     }
   }
 
-  /** Cells: one cell per sample, none wider than its bucket, even though neighbours are equal. */
+  // Cells never join equal neighbours: one cell per sample, none wider than its bucket.
   expectStateTimelineCells(layout, bucketMs) {
     for (const row of layout.rows) {
       expect(row.length).toBe(layout.sampleTimes);

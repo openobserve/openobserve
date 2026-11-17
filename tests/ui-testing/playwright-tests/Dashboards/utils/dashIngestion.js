@@ -250,12 +250,8 @@ const ingestionForSankey = async (streamName = "sankey_data") => {
   }
 };
 
-/**
- * One sample per host every `stepSeconds`, aligned to that step and ending one step ago.
- * Each host keeps a single `state_code`, so equal neighbours exist for Bands to join, and
- * with the 10 s buckets of "Last 15 minutes" every bucket in the run holds a sample.
- * Re-ingesting only adds samples at the same aligned times, so max(state_code) never changes.
- */
+// Samples sit on step-aligned times with one constant state per host, so re-ingesting
+// (e.g. from parallel tests) only adds samples at the same times and max(state_code) never changes.
 export const ingestionForStateTimeline = async (
   page,
   streamName = "e2e_state_timeline",

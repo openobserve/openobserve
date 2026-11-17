@@ -317,10 +317,7 @@ export async function setupBarGaugePanelWithConfig(page, pm, dashboardName, pane
   testLogger.info("Bar gauge panel with config ready", { dashboardName, panelName });
 }
 
-/**
- * State timeline panel — ingests evenly spaced per-host states, plots max(state_code)
- * over the seeded time axis with one row per host, opens config sidebar.
- */
+/** State timeline panel — max(state_code) over time with one row per host; config sidebar opened. */
 export async function setupStateTimelinePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
   const streamName = "e2e_state_timeline";
   await ingestionForStateTimeline(page, streamName);
