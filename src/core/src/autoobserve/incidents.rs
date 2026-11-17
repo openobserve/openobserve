@@ -810,6 +810,7 @@ mod tests {
                     detected_us: *onset,
                     recovered_us: None,
                     shadow: false,
+                    source: None,
                 })
             })
             .collect();
