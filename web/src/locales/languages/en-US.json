@@ -12395,7 +12395,15 @@
       "timelineLoading": "Loading timeline…",
       "timelineEmpty": "No timeline data yet",
       "legendWarning": "Warning",
-      "legendNoData": "No data"
+      "legendNoData": "No data",
+      "whichAlerts": "Which alerts?",
+      "whichAlertsHelp": "Pick 2 to 10 of your alerts",
+      "fireWhen": "Fire when",
+      "fireWhenHelp": "Use each alert once",
+      "alertCap": "{count} of {max} alerts",
+      "expressionExample": "For example: {example}",
+      "noAlertsChosen": "No alerts chosen yet. Each one you add gets a letter (A, B, C and so on) to use below.",
+      "alertsLabel": "Alerts"
     },
     "importAlertTitle": "Import Alert",
     "importAlert": "Import alert",
@@ -15633,7 +15641,13 @@
         "learned": "· learned from your data",
         "scheduleLine": "Checks every {every}, looking at the last {window}. Set in {link}.",
         "scheduleLink": "How often to check",
-        "windowSentence": "Fire when {fire}% of the last {buckets} buckets are unusual, and recover below {recover}%"
+        "windowSentence": "Fire when {fire}% of the last {buckets} buckets are unusual, and recover below {recover}%",
+        "measure": "Measure",
+        "of": "of",
+        "per": "per",
+        "learnFrom": "Learn from",
+        "trainingWindow": "Training window",
+        "theLast": "the last"
       },
       "holdFor": {
         "label": "Must last",
