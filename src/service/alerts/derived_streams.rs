@@ -31,6 +31,9 @@ use cron::Schedule;
 
 use crate::service::{alerts::QueryConditionExt, db};
 
+/// The largest delay a save accepts: 365 days in minutes.
+const MAX_DELAY_MINS: i32 = 525_600;
+
 pub async fn save(
     mut derived_stream: DerivedStream,
     pipeline_name: &str,
@@ -106,6 +109,14 @@ pub async fn save(
         }
         _ => {}
     };
+    if derived_stream
+        .delay
+        .is_some_and(|delay| !(0..=MAX_DELAY_MINS).contains(&delay))
+    {
+        return Err(anyhow::anyhow!(
+            "delay must be between 0 and {MAX_DELAY_MINS} minutes"
+        ));
+    }
     // End input validation
 
     // 2. update the frequency
@@ -146,24 +157,8 @@ pub async fn save(
         };
     }
 
-    let next_run_at = if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
-        match derived_stream.trigger_condition.get_next_trigger_time(
-            false,
-            derived_stream.tz_offset,
-            false,
-            None,
-        ) {
-            Ok(t) => t,
-            Err(e) => {
-                log::error!(
-                    "Failed to compute next trigger time for DerivedStream {trigger_module_key}: {e}"
-                );
-                chrono::Utc::now().timestamp_micros()
-            }
-        }
-    } else {
-        chrono::Utc::now().timestamp_micros()
-    };
+    let next_run_at =
+        initial_derived_stream_run(&derived_stream, chrono::Utc::now().timestamp_micros());
     // Save the trigger to db
     match db::scheduler::get(
         &derived_stream.org_id,
@@ -191,6 +186,42 @@ pub async fn save(
             db::scheduler::push(trigger)
                 .await
                 .map_err(|e| anyhow::anyhow!("Error save DerivedStream trigger: {}", e))
+        }
+    }
+}
+
+/// The delay in microseconds; `None` and a negative value give 0.
+pub(crate) fn derived_stream_delay_micros(derived_stream: &DerivedStream) -> i64 {
+    derived_stream
+        .delay
+        .filter(|delay_in_mins| *delay_in_mins > 0)
+        .and_then(|delay_in_mins| {
+            chrono::Duration::try_minutes(delay_in_mins as _).and_then(|td| td.num_microseconds())
+        })
+        .unwrap_or_default()
+}
+
+/// The first run of a saved trigger: now for an interval, the next cron time plus the delay
+/// for a cron. A cron without a next time keeps now.
+fn initial_derived_stream_run(derived_stream: &DerivedStream, now: i64) -> i64 {
+    if derived_stream.trigger_condition.frequency_type != FrequencyType::Cron {
+        return now;
+    }
+    match derived_stream.trigger_condition.get_next_trigger_time(
+        false,
+        derived_stream.tz_offset,
+        false,
+        Some(now),
+    ) {
+        Ok(t) => t
+            .checked_add(derived_stream_delay_micros(derived_stream))
+            .unwrap_or(now),
+        Err(e) => {
+            log::error!(
+                "Failed to compute next trigger time for DerivedStream in org {}: {e}",
+                derived_stream.org_id
+            );
+            now
         }
     }
 }
@@ -302,6 +333,46 @@ mod tests {
         assert!(
             err.contains("max query range") && err.contains("\"spans\""),
             "{err}"
+        );
+    }
+
+    fn hm(h: u32, m: u32) -> i64 {
+        chrono::NaiveDate::from_ymd_opt(2026, 11, 16)
+            .unwrap()
+            .and_hms_opt(h, m, 0)
+            .unwrap()
+            .and_utc()
+            .timestamp_micros()
+    }
+
+    fn cron_stream(cron: &str, delay: i32) -> DerivedStream {
+        let mut derived_stream = DerivedStream {
+            delay: Some(delay),
+            ..Default::default()
+        };
+        derived_stream.trigger_condition.frequency_type = FrequencyType::Cron;
+        derived_stream.trigger_condition.cron = cron.to_string();
+        derived_stream.trigger_condition.align_time = true;
+        derived_stream
+    }
+
+    /// T15
+    #[test]
+    fn first_cron_run_is_the_next_cron_time_plus_the_delay() {
+        let derived_stream = cron_stream("0 0 * * * *", 10);
+        assert_eq!(
+            initial_derived_stream_run(&derived_stream, hm(9, 37)),
+            hm(10, 10)
+        );
+    }
+
+    #[test]
+    fn first_interval_run_is_now_with_any_delay() {
+        let mut derived_stream = cron_stream("", 10);
+        derived_stream.trigger_condition.frequency_type = FrequencyType::Minutes;
+        assert_eq!(
+            initial_derived_stream_run(&derived_stream, hm(9, 37)),
+            hm(9, 37)
         );
     }
 }

@@ -52,7 +52,7 @@ use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{
     alerts::{
         alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
-        derived_streams::DerivedStreamExt,
+        derived_streams::{DerivedStreamExt, derived_stream_delay_micros},
     },
     dashboards::reports::SendReport,
     db::{self, alerts::alert::set_without_updating_trigger},
@@ -1681,6 +1681,53 @@ async fn handle_report_triggers(
     Ok(())
 }
 
+/// How a scheduled pipeline run ended, for the choice of its next run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum RunEnd {
+    /// The start was not before the aligned end.
+    Skipped,
+    /// The run started with no retries left.
+    MaxRetries,
+    /// The window ended before the slot, so the next window can run at once.
+    CatchUp { end: i64 },
+    /// A finished run, or a failure that used the last retry.
+    Normal,
+}
+
+/// The window of one scheduled pipeline run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct RunPlan {
+    /// `None` for a run without a cursor and without `start_at`: the window is one period.
+    start: Option<i64>,
+    /// The window end, aligned to the period boundary for an interval pipeline.
+    end: i64,
+    /// The end before the alignment, for the run record.
+    unaligned_end: i64,
+    skip: bool,
+    catch_up: bool,
+}
+
+/// The end is cut to the minute later, so a cron time in `t0`'s minute (seconds field
+/// not 0) would give an empty window that never moves `t0`: take a later minute.
+fn cron_window_end(
+    trigger_condition: &TriggerCondition,
+    tz_offset: i32,
+    t0: i64,
+    supposed_to_be_run_at: i64,
+) -> Result<i64, anyhow::Error> {
+    let minute_of = |t: i64| {
+        TriggerCondition::align_time(t, tz_offset, None, trigger_condition.timezone.as_deref())
+    };
+    let mut next = trigger_condition.get_next_trigger_time(false, tz_offset, false, Some(t0))?;
+    if minute_of(next) <= t0 {
+        // The last second of t0's minute, so the next cron time is in a later minute.
+        let last_second = minute_of(t0) + second_micros(59);
+        next =
+            trigger_condition.get_next_trigger_time(false, tz_offset, false, Some(last_second))?;
+    }
+    Ok(std::cmp::min(supposed_to_be_run_at, next))
+}
+
 async fn handle_derived_stream_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
@@ -1908,113 +1955,26 @@ async fn handle_derived_stream_triggers(
         .period_end_time
         .map(|period_end_time| period_end_time + 1);
 
-    // in case the range [start_time, end_time] is greater than querying period, it needs to
-    // evaluate and ingest 1 period at a time.
-    let user_defined_delay = derived_stream
-        .delay
-        .and_then(|delay_in_mins| {
-            chrono::Duration::try_minutes(delay_in_mins as _).and_then(|td| td.num_microseconds())
-        })
-        .unwrap_or_default();
-    let supposed_to_be_run_at = trigger.next_run_at - user_defined_delay;
-    let is_cron_frequency = derived_stream
-        .trigger_condition
-        .frequency_type
-        .eq(&config::meta::alerts::FrequencyType::Cron);
+    let plan = plan_derived_stream_run(
+        &derived_stream,
+        trigger.next_run_at,
+        start_time,
+        trigger.data.is_empty(),
+    )?;
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, start: {:?}, end: {}, skip: {}, catch_up: {}",
+        new_trigger.module_key,
+        plan.start,
+        plan.end,
+        plan.skip,
+        plan.catch_up,
+    );
     let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
         .unwrap()
         .num_microseconds()
         .unwrap();
-    let aligned_supposed_to_be_run_at = if !is_cron_frequency {
-        TriggerCondition::align_time(
-            supposed_to_be_run_at,
-            derived_stream.tz_offset,
-            Some(derived_stream.trigger_condition.period * 60),
-            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
-                                                                   * timezone string yet */
-        )
-    } else {
-        // For cron frequency, we don't need to align the end time as it is already aligned (the
-        // cron crate takes care of it)
-        TriggerCondition::align_time(
-            supposed_to_be_run_at,
-            derived_stream.tz_offset,
-            None,
-            derived_stream.trigger_condition.timezone.as_deref(),
-        )
-    };
-
-    let (mut start, mut end) = if derived_stream.start_at.is_some() && trigger.data.is_empty() {
-        (derived_stream.start_at, supposed_to_be_run_at)
-    } else if let Some(t0) = start_time {
-        // If the delay is equal to or greater than the frequency, we need to ingest data one by
-        // one If the delay is less than the frequency, we need to ingest data for
-        // the "next run at" period, For example, if the current time is 5:19pm,
-        // frequency is 5 mins, and delay is 4mins (supposed to be run at 5:15pm),
-        // we need to ingest data for the period from 5:10pm to 5:15pm only. The
-        // next run at will be 5:20pm which will query for the period from 5:15pm to
-        // 5:20pm. But, if the suppossed to be run at is 5:10pm, then we need ingest
-        // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
-        // period from 5:05pm to 5:15pm.
-        log::debug!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
-            new_trigger.module_key,
-            chrono::DateTime::from_timestamp_micros(supposed_to_be_run_at)
-                .unwrap()
-                .time(),
-            chrono::DateTime::from_timestamp_micros(t0 + period_num_microseconds)
-                .unwrap()
-                .time(),
-            supposed_to_be_run_at < t0 + period_num_microseconds,
-        );
-        (
-            Some(t0),
-            if is_cron_frequency {
-                // For cron frequency, don't believe the period, the period can be dynamic for cron.
-                // For example, if cron expression evaluates to "run every weekend 12am", the period
-                // is dynamic here.
-                std::cmp::min(
-                    supposed_to_be_run_at,
-                    derived_stream.trigger_condition.get_next_trigger_time(
-                        false,
-                        derived_stream.tz_offset,
-                        false,
-                        Some(t0),
-                    )?,
-                )
-            } else {
-                std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds)
-            },
-        )
-    } else {
-        (None, supposed_to_be_run_at)
-    };
-    // For derived stream, period is in minutes, so we need to convert it to seconds for align_time
-    let aligned_end_time = if !is_cron_frequency {
-        // For non-cron frequency, we need to align the current time so that the end_time is
-        // divisible by the period For example, if the current time is 5:19pm, period is 5
-        // mins, and delay is 4mins (supposed to be run at 5:15pm), we need to ingest data
-        // for the period from 5:10pm to 5:15pm only. The next run at will be 5:24pm which
-        // will query for the period from 5:15pm to 5:20pm. But, if the suppossed to be run
-        // at is 5:10pm, then we need ingest data for the period from 5:05pm to 5:15pm.
-        // Which is to cover the skipped period from 5:05pm to 5:15pm.
-        TriggerCondition::align_time(
-            end,
-            derived_stream.tz_offset,
-            Some(derived_stream.trigger_condition.period * 60),
-            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
-                                                                   * timezone string yet */
-        )
-    } else {
-        // For cron frequency, we don't need to align the end time as it is already aligned (the
-        // cron crate takes care of it)
-        TriggerCondition::align_time(
-            end,
-            derived_stream.tz_offset,
-            None,
-            derived_stream.trigger_condition.timezone.as_deref(),
-        )
-    };
+    let mut start = plan.start;
+    let end = plan.end;
 
     let mut trigger_data_stream = TriggerData {
         _timestamp: now_micros(),
@@ -2028,9 +1988,9 @@ async fn handle_derived_stream_triggers(
         start_time: if let Some(start) = start {
             start
         } else {
-            end - period_num_microseconds
+            plan.unaligned_end - period_num_microseconds
         },
-        end_time: end,
+        end_time: plan.unaligned_end,
         retries: new_trigger.retries,
         error: None,
         success_response: None,
@@ -2044,34 +2004,24 @@ async fn handle_derived_stream_triggers(
         ..Default::default()
     };
 
-    // conditionally modify supposed_to_be_run_at
-    if start.is_none_or(|t0| t0 < aligned_end_time) {
-        end = aligned_end_time;
-    } else {
-        // either t0 = aligned_end_time or t0 > aligned_end_time
-        // in both cases, we need to skip to next run because, we should always use
-        // aligned_curr_time as the end time
-        // Invalid timerange, most probably due to non-zero delay
-        // Don't do any further processing, just skip to next run
-        let start_time = start.unwrap();
+    if let Some(start_time) = start.filter(|_| plan.skip) {
+        // The start is not before the aligned end, most often after a changed save in the
+        // middle of a period. Don't do any further processing, just skip to next run.
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, Invalid timerange. Skipping to next run. start: {}, end: {}",
             new_trigger.module_key,
             start_time,
-            end,
+            plan.unaligned_end,
         );
-        new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
-            false,
-            derived_stream.tz_offset,
-            false,
-            Some(trigger.next_run_at),
-        )?;
+        new_trigger.next_run_at =
+            next_run_after(&derived_stream, RunEnd::Skipped, trigger.next_run_at)?;
         trigger_data_stream.status = TriggerDataStatus::Skipped;
-        trigger_data_stream.end_time = aligned_end_time;
+        trigger_data_stream.end_time = end;
         trigger_data_stream.next_run_at = new_trigger.next_run_at;
         trigger_data_stream.start_time = start_time;
         trigger_data_stream.error = Some(format!(
-            "Invalid timerange - start: {start_time}, end: {end}, should be fixed in the next run"
+            "Invalid timerange - start: {start_time}, end: {}, should be fixed in the next run",
+            plan.unaligned_end
         ));
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         publish_triggers_usage(trigger_data_stream);
@@ -2089,12 +2039,8 @@ async fn handle_derived_stream_triggers(
             new_trigger.module_key
         );
         // Go to the next nun at, but use the same trigger start time
-        new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
-            false,
-            derived_stream.tz_offset,
-            false,
-            Some(trigger.next_run_at),
-        )?;
+        new_trigger.next_run_at =
+            next_run_after(&derived_stream, RunEnd::MaxRetries, trigger.next_run_at)?;
         // Start over next time
         new_trigger.retries = 0;
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
@@ -2342,7 +2288,7 @@ async fn handle_derived_stream_triggers(
     if !(trigger_data_stream.status == TriggerDataStatus::Failed
         && new_trigger.retries < max_retries)
     {
-        let need_to_catch_up = end < aligned_supposed_to_be_run_at;
+        let need_to_catch_up = plan.catch_up;
         // If the trigger didn't fail, we need to reset the `retries` count.
         // Only cumulative failures should be used to check with `max_retries`
         if trigger_data_stream.status != TriggerDataStatus::Failed {
@@ -2351,22 +2297,14 @@ async fn handle_derived_stream_triggers(
 
         if trigger_data_stream.status != TriggerDataStatus::Failed && need_to_catch_up {
             // Go to the next nun at, but use the same trigger start time
-            new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
-                false,
-                derived_stream.tz_offset,
-                false,
-                Some(end),
+            new_trigger.next_run_at = next_run_after(
+                &derived_stream,
+                RunEnd::CatchUp { end },
+                trigger.next_run_at,
             )?;
         } else {
-            // Go to the next nun at, but use the same trigger start time
-            new_trigger.next_run_at = derived_stream
-                .trigger_condition
-                .get_next_trigger_time_non_aligned(
-                    false,
-                    derived_stream.tz_offset,
-                    false,
-                    Some(trigger.next_run_at),
-                )?;
+            new_trigger.next_run_at =
+                next_run_after(&derived_stream, RunEnd::Normal, trigger.next_run_at)?;
         }
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
@@ -2410,6 +2348,122 @@ async fn handle_derived_stream_triggers(
     }
 
     Ok(())
+}
+
+/// The window of a scheduled pipeline run whose stored run time is `next_run_at`.
+fn plan_derived_stream_run(
+    derived_stream: &config::meta::pipeline::components::DerivedStream,
+    next_run_at: i64,
+    cursor: Option<i64>,
+    first_run: bool,
+) -> Result<RunPlan, anyhow::Error> {
+    let trigger_condition = &derived_stream.trigger_condition;
+    let tz_offset = derived_stream.tz_offset;
+    // The slot: the scheduled time without the delay.
+    let supposed_to_be_run_at = next_run_at - derived_stream_delay_micros(derived_stream);
+    let is_cron_frequency =
+        trigger_condition.frequency_type == config::meta::alerts::FrequencyType::Cron;
+    let period_num_microseconds = Duration::try_minutes(trigger_condition.period)
+        .unwrap()
+        .num_microseconds()
+        .unwrap();
+    // For cron frequency, only the seconds are cut: the cron crate aligns the time.
+    // Derived streams don't have a timezone string yet.
+    let align = |t: i64| {
+        TriggerCondition::align_time(
+            t,
+            tz_offset,
+            (!is_cron_frequency).then_some(trigger_condition.period * 60),
+            trigger_condition.timezone.as_deref(),
+        )
+    };
+    let aligned_supposed_to_be_run_at = align(supposed_to_be_run_at);
+
+    // A window larger than the period is ingested one period at a time.
+    let (start, end) = if derived_stream.start_at.is_some() && first_run {
+        (derived_stream.start_at, supposed_to_be_run_at)
+    } else if let Some(t0) = cursor {
+        (
+            Some(t0),
+            if is_cron_frequency {
+                // For cron frequency, don't believe the period, the period can be dynamic for cron.
+                // For example, if cron expression evaluates to "run every weekend 12am", the period
+                // is dynamic here.
+                cron_window_end(trigger_condition, tz_offset, t0, supposed_to_be_run_at)?
+            } else {
+                std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds)
+            },
+        )
+    } else {
+        (None, supposed_to_be_run_at)
+    };
+    let aligned_end_time = align(end);
+
+    Ok(RunPlan {
+        start,
+        end: aligned_end_time,
+        unaligned_end: end,
+        skip: start.is_some_and(|t0| t0 >= aligned_end_time),
+        catch_up: aligned_end_time < aligned_supposed_to_be_run_at,
+    })
+}
+
+/// The next run of a scheduled pipeline: the next slot after `base`, plus the delay.
+/// With a delay, the tolerance is drawn after the alignment, so that it is not rounded away.
+fn next_derived_stream_run(
+    trigger_condition: &TriggerCondition,
+    tz_offset: i32,
+    base: i64,
+    delay_micros: i64,
+) -> Result<i64, anyhow::Error> {
+    if delay_micros <= 0 {
+        return trigger_condition.get_next_trigger_time(false, tz_offset, false, Some(base));
+    }
+    let without_tolerance = TriggerCondition {
+        tolerance_in_secs: None,
+        ..trigger_condition.clone()
+    };
+    let next_slot = without_tolerance.get_next_trigger_time(false, tz_offset, false, Some(base))?;
+    let tolerance = match trigger_condition.tolerance_in_secs {
+        Some(tolerance) if tolerance > 0 => {
+            second_micros(get_rand_num_within(0, tolerance as u64) as i64)
+        }
+        _ => 0,
+    };
+    next_slot
+        .checked_add(delay_micros)
+        .and_then(|t| t.checked_add(tolerance))
+        .ok_or_else(|| anyhow::anyhow!("delay is out of range"))
+}
+
+/// The next run after a run whose stored run time is `next_run_at`.
+fn next_run_after(
+    derived_stream: &config::meta::pipeline::components::DerivedStream,
+    run_end: RunEnd,
+    next_run_at: i64,
+) -> Result<i64, anyhow::Error> {
+    let trigger_condition = &derived_stream.trigger_condition;
+    let tz_offset = derived_stream.tz_offset;
+    let delay = derived_stream_delay_micros(derived_stream);
+    let slot = next_run_at - delay;
+    match run_end {
+        RunEnd::Skipped | RunEnd::MaxRetries => {
+            next_derived_stream_run(trigger_condition, tz_offset, slot, delay)
+        }
+        RunEnd::CatchUp { end } => {
+            next_derived_stream_run(trigger_condition, tz_offset, end, delay)
+        }
+        // A delay needs a slot on the boundary, so the run time is aligned.
+        RunEnd::Normal if delay > 0 => {
+            next_derived_stream_run(trigger_condition, tz_offset, slot, delay)
+        }
+        RunEnd::Normal => trigger_condition.get_next_trigger_time_non_aligned(
+            false,
+            tz_offset,
+            false,
+            Some(next_run_at),
+        ),
+    }
 }
 
 pub fn get_pipeline_info_from_module_key(
@@ -4305,4 +4359,88 @@ mod tests {
         let result = get_destination_stream_from_pipeline(&pipeline);
         assert!(result.is_err());
     }
+
+    /// 2026-11-16 at `h:m:s` UTC, in microseconds.
+    fn nov16_micros(h: u32, m: u32, s: u32) -> i64 {
+        chrono::NaiveDate::from_ymd_opt(2026, 11, 16)
+            .unwrap()
+            .and_hms_opt(h, m, s)
+            .unwrap()
+            .and_utc()
+            .timestamp_micros()
+    }
+
+    fn cron_condition(cron: &str) -> TriggerCondition {
+        TriggerCondition {
+            frequency_type: config::meta::alerts::FrequencyType::Cron,
+            cron: cron.to_string(),
+            period: 2,
+            ..Default::default()
+        }
+    }
+
+    /// The window end the derived stream handler searches to, after the minute cut.
+    fn aligned_cron_end(tc: &TriggerCondition, t0: i64, supposed_to_be_run_at: i64) -> i64 {
+        let end = cron_window_end(tc, 0, t0, supposed_to_be_run_at).unwrap();
+        TriggerCondition::align_time(end, 0, None, None)
+    }
+
+    #[test]
+    fn cron_with_seconds_moves_the_window_forward_on_every_run() {
+        let tc = cron_condition("7 */2 * * * *");
+        // The first run (no cursor) searched 09:30:00 to 09:32:00.
+        let mut t0 = nov16_micros(9, 32, 0);
+        for (run_at, want_end) in [
+            (nov16_micros(9, 34, 7), nov16_micros(9, 34, 0)),
+            (nov16_micros(9, 36, 7), nov16_micros(9, 36, 0)),
+        ] {
+            let end = aligned_cron_end(&tc, t0, run_at);
+            assert_eq!(end, want_end);
+            assert!(t0 < end, "the window must not be empty");
+            t0 = end;
+        }
+    }
+
+    #[test]
+    fn cron_with_seconds_recovers_a_stalled_cursor() {
+        let tc = cron_condition("7 */2 * * * *");
+        // A trigger stalled today keeps the cursor at 09:32:00 while runs go on.
+        let end = aligned_cron_end(&tc, nov16_micros(9, 32, 0), nov16_micros(10, 0, 7));
+        assert_eq!(end, nov16_micros(9, 34, 0));
+    }
+
+    #[test]
+    fn cron_with_seconds_and_delay_gets_a_window() {
+        let tc = cron_condition("7 */2 * * * *");
+        // Run at 09:34:07 with a 2 minute delay.
+        let end = aligned_cron_end(&tc, nov16_micros(9, 30, 0), nov16_micros(9, 32, 7));
+        assert_eq!(end, nov16_micros(9, 32, 0));
+    }
+
+    #[test]
+    fn cron_with_zero_seconds_is_unchanged() {
+        let tc = cron_condition("0 */2 * * * *");
+        let mut t0 = nov16_micros(9, 32, 0);
+        for run_at in [
+            nov16_micros(9, 34, 0),
+            nov16_micros(9, 36, 0),
+            nov16_micros(10, 0, 0),
+        ] {
+            let before = std::cmp::min(
+                run_at,
+                tc.get_next_trigger_time(false, 0, false, Some(t0)).unwrap(),
+            );
+            let end = cron_window_end(&tc, 0, t0, run_at).unwrap();
+            assert_eq!(end, before);
+            assert_eq!(
+                TriggerCondition::align_time(end, 0, None, None),
+                t0 + second_micros(120)
+            );
+            t0 = end;
+        }
+    }
 }
+
+#[cfg(test)]
+#[path = "derived_stream_run_tests.rs"]
+mod derived_stream_run_tests;
