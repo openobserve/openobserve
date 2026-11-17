@@ -22,7 +22,11 @@ import i18n from "@/locales";
 // the panel's own layout rules are FirstDataPanel.spec's; here only HomeView's reading of them is pinned
 const panel = vi.hoisted(() => ({ layout: "none" as string }));
 
-const packs = vi.hoisted(() => ({ enabled: false, showSection: true }));
+const packs = vi.hoisted(() => ({
+  enabled: false,
+  offerShown: true,
+  offer: null as { value: boolean } | null,
+}));
 vi.mock("@/constants/starterPacks", () => ({
   get STARTER_PACKS_ENABLED() {
     return packs.enabled;
@@ -40,7 +44,10 @@ vi.mock("@/components/starterPacks/StarterPackHomeSection.vue", async () => {
       name: "StarterPackHomeSection",
       emits: ["ready"],
       setup(_props, { emit }) {
-        mounted(() => emit("ready", { showSection: vueRef(packs.showSection) }));
+        mounted(() => {
+          packs.offer = vueRef(packs.offerShown);
+          emit("ready", { offerShown: packs.offer });
+        });
         return () => render("div", { "data-test": "home-pack-section-stub" });
       },
     }),
@@ -84,7 +91,7 @@ vi.mock("@/services/overview", () => ({ default: overviewData }));
 vi.mock("@/views/OverviewTab.vue", () => ({
   default: {
     name: "OverviewTab",
-    emits: ["sendToAiChat", "not-monitored"],
+    emits: ["sendToAiChat"],
     template: '<div data-test="overview-tab-stub" />',
   },
 }));
@@ -365,16 +372,16 @@ describe("HomeView", () => {
     });
   });
 
-  describe("when nothing is watched yet", () => {
+  describe("while the Starter Packs offer shows", () => {
     beforeEach(() => {
       packs.enabled = true;
-      packs.showSection = true;
+      packs.offerShown = true;
     });
     afterEach(() => {
       packs.enabled = false;
     });
-    const notMonitored = async (value: boolean) => {
-      wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("not-monitored", value);
+    const setOffer = async (value: boolean) => {
+      packs.offer!.value = value;
       await flushPromises();
     };
     const panelShown = () =>
@@ -386,11 +393,9 @@ describe("HomeView", () => {
         wrapper = mountHome();
         await flushPromises();
         expect(has("home-pack-section-stub")).toBe(true);
-        expect(panelShown()).toBe(true);
-        await notMonitored(true);
         expect(panelShown()).toBe(false);
         expect(has("overview-tab-stub")).toBe(true);
-        await notMonitored(false);
+        await setOffer(false);
         expect(panelShown()).toBe(true);
       });
     }
@@ -399,9 +404,6 @@ describe("HomeView", () => {
       setFlag(false);
       wrapper = mountHome();
       await flushPromises();
-      expect(has("home-stream-totals")).toBe(false);
-      await notMonitored(true);
-      await flushPromises();
       const line = wrapper.get('[data-test="home-stream-totals"]');
       expect(line.get('[data-test="home-stream-totals-count"]').text()).toBe("9 streams");
       expect(line.get('[data-test="home-stream-totals-today"]').text()).toBe("1.20 GB today");
@@ -409,24 +411,17 @@ describe("HomeView", () => {
       await line.get('[data-test="home-stream-totals-open-btn"]').trigger("click");
       expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "logstreams" }));
       push.mockRestore();
-    });
-
-    it("shows no stream totals when the Starter Packs section is not shown", async () => {
-      packs.showSection = false;
-      setFlag(false);
-      wrapper = mountHome();
-      await flushPromises();
-      await notMonitored(true);
+      await setOffer(false);
       expect(has("home-stream-totals")).toBe(false);
     });
 
-    it("keeps the Overview panel when the Starter Packs section is not shown", async () => {
-      packs.showSection = false;
+    it("keeps the Overview panel and no stream totals when the offer is not shown", async () => {
+      packs.offerShown = false;
       setFlag(false);
       wrapper = mountHome();
       await flushPromises();
-      await notMonitored(true);
       expect(panelShown()).toBe(true);
+      expect(has("home-stream-totals")).toBe(false);
     });
   });
 

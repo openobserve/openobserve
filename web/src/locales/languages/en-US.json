@@ -15235,13 +15235,13 @@
       "rowFailed": "Failed · {name}"
     },
     "home": {
+      "label": "Starter packs",
       "title": "Your {title} data is ready to monitor",
       "hidden": "{title} pack hidden for you",
       "hiddenForEveryone": "{title} pack hidden for everyone",
       "showForEveryone": "Show for everyone",
       "hideFailed": "Couldn't change that setting. Try again.",
       "showAgain": "Show again",
-      "empty": "No starter pack matches your data yet",
       "error": "Couldn't check your data for packs",
       "turnOn": "Turn on alerts",
       "viewPack": "View pack",
@@ -15262,6 +15262,7 @@
       "fits": "Fits {stream}",
       "askAdmin": "Ask an admin",
       "copyLink": "Copy link",
+      "askAdminLine": "Starter packs fit your data. Ask an admin to add them.",
       "findOtherSub": "Nginx, PostgreSQL, AWS and more in the Starter Packs library.",
       "browse": "Browse starter packs",
       "streamCount": "{count} stream | {count} streams",

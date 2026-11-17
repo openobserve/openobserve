@@ -18,6 +18,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import { readQuery } from "@/composables/query/readQuery";
+import { refreshOrgResources } from "@/composables/useOrgResources";
 import { alertsByTagsQuery } from "@/services/alerts.queries";
 import { featureState } from "@/utils/featureGate";
 
@@ -292,6 +293,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       return false;
     } finally {
       running.value = false;
+      void refreshOrgResources(org);
     }
   };
 
@@ -315,6 +317,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       return false;
     } finally {
       busy.value = false;
+      void refreshOrgResources(org);
     }
   };
 

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount } from "vue";
+import { onBeforeUnmount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -25,7 +25,6 @@ import type { StarterPack } from "@/composables/starterPacks/types";
 import { useHomePacks, type HomePacks } from "@/composables/starterPacks/useHomePacks";
 import { raw, useI18nTyped } from "@/types/i18n";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
-import StarterPackFindMore from "./StarterPackFindMore.vue";
 import StarterPackHomeRow from "./StarterPackHomeRow.vue";
 import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
 import TurnOnAlertsDrawer from "./TurnOnAlertsDrawer.vue";
@@ -38,16 +37,13 @@ const { t } = useI18nTyped();
 const home = useHomePacks(props.org, props.packs);
 emit("ready", home);
 onBeforeUnmount(() => emit("ready", null));
-
-const compact = computed(() =>
-  home.items.filter((item) =>
-    ["hiddenAdmin", "dismissed", "interrupted", "error"].includes(item.view.value),
-  ),
-);
 </script>
 
 <template>
   <div class="mt-2.5 mb-3 flex shrink-0 flex-col gap-3 empty:hidden" data-test="home-pack-section">
+    <OText v-if="home.labelShown.value" variant="section" data-test="home-pack-label">{{
+      t("starterPacks.home.label")
+    }}</OText>
     <div
       v-if="home.loading.value"
       class="border-border-default rounded-surface flex flex-col gap-2 border p-4"
@@ -58,7 +54,7 @@ const compact = computed(() =>
       <OSkeleton class="h-8 w-1/3" />
     </div>
 
-    <template v-for="item in compact" :key="item.pack.id">
+    <template v-for="item in home.notices.value" :key="item.pack.id">
       <OBanner
         v-if="item.view.value === 'hiddenAdmin'"
         variant="default"
@@ -152,21 +148,22 @@ const compact = computed(() =>
     </template>
 
     <OBanner
-      v-if="home.empty.value"
+      v-if="home.askAdmin.value"
       variant="default"
       dense
       inline-actions
-      data-test="home-pack-empty"
+      data-test="home-pack-ask-admin"
     >
-      {{ t("starterPacks.home.empty") }}
+      {{ t("starterPacks.home.askAdminLine") }}
       <template #actions>
         <OButton
           variant="ghost-primary"
           size="sm-action"
-          data-test="home-pack-empty-library-link"
-          @click="home.library"
+          icon-left="content-copy"
+          data-test="home-pack-ask-admin-copy-link-btn"
+          @click="home.offered.value[0].copyLink"
         >
-          {{ t("starterPacks.library") }}
+          {{ t("starterPacks.home.copyLink") }}
         </OButton>
       </template>
     </OBanner>
@@ -215,18 +212,6 @@ const compact = computed(() =>
         </div>
       </div>
     </section>
-
-    <div
-      v-if="
-        !home.showSection.value &&
-        !home.setUp.value.length &&
-        !home.loading.value &&
-        home.hasData.value
-      "
-      class="flex justify-end"
-    >
-      <StarterPackFindMore :org="org" variant="link" />
-    </div>
 
     <template v-for="item in home.items" :key="`overlays-${item.pack.id}`">
       <StarterPackDrawer

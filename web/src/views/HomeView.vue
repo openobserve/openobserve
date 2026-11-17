@@ -239,10 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab
-              @send-to-ai-chat="onSendToAiChat"
-              @not-monitored="overviewNotMonitored = $event"
-            />
+            <OverviewTab @send-to-ai-chat="onSendToAiChat" />
           </div>
           <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
             <UsageTab />
@@ -258,10 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab
-              @send-to-ai-chat="onSendToAiChat"
-              @not-monitored="overviewNotMonitored = $event"
-            />
+            <OverviewTab @send-to-ai-chat="onSendToAiChat" />
           </div>
 
           <!-- Usage tab -->
@@ -353,11 +347,8 @@ export default defineComponent({
     const packsEnabled = STARTER_PACKS_ENABLED;
     const homePacks = shallowRef<HomePacks | null>(null);
     provide(HOME_PACKS, homePacks);
-    const overviewNotMonitored = ref(false);
-    // v-show, not v-if: unmounting OverviewTab would drop the state that decides the hide.
-    const hideOverviewPanel = computed(
-      () => packsEnabled && !!homePacks.value?.showSection.value && overviewNotMonitored.value,
-    );
+    // v-show, not v-if: Overview keeps its loaded state while the pack offer covers it.
+    const hideOverviewPanel = computed(() => packsEnabled && !!homePacks.value?.offerShown.value);
     // Overview already loads these totals, so the line under the pack strip reads the same cache entry.
     const overviewTotals = useQuery(() => ({
       ...orgOverviewQuery(store.state.selectedOrganization?.identifier ?? ""),
@@ -720,7 +711,6 @@ export default defineComponent({
       isEnterpriseOrCloud,
       packsEnabled,
       homePacks,
-      overviewNotMonitored,
       hideOverviewPanel,
       streamTotals,
       openStreams,

@@ -32,8 +32,10 @@ const fake = vi.hoisted(() => ({
   flows: {} as Record<string, any>,
   matchers: {} as Record<string, any>,
   dismissal: null as any,
+  dismissals: {} as Record<string, any>,
   org: null as any,
   hasUserData: null as any,
+  noResources: null as any,
   browser: {
     saveBuiltIn: vi.fn(),
   },
@@ -49,11 +51,15 @@ vi.mock("@/composables/starterPacks/useStarterPackMatcher", () => ({
     fake.matchers[pack.id],
 }));
 vi.mock("@/composables/starterPacks/packDismissal", () => ({
-  usePackDismissal: () => fake.dismissal,
+  usePackDismissal: (_surface: string, _org: string, packId: string) =>
+    fake.dismissals[packId] ?? fake.dismissal,
   usePackHiddenForOrg: () => fake.org,
 }));
 vi.mock("@/composables/useOrgHasUserData", () => ({
   useOrgHasUserData: () => ({ hasUserData: fake.hasUserData }),
+}));
+vi.mock("@/composables/useOrgResources", () => ({
+  useOrgHasNoResources: () => ({ noResources: fake.noResources }),
 }));
 vi.mock("@/composables/starterPacks/useBrowserMatches", () => ({
   useBrowserMatches: () => fake.browser,
@@ -87,7 +93,6 @@ const render = async (packs = [KUBERNETES_PACK]) => {
       stubs: {
         StarterPackDrawer: true,
         StarterPackHealthLine: true,
-        StarterPackFindMore: true,
         StarterPackUndoDialog: true,
         TurnOnAlertsDrawer: true,
         OIcon: true,
@@ -108,7 +113,9 @@ describe("StarterPackHomeSection", () => {
     fake.flows = { kubernetes: fakeFlow(), hosts: fakeFlow({ pack: HOSTS_PACK }) };
     fake.matchers = { kubernetes: matcherDouble(), hosts: matcherDouble() };
     fake.dismissal = dismissalDouble();
+    fake.dismissals = {};
     fake.hasUserData = ref(true);
+    fake.noResources = ref(true);
     fake.browser.saveBuiltIn.mockClear();
     fake.copy.mockClear();
     fake.org = {
@@ -335,20 +342,24 @@ describe("StarterPackHomeSection", () => {
     expect(fake.matchers.kubernetes.check).not.toHaveBeenCalled();
   });
 
-  it("says no pack matches once, and offers Retry on error", async () => {
+  it("shows nothing, not even the label, when no pack matches", async () => {
     fake.matchers.kubernetes.state.value = "none";
     fake.matchers.hosts.state.value = "none";
-    const none = await render([KUBERNETES_PACK, HOSTS_PACK]);
-    expect(none.findAll('[data-test="home-pack-empty"]')).toHaveLength(1);
-    expect(has(none, "home-pack-empty-library-link")).toBe(true);
+    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
+    expect(has(wrapper, "home-pack-label")).toBe(false);
+    expect(has(wrapper, "home-pack-empty")).toBe(false);
+    expect(has(wrapper, "home-pack-offer")).toBe(false);
+    expect(homeOf(wrapper).offerShown.value).toBe(false);
     fake.matchers.hosts.state.value = "matched";
     await nextTick();
-    expect(has(none, "home-pack-empty")).toBe(false);
-    expect(has(none, "home-pack-hosts-card")).toBe(true);
+    expect(has(wrapper, "home-pack-label")).toBe(true);
+    expect(has(wrapper, "home-pack-hosts-card")).toBe(true);
+  });
 
+  it("offers Retry under the label when a match check fails in an empty org", async () => {
     fake.matchers.kubernetes.state.value = "error";
-    fake.matchers.hosts.state.value = "none";
     const wrapper = await render();
+    expect(has(wrapper, "home-pack-label")).toBe(true);
     await wrapper.get('[data-test="home-pack-card-retry-btn"]').trigger("click");
     expect(fake.matchers.kubernetes.retry).toHaveBeenCalled();
   });
@@ -361,27 +372,129 @@ describe("StarterPackHomeSection", () => {
     expect(homeOf(wrapper).items[0].drawerOpen.value).toBe(true);
   });
 
-  it("says nothing about no match while the org has no data of its own", async () => {
+  it("shows nothing while the org has no data of its own", async () => {
     fake.hasUserData = ref(false);
-    fake.matchers.kubernetes.state.value = "none";
     const wrapper = await render();
-    expect(homeOf(wrapper).empty.value).toBe(false);
+    expect(has(wrapper, "home-pack-label")).toBe(false);
+    expect(has(wrapper, "home-pack-card")).toBe(false);
+    expect(has(wrapper, "home-pack-card-skeleton")).toBe(false);
     expect(has(wrapper, "home-pack-empty")).toBe(false);
-    expect(wrapper.findComponent({ name: "StarterPackFindMore" }).exists()).toBe(false);
+    expect(has(wrapper, "home-pack-find-other")).toBe(false);
+    expect(homeOf(wrapper).offerShown.value).toBe(false);
   });
 
-  it("swaps Set up for Ask an admin and Copy link when the user may not create the pack", async () => {
-    fake.flows.kubernetes.forbidden.value = true;
+  it("shows no pack UI and no skeleton until the resources check says the org is empty", async () => {
+    fake.noResources = ref(false);
+    fake.matchers.kubernetes.state.value = "checking";
     const wrapper = await render();
+    expect(has(wrapper, "home-pack-card-skeleton")).toBe(false);
+    fake.matchers.kubernetes.state.value = "matched";
+    await nextTick();
+    expect(has(wrapper, "home-pack-label")).toBe(false);
+    expect(has(wrapper, "home-pack-card")).toBe(false);
+    expect(homeOf(wrapper).offerShown.value).toBe(false);
+  });
+
+  it("offers the packs once the resources check says the org is empty", async () => {
+    fake.noResources = ref(false);
+    const wrapper = await render();
+    expect(has(wrapper, "home-pack-card")).toBe(false);
+    fake.noResources.value = true;
+    await nextTick();
+    expect(has(wrapper, "home-pack-label")).toBe(true);
+    expect(has(wrapper, "home-pack-card")).toBe(true);
+    expect(homeOf(wrapper).offerShown.value).toBe(true);
+  });
+
+  it("puts the Starter packs label over the skeleton and over the offer strip", async () => {
+    fake.matchers.kubernetes.state.value = "checking";
+    const wrapper = await render();
+    expect(wrapper.get('[data-test="home-pack-label"]').text()).toBe("Starter packs");
+    expect(homeOf(wrapper).offerShown.value).toBe(true);
+    fake.matchers.kubernetes.state.value = "matched";
+    await nextTick();
+    const section = wrapper.get('[data-test="home-pack-section"]').html();
+    expect(section.indexOf("home-pack-label")).toBeLessThan(section.indexOf("home-pack-offer"));
+    expect(wrapper.findAll('[data-test="home-pack-label"]')).toHaveLength(1);
+  });
+
+  it("still feeds the header chip in an org that already has resources", async () => {
+    fake.noResources = ref(false);
+    await render();
+    const [sources] = fake.browser.saveBuiltIn.mock.calls.at(-1)!;
+    expect(sources.map((source: { packId: string }) => source.packId)).toEqual(["kubernetes"]);
+    expect(fake.matchers.kubernetes.check).toHaveBeenCalled();
+  });
+
+  it("shows the stopped setup under the label in an org that already has resources", async () => {
+    fake.noResources = ref(false);
+    fake.flows.kubernetes.interrupted.value = true;
+    fake.flows.kubernetes.record = shallowRef({ status: "incomplete" });
+    const wrapper = await render();
+    expect(has(wrapper, "home-pack-label")).toBe(true);
+    expect(has(wrapper, "home-pack-interrupted")).toBe(true);
+  });
+
+  it("shows the hidden-for-you line under the label only in an empty org", async () => {
+    fake.dismissal.dismissed.value = true;
+    const wrapper = await render();
+    expect(has(wrapper, "home-pack-label")).toBe(true);
+    expect(has(wrapper, "home-pack-dismissed")).toBe(true);
+    expect(homeOf(wrapper).offerShown.value).toBe(false);
+    fake.noResources.value = false;
+    await nextTick();
+    expect(has(wrapper, "home-pack-label")).toBe(false);
+    expect(has(wrapper, "home-pack-dismissed")).toBe(false);
+  });
+
+  it("holds no skeleton over Overview for a dismissed pack whose record is still loading", async () => {
+    fake.dismissal.dismissed.value = true;
+    const wrapper = await render();
+    fake.flows.kubernetes.loaded.value = false;
+    await nextTick();
+    expect(homeOf(wrapper).items[0].view.value).toBe("loading");
+    expect(has(wrapper, "home-pack-card-skeleton")).toBe(false);
+    expect(homeOf(wrapper).offerShown.value).toBe(false);
+  });
+
+  it("holds the skeleton, not the strip, while a dismissed pack's record loads beside a matched pack", async () => {
+    fake.dismissals.hosts = dismissalDouble();
+    fake.dismissals.hosts.dismissed.value = true;
+    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
+    expect(has(wrapper, "home-pack-offer")).toBe(true);
+    fake.flows.hosts.loaded.value = false;
+    await nextTick();
+    expect(homeOf(wrapper).items[0].view.value).toBe("offer");
+    expect(homeOf(wrapper).items[1].view.value).toBe("loading");
+    expect(has(wrapper, "home-pack-offer")).toBe(false);
+    expect(has(wrapper, "home-pack-card-skeleton")).toBe(true);
+    expect(homeOf(wrapper).offerShown.value).toBe(true);
+    fake.flows.hosts.loaded.value = true;
+    await nextTick();
+    expect(has(wrapper, "home-pack-card-skeleton")).toBe(false);
+    expect(has(wrapper, "home-pack-offer")).toBe(true);
+  });
+
+  it("keeps Ask an admin on a row the user may not create beside one they may", async () => {
+    fake.flows.kubernetes.forbidden.value = true;
+    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
+    expect(has(wrapper, "home-pack-ask-admin")).toBe(false);
     expect(has(wrapper, "home-pack-card-setup-btn")).toBe(false);
     expect(wrapper.get('[data-test="home-pack-card-ask-admin-btn"]').text()).toBe("Ask an admin");
     expect(wrapper.get('[data-test="home-pack-card-copy-link-btn"]').text()).toBe("Copy link");
+    expect(has(wrapper, "home-pack-hosts-card-setup-btn")).toBe(true);
   });
 
-  it("copies the pack page link from the Copy link button of a pack the user may not create", async () => {
+  it("says once to ask an admin, with Copy link, when the user may create no offered pack", async () => {
     fake.flows.kubernetes.forbidden.value = true;
     const wrapper = await render();
-    await wrapper.get('[data-test="home-pack-card-copy-link-btn"]').trigger("click");
+    expect(has(wrapper, "home-pack-label")).toBe(true);
+    expect(has(wrapper, "home-pack-card")).toBe(false);
+    expect(wrapper.get('[data-test="home-pack-ask-admin"]').text()).toContain(
+      "Starter packs fit your data. Ask an admin to add them.",
+    );
+    expect(homeOf(wrapper).offerShown.value).toBe(false);
+    await wrapper.get('[data-test="home-pack-ask-admin-copy-link-btn"]').trigger("click");
     expect(fake.copy).toHaveBeenCalledTimes(1);
     expect(fake.copy.mock.calls[0][0]).toBe(fake.flows.kubernetes.packLink());
     expect(fake.copy.mock.calls[0][0]).toContain("/starter-packs/kubernetes");

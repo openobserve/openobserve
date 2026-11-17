@@ -13,6 +13,7 @@ const fake = vi.hoisted(() => ({
   previewPack: vi.fn(),
   undoPack: vi.fn(),
   removePack: vi.fn(),
+  refreshResources: vi.fn(),
   push: vi.fn(async () => undefined),
   alerts: [] as Array<{ enabled: boolean }>,
 }));
@@ -28,6 +29,7 @@ vi.mock("./useStarterPacks", () => ({
 }));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: fake.push }) }));
 vi.mock("@/composables/query/readQuery", () => ({ readQuery: async () => fake.alerts }));
+vi.mock("@/composables/useOrgResources", () => ({ refreshOrgResources: fake.refreshResources }));
 
 const PACK = {
   id: "kubernetes",
@@ -391,6 +393,23 @@ describe("useStarterPackFlow", () => {
     fake.undoPack.mockResolvedValueOnce({ removed: [{}], kept: [] });
     expect(await flow.undo()).toBe(true);
     expect(flow.record.value).toBeNull();
+  });
+
+  it("refreshes the org's resources check after every install, undo and remove", async () => {
+    const flow = setup();
+    fake.installPack.mockResolvedValueOnce(record());
+    await flow.install();
+    expect(fake.refreshResources).toHaveBeenLastCalledWith("org");
+    fake.installPack.mockRejectedValueOnce(new Error("down"));
+    await flow.install();
+    expect(fake.refreshResources).toHaveBeenCalledTimes(2);
+    fake.undoPack.mockResolvedValueOnce({ removed: [{}], kept: [] });
+    await flow.undo();
+    expect(fake.refreshResources).toHaveBeenCalledTimes(3);
+    fake.removePack.mockResolvedValueOnce({ removed: [{}], kept: [] });
+    await flow.remove();
+    expect(fake.refreshResources).toHaveBeenCalledTimes(4);
+    expect(fake.refreshResources.mock.calls.every(([org]) => org === "org")).toBe(true);
   });
 
   it("lands an unlicensed org on the dashboard it already has when nothing is left to create", async () => {
