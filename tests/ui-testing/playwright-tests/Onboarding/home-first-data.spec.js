@@ -243,7 +243,7 @@ const SCREENS = [
         },
         async run({ page, orgId }) {
             await openHome(page, orgId, 'overview');
-            await expect(tid(page, 'overview-headline-strip')).toBeVisible({ timeout: 30000 });
+            await expect(tid(page, 'overview-alerts-health-grid')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-not-monitored-empty-state')).toHaveCount(0);
             await expect(tid(page, 'overview-load-error-empty-state')).toHaveCount(0);
         },
@@ -379,7 +379,7 @@ const SCREENS = [
             const streamReads = [];
             page.on('request', (r) => { if (/\/api\/[^/]+\/streams\?/.test(r.url())) streamReads.push(r.url()); });
             await openHome(page, orgId, 'overview');
-            await expect(tid(page, 'overview-headline-strip')).toBeVisible({ timeout: 30000 });
+            await expect(tid(page, 'overview-alerts-health-grid')).toBeVisible({ timeout: 30000 });
             await expect.poll(() => streamReads.length, { timeout: 15000 }).toBeGreaterThan(0);
             // a failed probe is unknown, not empty, so the flag-off first-data hero must not take the page
             await expect(tid(page, 'home-first-data-hero')).toHaveCount(0);
