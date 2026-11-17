@@ -84,6 +84,76 @@ fn weakens_under(
         .any(|days| weakens_security_source(current, update, days))
 }
 
+/// Refuses an org retention default that shortens a Security source which inherits it, unless
+/// the user holds the Security delete grant.
+pub async fn guard_org_retention_update(
+    org_id: &str,
+    user_id: &str,
+    update: &config::meta::stream::DataRetentionDefaults,
+) -> Result<(), Response> {
+    let shortened = match db::organization::org_retention_defaults(org_id).await {
+        Ok(current) => shortened_types(
+            &db::organization::resolved_retention_defaults(&current),
+            &db::organization::resolved_retention_defaults(update),
+        ),
+        Err(e) => {
+            log::error!("[SECURITY] org retention read failed: {e}");
+            RETENTION_TYPES.to_vec()
+        }
+    };
+    let mut destructive = false;
+    for stream_type in shortened {
+        // a failed listing is refused: a source may sit behind it
+        destructive = match stream::try_get_streams(org_id, Some(stream_type), false, None).await {
+            Ok(streams) => {
+                let mut inherits = false;
+                for stream in streams {
+                    let settings =
+                        infra::schema::get_settings(org_id, &stream.name, stream_type).await;
+                    if settings.is_some_and(|s| inherits_as_security_source(&s)) {
+                        inherits = true;
+                        break;
+                    }
+                }
+                inherits
+            }
+            Err(e) => {
+                log::error!("[SECURITY] stream listing failed for {org_id}/{stream_type}: {e}");
+                true
+            }
+        };
+        if destructive {
+            break;
+        }
+    }
+    refuse_unless_admin(org_id, user_id, destructive).await
+}
+
+/// The stream types an org retention default applies to.
+const RETENTION_TYPES: [StreamType; 4] = [
+    StreamType::Logs,
+    StreamType::Metrics,
+    StreamType::Traces,
+    StreamType::Profiles,
+];
+
+/// The types whose resolved default gets shorter; 0 keeps the data forever.
+fn shortened_types(
+    current: &config::meta::stream::DataRetentionDefaults,
+    update: &config::meta::stream::DataRetentionDefaults,
+) -> Vec<StreamType> {
+    let days = |days: i64| if days > 0 { days } else { i64::MAX };
+    RETENTION_TYPES
+        .into_iter()
+        .filter(|t| days(update.for_type(*t)) < days(current.for_type(*t)))
+        .collect()
+}
+
+/// A Security source with no retention of its own, so the org default decides its data.
+fn inherits_as_security_source(settings: &config::meta::stream::StreamSettings) -> bool {
+    settings.data_retention <= 0 && is_security_source(settings.security.as_ref())
+}
+
 /// A `security` change is audited by its summary row, so its request row is not stamped too.
 pub fn audits_settings_request(touches_security: bool, summary_written: bool) -> bool {
     touches_security && !summary_written
@@ -150,6 +220,44 @@ mod tests {
         assert!(weakens_under(&inheriting, &retention(7), Ok(90)));
         assert!(weakens_under(&inheriting, &retention(7), down()));
         assert!(!weakens_under(&source, &retention(60), down()));
+    }
+
+    #[test]
+    fn test_an_org_default_is_judged_per_type_and_only_for_inheriting_sources() {
+        use config::meta::stream::{DataRetentionDefaults, SecuritySourceSetting, StreamSettings};
+        let defaults = |logs, metrics| DataRetentionDefaults {
+            logs,
+            metrics,
+            traces: 30,
+            profiles: 30,
+            ..Default::default()
+        };
+        assert_eq!(
+            shortened_types(&defaults(30, 30), &defaults(3, 30)),
+            vec![StreamType::Logs]
+        );
+        assert!(shortened_types(&defaults(30, 30), &defaults(60, 30)).is_empty());
+        assert_eq!(
+            shortened_types(&defaults(0, 30), &defaults(3, 30)),
+            vec![StreamType::Logs],
+            "0 kept the data forever"
+        );
+        assert!(shortened_types(&defaults(3, 30), &defaults(0, 30)).is_empty());
+
+        let stream = |data_retention, source: bool| StreamSettings {
+            data_retention,
+            security: source.then(|| SecuritySourceSetting {
+                included: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert!(inherits_as_security_source(&stream(0, true)));
+        assert!(
+            !inherits_as_security_source(&stream(30, true)),
+            "its own retention decides"
+        );
+        assert!(!inherits_as_security_source(&stream(0, false)));
     }
 
     #[test]

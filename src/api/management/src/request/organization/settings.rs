@@ -27,6 +27,8 @@ use infra::errors::{DbError, Error};
 use {
     axum::extract::{Multipart, Query},
     o2_enterprise::enterprise::common::settings,
+    openobserve_api_common::extractors::Headers,
+    openobserve_core::auth::UserEmail,
 };
 #[cfg(feature = "cloud")]
 use {
@@ -80,10 +82,23 @@ struct LogoUploadForm {
 )]
 pub async fn create(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(settings): Json<OrganizationSettingPayload>,
 ) -> Response {
     if let Err(msg) = validate_settings_payload(&settings) {
         return MetaHttpResponse::bad_request(msg);
+    }
+    // a shorter org default deletes the data of every Security source that inherits it
+    #[cfg(feature = "enterprise")]
+    if let Some(data_retention) = &settings.data_retention
+        && let Err(refusal) = crate::request::security::streams::guard_org_retention_update(
+            &org_id,
+            &user_email.user_id,
+            data_retention,
+        )
+        .await
+    {
+        return refusal;
     }
     #[cfg(feature = "cloud")]
     let settings = match check_domain_org_mappings(&org_id, settings).await {
