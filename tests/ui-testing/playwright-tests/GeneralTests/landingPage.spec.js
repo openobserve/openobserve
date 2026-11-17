@@ -17,6 +17,7 @@ const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
 const { getOrgIdentifier, getAuthHeaders } = require('../utils/cloud-auth.js');
 const {
+  BASE,
   NAMESPACE_FIELD,
   STREAM,
   namespaceTablePanel,
@@ -24,7 +25,6 @@ const {
   deleteDashboard,
 } = require('../utils/dashboard-auto-run-fixtures.js');
 
-const API_BASE = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || '').replace(/\/$/, '');
 const HOME_PIN_KEY = 'home_dashboard';
 const orgId = () => getOrgIdentifier() || process.env.ORGNAME || 'default';
 
@@ -562,7 +562,7 @@ test.describe("Landing Page Test Cases", () => {
 });
 
 async function settingsApi(method, path, body) {
-  const res = await fetch(`${API_BASE}/api/${orgId()}/settings/v2${path}`, {
+  const res = await fetch(`${BASE}/api/${orgId()}/settings/v2${path}`, {
     method,
     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     ...(body ? { body: JSON.stringify(body) } : {}),
@@ -581,6 +581,22 @@ async function restoreHomePin(previous) {
   else await settingsApi('DELETE', `/${HOME_PIN_KEY}`);
 }
 
+// An unreadable pin must stop the test, or the restore in `finally` would delete the org's real pin.
+async function readHomePin() {
+  const { status, body } = await settingsApi('GET', `/${HOME_PIN_KEY}`);
+  if (status === 404) return null;
+  if (status >= 400) throw new Error(`read home dashboard pin -> ${status}`);
+  return body?.setting_value ?? null;
+}
+
+// Recent events load in the same batch as anomalies, so their answer proves the anomaly loader already ran.
+function waitForOverviewHistory(page) {
+  return page.waitForResponse(
+    (res) => res.url().includes(`/api/v2/${orgId()}/alerts/history?`) && res.request().method() === 'GET',
+    { timeout: 60000 },
+  );
+}
+
 function inListValues(sql) {
   const match = /IN \(([^)]*)\)/.exec(sql);
   return match ? match[1].split(',').map((v) => v.trim()).sort() : null;
@@ -597,11 +613,7 @@ test.describe('Home Overview on the OSS build (#16634)', { tag: ['@landingPage',
     page.on('request', (req) => {
       if (/\/api\/[^/]+\/anomaly_detection/.test(new URL(req.url()).pathname)) anomalyRequests.push(req.url());
     });
-    // Recent events load in the same batch as anomalies, so their answer proves the anomaly loader already ran.
-    const historyAnswered = page.waitForResponse(
-      (res) => res.url().includes(`/api/v2/${orgId()}/alerts/history?`) && res.request().method() === 'GET',
-      { timeout: 60000 },
-    );
+    const historyAnswered = waitForOverviewHistory(page);
 
     await navigateToBase(page);
     await pm.homePage.openHomeTab('overview');
@@ -610,7 +622,9 @@ test.describe('Home Overview on the OSS build (#16634)', { tag: ['@landingPage',
     await expect(pm.homePage.homeOverviewPanel).toBeVisible();
     expect(anomalyRequests, 'OSS Overview must not call the unregistered anomaly_detection route').toEqual([]);
     await expect(page).not.toHaveURL(/\/login/);
+    const historyAfterReload = waitForOverviewHistory(page);
     await pm.homePage.loadHome(orgId());
+    expect((await historyAfterReload).status(), 'Overview recent-events request after a reload').toBeLessThan(400);
     await expect(page).not.toHaveURL(/\/login/);
     expect(anomalyRequests).toEqual([]);
   });
@@ -629,7 +643,7 @@ test.describe('Home pinned dashboard variables (#16699)', { tag: ['@landingPage'
     // Auto Run would apply the change without Refresh, so it is pinned off to test the Refresh path.
     await autoRun.pinAutoQuery(false);
 
-    const previousPin = await settingsApi('GET', `/${HOME_PIN_KEY}`);
+    const previousPin = await readHomePin();
     let dashboardId;
     try {
       dashboardId = await createDashboard(title, {
@@ -668,8 +682,8 @@ test.describe('Home pinned dashboard variables (#16699)', { tag: ['@landingPage'
       expect(inListValues(autoRun.runsOf('home')[base]), 'Refresh runs the panel with both selected values').toEqual(["'velero'", "'ziox'"]);
       await autoRun.expectPanelRows('p_home', { shows: ['ziox', 'velero'] });
     } finally {
-      await restoreHomePin(previousPin.status < 400 ? previousPin.body?.setting_value ?? null : null);
       await deleteDashboard(dashboardId);
+      await restoreHomePin(previousPin);
     }
   });
 });
