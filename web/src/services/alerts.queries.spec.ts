@@ -21,7 +21,6 @@ import {
   alertAcksQuery,
   alertDetailQuery,
   ackAlertMutation,
-  ackAlertsMutation,
   toggleAlertStateMutation,
   toggleAnomalyAlertStateMutation,
   unackAlertMutation,
@@ -217,35 +216,6 @@ describe("ack and mute queries", () => {
     }
   });
 
-  it("counts every row of an incident one bulk ack wrote", async () => {
-    const answer = (changed: boolean, id?: string) => ({
-      data: { changed, acks: [], incident: id ? { id, status: "acknowledged" } : undefined },
-    });
-    vi.mocked(alerts.ackAlert)
-      .mockResolvedValueOnce(answer(false, "inc") as any)
-      .mockResolvedValueOnce(answer(true, "inc") as any)
-      .mockResolvedValueOnce(answer(false, "inc") as any)
-      .mockResolvedValueOnce(answer(false, "held-elsewhere") as any)
-      .mockResolvedValueOnce(answer(false) as any);
-    const targets = ["1", "2", "3", "4", "5"].map((alertId) => ({ alertId, body: {} }));
-
-    const result = await (ackAlertsMutation(ORG).mutationFn as any)(targets);
-
-    expect(result).toEqual({ acked: 3, failures: [] });
-  });
-
-  it("reports a rejected bulk ack as a failure with its reason", async () => {
-    const reason = { response: { status: 409, data: { code: "firing_changed" } } };
-    vi.mocked(alerts.ackAlert)
-      .mockResolvedValueOnce({ data: { changed: true, acks: [] } } as any)
-      .mockRejectedValueOnce(reason);
-    const targets = ["1", "2"].map((alertId) => ({ alertId, body: {} }));
-
-    const result = await (ackAlertsMutation(ORG).mutationFn as any)(targets);
-
-    expect(result).toEqual({ acked: 1, failures: [{ alertId: "2", error: reason }] });
-  });
-
   it("tracks an ack only when it changed something", () => {
     vi.mocked(analytics.track).mockClear();
     const single = ackAlertMutation(ORG).onSuccess as (answer: unknown) => void;
@@ -253,13 +223,6 @@ describe("ack and mute queries", () => {
     expect(analytics.track).not.toHaveBeenCalled();
     single({ changed: true, acks: [] });
     expect(analytics.track).toHaveBeenCalledWith("alert_acknowledged", { count: 1 });
-
-    vi.mocked(analytics.track).mockClear();
-    const bulk = ackAlertsMutation(ORG).onSuccess as (result: unknown) => void;
-    bulk({ acked: 0, failures: [] });
-    expect(analytics.track).not.toHaveBeenCalled();
-    bulk({ acked: 3, failures: [] });
-    expect(analytics.track).toHaveBeenCalledWith("alert_acknowledged", { count: 3 });
   });
 
   it("refreshes the Firing read after a pause or resume", () => {

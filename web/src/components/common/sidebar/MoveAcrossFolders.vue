@@ -33,17 +33,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit.execute()"
   >
     <div role="body" :data-test="`${type}-folder-move-body`">
-      <OInput
-        :model-value="
-          store.state.organizationData.foldersByType?.[type]?.find(
-            (item: any) => item.folderId === activeFolderId,
-          )?.name ?? ''
-        "
-        :label="t(folderKey(type, 'dashboard.currentFolderLabel'))"
-        disabled
-        :data-test="`${type}-folder-move-name`"
-      />
-      <span>&nbsp;</span>
+      <template v-if="activeFolderId">
+        <OInput
+          :model-value="
+            store.state.organizationData.foldersByType?.[type]?.find(
+              (item: any) => item.folderId === activeFolderId,
+            )?.name ?? ''
+          "
+          :label="t(folderKey(type, 'dashboard.currentFolderLabel'))"
+          disabled
+          :data-test="`${type}-folder-move-name`"
+        />
+        <span>&nbsp;</span>
+      </template>
 
       <!-- select folder or create new folder and select.
 

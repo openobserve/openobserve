@@ -136,6 +136,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { streamProbeQuery } from "@/services/stream.queries";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { firstDataStorageKey } from "@/composables/firstEvent/useFirstDataNotice";
+import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 
 // OverviewTab renders only O2 `lib` components.
@@ -2640,7 +2641,12 @@ describe("OverviewTab", () => {
       expect(link.element.tagName).toBe("BUTTON");
       expect(link.text()).toBe("View all");
       await link.trigger("click");
-      expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "alertList",
+          query: expect.objectContaining({ state: ALERT_LIST_ALL_STATES }),
+        }),
+      );
       expect(section.html()).not.toContain("hover:bg-table-row-hover-bg");
       expect(section.html()).not.toContain("tracking-");
       push.mockRestore();
@@ -2688,9 +2694,17 @@ describe("OverviewTab", () => {
       const lastQuery = () => (push.mock.lastCall![0] as any).query;
 
       const cases: [string, string, Record<string, string>][] = [
-        ["overview-alerts-box-failing", "alertList", { state: "error" }],
-        ["overview-alerts-box-critical", "alertList", { state: "firing", level: "critical" }],
-        ["overview-alerts-box-warning", "alertList", { state: "firing", level: "warning" }],
+        ["overview-alerts-box-failing", "alertList", { state: "error", all_folders: "true" }],
+        [
+          "overview-alerts-box-critical",
+          "alertList",
+          { state: "firing", level: "critical", all_folders: "true" },
+        ],
+        [
+          "overview-alerts-box-warning",
+          "alertList",
+          { state: "firing", level: "warning", all_folders: "true" },
+        ],
       ];
       for (const [id, name, query] of cases) {
         await wrapper.get(`[data-test="${id}"]`).trigger("click");
@@ -2724,7 +2738,12 @@ describe("OverviewTab", () => {
       }
 
       await wrapper.get('[data-test="overview-alerts-view-all"]').trigger("click");
-      expect(lastQuery()).not.toHaveProperty("state");
+      expect(lastQuery()).toEqual(
+        expect.objectContaining({
+          state: ALERT_LIST_ALL_STATES,
+          all_folders: ALERT_LIST_ALL_FOLDERS,
+        }),
+      );
       push.mockRestore();
     });
 

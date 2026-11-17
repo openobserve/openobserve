@@ -194,6 +194,10 @@ class AnomalyDetectionPage {
         await tab.click();
         await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 10000 });
         await this.page.locator(this.selectors.listTable).waitFor({ state: 'visible', timeout: 30000 });
+        // The list opens on Firing, so a detector the test just made needs the Total tile.
+        const total = this.page.locator('[data-test="alert-summary-total"]').first();
+        await total.waitFor({ state: 'visible', timeout: 15000 });
+        await total.click();
         testLogger.info('Anomaly Detection tab loaded');
     }
 
