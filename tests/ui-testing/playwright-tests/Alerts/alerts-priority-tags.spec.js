@@ -40,7 +40,7 @@ const TEST_STREAM = 'e2e_automate';
 
 /** Navigate to the alert wizard, fill the required identity fields, land on Advanced. */
 async function openWizardOnAdvancedTab(page, pm, alertName) {
-    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&state=all`);
     await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
     await pm.alertsPage.clickAddAlertButton();
@@ -119,7 +119,7 @@ test.describe('Alerts — priority, tags & additional variables', {
 
         // Read the values back off the LIST TABLE — the assertion the three silent-drop bugs
         // would each have failed (the API can be perfect while the row mapping renders "—").
-        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&state=all`);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
         await pm.alertsPage.expectAlertVisibleInList(alertName);
@@ -170,7 +170,7 @@ test.describe('Alerts — priority, tags & additional variables', {
     // other surface in the list-browsing flow.
     // ─────────────────────────────────────────────────────────────────────────
     test('alert list shows Priority and Tags and no longer shows the removed configuration columns', async ({ page }) => {
-        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&state=all`);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
         await pm.alertsPage.expectListColumns({
@@ -199,7 +199,7 @@ test.describe('Alerts — priority, tags & additional variables', {
         expect(minsResp.ok(), `minutes alert create failed: ${minsResp.status()}`).toBeTruthy();
         expect(rtResp.ok(), `realtime alert create failed: ${rtResp.status()}`).toBeTruthy();
 
-        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&state=all`);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
         await pm.alertsPage.expectFrequencyCell(cronName, '0 */10 * * * *');
@@ -220,7 +220,7 @@ test.describe('Alerts — priority, tags & additional variables', {
         await createAlert(page, simpleAlert(schedName));
         await createAlert(page, realtimeAlert(rtName));
 
-        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&state=all`);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
         await pm.alertsPage.clickAlertTypeTab('scheduled');
@@ -272,7 +272,7 @@ test.describe('Alerts — priority, tags & additional variables', {
     test('the alert section tab strip shows the renamed labels', {
         tag: ['@alert-list-frequency-retries', '@all', '@alerts', '@P1'],
     }, async ({ page }) => {
-        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&state=all`);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
         await pm.alertsPage.expectSectionTabLabels([

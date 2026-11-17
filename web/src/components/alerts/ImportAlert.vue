@@ -298,6 +298,7 @@ import {
   ensureUnaryConditionValues,
 } from "@/utils/alerts/alertDataTransforms";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 
 export default defineComponent({
   name: "ImportAlert",
@@ -517,6 +518,7 @@ export default defineComponent({
             query: {
               org_identifier: store.state.selectedOrganization.identifier,
               folder: selectedFolderId.value,
+              state: ALERT_LIST_ALL_STATES,
             },
           });
         }, 400);

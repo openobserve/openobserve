@@ -5,6 +5,7 @@ import { expect } from '@playwright/test';
 import { getAuthHeaders, getOrgIdentifier } from '../playwright-tests/utils/cloud-auth.js';
 import testLogger from '../playwright-tests/utils/test-logger.js';
 import { ingestBase } from '../playwright-tests/utils/ingest-url.js';
+import { gotoWithAlpha1Reauth } from '../playwright-tests/utils/reauth-alpha1.js';
 
 // Left-nav group flyouts.
 // Several former top-level menu items (pipeline, functions, enrichment tables,
@@ -98,6 +99,16 @@ export async function gotoStreamsViaNav(page) {
 }
 
 /**
+ * Select the alerts list's Total tile; the list opens on Firing, and flows that look for an alert they made need every row.
+ * @param {import('@playwright/test').Page} page
+ */
+export async function showAllAlertStates(page) {
+    const total = page.locator('[data-test="alert-summary-total"]').first();
+    await total.waitFor({ state: 'visible', timeout: 15000 });
+    await total.click();
+}
+
+/**
  * Click a left-nav link, re-clicking until the SPA route actually lands on `pathSuffix` (e.g. '/logs').
  * @param {import('@playwright/test').Page} page
  * @param {string} selector
@@ -148,10 +159,12 @@ export async function gotoMetricsVisualize(page) {
         // about:blank and friends have no query string — keep the fallback.
     }
 
-    await page.goto(
-        `${process.env.ZO_BASE_URL}/web/metrics?org_identifier=${orgIdentifier}&mode=visualize`
+    await gotoWithAlpha1Reauth(
+        page,
+        `${process.env.ZO_BASE_URL}/web/metrics?org_identifier=${orgIdentifier}&mode=visualize`,
+        page.locator('[data-test="metrics-explorer-visualize"]'),
+        { timeout: 30000 }
     );
-    await page.locator('[data-test="metrics-explorer-visualize"]').waitFor({ state: 'visible', timeout: 30000 });
 }
 
 // Common Locator exports
@@ -179,6 +192,7 @@ export class CommonActions {
         await this.page.waitForTimeout(2000);
         // Check for alerts page loaded - use alert list page element
         await expect(this.page.locator('[data-test="alert-list-page"]')).toBeVisible();
+        await showAllAlertStates(this.page);
     }
 
     async navigateToSettings() {

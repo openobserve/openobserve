@@ -212,6 +212,8 @@ async function mountBare(rows: any[]) {
     },
   });
   await flushPromises();
+  // The list opens on the Firing tile; these rows never fire.
+  (wrapper.vm as any).stateFilters = [];
   return wrapper;
 }
 
@@ -803,6 +805,10 @@ describe("AlertList — SLO alert rows", () => {
       query: { folder: "default", "v.search": "cpu", "v.all": "true" },
     });
     wrapper = await mountBare([]);
+    await settle();
+    expect(wrapper.vm.searchQuery).toBe("cpu");
+    // The stubbed FolderList would emit the URL's folder on mount, which ends the restore.
+    await (wrapper.vm as any).updateActiveFolderId("default");
     await settle();
     expect(wrapper.vm.searchQuery).toBe("cpu");
 

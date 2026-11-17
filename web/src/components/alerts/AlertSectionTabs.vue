@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   AlertSectionTabs — the section switcher across the alerting siblings
-  (Firing / All Alerts / Destinations / Templates / Library), rendered in an
+  (All Alerts / Destinations / Templates / Library), rendered in an
   OPageLayout's #header-tabs slot on each of them.
 
   The routes stay FLAT top-level siblings (see shared/router.ts) — this is
@@ -38,8 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="section.key"
         :name="section.key"
         :data-test="`alert-section-tab-${section.key}`"
-        :count="section.key === 'alertFiring' ? firingCount : undefined"
-        :count-tone="firingCount ? 'error' : 'default'"
       >
         <OIcon :name="section.icon" size="sm" class="shrink-0" />
         <span :class="section.key === activeSectionKey ? '' : 'max-md:hidden'">{{
@@ -62,16 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter, type RouteLocationRaw } from "vue-router";
-import { useQuery } from "@tanstack/vue-query";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
-import { firingAlertsQuery } from "@/services/alerts.queries";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { countStates } from "@/utils/alerts/firingAlerts";
 import { featureState } from "@/utils/featureGate";
 
 const TAB_ORDER_KEY = "o2_alert_section_tab_order";
@@ -118,13 +113,6 @@ const sections = computed<Section[]>(() => {
     ...(alertsHidden
       ? []
       : [
-          {
-            key: "alertFiring",
-            label: t("alerts.firing.title"),
-            icon: "notifications-active" as IconName,
-            to: { name: "alertFiring", query },
-            licenseLocked,
-          },
           {
             key: "alertList",
             label: t("alerts.allAlerts"),
@@ -187,18 +175,6 @@ const onReorder = (move: { from: string | number; to: string | number; before: b
     // Storage unavailable: the order holds for this session only.
   }
 };
-
-const firingList = useQuery(() =>
-  Object.assign(firingAlertsQuery(orgIdentifier.value), {
-    enabled:
-      !!orgIdentifier.value && featureState(store.state.zoConfig?.features, "alerts") === "enabled",
-  }),
-);
-// Blank run state would read as a confident zero, so the badge hides instead.
-const firingCount = computed(() => {
-  const page = firingList.data.value;
-  return page && !page.status_unavailable ? countStates(page.list).firing : null;
-});
 
 // Empty on any other route, so a page that renders this strip outside the
 // siblings highlights nothing rather than lying about where you are.

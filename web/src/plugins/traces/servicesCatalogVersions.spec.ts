@@ -21,6 +21,7 @@ import {
   servingIdle,
   servingHealthSql,
   versionTrafficKey,
+  versionTrafficFrom,
   CATALOG_COLUMN_SIZES,
   catalogEnvColumn,
   catalogPanelRow,
@@ -37,6 +38,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { NO_ENV } from "@/services/service_versions.envs";
 import type { Scope, ServicesResponse } from "@/services/service_versions";
 import producer from "@/test/unit/fixtures/serviceVersions/producer.json";
+import { serviceKeySql } from "@/utils/serviceCount";
 const scope = (where_key: string): Scope => ({
   service: "checkout",
   scope_key: where_key,
@@ -58,6 +60,15 @@ describe("catalog identity", () => {
     );
     expect(rows.map((row) => row.versionScope?.where_key)).toEqual(["east", "west"]);
     expect(rows.map((row) => row.error_rate)).toEqual([7, 0]);
+  });
+  it("joins every spelling of a service to its scope and names the row after the scope", () => {
+    const renamed = { ...scope("east"), service: "checkout.service" };
+    const [row] = mergeCatalogVersions(
+      [{ service_name: "Checkout", where_key: "east" }],
+      [renamed],
+    );
+    expect(row.versionScope).toBe(renamed);
+    expect(row.service_name).toBe("checkout.service");
   });
   it("does not duplicate an unscoped RED aggregate across wheres", () => {
     expect(
@@ -173,7 +184,9 @@ describe("Health of the version serving now", () => {
   });
   it("counts only the service's own request spans per where and version", () => {
     const sql = servingHealthSql("default", "(kind)", true, false);
-    expect(sql).toContain("GROUP BY o2_service_where, service_name, o2_service_version");
+    expect(sql).toContain(
+      `GROUP BY o2_service_where, ${serviceKeySql("service_name")}, o2_service_version`,
+    );
     expect(sql).toContain("COUNT(*) FILTER (WHERE (kind)) AS total_requests");
     expect(sql).toContain("(infer_service_name IS NULL OR infer_service_name = '')");
     expect(servingHealthSql("default", "(kind)", false, false)).not.toContain("infer_service_name");
@@ -493,6 +506,13 @@ describe("Health when the shown version sent nothing in the window", () => {
     expect(servingIdle(row("1.0"), traffic, true)).toBe(false);
     expect(servingIdle(row("3.0"), traffic, false)).toBe(false);
   });
+  it("joins a row to the read's already folded name without folding it again", () => {
+    const doubled = { ...row("1.0"), service_name: "a.service.service" };
+    const read = versionTrafficFrom([
+      { where_key: "east", service_name: "a.service", version: "1.0", total_requests: 5 },
+    ]);
+    expect(servingIdle(doubled, read, true)).toBe(false);
+  });
   it("keeps Health for a version known only from browser data", () => {
     const rum = row("3.0");
     rum.versionScope.signals = ["rum"];
@@ -536,7 +556,7 @@ describe("Health of one build beside another build of the same version text", ()
     const sql = servingHealthSql("default", "(kind)", true, true);
     expect(sql).toContain("NULLIF(o2_service_image, '') AS image");
     expect(sql).toContain(
-      "GROUP BY o2_service_where, service_name, o2_service_version, NULLIF(o2_service_image, '')",
+      `GROUP BY o2_service_where, ${serviceKeySql("service_name")}, o2_service_version, NULLIF(o2_service_image, '')`,
     );
     const plain = servingHealthSql("default", "(kind)", true, false);
     expect(plain).toContain("CAST(NULL AS VARCHAR) AS image");
@@ -564,6 +584,7 @@ describe("the catalog row a service panel route opens", () => {
     { service: "querier", where: "", kind: "", id: "a" },
     { service: "querier", where: "default", kind: "", id: "a" },
     { service: "ingester", where: "default", kind: "", id: "d" },
+    { service: "Ingester.service", where: "k8s:c1/o2", kind: "", id: "d" },
     { service: "router", where: "", kind: "", id: undefined },
     { service: "querier", where: "", kind: "rpc", id: "c" },
     { service: "querier", where: "", kind: "database", id: undefined },

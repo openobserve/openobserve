@@ -894,7 +894,6 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { formatCompactCount } from "@/utils/formatters";
 import { useOverviewTime } from "./overview/useOverviewTime";
-import { countStates } from "@/utils/alerts/firingAlerts";
 import { isFiringOutcome, isErrorOutcome, isNotifyFailedOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
@@ -913,10 +912,7 @@ import OverviewSectionError from "./OverviewSectionError.vue";
 import OverviewSectionEmpty from "./OverviewSectionEmpty.vue";
 import HomeNoDataState from "./HomeNoDataState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OverviewHeadlineStrip, {
-  type OverviewTarget,
-  type IncidentsTile,
-} from "./overview/OverviewHeadlineStrip.vue";
+import OverviewHeadlineStrip, { type OverviewTarget } from "./overview/OverviewHeadlineStrip.vue";
 import OverviewFiringNow, { type FiringNowState } from "./overview/OverviewFiringNow.vue";
 import OverviewDataFreshness, {
   type DataFreshnessState,
@@ -926,6 +922,7 @@ import {
   alertsByName,
   firingLevel,
   firingNow,
+  undeliveredCount,
   type FiringLevel,
   type HomeAlertRow,
 } from "./overview/overviewFiring";
@@ -943,7 +940,7 @@ import { resolveBrowserTimezone } from "@/utils/timezone";
 import type { OverviewSignal } from "./overview/overviewFormat";
 import OverviewRowButton from "./overview/OverviewRowButton.vue";
 import { overviewKeys } from "@/services/overview.querykeys";
-import type { OrgOverview } from "@/ts/interfaces/overview";
+import type { IncidentsTile, OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
@@ -953,6 +950,7 @@ import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDi
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import analytics from "@/services/product_analytics";
 import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
+import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import type { AiChatHandoff } from "@/plugins/traces/utils/traceAiPayload";
 
 const AlertHistoryDrawer = defineAsyncComponent(
@@ -1358,7 +1356,7 @@ const alertRows = computed<HomeAlertRow[]>(() => firingRead.data.value?.list ?? 
 const firingRows = computed(() => firingNow(alertRows.value));
 // the alert list already says what /overview would, so a failed summary can still show it
 const deliveryFailures = computed(() =>
-  firingState.value === "ok" ? countStates(alertRows.value).failed : null,
+  firingState.value === "ok" ? undeliveredCount(alertRows.value) : null,
 );
 const enabledRules = computed(() => alertRows.value.filter((a) => a.enabled !== false).length);
 const firingState = computed<FiringNowState>(() => {
@@ -2008,19 +2006,22 @@ const goToIncident = (inc: any) => {
 const showAlertsCard = computed(() => router.hasRoute("alertList"));
 const showLogsCard = computed(() => router.hasRoute("logs"));
 
-const openAlertList = (filter: Record<string, string> = {}) => {
+// The bare "View all" promises every alert behind the org-wide counts, not only what fires.
+const openAlertList = (filter: Record<string, string> = ALERT_LIST_FILTERS.all) => {
   if (alertsLocked.value) return;
   trackDrilldown("alerts");
   router.push({ name: "alertList", query: { org_identifier: orgId.value, ...filter } });
 };
 
-// Each filter yields exactly the rows its count tallies.
+// Each filter yields exactly the rows its count tallies; the counts are org-wide, so the list opens on every folder.
+const all_folders = ALERT_LIST_ALL_FOLDERS;
 const ALERT_LIST_FILTERS = {
-  firing: { state: "firing" },
-  failing: { state: "error" },
-  delivery: { state: "notify_failed" },
-  critical: { state: "firing", level: "critical" },
-  warning: { state: "firing", level: "warning" },
+  all: { state: ALERT_LIST_ALL_STATES, all_folders },
+  firing: { state: "firing", all_folders },
+  failing: { state: "error", all_folders },
+  delivery: { state: "notify_failed", all_folders },
+  critical: { state: "firing", level: "critical", all_folders },
+  warning: { state: "firing", level: "warning", all_folders },
 } as const;
 
 const goToAddAlert = () => {

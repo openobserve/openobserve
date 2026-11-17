@@ -5474,6 +5474,27 @@ fn report_next_run(
     })
 }
 
+/// The end is cut to the minute later, so a cron time in `t0`'s minute (seconds field
+/// not 0) would give an empty window that never moves `t0`: take a later minute.
+fn cron_window_end(
+    trigger_condition: &TriggerCondition,
+    tz_offset: i32,
+    t0: i64,
+    supposed_to_be_run_at: i64,
+) -> Result<i64, anyhow::Error> {
+    let minute_of = |t: i64| {
+        TriggerCondition::align_time(t, tz_offset, None, trigger_condition.timezone.as_deref())
+    };
+    let mut next = trigger_condition.get_next_trigger_time(false, tz_offset, false, Some(t0))?;
+    if minute_of(next) <= t0 {
+        // The last second of t0's minute, so the next cron time is in a later minute.
+        let last_second = minute_of(t0) + second_micros(59);
+        next =
+            trigger_condition.get_next_trigger_time(false, tz_offset, false, Some(last_second))?;
+    }
+    Ok(std::cmp::min(supposed_to_be_run_at, next))
+}
+
 async fn handle_derived_stream_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
@@ -5782,15 +5803,12 @@ async fn handle_derived_stream_triggers(
                 // For cron frequency, don't believe the period, the period can be dynamic for cron.
                 // For example, if cron expression evaluates to "run every weekend 12am", the period
                 // is dynamic here.
-                std::cmp::min(
+                cron_window_end(
+                    &derived_stream.trigger_condition,
+                    derived_stream.tz_offset,
+                    t0,
                     supposed_to_be_run_at,
-                    derived_stream.trigger_condition.get_next_trigger_time(
-                        false,
-                        derived_stream.tz_offset,
-                        false,
-                        Some(t0),
-                    )?,
-                )
+                )?
             } else {
                 std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds)
             },
@@ -10790,5 +10808,85 @@ mod tests {
         );
         handle_triggers("t", row).await.unwrap();
         assert!(infra::scheduler::get(&org, module, "engine").await.is_err());
+    }
+
+    /// 2026-11-16 at `h:m:s` UTC, in microseconds.
+    fn nov16_micros(h: u32, m: u32, s: u32) -> i64 {
+        chrono::NaiveDate::from_ymd_opt(2026, 11, 16)
+            .unwrap()
+            .and_hms_opt(h, m, s)
+            .unwrap()
+            .and_utc()
+            .timestamp_micros()
+    }
+
+    fn cron_condition(cron: &str) -> TriggerCondition {
+        TriggerCondition {
+            frequency_type: config::meta::alerts::FrequencyType::Cron,
+            cron: cron.to_string(),
+            period: 2,
+            ..Default::default()
+        }
+    }
+
+    /// The window end the derived stream handler searches to, after the minute cut.
+    fn aligned_cron_end(tc: &TriggerCondition, t0: i64, supposed_to_be_run_at: i64) -> i64 {
+        let end = cron_window_end(tc, 0, t0, supposed_to_be_run_at).unwrap();
+        TriggerCondition::align_time(end, 0, None, None)
+    }
+
+    #[test]
+    fn cron_with_seconds_moves_the_window_forward_on_every_run() {
+        let tc = cron_condition("7 */2 * * * *");
+        // The first run (no cursor) searched 09:30:00 to 09:32:00.
+        let mut t0 = nov16_micros(9, 32, 0);
+        for (run_at, want_end) in [
+            (nov16_micros(9, 34, 7), nov16_micros(9, 34, 0)),
+            (nov16_micros(9, 36, 7), nov16_micros(9, 36, 0)),
+        ] {
+            let end = aligned_cron_end(&tc, t0, run_at);
+            assert_eq!(end, want_end);
+            assert!(t0 < end, "the window must not be empty");
+            t0 = end;
+        }
+    }
+
+    #[test]
+    fn cron_with_seconds_recovers_a_stalled_cursor() {
+        let tc = cron_condition("7 */2 * * * *");
+        // A trigger stalled today keeps the cursor at 09:32:00 while runs go on.
+        let end = aligned_cron_end(&tc, nov16_micros(9, 32, 0), nov16_micros(10, 0, 7));
+        assert_eq!(end, nov16_micros(9, 34, 0));
+    }
+
+    #[test]
+    fn cron_with_seconds_and_delay_gets_a_window() {
+        let tc = cron_condition("7 */2 * * * *");
+        // Run at 09:34:07 with a 2 minute delay.
+        let end = aligned_cron_end(&tc, nov16_micros(9, 30, 0), nov16_micros(9, 32, 7));
+        assert_eq!(end, nov16_micros(9, 32, 0));
+    }
+
+    #[test]
+    fn cron_with_zero_seconds_is_unchanged() {
+        let tc = cron_condition("0 */2 * * * *");
+        let mut t0 = nov16_micros(9, 32, 0);
+        for run_at in [
+            nov16_micros(9, 34, 0),
+            nov16_micros(9, 36, 0),
+            nov16_micros(10, 0, 0),
+        ] {
+            let before = std::cmp::min(
+                run_at,
+                tc.get_next_trigger_time(false, 0, false, Some(t0)).unwrap(),
+            );
+            let end = cron_window_end(&tc, 0, t0, run_at).unwrap();
+            assert_eq!(end, before);
+            assert_eq!(
+                TriggerCondition::align_time(end, 0, None, None),
+                t0 + second_micros(120)
+            );
+            t0 = end;
+        }
     }
 }

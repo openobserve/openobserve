@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use config::meta::service_identity::WhereSummaryRecord;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DbBackend, DbErr, EntityTrait, QueryFilter, QueryOrder,
-    Statement,
+    QuerySelect, Statement,
     sea_query::{Expr, Func, OnConflict, Query, SimpleExpr},
 };
 
@@ -173,6 +173,23 @@ pub async fn list_by_org<C: ConnectionTrait>(
         .into_iter()
         .map(to_record)
         .collect()
+}
+
+/// Orgs with a summary row seen at or after `since`; ingest moves `last_seen` before stats do.
+pub async fn orgs_seen_since<C: ConnectionTrait>(
+    conn: &C,
+    since: i64,
+) -> Result<BTreeSet<String>, errors::Error> {
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .distinct()
+        .filter(Column::LastSeen.gte(since))
+        .into_tuple::<String>()
+        .all(conn)
+        .await?
+        .into_iter()
+        .collect())
 }
 
 pub async fn catalog_page<C: ConnectionTrait>(

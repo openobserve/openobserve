@@ -68,6 +68,16 @@ pub fn quote_sql_string(value: &str) -> String {
     }
 }
 
+/// Quotes a LIKE pattern in which `value` matches literally; `prefix` and `suffix` are raw
+/// LIKE syntax such as `%`. Escapes use `\`, DataFusion's default LIKE escape.
+pub fn quote_like_pattern(prefix: &str, value: &str, suffix: &str) -> String {
+    let escaped = value
+        .replace('\\', r"\\")
+        .replace('%', r"\%")
+        .replace('_', r"\_");
+    quote_sql_string(&format!("{prefix}{escaped}{suffix}"))
+}
+
 /// Prefer [`quote_sql_string`], which also parenthesises a split `||` chain.
 pub fn escape_sql_string(value: &str) -> String {
     literal_pieces(value)
@@ -199,6 +209,26 @@ mod tests {
                 escape_sql_string(value)
             );
             assert_eq!(compared_values(&sql), vec![value, "end"], "{sql}");
+        }
+    }
+
+    #[test]
+    fn like_patterns_survive_reserialisation_and_match_literally() {
+        for (value, pattern) in [
+            (r"x\' OR 1=1 --", r"%x\\' OR 1=1 --%"),
+            ("a''b", "%a''b%"),
+            (r"50%_off\", r"%50\%\_off\\%"),
+            ("O'Brien", "%O'Brien%"),
+        ] {
+            let sql = format!(
+                "SELECT * FROM t WHERE b LIKE {} AND d = 'end'",
+                quote_like_pattern("%", value, "%")
+            );
+            assert_eq!(
+                compared_values(&sql),
+                vec![pattern, "end"],
+                "{value:?} through {sql}"
+            );
         }
     }
 

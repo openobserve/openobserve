@@ -159,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter } from "vue-router";
+import { ALERT_LIST_ALL_FOLDERS } from "@/utils/alerts/alertListLink";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -167,14 +168,19 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { firingForLabel } from "@/utils/alerts/firingAlerts";
 import OverviewAskAiButton from "./OverviewAskAiButton.vue";
 import OverviewRowButton from "./OverviewRowButton.vue";
 import type { OverviewAskAiTarget } from "./overviewAskAi";
 import { useOverviewAskAi } from "./useOverviewAskAi";
 import type { OverviewFiringAlert } from "@/ts/interfaces/overview";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
-import { firingByLevel, firingLevel, type FiringLevel, type HomeAlertRow } from "./overviewFiring";
+import {
+  firingByLevel,
+  firingForLabel,
+  firingLevel,
+  type FiringLevel,
+  type HomeAlertRow,
+} from "./overviewFiring";
 
 export type FiringNowState = "loading" | "error" | "unavailable" | "denied" | "locked" | "ok";
 
@@ -243,8 +249,8 @@ const detailRoute = (row: HomeAlertRow) => ({
 });
 
 const firingListRoute = computed(() => ({
-  name: "alertFiring",
-  query: { org_identifier: org.value },
+  name: "alertList",
+  query: { org_identifier: org.value, state: "firing", all_folders: ALERT_LIST_ALL_FOLDERS },
 }));
 
 const libraryRoute = computed(() => ({

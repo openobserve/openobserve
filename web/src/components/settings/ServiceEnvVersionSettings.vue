@@ -117,12 +117,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex items-center gap-2">
             <span class="flex flex-col items-start py-1.5">
               <ODimensionChip
+                v-if="row.inferred_source === 'default'"
+                dim-key="env"
+                :key-label="t('serviceVersions.compare.envChip')"
+                :value="t('serviceVersions.env.noEnv')"
+                muted
+                :value-tooltip="false"
+              />
+              <ODimensionChip
+                v-else
                 dim-key="env"
                 :key-label="t('serviceVersions.compare.envChip')"
                 :value="row.inferred_value"
                 :value-tooltip="false"
               />
-              <span class="text-text-secondary text-2xs">{{
+              <span v-if="row.inferred_source !== 'default'" class="text-text-secondary text-2xs">{{
                 t("serviceVersions.settings.from", { kind: envKind(row.inferred_source, t) })
               }}</span>
             </span>

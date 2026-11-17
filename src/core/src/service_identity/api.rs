@@ -196,6 +196,13 @@ impl Context {
 
     pub fn version(&self, row: &ServiceVersionRecord, now: i64) -> Value {
         let mut result = serde_json::to_value(row).expect("registry row serialization");
+        // Traffic after a delete revives the row, so it no longer reports that delete.
+        if row
+            .deleted_at
+            .is_some_and(|deleted| row.last_seen > deleted)
+        {
+            result["deleted_at"] = Value::Null;
+        }
         let label = self
             .scope_label(&row.service_name, &row.where_key)
             .unwrap_or_else(|| {
@@ -312,14 +319,7 @@ pub async fn versions(ctx: &Context, params: &BTreeMap<String, String>) -> Resul
         let Some(row) = rows.iter().find(|row| row.version_key == key) else {
             continue;
         };
-        let previous = rows
-            .iter()
-            .filter(|other| other.where_key == row.where_key && other.first_seen < row.first_seen)
-            .max_by(|a, b| {
-                a.first_seen
-                    .cmp(&b.first_seen)
-                    .then_with(|| b.version_key.cmp(&a.version_key))
-            });
+        let previous = previous_version(&rows, &row.where_key, &row.version, row.first_seen);
         value["previous_version"] = json!(previous.map(|row| &row.version));
         value["previous_image"] = json!(previous.and_then(|row| row.image.as_ref()));
         value["version_images"] = json!(image_count(&images, row));
@@ -609,6 +609,24 @@ pub fn compare_disabled(row: &ServiceVersionRecord) -> (bool, Option<&'static st
         disabled,
         disabled.then_some(COMPARE_DISABLED_NO_SPAN_VERSION),
     )
+}
+
+/// The newest version seen before `first_seen` in `place`; another build of `version` never is.
+pub fn previous_version<'a>(
+    rows: impl IntoIterator<Item = &'a ServiceVersionRecord>,
+    place: &str,
+    version: &str,
+    first_seen: i64,
+) -> Option<&'a ServiceVersionRecord> {
+    rows.into_iter()
+        .filter(|row| {
+            row.where_key == place && row.first_seen < first_seen && row.version != version
+        })
+        .max_by(|a, b| {
+            a.first_seen
+                .cmp(&b.first_seen)
+                .then_with(|| b.version_key.cmp(&a.version_key))
+        })
 }
 
 pub async fn envs(ctx: &Context, params: &BTreeMap<String, String>) -> Result<Value, Response> {
@@ -1929,5 +1947,39 @@ mod tests {
             assert!(version_listed(&version, &filter(env)), "env={env} lists it");
         }
         assert!(!version_listed(&version, &filter("qa")));
+    }
+
+    #[test]
+    fn another_build_of_the_same_version_is_never_the_previous_version() {
+        let rows = [
+            registry_row("1.0.0", None, "service.version", 1),
+            registry_row("2.0.0", Some("a1b2c3d"), "service.version", 2),
+            registry_row("2.0.0", Some("f9e8d7c"), "service.version", 3),
+        ];
+        let previous = |row: &ServiceVersionRecord| {
+            previous_version(&rows, &row.where_key, &row.version, row.first_seen)
+                .map(|row| row.version.as_str())
+        };
+        assert_eq!(previous(&rows[2]), Some("1.0.0"));
+        assert_eq!(previous(&rows[1]), Some("1.0.0"));
+        assert_eq!(previous(&rows[0]), None);
+    }
+
+    #[test]
+    fn a_version_seen_after_its_delete_reports_no_deleted_time() {
+        let ctx = context(Vec::new());
+        for (deleted_at, expected) in [
+            (Some(5), Value::Null),
+            (Some(50), json!(50)),
+            (None, Value::Null),
+        ] {
+            let mut row = registry_row("2.4.0", None, "service.version", 1);
+            row.deleted_at = deleted_at;
+            assert_eq!(
+                ctx.version(&row, 11)["deleted_at"],
+                expected,
+                "{deleted_at:?}"
+            );
+        }
     }
 }

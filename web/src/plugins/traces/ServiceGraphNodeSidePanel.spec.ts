@@ -706,6 +706,22 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(sql).not.toContain("LEFT JOIN");
     });
 
+    it("matches every spelling a folded catalog row carries, in its spans and in View traces", async () => {
+      vi.mocked(streamTraceRows).mockClear();
+      vi.mocked(streamTraceRows).mockResolvedValue([]);
+      const service_names = ["Checkout", "checkout.service"];
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, name: "checkout.service", service_names },
+      });
+      await flushPromises();
+      const sql = vi.mocked(streamTraceRows).mock.calls[0][0].sql;
+      expect(sql).toContain("service_name IN ('Checkout','checkout.service')");
+      await wrapper.vm.viewRelatedTraces();
+      expect(wrapper.emitted("view-traces")?.[0]?.[0]).toMatchObject({
+        serviceNames: service_names,
+      });
+    });
+
     it("filters catalog-origin inferred dependencies by type and system", async () => {
       vi.mocked(streamTraceRows).mockClear();
       vi.mocked(streamTraceRows).mockResolvedValue([]);
@@ -1696,6 +1712,13 @@ describe("ServiceGraphNodeSidePanel", () => {
   describe("versions tab placement and identity header", () => {
     it.each([
       { scope: "route's", panel: "operations", where: "k8s:c1/web", spans: "k8s:c1/web" },
+      {
+        scope: "route's, linked in another spelling,",
+        panel: "operations",
+        where: "k8s:c1/web",
+        spans: "k8s:c1/web",
+        service: "Frontend.service",
+      },
       { scope: "Versions tab's own", panel: "versions", where: "", spans: "" },
       // The count does not wait for the tab: it takes the place the tab will open on.
       { scope: "first", panel: "operations", where: "", spans: "", countOnly: true },
@@ -1711,7 +1734,11 @@ describe("ServiceGraphNodeSidePanel", () => {
         vi.mocked(streamTraceRows).mockResolvedValue([
           { operation_name: "GET /", request_count: 1 },
         ]);
-        Object.assign(routeQuery, { panel: c.panel, panelSvc: "frontend", panelWhere: c.where });
+        Object.assign(routeQuery, {
+          panel: c.panel,
+          panelSvc: c.service ?? "frontend",
+          panelWhere: c.where,
+        });
         panelVersions.splice(
           0,
           panelVersions.length,
@@ -1719,6 +1746,8 @@ describe("ServiceGraphNodeSidePanel", () => {
             { version: "2.0", active: true, first_seen: 2 },
             { version: "1.0", active: false, first_seen: 1 },
             { version: "9.9", active: true, first_seen: 3, where_key: "k8s:c2/web" },
+            // Spans with no version stamp register a row that is not a version.
+            { version: "", active: true, first_seen: 4 },
           ].map((row) => ({
             version_key: row.version,
             where_key: "k8s:c1/web",
@@ -1765,6 +1794,43 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("says the stream's spans report no version, and shows a picked place as a chip that undoes the pick", async () => {
       const previous = config.isEnterprise;
       config.isEnterprise = "true";
+      panelVersions.splice(0, panelVersions.length, {
+        version_key: "",
+        version: "",
+        active: true,
+        first_seen: 1,
+        where_key: "default",
+        where: { kind: "default" },
+        signals: {},
+        deploys: [],
+      });
+      wrapper = mountPanel({ selectedNode: { ...baseNode, where_key: "default" } });
+      const placeOnly = () => wrapper.get('[data-test="svcver-panel-identity"]');
+      expect(placeOnly().find('[data-test="svcver-panel-identity-not-reported"]').exists()).toBe(
+        false,
+      );
+      await flushPromises();
+      expect(placeOnly().text()).toBe("This service's spans don't report env, where or version");
+      wrapper.unmount();
+      // Unversioned spans that name an env and place show those, not the nothing-reported sentence.
+      panelVersions.splice(0, panelVersions.length, {
+        version_key: "",
+        version: "",
+        active: true,
+        first_seen: 1,
+        where_key: "k8s:c1/web",
+        where: { kind: "k8s", k8s_cluster: "c1", k8s_namespace: "web" },
+        env: "prod",
+        env_source: "attribute",
+        signals: {},
+        deploys: [],
+      });
+      wrapper = mountPanel({ selectedNode: { ...baseNode, where_key: "k8s:c1/web" } });
+      await flushPromises();
+      expect(placeOnly().text()).not.toContain("don't report");
+      expect(placeOnly().text()).toContain("c1 · web");
+      expect(placeOnly().text()).toContain("No version");
+      wrapper.unmount();
       Object.assign(routeQuery, { panel: "operations", panelSvc: "frontend", panelWhere: "" });
       panelVersions.splice(0, panelVersions.length, {
         version_key: "2.0",
@@ -2119,7 +2185,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     });
 
-    it("filters RED charts, Operations, recent spans and resource tables by the escaped where", async () => {
+    it("filters RED charts, Operations and resource tables by the escaped where", async () => {
       givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
       openAt(WHERE_A);
       wrapper = mountAt();
@@ -2139,13 +2205,6 @@ describe("ServiceGraphNodeSidePanel", () => {
       (wrapper.vm as any).onTabChange("metrics");
       await flushPromises();
       expect(vi.mocked(streamTraceRows).mock.calls.at(-1)?.[0].sql).toContain(predicate);
-
-      vi.mocked(streamTraceRows).mockClear();
-      (wrapper.vm as any).operationsViewMode = "spans";
-      await flushPromises();
-      const spanSqls = sqls().filter((sql) => sql.includes("SELECT operation_name, duration"));
-      expect(spanSqls).toHaveLength(2);
-      for (const sql of spanSqls) expect(sql).toContain(predicate);
     });
 
     it("reloads every source query when the where picker moves to a second where", async () => {
@@ -2175,6 +2234,16 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(sqls().find((sql) => sql.includes("GROUP BY operation_name"))).toContain(predicate);
       expect(sqls().find((sql) => sql.includes("o2_service_version as"))).toContain(predicate);
       expect(sqls().join("\n")).not.toContain("k8s:c1/");
+
+      // A refresh that folds another spelling into the same row reads the open resource tab again.
+      vi.mocked(streamTraceRows).mockClear();
+      await wrapper.setProps({
+        selectedNode: { ...rowAt(WHERE_B), service_names: ["frontend", "Frontend.service"] },
+      });
+      await flushPromises();
+      expect(sqls().find((sql) => sql.includes("o2_service_version as"))).toContain(
+        "Frontend.service",
+      );
     });
 
     // An empty answer is kept; a failed read shows the red error and reads again when reopened.

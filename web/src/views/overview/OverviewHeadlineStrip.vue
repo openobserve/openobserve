@@ -136,7 +136,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatCompactCount } from "@/utils/formatters";
-import type { OrgOverview, OverviewSection } from "@/ts/interfaces/overview";
+import type { IncidentsTile, OrgOverview, OverviewSection } from "@/ts/interfaces/overview";
 import { sectionView } from "./overviewFormat";
 import OverviewAskAiButton from "./OverviewAskAiButton.vue";
 import type { OverviewAskAiTarget } from "./overviewAskAi";
@@ -144,7 +144,6 @@ import { useOverviewAskAi } from "./useOverviewAskAi";
 
 export type OverviewTarget =
   "firing" | "failing" | "incidents" | "pipelines" | "delivery" | "quiet";
-export type IncidentsTile = "ok" | "loading" | "error" | "locked" | "unavailable" | "forbidden";
 
 type NoteTone = "positive" | "problem" | "plain";
 

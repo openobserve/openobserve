@@ -704,6 +704,67 @@ describe("convertLogData.ts", () => {
         ]);
         expect(result).toContain("2022-01-01");
       });
+
+      it("caps the tooltip width to the viewport so a long value cannot push it off screen", () => {
+        const bd = makeBreakdown([["info", [1]]]);
+        const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+        expect(options.tooltip.extraCssText).toContain(
+          "max-width: min(25rem, calc(100vw - 1.5rem)) !important;",
+        );
+      });
+
+      it("cuts a long series name with an ellipsis and keeps the full name in its title", () => {
+        const longName = "L".repeat(5000);
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: longName, value: [ts1, 1] },
+        ]);
+        expect(result).toContain(`title="${longName}"`);
+        expect(result).toMatch(
+          /<span title="L+" style="[^"]*overflow:hidden;text-overflow:ellipsis;white-space:nowrap/,
+        );
+      });
+
+      it("escapes double quotes so a series name cannot break out of the title attribute", () => {
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: 'say "hi"', value: [ts1, 1] },
+        ]);
+        expect(result).toContain('title="say &quot;hi&quot;"');
+        expect(result).not.toContain('"hi"');
+      });
+
+      it("lists only series with a count in the hovered bucket", () => {
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: "error", value: [ts1, 3] },
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: "warn", value: [ts1, 0] },
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: "info", value: [ts1, 0] },
+        ]);
+        expect(result).toContain('title="error"');
+        expect(result).not.toContain('title="warn"');
+        expect(result).not.toContain('title="info"');
+      });
+
+      it("shows only the time header when the hovered bucket is empty", () => {
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: "error", value: [ts1, 0] },
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: "info", value: [ts1, 0] },
+        ]);
+        expect(result).toContain("Jan 1");
+        expect(result).not.toContain("title=");
+      });
+    });
+
+    it("truncates long legend names and shows the full name on hover", () => {
+      const bd = makeBreakdown([
+        ["L".repeat(5000), [1]],
+        ["info", [1]],
+      ]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.legend.textStyle).toMatchObject({ width: 120, overflow: "truncate" });
+      expect(options.legend.tooltip).toEqual({ show: true });
     });
   });
 

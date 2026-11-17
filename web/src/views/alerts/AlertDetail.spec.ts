@@ -424,6 +424,39 @@ describe("AlertDetail — History tab", () => {
     });
   });
 
+  describe("load failures", () => {
+    const rejectWith = (status: number) =>
+      Promise.reject(Object.assign(new Error("request failed"), { response: { status } }));
+
+    it("shows not found for a 404", async () => {
+      wrapper = await mountView({ alertRequest: rejectWith(404) });
+      expect(wrapper.find('[data-test="alerts-alertdetail-not-found"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertdetail-edit"]').exists()).toBe(false);
+    });
+
+    it("shows no access for a 403, not not found", async () => {
+      wrapper = await mountView({ alertRequest: rejectWith(403) });
+      expect(wrapper.find('[data-test="alerts-alertdetail-no-access"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertdetail-not-found"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alerts-alertdetail-edit"]').exists()).toBe(false);
+    });
+
+    it("shows could not load with a Retry that loads the alert again for a 500", async () => {
+      wrapper = await mountView({ alertRequest: rejectWith(500) });
+      const failed = wrapper.find('[data-test="alerts-alertdetail-load-error"]');
+      expect(failed.exists()).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertdetail-not-found"]').exists()).toBe(false);
+      vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
+        data: makeSimpleAlert(),
+      } as any);
+      await failed.find("button").trigger("click");
+      await flushPromises();
+      expect(alertsService.get_by_alert_id).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('[data-test="alerts-alertdetail-load-error"]').exists()).toBe(false);
+      expect(alertsService.list_group_transitions).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("page title", () => {
     it("never shows the alert id while the alert is loading", async () => {
       let resolveAlert: (value: any) => void = () => {};
@@ -704,10 +737,17 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
     wrapper?.unmount();
   });
 
-  it("hands a firing single-row alert to the header actions", async () => {
-    withListRow({ last_outcome: "firing" });
+  it.each([
+    ["a firing run", { last_outcome: "firing", last_outcome_since: 1_700_000_000_000_000 }],
+    [
+      "an errored run during an open firing",
+      { last_outcome: "error", firing_started_at: 1_700_000_000_000_000 },
+    ],
+  ])("hands a single-row alert with %s to the header actions as firing", async (_case, row) => {
+    withListRow(row);
     wrapper = await mountView();
     expect(header().exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-alertdetail-firing-for"]').exists()).toBe(true);
     expect(header().props()).toMatchObject({
       alertId: "alert-1",
       name: "cpu-high",

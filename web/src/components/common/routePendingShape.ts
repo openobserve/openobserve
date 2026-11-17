@@ -30,7 +30,7 @@ type PendingRoute = Pick<RouteLocationNormalizedLoaded, "name" | "path" | "param
 
 const DASHBOARD_ROUTES = new Set(["home", "viewDashboard", "securityOverview", "aiLLMInsights"]);
 const FORM_ROUTES = new Set(["general", "organizationSettings", "importDashboard"]);
-const TABBED_ROUTES = new Set(["home", "alertList", "alertFiring", "alertHistory", "reports"]);
+const TABBED_ROUTES = new Set(["home", "alertList", "alertHistory", "reports"]);
 const FOLDER_RAIL_ROUTES = new Set(["dashboards", "alertList", "sloList", "reports"]);
 const SECTION_RAIL_PARENTS = new Set(["iam", "settings"]);
 

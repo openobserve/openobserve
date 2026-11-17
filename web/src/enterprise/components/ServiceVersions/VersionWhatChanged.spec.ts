@@ -497,6 +497,11 @@ describe("first version endpoints (real producer compare with no baseline)", () 
       .map((th) => th.text());
     expect(headers).toContain("serviceVersions.compare.tile.error_rate");
     expect(headers).not.toContain("serviceVersions.compare.column.errorChange");
+    const errorTable = wrapper.get('[data-test="svcver-error-table"]');
+    expect(errorTable.findAll('[data-test^="svcver-error-before-"]')).toHaveLength(0);
+    expect(errorTable.findAll("tbody tr")[0].findAll("td")).toHaveLength(
+      errorTable.findAll("th").length,
+    );
     expect(translate).not.toHaveBeenCalledWith("serviceVersions.compare.pointsShort", {
       value: expect.anything(),
     });

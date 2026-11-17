@@ -88,8 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabs
             orientation="vertical"
             size="compact"
-            v-model="activeFolderId"
+            :model-value="hideActive ? '' : activeFolderId"
             data-test="dashboards-folder-tabs"
+            @update:model-value="(v) => (activeFolderId = String(v))"
           >
             <OTab
               v-for="tab in filteredTabs"
@@ -246,6 +247,11 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // The owner is listing every folder, so none reads as the open one; the active id is kept for its return.
+    hideActive: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["update:folders", "update:activeFolderId"],
   setup(props, { emit }) {
@@ -269,8 +275,10 @@ export default defineComponent({
           }
         : {},
     );
-    const activeFolderName = computed(
-      () => filteredTabs.value.find((f: any) => f.folderId === activeFolderId.value)?.name ?? "",
+    const activeFolderName = computed(() =>
+      props.hideActive
+        ? ""
+        : (filteredTabs.value.find((f: any) => f.folderId === activeFolderId.value)?.name ?? ""),
     );
     const showAddFolderDialog = ref(false);
     const isFolderEditMode = ref(false);

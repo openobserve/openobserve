@@ -92,8 +92,14 @@ pub fn claim_decision(node: &str, local: &str, node_alive: bool) -> ClaimDecisio
     }
 }
 
+/// An entry on this process's own http and grpc address is a former incarnation: no live peer can
+/// listen there, and the health check that should drop it is answered by this process.
 pub(crate) async fn node_alive(node: &str) -> bool {
-    !node.is_empty() && node != LOCAL_NODE.uuid && get_node_by_uuid(node).await.is_some()
+    !node.is_empty()
+        && node != LOCAL_NODE.uuid
+        && get_node_by_uuid(node).await.is_some_and(|owner| {
+            owner.http_addr != LOCAL_NODE.http_addr || owner.grpc_addr != LOCAL_NODE.grpc_addr
+        })
 }
 
 pub fn align_down(ts: i64, flush: i64) -> i64 {
@@ -838,6 +844,52 @@ mod tests {
         assert_eq!(claim_decision("me", "me", true), ClaimDecision::Owned);
         assert_eq!(claim_decision("other", "me", true), ClaimDecision::Skip);
         assert_eq!(claim_decision("other", "me", false), ClaimDecision::Claim);
+    }
+
+    #[tokio::test]
+    async fn test_claim_owner_liveness() {
+        let node = |uuid: &str, name: &str, http_addr: &str, grpc_addr: &str| {
+            config::meta::cluster::Node {
+                uuid: uuid.into(),
+                name: name.into(),
+                http_addr: http_addr.into(),
+                grpc_addr: grpc_addr.into(),
+                status: config::meta::cluster::NodeStatus::Online,
+                ..Default::default()
+            }
+        };
+        let me = LOCAL_NODE.name.as_str();
+        let (local_http, local_grpc) = (&LOCAL_NODE.http_addr, &LOCAL_NODE.grpc_addr);
+        let (peer_http, peer_grpc) = ("http://192.0.2.7:15080", "http://192.0.2.7:15081");
+        assert!(!me.is_empty() && local_http != peer_http);
+        let cases = [
+            ("", None, ClaimDecision::Claim),
+            (
+                "former-self",
+                Some(node("former-self", me, local_http, local_grpc)),
+                ClaimDecision::Claim,
+            ),
+            ("gone", None, ClaimDecision::Claim),
+            (
+                "same-name-peer",
+                Some(node("same-name-peer", me, peer_http, peer_grpc)),
+                ClaimDecision::Skip,
+            ),
+            (
+                "peer",
+                Some(node("peer", "peer-host", peer_http, peer_grpc)),
+                ClaimDecision::Skip,
+            ),
+        ];
+        for (_, entry, _) in &cases {
+            if let Some(entry) = entry {
+                infra::cluster::add_node_to_cache(entry.clone()).await;
+            }
+        }
+        for (owner, _, want) in cases {
+            let got = claim_decision(owner, &LOCAL_NODE.uuid, node_alive(owner).await);
+            assert_eq!(got, want, "owner {owner:?}");
+        }
     }
 
     #[test]

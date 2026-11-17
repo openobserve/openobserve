@@ -135,16 +135,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText class="min-w-0">
               {{ row.title || formatDimensions(row.group_values) }}
             </OTruncatedText>
-            <OTag
+            <IncidentMutedTag
               v-if="row.muted_by_downtime_id"
-              type="downtimeStatus"
-              value="active"
-              class="max-w-60 min-w-12 shrink-4"
-              data-test="incident-list-muted"
-            >
-              <span class="truncate">{{ mutedLabel(row.muted_by_downtime_id) }}</span>
-              <OTooltip :content="mutedTooltip(row.muted_by_downtime_id)" />
-            </OTag>
+              :label="mutedLabel(row.muted_by_downtime_id)"
+              :tooltip="mutedTooltip(row.muted_by_downtime_id)"
+              :to="mutedRoute(row.muted_by_downtime_id)"
+            />
           </div>
         </template>
         <template #cell-dimensions="{ row }">
@@ -402,6 +398,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import IncidentMutedTag from "@/components/alerts/downtimes/IncidentMutedTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
 import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
@@ -428,6 +425,7 @@ const isSeverityKey = (key: string): key is SeverityKey =>
 export default defineComponent({
   name: "IncidentList",
   components: {
+    IncidentMutedTag,
     OPageLayout,
     OEmptyState,
     OButton,
@@ -497,7 +495,11 @@ export default defineComponent({
     // reactivity hot path — the difference is very visible at a few hundred rows.
     const allIncidents = shallowRef<Incident[]>([]);
     // The downtimes list is read only to name a muted row's downtime.
-    const { nameOf, notLoaded } = useDowntimeLookup(() =>
+    const {
+      nameOf,
+      notLoaded,
+      detailRoute: mutedRoute,
+    } = useDowntimeLookup(() =>
       allIncidents.value.some((incident) => !!incident.muted_by_downtime_id),
     );
     // A downtime past the lookup's one page says so, with its id kept for the tooltip.
@@ -1164,6 +1166,7 @@ export default defineComponent({
 
     return {
       mutedLabel,
+      mutedRoute,
       mutedTooltip,
       raw,
       t,

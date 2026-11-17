@@ -68,7 +68,7 @@ test.describe("Span View Logs (#12013, #15028)", { tag: "@enterprise" }, () => {
       await pm.tracesPage.clickSpanViewLogs(spanId);
       expect((await correlate).status(), "the correlation lookup must have run").toBe(200);
 
-      await pm.tracesPage.expectWarningToast("No correlated logs found for this span");
+      await pm.tracesPage.expectSpanNoLogsNotice("No log stream has logs for this trace.");
       await expect(page, "View Logs must not leave the trace when nothing is correlated").toHaveURL(
         /\/traces\/trace-details/,
       );
@@ -76,7 +76,7 @@ test.describe("Span View Logs (#12013, #15028)", { tag: "@enterprise" }, () => {
   );
 
   test(
-    "logs in streams with different namespace fields open on the span, with no field error",
+    "logs in streams with different namespace fields open on the trace, with no field error",
     {
       tag: ["@bug-15028", "@P1", "@regression", "@tracesRegression"],
     },
@@ -124,8 +124,8 @@ test.describe("Span View Logs (#12013, #15028)", { tag: "@enterprise" }, () => {
         (opened.get("query") || "").replace(/^b64uni:/, ""),
         "base64",
       ).toString();
-      expect(query, "Bug #15028: the filter must rest on the span and trace ids only").toBe(
-        `span_id = '${spanId}' and trace_id = '${traceId}'`,
+      expect(query, "Bug #15028: the filter must rest on the trace id only").toBe(
+        `trace_id = '${traceId}'`,
       );
       await pm.logsPage.expectLogsTableRowCount(2);
       await pm.logsPage.expectNoQueryError(
