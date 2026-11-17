@@ -35,39 +35,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title-overflow="visible"
           :overflow-first="isEditingAlert"
         >
-          <!-- The name IS the title in both modes, so creating no longer means
-             filling a boxed field wedged into the toolbar: it renders as heading
-             text and swaps to an input on click. Create mode also gets a
-             generated name that tracks the stream + condition until the user
-             types (see alertAutoName / useAutoName). EDIT mode is readonly —
-             OInlineEdit then renders the saved name as plain heading text with
-             no affordance, which is exactly what this header showed before.
-             Anomaly and alert names bind the SAME `name` field — see the note on
-             the folder select below for why the anomaly path never binds
-             anomalyConfig.name directly. -->
           <template #title>
-            <OFormInlineEdit
-              ref="step1Ref"
-              name="name"
-              :readonly="beingUpdated || anomalyEditMode"
-              :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
-              :placeholder="
-                isAnomalyMode
-                  ? t('alerts.anomalyNamePlaceholder')
-                  : t('alerts.alertNamePlaceholder')
-              "
-              :aria-label="
-                isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName')
-              "
-              :edit-hint="
-                alertAutoName.isAuto.value
-                  ? t('common.inlineEdit.autoHint')
-                  : t('alerts.renameHint')
-              "
-              @update:model-value="alertAutoName.markManual"
-              @commit="alertAutoName.onCommit"
-              @cancel="alertAutoName.onCommit"
-            />
+            <span class="flex min-w-0 items-center gap-1">
+              <OTruncatedText data-test="add-alert-header-title">{{
+                formData.name || t("alerts.sections.details.unnamed")
+              }}</OTruncatedText>
+              <OButton
+                v-if="!isEditing"
+                variant="ghost"
+                size="icon-sm"
+                icon-left="edit"
+                :aria-label="t('alerts.form.header.editName')"
+                data-test="add-alert-header-name-edit"
+                @click="editNameInDetails"
+              >
+                <OTooltip side="bottom" :content="t('alerts.form.header.editName')" />
+              </OButton>
+            </span>
           </template>
 
           <!-- EDIT MODE (anomaly): status + last-run + retry trail the name -->
@@ -145,32 +129,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <!-- The description line states what this page is AND where the alert
-             will land: "Add Alert in <folder>", the folder being a text-styled
-             dropdown. Parked on the right of the header it was invisible; read
-             as part of the sentence directly under the name it is exactly where
-             someone looks to answer "where is this being saved?". Edit mode
-             prints the folder as plain text — an alert does not move folders
-             from here.
-             (The anomaly name binds the SAME `name` field as the alert name,
-             not `anomalyConfig.name`: a bare input has no field for the schema
-             to paint, so a blank name could only ever toast. The
-             formData.name → anomalyConfig.name watcher in useAlertForm still
-             feeds the value saveAnomalyDetection reads, and anomaly edit-load
-             seeds it via setF("name", data.name).) -->
           <template #subtitle>
             <span class="flex min-w-0 items-center gap-1 leading-normal">
               <span class="whitespace-nowrap">
                 {{ t("alerts.modeInFolder", { mode: headerModeLabel }) }}
               </span>
-              <InlineSelectFolderDropdown
-                v-if="!(beingUpdated || anomalyEditMode)"
-                variant="inline"
-                :model-value="activeFolderId as string"
-                type="alerts"
-                @update:model-value="updateActiveFolderId({ value: $event })"
-              />
-              <OTruncatedText v-else class="text-text-body font-medium">
+              <OTruncatedText
+                class="text-text-body font-medium"
+                data-test="add-alert-header-folder"
+              >
                 {{ activeFolderName }}
               </OTruncatedText>
             </span>
@@ -610,6 +577,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-show="!isAnomalyMode"
+                  :ref="(el) => setSectionTarget('advancedMessage', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <div
+                  v-show="!isAnomalyMode"
                   :ref="(el) => setSectionTarget('settingsNotifyMore', el)"
                   class="empty:hidden"
                   data-snap-stop
@@ -622,12 +595,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @refresh:destinations="$emit('refresh:destinations')"
                   />
                 </div>
-                <div
-                  v-show="!isAnomalyMode"
-                  :ref="(el) => setSectionTarget('advancedMessage', el)"
-                  class="empty:hidden"
-                  data-snap-stop
-                />
                 <div
                   v-show="!isAnomalyMode"
                   :ref="(el) => setSectionTarget('advancedOncall', el)"
@@ -729,6 +696,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-snap-stop
                 >
                   <div
+                    ref="step1Ref"
                     class="flex max-w-120 min-w-0 flex-col gap-1.5"
                     @input="onNameInput"
                     @focusin="onNameFocus"
@@ -737,7 +705,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OFormInput
                       name="name"
-                      :placeholder="t('alerts.alertNamePlaceholder')"
+                      :placeholder="
+                        isAnomalyMode
+                          ? t('alerts.anomalyNamePlaceholder')
+                          : t('alerts.alertNamePlaceholder')
+                      "
                       :aria-label="t('alerts.sections.details.name')"
                       data-test="add-alert-details-name-input"
                     />
@@ -766,6 +738,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}</OButton
                     >
                   </div>
+                </OSettingRow>
+                <OSettingRow
+                  :label="t('alerts.sections.details.folder')"
+                  fill
+                  data-test="add-alert-details-folder-row"
+                  data-snap-stop
+                >
+                  <InlineSelectFolderDropdown
+                    v-if="!isEditing"
+                    class="max-w-75"
+                    :model-value="activeFolderId as string"
+                    type="alerts"
+                    data-test="add-alert-details-folder-select"
+                    @update:model-value="updateActiveFolderId({ value: $event })"
+                  />
+                  <OTruncatedText
+                    v-else
+                    class="text-text-body text-sm"
+                    data-test="add-alert-details-folder-name"
+                  >
+                    {{ activeFolderName }}
+                  </OTruncatedText>
                 </OSettingRow>
                 <AlertOptionalHeading v-if="!isAnomalyMode" />
                 <div
@@ -842,18 +836,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-text-heading text-sm font-medium">{{
                     t("alerts.sections.review.title")
                   }}</span>
-                  <dl class="m-0 grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-3">
-                    <div v-for="item in reviewItems" :key="item.id" class="min-w-0">
-                      <dt class="text-text-secondary text-xs">{{ item.title }}</dt>
-                      <dd class="m-0 min-w-0">
-                        <button
-                          type="button"
-                          class="text-accent block max-w-full cursor-pointer truncate text-sm hover:underline"
+                  <dl class="m-0 flex flex-col gap-1.5">
+                    <div
+                      v-for="item in reviewItems"
+                      :key="item.id"
+                      class="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm"
+                    >
+                      <dt class="text-text-secondary">{{ item.title }}</dt>
+                      <dd class="text-text-body m-0 min-w-0 break-words">{{ item.summary }}</dd>
+                      <dd class="m-0">
+                        <OButton
+                          variant="link"
                           :data-test="`add-alert-review-${item.id}`"
                           @click="goToSection(item.id)"
+                          >{{ t("alerts.form.change") }}</OButton
                         >
-                          {{ item.summary }}
-                        </button>
                       </dd>
                     </div>
                   </dl>
@@ -1115,7 +1112,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { ALERT_NAME_UNSUPPORTED_CHARS } from "./AddAlert.schema";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
@@ -1258,7 +1254,6 @@ export default defineComponent({
     OTag,
     OTooltip,
     OForm,
-    OFormInlineEdit,
     OFormInput,
     OFormSelect,
     OPageHeader,
@@ -1658,6 +1653,14 @@ export default defineComponent({
     );
     // Section 1 cannot change after the alert is created, so an edit always shows it folded.
     const watchCollapsed = computed(() => isEditing.value || leftWatch.value);
+    const editNameInDetails = () => {
+      goToSection("details");
+      void nextTick(() =>
+        document
+          .querySelector<HTMLElement>('[data-test="add-alert-details-name-input"] input')
+          ?.focus({ preventScroll: true }),
+      );
+    };
     const expandWatch = () => {
       leftWatch.value = false;
       void nextTick(() => snapScrollRef.value?.scrollToSection("watch"));
@@ -2118,6 +2121,7 @@ export default defineComponent({
       watchCollapsed,
       watchSummary,
       expandWatch,
+      editNameInDetails,
       ALERT_SECTIONS,
       guidesToNext,
       sectionTargets,

@@ -1663,20 +1663,19 @@ export function useAlertForm(
     });
   };
 
-  // Focus a topbar select/input by its Vue component ref. A component that
-  // exposes its own focus() owns the decision (OInlineEdit has no input in the
-  // DOM until it opens, so "focus me" means "open the editor"); everything else
-  // falls back to the first input inside its root.
+  // A component exposing focus() owns the decision; otherwise the first input inside the
+  // element is focused. A component rendering a fragment has no element and is skipped.
   const focusTopbarField = (fieldRef: any) => {
     nextTick(() => {
-      const el = fieldRef?.value?.$el as HTMLElement | null;
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-      if (typeof fieldRef?.value?.focus === "function") {
-        fieldRef.value.focus();
+      const target = fieldRef?.value;
+      const el = (target instanceof HTMLElement ? target : target?.$el) as unknown;
+      if (!(el instanceof HTMLElement)) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (!(target instanceof HTMLElement) && typeof target?.focus === "function") {
+        target.focus();
         return;
       }
-      const input = el?.querySelector("input") as HTMLElement | null;
-      input?.focus();
+      el.querySelector<HTMLElement>("input")?.focus();
     });
   };
 
@@ -1694,8 +1693,6 @@ export function useAlertForm(
           variant: "error",
           message: t("alerts.messages.anomalyDetectionNameRequired"),
         });
-        // One inline-edit control now serves both alert and anomaly names, so
-        // step1Ref is the anomaly name field too.
         focusTopbarField(step1Ref);
         return false;
       }

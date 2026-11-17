@@ -1563,6 +1563,16 @@ describe("AddAlert (OForm owner)", () => {
       expect(slot.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
+    it("section 3 puts what the message says before the incident rows", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const { advancedMessage, settingsNotifyMore } = wrapper.vm.sectionTargets;
+      expect(
+        advancedMessage.compareDocumentPosition(settingsNotifyMore) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
     it("moves the preview under the condition step below lg and back beside it at lg", async () => {
       breakpoint.lgUp!.value = false;
       wrapper = mountAlert();
@@ -1615,21 +1625,6 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       expect(save().props("variant")).toBe("primary");
       expect(wrapper.find('[data-test="add-alert-footer"]').text()).not.toContain("Next");
-    });
-
-    it("saves the alert when Enter is pressed in the name, as before the redesign", () => {
-      wrapper = mountAlert(
-        {},
-        {
-          global: {
-            provide: { store },
-            plugins: [i18n, router],
-            stubs: { ...stubs, OPageHeader: false },
-          },
-        },
-      );
-      const name = wrapper.findComponent(OFormInlineEdit);
-      expect(name.props("submitOnEnter")).toBe(true);
     });
 
     it("ticks a section with a value once the user moves past it", async () => {
@@ -2206,6 +2201,64 @@ describe("AddAlert (OForm owner)", () => {
           : undefined,
       );
     });
+  });
+
+  describe("name and folder live in section 5", () => {
+    const withHeader = (props: Record<string, any> = {}) =>
+      mountAlert(props, {
+        attachTo: document.body,
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: { ...stubs, OPageHeader: false },
+        },
+      });
+
+    it("the name has one input and its error shows once", async () => {
+      wrapper = withHeader();
+      await flushPromises();
+      expect(wrapper.findComponent(OFormInlineEdit).exists()).toBe(false);
+      expect(wrapper.findAll('[data-test="add-alert-details-name-input"] input')).toHaveLength(1);
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.form.setFieldValue("name", "bad#name");
+      await wrapper.vm.handleSave();
+      await flushPromises();
+      const messages = wrapper
+        .findAll('[role="alert"]')
+        .filter((m: any) => m.text().includes(i18n.global.t("alerts.nameNoSpecialChars")));
+      expect(messages).toHaveLength(1);
+    });
+
+    it("the header pencil focuses the Name field", async () => {
+      wrapper = withHeader();
+      await flushPromises();
+      expect(wrapper.get('[data-test="add-alert-header-title"]').text()).toBe(
+        i18n.global.t("alerts.sections.details.unnamed"),
+      );
+      await wrapper.get('[data-test="add-alert-header-name-edit"]').trigger("click");
+      await flushPromises();
+      const input = document.querySelector('[data-test="add-alert-details-name-input"] input');
+      expect(document.activeElement).toBe(input);
+    });
+
+    it.each([
+      ["create", {}, true],
+      ["edit", { isUpdated: true, modelValue: savedAlert() }, false],
+    ])(
+      "folder is chosen in section 5 on %s and read-only in the header",
+      async (_, props, pick) => {
+        wrapper = withHeader(props);
+        await flushPromises();
+        const details = wrapper.get('[data-test="add-alert-section-details"]');
+        expect(details.find('[data-test="add-alert-details-folder-select"]').exists()).toBe(pick);
+        expect(details.find('[data-test="add-alert-details-folder-name"]').exists()).toBe(!pick);
+        expect(wrapper.get('[data-test="add-alert-header-folder"]').text()).toBe("default");
+        expect(wrapper.findAllComponents({ name: "InlineSelectFolderDropdown" })).toHaveLength(
+          pick ? 1 : 0,
+        );
+        expect(wrapper.find('[data-test="add-alert-header-name-edit"]').exists()).toBe(pick);
+      },
+    );
   });
 
   // ── Error focus across sections ───────────────────────────────────────────
