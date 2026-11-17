@@ -1328,6 +1328,33 @@ async fn nudge_composite_parents(
     }
 }
 
+/// Ends the run of a composite whose nested graph holds a cycle or nests past two.
+async fn refuse_broken_graph(
+    db: &sea_orm::DatabaseConnection,
+    composite: &infra::table::alert_composites::CompositeWithChildren,
+) -> Result<(), anyhow::Error> {
+    use infra::table::alert_composites::{ChildKind, load_graph};
+
+    let nested = composite
+        .children
+        .iter()
+        .any(|child| child.child_kind == ChildKind::Composite as i16);
+    if !nested {
+        return Ok(());
+    }
+    let definition = &composite.definition;
+    let graph = load_graph(db, &definition.org).await?;
+    let Some(fault) = crate::alerts::composite::graph_fault(&graph, &definition.id) else {
+        return Ok(());
+    };
+    log::error!(
+        "[COMPOSITE_ALERT] not evaluating {}/{}: {fault}",
+        definition.org,
+        definition.id
+    );
+    Err(fault.into())
+}
+
 /// Composite jobs are routed explicitly by their append-only scheduler
 /// module. The definition/evaluation service is intentionally separate from
 /// the query-alert handler so a composite can never execute child queries.
@@ -1335,19 +1362,6 @@ async fn handle_composite_alert_trigger(
     trace_id: &str,
     mut trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
-        infra::scheduler::delete(
-            &trigger.org,
-            db::scheduler::TriggerModule::CompositeAlert,
-            &trigger.module_key,
-        )
-        .await?;
-        return Ok(());
-    }
     // Until a production database-backed evaluator can obtain the metadata
     // transaction used for state fencing, a missing/stale definition is
     // completed safely through the epoch-fenced scheduler seam. This path is
@@ -1373,6 +1387,7 @@ async fn handle_composite_alert_trigger(
         .await?;
         return Ok(());
     }
+    refuse_broken_graph(db, &definition).await?;
     let mut scheduled_data: config::meta::triggers::ScheduledTriggerData =
         config::utils::json::from_str(&trigger.data).unwrap_or_default();
 
@@ -1549,8 +1564,7 @@ async fn handle_composite_alert_trigger(
         let _ = infra::scheduler::complete_claim(trigger).await?;
         return Ok(());
     }
-    infra::table::alert_states::persist_update_in_transaction(&transaction, &update).await?;
-    transaction.commit().await?;
+    db::alerts::alert_states::persist_and_commit(transaction, &update).await?;
     if let Some(c) = crate::alerts::lifecycle::update_clear(
         previous.as_ref(),
         &update,

@@ -273,7 +273,6 @@ pub enum Mutation {
 pub enum GateMode {
     Supported,
     WritesDisabled,
-    SuperCluster,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -516,18 +515,6 @@ pub struct LifecycleResult {
 }
 
 #[derive(Clone, Debug)]
-pub struct Capabilities {
-    pub composite_alerts_available: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct StartupError {
-    pub code: String,
-    pub definition_count: usize,
-    pub job_count: usize,
-}
-
-#[derive(Clone, Debug)]
 pub struct CompositeHarnessBuilder {
     now: i64,
     debounce_seconds: i64,
@@ -700,21 +687,6 @@ impl CompositeHarness {
         });
         harness.gate_mode = mode;
         harness
-    }
-
-    pub fn startup_preflight(
-        definition_count: usize,
-        job_count: usize,
-    ) -> Result<(), StartupError> {
-        if definition_count == 0 && job_count == 0 {
-            Ok(())
-        } else {
-            Err(StartupError {
-                code: "composite_super_cluster_startup_blocked".to_string(),
-                definition_count,
-                job_count,
-            })
-        }
     }
 
     pub async fn add_child(&mut self, spec: ChildSpec) -> String {
@@ -2011,12 +1983,6 @@ impl CompositeHarness {
         )
     }
 
-    pub fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            composite_alerts_available: self.gate_mode != GateMode::SuperCluster,
-        }
-    }
-
     pub fn gate(&self, mutation: &Mutation) -> Result<(), ServiceError> {
         if matches!(mutation, Mutation::Disable | Mutation::Delete) {
             return Ok(());
@@ -2024,10 +1990,6 @@ impl CompositeHarness {
         match self.gate_mode {
             GateMode::Supported => Ok(()),
             GateMode::WritesDisabled => Err(ServiceError::new(503, "composite_writes_disabled")),
-            GateMode::SuperCluster => Err(ServiceError::new(
-                409,
-                "composite_super_cluster_unsupported",
-            )),
         }
     }
 

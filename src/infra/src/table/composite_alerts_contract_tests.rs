@@ -6,9 +6,10 @@ use svix_ksuid::{Ksuid, KsuidLike as _};
 
 use super::{
     alert_composites::{
-        ChildKind, Resolution, create_with_children, delete_by_id, get_by_id,
-        increment_evaluation_generation, list_by_org, list_parents, load_graph, resolve_by_id,
-        update_with_children,
+        ChildKind, CompositeWithChildren, ReplicaWrite, ReplicatedKind, Resolution,
+        apply_replicated, create_with_children, delete_by_id, get_by_id,
+        increment_evaluation_generation, list_by_org, list_parents, load_graph, move_to_folder,
+        replica_write, resolve_by_id, set_enabled, update_with_children,
     },
     entity::{alert_composite_children, alert_composites, alerts},
     migration::{
@@ -554,5 +555,354 @@ async fn generic_resolution_rejects_a_cross_table_duplicate_id() {
     assert_eq!(
         resolve_by_id(&db, ORG, &duplicate_id).await.unwrap(),
         Resolution::DuplicateId
+    );
+}
+
+/// A definition as another region would send it; `children` are ordinary alerts in display order.
+fn replicated(
+    id: &str,
+    name: &str,
+    updated_at: Option<i64>,
+    evaluation_generation: i64,
+    children: &[&str],
+) -> CompositeWithChildren {
+    CompositeWithChildren {
+        definition: alert_composites::Model {
+            id: id.to_string(),
+            org: ORG.to_string(),
+            folder_id: "folder-a".to_string(),
+            name: name.to_string(),
+            expression: "normalized-expression".to_string(),
+            destinations: serde_json::json!(["pager"]),
+            enabled: true,
+            workflows: serde_json::json!([]),
+            updated_at,
+            evaluation_generation,
+            ..Default::default()
+        },
+        children: children
+            .iter()
+            .enumerate()
+            .map(|(order, child_id)| alert_composite_children::Model {
+                composite_id: id.to_string(),
+                child_alert_id: child_id.to_string(),
+                child_kind: ChildKind::Alert as i16,
+                display_order: order as i32,
+            })
+            .collect(),
+    }
+}
+
+fn child_ids(stored: &CompositeWithChildren) -> Vec<&str> {
+    stored
+        .children
+        .iter()
+        .map(|child| child.child_alert_id.as_str())
+        .collect()
+}
+
+/// R3 and R4: the decision for every (message kind, local row, incoming `updated_at`).
+#[test]
+fn a_replicated_definition_is_decided_by_its_kind_the_local_row_and_updated_at() {
+    use ReplicaWrite::{Insert, Replace, Skip};
+    use ReplicatedKind::{Create, Update};
+
+    let bumped = Replace {
+        evaluation_generation: 5,
+    };
+    let cases = [
+        (Create, None, Some(10), Insert),
+        (Update, None, Some(10), Skip),
+        (Update, Some(Some(10)), Some(11), bumped),
+        (Update, Some(Some(10)), Some(10), Skip),
+        (Update, Some(Some(10)), Some(9), Skip),
+        (Update, Some(Some(10)), None, Skip),
+        (Update, Some(None), Some(1), bumped),
+        (Update, Some(None), None, Skip),
+        (Create, Some(Some(10)), Some(11), bumped),
+        (Create, Some(Some(10)), Some(10), Skip),
+    ];
+    for (kind, local_updated_at, incoming_updated_at, expected) in cases {
+        let local = local_updated_at.map(|updated_at| alert_composites::Model {
+            updated_at,
+            evaluation_generation: 4,
+            ..Default::default()
+        });
+        let incoming = alert_composites::Model {
+            updated_at: incoming_updated_at,
+            evaluation_generation: 99,
+            ..Default::default()
+        };
+        assert_eq!(
+            replica_write(kind, local.as_ref(), &incoming),
+            expected,
+            "{kind:?} local={local_updated_at:?} incoming={incoming_updated_at:?}"
+        );
+    }
+}
+
+/// R3: an unknown id is inserted with the origin's `updated_at` and a fresh generation.
+#[tokio::test]
+async fn a_replicated_create_inserts_once_and_a_redelivery_changes_nothing() {
+    let db = db().await;
+    let composite_id = id();
+    let (first, second) = (id(), id());
+    let incoming = replicated(
+        &composite_id,
+        "from-origin",
+        Some(100),
+        7,
+        &[&first, &second],
+    );
+
+    let write = apply_replicated(&db, ReplicatedKind::Create, incoming.clone())
+        .await
+        .unwrap();
+    assert_eq!(write, ReplicaWrite::Insert);
+    let stored = get_by_id(&db, ORG, &composite_id).await.unwrap().unwrap();
+    assert_eq!(stored.definition.name, "from-origin");
+    assert_eq!(stored.definition.updated_at, Some(100));
+    assert_eq!(stored.definition.evaluation_generation, 0);
+    assert_eq!(stored.children, incoming.children);
+
+    let again = apply_replicated(&db, ReplicatedKind::Create, incoming)
+        .await
+        .unwrap();
+    assert_eq!(again, ReplicaWrite::Skip);
+    assert_eq!(
+        get_by_id(&db, ORG, &composite_id).await.unwrap().unwrap(),
+        stored
+    );
+}
+
+/// R3: a create for an id this region already holds is applied as an update.
+#[tokio::test]
+async fn a_replicated_create_of_a_known_id_is_applied_as_an_update() {
+    let db = db().await;
+    let composite_id = id();
+    let (old_child, new_child) = (id(), id());
+    apply_replicated(
+        &db,
+        ReplicatedKind::Create,
+        replicated(&composite_id, "before", Some(100), 0, &[&old_child]),
+    )
+    .await
+    .unwrap();
+
+    let write = apply_replicated(
+        &db,
+        ReplicatedKind::Create,
+        replicated(&composite_id, "after", Some(200), 0, &[&new_child]),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        write,
+        ReplicaWrite::Replace {
+            evaluation_generation: 1
+        }
+    );
+    let stored = get_by_id(&db, ORG, &composite_id).await.unwrap().unwrap();
+    assert_eq!(stored.definition.name, "after");
+    assert_eq!(stored.definition.updated_at, Some(200));
+    assert_eq!(stored.definition.evaluation_generation, 1);
+    assert_eq!(child_ids(&stored), vec![new_child.as_str()]);
+}
+
+/// R4: only a strictly newer `updated_at` replaces the row, and the generation is the local one.
+#[tokio::test]
+async fn a_replicated_update_applies_only_when_strictly_newer() {
+    let db = db().await;
+    let composite_id = id();
+    let (old_child, new_child) = (id(), id());
+    apply_replicated(
+        &db,
+        ReplicatedKind::Create,
+        replicated(&composite_id, "before", Some(100), 0, &[&old_child]),
+    )
+    .await
+    .unwrap();
+    for _ in 0..3 {
+        increment_evaluation_generation(&db, ORG, &composite_id)
+            .await
+            .unwrap();
+    }
+    let before = get_by_id(&db, ORG, &composite_id).await.unwrap().unwrap();
+
+    for not_newer in [Some(100), Some(99), None] {
+        let write = apply_replicated(
+            &db,
+            ReplicatedKind::Update,
+            replicated(&composite_id, "stale", not_newer, 50, &[&new_child]),
+        )
+        .await
+        .unwrap();
+        assert_eq!(write, ReplicaWrite::Skip, "incoming {not_newer:?}");
+        assert_eq!(
+            get_by_id(&db, ORG, &composite_id).await.unwrap().unwrap(),
+            before
+        );
+    }
+
+    let write = apply_replicated(
+        &db,
+        ReplicatedKind::Update,
+        replicated(&composite_id, "after", Some(101), 50, &[&new_child]),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        write,
+        ReplicaWrite::Replace {
+            evaluation_generation: 4
+        }
+    );
+    let stored = get_by_id(&db, ORG, &composite_id).await.unwrap().unwrap();
+    assert_eq!(stored.definition.name, "after");
+    assert_eq!(stored.definition.updated_at, Some(101));
+    assert_eq!(stored.definition.evaluation_generation, 4);
+    assert_eq!(child_ids(&stored), vec![new_child.as_str()]);
+}
+
+/// R4: a delete wins over a late update.
+#[tokio::test]
+async fn a_replicated_update_of_an_absent_id_writes_nothing() {
+    let db = db().await;
+    let composite_id = id();
+
+    let write = apply_replicated(
+        &db,
+        ReplicatedKind::Update,
+        replicated(&composite_id, "late", Some(100), 0, &[&id()]),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(write, ReplicaWrite::Skip);
+    assert!(get_by_id(&db, ORG, &composite_id).await.unwrap().is_none());
+    assert!(
+        alert_composite_children::Entity::find()
+            .all(&db)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
+/// The `[strong]` promise of `apply_replicated`: a failed apply leaves the row as it was.
+#[tokio::test]
+async fn a_failed_replicated_update_changes_nothing() {
+    let db = db().await;
+    let composite_id = id();
+    apply_replicated(
+        &db,
+        ReplicatedKind::Create,
+        replicated(&composite_id, "before", Some(100), 0, &[&id(), &id()]),
+    )
+    .await
+    .unwrap();
+    let before = get_by_id(&db, ORG, &composite_id).await.unwrap().unwrap();
+    let duplicate = id();
+
+    let result = apply_replicated(
+        &db,
+        ReplicatedKind::Update,
+        replicated(
+            &composite_id,
+            "must-not-commit",
+            Some(200),
+            0,
+            &[&duplicate, &duplicate],
+        ),
+    )
+    .await;
+
+    assert!(result.is_err());
+    assert_eq!(
+        get_by_id(&db, ORG, &composite_id).await.unwrap().unwrap(),
+        before
+    );
+}
+
+/// R5: a replicated delete removes the definition with its children, and an absent id is fine.
+#[tokio::test]
+async fn deleting_removes_the_definition_with_its_children_and_tolerates_absence() {
+    let db = db().await;
+    let composite_id = id();
+    apply_replicated(
+        &db,
+        ReplicatedKind::Create,
+        replicated(&composite_id, "doomed", Some(100), 0, &[&id(), &id()]),
+    )
+    .await
+    .unwrap();
+
+    delete_by_id(&db, ORG, &composite_id).await.unwrap();
+    assert!(get_by_id(&db, ORG, &composite_id).await.unwrap().is_none());
+    assert!(
+        alert_composite_children::Entity::find()
+            .all(&db)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    delete_by_id(&db, ORG, &composite_id).await.unwrap();
+}
+
+/// R2: enable, disable and move stamp the `updated_at` the origin passes and bump the generation.
+#[tokio::test]
+async fn enabling_and_moving_stamp_updated_at_and_bump_the_generation() {
+    let db = db().await;
+    let composite_id = id();
+    let child_id = id();
+    apply_replicated(
+        &db,
+        ReplicatedKind::Create,
+        replicated(&composite_id, "stamped", Some(100), 0, &[&child_id]),
+    )
+    .await
+    .unwrap();
+
+    let disabled = set_enabled(&db, ORG, &composite_id, false, 500)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(!disabled.definition.enabled);
+    assert_eq!(disabled.definition.updated_at, Some(500));
+    assert_eq!(disabled.definition.evaluation_generation, 1);
+    assert_eq!(child_ids(&disabled), vec![child_id.as_str()]);
+
+    let moved = move_to_folder(&db, ORG, &composite_id, "folder-b", "editor@acme.com", 600)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(moved.definition.folder_id, "folder-b");
+    assert_eq!(
+        moved.definition.last_edited_by.as_deref(),
+        Some("editor@acme.com")
+    );
+    assert_eq!(moved.definition.updated_at, Some(600));
+    assert_eq!(moved.definition.evaluation_generation, 2);
+    assert_eq!(
+        get_by_id(&db, ORG, &composite_id).await.unwrap().unwrap(),
+        moved
+    );
+
+    assert!(
+        set_enabled(&db, OTHER_ORG, &composite_id, true, 700)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        move_to_folder(&db, ORG, &id(), "folder-b", "editor@acme.com", 700)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        get_by_id(&db, ORG, &composite_id).await.unwrap().unwrap(),
+        moved
     );
 }

@@ -1011,11 +1011,6 @@ fn composite_error_response(
             "composite_writes_disabled",
             error,
         ),
-        CompositeServiceError::SuperClusterUnsupported => composite_machine_error(
-            StatusCode::CONFLICT,
-            "composite_super_cluster_unsupported",
-            error,
-        ),
         CompositeServiceError::PermissionDenied => {
             composite_machine_error(StatusCode::FORBIDDEN, "permission_denied", error)
         }

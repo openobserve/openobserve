@@ -103,8 +103,6 @@ pub enum CompositeServiceError {
     WritesDisabled,
     #[error("permission denied")]
     PermissionDenied,
-    #[error("composite alerts are unsupported in super-cluster mode")]
-    SuperClusterUnsupported,
     #[error(transparent)]
     Database(#[from] sea_orm::DbErr),
     #[error(transparent)]
@@ -115,6 +113,15 @@ pub enum CompositeServiceError {
     JiraDestinationNotSupported(String),
     #[error(transparent)]
     NotificationTarget(crate::alerts::alert::AlertError),
+}
+
+/// Why a stored composite graph cannot be evaluated from one of its nodes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum GraphFault {
+    #[error("a cycle is reachable from it")]
+    Cycle,
+    #[error("its nesting exceeds depth two")]
+    TooDeep,
 }
 
 pub async fn create_composite(
@@ -157,30 +164,16 @@ pub async fn set_composite_enabled(
     if enabled {
         ensure_mutation_allowed()?;
     }
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
     let db = get_orm_client_rw().await;
     if enabled {
         reset_if_re_enabled(db, org, id, enabled).await?;
     }
-    let result = composite_entity::Entity::update_many()
-        .col_expr(composite_entity::Column::Enabled, Expr::value(enabled))
-        .col_expr(
-            composite_entity::Column::EvaluationGeneration,
-            Expr::col(composite_entity::Column::EvaluationGeneration).add(1),
-        )
-        .filter(composite_entity::Column::Org.eq(org))
-        .filter(composite_entity::Column::Id.eq(id))
-        .exec(db)
-        .await?;
-    if result.rows_affected != 1 {
-        return Err(CompositeServiceError::NotFound);
-    }
+    let now = config::utils::time::now_micros();
+    let definition = db::alerts::alert_composites::set_enabled(db, org, id, enabled, now)
+        .await?
+        .ok_or(CompositeServiceError::NotFound)?
+        .definition;
     if enabled {
-        let definition = composite_entity::Entity::find_by_id(id)
-            .filter(composite_entity::Column::Org.eq(org))
-            .one(db)
-            .await?
-            .ok_or(CompositeServiceError::NotFound)?;
         schedule_definition(&definition).await;
     } else if let Err(error) = scheduler::delete(org, TriggerModule::CompositeAlert, id).await {
         log::error!("[COMPOSITE_ALERT] scheduler delete failed for {org}/{id}: {error}");
@@ -262,23 +255,10 @@ pub async fn move_composite(
     folder_id: &str,
     editor: &str,
 ) -> Result<(), CompositeServiceError> {
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
     let db = get_orm_client_rw().await;
-    let result = composite_entity::Entity::update_many()
-        .col_expr(composite_entity::Column::FolderId, Expr::value(folder_id))
-        .col_expr(composite_entity::Column::LastEditedBy, Expr::value(editor))
-        .col_expr(
-            composite_entity::Column::UpdatedAt,
-            Expr::value(config::utils::time::now_micros()),
-        )
-        .col_expr(
-            composite_entity::Column::EvaluationGeneration,
-            Expr::col(composite_entity::Column::EvaluationGeneration).add(1),
-        )
-        .filter(composite_entity::Column::Org.eq(org))
-        .filter(composite_entity::Column::Id.eq(id))
-        .exec(db)
-        .await?;
+    let now = config::utils::time::now_micros();
+    let moved =
+        db::alerts::alert_composites::move_to_folder(db, org, id, folder_id, editor, now).await?;
     // released before the OpenFGA relation rewrites below
     #[cfg(feature = "enterprise")]
     if get_openfga_config().enabled {
@@ -297,11 +277,7 @@ pub async fn move_composite(
         )
         .await;
     }
-    if result.rows_affected == 1 {
-        Ok(())
-    } else {
-        Err(CompositeServiceError::NotFound)
-    }
+    moved.map(|_| ()).ok_or(CompositeServiceError::NotFound)
 }
 
 pub async fn clone_composite(
@@ -501,11 +477,11 @@ async fn persist_under_lock(
         )
         .collect();
     let saved = if update {
-        alert_composites::update_with_children(db, model, children)
+        db::alerts::alert_composites::update(db, model, children)
             .await
             .map_err(map_update_error)?
     } else {
-        alert_composites::create_with_children(db, model, children).await?
+        db::alerts::alert_composites::create(db, model, children).await?
     };
     Ok(saved.definition)
 }
@@ -604,22 +580,7 @@ async fn schedule_definition(definition: &composite_entity::Model) {
             }
             return;
         }
-        let trigger = Trigger {
-            id: 0,
-            org: definition.org.clone(),
-            module: TriggerModule::CompositeAlert,
-            module_key: definition.id.clone(),
-            next_run_at: now,
-            is_realtime: false,
-            is_silenced: false,
-            status: TriggerStatus::Waiting,
-            start_time: None,
-            end_time: None,
-            retries: 0,
-            claim_epoch: 0,
-            data: String::new(),
-        };
-        if let Err(error) = scheduler::push(trigger).await {
+        if let Err(error) = scheduler::push(waiting_job(definition, now)).await {
             log::error!(
                 "[COMPOSITE_ALERT] scheduler push failed for {}/{}: {error}",
                 definition.org,
@@ -627,6 +588,32 @@ async fn schedule_definition(definition: &composite_entity::Model) {
             );
         }
     }
+}
+
+/// A new scheduler job for `definition`, due at `now`. [pure]
+fn waiting_job(definition: &composite_entity::Model, now: i64) -> Trigger {
+    Trigger {
+        id: 0,
+        org: definition.org.clone(),
+        module: TriggerModule::CompositeAlert,
+        module_key: definition.id.clone(),
+        next_run_at: now,
+        is_realtime: false,
+        is_silenced: false,
+        status: TriggerStatus::Waiting,
+        start_time: None,
+        end_time: None,
+        retries: 0,
+        claim_epoch: 0,
+        data: String::new(),
+    }
+}
+
+/// The job a region holds for its local copy of a composite; `None` means it holds none. [pure]
+fn replica_job(definition: Option<&composite_entity::Model>, now: i64) -> Option<Trigger> {
+    definition
+        .filter(|definition| definition.enabled)
+        .map(|definition| waiting_job(definition, now))
 }
 
 pub async fn get_composite(
@@ -826,6 +813,16 @@ pub async fn validate_composite_graph(
     Ok(canonical_expression(&parsed))
 }
 
+/// Why `id` must not be evaluated over `graph`; regions validate writes apart, so it can break.
+/// [pure]
+pub fn graph_fault(graph: &HashMap<String, Vec<String>>, id: &str) -> Option<GraphFault> {
+    match depth(id, graph, &mut HashSet::new(), &mut HashMap::new()) {
+        Err(()) => Some(GraphFault::Cycle),
+        Ok(value) if value > 2 => Some(GraphFault::TooDeep),
+        Ok(_) => None,
+    }
+}
+
 pub async fn delete_composite(org: &str, id: &str) -> Result<(), CompositeServiceError> {
     let graph_guard = composite_graph_lock::lock(org)
         .await
@@ -836,7 +833,7 @@ pub async fn delete_composite(org: &str, id: &str) -> Result<(), CompositeServic
             alert_composites::list_parents(db, org, alert_composites::ChildKind::Composite, id)
                 .await?;
         if parents.is_empty() {
-            alert_composites::delete_by_id(db, org, id).await?;
+            db::alerts::alert_composites::delete(db, org, id).await?;
             remove_ownership(org, "alerts", Authz::new(id)).await;
             Ok(())
         } else {
@@ -859,6 +856,19 @@ pub async fn delete_composite(org: &str, id: &str) -> Result<(), CompositeServic
     result
 }
 
+/// Derives this region's scheduler job from its local copy, after a replicated definition write.
+/// [weak: the definition may be applied without its job; applying the message again repairs it]
+pub async fn sync_replica_job(org: &str, id: &str) -> Result<(), infra::errors::Error> {
+    let db = get_orm_client_rw().await;
+    let local = alert_composites::get_by_id(db, org, id).await?;
+    let definition = local.as_ref().map(|local| &local.definition);
+    match replica_job(definition, config::utils::time::now_micros()) {
+        // `push` leaves a job that already exists as it is.
+        Some(job) => scheduler::push(job).await,
+        None => scheduler::delete(org, TriggerModule::CompositeAlert, id).await,
+    }
+}
+
 fn map_expression_error(error: CompositeError) -> CompositeServiceError {
     CompositeServiceError::InvalidExpression(error.to_string())
 }
@@ -877,65 +887,10 @@ fn map_update_error(error: sea_orm::DbErr) -> CompositeServiceError {
 /// mutation is enabled unless the flag is explicitly set to `false` (see
 /// [`config::AlertComposite::writes_enabled`]).
 fn ensure_mutation_allowed() -> Result<(), CompositeServiceError> {
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
-        return Err(CompositeServiceError::SuperClusterUnsupported);
-    }
     if config::get_config().alert_composite.writes_enabled {
         Ok(())
     } else {
         Err(CompositeServiceError::WritesDisabled)
-    }
-}
-
-/// Fatal on startup when super-cluster mode is enabled but composite
-/// definitions or `CompositeAlert` jobs remain (§18). Super-cluster replication
-/// cannot guarantee a cycle-sensitive graph, so operators must drain composites
-/// before enabling it; this fails closed rather than serving a corrupt graph.
-#[derive(Debug, thiserror::Error)]
-#[error(
-    "composite alerts are unsupported in super-cluster mode ({code}): {definition_count} definitions and {job_count} jobs remain"
-)]
-pub struct StartupPreflightError {
-    pub code: &'static str,
-    pub definition_count: usize,
-    pub job_count: usize,
-}
-
-/// Startup gate for super-cluster mode. A no-op when super-cluster is off (or
-/// in OSS, where it cannot be enabled). Requires the ORM and scheduler clients
-/// to be initialised first.
-pub async fn startup_preflight() -> anyhow::Result<()> {
-    #[cfg(feature = "enterprise")]
-    let super_cluster = o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let super_cluster = false;
-
-    if !super_cluster {
-        return Ok(());
-    }
-
-    let db = get_orm_client_ro().await;
-    let definition_count = alert_composites::count_all(db).await? as usize;
-    // `list` (not `len_module`) so a scheduler read failure fails the preflight
-    // closed rather than silently reporting zero jobs.
-    let job_count = scheduler::list(Some(TriggerModule::CompositeAlert))
-        .await?
-        .len();
-    if definition_count == 0 && job_count == 0 {
-        Ok(())
-    } else {
-        Err(StartupPreflightError {
-            code: "composite_super_cluster_startup_blocked",
-            definition_count,
-            job_count,
-        }
-        .into())
     }
 }
 
@@ -944,8 +899,8 @@ mod tests {
     use config::meta::destinations::{Destination, DestinationType, Endpoint, Module, Template};
 
     use super::{
-        CompositeCreate, create_composite, set_composite_enabled, update_composite,
-        validate_jira_destinations,
+        CompositeCreate, GraphFault, composite_entity, create_composite, graph_fault, replica_job,
+        set_composite_enabled, sync_replica_job, update_composite, validate_jira_destinations,
     };
     use crate::alerts::notifications::jira;
 
@@ -1179,5 +1134,140 @@ mod tests {
                 .await
                 .is_ok()
         );
+    }
+
+    /// R6: the job a region holds, for every state of its local definition.
+    #[test]
+    fn a_replica_holds_a_waiting_job_only_for_an_enabled_local_definition() {
+        use config::meta::triggers::{TriggerModule, TriggerStatus};
+
+        let definition = |enabled| composite_entity::Model {
+            id: "c1".to_string(),
+            org: "acme".to_string(),
+            enabled,
+            ..Default::default()
+        };
+        for (local, holds_job) in [
+            (Some(definition(true)), true),
+            (Some(definition(false)), false),
+            (None, false),
+        ] {
+            let job = replica_job(local.as_ref(), 42);
+            assert_eq!(job.is_some(), holds_job, "{local:?}");
+            if let Some(job) = job {
+                assert_eq!((job.org.as_str(), job.module_key.as_str()), ("acme", "c1"));
+                assert_eq!(job.module, TriggerModule::CompositeAlert);
+                assert_eq!(job.status, TriggerStatus::Waiting);
+                assert_eq!(job.next_run_at, 42);
+            }
+        }
+    }
+
+    /// R8: the refusal for every shape of graph around the evaluated node.
+    #[test]
+    fn evaluation_refuses_a_cycle_reachable_from_the_node_or_nesting_past_two() {
+        // Each word is `parent:child,child`, the composite children of one composite.
+        let cases = [
+            ("a:", "a", None),
+            ("a:b b:", "a", None),
+            ("a:b b:c c:", "a", Some(GraphFault::TooDeep)),
+            ("a:b b:c c:", "b", None),
+            ("a:a", "a", Some(GraphFault::Cycle)),
+            ("a:b b:a", "a", Some(GraphFault::Cycle)),
+            ("a:b b:c c:b", "a", Some(GraphFault::Cycle)),
+            ("a: x:y y:x", "a", None),
+            ("a:gone", "a", None),
+        ];
+        for (edges, node, expected) in cases {
+            let graph = edges
+                .split_whitespace()
+                .filter_map(|word| word.split_once(':'))
+                .map(|(parent, children)| {
+                    let children = children
+                        .split(',')
+                        .filter(|child| !child.is_empty())
+                        .map(str::to_string)
+                        .collect();
+                    (parent.to_string(), children)
+                })
+                .collect();
+            assert_eq!(graph_fault(&graph, node), expected, "{edges} from {node}");
+        }
+    }
+
+    /// R6 against the scheduler table, and the retry `sync_replica_job` promises is safe.
+    #[tokio::test]
+    async fn a_replica_job_follows_the_local_definition() {
+        use config::meta::triggers::{TriggerModule, TriggerStatus};
+        use infra::table::alert_composites::{
+            CompositeWithChildren, ReplicaWrite, ReplicatedKind, apply_replicated, delete_by_id,
+        };
+        use svix_ksuid::{Ksuid, KsuidLike as _};
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let conn = infra::db::get_orm_client_rw().await;
+        let org = format!(
+            "composite_replica_job_{}",
+            config::utils::time::now_micros()
+        );
+        let org = org.as_str();
+        let id = Ksuid::new(None, None).to_string();
+        let id = id.as_str();
+        let incoming = |enabled, updated_at| CompositeWithChildren {
+            definition: composite_entity::Model {
+                id: id.to_string(),
+                org: org.to_string(),
+                folder_id: "default".to_string(),
+                name: "replicated".to_string(),
+                expression: "{a} && {b}".to_string(),
+                destinations: serde_json::json!([]),
+                workflows: serde_json::json!([]),
+                enabled,
+                updated_at: Some(updated_at),
+                ..Default::default()
+            },
+            children: vec![],
+        };
+        let job = || infra::scheduler::get(org, TriggerModule::CompositeAlert, id);
+
+        let applied = apply_replicated(conn, ReplicatedKind::Create, incoming(true, 1)).await;
+        assert_eq!(applied.unwrap(), ReplicaWrite::Insert);
+        assert!(job().await.is_err(), "the apply alone creates no job");
+        let redelivered = apply_replicated(conn, ReplicatedKind::Create, incoming(true, 1)).await;
+        assert_eq!(redelivered.unwrap(), ReplicaWrite::Skip);
+        sync_replica_job(org, id).await.unwrap();
+        let created = job().await.expect("an enabled definition has a job");
+        assert_eq!(created.status, TriggerStatus::Waiting);
+
+        let mut advanced = created.clone();
+        advanced.next_run_at = 7;
+        infra::scheduler::update_trigger(advanced, false)
+            .await
+            .unwrap();
+        sync_replica_job(org, id).await.unwrap();
+        assert_eq!(
+            job().await.unwrap().next_run_at,
+            7,
+            "an existing job is kept"
+        );
+
+        let disabled = apply_replicated(conn, ReplicatedKind::Update, incoming(false, 2)).await;
+        assert!(matches!(disabled.unwrap(), ReplicaWrite::Replace { .. }));
+        sync_replica_job(org, id).await.unwrap();
+        assert!(job().await.is_err(), "a disabled definition has no job");
+
+        let enabled = apply_replicated(conn, ReplicatedKind::Update, incoming(true, 3)).await;
+        assert!(matches!(enabled.unwrap(), ReplicaWrite::Replace { .. }));
+        sync_replica_job(org, id).await.unwrap();
+        assert!(job().await.is_ok());
+
+        delete_by_id(conn, org, id).await.unwrap();
+        sync_replica_job(org, id).await.unwrap();
+        assert!(job().await.is_err(), "a deleted definition has no job");
     }
 }

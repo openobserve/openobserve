@@ -19,9 +19,9 @@ pub use runtime::{
     CompositeEvaluation, CompositeEvaluator, CompositeStateInput, EvaluatedChild, EvaluationFailure,
 };
 pub use service::{
-    CompositeCreate, CompositeServiceError, StartupPreflightError, check_move_composite,
-    clone_composite, create_composite, delete_composite, evaluate_definition, evaluate_expression,
-    get_composite, move_composite, set_composite_enabled, startup_preflight, trigger_composite,
+    CompositeCreate, CompositeServiceError, GraphFault, check_move_composite, clone_composite,
+    create_composite, delete_composite, evaluate_definition, evaluate_expression, get_composite,
+    graph_fault, move_composite, set_composite_enabled, sync_replica_job, trigger_composite,
     update_composite, validate_composite_graph,
 };
 
@@ -1016,46 +1016,24 @@ mod tests {
             Mutation::Disable,
             Mutation::Delete,
         ];
-        for mode in [GateMode::WritesDisabled, GateMode::SuperCluster] {
-            let h = CompositeHarness::gate_only(mode);
-            assert_eq!(
-                h.capabilities().composite_alerts_available,
-                mode != GateMode::SuperCluster
-            );
-            for mutation in &mutations {
-                let decision = h.gate(mutation);
-                if matches!(mutation, Mutation::Disable | Mutation::Delete) {
-                    assert!(
-                        decision.is_ok(),
-                        "{mode:?} must permit cleanup {mutation:?}"
-                    );
-                } else {
-                    let error = decision.unwrap_err();
-                    let expected = match mode {
-                        GateMode::WritesDisabled => (503, "composite_writes_disabled"),
-                        GateMode::SuperCluster => (409, "composite_super_cluster_unsupported"),
-                        GateMode::Supported => unreachable!(),
-                    };
-                    assert_eq!((error.status, error.code.as_str()), expected);
-                    assert!(!error.graph_lock_attempted);
-                    assert!(!error.write_attempted);
-                }
+        let h = CompositeHarness::gate_only(GateMode::WritesDisabled);
+        for mutation in &mutations {
+            let decision = h.gate(mutation);
+            if matches!(mutation, Mutation::Disable | Mutation::Delete) {
+                assert!(decision.is_ok(), "cleanup {mutation:?} must stay possible");
+            } else {
+                let error = decision.unwrap_err();
+                assert_eq!(
+                    (error.status, error.code.as_str()),
+                    (503, "composite_writes_disabled")
+                );
+                assert!(!error.graph_lock_attempted);
+                assert!(!error.write_attempted);
             }
         }
-    }
-
-    #[tokio::test]
-    async fn super_cluster_startup_preflight_requires_zero_definitions_and_jobs() {
-        for (definitions, jobs, allowed) in
-            [(0, 0, true), (1, 0, false), (0, 1, false), (1, 1, false)]
-        {
-            let h = CompositeHarness::startup_preflight(definitions, jobs);
-            assert_eq!(h.is_ok(), allowed);
-            if let Err(error) = h {
-                assert_eq!(error.code, "composite_super_cluster_startup_blocked");
-                assert_eq!(error.definition_count, definitions);
-                assert_eq!(error.job_count, jobs);
-            }
+        let supported = CompositeHarness::gate_only(GateMode::Supported);
+        for mutation in &mutations {
+            assert!(supported.gate(mutation).is_ok(), "{mutation:?}");
         }
     }
 
