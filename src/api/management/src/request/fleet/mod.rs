@@ -2919,23 +2919,12 @@ mod tests {
         assert_eq!(empty.settings, FleetSettings::default());
     }
 
-    /// Nothing else in this binary migrates the meta store the handlers write to.
-    async fn meta_store() {
-        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
-        ONCE.get_or_init(|| async {
-            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
-            infra::db_init().await.expect("meta store");
-            infra::table::migrate().await.expect("migrations");
-        })
-        .await;
-    }
-
     /// Shared by the audit tests and never forgotten, since they run in parallel.
     const AUDIT_ROOT: &str = "audit-root@fleet-audit-scope.test";
 
     /// A fresh org with one fleet, written by a root caller, so every check passes for real.
     async fn audit_org(label: &str) -> (String, String) {
-        meta_store().await;
+        crate::request::security::tests::meta_store().await;
         openfga_off();
         seed_member(
             AUDIT_ROOT,
