@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { inject, reactive, watchEffect, type InjectionKey } from "vue";
+import { inject, reactive, watchEffect, type InjectionKey, type Ref } from "vue";
 import type { AlertSectionId } from "@/components/alerts/alertFormSections";
 import {
   ALERT_SETTING_TIERS,
@@ -28,9 +28,8 @@ export interface AlertSettingTiers {
   isVisible: (id: AlertSettingId) => boolean;
   view: (section: AlertSectionId) => AlertSectionTierView;
   reveal: (id: AlertSettingId) => void;
+  conceal: (id: AlertSettingId) => void;
   toggle: (section: AlertSectionId) => void;
-  expand: (section: AlertSectionId) => void;
-  collapse: (section: AlertSectionId) => void;
 }
 
 export const ALERT_SETTING_TIERS_KEY: InjectionKey<AlertSettingTiers> = Symbol("alertSettingTiers");
@@ -39,6 +38,7 @@ export const ALERT_SETTING_TIERS_KEY: InjectionKey<AlertSettingTiers> = Symbol("
 export function useAlertSettingTiers(opts: {
   available: (id: AlertSettingId) => boolean;
   isSet: (id: AlertSettingId) => boolean;
+  showAll: Ref<boolean>;
 }): AlertSettingTiers {
   const revealed = reactive(new Set<AlertSettingId>());
   const expanded = reactive<Partial<Record<AlertSectionId, boolean>>>({});
@@ -46,12 +46,15 @@ export function useAlertSettingTiers(opts: {
     available: opts.available,
     isSet: opts.isSet,
     revealed,
+    get showAll() {
+      return opts.showAll.value;
+    },
     expanded: (section) => expanded[section] === true,
   };
   // Once shown for its value, a setting stays: clearing or breaking the value must not unmount it under the cursor.
   watchEffect(() => {
     for (const def of ALERT_SETTING_TIERS) {
-      if (def.tier !== "shown" && !revealed.has(def.id) && opts.isSet(def.id)) revealed.add(def.id);
+      if (!revealed.has(def.id) && opts.isSet(def.id)) revealed.add(def.id);
     }
   });
   return {
@@ -60,14 +63,11 @@ export function useAlertSettingTiers(opts: {
     reveal: (id) => {
       revealed.add(id);
     },
+    conceal: (id) => {
+      revealed.delete(id);
+    },
     toggle: (section) => {
       expanded[section] = !expanded[section];
-    },
-    expand: (section) => {
-      expanded[section] = true;
-    },
-    collapse: (section) => {
-      expanded[section] = false;
     },
   };
 }

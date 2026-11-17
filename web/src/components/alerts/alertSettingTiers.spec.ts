@@ -1,135 +1,184 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect } from "vitest";
-import i18n from "@/locales";
-import { raw, type TranslateFn } from "@/types/i18n";
 import {
   ALERT_SETTING_TIERS,
+  alertTierContext,
   isTierVisible,
-  moreLinkLabel,
   sectionTierView,
+  tierAvailable,
+  tierIsSet,
   type AlertSettingId,
+  type AlertTierContext,
   type AlertTierState,
+  type AlertTierValues,
 } from "./alertSettingTiers";
-import { useAlertSettingTiers } from "@/composables/alerts/useAlertSettingTiers";
+import type { AlertSectionId } from "./alertFormSections";
 
-const t = i18n.global.t as unknown as TranslateFn;
+const ctx = (over: Partial<AlertTierContext> = {}): AlertTierContext => ({
+  kind: "scheduled",
+  shape: "filters",
+  aggregate: false,
+  incidentsEnabled: false,
+  oncallEnabled: false,
+  suppressRepeatsEnabled: false,
+  ...over,
+});
 
-const state = (over: Partial<AlertTierState> = {}): AlertTierState => ({
-  available: () => true,
+const state = (c: AlertTierContext, over: Partial<AlertTierState> = {}): AlertTierState => ({
+  available: (id) => tierAvailable(id, c),
   isSet: () => false,
   revealed: new Set<AlertSettingId>(),
+  showAll: false,
   expanded: () => false,
   ...over,
 });
 
-describe("ALERT_SETTING_TIERS", () => {
-  it("tiers every setting once, from the usage study", () => {
-    const ids = ALERT_SETTING_TIERS.map((d) => d.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    const count = (tier: string) => ALERT_SETTING_TIERS.filter((d) => d.tier === tier).length;
-    expect([count("shown"), count("one"), count("tucked")]).toEqual([3, 3, 9]);
+const ALL_ON = { incidentsEnabled: true, oncallEnabled: true, suppressRepeatsEnabled: true };
+const SECTIONS: AlertSectionId[] = ["watch", "condition", "notify", "schedule", "details"];
+
+describe("sectionTierView: the More options line per mockup screen", () => {
+  it.each<[string, AlertSectionId, Partial<AlertTierContext>, AlertSettingId[]]>([
+    ["A2 filters", "condition", {}, ["holdFor", "generatedSql"]],
+    ["B0/B1 SQL", "condition", { shape: "sql" }, ["holdFor", "compareWithPast", "vrl"]],
+    ["DRY-C2 PromQL", "condition", { shape: "promql" }, ["holdFor", "ruleExpression"]],
+    [
+      "filters, aggregate",
+      "condition",
+      { aggregate: true },
+      ["holdFor", "generatedSql", "groupBy"],
+    ],
+    ["A3 notify", "notify", ALL_ON, ["recovery", "keepFiring", "suppressRepeats", "oncall"]],
+    ["A5 details", "details", {}, ["tags", "priority"]],
+    [
+      "E1 anomaly",
+      "condition",
+      { kind: "anomaly", shape: "anomaly" },
+      ["anomalyDirection", "anomalyWindow", "anomalySqlPreview"],
+    ],
+    [
+      "E1b anomaly notify",
+      "notify",
+      { kind: "anomaly", shape: "anomaly", ...ALL_ON },
+      ["anomalyRecordOnly"],
+    ],
+    [
+      "E1c anomaly details",
+      "details",
+      { kind: "anomaly", shape: "anomaly" },
+      ["anomalyTags", "anomalyPriority"],
+    ],
+    [
+      "E2 composite",
+      "condition",
+      { kind: "composite", shape: "composite" },
+      ["compositeWarningCounts", "compositeStalePolicy", "holdFor"],
+    ],
+    ["real-time condition", "condition", { kind: "realtime" }, []],
+    ["A4 schedule", "schedule", {}, []],
+  ])("%s", (_name, section, over, expected) => {
+    expect(sectionTierView(section, state(ctx(over))).more.map((d) => d.id)).toEqual(expected);
   });
 
-  it("puts every one-click setting in a labelled row", () => {
-    for (const d of ALERT_SETTING_TIERS.filter((x) => x.tier === "one")) {
-      expect(d.row).toBeDefined();
+  it("lists every unset setting on the line, never cutting it (Review Focus 4)", () => {
+    expect(sectionTierView("notify", state(ctx(ALL_ON))).more).toHaveLength(4);
+  });
+});
+
+describe("tier rules", () => {
+  it("offers Show generated SQL only for Filters", () => {
+    for (const shape of ["sql", "promql", "anomaly", "composite"] as const) {
+      expect(tierAvailable("generatedSql", ctx({ shape }))).toBe(false);
+    }
+    expect(tierAvailable("generatedSql", ctx())).toBe(true);
+  });
+
+  it("with Show all, no section has links and every available setting shows", () => {
+    for (const over of [
+      {},
+      { shape: "sql" as const },
+      { kind: "anomaly" as const, shape: "anomaly" as const },
+    ]) {
+      const c = ctx({ ...over, ...ALL_ON });
+      const s = state(c, { showAll: true });
+      for (const section of SECTIONS) {
+        expect(sectionTierView(section, s)).toEqual({ addLinks: [], more: [], expanded: true });
+      }
+      for (const d of ALERT_SETTING_TIERS.filter((x) => tierAvailable(x.id, c))) {
+        expect(isTierVisible(d.id, s)).toBe(true);
+      }
+    }
+  });
+
+  it("a set or revealed setting shows and leaves its link and the line", () => {
+    for (const over of [
+      { isSet: (id: AlertSettingId) => id === "holdFor" },
+      { revealed: new Set<AlertSettingId>(["holdFor", "warning"]) },
+    ]) {
+      const s = state(ctx(), over);
+      const view = sectionTierView("condition", s);
+      expect(view.more.map((d) => d.id)).not.toContain("holdFor");
+      expect(isTierVisible("holdFor", s)).toBe(true);
+    }
+    expect(isTierVisible("holdFor", state(ctx()))).toBe(false);
+  });
+
+  it("an expanded section shows its rare settings but keeps its + links", () => {
+    const s = state(ctx(), { expanded: (section) => section === "condition" });
+    expect(isTierVisible("holdFor", s)).toBe(true);
+    expect(isTierVisible("warning", s)).toBe(false);
+    expect(sectionTierView("condition", s).addLinks.map((d) => d.id)).toContain("warning");
+  });
+
+  it("every smart setting has a name for the More options line", () => {
+    for (const d of ALERT_SETTING_TIERS.filter((x) => x.tier === "smart")) {
+      expect(d.nameKey).toMatch(/^alerts\.tiers\.names\./);
     }
   });
 });
 
-describe("sectionTierView", () => {
-  it("names the condition section's tucked settings and has no add links", () => {
-    const view = sectionTierView("condition", state());
-    expect(view.addLinks).toEqual([]);
-    expect(view.tucked.map((d) => d.id)).toEqual([
-      "warning",
-      "holdFor",
-      "groupBy",
-      "compareWithPast",
-    ]);
-  });
-
-  it("drops a set tucked setting from the count, and unavailable ones", () => {
-    const view = sectionTierView(
-      "condition",
-      state({
-        isSet: (id) => id === "compareWithPast",
-        available: (id) => id !== "groupBy",
-      }),
+describe("alertTierContext", () => {
+  it.each<[string, string | undefined, Pick<AlertTierContext, "kind" | "shape">]>([
+    ["false", "custom", { kind: "scheduled", shape: "filters" }],
+    ["false", "sql", { kind: "scheduled", shape: "sql" }],
+    ["false", "promql", { kind: "scheduled", shape: "promql" }],
+    ["true", "sql", { kind: "realtime", shape: "filters" }],
+    ["anomaly", undefined, { kind: "anomaly", shape: "anomaly" }],
+    ["composite", "custom", { kind: "composite", shape: "composite" }],
+  ])("is_real_time %s, type %s", (isRealTime, queryType, expected) => {
+    expect(alertTierContext({ isRealTime, queryType, aggregate: false, ...ALL_ON })).toMatchObject(
+      expected,
     );
-    expect(view.tucked.map((d) => d.id)).toEqual(["warning", "holdFor"]);
-  });
-
-  it("offers one-click links in the notify section until added or set", () => {
-    const revealed = new Set<AlertSettingId>(["template"]);
-    const view = sectionTierView(
-      "notify",
-      state({ revealed, isSet: (id) => id === "createsIncident" }),
-    );
-    expect(view.addLinks.map((d) => d.id)).toEqual(["variables"]);
-    expect(view.tucked.map((d) => d.id)).toEqual(["recovery", "oncall", "keepFiring"]);
   });
 });
 
-describe("isTierVisible", () => {
-  it("always shows a shown setting and hides an unset tucked one", () => {
-    expect(isTierVisible("destinations", state())).toBe(true);
-    expect(isTierVisible("priority", state())).toBe(false);
-    expect(isTierVisible("template", state())).toBe(false);
+describe("tierIsSet", () => {
+  const v = (form: AlertTierValues["form"], anomaly: AlertTierValues["anomaly"] = null) => ({
+    form,
+    anomaly,
   });
-
-  it("shows a tucked setting with a non-default value", () => {
-    expect(isTierVisible("compareWithPast", state({ isSet: () => true }))).toBe(true);
-  });
-
-  it("shows tucked settings while their section is expanded", () => {
-    const s = state({ expanded: (section) => section === "details" });
-    expect(isTierVisible("priority", s)).toBe(true);
-    expect(isTierVisible("recovery", s)).toBe(false);
-  });
-
-  it("does not expand a tucked setting that does not apply here", () => {
-    const s = state({ expanded: () => true, available: (id) => id !== "compareWithPast" });
-    expect(isTierVisible("compareWithPast", s)).toBe(false);
-    expect(isTierVisible("warning", s)).toBe(true);
-  });
-
-  it("shows a one-click setting once added, and never via expand", () => {
-    expect(isTierVisible("template", state({ expanded: () => true }))).toBe(true);
-    expect(isTierVisible("template", state({ revealed: new Set(["template"]) }))).toBe(true);
-  });
-});
-
-describe("moreLinkLabel", () => {
-  it("lists every name up to five", () => {
-    const names = ["warning", "hold for", "group by", "compare with past"].map(raw);
-    expect(moreLinkLabel(names, t)).toBe(
-      "More options: warning, hold for, group by, compare with past",
-    );
-  });
-
-  it("past five, names the first three and counts the rest", () => {
-    const names = ["a", "b", "c", "d", "e", "f"].map(raw);
-    expect(moreLinkLabel(names, t)).toBe("More options: a, b, c and 3 more");
-  });
-});
-
-describe("useAlertSettingTiers", () => {
-  it("expands and collapses a section in place", () => {
-    const tiers = useAlertSettingTiers({ available: () => true, isSet: () => false });
-    expect(tiers.isVisible("priority")).toBe(false);
-    tiers.toggle("details");
-    expect(tiers.view("details").expanded).toBe(true);
-    expect(tiers.isVisible("priority")).toBe(true);
-    tiers.toggle("details");
-    expect(tiers.isVisible("priority")).toBe(false);
-  });
-
-  it("keeps an added one-click setting in place", () => {
-    const tiers = useAlertSettingTiers({ available: () => true, isSet: () => false });
-    tiers.reveal("variables");
-    expect(tiers.isVisible("variables")).toBe(true);
-    expect(tiers.view("notify").addLinks.map((d) => d.id)).toEqual(["createsIncident", "template"]);
+  it.each<[AlertSettingId, AlertTierValues, boolean]>([
+    ["holdFor", v({ pending_period_sec: 600 }), true],
+    ["holdFor", v({ pending_period_sec: 0 }), false],
+    ["keepFiring", v({ keep_firing_for: 45 }), true],
+    ["cron", v({ trigger_condition: { frequency_type: "cron" } }), true],
+    ["cron", v({ trigger_condition: { frequency_type: "minutes" } }), false],
+    ["vrl", v({ query_condition: { vrl_function: "LiAuCg==" } }), true],
+    ["anomalyRecordOnly", v({}, { alert_enabled: false }), true],
+    ["anomalyRecordOnly", v({}, null), false],
+    ["anomalyWindow", v({}, { alert_window_buckets: 1, alert_window_fire_pct: 100 }), false],
+    ["anomalyWindow", v({}, { alert_window_buckets: 3, alert_window_fire_pct: 100 }), true],
+    [
+      "compositeStalePolicy",
+      v({ composite_condition: { stale_child_policy: "treat_as_false" } }),
+      true,
+    ],
+    [
+      "compositeStalePolicy",
+      v({ composite_condition: { stale_child_policy: "use_last_state" } }),
+      false,
+    ],
+  ])("%s %#", (id, values, expected) => {
+    expect(tierIsSet(id, values)).toBe(expected);
   });
 });

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { defineComponent, h, nextTick, reactive } from "vue";
+import { defineComponent, h, nextTick, reactive, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { useAlertSettingTiers, type AlertSettingTiers } from "./useAlertSettingTiers";
 import type { AlertSettingId } from "@/components/alerts/alertSettingTiers";
@@ -24,7 +24,11 @@ const host = (set: Partial<Record<AlertSettingId, boolean>>) => {
   mount(
     defineComponent({
       setup() {
-        api = useAlertSettingTiers({ available: () => true, isSet: (id) => set[id] === true });
+        api = useAlertSettingTiers({
+          available: () => true,
+          isSet: (id) => set[id] === true,
+          showAll: ref(false),
+        });
         return () => h("div");
       },
     }),
@@ -33,7 +37,7 @@ const host = (set: Partial<Record<AlertSettingId, boolean>>) => {
 };
 
 describe("useAlertSettingTiers", () => {
-  it("keeps a tucked setting on screen after its value is cleared", async () => {
+  it("a setting set from the start stays shown when its value is cleared", async () => {
     const set = reactive<Partial<Record<AlertSettingId, boolean>>>({ holdFor: true });
     const api = host(set);
     expect(api().isVisible("holdFor")).toBe(true);
@@ -43,7 +47,7 @@ describe("useAlertSettingTiers", () => {
     expect(
       api()
         .view("condition")
-        .tucked.map((d) => d.id),
+        .more.map((d) => d.id),
     ).not.toContain("holdFor");
   });
 
@@ -58,12 +62,28 @@ describe("useAlertSettingTiers", () => {
     expect(api().isVisible("priority")).toBe(true);
   });
 
-  it("collapses a section that was expanded", () => {
-    const tiers = useAlertSettingTiers({ available: () => true, isSet: () => false });
-    tiers.expand("condition");
-    expect(tiers.view("condition").expanded).toBe(true);
-    tiers.collapse("condition");
-    expect(tiers.view("condition").expanded).toBe(false);
+  it("showAll on expands every section without a click", () => {
+    const showAll = ref(false);
+    const tiers = useAlertSettingTiers({ available: () => true, isSet: () => false, showAll });
+    expect(tiers.isVisible("priority")).toBe(false);
+    showAll.value = true;
+    expect(tiers.view("details").expanded).toBe(true);
+    expect(tiers.view("condition").more).toEqual([]);
+    expect(tiers.isVisible("priority")).toBe(true);
+    expect(tiers.isVisible("description")).toBe(true);
+  });
+
+  it("conceal returns a revealed setting to its link", () => {
+    const tiers = useAlertSettingTiers({
+      available: () => true,
+      isSet: () => false,
+      showAll: ref(false),
+    });
+    tiers.reveal("description");
+    expect(tiers.isVisible("description")).toBe(true);
+    tiers.conceal("description");
+    expect(tiers.isVisible("description")).toBe(false);
+    expect(tiers.view("details").addLinks.map((d) => d.id)).toContain("description");
   });
 
   it("still hides an unset setting that was never shown", async () => {
