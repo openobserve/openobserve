@@ -287,6 +287,8 @@ export interface ValueContext {
   operator: ValueOperator;
   /** Earlier elements of the IN list being typed; empty for every other operator. */
   chosen: string[];
+  /** From the field to the caret, e.g. `level = 'err`. */
+  span: string;
 }
 
 const BARE_OR_QUOTED = String.raw`(?:'([^']*)|([\w.\-]*))`;
@@ -331,6 +333,7 @@ export const parseValueContext = (textUntilCursor: string): ValueContext | null 
       operator,
       chosen:
         operator === "in" ? chosenInValues(match[0].slice(match[0].indexOf("(") + 1, listEnd)) : [],
+      span: match[0],
     };
   }
   return null;
@@ -923,6 +926,113 @@ export const buildOperatorLane = ({
   });
 };
 
+const TERM_SEARCH_FUNCTIONS = ["match_all"];
+const FIELD_SEARCH_FUNCTIONS = ["str_match", "str_match_ignore_case", "re_match", "re_not_match"];
+
+const sqlQuoted = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+const snippetLiteral = (text: string): string => text.replace(/[\\$}]/g, "\\$&");
+
+// Only functions the catalog offers, so a server without one never gets a row for it.
+const catalogFunctions = (catalog: LooseEntry[], names: string[]): LooseEntry[] =>
+  names.flatMap((name) => {
+    const entry = catalog.find((e) => e?.kind === "Function" && entryName(e) === name);
+    return entry ? [entry] : [];
+  });
+
+const filledRow = (entry: LooseEntry, labelDetail: string): LooseEntry => ({
+  name: entryName(entry),
+  label: entryName(entry),
+  kind: "Function",
+  labelDetail,
+  documentation: entry.documentation,
+  filled: true,
+});
+
+/** Search functions with a bare typed word as their value; the field-taking ones open the field menu at the field. */
+export const buildFilledWordEntries = (word: string, catalog: LooseEntry[]): LooseEntry[] => {
+  if (!word) return [];
+  const literal = sqlQuoted(word);
+  // A prefix filter word ties with the catalog's prefix matches, which then sort first; an exact one would be boosted above them.
+  const shared = {
+    filterText: `${word.toLowerCase()}\u0001`,
+    sortText: `${SORT_LANE.clause}\uffff`,
+  };
+  const term = catalogFunctions(catalog, TERM_SEARCH_FUNCTIONS).map((entry) => ({
+    ...filledRow(entry, `(${literal})`),
+    ...shared,
+    insertText: `${entryName(entry)}(${literal})`,
+  }));
+  const withField = catalogFunctions(catalog, FIELD_SEARCH_FUNCTIONS).map((entry) => ({
+    ...filledRow(entry, `(…, ${literal})`),
+    ...shared,
+    insertText: `${entryName(entry)}(\${1}, ${snippetLiteral(literal)})`,
+    insertTextRules: "InsertAsSnippet" as const,
+    command: { id: "editor.action.triggerSuggest", title: "" },
+  }));
+  return [...term, ...withField].map((entry, index) => ({
+    ...entry,
+    sortText: `${entry.sortText}${index}`,
+  }));
+};
+
+export interface FilledValueOptions {
+  context: ValueContext;
+  /** Everything before the caret, to tell a predicate from any other `x = 'v'`. */
+  textUntilCaret: string;
+  filterMode: boolean;
+  fieldType?: string;
+  lineNumber: number;
+  column: number;
+  closingQuoteAhead: boolean;
+  catalog: LooseEntry[];
+}
+
+/** `level = 'err` rewritten as a string-search call on the same field and value. */
+export const buildFilledValueEntries = ({
+  context,
+  textUntilCaret,
+  filterMode,
+  fieldType,
+  lineNumber,
+  column,
+  closingQuoteAhead,
+  catalog,
+}: FilledValueOptions): LooseEntry[] => {
+  const { field, typed, hasOpenQuote, operator, span } = context;
+  const kind = columnKind(fieldType);
+  if (!typed || operator !== "compare" || (kind !== "text" && kind !== "unknown")) return [];
+  // Only `=`: the same value under `!=` or `>` asks for something these functions do not do.
+  if (!/^\w+\s*=/.test(span) || span.includes("\n")) return [];
+  const textBeforeSpan = textUntilCaret.slice(0, textUntilCaret.length - span.length);
+  // A qualified `t.level` would keep its `t.` in front of the call.
+  if (textBeforeSpan.endsWith(".") || !isPredicatePosition(textBeforeSpan, filterMode)) return [];
+  const literal = sqlQuoted(typed);
+  const typedStart = column - typed.length;
+  // The opening quote stays where it is, so the filter word is only what was typed after it.
+  const valueStart = typedStart - (hasOpenQuote ? 1 : 0);
+  return catalogFunctions(catalog, FIELD_SEARCH_FUNCTIONS).map((entry) => ({
+    ...filledRow(entry, `(${field}, ${literal})`),
+    insertText: `${hasOpenQuote ? literal.slice(1) : literal})`,
+    range: {
+      startLineNumber: lineNumber,
+      endLineNumber: lineNumber,
+      startColumn: typedStart,
+      endColumn: column + (hasOpenQuote && closingQuoteAhead ? 1 : 0),
+    },
+    additionalTextEdits: [
+      {
+        range: {
+          startLineNumber: lineNumber,
+          endLineNumber: lineNumber,
+          startColumn: column - span.length,
+          endColumn: valueStart,
+        },
+        text: `${entryName(entry)}(${field}, `,
+      },
+    ],
+  }));
+};
+
 /** Catalog names in lead order; GROUP BY and friends only where the full query can end the WHERE here. */
 export const logicalLeadNames = (context: LogicalLeadContext, filterMode: boolean): string[] => {
   const lead = ["and", "or"];
@@ -1009,7 +1119,7 @@ export const isValueFunction = (entry: LooseEntry | null | undefined): boolean =
 /** Case-insensitive prefix of the name or of any `_` segment, or for a value anywhere inside as the server's keyword match is; LIKE wildcards are ignored. */
 export const matchesTyped = (entry: LooseEntry, typed: string): boolean => {
   const word = typedWord(typed);
-  if (!word) return true;
+  if (!word || entry.filled) return true;
   const text = matchText(entry);
   return startsWithWord(text, word) || (entry.kind === "Value" && text.includes(word));
 };
