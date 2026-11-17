@@ -236,9 +236,8 @@ export class RumPage {
      * (?query= is base64, restored on mount) instead of typing into the Monaco
      * editor, which is racy while the editor boots.
      */
-    async gotoErrorsList({ service = null, period = '1h' } = {}) {
+    async gotoErrorsList({ service = null, period = '1h', org = process.env.ORGNAME || 'default' } = {}) {
         const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
-        const org = process.env.ORGNAME || 'default';
         let url = `${base}/web/rum/errors?period=${period}&org_identifier=${org}`;
         if (service) {
             const filter = Buffer.from(`service='${service}'`).toString('base64');
