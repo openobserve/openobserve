@@ -346,7 +346,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 80] = [
     ("core/src/self_reporting/search.rs", "get_usage", Caller::Exempt("licence usage from the meta org")),
     ("core/src/service_identity/signals/metrics.rs", "range", Caller::Helper("version compare arms and RUM vitals; service_versions::compare is in the gated group, deploy detection and verdict ticks call it in the background")),
     ("core/src/service_identity/signals/processor.rs", "query", Caller::Background("service version deploy detection and verdict ticks")),
-    ("core/src/service_identity/signals/record_services.rs", "search", Caller::Helper("correlation span vote; request/service_streams/mod.rs checks the licence before it")),
+    ("core/src/service_identity/signals/record_services.rs", "search", Caller::InHandler),
     ("core/src/service_identity/signals/rum_drill.rs", "hits", Caller::Routed("service_versions::compare")),
     ("core/src/slo/job.rs", "prom_search", Caller::Background("SLO job")),
     ("core/src/slo/job.rs", "search", Caller::Background("SLO job")),

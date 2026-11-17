@@ -296,6 +296,7 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
     const args = {
       stream: stream.name,
       filters: stream.info.filters ?? {},
+      aliases: stream.info.filter_aliases,
       timeRange: deps.timeRange(),
       org: deps.org(),
     };

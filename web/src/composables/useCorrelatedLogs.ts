@@ -20,7 +20,7 @@ import { useStore } from "vuex";
 import type { StreamInfo, FieldAlias } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
-  buildSqlCondition,
+  buildStreamFilterCondition,
   applyFilterOverlay,
   buildFieldToGroupIdMap,
 } from "@/utils/telemetryCorrelation";
@@ -178,9 +178,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
         if (field.startsWith("_")) continue;
         if (value === null || value === undefined || value === "") continue;
 
-        conditions.push(
-          buildSqlCondition(field, String(value), streamInfo.filter_spellings?.[field]),
-        );
+        conditions.push(buildStreamFilterCondition(streamInfo, field, String(value)));
       }
 
       // Always quote stream name to match dashboard behavior

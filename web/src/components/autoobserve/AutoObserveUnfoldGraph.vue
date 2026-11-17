@@ -170,11 +170,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ><OTooltip :content="node.card.title"
             /></span>
             <span
-              class="text-text-secondary flex w-full min-w-0 items-center gap-1.5 text-xs leading-4"
+              class="text-text-secondary flex w-full min-w-0 flex-wrap items-center gap-x-1.5 text-xs leading-4"
             >
-              <span class="truncate tabular-nums">{{
-                node.card.until ? `${node.card.at} → ${node.card.until}` : node.card.at
-              }}</span>
+              <span
+                class="flex flex-wrap gap-x-1 tabular-nums"
+                :data-test="`autoobserve-unfold-time-${node.card.id}`"
+                ><OTooltip v-if="node.card.ago" :content="node.card.ago" /><span
+                  class="whitespace-nowrap"
+                  >{{ node.card.until ? `${node.card.at} ` : node.card.at }}</span
+                >
+                <span v-if="node.card.until" class="whitespace-nowrap">{{
+                  `→ ${node.card.until}`
+                }}</span></span
+              >
               <span
                 v-if="node.card.tag"
                 class="rounded-default inline-flex shrink-0 items-center gap-0.5 px-1 font-medium"
@@ -250,7 +258,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="absolute inset-y-0 start-0 w-1" :class="TONE[node.card.tone].bar" />
             <span class="text-text-secondary flex w-full items-center gap-1.5 text-xs">
               <OIcon :name="iconOf(node.card)" size="xs" :class="TONE[node.card.tone].ink" />
-              <span class="truncate tabular-nums">{{ node.card.at }}</span>
+              <span class="truncate tabular-nums"
+                >{{ node.card.at }}<OTooltip v-if="node.card.ago" :content="node.card.ago"
+              /></span>
               <span
                 v-if="node.card.count"
                 class="text-text-heading ms-auto font-semibold tabular-nums"

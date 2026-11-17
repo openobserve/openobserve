@@ -428,6 +428,121 @@ describe("incidents service", () => {
   });
 
   describe("getCorrelatedStreams", () => {
+    const window = { startTime: 1_700_000_000_000_000, endTime: 1_700_001_800_000_000 };
+    const noFirings = { triggers: [], window };
+    const groups = [
+      { id: "service", display: "Service", fields: ["service", "service_name"] },
+      { id: "k8s-pod", display: "Pod", fields: ["k8s_pod_name"] },
+    ];
+    const firing = (labels: Record<string, string>) => ({ labels }) as any;
+    const located = {
+      data: {
+        service_name: "checkout",
+        matched_dimensions: {},
+        additional_dimensions: {},
+        related_streams: { logs: [], metrics: [], traces: [], profiles: [] },
+      },
+    };
+
+    it.each([
+      {
+        name: "locates by the incident and names its service from every firing's labels",
+        group_values: { service: "checkout", "k8s-namespace": "prod" },
+        labels: [{ k8s_pod_name: "pod-a", service_name: "other" }, { k8s_pod_name: "pod-b" }],
+        now: window.endTime + 1,
+        available: { service: "checkout", "k8s-namespace": "prod" },
+        source: { service: "checkout", "k8s-namespace": "prod", "k8s-pod": "pod-a" },
+        end: window.endTime,
+      },
+      {
+        name: "locates by the labels when the incident has no dimensions",
+        group_values: {},
+        labels: [{ __name__: "http_requests_total", k8s_pod_name: "pod-a" }],
+        now: window.endTime + 1,
+        available: { "k8s-pod": "pod-a" },
+        source: { "k8s-pod": "pod-a" },
+        end: window.endTime,
+      },
+      {
+        name: "skips a blank label so a later firing names the service",
+        group_values: {},
+        labels: [{ service_name: " " }, { service_name: "checkout" }],
+        now: window.endTime + 1,
+        available: { service: "checkout" },
+        source: { service: "checkout" },
+        end: window.endTime,
+      },
+      {
+        name: "ends a window that reaches past now at now",
+        group_values: { service: "checkout" },
+        labels: [],
+        now: window.endTime - 60_000_000,
+        available: { service: "checkout" },
+        source: { service: "checkout" },
+        end: window.endTime - 60_000_000,
+      },
+    ])("$name", async ({ group_values, labels, now, available, source, end }) => {
+      vi.useFakeTimers({ now: now / 1000, toFake: ["Date"] });
+      vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: groups } as any);
+      vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(located as any);
+
+      await incidents.getCorrelatedStreams("label-org", { id: "i-1", group_values } as any, gt, {
+        triggers: labels.map(firing),
+        window,
+      });
+      vi.useRealTimers();
+
+      expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("label-org", {
+        source_stream: "",
+        source_type: "incident",
+        available_dimensions: available,
+        source_dimensions: source,
+        resolve_from_source: true,
+        start_time: window.startTime,
+        end_time: end,
+      });
+    });
+
+    it("returns the no-dimensions reason without calling correlate when nothing locates the incident", async () => {
+      vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: groups } as any);
+
+      const result = await incidents.getCorrelatedStreams(
+        "label-org",
+        { id: "i-2", group_values: {} } as any,
+        gt,
+        { triggers: [firing({ __name__: "up" }), { labels: null } as any], window },
+      );
+
+      expect(serviceStreamsApi.correlate).not.toHaveBeenCalled();
+      expect(result.emptyReason).toBe("no_service_dimensions");
+      expect(result.correlationData).toBeNull();
+    });
+
+    it("correlates an incident keyed only by its service when the location leaves the service out", async () => {
+      vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: groups } as any);
+      vi.mocked(serviceStreamsApi.getIdentityConfig).mockResolvedValueOnce({
+        data: {
+          sets: [{ id: "k8s", label: "Kubernetes", distinguish_by: ["k8s-pod"] }],
+          service_optional: true,
+        },
+      } as any);
+      vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(located as any);
+
+      const result = await incidents.getCorrelatedStreams(
+        "service-only-org",
+        { id: "i-3", group_values: { service: "checkout" } } as any,
+        gt,
+        noFirings,
+      );
+
+      expect(serviceStreamsApi.correlate).toHaveBeenCalledWith(
+        "service-only-org",
+        expect.objectContaining({ available_dimensions: { service: "checkout" } }),
+      );
+      expect(result.emptyReason).toBeUndefined();
+      expect(result.serviceName).toBe("checkout");
+    });
+
     it("returns the display props and keeps serviceName and the request on the key", async () => {
       const row = labelRows.qualified;
       const mockIncident = {
@@ -444,12 +559,16 @@ describe("incidents service", () => {
         },
       } as any);
 
-      const result = await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
+      const result = await incidents.getCorrelatedStreams("test-org", mockIncident, gt, noFirings);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "",
         source_type: "incident",
         available_dimensions: { service: row.service_name },
+        source_dimensions: mockIncident.group_values,
+        resolve_from_source: true,
+        start_time: noFirings.window.startTime,
+        end_time: noFirings.window.endTime,
       });
       expect(result.serviceName).toBe(row.service_name);
       expect(result.displayServiceName).toBe(row.display_name);
@@ -487,12 +606,16 @@ describe("incidents service", () => {
 
       vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
 
-      const result = await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
+      const result = await incidents.getCorrelatedStreams("test-org", mockIncident, gt, noFirings);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "",
         source_type: "incident",
         available_dimensions: mockIncident.group_values,
+        source_dimensions: mockIncident.group_values,
+        resolve_from_source: true,
+        start_time: noFirings.window.startTime,
+        end_time: noFirings.window.endTime,
       });
 
       expect(result.serviceName).toBe("api-gateway");
@@ -520,12 +643,16 @@ describe("incidents service", () => {
 
       vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
 
-      await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
+      await incidents.getCorrelatedStreams("test-org", mockIncident, gt, noFirings);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "",
         source_type: "incident",
         available_dimensions: mockIncident.group_values,
+        source_dimensions: mockIncident.group_values,
+        resolve_from_source: true,
+        start_time: noFirings.window.startTime,
+        end_time: noFirings.window.endTime,
       });
     });
 
@@ -548,12 +675,16 @@ describe("incidents service", () => {
 
       vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
 
-      await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
+      await incidents.getCorrelatedStreams("test-org", mockIncident, gt, noFirings);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "",
         source_type: "incident",
         available_dimensions: mockIncident.group_values,
+        source_dimensions: mockIncident.group_values,
+        resolve_from_source: true,
+        start_time: noFirings.window.startTime,
+        end_time: noFirings.window.endTime,
       });
     });
   });

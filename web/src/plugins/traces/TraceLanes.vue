@@ -130,7 +130,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import {
-  buildSqlCondition,
+  buildStreamFilterCondition,
   correlationWindow,
   quoteSqlIdentifier,
 } from "@/utils/telemetryCorrelation";
@@ -261,7 +261,9 @@ async function loadLogs(correlated: Correlated[], from: number, to: number, onFa
 
   const pages = await Promise.all(
     queries.flatMap(({ service, stream }) => {
-      const where = filterPairs(stream).map(([field, value]) => buildSqlCondition(field, value));
+      const where = filterPairs(stream).map(([field, value]) =>
+        buildStreamFilterCondition(stream, field, value),
+      );
       return (["ASC", "DESC"] as const).map((order) => {
         const sql = `SELECT * FROM ${quoteSqlIdentifier(stream.stream_name)} WHERE ${where.join(" AND ")} ORDER BY ${quoteSqlIdentifier(ts)} ${order}`;
         return searchService

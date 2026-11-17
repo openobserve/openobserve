@@ -155,7 +155,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 //      status_page_notices.false_alarm_recovered_at.
 // 155: create the service version, identity, alias, deploy and verdict tables.
 // 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
-pub const DB_SCHEMA_VERSION: u64 = 156;
+// 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
+//      service_streams rows named by the metric-name label that list no trace stream.
+pub const DB_SCHEMA_VERSION: u64 = 157;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -3069,6 +3071,12 @@ pub struct Limit {
         help = "Per-user cap on alert-destination test-sends per minute. A test-send posts a real [TEST]-marked message to a real destination, so this bounds accidental or scripted spam of someone's channel/inbox. The cap is enforced PER PROCESS (in-memory, not cluster-shared) — a multi-node deployment's effective cap is N times this value, where N is the node count. 0 = unlimited."
     )]
     pub alert_test_send_per_minute: u32,
+    #[env_config(
+        name = "ZO_INCIDENTS_JOIN_WINDOW_MINUTES",
+        default = 240,
+        help = "How long after an incident's first alert another alert may still join it by matching dimensions, in minutes. Alerts already in the incident always rejoin it, and an incident without dimensions takes only its own alerts. 0 removes the time limit."
+    )]
+    pub incidents_join_window_minutes: i64,
     #[env_config(
         name = "ZO_ALERT_CHART_ENABLED",
         default = true,
