@@ -135,22 +135,21 @@ const RETENTION_TYPES: [StreamType; 4] = [
     StreamType::Profiles,
 ];
 
-/// Whether the resolved default that a stream of this type inherits gets shorter. A type with
-/// no value of its own follows the generic default. 0 keeps the data forever.
+/// Whether the resolved default that a stream of this type inherits gets shorter. 0 keeps the
+/// data forever. A type with no value of its own follows the generic default or, as a derived
+/// metadata or index stream, the type of its source, so any shorter default counts for it.
 fn default_shortened_for(
     stream_type: StreamType,
     current: &config::meta::stream::DataRetentionDefaults,
     update: &config::meta::stream::DataRetentionDefaults,
 ) -> bool {
-    let days = |defaults: &config::meta::stream::DataRetentionDefaults| {
-        let days = if RETENTION_TYPES.contains(&stream_type) {
-            defaults.for_type(stream_type)
-        } else {
-            defaults.default
-        };
-        if days > 0 { days } else { i64::MAX }
-    };
-    days(update) < days(current)
+    let days = |days: i64| if days > 0 { days } else { i64::MAX };
+    let shorter = |t: StreamType| days(update.for_type(t)) < days(current.for_type(t));
+    if RETENTION_TYPES.contains(&stream_type) {
+        shorter(stream_type)
+    } else {
+        days(update.default) < days(current.default) || RETENTION_TYPES.into_iter().any(shorter)
+    }
 }
 
 /// A Security source with no retention of its own, so the org default decides its data.
@@ -248,10 +247,11 @@ mod tests {
             "0 kept the data forever"
         );
         assert!(!shortened(logs, defaults(30, 3), defaults(30, 0)));
-        // a type with no value of its own follows the generic default
+        // a type with no value of its own follows the generic default or its source's type
         assert!(shortened(metadata, defaults(30, 30), defaults(3, 30)));
         assert!(!shortened(logs, defaults(30, 30), defaults(3, 30)));
-        assert!(!shortened(metadata, defaults(30, 30), defaults(30, 3)));
+        assert!(shortened(metadata, defaults(30, 30), defaults(30, 3)));
+        assert!(!shortened(metadata, defaults(30, 30), defaults(60, 60)));
 
         let stream = |data_retention, source: bool| StreamSettings {
             data_retention,
