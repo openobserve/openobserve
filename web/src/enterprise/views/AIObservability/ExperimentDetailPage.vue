@@ -222,7 +222,7 @@
           @row-click="openRow"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2 max-md:contents">
+            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
               <OInput
                 v-model="rowSearch"
                 class="min-w-0 flex-1"

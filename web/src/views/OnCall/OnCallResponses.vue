@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- During an incident the list IS the work surface. Opening 200 pages
            one at a time to claim them is not triage. -->
       <template v-if="hasPages" #toolbar>
-        <div class="flex w-full flex-wrap items-center gap-2 max-md:contents">
+        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-md:contents">
           <!-- First, and always on screen, so a list narrowed to the reader's own pages never looks empty for a hidden reason. -->
           <OToggleGroup
             v-if="viewerEmail"

@@ -147,7 +147,7 @@ for every list — don't ship a listing page without them.
   <!-- filters + search on the LEFT of the toolbar (fills the row); max-md:contents +
        mobile-dropdown keep the phone toolbar on one row -->
   <template #toolbar>
-    <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+    <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
       <OToggleGroup
         mobile-dropdown
         :model-value="typeFilter"

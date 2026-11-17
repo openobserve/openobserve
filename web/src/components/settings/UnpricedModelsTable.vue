@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
       >
         <template #toolbar>
-          <div class="flex w-full min-w-0 flex-wrap items-center gap-2">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <div class="w-64" data-test="model-pricing-unpriced-stream-select">
               <OSelect
                 :model-value="stream"

@@ -116,7 +116,7 @@ function fmtTs(ms: number | null): string {
     @sort-change="emit('sort-change', $event)"
   >
     <template #toolbar>
-      <div class="flex w-full items-center gap-3">
+      <div class="flex min-w-0 flex-1 items-center gap-3">
         <div class="flex-1" />
         <OButton
           v-if="canShowTimeline"

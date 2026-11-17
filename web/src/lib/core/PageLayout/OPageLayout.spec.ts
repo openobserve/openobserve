@@ -47,6 +47,13 @@ describe("OPageLayout entrance", () => {
     );
   });
 
+  it("clips the sliding body at the layout root so the page's scroll box never overflows", () => {
+    const root = bodyOf(mountLayout()).parentElement!;
+
+    expect(root.classList).toContain("h-full");
+    expect(root.classList).toContain("overflow-clip");
+  });
+
   it("shows the license message without the slide while the page is locked", () => {
     const wrapper = mount(
       defineComponent({
