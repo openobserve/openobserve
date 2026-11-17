@@ -28,7 +28,7 @@ use crate::incremental::OPEN_HOUR_MERGE_FILES;
 /// The pending ingester files merge whatever their size.
 pub(super) const READS_WHOLE_WINDOW: bool = true;
 
-pub(super) fn plan(files: Vec<FileKey>, limits: &BatchLimits<'_>) -> RoundPlan {
+pub(super) fn plan(files: Vec<FileKey>, limits: &BatchLimits) -> RoundPlan {
     let (files, legacy_files) = split_legacy_metrics(files);
     let mut batches = legacy_batches(legacy_files, limits);
     batches.extend(pending_batches(&files, limits));
@@ -36,7 +36,7 @@ pub(super) fn plan(files: Vec<FileKey>, limits: &BatchLimits<'_>) -> RoundPlan {
 }
 
 /// The pending ingester files, once enough piled up, in batches of at most the merge-group cap.
-fn pending_batches(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<PlannedBatch> {
+fn pending_batches(files: &[FileKey], limits: &BatchLimits) -> Vec<PlannedBatch> {
     let pending: Vec<FileKey> = files
         .iter()
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
