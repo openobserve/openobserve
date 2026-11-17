@@ -394,8 +394,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OSettingRow>
 
                     <!-- group by row (hidden for count mode) -->
+                    <AlertSentenceRow
+                      v-if="groupBySettled"
+                      :label="t('alerts.tiers.names.groupBy')"
+                      data-test="add-alert-group-by-sentence"
+                      changeable
+                      removable
+                      @change="groupByEditing = true"
+                      @remove="clearGroupBy"
+                    >
+                      {{ raw(groupLabelsText(groupByLabels, locale)) }}
+                    </AlertSentenceRow>
                     <OSettingRow
-                      v-if="selectedFunction !== 'total_events' && tierShows('groupBy')"
+                      v-else-if="selectedFunction !== 'total_events' && tierShows('groupBy')"
                       data-test="alert-group-by-row"
                       :label="t('alerts.plain.groupedBy')"
                       :info="t('alerts.queryConfig.groupByTooltip')"
@@ -769,8 +780,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OSettingRow>
 
                     <!-- group by row — hidden for count mode -->
+                    <AlertSentenceRow
+                      v-if="groupBySettled"
+                      :label="t('alerts.tiers.names.groupBy')"
+                      data-test="add-alert-group-by-sentence"
+                      changeable
+                      removable
+                      @change="groupByEditing = true"
+                      @remove="clearGroupBy"
+                    >
+                      {{ raw(groupLabelsText(groupByLabels, locale)) }}
+                    </AlertSentenceRow>
                     <OSettingRow
-                      v-if="
+                      v-else-if="
                         inputData.aggregation &&
                         selectedFunction !== 'total_events' &&
                         tierShows('groupBy')
@@ -946,53 +968,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </span>
                       </template>
-
-                      <template v-if="!sectionTargets"
-                        ><span
-                          class="text-text-secondary text-compact font-semibold whitespace-nowrap"
-                          >{{ t("alerts.queryConfig.onThese") }}</span
-                        >
-                        <div
-                          class="filters-inline-toggle rounded-default bg-surface-panel hover:bg-tabs-hover-bg flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors select-none"
-                          @click="toggleFilters"
-                        >
-                          <OIcon
-                            name="filter-alt"
-                            size="xs"
-                            :class="filterCount > 0 ? 'text-theme-accent' : 'text-text-secondary'"
-                          />
-                          <span
-                            class="text-xs font-semibold"
-                            :class="filterCount > 0 ? 'text-theme-accent' : 'text-text-body'"
-                          >
-                            {{ t("alerts.queryConfig.filters") }}
-                          </span>
-                          <span
-                            v-if="filterCount > 0"
-                            class="text-2xs rounded-full px-1.5 py-0 leading-5 font-bold"
-                            :class="'bg-status-info-bg text-status-info-text'"
-                          >
-                            {{ filterCount }}
-                          </span>
-                          <OIcon
-                            :name="showFilters ? 'expand-more' : 'chevron-right'"
-                            size="sm"
-                            :class="'text-text-secondary'"
-                          />
-                          <!-- Review your SQL query hint -->
-                          <span
-                            v-if="generatedSqlQuery && !showFilters"
-                            class="ms-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
-                            :class="'text-text-secondary'"
-                          >
-                            {{ t("alerts.queryConfig.viewAlertQuery") }}
-                            <OTooltip :delay="200" side="bottom">
-                              <template #content>
-                                <AlertQueryPreview :query="generatedSqlQuery" />
-                              </template>
-                            </OTooltip>
-                          </span></div
-                      ></template>
                     </div>
 
                     <!-- Cron description + error -->
@@ -1022,14 +997,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </Teleport>
             </div>
 
-            <!-- Filters section — scheduled -->
             <div
-              v-if="isRealTime === 'false'"
               ref="filtersSectionRef"
-              class="mt-1"
+              class="mt-1 flex flex-col gap-2"
               :class="sectionTargets ? 'pb-2' : 'px-3'"
             >
-              <div v-show="showFilters" ref="customPreviewRef">
+              <AlertFilterSentence
+                v-if="filtersFolded"
+                :group="filterSentenceGroup"
+                :stream-name="streamName"
+                :dialect="filterDialect"
+                data-test="add-alert-filter-sentence"
+                @add="openFilters"
+                @change="openFilters"
+                @edit="openFilters"
+                @remove="removeFilters"
+                @toggle-connector="toggleFilterConnector"
+              />
+              <!-- Mounted while folded too: its validity check is what gates Save. -->
+              <div v-show="!filtersFolded" ref="customPreviewRef">
                 <FilterBuilder
                   ref="conditionsBuilderRef"
                   profile="alert"
@@ -1049,73 +1035,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("filterBar.validation.incomplete") }}
                 </div>
               </div>
-            </div>
-
-            <!-- Realtime — no threshold sentence, just filters always visible -->
-            <div v-else class="mb-1" :class="sectionTargets ? 'pb-2' : 'px-3'">
-              <div v-if="!sectionTargets" class="flex items-center gap-2 py-1">
-                <div
-                  class="filters-inline-toggle rounded-default bg-surface-panel hover:bg-tabs-hover-bg flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors select-none"
-                  @click="toggleFilters"
-                >
-                  <OIcon
-                    name="filter-alt"
-                    size="xs"
-                    :class="filterCount > 0 ? 'text-theme-accent' : 'text-text-secondary'"
-                  />
-                  <span
-                    class="text-xs font-semibold"
-                    :class="filterCount > 0 ? 'text-theme-accent' : 'text-text-body'"
-                  >
-                    {{ t("alerts.queryConfig.filters") }}
-                  </span>
-                  <span
-                    v-if="filterCount > 0"
-                    class="text-2xs rounded-full px-1.5 py-0 leading-5 font-bold"
-                    :class="'bg-status-info-bg text-status-info-text'"
-                  >
-                    {{ filterCount }}
-                  </span>
-                  <OIcon
-                    :name="showFilters ? 'expand-more' : 'chevron-right'"
-                    size="sm"
-                    :class="'text-text-secondary'"
-                  />
-                  <!-- Review your SQL query hint -->
-                  <span
-                    v-if="generatedSqlQuery && !showFilters"
-                    class="ms-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
-                    :class="'text-text-secondary'"
-                  >
-                    {{ t("alerts.queryConfig.viewAlertQuery") }}
-                    <OTooltip :delay="200" side="bottom">
-                      <template #content>
-                        <AlertQueryPreview :query="generatedSqlQuery" />
-                      </template>
-                    </OTooltip>
-                  </span>
-                </div>
-              </div>
-              <div v-show="showFilters || sectionTargets" ref="customPreviewRef">
-                <FilterBuilder
-                  ref="conditionsBuilderRef"
-                  profile="alert"
-                  :model-value="inputData.conditions"
-                  :fields="conditionFields"
-                  :load-values="conditionValueLoader"
-                  data-test="alert-conditions"
-                  @update:model-value="onConditionsChange"
-                  @update:valid="conditionsValid = $event"
-                />
-                <div
-                  v-if="showConditionsError"
-                  class="text-input-error-text mt-1 text-xs"
-                  role="alert"
-                  data-test="alert-conditions-error"
-                >
-                  {{ t("filterBar.validation.incomplete") }}
-                </div>
-              </div>
+              <AlertSentenceRow
+                v-if="showsGeneratedSql"
+                :label="t('alerts.tiers.names.generatedSql')"
+                data-test="add-alert-generated-sql"
+                removable
+                @remove="hideGeneratedSql"
+              >
+                <AlertQueryPreview :query="generatedSqlQuery" />
+              </AlertSentenceRow>
             </div>
           </div>
         </template>
@@ -1969,8 +1897,18 @@ import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useT
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
+import AlertFilterSentence from "@/components/alerts/AlertFilterSentence.vue";
+import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
 import { streamValuesLoader } from "@/components/filterBar/streamValues";
-import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
+import {
+  findNode,
+  replaceNode,
+  toFilterFieldType,
+  type FilterField,
+  type FilterGroup,
+  type FilterNode,
+} from "@/utils/query/filterBar";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
@@ -1999,8 +1937,31 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { type QueryConfigMeta } from "./QueryConfig.schema";
-import { useTierVisibility } from "@/composables/alerts/useAlertSettingTiers";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useTierVisibility,
+} from "@/composables/alerts/useAlertSettingTiers";
+import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
+
+/** Group labels as prose in the reader's language ("service, region and pod"). */
+function groupLabelsText(labels: string[], locale: string): string {
+  return new Intl.ListFormat(localeFileMap[locale] ?? locale, { type: "conjunction" }).format(
+    labels,
+  );
+}
+
+// The sentence reads only rows that name a field; the builder's own blank starter row is not a filter.
+const withoutBlankRows = (group: FilterGroup): FilterGroup => ({
+  ...group,
+  items: group.items.flatMap((item): FilterNode[] => {
+    if (item.kind === "group") {
+      const inner = withoutBlankRows(item);
+      return inner.items.length ? [inner] : [];
+    }
+    return item.kind === "condition" && !item.field ? [] : [item];
+  }),
+});
 
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
@@ -2011,6 +1972,8 @@ export default defineComponent({
     AlertMultiToggle,
     ForecastAlertFields,
     AlertQueryPreview,
+    AlertFilterSentence,
+    AlertSentenceRow,
     FilterBuilder,
     QueryEditorDialog,
     CustomConfirmDialog,
@@ -2139,8 +2102,9 @@ export default defineComponent({
     "update:triggerCondition",
   ],
   setup(props, { emit }) {
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     const store = useStore();
+    const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
 
     // Descendant step: the AddAlert orchestrator owns the ONE form and provides
     // FORM_CONTEXT_KEY. All field reads/writes below go through it; the composed
@@ -2226,8 +2190,6 @@ export default defineComponent({
     // Aggregation state
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
 
-    // Expandable section toggles — auto-expand filters if editing an alert with existing conditions
-    const showFilters = ref(true);
     const showVrl = ref(!!props.vrlFunction?.trim());
     const filtersSectionRef = ref<HTMLElement | null>(null);
     const inlineQueryEditorRef = ref<any>(null);
@@ -2426,10 +2388,6 @@ export default defineComponent({
     };
     const onBlurInlineVrlEditor = () => {
       vrlEditorPlaceholderFlag.value = vrlFunctionContent.value === "";
-    };
-
-    const toggleFilters = () => {
-      showFilters.value = !showFilters.value;
     };
 
     // Stream-type-driven: logs/traces are event-based, metrics are aggregation-based
@@ -2976,6 +2934,34 @@ export default defineComponent({
     const hasMetricGroupByFields = computed(
       () => metricGroupByStore.value.filter((f: string) => f?.trim()).length > 0,
     );
+    const groupByLabels = computed(() =>
+      (isEventBased.value ? logGroupByStore.value : metricGroupByStore.value).filter((f: string) =>
+        f?.trim(),
+      ),
+    );
+    // A loaded group-by reads as a sentence; once the user edits it, the pickers stay open under the cursor.
+    const groupByEditing = ref(false);
+    const groupBySettled = computed(
+      () =>
+        !!props.sectionTargets &&
+        selectedFunction.value !== "total_events" &&
+        groupByLabels.value.length > 0 &&
+        !groupByEditing.value,
+    );
+    const clearGroupBy = () => {
+      if (isEventBased.value) setFV("logGroupBy", []);
+      if (fv("query_condition.aggregation")) {
+        writeAggregation((agg) => {
+          agg.group_by = [];
+          agg.multi_alert = false;
+        });
+        emitAggregationUpdate();
+      }
+      triggerThreshold.value = 1;
+      triggerOperator.value = ">=";
+      groupByEditing.value = false;
+      tiers?.conceal("groupBy");
+    };
 
     // The choice only appears once a group-by exists, so normalise then —
     // that is the moment it becomes visible and needs a selected option.
@@ -3269,13 +3255,6 @@ export default defineComponent({
       }
     };
 
-    // Count of active filter conditions
-    const filterCount = computed(() => {
-      const conditions = props.inputData.conditions?.conditions;
-      if (!conditions || !Array.isArray(conditions)) return 0;
-      return conditions.filter((c: any) => c.filterType === "condition" && c.column).length;
-    });
-
     const countLeafFilters = (items: unknown): number =>
       Array.isArray(items)
         ? (items as { filterType?: string; column?: string; conditions?: unknown }[]).reduce(
@@ -3480,6 +3459,49 @@ export default defineComponent({
     );
     watch(submissionAttempts, () => conditionsBuilderRef.value?.validate());
 
+    // The sectioned editor folds the builder behind its sentence until the user asks to edit.
+    const filtersOpen = ref(false);
+    const filtersFolded = computed(
+      () => !!props.sectionTargets && !filtersOpen.value && !showConditionsError.value,
+    );
+    const filterContext = computed(() => ({ fields: conditionFields.value }));
+    const filterTree = computed(() =>
+      FILTER_PROFILES.alert.codec.parse(props.inputData.conditions, filterContext.value),
+    );
+    const filterSentenceGroup = computed(() => withoutBlankRows(filterTree.value));
+    const filterDialect = FILTER_PROFILES.alert.dialect;
+    const openFilters = () => {
+      filtersOpen.value = true;
+      nextTick(() => conditionsBuilderRef.value?.focus());
+    };
+    const toggleFilterConnector = (id: string) => {
+      const node = findNode(filterTree.value, id);
+      if (!node) return;
+      const next = replaceNode(filterTree.value, id, {
+        ...node,
+        connector: node.connector === "AND" ? "OR" : "AND",
+      });
+      onConditionsChange(FILTER_PROFILES.alert.codec.serialize(next, filterContext.value));
+    };
+    const removeFilters = () => {
+      const current = props.inputData.conditions;
+      const empty = current
+        ? { ...JSON.parse(JSON.stringify(current)), conditions: [] }
+        : { filterType: "group", logicalOperator: "AND", conditions: [] };
+      onConditionsChange(empty);
+      filtersOpen.value = false;
+    };
+
+    const showsGeneratedSql = computed(
+      () =>
+        !!props.sectionTargets &&
+        localTab.value === "custom" &&
+        props.isRealTime === "false" &&
+        !!props.generatedSqlQuery &&
+        !!tiers?.isVisible("generatedSql"),
+    );
+    const hideGeneratedSql = () => tiers?.conceal("generatedSql");
+
     const sqlOrPromqlQuery = computed(() => {
       return localTab.value === "sql" ? props.sqlQuery : props.promqlQuery;
     });
@@ -3623,6 +3645,7 @@ export default defineComponent({
     // is bridged into props.inputData.aggregation.group_by (in place) + emitted,
     // preserving the SQL-gen cadence.
     const addLogGroupByColumn = () => {
+      groupByEditing.value = true;
       form?.pushFieldValue?.("logGroupBy", "");
     };
     const deleteLogGroupByColumn = (index: number) => {
@@ -3730,6 +3753,7 @@ export default defineComponent({
 
     // Add group by column
     const addGroupByColumn = () => {
+      groupByEditing.value = true;
       if (fv("query_condition.aggregation")) {
         form?.pushFieldValue?.("query_condition.aggregation.group_by", "");
         syncMetricGroupByToProps();
@@ -4061,6 +4085,14 @@ export default defineComponent({
       conditionValueLoader,
       onConditionsChange,
       showConditionsError,
+      filtersFolded,
+      filterSentenceGroup,
+      filterDialect,
+      openFilters,
+      toggleFilterConnector,
+      removeFilters,
+      showsGeneratedSql,
+      hideGeneratedSql,
       sqlOrPromqlQuery,
       viewSqlEditor,
       localSqlQuery,
@@ -4111,6 +4143,12 @@ export default defineComponent({
       restoreDefaultThreshold,
       hasLogGroupByFields,
       hasMetricGroupByFields,
+      groupByLabels,
+      groupByEditing,
+      groupBySettled,
+      clearGroupBy,
+      groupLabelsText,
+      locale,
       isMultiAlert,
       onMultiAlertChange,
       onSqlMultiAlertChange,
@@ -4161,11 +4199,8 @@ export default defineComponent({
       onLogGroupByChange,
       onConditionOperatorChange,
       onConditionValueChange,
-      showFilters,
-      toggleFilters,
       filtersSectionRef,
       showVrl,
-      filterCount,
       leafFilterCount,
       periodMinutes,
       tierShows,

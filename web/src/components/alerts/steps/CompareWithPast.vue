@@ -15,218 +15,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    ref="multiWindowContainerRef"
-    class="step-compare-with-past mx-auto flex h-full w-full flex-col"
-  >
-    <div
-      class="step-content rounded-default bg-surface-overlay border-border-default min-h-0 flex-1 overflow-auto border"
+  <div ref="multiWindowContainerRef" class="step-compare-with-past flex w-full flex-col">
+    <OSettingRow
+      :label="t('alerts.plain.compareTitle')"
+      :description="
+        t('alerts.compareWithPast.runningFor', {
+          period: convertMinutesToDisplayValue(period),
+          frequency: convertMinutesToDisplayValue(frequency),
+        })
+      "
+      fill
+      data-test="add-alert-compare"
     >
-      <div
-        class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
-      >
-        <div
-          class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
-        />
-        <span class="section-header-title text-compact text-text-heading font-semibold">{{
-          t("alerts.plain.compareTitle")
-        }}</span>
-      </div>
-      <div class="px-3 pb-2">
-        <!-- Alert set for header -->
-        <div
-          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
-        >
-          <span>{{ t("alerts.plain.compareThisCheck") }}</span>
-          <div class="border-line h-px flex-1"></div>
-        </div>
-
-        <!-- Current Window -->
-        <div
-          class="bg-card-glass-bg border-border-default flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
-        >
-          <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
-          >
-            {{ t("alerts.compareWithPast.currentWindow") }}
-          </div>
-
-          <div class="flex flex-col items-start gap-2">
-            <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
-            >
-              {{ t("alerts.plain.compareRuns") }}
-              <span class="cursor-pointer">
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="ms-1 cursor-pointer"
-                  :class="'text-text-secondary'"
-                />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.cycleTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
-              </span>
-            </div>
-            <div class="flex items-start justify-between gap-4">
-              <div class="w-75 text-sm leading-5 font-normal">
-                {{
-                  t("alerts.compareWithPast.runningFor", {
-                    period: convertMinutesToDisplayValue(period),
-                    frequency: convertMinutesToDisplayValue(frequency),
-                  })
-                }}
-              </div>
-              <div>
-                <span class="inline-block">
-                  <OButton
-                    aria-hidden="true"
-                    tabindex="-1"
-                    class="pointer-events-none min-w-auto opacity-30"
-                    variant="ghost"
-                    size="icon-circle-sm"
-                    disable
-                  >
-                    <OIcon name="delete-outline" size="sm" />
-                  </OButton>
-                  <OTooltip
-                    :content="t('alerts.compareWithPast.currentWindowCannotBeDeleted')"
-                    side="top"
-                    align="center"
-                    :sideOffset="8"
-                  />
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Comparing with header -->
-        <div
-          v-if="localMultiTimeRange.length > 0"
-          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
-        >
-          <span>{{ t("alerts.compareWithPast.comparingWith") }}</span>
-          <div class="border-line h-px flex-1"></div>
-        </div>
-
-        <!-- Reference Windows List -->
-        <!-- `:key` is the row UUID (NOT the array index) because the only per-row
-           control is CustomDateTimePicker — a non-form widget bound by object
-           reference (`v-model="picker.offSet"`), not by an index-based OForm*
-           `name=`. The multi_time_range array is bridged into the form via
-           setFieldValue (descendant) / emit (bare) — see commit(). -->
+      <div class="flex flex-col items-start gap-1">
+        <!-- `:key` is the row UUID: the picker is bound by object reference, not by an index `name=`. -->
         <div
           v-for="(picker, index) in localMultiTimeRange"
           :key="picker.uuid"
-          class="reference-window-container bg-card-glass-bg border-border-default mt-2 flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
+          class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+          data-test="add-alert-compare-window"
         >
-          <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+          <i18n-t
+            keypath="alerts.compareWithPast.comparingText"
+            tag="span"
+            scope="global"
+            class="text-text-body flex flex-wrap items-center gap-x-1"
           >
-            {{ t("alerts.compareWithPast.referenceWindow") }} {{ index + 1 }}
-          </div>
-
-          <!-- Time Frame -->
-          <div class="flex flex-col items-start gap-2">
-            <div class="flex items-center">
-              <span class="me-1"><OIcon name="schedule" size="sm" /></span>
-              {{ t("alerts.compareWithPast.timeFrame") }}
-              <span class="ms-2 cursor-pointer">
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="ms-1 cursor-pointer"
-                  :class="'text-text-secondary'"
-                />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.timeFrameTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
+            <template #offset>
+              <span class="datetime-picker-wrapper rounded-default border-border-default border">
+                <CustomDateTimePicker
+                  v-model="picker.offSet"
+                  :picker="picker"
+                  :isFirstEntry="false"
+                  @update:model-value="updateDateTimePicker"
+                  :changeStyle="true"
                 />
               </span>
-            </div>
-            <div class="datetime-picker-wrapper rounded-default !border-border-default mt-2 border">
-              <CustomDateTimePicker
-                v-model="picker.offSet"
-                :picker="picker"
-                :isFirstEntry="false"
-                @update:model-value="updateDateTimePicker"
-                :changeStyle="true"
-              />
-            </div>
-          </div>
-
-          <!-- Cycle Info -->
-          <div class="flex flex-col items-start gap-2">
-            <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
-            >
-              {{ t("alerts.plain.compareRuns") }}
-              <span class="cursor-pointer">
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="ms-1 cursor-pointer"
-                  :class="'text-text-secondary'"
-                />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.cycleTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
-              </span>
-            </div>
-            <div class="flex items-start justify-between gap-4">
-              <div class="w-75 text-sm font-normal">
-                {{
-                  t("alerts.compareWithPast.comparingText", {
-                    offset: getDisplayValue(picker.offSet),
-                  })
-                }}
-              </div>
-              <div>
-                <OButton
-                  :aria-label="t('common.delete')"
-                  data-test="multi-time-range-alerts-delete-btn"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  @click="removeTimeShift(index)"
-                >
-                  <OIcon name="delete-outline" size="sm" />
-                </OButton>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Action Buttons Section -->
-        <div class="mt-2 flex w-full items-center justify-center gap-3">
+            </template>
+          </i18n-t>
           <OButton
-            data-test="multi-time-range-alerts-add-btn"
-            variant="outline"
+            data-test="multi-time-range-alerts-delete-btn"
+            variant="ghost-primary"
             size="sm"
-            :disabled="isComparisonDisabled"
-            @click="addTimeShift"
+            @click="removeTimeShift(index)"
           >
-            {{ t("alerts.plain.compareAddWindow") }}
-            <OTooltip
-              v-if="isComparisonDisabled"
-              :content="raw(comparisonDisabledTooltip)"
-              side="top"
-              align="center"
-              :sideOffset="8"
-            />
+            {{ t("common.remove") }}
           </OButton>
         </div>
+        <OButton
+          data-test="multi-time-range-alerts-add-btn"
+          variant="ghost-primary"
+          size="sm"
+          icon-left="add"
+          :disabled="isComparisonDisabled"
+          @click="addTimeShift"
+        >
+          {{
+            localMultiTimeRange.length
+              ? t("alerts.form.compare.addWindow")
+              : t("alerts.plain.compareAddWindow")
+          }}
+          <OTooltip
+            v-if="isComparisonDisabled"
+            :content="raw(comparisonDisabledTooltip)"
+            side="top"
+            align="center"
+            :sideOffset="8"
+          />
+        </OButton>
       </div>
-      <!-- end px-3 py-2 -->
-    </div>
+    </OSettingRow>
   </div>
 </template>
 
@@ -237,7 +95,7 @@ import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 
@@ -251,7 +109,7 @@ export default defineComponent({
   components: {
     CustomDateTimePicker,
     OButton,
-    OIcon,
+    OSettingRow,
     OTooltip,
   },
   props: {

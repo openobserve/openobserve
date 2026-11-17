@@ -23,7 +23,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { defineComponent, nextTick, reactive } from "vue";
+import { defineComponent, nextTick, reactive, ref } from "vue";
 import QueryConfig from "./QueryConfig.vue";
 import i18n from "@/locales";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -31,6 +31,10 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import { buildForecastAlertPromql } from "@/utils/alerts/forecastAlert";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
 
 // The composed orchestrator schema — messages resolve through the real locale.
 const t = (key: string, named?: Record<string, unknown>): string =>
@@ -2245,6 +2249,73 @@ describe("QueryConfig.vue", () => {
       wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
     };
     const columns = ["service", "status"].map((c) => ({ label: c, value: c, type: "utf8" }));
+    const sectioned = { sectionTargets: {} };
+    const leaf = (column: string, value: string, logicalOperator = "AND") => ({
+      filterType: "condition",
+      column,
+      operator: "=",
+      value,
+      logicalOperator,
+    });
+    const group = (...conditions: any[]) => ({
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions,
+    });
+    const tiersWith = (revealed: string[] = []) => {
+      const tiers = useAlertSettingTiers({
+        available: () => true,
+        isSet: () => false,
+        showAll: ref(false),
+      });
+      revealed.forEach((id) => tiers.reveal(id as any));
+      return { [ALERT_SETTING_TIERS_KEY as symbol]: tiers };
+    };
+    const formConditions = () => hostForm().state.values.query_condition.conditions;
+
+    it("filters read as a sentence and Change opens the builder", async () => {
+      remount({
+        ...sectioned,
+        inputData: { ...mockInputData, conditions: group(leaf("level", "error")) },
+      });
+      const sentence = host.find('[data-test="add-alert-filter-sentence"]');
+      expect(sentence.text()).toContain("level");
+      expect(sentence.text()).toContain("error");
+      expect(host.findComponent({ name: "FilterBuilder" }).isVisible()).toBe(false);
+      await host.find('[data-test="add-alert-filter-sentence-change"]').trigger("click");
+      expect(host.findComponent({ name: "FilterBuilder" }).isVisible()).toBe(true);
+    });
+
+    it("the and/or word on the sentence switches the stored connector", async () => {
+      const conditions = group(leaf("level", "error"), leaf("service", "cart"));
+      remount({ ...sectioned, inputData: { ...mockInputData, conditions } });
+      await host.find('[data-test^="add-alert-filter-sentence-connector-"]').trigger("click");
+      expect(formConditions().conditions.map((c: any) => c.logicalOperator)).toEqual(["AND", "OR"]);
+    });
+
+    it("Remove clears the filters", async () => {
+      remount({
+        ...sectioned,
+        inputData: { ...mockInputData, conditions: group(leaf("level", "error")) },
+      });
+      await host.find('[data-test="add-alert-filter-sentence-remove"]').trigger("click");
+      expect(formConditions().conditions).toEqual([]);
+      await setQCProps({ inputData: { ...mockInputData, conditions: formConditions() } });
+      expect(host.find('[data-test="add-alert-add-filters"]').exists()).toBe(true);
+    });
+
+    it.each([
+      ["custom", true],
+      ["sql", false],
+      ["promql", false],
+    ])("Show generated SQL in %s mode: %s", (tab, shown) => {
+      remount(
+        { ...sectioned, tab, streamType: "metrics", generatedSqlQuery: "SELECT 1" },
+        {},
+        tiersWith(["generatedSql"]),
+      );
+      expect(host.find('[data-test="add-alert-generated-sql"]').exists()).toBe(shown);
+    });
 
     it("an invalid SQL error shows under the editor with Use 'service'", async () => {
       const sql = "SELECT *\nFROM t\nWHERE servce = 'a'";

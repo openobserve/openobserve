@@ -379,67 +379,25 @@ describe("CompareWithPast.vue", () => {
   });
 
   describe("UI Rendering", () => {
-    it("should render Current window text", () => {
-      // The current window section renders its translated label
-      expect(wrapper.text()).toContain("Current window");
-    });
-
-    it("should render Cycle text", () => {
-      // Check for info icon (OIcon component) which accompanies the cycle text
-      const icons = wrapper.findAllComponents({ name: "OIcon" });
-      expect(icons.some((i) => /^info/.test(i.props("name") ?? ""))).toBe(true);
-    });
-
     it("should render running text with period and frequency", () => {
-      // Test the conversion functions directly
       expect(wrapper.vm.convertMinutesToDisplayValue(10)).toBe("10 Minutes");
       expect(wrapper.vm.convertMinutesToDisplayValue(1)).toBe("1 Minute");
     });
 
-    it("should render add comparison button", () => {
-      const addBtn = wrapper.find('[data-test="multi-time-range-alerts-add-btn"]');
-      expect(addBtn.exists()).toBe(true);
-    });
-
-    it("should render Comparing with section when windows exist", async () => {
-      await wrapper.setProps({
-        multiTimeRange: [{ offSet: "15m", uuid: "uuid-1" }],
-      });
-      await flushPromises();
-      // Check that reference window container is rendered
-      const html = wrapper.html();
-      expect(html).toContain("reference-window-container");
-    });
-
-    it("should not render Comparing with section when no windows", () => {
-      // When no windows exist, the v-if should hide the "Comparing with" div
-      // Check that localMultiTimeRange is empty
-      expect(wrapper.vm.localMultiTimeRange.length).toBe(0);
-    });
-
-    it("should render reference windows", async () => {
+    it("a set comparison reads as one row per past window with an add link and Remove", async () => {
       await wrapper.setProps({
         multiTimeRange: [
           { offSet: "15m", uuid: "uuid-1" },
-          { offSet: "30m", uuid: "uuid-2" },
+          { offSet: "1d", uuid: "uuid-2" },
         ],
       });
       await flushPromises();
-      // Check that the correct number of reference windows are rendered
-      const deleteBtns = wrapper.findAll('[data-test="multi-time-range-alerts-delete-btn"]');
-      expect(deleteBtns.length).toBe(2);
-    });
-
-    it("should render delete buttons for each window", async () => {
-      await wrapper.setProps({
-        multiTimeRange: [
-          { offSet: "15m", uuid: "uuid-1" },
-          { offSet: "30m", uuid: "uuid-2" },
-        ],
-      });
-      await flushPromises();
-      const deleteBtns = wrapper.findAll('[data-test="multi-time-range-alerts-delete-btn"]');
-      expect(deleteBtns.length).toBe(2);
+      expect(wrapper.findAll('[data-test="add-alert-compare-window"]')).toHaveLength(2);
+      expect(wrapper.find('[data-test="multi-time-range-alerts-add-btn"]').exists()).toBe(true);
+      await wrapper.findAll('[data-test="multi-time-range-alerts-delete-btn"]')[1].trigger("click");
+      expect(wrapper.emitted("update:multiTimeRange")?.at(-1)?.[0]).toEqual([
+        { offSet: "15m", uuid: "uuid-1" },
+      ]);
     });
   });
 
@@ -483,11 +441,6 @@ describe("CompareWithPast.vue", () => {
   describe("Accessibility", () => {
     it("should have proper structure for form inputs", () => {
       expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should have info icons with tooltips", () => {
-      const icons = wrapper.findAllComponents({ name: "OIcon" });
-      expect(icons.some((i) => /^info/.test(i.props("name") ?? ""))).toBe(true);
     });
   });
 
