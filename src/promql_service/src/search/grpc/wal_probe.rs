@@ -20,7 +20,7 @@ use std::{
 };
 
 use config::{RwAHashMap, meta::cluster::NodeInfo};
-use futures::future::join_all;
+use futures::future::try_join_all;
 use infra::{client::grpc::make_grpc_metrics_client, cluster::get_cached_online_ingester_nodes};
 use promql::ast::selector_window::SelectorWindow;
 use proto::cluster_rpc::WalMinTsRequest;
@@ -32,36 +32,44 @@ use super::{wal_floor, wal_head};
 const CACHE_TTL: Duration = Duration::from_secs(10);
 const PROBE_TIMEOUT_SECS: u64 = 5;
 
-/// key: `org/stream`, val: the oldest unflushed sample across the ingesters, and when it was probed
-static CACHE: LazyLock<RwAHashMap<String, (Option<i64>, Instant)>> =
-    LazyLock::new(Default::default);
+/// key: `org/stream`, val: what the last probe learned about the stream, and when
+static CACHE: LazyLock<RwAHashMap<String, (Probed, Instant)>> = LazyLock::new(Default::default);
+
+/// What a probe learned about one stream across the ingesters.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Probed {
+    /// the oldest unflushed sample, `None` when no ingester holds one
+    Oldest(Option<i64>),
+    /// an ingester did not answer; cached too, so one bad node does not stall every query
+    Unknown,
+}
 
 /// The time from which the streams' groups must read the WAL, 0 when an ingester could not tell.
 pub(crate) async fn wal_start_time(trace_id: &str, org_id: &str, streams: &HashSet<String>) -> i64 {
-    let mut oldest = None;
+    let mut probed = Vec::with_capacity(streams.len());
     let mut missing = Vec::new();
     {
         let cache = CACHE.read().await;
         for stream in streams {
             match cache.get(&cache_key(org_id, stream)) {
-                Some((min_ts, at)) if at.elapsed() < CACHE_TTL => oldest = older(oldest, *min_ts),
+                Some((entry, at)) if at.elapsed() < CACHE_TTL => probed.push(*entry),
                 _ => missing.push(stream.clone()),
             }
         }
     }
-    if !missing.is_empty() {
-        let Some(probed) = probe(trace_id, org_id, &missing).await else {
-            return 0;
-        };
+    if !missing.is_empty() && !probed.contains(&Probed::Unknown) {
+        let answers = probe(trace_id, org_id, &missing).await;
         let now = Instant::now();
         let mut cache = CACHE.write().await;
         for stream in missing {
-            let min_ts = probed.get(&stream).copied();
-            oldest = older(oldest, min_ts);
-            cache.insert(cache_key(org_id, &stream), (min_ts, now));
+            let entry = answers.as_ref().map_or(Probed::Unknown, |answers| {
+                Probed::Oldest(answers.get(&stream).copied())
+            });
+            probed.push(entry);
+            cache.insert(cache_key(org_id, &stream), (entry, now));
         }
     }
-    late_floor(oldest, wal_head(), wal_floor())
+    start_time(probed, wal_head(), wal_floor())
 }
 
 /// Whether some group of `[start, end]` reads the WAL only when it holds late samples.
@@ -69,7 +77,7 @@ pub(crate) fn needs_probe(window: &SelectorWindow, start: i64, end: i64) -> bool
     window.reaches(end, wal_floor()) && !window.reaches(start, wal_head())
 }
 
-/// The oldest unflushed sample per stream across all ingesters, `None` when one did not answer.
+/// The oldest unflushed sample per stream across all ingesters, `None` as soon as one fails.
 async fn probe(trace_id: &str, org_id: &str, streams: &[String]) -> Option<HashMap<String, i64>> {
     let nodes = get_cached_online_ingester_nodes().await.unwrap_or_default();
     let tasks = nodes.into_iter().map(|node| async move {
@@ -88,19 +96,27 @@ async fn probe(trace_id: &str, org_id: &str, streams: &[String]) -> Option<HashM
             .map(|resp| resp.into_inner().min_ts)
             .map_err(|e| format!("node {}: {e}", node.get_grpc_addr()))
     });
-    let mut answers = Vec::new();
-    for result in join_all(tasks).await {
-        match result {
-            Ok(answer) => answers.push(answer),
-            Err(e) => {
-                log::warn!(
-                    "[trace_id {trace_id}] promql->wal->probe: {e}, reading the whole ingest window"
-                );
-                return None;
-            }
+    match try_join_all(tasks).await {
+        Ok(answers) => Some(merge_oldest(answers)),
+        Err(e) => {
+            log::warn!(
+                "[trace_id {trace_id}] promql->wal->probe: {e}, reading the whole ingest window"
+            );
+            None
         }
     }
-    Some(merge_oldest(answers))
+}
+
+/// 0 when any stream is unknown, otherwise where the oldest late sample says the WAL read starts.
+fn start_time(probed: Vec<Probed>, head: i64, floor: i64) -> i64 {
+    let mut oldest = None;
+    for entry in probed {
+        match entry {
+            Probed::Unknown => return 0,
+            Probed::Oldest(min_ts) => oldest = older(oldest, min_ts),
+        }
+    }
+    late_floor(oldest, head, floor)
 }
 
 fn merge_oldest(answers: Vec<HashMap<String, i64>>) -> HashMap<String, i64> {
@@ -154,6 +170,23 @@ mod tests {
     #[test]
     fn test_late_floor_never_reaches_past_the_ingest_window() {
         assert_eq!(late_floor(Some(5), 100, 10), 10);
+    }
+
+    #[test]
+    fn test_start_time_is_unknown_when_any_stream_is_unknown() {
+        let probed = vec![Probed::Oldest(Some(40)), Probed::Unknown];
+        assert_eq!(start_time(probed, 100, 10), 0);
+    }
+
+    #[test]
+    fn test_start_time_takes_the_oldest_stream() {
+        let probed = vec![
+            Probed::Oldest(None),
+            Probed::Oldest(Some(60)),
+            Probed::Oldest(Some(40)),
+        ];
+        assert_eq!(start_time(probed, 100, 10), 40);
+        assert_eq!(start_time(vec![Probed::Oldest(None)], 100, 10), 100);
     }
 
     #[test]
