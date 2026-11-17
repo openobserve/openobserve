@@ -693,6 +693,22 @@ describe("TelemetryCorrelationDashboard.vue", () => {
     });
   });
 
+  it.each([
+    {
+      name: "drops a pod name a Correlated by chip already shows",
+      filters: { "k8s-pod-name": "pod-a" },
+      label: undefined,
+    },
+    { name: "keeps it when no metric stream was filtered by the pod", filters: {}, label: "pod-a" },
+  ])("Pods tab label: $name", ({ filters, label }) => {
+    wrapper = createWrapper({
+      externalActiveTab: "metrics",
+      chipDimensions: { "k8s-pod-name": "pod-a" },
+      metricStreams: [{ stream_name: "k8s_pod_cpu_usage", stream_type: "metrics", filters }],
+    });
+    expect(wrapper.vm.outerTabResourceName.pods).toBe(label);
+  });
+
   describe("uniqueMetricStreams computed", () => {
     it("should return unique streams from metricStreams prop", () => {
       const streamsWithDuplicates = [

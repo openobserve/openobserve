@@ -87,7 +87,7 @@ const emit = defineEmits<{ (e: "remove"): void }>();
       <span class="inline-flex min-w-0 items-stretch">
         <span
           v-if="!hideKey"
-          class="shrink-0 bg-current/8 py-1.5 ps-2.5 pe-1 whitespace-nowrap opacity-90"
+          class="shrink-0 bg-current/8 py-1.5 ps-2.5 pe-1 whitespace-nowrap"
           :class="muted ? 'text-text-secondary' : undefined"
           >{{ keyLabel ?? dimKey }}</span
         >
@@ -113,7 +113,7 @@ const emit = defineEmits<{ (e: "remove"): void }>();
         </button>
         <span
           v-else-if="qualifier"
-          class="shrink-0 border-s border-current/20 bg-current/8 py-1.5 ps-1.5 pe-2 font-medium whitespace-nowrap opacity-90"
+          class="shrink-0 border-s border-current/20 bg-current/8 py-1.5 ps-1.5 pe-2 font-medium whitespace-nowrap"
           :data-test="qualifierDataTest"
           >{{ qualifier }}</span
         >

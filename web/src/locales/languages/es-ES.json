@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "El número de página está fuera de rango. Proporciona un número de página válido.",
       "noMatchingService": "No se encontró un servicio coincidente para la correlación",
       "unableToRetrieveCorrelation": "No se pueden recuperar los datos de correlación",
-      "noMetricStreams": "No se encontraron streams de métricas para el servicio \"{service}\"",
       "correlationError": "Error de correlación: {error}",
       "contentCopied": "¡Contenido copiado exitosamente!",
       "noTraceIdForInspection": "No hay un ID de traza disponible para inspección"

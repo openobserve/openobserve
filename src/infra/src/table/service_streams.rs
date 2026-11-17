@@ -252,6 +252,9 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             max_streams_per_type,
         );
 
+        let merged_fnm = record.field_name_mapping.map(|incoming| {
+            merge_field_name_mapping(existing_model.field_name_mapping.as_ref(), incoming)
+        });
         let mut active: ActiveModel = existing_model.into();
         let mut dirty = false;
         set_if_dirty(&mut active.logs_streams, logs, &mut dirty);
@@ -259,7 +262,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
         set_if_dirty(&mut active.metrics_streams, metrics, &mut dirty);
         set_if_dirty(&mut active.profiles_streams, profiles, &mut dirty);
         set_if_dirty(&mut active.all_dimensions, merged_dims, &mut dirty);
-        if let Some(fnm) = record.field_name_mapping {
+        if let Some(fnm) = merged_fnm {
             set_if_dirty(&mut active.field_name_mapping, Some(fnm), &mut dirty);
         }
         active.last_seen = Set(record.last_seen);
@@ -374,6 +377,9 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
 
             let merged_dims =
                 union_dimension_objects(&existing_model.all_dimensions, &record.all_dimensions);
+            let merged_fnm = record.field_name_mapping.map(|incoming| {
+                merge_field_name_mapping(existing_model.field_name_mapping.as_ref(), incoming)
+            });
             let mut active: ActiveModel = existing_model.into();
             let mut dirty = false;
             set_if_dirty(
@@ -386,7 +392,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             set_if_dirty(&mut active.metrics_streams, metrics, &mut dirty);
             set_if_dirty(&mut active.profiles_streams, profiles, &mut dirty);
             set_if_dirty(&mut active.all_dimensions, merged_dims, &mut dirty);
-            if let Some(fnm) = record.field_name_mapping {
+            if let Some(fnm) = merged_fnm {
                 set_if_dirty(&mut active.field_name_mapping, Some(fnm), &mut dirty);
             }
             active.last_seen = Set(record.last_seen);
@@ -530,6 +536,28 @@ fn union_dimension_objects(
         }
     }
     serde_json::Value::Object(out)
+}
+
+/// The incoming mapping wins, except that an explicit `service` source never yields to
+/// `__name__` or to none: correlation trusts a row as a real service only by that source.
+fn merge_field_name_mapping(
+    existing: Option<&serde_json::Value>,
+    mut incoming: serde_json::Value,
+) -> serde_json::Value {
+    let explicit = |mapping: &serde_json::Value| {
+        mapping
+            .get("service")
+            .and_then(serde_json::Value::as_str)
+            .filter(|field| *field != config::meta::promql::NAME_LABEL)
+            .map(str::to_owned)
+    };
+    if explicit(&incoming).is_none()
+        && let Some(field) = existing.and_then(explicit)
+        && let Some(map) = incoming.as_object_mut()
+    {
+        map.insert("service".to_owned(), serde_json::Value::String(field));
+    }
+    incoming
 }
 
 /// Union two stream-name arrays, deduplicating and capping the result at
@@ -1234,6 +1262,69 @@ mod tests {
             row.field_name_mapping,
             Some(serde_json::json!({"service": "kubernetes_labels_app"}))
         );
+    }
+
+    // A metric `__name__` source replacing an explicit one makes correlation drop a real service.
+    #[tokio::test]
+    async fn explicit_service_source_is_never_downgraded_in_either_order() {
+        use serde_json::json;
+        let explicit = json!({"service": "service_name", "k8s-cluster": "cluster"});
+        let metric = json!({"service": "__name__", "k8s-cluster": "k8s_cluster"});
+        let kept = json!({"service": "service_name", "k8s-cluster": "k8s_cluster"});
+        let no_service = json!({"k8s-cluster": "k8s_cluster"});
+        let prod = json!({"k8s-cluster": "prod"});
+        let richer = json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"});
+        let cases = [
+            ("explicit then metric", &explicit, &metric, &prod, &kept),
+            ("metric then explicit", &metric, &explicit, &prod, &explicit),
+            (
+                "explicit then metric, upgrade",
+                &explicit,
+                &metric,
+                &richer,
+                &kept,
+            ),
+            (
+                "metric then explicit, upgrade",
+                &metric,
+                &explicit,
+                &richer,
+                &explicit,
+            ),
+            (
+                "explicit then no service source",
+                &explicit,
+                &no_service,
+                &prod,
+                &kept,
+            ),
+        ];
+        for (case, first_fnm, second_fnm, second_disambiguation, want) in cases {
+            let db = db().await;
+            let mut first = service_record(prod.clone(), 1_000);
+            first.field_name_mapping = Some(first_fnm.clone());
+            let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+                .await
+                .unwrap();
+            let mut second = service_record(second_disambiguation.clone(), 2_000);
+            second.field_name_mapping = Some(second_fnm.clone());
+            let outcome = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+                .await
+                .unwrap();
+
+            assert_eq!(
+                outcome.stored.field_name_mapping.as_ref(),
+                Some(want),
+                "{case}: put"
+            );
+            let reloaded = list_with(&db, "org1").await.unwrap();
+            assert_eq!(reloaded.len(), 1, "{case}: one merged row");
+            assert_eq!(
+                reloaded[0].field_name_mapping.as_ref(),
+                Some(want),
+                "{case}: reload"
+            );
+        }
     }
 
     // Subset incoming resolves richer_disambiguation to the stored value: rewrite nothing.

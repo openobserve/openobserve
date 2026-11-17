@@ -18246,6 +18246,8 @@
     "metricsError": "Unable to Load Metrics",
     "metricsErrorDetails": "An error occurred while fetching metrics data. Please try again.",
     "noMetricsDescription": "Select metrics from the sidebar to view charts.",
+    "noMetricStreamsForService": "No metric streams found for {service}",
+    "noMetricStreamsForServiceDescription": "Metrics appear here when a metric stream reports the same service and dimensions.",
     "dimensionBasedCorrelation": "Dimension-based Correlation",
     "tracesFromService": "Traces from service: {service}",
     "noTracesFound": "No Traces Found",
@@ -21553,7 +21555,6 @@
       "pageOutOfRange": "Page number is out of range. Please provide valid page number.",
       "noMatchingService": "No matching service found for correlation",
       "unableToRetrieveCorrelation": "Unable to retrieve correlation data",
-      "noMetricStreams": "No metric streams found for service \"{service}\"",
       "correlationError": "Correlation error: {error}",
       "contentCopied": "Content Copied Successfully!",
       "noTraceIdForInspection": "No trace ID available for inspection"
@@ -34082,19 +34083,14 @@
       "noServiceName": "No service name was sent"
     },
     "correlation": {
-      "openService": "Open service",
+      "versionsAndDeploys": "Versions & deploys",
+      "moreServices": "and {count} more",
       "versionChip": "version",
       "versionFilter": "version:",
       "allVersions": "All versions",
-      "versionsLine": "{count} version of {service} sent spans in this window: | {count} versions of {service} sent spans in this window:",
-      "versionOnPods": "{version} on {count} pod | {version} on {count} pods",
-      "podRunsVersion": "{pod} runs {version}",
       "versionColumn": "Version",
       "deployVerdict": "Deploy verdict {from} → {to}",
-      "deployVerdictFirst": "Deploy verdict {to}",
-      "byPod": "picked from this log's pod",
-      "byPodSpans": "Pod {pod} sent its spans from cluster {cluster}, namespace {namespace}.",
-      "byPodLogCluster": "This log's own cluster field reads {cluster}."
+      "deployVerdictFirst": "Deploy verdict {to}"
     },
     "discovered": {
       "banner": "Service = name from traces. \"detected as\" = the name correlation matches on (kept, shown muted). K8s workload = the deployment or statefulset the pods belong to.",

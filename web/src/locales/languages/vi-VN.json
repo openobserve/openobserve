@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "Số trang nằm ngoài phạm vi. Vui lòng cung cấp số trang hợp lệ.",
       "noMatchingService": "Không tìm thấy dịch vụ phù hợp cho tương quan",
       "unableToRetrieveCorrelation": "Không thể truy xuất dữ liệu tương quan",
-      "noMetricStreams": "Không tìm thấy stream chỉ số nào cho dịch vụ \"{service}\"",
       "correlationError": "Lỗi tương quan: {error}",
       "contentCopied": "Đã sao chép nội dung thành công!",
       "noTraceIdForInspection": "Không có Trace ID để kiểm tra"

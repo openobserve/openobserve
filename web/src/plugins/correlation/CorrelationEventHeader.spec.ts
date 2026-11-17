@@ -76,6 +76,23 @@ describe("CorrelationEventHeader.vue", () => {
     vi.clearAllMocks();
   });
 
+  it.each([
+    { name: "hides a switch whose only option is disabled", extra: [], shown: false },
+    {
+      name: "shows it again with a second option",
+      extra: [subjectChip({ key: "k8s-node-name", label: "Node", value: "node-1" })],
+      shown: true,
+    },
+  ])("View by: $name", ({ extra, shown }) => {
+    wrapper = createWrapper({
+      subjectChips: [subjectChip({ disabled: true }), ...extra],
+      activeSubject: null,
+    });
+    expect(
+      wrapper.find('[data-test="correlation-event-header-subject-k8s-pod-name"]').exists(),
+    ).toBe(shown);
+  });
+
   describe("selected-subject badge", () => {
     it("should render a 'label = value' badge for the active subject when it has a value", () => {
       wrapper = createWrapper();
@@ -94,6 +111,30 @@ describe("CorrelationEventHeader.vue", () => {
       expect(
         wrapper.find('[data-test="correlation-event-header-active-subject-k8s-pod-name"]').exists(),
       ).toBe(false);
+    });
+
+    it.each([
+      {
+        name: "hides it when a chip shows the pod under an alias",
+        key: "k8s_pod_name",
+        shown: false,
+      },
+      {
+        name: "keeps it when only a namespace chip shares its text",
+        key: "k8s-namespace",
+        shown: true,
+      },
+    ])("$name", ({ key, shown }) => {
+      wrapper = createWrapper({
+        contextChips: [{ key, label: key, value: "pod-abc", kind: "context" }],
+        semanticGroups: [
+          { id: "k8s-namespace", display: "K8s Namespace", fields: ["k8s_namespace_name"] },
+          { id: "k8s-pod-name", display: "K8s Pod", fields: ["k8s_pod_name"] },
+        ],
+      });
+      expect(
+        wrapper.find('[data-test="correlation-event-header-active-subject-k8s-pod-name"]').exists(),
+      ).toBe(shown);
     });
 
     it("should not render the badge when no subject is active", () => {

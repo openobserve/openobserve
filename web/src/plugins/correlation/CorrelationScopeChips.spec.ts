@@ -5,9 +5,10 @@ import i18n from "@/locales";
 import Chips from "./CorrelationScopeChips.vue";
 import type { Scope, VerdictSummary } from "@/services/service_versions";
 
+const push = vi.hoisted(() => vi.fn());
 vi.mock("vue-router", async (original) => ({
   ...(await original<object>()),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
 }));
 vi.mock("vuex", () => ({ useStore: () => ({ state: { selectedOrganization: {} } }) }));
 vi.mock("@/enterprise/composables/useVersionCompareDrawer", () => ({
@@ -37,7 +38,7 @@ const verdict = (patch: Partial<VerdictSummary> = {}) =>
   }) as VerdictSummary;
 const render = (value: Scope) =>
   mount(Chips, {
-    props: { scope: value },
+    props: { scope: value, service: value.service, instanceVersion: null },
     global: {
       plugins: [i18n],
       stubs: { ServiceEnvChip: true, VerdictChip: true, OButton: true, OIcon: true },
@@ -73,34 +74,33 @@ describe("the correlation header scope chips", () => {
     expect(chips.get('[data-test="svcver-correlation-version"]').text()).not.toContain("2.0");
   });
 
-  it("gives the where chip no pod tooltip when its own place picked the scope", () => {
-    const chips = render(scope());
-    expect(chips.find('[data-test="svcver-correlation-where-by-pod"]').exists()).toBe(false);
-  });
-
-  it("names only the pod when the picked where has no cluster to quote, and skips an absent log cluster", () => {
+  it("offers each service an ambiguous name covers and opens the one picked", async () => {
+    const candidates = ["querier", "ingester", "alertmanager", "router", "compactor", "flusher"];
     const chips = mount(Chips, {
-      props: {
-        scope: scope({
-          where_key: "env:prod",
-          where: { kind: "env", k8s_cluster: "", k8s_namespace: "" },
-        }),
-        byPod: { pod: "web-1" },
-      },
+      props: { scope: null, service: "openobserve", instanceVersion: null, candidates },
       global: {
         plugins: [i18n],
         stubs: {
-          ServiceEnvChip: true,
-          VerdictChip: true,
-          OButton: true,
           OIcon: true,
-          OTooltip: { template: "<div><slot /><slot name='content' /></div>" },
+          ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+          ODropdownItem: {
+            template:
+              "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('select')\"><slot /></button>",
+          },
         },
       },
     });
-    const tip = chips.get('[data-test="svcver-correlation-where-by-pod"]').text();
-    expect(tip).toContain("picked from this log's pod");
-    expect(tip).not.toContain("sent its spans");
-    expect(tip).not.toContain("own cluster");
+    expect(chips.find('[data-test="svcver-correlation-version"]').exists()).toBe(false);
+    expect(chips.find('[data-test="svcver-correlation-open-service-router"]').exists()).toBe(false);
+    await chips.get('[data-test="svcver-correlation-open-service-more"]').trigger("click");
+    expect(chips.find('[data-test="svcver-correlation-open-service-more"]').exists()).toBe(false);
+    expect(chips.find('[data-test="svcver-correlation-open-service-router"]').exists()).toBe(true);
+    expect(chips.emitted("close")).toBeUndefined();
+    await chips.get('[data-test="svcver-correlation-open-service-compactor"]').trigger("click");
+    expect(chips.emitted("close")).toHaveLength(1);
+    expect(push).toHaveBeenCalledWith({
+      name: "traces",
+      query: expect.objectContaining({ panelSvc: "compactor", panelWhere: undefined }),
+    });
   });
 });
