@@ -198,8 +198,7 @@ test.describe("ConfigPanel — Distribution Settings", () => {
       for (const invalidCount of ["0", "1001"]) {
         await configs.setDistributionBucketCount(invalidCount);
         await expect(configs.distributionBucketCountError).toContainText(BUCKET_COUNT_ERROR);
-        await pm.dashboardPanelActions.savePanel();
-        await expect(page).toHaveURL(/\/add_panel/);
+        await pm.dashboardPanelActions.savePanelExpectingBlocked(BUCKET_COUNT_ERROR);
         testLogger.info("Out-of-range bucket count blocks save", { invalidCount });
       }
 
@@ -210,8 +209,7 @@ test.describe("ConfigPanel — Distribution Settings", () => {
       await configs.setDistributionBucketSize("0");
       await expect(configs.distributionBucketSizeError).toContainText(BUCKET_SIZE_ERROR);
       await expect(configs.distributionBucketCountField).toBeDisabled();
-      await pm.dashboardPanelActions.savePanel();
-      await expect(page).toHaveURL(/\/add_panel/);
+      await pm.dashboardPanelActions.savePanelExpectingBlocked(BUCKET_SIZE_ERROR);
       testLogger.info("Zero bucket size blocks save");
 
       await configs.setDistributionBucketSize("10");
@@ -219,6 +217,8 @@ test.describe("ConfigPanel — Distribution Settings", () => {
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender();
       await expect(pm.dashboardPanelActions.dashboardErrorItems).toHaveCount(0);
+      // Clear the earlier error toasts so savePanel() waits for the real navigation.
+      await pm.dashboardPanelActions.dismissErrorToasts();
       await pm.dashboardPanelActions.savePanel();
       await expect(page).not.toHaveURL(/\/add_panel/);
       await cleanupTestDashboard(page, pm, dashboardName);
