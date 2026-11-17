@@ -232,7 +232,11 @@ const makeSearchObj = () =>
         filterField: "",
         addToFilter: "",
         removeFilterField: "",
-        sqlFieldFilter: null as { field: string; condition: string } | null,
+        sqlFieldFilter: null as { field: string; values: string[]; exclude: boolean } | null,
+        sqlFieldConditions: {} as Record<
+          string,
+          { text: string; values: string[]; exclude: boolean }
+        >,
         fieldsInAll: {} as Record<string, string>,
         functions: [],
         filters: [] as any[],
@@ -313,6 +317,7 @@ const sqlTextsOf = (obj: any) => {
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     ...sqlTextsOf(searchObjInstance),
+    resetSqlTexts: sqlTextsOf(searchObjInstance).reset,
     get searchObj() {
       return searchObjInstance;
     },
@@ -3835,6 +3840,17 @@ describe("SearchBar", () => {
       expect(searchObjInstance.data.groupsRequest).toBeNull();
     });
 
+    it("Reset Filters clears the stored SQL text too, so no kept line stays", async () => {
+      searchObjInstance.meta.searchMode = "traces";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const texts = sqlTextsOf(searchObjInstance);
+      texts.sqlTexts.sql = `SELECT * FROM "default" WHERE a = 1`;
+      (wrapper.vm as any).resetFilters();
+      expect(texts.sqlTexts.sql).toBe("");
+      expect(searchObjInstance.data.editorValue).toBe("");
+    });
+
     it("Reset Filters drops the shown Groups table with Group by", async () => {
       searchObjInstance.meta.searchMode = "spans";
       searchObjInstance.meta.groupBy = "service_name";
@@ -4170,74 +4186,115 @@ describe("SearchBar", () => {
         expect(lastToast()).toMatchObject({ message: "traces.sqlMode.putConditionInWhere" });
       });
 
-      it("replaces the field's condition with every ticked value, so a second value is ORed", async () => {
-        const typed = `SELECT * FROM "default" WHERE service_name = 'api' ORDER BY start_time DESC`;
-        await mountTyped(typed);
-        searchObjInstance.data.stream.sqlFieldFilter = {
-          field: "service_name",
-          condition: "(service_name = 'api' OR service_name = 'db')",
-        };
+      const tick = async (field: string, values: string[], exclude = false) => {
+        searchObjInstance.data.stream.sqlFieldFilter = { field, values, exclude };
         await flushPromises();
+      };
+      const toastMessages = () => toastMock.mock.calls.map((call: any[]) => call[0]?.message);
+
+      it("writes one condition per field that it owns, and a later tick updates only that one", async () => {
+        const typed = `SELECT * FROM "default" WHERE a = 1 ORDER BY start_time DESC`;
+        await mountTyped(typed);
+        await tick("service_name", ["api"]);
         expect(searchObjInstance.data.stream.sqlFieldFilter).toBeNull();
+        const one = `SELECT * FROM "default" WHERE a = 1 AND service_name = 'api' ORDER BY start_time DESC`;
+        expect(searchObjInstance.data.editorValue).toBe(one);
+        await tick("service_name", ["api", "o'k"]);
         expect(searchObjInstance.data.editorValue).toBe(
-          `SELECT * FROM "default" WHERE (service_name = 'api' OR service_name = 'db') ORDER BY start_time DESC`,
+          `SELECT * FROM "default" WHERE a = 1 AND service_name IN ('api','o''k') ORDER BY start_time DESC`,
         );
-        expect(wrapper.emitted("searchdata")).toHaveLength(1);
+        expect(wrapper.emitted("searchdata")).toHaveLength(2);
+        expect(searchObjInstance.data.stream.sqlFieldConditions.service_name).toEqual({
+          text: "service_name IN ('api','o''k')",
+          values: ["api", "o'k"],
+          exclude: false,
+        });
+        expect(toastMessages()).not.toContain("traces.sqlMode.editWhereToRemove");
+      });
+
+      it("Undo puts the exact previous text back, and the condition it owned with it", async () => {
+        await mountTyped(`SELECT * FROM "default" WHERE a = 1`);
+        await tick("service_name", ["api"]);
+        await tick("service_name", ["api", "db"]);
         lastToast().action.handler();
         await flushPromises();
-        expect(searchObjInstance.data.editorValue).toBe(typed);
+        expect(searchObjInstance.data.editorValue).toBe(
+          `SELECT * FROM "default" WHERE a = 1 AND service_name = 'api'`,
+        );
+        await tick("service_name", ["api", "x"]);
+        expect(searchObjInstance.data.editorValue).toBe(
+          `SELECT * FROM "default" WHERE a = 1 AND service_name IN ('api','x')`,
+        );
       });
 
-      it("ORs a second ticked value of a field stored in _all onto its json_get condition", async () => {
-        await mountTyped(`SELECT * FROM "default" WHERE json_get_str(_all, 'http_route') = '/a'`);
+      it("never rewrites a condition the user typed: it appends with AND and says to edit the WHERE", async () => {
+        await mountTyped(`SELECT * FROM "default" WHERE service_name = 'api'`);
+        await tick("service_name", ["db"]);
+        expect(searchObjInstance.data.editorValue).toBe(
+          `SELECT * FROM "default" WHERE service_name = 'api' AND service_name = 'db'`,
+        );
+        expect(toastMessages()).toContain("traces.sqlMode.editWhereToRemove");
+      });
+
+      it("writes excluded values as NOT IN, and one as !=", async () => {
+        await mountTyped(`SELECT * FROM "default"`);
+        await tick("service_name", ["a", "b"], true);
+        expect(searchObjInstance.data.editorValue).toBe(
+          `SELECT * FROM "default" WHERE service_name NOT IN ('a','b')`,
+        );
+        await tick("service_name", ["a"], true);
+        expect(searchObjInstance.data.editorValue).toBe(
+          `SELECT * FROM "default" WHERE service_name != 'a'`,
+        );
+      });
+
+      it("reads a field stored in _all through json_get in the IN list", async () => {
+        await mountTyped(`SELECT * FROM "default"`);
         searchObjInstance.data.stream.fieldsInAll = { http_route: "Utf8" };
-        searchObjInstance.data.stream.sqlFieldFilter = {
-          field: "http_route",
-          condition: "(http_route = '/a' OR http_route = '/b')",
-        };
-        await flushPromises();
+        await tick("http_route", ["/a", "/b"]);
         expect(searchObjInstance.data.editorValue).toBe(
-          `SELECT * FROM "default" WHERE (json_get_str(_all, 'http_route') = '/a' OR json_get_str(_all, 'http_route') = '/b')`,
+          `SELECT * FROM "default" WHERE json_get_str(_all, 'http_route') IN ('/a','/b')`,
         );
       });
 
-      it("flips the field's values to the exclude form instead of adding != next to =", async () => {
-        await mountTyped(`SELECT * FROM "default" WHERE service_name = 'api' AND a = 1`);
-        searchObjInstance.data.stream.sqlFieldFilter = {
-          field: "service_name",
-          condition: "service_name != 'api'",
-        };
-        await flushPromises();
-        expect(searchObjInstance.data.editorValue).toBe(
-          `SELECT * FROM "default" WHERE a = 1 AND service_name != 'api'`,
-        );
-      });
-
-      it("removes the field's condition when its last value is unticked, with Undo", async () => {
-        const typed = `SELECT * FROM "default" WHERE service_name = 'api' AND a = 1`;
-        await mountTyped(typed);
+      it("unticking takes the value out of its list, and the last one removes the condition, with Undo", async () => {
+        await mountTyped(`SELECT * FROM "default" WHERE a = 1`);
+        await tick("service_name", ["api", "db"]);
+        await tick("service_name", ["db"]);
+        const one = `SELECT * FROM "default" WHERE a = 1 AND service_name = 'db'`;
+        expect(searchObjInstance.data.editorValue).toBe(one);
         searchObjInstance.data.stream.removeFilterField = "service_name";
         await flushPromises();
         expect(searchObjInstance.data.stream.removeFilterField).toBe("");
         expect(searchObjInstance.data.editorValue).toBe(`SELECT * FROM "default" WHERE a = 1`);
-        expect(wrapper.emitted("searchdata")).toHaveLength(1);
+        expect(searchObjInstance.data.stream.sqlFieldConditions.service_name).toBeUndefined();
         expect(lastToast()).toMatchObject({
           message: "traces.sqlMode.conditionRemoved",
           action: { label: "traces.sqlMode.undo" },
         });
         lastToast().action.handler();
         await flushPromises();
-        expect(searchObjInstance.data.editorValue).toBe(typed);
+        expect(searchObjInstance.data.editorValue).toBe(one);
       });
 
-      it("says to edit the WHERE when the unticked value has no top-level condition", async () => {
-        const typed = `SELECT * FROM "default" WHERE service_name = 'api' OR a = 1`;
+      it("removes nothing the user typed and says to edit the WHERE", async () => {
+        const typed = `SELECT * FROM "default" WHERE service_name = 'api' AND a = 1`;
         await mountTyped(typed);
         searchObjInstance.data.stream.removeFilterField = "service_name";
         await flushPromises();
         expect(searchObjInstance.data.editorValue).toBe(typed);
         expect(wrapper.emitted("searchdata")).toBeUndefined();
         expect(lastToast()).toMatchObject({ message: "traces.sqlMode.editWhereToRemove" });
+      });
+
+      it("treats its own condition as typed once the user edits it", async () => {
+        await mountTyped(`SELECT * FROM "default" WHERE a = 1`);
+        await tick("service_name", ["api"]);
+        searchObjInstance.data.editorValue = `SELECT * FROM "default" WHERE a = 1 AND service_name = 'web'`;
+        await tick("service_name", ["db"]);
+        expect(searchObjInstance.data.editorValue).toBe(
+          `SELECT * FROM "default" WHERE a = 1 AND service_name = 'web' AND service_name = 'db'`,
+        );
       });
 
       it("keeps the Errors bar and Duration brush out of typed SQL", async () => {

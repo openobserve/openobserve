@@ -219,8 +219,13 @@ const defaultObject = {
       fieldsInAll: {} as Record<string, string>,
       filterField: "",
       addToFilter: "",
-      /** A sidebar value tick in SQL mode: the condition that replaces the field's top-level WHERE conditions. */
-      sqlFieldFilter: null as { field: string; condition: string } | null,
+      /** A sidebar value tick in SQL mode: the field's ticked values, for the search bar to write. */
+      sqlFieldFilter: null as { field: string; values: string[]; exclude: boolean } | null,
+      /** The condition each field's sidebar ticks wrote into the SQL, recognised again only by its exact text. */
+      sqlFieldConditions: {} as Record<
+        string,
+        { text: string; values: string[]; exclude: boolean }
+      >,
       removeFilterField: "",
       functions: [],
       filters: [] as any[],
@@ -351,6 +356,7 @@ const useTraces = () => {
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
     tracesSqlTexts.reset();
+    searchObj.data.stream.sqlFieldConditions = {};
     searchObj.meta.scope = "all";
     searchObj.meta.groupBy = "";
     searchObj.meta.groupsSort = { ...DEFAULT_GROUPS_SORT };
@@ -853,6 +859,8 @@ const useTraces = () => {
     sqlTexts: tracesSqlTexts.sqlTexts,
     noteFilterText: tracesSqlTexts.noteFilterText,
     clearSqlText: tracesSqlTexts.clearSqlText,
+    deleteSqlText: tracesSqlTexts.deleteSqlText,
+    resetSqlTexts: tracesSqlTexts.reset,
     leaveSql: tracesSqlTexts.leaveSql,
     turnSqlOn: tracesSqlTexts.turnSqlOn,
     takeTypedSql: tracesSqlTexts.takeTypedSql,

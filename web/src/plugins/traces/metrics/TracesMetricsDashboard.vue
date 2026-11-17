@@ -515,7 +515,7 @@ const runCombinedRed = () => {
   );
 };
 
-// R2: the whole stream is scanned only on this click, never on its own.
+// The whole stream is scanned only on this click, never on its own.
 const onShowAllSpans = () => {
   const interval =
     chartsInterval ??

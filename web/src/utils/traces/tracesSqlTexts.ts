@@ -24,8 +24,8 @@ import { isAuthoredStatement } from "@/utils/query/freeTextFilter";
 export type TracesViewEntry =
   /** A view toggle, the nav, Back or Forward, or a return to the page; `sql` is a history entry's own SQL. */
   | { kind: "move"; sql?: string }
-  /** The SQL switch in the Traces view, Back to SQL, or Open in Spans view with the typed `text`. */
-  | { kind: "sql"; text?: string }
+  /** The SQL switch in the Traces view, Back to SQL (`stored`), or Open in Spans view with the typed `text`. */
+  | { kind: "sql"; text?: string; stored?: boolean }
   /** A link, saved view or recent search that brings its own text. */
   | { kind: "open"; text: string; sqlMode?: boolean }
   /** A service graph or catalog handoff; a null filter keeps the current one. */
@@ -41,7 +41,11 @@ export interface TracesSqlTextsHost {
   };
   data: {
     editorValue: string;
-    stream: { selectedStream: { value: string }; hasParentColumn?: boolean };
+    stream: {
+      selectedStream: { value: string };
+      hasParentColumn?: boolean;
+      sqlFieldConditions?: Record<string, unknown>;
+    };
   };
 }
 
@@ -64,8 +68,6 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
     filterFromSql: null as string | null,
     /** The filter as it was before a statement was typed over it. */
     filterBeforeStatement: "",
-    /** SQL was on when the Spans view was last left, so a plain return brings it back. */
-    spansSql: false,
   });
 
   const editorText = () => String(host.data.editorValue ?? "");
@@ -73,17 +75,21 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
   /** Remembers the filter a typed statement may replace; called with each filter edit and run. */
   const noteFilterText = (text: string, run = false) => {
     if (isAuthoredStatement(text)) return;
-    if (!run && STATEMENT_START.test(text)) return;
+    // A cleared filter is noted, so a statement typed after it keeps the empty filter.
+    if (!run && text.trim() && STATEMENT_START.test(text)) return;
     sqlTexts.filterBeforeStatement = text;
   };
 
   /** Forgets the stored SQL text and what came from it; the editor keeps whatever it shows. */
   const clearSqlText = () => {
+    // The sidebar finds its conditions by exact text, so with the SQL gone they could claim typed text.
+    if (Object.keys(host.data.stream.sqlFieldConditions ?? {}).length) {
+      host.data.stream.sqlFieldConditions = {};
+    }
     sqlTexts.sql = "";
     sqlTexts.prefill = null;
     sqlTexts.scopeBeforePrefill = null;
     sqlTexts.filterFromSql = null;
-    sqlTexts.spansSql = false;
   };
 
   /** Everything, for a new org. */
@@ -128,16 +134,28 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
     dropUntouchedPrefill();
   };
 
+  /** Deleting the SELECT turns SQL off; what is left becomes the filter and a folded scope comes back. */
+  const deleteSqlText = () => {
+    giveBackPrefillScope();
+    clearSqlText();
+    sqlTexts.filter = "";
+    host.meta.sqlMode = false;
+  };
+
   /** A statement typed over the filter becomes the SQL text, and the filter keeps its value from before. */
   const takeTypedSql = (text: string) => {
     clearSqlText();
     showSql(text, sqlTexts.filterBeforeStatement);
   };
 
-  /** Turns SQL on with the stored text, or the first time with a SELECT built from the filter. */
-  const turnSqlOn = () => {
+  /** Turns SQL on with the stored text, or the first time with a SELECT built from the filter; `stored` never takes a typed statement. */
+  const turnSqlOn = (stored = false) => {
     if (host.meta.sqlMode) return;
     const filter = editorText();
+    if (stored && sqlTexts.sql) {
+      showSql(sqlTexts.sql, filter);
+      return;
+    }
     if (isAuthoredStatement(filter)) {
       takeTypedSql(filter);
       return;
@@ -179,7 +197,7 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
     }
     if (entrySql?.trim()) showSql(entrySql, typed);
     else if (isAuthoredStatement(typed)) takeTypedSql(typed);
-    else if (sqlTexts.spansSql && sqlTexts.sql) showSql(sqlTexts.sql, typed);
+    else if (sqlTexts.sql) showSql(sqlTexts.sql, typed);
     else return false;
     return true;
   };
@@ -213,14 +231,10 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
       target = "spans";
       waitForRun = true;
       if (entry.text !== undefined) takeTypedSql(entry.text);
-      else turnSqlOn();
+      else turnSqlOn(entry.stored);
     } else if (view === "spans") {
       waitForRun = enterSpans(entry.sql);
     } else if (view === "traces") {
-      // SQL is on only in Spans, so it being on means Spans was left with it, whatever view came between.
-      if (host.meta.searchMode === "spans" || host.meta.sqlMode) {
-        sqlTexts.spansSql = host.meta.sqlMode;
-      }
       leaveSql();
     }
     if (target === "traces") {
@@ -235,6 +249,7 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
     sqlTexts,
     noteFilterText,
     clearSqlText,
+    deleteSqlText,
     reset,
     leaveSql,
     turnSqlOn,

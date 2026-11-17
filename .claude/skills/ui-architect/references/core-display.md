@@ -219,7 +219,6 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 **Key props:**
 
 - `block` (boolean, default `false` — full-width scrollable block vs inline chip)
-- `wrap` (boolean, default `false` — block mode only: wrap long lines instead of scrolling sideways)
 - `copyable` (boolean, default `false` — shows a copy-to-clipboard button)
 - `truncate` (boolean, default `false` — ellipsis; inline mode only). A cut value shows its full text on hover, only while it is cut.
 - `tooltip` (I18nText | `false` — with `truncate`: hover text when cut, defaults to the value; **`false` for secrets** such as API keys and tokens, which must never show on hover)

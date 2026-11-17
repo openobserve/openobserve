@@ -132,7 +132,12 @@ describe("TracesGroupsTable", () => {
   it("streams the groups query over the request's window, then the sparklines for the visible keys", async () => {
     respond([hit("cart", 200, 10), hit(null, 5, 0)], []);
     const wrapper = await mountTable();
-    expect(mockSearch.mock.calls[0].slice(1)).toEqual([START, START + HOUR_US, "traces"]);
+    expect(mockSearch.mock.calls[0].slice(1)).toEqual([
+      START,
+      START + HOUR_US,
+      "traces",
+      { replaceStreamingAggs: true },
+    ]);
     expect(sqlOf(0)).toContain('GROUP BY "service_name" ORDER BY errors DESC, spans DESC LIMIT 50');
     expect(sqlOf(0)).toContain("WHERE duration > 10");
     expect(sqlOf(1)).toContain("histogram(_timestamp");

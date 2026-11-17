@@ -194,11 +194,7 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
   /** Human-readable message — all HTML stripped, TraceID fragment removed. */
   const cleanMessage = computed<string>(() => {
     if (!rawMsg.value) return "";
-    // The text content, not the serialized string, or a `>` in the query reaches the user as `&gt;`.
-    return (
-      DOMPurify.sanitize(rawMsg.value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [], RETURN_DOM: true })
-        .textContent ?? ""
-    )
+    return DOMPurify.sanitize(rawMsg.value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
       .replace(/TraceID:\s*[a-f0-9A-F-]+/gi, "")
       .replace(/\s+/g, " ")
       .trim();

@@ -51,10 +51,26 @@ describe("useTracesSqlTemplates", () => {
     searchObj.data.datetime = { startTime: 1, endTime: 2 };
   });
 
+  it("asks for service names only once the gallery or Examples menu shows", async () => {
+    const shown = ref(false);
+    const scope = effectScope();
+    scope.run(() => useTracesSqlTemplates(() => shown.value));
+    searchObj.meta.sqlMode = true;
+    await nextTick();
+    searchObj.data.datetime = { startTime: 1, endTime: 5 };
+    await nextTick();
+    expect(fetchFieldValues).not.toHaveBeenCalled();
+    shown.value = true;
+    await nextTick();
+    expect(fetchFieldValues).toHaveBeenCalledTimes(1);
+    expect(fetchFieldValues.mock.calls[0][0]).toMatchObject({ start_time: 1, end_time: 5 });
+    scope.stop();
+  });
+
   it("waits for a time range, asks once per stream and range, and asks again when either changes", async () => {
     searchObj.data.datetime = { startTime: 0, endTime: 0 };
     const scope = effectScope();
-    scope.run(() => useTracesSqlTemplates());
+    scope.run(() => useTracesSqlTemplates(() => true));
     searchObj.meta.sqlMode = true;
     await nextTick();
     expect(fetchFieldValues).not.toHaveBeenCalled();
@@ -91,7 +107,7 @@ describe("useTracesSqlTemplates", () => {
       endTime: 20,
     };
     const scope = effectScope();
-    scope.run(() => useTracesSqlTemplates());
+    scope.run(() => useTracesSqlTemplates(() => true));
     searchObj.meta.sqlMode = true;
     await nextTick();
     expect(fetchFieldValues).toHaveBeenCalledTimes(1);
@@ -117,7 +133,7 @@ describe("useTracesSqlTemplates", () => {
   });
 
   it("reads service names for the trace questions once SQL mode is on in the Spans view", async () => {
-    const { sqlTemplates } = useTracesSqlTemplates();
+    const { sqlTemplates } = useTracesSqlTemplates(() => true);
     expect(fetchFieldValues).not.toHaveBeenCalled();
     searchObj.meta.sqlMode = true;
     await nextTick();
@@ -138,7 +154,7 @@ describe("useTracesSqlTemplates", () => {
 
   it("offers no templates and asks for nothing in the Traces view", async () => {
     searchObj.meta.searchMode = "traces";
-    const { sqlTemplates } = useTracesSqlTemplates();
+    const { sqlTemplates } = useTracesSqlTemplates(() => true);
     searchObj.meta.sqlMode = true;
     await nextTick();
     expect(fetchFieldValues).not.toHaveBeenCalled();
@@ -146,7 +162,7 @@ describe("useTracesSqlTemplates", () => {
   });
 
   it("gates Tokens by model on the schema", async () => {
-    const { sqlTemplates } = useTracesSqlTemplates();
+    const { sqlTemplates } = useTracesSqlTemplates(() => true);
     searchObj.meta.sqlMode = true;
     await nextTick();
     expect(sqlTemplates.value.map((tpl) => tpl.id)).not.toContain("tokensByModel");

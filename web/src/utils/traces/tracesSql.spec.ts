@@ -26,7 +26,11 @@ import {
   matchAllToStrMatch,
   withAllFieldRefs,
   missingStreamAfterFrom,
-  replaceFieldConditions,
+  fieldHasOtherCondition,
+  fieldValuesCondition,
+  filterHasSubquery,
+  hasOwnCondition,
+  replaceOwnCondition,
   replaceSqlIdentifier,
   sqlJoinKeyword,
   strayKeywordBeforeWhere,
@@ -119,6 +123,13 @@ describe("analyzeTracesSql: top-level WHERE slice", () => {
 });
 
 describe("analyzeTracesSql: query features", () => {
+  it("keeps the WITH clause as typed, ahead of the main SELECT", () => {
+    expect(
+      info(`WITH s AS (SELECT * FROM "d" WHERE a = 1) SELECT * FROM s WHERE b = 2`).withClause,
+    ).toBe(`WITH s AS (SELECT * FROM "d" WHERE a = 1)`);
+    expect(info(`SELECT * FROM "d"`).withClause).toBe("");
+  });
+
   it("reads the stream named in FROM", () => {
     expect(info(`SELECT * FROM "my stream" WHERE a = 1`).stream).toBe("my stream");
     expect(info(`SELECT * FROM default`).stream).toBe("default");
@@ -183,6 +194,10 @@ describe("analyzeTracesSql: query features", () => {
 });
 
 describe("isRowQuery", () => {
+  it("is false for OFFSET, as the WHERE count no longer describes the rows", () => {
+    expect(isRowQuery(info(`SELECT * FROM "a" OFFSET 10`))).toBe(false);
+  });
+
   it("is a row query only when each row is one span", () => {
     expect(isRowQuery(info(`SELECT * FROM "a" WHERE b = 1`))).toBe(true);
     expect(isRowQuery(info(`SELECT x, count(*) FROM "a" GROUP BY x`))).toBe(false);
@@ -463,6 +478,14 @@ describe("histogramLosesSpans", () => {
 });
 
 describe("sqlPaging", () => {
+  it("does not page a query with OFFSET and no LIMIT by from", () => {
+    expect(sqlPaging(info(`SELECT * FROM "a" ORDER BY start_time OFFSET 10`), 25, 2)).toEqual({
+      from: 0,
+      size: -1,
+      paged: false,
+    });
+  });
+
   it("pages a row query with from/size", () => {
     expect(sqlPaging(info(`SELECT * FROM "a"`), 25, 2)).toEqual({
       from: 50,
@@ -833,129 +856,119 @@ describe("insertWhereCondition", () => {
   });
 });
 
-describe("replaceFieldConditions", () => {
-  const from = `SELECT * FROM "t"`;
-  const both = "(service_name = 'api' OR service_name = 'db')";
-
-  it("replaces the field's equality with the condition for every ticked value", () => {
-    expect(
-      replaceFieldConditions(`${from} WHERE service_name = 'api' ORDER BY x`, "service_name", both),
-    ).toBe(`${from} WHERE ${both} ORDER BY x`);
-  });
-
-  it("keeps the other conditions and adds the new one after them", () => {
-    expect(
-      replaceFieldConditions(
-        `${from} WHERE a = 1 AND service_name = 'api' AND b = 2`,
-        "service_name",
-        "service_name != 'api'",
-      ),
-    ).toBe(`${from} WHERE a = 1 AND b = 2 AND service_name != 'api'`);
-  });
-
-  it("replaces a group of the field's values, a quoted name and IS NULL", () => {
-    expect(
-      replaceFieldConditions(
-        `${from} WHERE ("service_name" = 'a' OR service_name = 'b') AND service_name IS NULL AND a = 1`,
-        "service_name",
-        "service_name = 'c'",
-      ),
-    ).toBe(`${from} WHERE a = 1 AND service_name = 'c'`);
-  });
-
-  it("drops the WHERE when its only conditions were on the field and none is left", () => {
-    expect(
-      replaceFieldConditions(`${from} WHERE service_name = 'api' LIMIT 10`, "service_name", ""),
-    ).toBe(`${from} LIMIT 10`);
-    expect(replaceFieldConditions(`${from} WHERE service_name != 'api';`, "service_name", "")).toBe(
-      `${from};`,
+describe("fieldValuesCondition", () => {
+  it("writes = for one value and IN for several, escaping quotes", () => {
+    expect(fieldValuesCondition("service_name", ["api"], false)).toBe("service_name = 'api'");
+    expect(fieldValuesCondition("service_name", ["api", "o'k"], false)).toBe(
+      "service_name IN ('api','o''k')",
     );
   });
 
-  it("leaves other comparisons, BETWEEN and subqueries on the field alone", () => {
-    const typed = `${from} WHERE duration BETWEEN 1 AND 5 AND service_name LIKE 'a%' AND trace_id IN (SELECT trace_id FROM "t" WHERE service_name = 'a') AND service_name = 'a'`;
-    expect(replaceFieldConditions(typed, "service_name", "service_name = 'b'")).toBe(
-      `${from} WHERE duration BETWEEN 1 AND 5 AND service_name LIKE 'a%' AND trace_id IN (SELECT trace_id FROM "t" WHERE service_name = 'a') AND service_name = 'b'`,
+  it("writes != and NOT IN for excluded values", () => {
+    expect(fieldValuesCondition("s", ["a"], true)).toBe("s != 'a'");
+    expect(fieldValuesCondition("s", ["a", "b"], true)).toBe("s NOT IN ('a','b')");
+  });
+
+  it("reads the null value as IS NULL, bracketed beside a list", () => {
+    expect(fieldValuesCondition("s", ["null"], false)).toBe("s IS NULL");
+    expect(fieldValuesCondition("s", ["null"], true)).toBe("s IS NOT NULL");
+    expect(fieldValuesCondition("s", ["a", "null"], false)).toBe("(s = 'a' OR s IS NULL)");
+    expect(fieldValuesCondition("s", ["a", "b", "null"], true)).toBe(
+      "(s NOT IN ('a','b') AND s IS NOT NULL)",
     );
   });
 
-  it("reads a field stored in _all through its json_get expression", () => {
-    const ref = "json_get_str(_all, 'http_route')";
+  it("is empty with no values", () => {
+    expect(fieldValuesCondition("s", [], false)).toBe("");
+  });
+});
+
+describe("replaceOwnCondition / hasOwnCondition", () => {
+  const from = `SELECT * FROM "default"`;
+  const own = "service_name IN ('a','b')";
+
+  it("finds its own condition only as a whole top-level AND part with the same text", () => {
+    expect(hasOwnCondition(`${from} WHERE a = 1 AND ${own} ORDER BY x`, own)).toBe(true);
+    expect(hasOwnCondition(`${from} WHERE ${own}`, own)).toBe(true);
+    expect(hasOwnCondition(`${from} WHERE service_name IN ('a', 'b')`, own)).toBe(false);
+    expect(hasOwnCondition(`${from} WHERE ${own} OR a = 1`, own)).toBe(false);
+    expect(hasOwnCondition(`${from} WHERE x = '${"service_name IN"}'`, own)).toBe(false);
+    expect(hasOwnCondition("", own)).toBe(false);
+  });
+
+  it("swaps only its own condition, leaving the typed ones and their spelling", () => {
     expect(
-      replaceFieldConditions(
-        `${from} WHERE json_get_str(_all,'http_route') = '/a'`,
-        "http_route",
-        `${ref} = '/b'`,
+      replaceOwnCondition(
+        `${from} WHERE a = 1 /* keep */ AND ${own} ORDER BY x`,
+        own,
+        "service_name = 'a'",
+      ),
+    ).toBe(`${from} WHERE a = 1 /* keep */ AND service_name = 'a' ORDER BY x`);
+  });
+
+  it("removes its own condition with its AND, or the WHERE when it was alone", () => {
+    expect(replaceOwnCondition(`${from} WHERE a = 1 AND ${own} LIMIT 5`, own, "")).toBe(
+      `${from} WHERE a = 1 LIMIT 5`,
+    );
+    expect(replaceOwnCondition(`${from} WHERE ${own} AND a = 1`, own, "")).toBe(
+      `${from} WHERE a = 1`,
+    );
+    expect(replaceOwnCondition(`${from} WHERE ${own} ORDER BY x`, own, "")).toBe(
+      `${from} ORDER BY x`,
+    );
+  });
+
+  it("returns null when its own condition is not there", () => {
+    expect(replaceOwnCondition(`${from} WHERE a = 1`, own, "")).toBeNull();
+    expect(replaceOwnCondition(`${from} WHERE (${own})`, own, "x = 1")).toBeNull();
+  });
+});
+
+describe("fieldHasOtherCondition", () => {
+  const from = `SELECT * FROM "default"`;
+
+  it("sees a typed condition on the field outside the page's own one", () => {
+    const own = "service_name = 'b'";
+    expect(
+      fieldHasOtherCondition(`${from} WHERE service_name = 'a' AND ${own}`, "service_name", own),
+    ).toBe(true);
+    expect(fieldHasOtherCondition(`${from} WHERE a = 1 AND ${own}`, "service_name", own)).toBe(
+      false,
+    );
+    expect(fieldHasOtherCondition(`${from} WHERE x = 'service_name'`, "service_name", own)).toBe(
+      false,
+    );
+  });
+
+  it("sees a typed json_get read of a field stored in _all", () => {
+    const ref = "json_get_str(_all, 'route')";
+    const own = `${ref} = 'b'`;
+    expect(
+      fieldHasOtherCondition(
+        `${from} WHERE JSON_GET_STR(_all, 'route') = 'a' AND ${own}`,
+        "route",
+        own,
         ref,
       ),
-    ).toBe(`${from} WHERE ${ref} = '/b'`);
+    ).toBe(true);
+  });
+});
+
+describe("filterHasSubquery", () => {
+  it("finds IN (SELECT ...) in a filter with the parser", () => {
+    expect(
+      filterHasSubquery(
+        `trace_id IN (SELECT trace_id FROM "default" WHERE span_status = 'ERROR')`,
+        parser,
+      ),
+    ).toBe(true);
+    expect(filterHasSubquery(`a = 1 AND (b = 2 OR c IN (SELECT c FROM "x"))`, parser)).toBe(true);
   });
 
-  it("adds the condition when the field has no top-level condition, or the WHERE has a top-level OR", () => {
-    expect(
-      replaceFieldConditions(`${from} WHERE a = 1`, "service_name", "service_name = 'x'"),
-    ).toBe(`${from} WHERE a = 1 AND service_name = 'x'`);
-    expect(
-      replaceFieldConditions(
-        `${from} WHERE service_name = 'a' OR b = 1`,
-        "service_name",
-        "service_name = 'x'",
-      ),
-    ).toBe(`${from} WHERE (service_name = 'a' OR b = 1) AND service_name = 'x'`);
-  });
-
-  it("matches a function name in any case and a table-qualified field", () => {
-    const ref = "json_get_str(_all, 'http_route')";
-    expect(
-      replaceFieldConditions(
-        `${from} WHERE JSON_GET_STR(_all, 'http_route') = '/a'`,
-        "http_route",
-        `${ref} = '/b'`,
-        ref,
-      ),
-    ).toBe(`${from} WHERE ${ref} = '/b'`);
-    expect(
-      replaceFieldConditions(
-        `SELECT * FROM "t" s WHERE s.service_name = 'api' AND "s"."service_name" = 'x'`,
-        "service_name",
-        "service_name = 'b'",
-      ),
-    ).toBe(`SELECT * FROM "t" s WHERE service_name = 'b'`);
-  });
-
-  it("leaves a typed mix of included and excluded values alone, so a tick never flips one", () => {
-    expect(
-      replaceFieldConditions(
-        `${from} WHERE service_name = 'api' AND service_name != 'db'`,
-        "service_name",
-        "service_name != 'api' AND service_name != 'db' AND service_name != 'web'",
-      ),
-    ).toBeNull();
-  });
-
-  it("keeps comments and the text between the conditions it keeps", () => {
-    expect(
-      replaceFieldConditions(
-        `${from} WHERE a = 1 /* prod only */ AND service_name = 'api' and b = 2 -- temp`,
-        "service_name",
-        "service_name = 'db'",
-      ),
-    ).toBe(`${from} WHERE a = 1 /* prod only */ and b = 2 AND service_name = 'db' -- temp`);
-    expect(
-      replaceFieldConditions(
-        `${from} WHERE service_name = 'api' AND /* keep */ a = 1`,
-        "service_name",
-        "",
-      ),
-    ).toBe(`${from} WHERE /* keep */ a = 1`);
-  });
-
-  it("is null when there is nothing to remove", () => {
-    expect(replaceFieldConditions(`${from} WHERE a = 1`, "service_name", "")).toBeNull();
-    expect(
-      replaceFieldConditions(`${from} WHERE service_name = 'a' OR b = 1`, "service_name", ""),
-    ).toBeNull();
-    expect(replaceFieldConditions(`${from}`, "service_name", "")).toBeNull();
+  it("is not fooled by SELECT inside a string or a plain IN list", () => {
+    expect(filterHasSubquery(`db_statement = 'x IN (SELECT 1)'`, parser)).toBe(false);
+    expect(filterHasSubquery(`service_name IN ('a','b')`, parser)).toBe(false);
+    expect(filterHasSubquery("", parser)).toBe(false);
   });
 });
 

@@ -215,7 +215,9 @@ let cancelLoad: (() => void) | null = null;
 // cancelAll stops the streams but never settles their promises, so each load races its own cancel.
 const search = (sql: string, cancelled: Promise<never>) =>
   Promise.race([
-    executeQuery(sql, props.request.startTime, props.request.endTime, "traces"),
+    executeQuery(sql, props.request.startTime, props.request.endTime, "traces", {
+      replaceStreamingAggs: true,
+    }),
     cancelled,
   ]) as Promise<Record<string, unknown>[]>;
 
