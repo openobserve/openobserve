@@ -22,9 +22,9 @@ import store from "@/test/unit/helpers/store";
 
 import { HOST_METRICS_DASHBOARD_TITLE } from "@/composables/useHostMetricsDashboard";
 
-import { HOSTS_PACK } from "./hostsPack";
 import type { PackStreamRole, StarterPack } from "./types";
 import { leftOutIds, StarterPackPermissionError } from "./types";
+import { catalogVersion, packById } from "./usePackCatalog";
 
 const library = vi.hoisted(() => ({
   down: false,
@@ -34,6 +34,7 @@ const library = vi.hoisted(() => ({
   version: "",
   description: "d1",
   threshold: 3,
+  schemas: {} as Record<string, string[]>,
 }));
 vi.mock("@/constants/starterPacks", () => ({
   get STARTER_PACKS_ENABLED() {
@@ -68,7 +69,9 @@ const fake = vi.hoisted(() => {
       if (library.onlyType && !url.includes(`type=${library.onlyType}`)) {
         return reply({ list: [], schema: [] });
       }
-      return reply({ list: [{ name: "kube_present", stats }], schema: [{ name: "value" }] });
+      const type = url.match(/type=(\w+)/)?.[1] ?? "";
+      const schema = (library.schemas[type] ?? ["value"]).map((name) => ({ name }));
+      return reply({ list: [{ name: "kube_present", stats }], schema });
     }
     if (url.endsWith("/parse_tree")) {
       if (state.parseFails) throw httpError(state.parseFails);
@@ -225,8 +228,8 @@ import { useStarterPacks } from "./useStarterPacks";
 
 const PACK: StarterPack = {
   id: "kubernetes",
-  titleKey: "starterPacks.kubernetes.title",
-  descriptionKey: "starterPacks.kubernetes.description",
+  titleKey: "starterPacks.packs.kubernetes.title",
+  descriptionKey: "starterPacks.packs.kubernetes.description",
   folder: { name: "Kubernetes", description: "pack" },
   dashboards: [{ id: "overview", title: "Overview", load: async () => ({ version: 8, tabs: [] }) }],
   alerts: ["k8s/one", "k8s/two"],
@@ -705,7 +708,7 @@ describe("useStarterPacks", () => {
         flavours: [
           {
             id: "otel",
-            titleKey: "starterPacks.kubernetes.title",
+            titleKey: "starterPacks.packs.kubernetes.title",
             detect: ["kube_present"],
             alerts: { "k8s/two": { promql: "kube_present", streams: ["kube_present"] } },
           },
@@ -723,7 +726,7 @@ describe("useStarterPacks", () => {
         flavours: [
           {
             id: "otel",
-            titleKey: "starterPacks.kubernetes.title",
+            titleKey: "starterPacks.packs.kubernetes.title",
             detect: ["kube_present"],
             alerts: { "k8s/two": { promql: "kube_present", streams: ["kube_present"] } },
           },
@@ -737,7 +740,7 @@ describe("useStarterPacks", () => {
     it("takes the first usable flavour and does not call the alert unsupported", async () => {
       library.lastIngested = Date.now() * 1000;
       const flavour = {
-        titleKey: "starterPacks.kubernetes.title",
+        titleKey: "starterPacks.packs.kubernetes.title",
         detect: ["kube_present"],
       } as const;
       const usable = { "k8s/two": { promql: "kube_present", streams: ["kube_present"] } };
@@ -798,7 +801,7 @@ describe("useStarterPacks", () => {
       };
       const role = (fields: string[]): PackStreamRole => ({
         id: "events",
-        titleKey: "starterPacks.kubernetes.title",
+        titleKey: "starterPacks.packs.kubernetes.title",
         stream: "k8s_events",
         fields,
         identity: [{ field: "service_name", pattern: "^k8s-events$" }],
@@ -861,6 +864,11 @@ describe("useStarterPacks", () => {
         library.onlyType = "";
         expect(viewOf(preview)).toEqual({ included: true, left: undefined });
       });
+    });
+
+    it("records the catalog version the install came from", async () => {
+      const record = await packs().installPack(PACK);
+      expect(record.catalogVersion).toBe(catalogVersion());
     });
 
     it("installs without excluded items, reporting progress and who installed", async () => {
@@ -958,6 +966,83 @@ describe("useStarterPacks", () => {
       expect((await api.previewPack(none)).notIncluded).toContainEqual(
         expect.objectContaining({ itemId: "other", reason: "no_data" }),
       );
+    });
+
+    it("keeps a panel that reads a traces stream", async () => {
+      const tracesPack: StarterPack = {
+        ...PACK,
+        alerts: [],
+        bundledAlerts: BUNDLED_PACK.bundledAlerts,
+        dashboards: [
+          {
+            id: "apm",
+            title: "APM",
+            load: async () => ({
+              version: 8,
+              tabs: [
+                {
+                  tabId: "t",
+                  panels: [
+                    {
+                      title: "Spans",
+                      queryType: "sql",
+                      layout: { x: 0, y: 0, w: 4, h: 4 },
+                      queries: [{ query: 'SELECT count(*) FROM "kube_present"' }],
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        ],
+      };
+      library.onlyType = "traces";
+      try {
+        const api = packs();
+        expect((await api.previewPack(tracesPack)).panels).toEqual({ kept: 1, dropped: 0 });
+        await api.installPack(tracesPack);
+      } finally {
+        library.onlyType = "";
+      }
+      expect(fake.state.dashboards[0].body.tabs[0].panels.map((p: any) => p.title)).toEqual([
+        "Spans",
+      ]);
+    });
+
+    it("reads a logs stream's schema when traces has a stream of the same name", async () => {
+      const logsPack: StarterPack = {
+        ...PACK,
+        alerts: [],
+        bundledAlerts: BUNDLED_PACK.bundledAlerts,
+        dashboards: [
+          {
+            id: "events",
+            title: "Events",
+            load: async () => ({
+              version: 8,
+              tabs: [
+                {
+                  tabId: "t",
+                  panels: [
+                    {
+                      title: "By host",
+                      queryType: "sql",
+                      layout: { x: 0, y: 0, w: 4, h: 4 },
+                      queries: [{ query: 'SELECT host FROM "kube_present"' }],
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        ],
+      };
+      library.schemas = { logs: ["value", "host"], traces: ["value"], metrics: ["value"] };
+      try {
+        expect((await packs().previewPack(logsPack)).panels).toEqual({ kept: 1, dropped: 0 });
+      } finally {
+        library.schemas = {};
+      }
     });
 
     it("still fails a pack with no bundled copy", async () => {
@@ -1193,7 +1278,7 @@ describe("useStarterPacks", () => {
   });
 
   describe("shared host dashboard", () => {
-    const HOSTS = { ...HOSTS_PACK, alerts: [] };
+    const HOSTS = { ...packById("hosts")!, alerts: [] };
     const hostDashboards = () =>
       fake.state.dashboards.filter((row) => row.title === HOST_METRICS_DASHBOARD_TITLE);
     const dashboardItem = (record: { items: Array<{ kind: string }> }) =>

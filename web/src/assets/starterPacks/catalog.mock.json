@@ -1,0 +1,520 @@
+{
+  "format_version": "1.0.0",
+  "catalog_version": "mock-2026.11.17",
+  "packs": [
+    {
+      "id": "kubernetes",
+      "version": "1.1.0",
+      "title": "Kubernetes",
+      "description": "Dashboards, alerts and saved views for Kubernetes clusters.",
+      "paused_impact": "pods crash or run out of memory, or a deployment loses replicas",
+      "logo": "images/common/kubernetes.svg",
+      "collector_route": "ingestFromKubernetes",
+      "native_view": {
+        "feature": "kubernetes_monitoring",
+        "route": "infraKubernetes"
+      },
+      "cluster_scoped": true,
+      "folder": {
+        "name": "Kubernetes",
+        "description": "Installed by the Kubernetes starter pack"
+      },
+      "detect": {
+        "detector": "kubernetes"
+      },
+      "dashboards": [
+        {
+          "id": "overview",
+          "title": "Kubernetes Overview",
+          "gallery_path": "Kubernetes(openobserve-collector)/kubernetes_overview.json",
+          "bundled": "kubernetes_overview"
+        }
+      ],
+      "alerts": {
+        "core": [
+          "k8s/pod_crashloop_backoff",
+          "k8s/pod_oom_killed",
+          "k8s/deployment_replica_mismatch",
+          "k8s/node_high_memory_usage",
+          "k8s/oom_killing_events"
+        ],
+        "more": [
+          "k8s/apiserver_high_latency",
+          "k8s/cluster_cpu_capacity_high",
+          "k8s/cluster_memory_capacity_high",
+          "k8s/cluster_pod_count_high"
+        ]
+      },
+      "bundled_alerts": "kubernetes",
+      "aliases": [
+        [
+          "k8s_cluster",
+          "k8s_cluster_name",
+          "cluster",
+          "cluster_name"
+        ],
+        [
+          "k8s_namespace_name",
+          "k8s_namespace",
+          "namespace",
+          "body_k8s_namespace_name",
+          "body_namespace"
+        ],
+        [
+          "k8s_pod_name",
+          "k8s_pod",
+          "pod",
+          "body_k8s_pod_name",
+          "body_pod"
+        ],
+        [
+          "k8s_node_name",
+          "k8s_node",
+          "node",
+          "body_k8s_node_name",
+          "body_node"
+        ],
+        [
+          "k8s_container_name",
+          "k8s_container",
+          "container",
+          "body_k8s_container_name",
+          "body_container"
+        ],
+        [
+          "kind",
+          "body_kind"
+        ],
+        [
+          "reason",
+          "body_reason"
+        ],
+        [
+          "message",
+          "body_message",
+          "body_note"
+        ]
+      ],
+      "alias_titles": {
+        "k8s_cluster": "Cluster name",
+        "k8s_namespace_name": "Namespace",
+        "k8s_pod_name": "Pod name",
+        "k8s_node_name": "Node name",
+        "k8s_container_name": "Container name",
+        "kind": "Event kind",
+        "reason": "Event reason",
+        "message": "Event message"
+      },
+      "roles": [
+        {
+          "id": "events",
+          "title": "Kubernetes events",
+          "stream": "k8s_events",
+          "fields": [
+            "kind",
+            "reason",
+            "message",
+            "k8s_namespace_name"
+          ],
+          "identity": [
+            {
+              "field": "instrumentation_library_name",
+              "pattern": "k8sobjects|k8s_events|k8sevents"
+            },
+            {
+              "field": "service_name",
+              "pattern": "k8s[-_]?events"
+            },
+            {
+              "field": "container_image_name",
+              "pattern": "event-exporter"
+            }
+          ]
+        }
+      ],
+      "flavours": [
+        {
+          "id": "opentelemetry",
+          "title": "OpenTelemetry",
+          "detect": [
+            "k8s_pod_phase",
+            "k8s_node_allocatable_cpu",
+            "k8s_container_cpu_request"
+          ],
+          "alerts": {
+            "k8s/cluster_cpu_capacity_high": {
+              "promql": "clamp_max(floor(sum by(k8s_cluster)(k8s_container_cpu_request) / on(k8s_cluster) sum by(k8s_cluster)(k8s_node_allocatable_cpu) * 10000) / 100, 100)",
+              "streams": [
+                "k8s_container_cpu_request",
+                "k8s_node_allocatable_cpu"
+              ]
+            },
+            "k8s/cluster_memory_capacity_high": {
+              "promql": "clamp_max(floor(sum by(k8s_cluster)(k8s_container_memory_request) / on(k8s_cluster) sum by(k8s_cluster)(k8s_node_allocatable_memory) * 10000) / 100, 100)",
+              "streams": [
+                "k8s_container_memory_request",
+                "k8s_node_allocatable_memory"
+              ]
+            },
+            "k8s/cluster_pod_count_high": {
+              "promql": "floor(count by(k8s_cluster) (k8s_pod_phase) / sum by(k8s_cluster) (k8s_node_allocatable_pods) * 10000) / 100",
+              "streams": [
+                "k8s_pod_phase",
+                "k8s_node_allocatable_pods"
+              ]
+            }
+          }
+        }
+      ],
+      "saved_views": [
+        {
+          "id": "events",
+          "name": "Kubernetes events",
+          "search": {
+            "meta": {},
+            "data": {
+              "stream": {
+                "streamType": "logs",
+                "selectedStream": [
+                  "k8s_events"
+                ]
+              },
+              "query": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "hosts",
+      "version": "1.1.0",
+      "title": "Hosts",
+      "description": "The host metrics dashboard for servers and virtual machines.",
+      "logo": "images/common/linux.svg",
+      "collector_route": "ingestFromLinux",
+      "folder": {
+        "name": "Hosts",
+        "description": "Installed by the Hosts starter pack"
+      },
+      "detect": {
+        "metric_names": [
+          [
+            "system_cpu_time",
+            "node_cpu_seconds_total"
+          ],
+          [
+            "system_memory_usage",
+            "node_memory_MemAvailable_bytes"
+          ],
+          [
+            "system_filesystem_usage",
+            "node_filesystem_avail_bytes"
+          ]
+        ]
+      },
+      "dashboards": [
+        {
+          "id": "host_metrics",
+          "title": "Host Metrics",
+          "bundled": "host_metrics",
+          "importer": "host_metrics"
+        }
+      ],
+      "alerts": {
+        "core": [
+          "opentelemetry/host_high_cpu_load_otel",
+          "opentelemetry/host_out_of_memory_otel",
+          "opentelemetry/host_out_of_disk_space_otel",
+          "opentelemetry/host_stopped_reporting"
+        ],
+        "more": [
+          "opentelemetry/host_disk_may_fill_in_24_hours_otel",
+          "opentelemetry/host_cpu_load_saturation_otel"
+        ]
+      },
+      "saved_views": [],
+      "paused_impact": "a host runs out of CPU, memory or disk, or stops reporting"
+    },
+    {
+      "id": "traces",
+      "version": "1.0.0",
+      "title": "Traces (APM)",
+      "description": "Request rate, errors and latency per service from OpenTelemetry traces.",
+      "collector_route": "ingestFromTraces",
+      "folder": {
+        "name": "Traces",
+        "description": "Installed by the Traces starter pack"
+      },
+      "detect": {
+        "streams": [
+          {
+            "type": "traces"
+          }
+        ]
+      },
+      "dashboards": [
+        {
+          "id": "apm",
+          "title": "Traces APM",
+          "gallery_path": "Traces_APM/Traces APM.dashboard.json"
+        }
+      ],
+      "alerts": {
+        "core": [
+          "apm/traces_service_error_rate_high",
+          "apm/traces_service_p95_latency_high",
+          "apm/traces_dependency_error_rate_high"
+        ],
+        "more": [
+          "apm/traces_operation_error_burst"
+        ]
+      },
+      "saved_views": [],
+      "paused_impact": "a service's error rate or latency climbs, or a dependency starts failing"
+    },
+    {
+      "id": "postgresql",
+      "version": "1.0.0",
+      "title": "PostgreSQL",
+      "description": "Connections, commits, database size and locks from the OpenTelemetry PostgreSQL receiver.",
+      "logo": "images/ingestion/postgres.png",
+      "collector_route": "postgres",
+      "folder": {
+        "name": "PostgreSQL",
+        "description": "Installed by the PostgreSQL starter pack"
+      },
+      "detect": {
+        "metric_names": [
+          [
+            "postgresql_backends"
+          ],
+          [
+            "postgresql_commits"
+          ],
+          [
+            "postgresql_db_size"
+          ]
+        ]
+      },
+      "dashboards": [
+        {
+          "id": "overview",
+          "title": "PostgreSQL",
+          "gallery_path": "PostgreSQL Metrics (opentelemetry-contrib)/PostgreSQL.dashboard.json"
+        }
+      ],
+      "alerts": {
+        "core": [
+          "opentelemetry/postgresql_down_otel",
+          "opentelemetry/postgresql_too_many_connections_otel",
+          "opentelemetry/postgresql_low_cache_hit_rate_otel",
+          "opentelemetry/postgresql_high_rollback_rate_otel"
+        ],
+        "more": [
+          "opentelemetry/postgresql_replication_lag_otel"
+        ]
+      },
+      "saved_views": [],
+      "paused_impact": "PostgreSQL goes down, runs out of connections or slows down"
+    },
+    {
+      "id": "docker",
+      "version": "1.0.0",
+      "title": "Docker",
+      "description": "Container CPU, memory, network and disk from the OpenTelemetry Docker stats receiver.",
+      "logo": "images/common/docker.svg",
+      "folder": {
+        "name": "Docker",
+        "description": "Installed by the Docker starter pack"
+      },
+      "detect": {
+        "metric_names": [
+          [
+            "container_memory_percent"
+          ],
+          [
+            "container_cpu_usage_total"
+          ]
+        ]
+      },
+      "dashboards": [
+        {
+          "id": "containers",
+          "title": "Docker Container Metrics",
+          "gallery_path": "Docker_Metrics/Docker Container Metrics.dashboard.json"
+        }
+      ],
+      "alerts": {
+        "core": [
+          "opentelemetry/container_high_memory_usage_otel",
+          "opentelemetry/container_memory_near_limit_otel",
+          "opentelemetry/docker_stopped_reporting"
+        ],
+        "more": [
+          "opentelemetry/container_absent_otel"
+        ]
+      },
+      "saved_views": [],
+      "paused_impact": "a container runs out of memory or container metrics stop arriving"
+    },
+    {
+      "id": "aws-cloudwatch",
+      "version": "1.0.0",
+      "title": "AWS CloudWatch",
+      "description": "EC2, RDS, load balancer, Lambda and SQS health from a CloudWatch metric stream.",
+      "logo": "images/ingestion/aws.svg",
+      "collector_route": "cloudwatchMetrics",
+      "folder": {
+        "name": "AWS CloudWatch",
+        "description": "Installed by the AWS CloudWatch starter pack"
+      },
+      "detect": {
+        "streams": [
+          {
+            "type": "logs",
+            "name": "cloudwatch_metrics"
+          }
+        ]
+      },
+      "dashboards": [
+        {
+          "id": "overview",
+          "title": "AWS CloudWatch Overview",
+          "gallery_path": "AWS_CloudWatch/AWS_CloudWatch_Overview.dashboard.json"
+        }
+      ],
+      "alerts": {
+        "core": [
+          "opentelemetry/aws_ec2_status_check_failed",
+          "opentelemetry/aws_ec2_high_cpu",
+          "opentelemetry/aws_rds_low_free_storage",
+          "opentelemetry/aws_alb_high_5xx_rate",
+          "opentelemetry/aws_lambda_high_error_rate_otel",
+          "opentelemetry/aws_sqs_old_messages"
+        ],
+        "more": [
+          "opentelemetry/aws_cloudwatch_metric_stream_stopped"
+        ]
+      },
+      "saved_views": [],
+      "paused_impact": "an AWS resource fails, fills up or starts erroring"
+    },
+    {
+      "id": "genai",
+      "version": "1.0.0",
+      "title": "AI (LLM apps)",
+      "description": "Requests, tokens, cost and latency per model from OpenTelemetry GenAI traces.",
+      "folder": {
+        "name": "AI (LLM apps)",
+        "description": "Installed by the AI starter pack"
+      },
+      "detect": {
+        "streams": [
+          {
+            "type": "traces",
+            "fields": [
+              "gen_ai_operation_name"
+            ]
+          }
+        ]
+      },
+      "dashboards": [
+        {
+          "id": "overview",
+          "title": "AI LLM Apps",
+          "gallery_path": "AI_LLM_Apps/AI LLM Apps.dashboard.json"
+        }
+      ],
+      "alerts": {
+        "core": [
+          "ai/llm_error_rate_high",
+          "ai/llm_p95_latency_high",
+          "ai/llm_hourly_spend_high"
+        ],
+        "more": [
+          "ai/llm_token_burn_high",
+          "ai/llm_tool_agent_failures"
+        ]
+      },
+      "saved_views": [],
+      "paused_impact": "LLM calls fail, slow down or cost more than expected"
+    },
+    {
+      "id": "github",
+      "version": "1.0.0",
+      "title": "GitHub (Actions)",
+      "description": "Workflow runs, failures and duration from GitHub Actions events.",
+      "logo": "images/ingestion/github-actions.svg",
+      "collector_route": "github-actions",
+      "folder": {
+        "name": "GitHub",
+        "description": "Installed by the GitHub starter pack"
+      },
+      "detect": {
+        "streams": [
+          {
+            "type": "logs",
+            "name": "githubactions"
+          }
+        ]
+      },
+      "dashboards": [
+        {
+          "id": "job_logs",
+          "title": "GitHub Actions Job Logs",
+          "gallery_path": "GitHub_Actions/GitHub_Actions_Job_Logs.dashboard.json"
+        }
+      ],
+      "alerts": {
+        "core": [
+          "opentelemetry/github_actions_job_errors",
+          "opentelemetry/github_actions_logs_stopped"
+        ],
+        "more": []
+      },
+      "saved_views": [],
+      "paused_impact": "a GitHub Actions job logs errors or job logs stop arriving"
+    },
+    {
+      "id": "argocd",
+      "version": "1.0.0",
+      "title": "Argo CD",
+      "description": "Application sync and health, Git fetches and controller load from Argo CD's own metrics.",
+      "paused_impact": "an application fails to sync, turns unhealthy or can't fetch from Git",
+      "folder": {
+        "name": "Argo CD",
+        "description": "Installed by the Argo CD starter pack"
+      },
+      "detect": {
+        "metric_names": [
+          [
+            "argocd_app_info"
+          ],
+          [
+            "argocd_app_sync_total"
+          ]
+        ]
+      },
+      "dashboards": [
+        {
+          "id": "monitoring",
+          "title": "ArgoCD Monitoring",
+          "gallery_path": "ArgoCD/ArgoCD Monitoring.dashboard.json"
+        }
+      ],
+      "alerts": {
+        "core": [
+          "ci-cd/argocd_application_sync_failed",
+          "ci-cd/argocd_service_unhealthy",
+          "ci-cd/argocd_service_not_synced",
+          "ci-cd/argocd_git_fetch_failures",
+          "ci-cd/argocd_cluster_connection_error"
+        ],
+        "more": [
+          "ci-cd/argocd_application_controller_slow_reconciliation"
+        ]
+      },
+      "saved_views": []
+    }
+  ]
+}

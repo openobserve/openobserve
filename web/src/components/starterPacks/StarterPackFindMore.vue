@@ -27,7 +27,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type { FindMoreResult, FindMoreSource } from "@/composables/starterPacks/findMore";
-import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
+import { packs } from "@/composables/starterPacks/usePackCatalog";
 import { useDailyCheck } from "@/composables/starterPacks/useDailyCheck";
 import { useFindMore } from "@/composables/starterPacks/useFindMore";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
@@ -58,7 +58,7 @@ const activePack = ref<string | null>(null);
 // A setup popup mounts on first use, so opening Find More costs nothing.
 const usedPacks = ref<string[]>([]);
 
-const builtIns = STARTER_PACKS.map((pack) => ({
+const builtIns = packs().map((pack) => ({
   pack,
   flow: useStarterPackFlow(props.org, pack),
   matcher: useStarterPackMatcher(props.org, { pack }),
@@ -96,7 +96,7 @@ const when = (result: FindMoreResult): I18nText => {
 };
 
 const titleOf = (source: FindMoreSource): I18nText => {
-  const pack = STARTER_PACKS.find(({ id }) => id === source.packId);
+  const pack = packs().find(({ id }) => id === source.packId);
   const name = pack ? t(pack.titleKey) : raw(source.label);
   return source.streams[0] ? raw(`${name} · ${source.streams[0]}`) : name;
 };

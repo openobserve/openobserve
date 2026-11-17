@@ -23,7 +23,7 @@ import {
 } from "vue";
 
 import type { FindMoreResult, FindMoreSource } from "./findMore";
-import { STARTER_PACKS } from "./kubernetesPack";
+import { packs } from "./usePackCatalog";
 
 export interface BrowserInterrupted {
   packId: string;
@@ -50,7 +50,7 @@ interface OrgState {
 export const matchesKey = (org: string) => `o2.starterPacks.browserMatches.${org}`;
 export const notNowKey = (org: string) => `o2.starterPacks.notNow.${org}`;
 
-const BUILT_IN_IDS = new Set(STARTER_PACKS.map(({ id }) => id));
+const BUILT_IN_IDS = new Set(packs().map(({ id }) => id));
 
 // Shared by every caller in the tab, so a save on Home updates the header at once.
 const orgs = new Map<string, OrgState>();

@@ -36,7 +36,7 @@ import {
   type FindMoreResult,
   type FindMoreSource,
 } from "./findMore";
-import { STARTER_PACKS } from "./kubernetesPack";
+import { packs as allPacks } from "./usePackCatalog";
 import { matchAlerts, matchPack, readOrgStreams } from "./packMatchData";
 import type { StarterPack } from "./types";
 import { useBrowserMatches } from "./useBrowserMatches";
@@ -135,10 +135,10 @@ export function useFindMoreCheck(org: string) {
       readDismissalsForCheck(),
     ]);
     const library = { loadManifest, loadAlertFile };
-    const packAlerts = new Set(STARTER_PACKS.flatMap((pack) => pack.alerts));
+    const packAlerts = new Set(allPacks().flatMap((pack) => pack.alerts));
     const outside = manifest.alerts.filter((entry) => !packAlerts.has(entry.id));
     const packs = await Promise.all(
-      STARTER_PACKS.map(async (pack) => ({
+      allPacks().map(async (pack) => ({
         pack,
         match: await matchPack(org, pack, streams, library),
         records: await records.list(pack.id),
@@ -146,10 +146,10 @@ export function useFindMoreCheck(org: string) {
     );
     const verdicts = await matchAlerts(org, outside, streams, {
       loadFile: loadAlertFile,
-      packs: STARTER_PACKS,
+      packs: allPacks(),
     });
     const catalog = new Map(manifest.alerts.map((entry) => [entry.id, entry]));
-    for (const pack of STARTER_PACKS) {
+    for (const pack of allPacks()) {
       for (const { entry } of pack.bundledAlerts ?? []) {
         if (!catalog.has(entry.id)) catalog.set(entry.id, entry);
       }

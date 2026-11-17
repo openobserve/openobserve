@@ -19,12 +19,14 @@ import { nextTick, ref, shallowRef } from "vue";
 
 import i18n from "@/locales";
 
-import { HOSTS_PACK } from "@/composables/starterPacks/hostsPack";
-import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
 import type { HomePacks } from "@/composables/starterPacks/useHomePacks";
+import { packById } from "@/composables/starterPacks/usePackCatalog";
 
 import StarterPackHomeSection from "./StarterPackHomeSection.vue";
 import { fakeFlow } from "./starterPackTestFlow";
+
+const HOSTS_PACK = packById("hosts")!;
+const KUBERNETES_PACK = packById("kubernetes")!;
 
 const fake = vi.hoisted(() => ({
   flows: {} as Record<string, any>,

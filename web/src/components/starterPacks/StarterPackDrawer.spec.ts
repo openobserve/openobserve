@@ -112,7 +112,10 @@ const BINDINGS = [
 ];
 const adaptedFlow = (over: Record<string, unknown>) =>
   ready({
-    pack: { ...PACK, flavours: [{ id: "otel", titleKey: "starterPacks.kubernetes.flavourOtel" }] },
+    pack: {
+      ...PACK,
+      flavours: [{ id: "otel", titleKey: "starterPacks.packs.kubernetes.flavours.opentelemetry" }],
+    },
     preview: shallowRef({ ...PREVIEW, ...over }),
   });
 const adaptedMeta = (wrapper: Wrapper) =>

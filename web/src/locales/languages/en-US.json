@@ -15108,25 +15108,68 @@
       "confirmNew": "Parse new Nginx lines",
       "notNow": "Not now"
     },
-    "hosts": {
-      "title": "Hosts",
-      "description": "The host metrics dashboard and alerts for servers and virtual machines.",
-      "pausedImpact": "a host runs out of CPU, memory or disk"
-    },
-    "kubernetes": {
-      "title": "Kubernetes",
-      "description": "Dashboards, alerts and saved views for Kubernetes clusters.",
-      "fieldCluster": "Cluster name",
-      "fieldNamespace": "Namespace",
-      "fieldPod": "Pod name",
-      "fieldNode": "Node name",
-      "fieldContainer": "Container name",
-      "fieldKind": "Event kind",
-      "fieldReason": "Event reason",
-      "fieldMessage": "Event message",
-      "roleEvents": "Kubernetes events",
-      "flavourOtel": "OpenTelemetry",
-      "pausedImpact": "your cluster runs out of CPU, memory or pods"
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "description": "Dashboards, alerts and saved views for Kubernetes clusters.",
+        "fields": {
+          "k8s_cluster": "Cluster name",
+          "k8s_namespace_name": "Namespace",
+          "k8s_pod_name": "Pod name",
+          "k8s_node_name": "Node name",
+          "k8s_container_name": "Container name",
+          "kind": "Event kind",
+          "reason": "Event reason",
+          "message": "Event message"
+        },
+        "roles": {
+          "events": "Kubernetes events"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        },
+        "pausedImpact": "your cluster runs out of CPU, memory or pods"
+      },
+      "hosts": {
+        "title": "Hosts",
+        "description": "The host metrics dashboard and alerts for servers and virtual machines.",
+        "pausedImpact": "a host runs out of CPU, memory or disk"
+      },
+      "traces": {
+        "title": "Traces (APM)",
+        "description": "Request rate, errors and latency per service from OpenTelemetry traces.",
+        "pausedImpact": "a service's error rate or latency climbs, or a dependency starts failing"
+      },
+      "postgresql": {
+        "title": "PostgreSQL",
+        "description": "Connections, commits, database size and locks from the OpenTelemetry PostgreSQL receiver.",
+        "pausedImpact": "PostgreSQL goes down, runs out of connections or slows down"
+      },
+      "docker": {
+        "title": "Docker",
+        "description": "Container CPU, memory, network and disk from the OpenTelemetry Docker stats receiver.",
+        "pausedImpact": "a container runs out of memory or container metrics stop arriving"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "description": "EC2, RDS, load balancer, Lambda and SQS health from a CloudWatch metric stream.",
+        "pausedImpact": "an AWS resource fails, fills up or starts erroring"
+      },
+      "genai": {
+        "title": "AI (LLM apps)",
+        "description": "Requests, tokens, cost and latency per model from OpenTelemetry GenAI traces.",
+        "pausedImpact": "LLM calls fail, slow down or cost more than expected"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "description": "Workflow runs, failures and duration from GitHub Actions events.",
+        "pausedImpact": "a GitHub Actions job logs errors or job logs stop arriving"
+      },
+      "argocd": {
+        "title": "Argo CD",
+        "description": "Application sync and health, Git fetches and controller load from Argo CD's own metrics.",
+        "pausedImpact": "an application fails to sync, turns unhealthy or can't fetch from Git"
+      }
     },
     "setUp": "Set up {title} monitoring",
     "checking": "Checking what fits…",

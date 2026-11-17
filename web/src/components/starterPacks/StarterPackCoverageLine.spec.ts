@@ -23,6 +23,8 @@ const fake = vi.hoisted(() => ({
   ready: {} as Record<string, boolean>,
   failing: "",
   metrics: ["kube_pod_status_phase", "system_cpu_time"],
+  logs: [] as string[],
+  traces: [] as string[],
   matchPack: vi.fn(),
   installs: {} as Record<string, Array<{ status: string }>>,
   alerts: {} as Record<string, Array<Record<string, unknown>>>,
@@ -34,7 +36,12 @@ vi.mock("@/composables/alerts/useAlertLibrary", () => ({
   useAlertLibrary: () => ({ loadManifest: vi.fn(), loadAlertFile: vi.fn() }),
 }));
 vi.mock("@/composables/starterPacks/packMatchData", () => ({
-  readOrgStreams: async () => ({ metrics: new Map(fake.metrics.map((name) => [name, 1])) }),
+  readOrgStreams: async () => ({
+    metrics: new Map(fake.metrics.map((name) => [name, 1])),
+    logs: new Map(fake.logs.map((name) => [name, 1])),
+    traces: new Map(fake.traces.map((name) => [name, 1])),
+  }),
+  readSchemaColumns: async () => ["trace_id"],
   matchPack: (...args: unknown[]) => fake.matchPack(...args),
 }));
 vi.mock("@/composables/starterPacks/useInstallRecords", () => ({
@@ -78,6 +85,8 @@ describe("StarterPackCoverageLine", () => {
     fake.alerts = {};
     fake.failing = "";
     fake.metrics = ["kube_pod_status_phase", "system_cpu_time"];
+    fake.logs = [];
+    fake.traces = [];
     fake.matchPack.mockReset();
     fake.matchPack.mockImplementation(async (_org: string, pack: { id: string }) => ({
       ready: !!fake.ready[pack.id],
@@ -163,6 +172,26 @@ describe("StarterPackCoverageLine", () => {
     fake.metrics = [];
     await mountLine();
     expect(fake.matchPack).not.toHaveBeenCalled();
+  });
+
+  it("offers Traces to an org with only a traces stream", async () => {
+    fake.metrics = [];
+    fake.traces = ["default"];
+    fake.ready = { traces: true };
+    const wrapper = await mountLine();
+    expect(wrapper.find('[data-test="starter-pack-coverage-row-traces"]').exists()).toBe(true);
+    const matched = fake.matchPack.mock.calls.map(([, pack]) => pack.id);
+    expect(matched).toEqual(["traces"]);
+  });
+
+  it("offers AWS CloudWatch to an org with a cloudwatch_metrics logs stream", async () => {
+    fake.metrics = [];
+    fake.logs = ["cloudwatch_metrics"];
+    fake.ready = { "aws-cloudwatch": true };
+    const wrapper = await mountLine();
+    expect(wrapper.find('[data-test="starter-pack-coverage-row-aws-cloudwatch"]').exists()).toBe(
+      true,
+    );
   });
 
   it("still reports the other packs when one pack's read fails", async () => {

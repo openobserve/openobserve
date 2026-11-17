@@ -112,6 +112,14 @@ export interface PackFlavour {
   alerts: Record<string, PackFlavourAlert>;
 }
 
+/** Streams of one type that show the source is reporting; no name means any stream of the type. */
+export interface PackDetectStream {
+  type: string;
+  name?: string;
+  /** Only a stream whose schema has every one of these fields counts. */
+  fields?: string[];
+}
+
 export interface StarterPack {
   id: string;
   version: string;
@@ -138,6 +146,10 @@ export interface StarterPack {
   collectorRoute?: string;
   /** Metric streams that show this source is reporting, each list the spellings of one signal; without one the pack is never matched. */
   signals?: string[][];
+  /** Streams, matched by type, name or schema, that show this source is reporting. */
+  detectStreams?: PackDetectStream[];
+  /** A built-in detector that decides whether the source is reporting. */
+  detector?: "kubernetes";
   /** Image path under assets, shown beside the pack title on Home. */
   logo?: string;
   /** What goes unnoticed while the pack's alerts are paused, as the end of a sentence. */
@@ -219,6 +231,8 @@ export interface PackInstallRecord {
   installedAt?: number;
   installedBy?: string;
   version?: string;
+  /** The catalog the pack definition came from. */
+  catalogVersion?: string;
   repairs?: PackRepair[];
   bindings?: PackBinding[];
   /** Alert id to flavour id, so a resumed install writes the same query. */

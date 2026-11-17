@@ -19,7 +19,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
-import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
+import { packById } from "@/composables/starterPacks/usePackCatalog";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
@@ -29,7 +29,8 @@ const props = defineProps<{ org: string; clusterName?: string }>();
 const emit = defineEmits<{ offered: [offered: boolean] }>();
 
 const { t } = useI18nTyped();
-const flow = useStarterPackFlow(props.org, KUBERNETES_PACK);
+const pack = packById("kubernetes")!;
+const flow = useStarterPackFlow(props.org, pack);
 const matcher = useStarterPackMatcher(props.org, { poll: true });
 const drawerOpen = ref(false);
 
@@ -104,7 +105,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
   </Teleport>
   <StarterPackInstallCard
     v-if="showCard"
-    :title="t(KUBERNETES_PACK.titleKey)"
+    :title="t(pack.titleKey)"
     :flow="flow"
     :status="status"
     :stream-count="matcher.streams.value.length"

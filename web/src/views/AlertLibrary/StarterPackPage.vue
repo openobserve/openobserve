@@ -22,7 +22,7 @@ import StarterPackDetail from "@/components/starterPacks/StarterPackDetail.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
+import { packById } from "@/composables/starterPacks/usePackCatalog";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
@@ -31,7 +31,7 @@ const route = useRoute();
 const router = useRouter();
 const org = String(route.query.org_identifier ?? store.state.selectedOrganization?.identifier);
 const packId = String(route.params.pack ?? "");
-const pack = STARTER_PACKS.find(({ id }) => id === packId) ?? null;
+const pack = packById(packId) ?? null;
 
 const packsRoute = computed(() => ({ name: "starterPacks", query: { org_identifier: org } }));
 const backToPacks = () => router.push(packsRoute.value).catch(() => {});

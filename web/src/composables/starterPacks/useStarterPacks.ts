@@ -91,6 +91,7 @@ import {
 } from "./packMatchData";
 import { MAX_STREAM_COPIES } from "./streamCandidates";
 import { contentHash, useInstallRecords } from "./useInstallRecords";
+import { catalogVersion } from "./usePackCatalog";
 import { mergeUpdate, pickFields, revertUpdate } from "./packUpdate";
 import { panelHash } from "./repairLater";
 import { StreamRewriteError } from "./streamRewriter";
@@ -234,7 +235,8 @@ export function useStarterPacks(org: string) {
     const wanted = dashboardStreams(doc);
     const schemas = new Map<string, Set<string>>();
     if (!wanted.length) return schemas;
-    const types = ["metrics", "logs"];
+    // The last type read wins a shared name, so logs keeps winning as it did before traces was read.
+    const types = ["traces", "metrics", "logs"];
     const lists = await Promise.all(
       types.map((type) => readQuery(streamNameListQuery(org, type), true)),
     );
@@ -756,6 +758,7 @@ export function useStarterPacks(org: string) {
           installedAt: Date.now() * 1000,
           installedBy: store.state.userInfo?.email ?? "",
           version: pack.version,
+          catalogVersion: catalogVersion(),
           ...(repairs.length ? { repairs } : {}),
           ...(bindings.length ? { bindings } : {}),
           ...(Object.keys(flavours).length ? { flavours } : {}),

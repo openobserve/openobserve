@@ -65,19 +65,26 @@ vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/alerts/useAlertLibrary")>()),
   useAlertLibrary: () => library,
 }));
-vi.mock("./kubernetesPack", () => ({
-  KUBERNETES_PACK: {
+vi.mock("./usePackCatalog", () => {
+  const kubernetes = {
     id: "kubernetes",
+    detector: "kubernetes",
     alerts: ["k8s/one"],
     dashboards: [] as unknown[],
     savedViews: [] as unknown[],
     aliases: [["k8s_cluster", "k8s_cluster_name"]],
-  },
-}));
+  };
+  return {
+    packs: () => [kubernetes],
+    packById: (id: string) => (id === "kubernetes" ? kubernetes : undefined),
+  };
+});
 
-import { KUBERNETES_PACK } from "./kubernetesPack";
 import { matchAlerts, matchPack, readOrgStreams } from "./packMatchData";
+import { packById } from "./usePackCatalog";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
+
+const KUBERNETES_PACK = packById("kubernetes")!;
 
 const entry = {
   id: "k8s/one",

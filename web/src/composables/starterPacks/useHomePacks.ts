@@ -22,7 +22,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
 
 import type { FindMoreItem, FindMoreSource } from "./findMore";
-import { STARTER_PACKS } from "./kubernetesPack";
+import { packs as allPacks } from "./usePackCatalog";
 import { usePackDismissal, usePackHiddenForOrg } from "./packDismissal";
 import type { PackItemKind, StarterPack } from "./types";
 import { useBrowserMatches, type BrowserInterrupted } from "./useBrowserMatches";
@@ -192,7 +192,7 @@ const interruptedOf = (item: HomePack): BrowserInterrupted => ({
 });
 
 /** Every pack Home offers, plus whether Home shows the setup section. */
-export function useHomePacks(org: string, packs: StarterPack[] = STARTER_PACKS) {
+export function useHomePacks(org: string, packs: StarterPack[] = allPacks()) {
   const router = useRouter();
   const items = packs.map((pack) => useHomePack(org, pack));
   const { hasUserData } = useOrgHasUserData(org);

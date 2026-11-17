@@ -97,6 +97,17 @@ describe("streamHealthOf", () => {
     expect(streamHealthOf({ name: "a", type: "metrics" }, read, NOW).state).toBe("unknown");
   });
 
+  it("finds an untyped stream that only a traces list holds", () => {
+    const read = lists({
+      metrics: [],
+      logs: [],
+      traces: [{ name: "default", stats: { doc_time_max: NOW } }],
+    });
+    const health = streamHealthOf({ name: "default", type: "" }, read, NOW);
+    expect(health.state).toBe("receiving");
+    expect(health.type).toBe("traces");
+  });
+
   it("looks an untyped stream up in both lists and takes the type it is found under", () => {
     const read = lists({ metrics: [], logs: [{ name: "a", stats: { doc_time_max: NOW } }] });
     const health = streamHealthOf({ name: "a", type: "" }, read, NOW);

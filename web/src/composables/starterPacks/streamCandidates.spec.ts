@@ -35,7 +35,7 @@ const labels = ["k8s_cluster", "namespace", "deployment"];
 
 const role: PackStreamRole = {
   id: "events",
-  titleKey: "starterPacks.kubernetes.title",
+  titleKey: "starterPacks.packs.kubernetes.title",
   stream: "k8s_events",
   fields: ["kind", "reason", "namespace"],
   identity: [

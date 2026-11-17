@@ -15,9 +15,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { HOSTS_PACK } from "./hostsPack";
-import { KUBERNETES_PACK } from "./kubernetesPack";
 import { packStreams } from "./packStreams";
+import type { StarterPack } from "./types";
+import { packById } from "./usePackCatalog";
+
+const HOSTS_PACK = packById("hosts")!;
+const KUBERNETES_PACK = packById("kubernetes")!;
 
 const names = (rows: { name: string }[]) => rows.map(({ name }) => name);
 
@@ -82,5 +85,14 @@ describe("packStreams", () => {
       alertStreams: [{ name: "k8s_pod_phase", type: "metrics" }],
     });
     expect(names(rows).filter((name) => name === "k8s_pod_phase")).toHaveLength(1);
+  });
+
+  it("adds the streams a pack is detected by name, but not a type-only rule", () => {
+    const pack = {
+      ...HOSTS_PACK,
+      signals: undefined,
+      detectStreams: [{ type: "logs", name: "cloudwatch_metrics" }, { type: "traces" }],
+    } as StarterPack;
+    expect(packStreams(pack)).toEqual([{ name: "cloudwatch_metrics", type: "logs" }]);
   });
 });

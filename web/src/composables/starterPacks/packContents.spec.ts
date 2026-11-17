@@ -15,9 +15,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { KUBERNETES_PACK } from "./kubernetesPack";
 import { buildContentRows, type ContentSources } from "./packContents";
 import type { PackPreview } from "./types";
+import { packById } from "./usePackCatalog";
+
+const KUBERNETES_PACK = packById("kubernetes")!;
 
 const preview = {
   items: [{ kind: "dashboard", itemId: "overview", status: "pending" }],

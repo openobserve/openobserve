@@ -34,10 +34,11 @@ const fake = vi.hoisted(() => ({
   >,
   repairs: [] as Array<Record<string, any>>,
   undo: vi.fn(async () => {}),
+  realCatalog: false,
   pack: {
     id: "kubernetes",
-    titleKey: "starterPacks.kubernetes.title",
-    descriptionKey: "starterPacks.kubernetes.description",
+    titleKey: "starterPacks.packs.kubernetes.title",
+    descriptionKey: "starterPacks.packs.kubernetes.description",
     dashboards: [{ id: "overview", title: "Kubernetes Overview" }],
     collectorRoute: "ingestFromKubernetes",
   } as Record<string, unknown>,
@@ -68,9 +69,10 @@ vi.mock("vue-router", async (importOriginal) => ({
 vi.mock("@/composables/alerts/useAlertLibrary", () => ({
   useAlertLibrary: () => ({ loadManifest: vi.fn(), loadAlertFile: vi.fn() }),
 }));
-vi.mock("@/composables/starterPacks/kubernetesPack", () => ({
-  STARTER_PACKS: [fake.pack],
-}));
+vi.mock("@/composables/starterPacks/usePackCatalog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/starterPacks/usePackCatalog")>();
+  return { ...actual, packs: () => (fake.realCatalog ? actual.packs() : [fake.pack]) };
+});
 vi.mock("@/composables/starterPacks/packMatchData", () => ({
   readOrgStreams: async () => {
     if (fake.fail) throw new Error("down");
@@ -144,6 +146,7 @@ const shortDate = new Date(1_700_000_000_000).toLocaleDateString(undefined, {
 describe("StarterPackLibraryTab", () => {
   beforeEach(() => {
     fake.ready = true;
+    fake.realCatalog = false;
     fake.fail = false;
     fake.records = [];
     fake.push.mockClear();
@@ -160,6 +163,27 @@ describe("StarterPackLibraryTab", () => {
     vi.mocked(flow.install).mockClear();
     vi.mocked(flow.retry).mockClear();
     vi.mocked(flow.undo).mockClear();
+  });
+
+  it("shows a card for each of the nine catalog packs", async () => {
+    fake.realCatalog = true;
+    const wrapper = await render();
+    const cards = wrapper.findAll('[data-test^="library-tab-row-"]');
+    expect(cards.map((card) => card.attributes("data-test"))).toEqual(
+      [
+        "kubernetes",
+        "hosts",
+        "traces",
+        "postgresql",
+        "docker",
+        "aws-cloudwatch",
+        "genai",
+        "github",
+        "argocd",
+      ].map((id) => `library-tab-row-${id}`),
+    );
+    expect(text(wrapper, "library-tab-stat-all")).toContain("9");
+    expect(wrapper.text()).not.toContain("starterPacks.");
   });
 
   it("opens the popup on Choose content from Set up instead of installing at once", async () => {

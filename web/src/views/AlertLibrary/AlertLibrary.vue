@@ -401,7 +401,7 @@ import useStreams from "@/composables/useStreams";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
+import { packs as allPacks } from "@/composables/starterPacks/usePackCatalog";
 import { ingestTimes, matchAlerts } from "@/composables/starterPacks/packMatchData";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -1002,7 +1002,7 @@ const matchEntries = async (list: Parameters<typeof ingestTimes>[0]) => {
     await loadManifest();
     verdicts = await matchAlerts(org, entries.value, ingestTimes(list), {
       loadFile: loadAlertFile,
-      packs: STARTER_PACKS,
+      packs: allPacks(),
     });
   } catch {
     verdicts = null;

@@ -31,7 +31,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import StarterPackParseDialog from "@/components/starterPacks/StarterPackParseDialog.vue";
 import StarterPackUndoDialog from "@/components/starterPacks/StarterPackUndoDialog.vue";
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
-import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
+import { packs } from "@/composables/starterPacks/usePackCatalog";
 import { matchPack, readOrgStreams } from "@/composables/starterPacks/packMatchData";
 import { findRawNginxLogs, type RawLogNotice } from "@/composables/starterPacks/rawLogs";
 import type {
@@ -74,9 +74,9 @@ const { readValues } = useStreamValues(props.org);
 const rows = ref<LibraryRow[]>([]);
 const state = ref<"loading" | "ready" | "error">("loading");
 const facet = ref<Facet>("all");
-const flows = new Map(STARTER_PACKS.map((pack) => [pack.id, useStarterPackFlow(props.org, pack)]));
+const flows = new Map(packs().map((pack) => [pack.id, useStarterPackFlow(props.org, pack)]));
 const updates = new Map(
-  STARTER_PACKS.map((pack) => [pack.id, usePackUpdates(props.org, flows.get(pack.id)!)]),
+  packs().map((pack) => [pack.id, usePackUpdates(props.org, flows.get(pack.id)!)]),
 );
 const drawerPackId = ref<string | null>(null);
 const drawerFlow = computed(() => (drawerPackId.value ? flows.get(drawerPackId.value) : undefined));
@@ -367,7 +367,7 @@ const load = async ({ quiet = false }: { quiet?: boolean } = {}) => {
     const streams = await readOrgStreams(props.org);
     void loadRawLogs(streams.logs ?? new Map());
     const built = await Promise.all(
-      STARTER_PACKS.map(async (pack) => {
+      packs().map(async (pack) => {
         const [match, installs] = await Promise.all([
           matchPack(props.org, pack, streams, { loadManifest, loadAlertFile }),
           records.list(pack.id),

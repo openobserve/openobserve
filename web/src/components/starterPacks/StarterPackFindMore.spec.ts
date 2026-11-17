@@ -30,8 +30,8 @@ const fake = vi.hoisted(() => ({
   checks: vi.fn(),
 }));
 
-vi.mock("@/composables/starterPacks/kubernetesPack", () => ({
-  STARTER_PACKS: [{ id: "kubernetes", titleKey: "starterPacks.kubernetes.title" }],
+vi.mock("@/composables/starterPacks/usePackCatalog", () => ({
+  packs: () => [{ id: "kubernetes", titleKey: "starterPacks.packs.kubernetes.title" }],
 }));
 vi.mock("@/composables/starterPacks/useFindMore", () => ({ useFindMore: () => fake.finder }));
 vi.mock("@/composables/starterPacks/useDailyCheck", () => ({ useDailyCheck: () => fake.daily }));
@@ -64,12 +64,14 @@ vi.mock("./StarterPackDrawer.vue", async () => {
     default: defineComponent({
       props: { open: Boolean, flow: { type: Object, required: true } },
       emits: ["update:open", "installed"],
-      setup: (props, { emit }) => () =>
-        h("button", {
-          "data-test": `drawer-${props.flow.pack.id}`,
-          "data-open": String(props.open),
-          onClick: () => emit("installed"),
-        }),
+      setup:
+        (props, { emit }) =>
+        () =>
+          h("button", {
+            "data-test": `drawer-${props.flow.pack.id}`,
+            "data-open": String(props.open),
+            onClick: () => emit("installed"),
+          }),
     }),
   };
 });
@@ -190,7 +192,9 @@ describe("StarterPackFindMore", () => {
     expect(fake.flows[0].record.value).toBeNull();
     expect(fake.checks).toHaveBeenCalled();
     expect(wrapper.get('[data-test="drawer-kubernetes"]').attributes("data-open")).toBe("true");
-    expect(wrapper.get('[data-test="starter-pack-find-more-drawer"]').attributes("data-open")).toBe("false");
+    expect(wrapper.get('[data-test="starter-pack-find-more-drawer"]').attributes("data-open")).toBe(
+      "false",
+    );
   });
 
   it("refreshes the list and tells the page once the popup sets the pack up", async () => {
@@ -223,7 +227,9 @@ describe("StarterPackFindMore", () => {
       query: { org_identifier: "org" },
     });
     expect(wrapper.find('[data-test="drawer-kubernetes"]').exists()).toBe(false);
-    expect(wrapper.get('[data-test="starter-pack-find-more-drawer"]').attributes("data-open")).toBe("false");
+    expect(wrapper.get('[data-test="starter-pack-find-more-drawer"]').attributes("data-open")).toBe(
+      "false",
+    );
   });
 
   it("dismisses one item or the whole source", async () => {

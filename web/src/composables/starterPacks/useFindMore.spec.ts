@@ -69,8 +69,8 @@ vi.mock("@/composables/alerts/useAlertLibrary", () => ({
     loadAlertFile: async () => ({}),
   }),
 }));
-vi.mock("./kubernetesPack", () => ({
-  STARTER_PACKS: [
+vi.mock("./usePackCatalog", () => ({
+  packs: () => [
     {
       id: "kubernetes",
       dashboards: [{ id: "overview" }],

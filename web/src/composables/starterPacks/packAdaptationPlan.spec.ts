@@ -89,7 +89,7 @@ describe("planAdaptation", () => {
     const values = vi.fn(async () => ({ service_name: ["k8s-events"] }));
     const role = {
       id: "events",
-      titleKey: "starterPacks.kubernetes.title",
+      titleKey: "starterPacks.packs.kubernetes.title",
       stream: "k8s_events",
       fields: ["kind", "reason"],
       identity: [{ field: "service_name", pattern: "^k8s-events$" }],

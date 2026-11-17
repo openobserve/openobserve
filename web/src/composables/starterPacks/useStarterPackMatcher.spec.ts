@@ -2,8 +2,8 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 
-import { HOSTS_PACK } from "./hostsPack";
 import type { StarterPack } from "./types";
+import { packById } from "./usePackCatalog";
 import {
   MATCH_PARTIAL_AFTER_MS,
   MATCH_POLL_MS,
@@ -13,6 +13,7 @@ import {
 const fake = vi.hoisted(() => ({
   metrics: [] as string[],
   logs: [] as string[],
+  traces: [] as string[],
   columns: {} as Record<string, string[]>,
   fail: false,
   clusters: ["staging-eu-1"],
@@ -27,6 +28,9 @@ vi.mock("@/composables/query/readQuery", () => ({
     const key = JSON.stringify(options.queryKey);
     if ((options.queryKey as string[]).length === 2 && key.includes("metrics")) {
       return fake.metrics.map((name) => ({ name }));
+    }
+    if ((options.queryKey as string[]).length === 2 && key.includes("traces")) {
+      return fake.traces.map((name) => ({ name }));
     }
     if ((options.queryKey as string[]).length === 2) return fake.logs.map((name) => ({ name }));
     const stream = Object.keys(fake.columns).find((name) => key.includes(name));
@@ -69,7 +73,7 @@ const setup = (poll = false, pack?: StarterPack) => {
 describe("useStarterPackMatcher", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    Object.assign(fake, { metrics: [], logs: [], columns: {}, fail: false, sql: [] });
+    Object.assign(fake, { metrics: [], logs: [], traces: [], columns: {}, fail: false, sql: [] });
   });
   afterEach(() => vi.useRealTimers());
 
@@ -140,6 +144,8 @@ describe("useStarterPackMatcher", () => {
   });
 
   describe("hosts pack", () => {
+    const HOSTS_PACK = packById("hosts")!;
+
     it.each([
       ["OpenTelemetry hostmetrics", "system_cpu_time"],
       ["node-exporter", "node_cpu_seconds_total"],
@@ -163,6 +169,43 @@ describe("useStarterPackMatcher", () => {
       const second = setup(false, HOSTS_PACK);
       await second.api.check();
       expect(second.api.state.value).toBe("none");
+    });
+  });
+
+  describe("packs found by stream", () => {
+    it("finds Traces in an org with only a traces stream", async () => {
+      fake.traces = ["default"];
+      fake.columns = { default: ["trace_id", "duration"] };
+      const { api } = setup(false, packById("traces")!);
+      await api.check();
+      expect(api.state.value).toBe("matched");
+      expect(api.streams.value).toEqual(["default"]);
+      expect(fake.sql).toEqual([]);
+    });
+
+    it("ignores sample and internal traces streams", async () => {
+      fake.traces = ["o2_demo_traces", "traces_service_graph_edges"];
+      fake.columns = { o2_demo_traces: ["trace_id"], traces_service_graph_edges: ["trace_id"] };
+      const { api } = setup(false, packById("traces")!);
+      await api.check();
+      expect(api.state.value).toBe("none");
+    });
+
+    it("finds AWS CloudWatch by its cloudwatch_metrics logs stream", async () => {
+      fake.logs = ["cloudwatch_metrics"];
+      fake.columns = { cloudwatch_metrics: ["metric_name", "value"] };
+      const { api } = setup(false, packById("aws-cloudwatch")!);
+      await api.check();
+      expect(api.state.value).toBe("matched");
+      expect(api.streams.value).toEqual(["cloudwatch_metrics"]);
+    });
+
+    it("reports none for AWS CloudWatch without its logs stream", async () => {
+      fake.logs = ["web"];
+      fake.columns = { web: ["message"] };
+      const { api } = setup(false, packById("aws-cloudwatch")!);
+      await api.check();
+      expect(api.state.value).toBe("none");
     });
   });
 });

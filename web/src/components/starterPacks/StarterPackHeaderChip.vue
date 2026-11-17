@@ -29,7 +29,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { FindMoreSource } from "@/composables/starterPacks/findMore";
-import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
+import { packs } from "@/composables/starterPacks/usePackCatalog";
 import { useBrowserMatches } from "@/composables/starterPacks/useBrowserMatches";
 import { useRefreshMatches } from "@/composables/starterPacks/useRefreshMatches";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
@@ -62,7 +62,7 @@ const rows = computed(() => matches.visible.value.slice(0, ROWS_SHOWN));
 const moreCount = computed(() => Math.max(0, matches.count.value - ROWS_SHOWN));
 const interrupted = computed(() => matches.copy.value?.interrupted ?? null);
 
-const builtIns = STARTER_PACKS.map((pack) => {
+const builtIns = packs().map((pack) => {
   const flow = useStarterPackFlow(org, pack);
   const matcher = useStarterPackMatcher(org, { pack });
   return { pack, flow, matcher };

@@ -24,14 +24,18 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import { readQuery } from "@/composables/query/readQuery";
-import { KUBERNETES_PACK, STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
-import { matchPack, readOrgStreams } from "@/composables/starterPacks/packMatchData";
+import { detectedStreams } from "@/composables/starterPacks/packDetect";
+import {
+  matchPack,
+  readOrgStreams,
+  readSchemaColumns,
+} from "@/composables/starterPacks/packMatchData";
 import type { StarterPack } from "@/composables/starterPacks/types";
 import { useInstallRecords } from "@/composables/starterPacks/useInstallRecords";
+import { packs } from "@/composables/starterPacks/usePackCatalog";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { alertsByTagsQuery } from "@/services/alerts.queries";
 import { useI18nTyped } from "@/types/i18n";
-import { DETECTION_STREAMS } from "@/views/Infrastructure/kubernetes2/kubernetesQueries";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
 
 type Gap = { pack: StarterPack; installed: boolean };
@@ -56,20 +60,17 @@ const reported = ref(0);
 const gaps = ref<Gap[]>([]);
 const fitCounts = ref<Record<string, number>>({});
 const silent = ref(0);
-const flows = new Map(STARTER_PACKS.map((pack) => [pack.id, useStarterPackFlow(props.org, pack)]));
+const flows = new Map(packs().map((pack) => [pack.id, useStarterPackFlow(props.org, pack)]));
 const drawerPackId = ref<string | null>(null);
 const drawerFlow = computed(() => (drawerPackId.value ? flows.get(drawerPackId.value) : undefined));
 
-const signalsOf = (pack: StarterPack) =>
-  pack.id === KUBERNETES_PACK.id ? DETECTION_STREAMS : (pack.signals ?? []).flat();
-
-// Without a signal stream the pack cannot fit, so the full match is not paid for on this hot page.
+// Without a detected stream the pack cannot fit, so the full match is not paid for on this hot page.
 const matches = async (
   pack: StarterPack,
   streams: Awaited<ReturnType<typeof readOrgStreams>>,
 ): Promise<boolean> => {
-  const metrics = streams.metrics ?? new Map();
-  if (!signalsOf(pack).some((name) => metrics.has(name))) return false;
+  const readColumns = (type: string, name: string) => readSchemaColumns(props.org, type, name);
+  if (!(await detectedStreams(pack, streams, readColumns)).length) return false;
   const match = await matchPack(props.org, pack, streams, { loadManifest, loadAlertFile });
   if (match.alerts) {
     const fit = [...match.alerts.values()].filter(Boolean).length;
@@ -129,7 +130,7 @@ onMounted(async () => {
   const streams = await readOrgStreams(props.org).catch(() => null);
   if (!streams) return;
   const found = await settled(
-    STARTER_PACKS.map(async (pack) => ((await matches(pack, streams)) ? pack : null)),
+    packs().map(async (pack) => ((await matches(pack, streams)) ? pack : null)),
   );
   matchedPacks.value = found.filter((pack): pack is StarterPack => pack !== null);
   await loadGaps(false);

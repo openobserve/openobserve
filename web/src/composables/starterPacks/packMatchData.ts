@@ -197,6 +197,10 @@ export const ingestTimes = (list: StreamRow[] | null | undefined): StreamsByType
     })),
   );
 
+/** A stream the user's own data lives in, so neither sample data nor O2's own streams match a pack. */
+export const isPackStream = (row: StreamRow, type: string) =>
+  isOwnedStream(row, type) && !isSampleStreamName(row.name ?? "");
+
 /** Every stream in the org with its last ingest time. */
 export const readOrgStreams = async (org: string): Promise<StreamsByType> => {
   const lists = await Promise.all(
@@ -205,9 +209,7 @@ export const readOrgStreams = async (org: string): Promise<StreamsByType> => {
   return ingestTimes(
     lists.flatMap((rows, index) =>
       rows
-        .filter(
-          (row) => isOwnedStream(row, STREAM_TYPES[index]) && !isSampleStreamName(row.name ?? ""),
-        )
+        .filter((row) => isPackStream(row, STREAM_TYPES[index]))
         .map((row) => ({ ...row, stream_type: STREAM_TYPES[index] })),
     ),
   );

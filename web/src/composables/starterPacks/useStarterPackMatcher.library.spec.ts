@@ -50,9 +50,11 @@ vi.mock("./packMatchData", () => ({
   },
 }));
 
-import { HOSTS_PACK } from "./hostsPack";
-import { KUBERNETES_PACK } from "./kubernetesPack";
+import { packById } from "./usePackCatalog";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
+
+const HOSTS_PACK = packById("hosts")!;
+const KUBERNETES_PACK = packById("kubernetes")!;
 
 const check = async (pack = HOSTS_PACK) => {
   let api!: ReturnType<typeof useStarterPackMatcher>;
