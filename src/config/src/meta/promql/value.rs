@@ -516,7 +516,6 @@ pub struct QueryContext {
     pub org_id: String,
     pub query_exemplars: bool,
     pub query_data: bool,
-    pub need_wal: bool,
     pub use_cache: bool,
     pub timeout: u64, // seconds, query timeout
     pub search_event_type: Option<SearchEventType>,

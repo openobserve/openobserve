@@ -49,6 +49,7 @@ use search::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+/// The WAL rows as a table context, `None` when the WAL holds none, plus the nodes' warnings.
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
     trace_id: &str,
@@ -57,8 +58,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
-) -> Result<Vec<ScanContext>> {
-    let mut resp = vec![];
+) -> Result<(Option<ScanContext>, Vec<String>)> {
     // fetch all schema versions, get latest schema
     let schema = Arc::new(
         infra::schema::get(org_id, stream_name, StreamType::Metrics)
@@ -70,11 +70,11 @@ pub(crate) async fn create_context(
     );
     if schema.fields().is_empty() {
         // stream not found
-        return Ok(vec![]);
+        return Ok((None, vec![]));
     }
 
     // get wal record batches
-    let (stats, batches, schema, partial_err) = get_wal_batches(
+    let (stats, mut batches, schema, partial_err) = get_wal_batches(
         trace_id,
         org_id,
         stream_name,
@@ -91,16 +91,9 @@ pub(crate) async fn create_context(
         vec![partial_err]
     };
 
+    batches.retain(|batch| batch.num_rows() > 0);
     if batches.is_empty() {
-        return Ok(vec![
-            ScanContext::table(
-                SessionContext::new(),
-                Arc::new(Schema::empty()),
-                ScanStats::default(),
-                true,
-            )
-            .with_warnings(warnings),
-        ]);
+        return Ok((None, warnings));
     }
 
     log::info!(
@@ -116,9 +109,7 @@ pub(crate) async fn create_context(
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
-    resp.push(ScanContext::table(ctx, schema, stats, true).with_warnings(warnings));
-
-    Ok(resp)
+    Ok((Some(ScanContext::table(ctx, schema, stats, true)), warnings))
 }
 
 /// Register a placeholder metrics table for a distributed WAL search.
