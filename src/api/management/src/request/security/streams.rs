@@ -91,45 +91,43 @@ pub async fn guard_org_retention_update(
     user_id: &str,
     update: &config::meta::stream::DataRetentionDefaults,
 ) -> Result<(), Response> {
-    let shortened = match db::organization::org_retention_defaults(org_id).await {
-        Ok(current) => shortened_types(
-            &db::organization::resolved_retention_defaults(&current),
-            &db::organization::resolved_retention_defaults(update),
-        ),
+    // `None` after a failed read: every type then counts as shortened
+    let defaults = match db::organization::org_retention_defaults(org_id).await {
+        Ok(current) => Some((
+            db::organization::resolved_retention_defaults(&current),
+            db::organization::resolved_retention_defaults(update),
+        )),
         Err(e) => {
             log::error!("[SECURITY] org retention read failed: {e}");
-            RETENTION_TYPES.to_vec()
+            None
         }
     };
-    let mut destructive = false;
-    for stream_type in shortened {
-        // a failed listing is refused: a source may sit behind it
-        destructive = match stream::try_get_streams(org_id, Some(stream_type), false, None).await {
-            Ok(streams) => {
-                let mut inherits = false;
-                for stream in streams {
-                    let settings =
-                        infra::schema::get_settings(org_id, &stream.name, stream_type).await;
-                    if settings.is_some_and(|s| inherits_as_security_source(&s)) {
-                        inherits = true;
-                        break;
-                    }
-                }
-                inherits
-            }
+    let shortened = |stream_type| {
+        defaults
+            .as_ref()
+            .is_none_or(|(current, update)| default_shortened_for(stream_type, current, update))
+    };
+    let any_shortened = defaults.as_ref().is_none_or(|(current, update)| {
+        RETENTION_TYPES
+            .into_iter()
+            .chain([StreamType::Metadata])
+            .any(|t| default_shortened_for(t, current, update))
+    });
+    // a failed listing is refused: a source may sit behind it
+    let destructive = any_shortened
+        && match stream::try_get_streams(org_id, None, false, None).await {
+            Ok(streams) => streams.iter().any(|stream| {
+                shortened(stream.stream_type) && inherits_as_security_source(&stream.settings)
+            }),
             Err(e) => {
-                log::error!("[SECURITY] stream listing failed for {org_id}/{stream_type}: {e}");
+                log::error!("[SECURITY] stream listing failed for {org_id}: {e}");
                 true
             }
         };
-        if destructive {
-            break;
-        }
-    }
     refuse_unless_admin(org_id, user_id, destructive).await
 }
 
-/// The stream types an org retention default applies to.
+/// The stream types with an org retention default of their own.
 const RETENTION_TYPES: [StreamType; 4] = [
     StreamType::Logs,
     StreamType::Metrics,
@@ -137,16 +135,22 @@ const RETENTION_TYPES: [StreamType; 4] = [
     StreamType::Profiles,
 ];
 
-/// The types whose resolved default gets shorter; 0 keeps the data forever.
-fn shortened_types(
+/// Whether the resolved default that a stream of this type inherits gets shorter. A type with
+/// no value of its own follows the generic default. 0 keeps the data forever.
+fn default_shortened_for(
+    stream_type: StreamType,
     current: &config::meta::stream::DataRetentionDefaults,
     update: &config::meta::stream::DataRetentionDefaults,
-) -> Vec<StreamType> {
-    let days = |days: i64| if days > 0 { days } else { i64::MAX };
-    RETENTION_TYPES
-        .into_iter()
-        .filter(|t| days(update.for_type(*t)) < days(current.for_type(*t)))
-        .collect()
+) -> bool {
+    let days = |defaults: &config::meta::stream::DataRetentionDefaults| {
+        let days = if RETENTION_TYPES.contains(&stream_type) {
+            defaults.for_type(stream_type)
+        } else {
+            defaults.default
+        };
+        if days > 0 { days } else { i64::MAX }
+    };
+    days(update) < days(current)
 }
 
 /// A Security source with no retention of its own, so the org default decides its data.
@@ -225,24 +229,29 @@ mod tests {
     #[test]
     fn test_an_org_default_is_judged_per_type_and_only_for_inheriting_sources() {
         use config::meta::stream::{DataRetentionDefaults, SecuritySourceSetting, StreamSettings};
-        let defaults = |logs, metrics| DataRetentionDefaults {
+        let defaults = |default, logs| DataRetentionDefaults {
+            default,
             logs,
-            metrics,
+            metrics: 30,
             traces: 30,
             profiles: 30,
-            ..Default::default()
         };
-        assert_eq!(
-            shortened_types(&defaults(30, 30), &defaults(3, 30)),
-            vec![StreamType::Logs]
-        );
-        assert!(shortened_types(&defaults(30, 30), &defaults(60, 30)).is_empty());
-        assert_eq!(
-            shortened_types(&defaults(0, 30), &defaults(3, 30)),
-            vec![StreamType::Logs],
+        let shortened =
+            |stream_type, current, update| default_shortened_for(stream_type, &current, &update);
+        let (logs, metrics, metadata) =
+            (StreamType::Logs, StreamType::Metrics, StreamType::Metadata);
+        assert!(shortened(logs, defaults(30, 30), defaults(30, 3)));
+        assert!(!shortened(metrics, defaults(30, 30), defaults(30, 3)));
+        assert!(!shortened(logs, defaults(30, 30), defaults(30, 60)));
+        assert!(
+            shortened(logs, defaults(30, 0), defaults(30, 3)),
             "0 kept the data forever"
         );
-        assert!(shortened_types(&defaults(3, 30), &defaults(0, 30)).is_empty());
+        assert!(!shortened(logs, defaults(30, 3), defaults(30, 0)));
+        // a type with no value of its own follows the generic default
+        assert!(shortened(metadata, defaults(30, 30), defaults(3, 30)));
+        assert!(!shortened(logs, defaults(30, 30), defaults(3, 30)));
+        assert!(!shortened(metadata, defaults(30, 30), defaults(30, 3)));
 
         let stream = |data_retention, source: bool| StreamSettings {
             data_retention,
