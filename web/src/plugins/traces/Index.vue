@@ -187,7 +187,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </FirstDataPanel>
                       <TracesSqlTemplateGallery
                         v-else-if="!searchObj.loadingStream && sqlEditorEmpty && isStreamSelected"
-                        :view="searchObj.meta.searchMode === 'spans' ? 'spans' : 'traces'"
                         :templates="sqlTemplates"
                         @use="onUseSqlTemplate"
                       />
@@ -202,7 +201,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-show="searchObj.meta.showHistogram"
                           class="shrink-0"
                           :stream-name="searchObj.data.stream.selectedStream.value"
-                          :stream-fields="searchObj.data.stream.selectedStreamFields"
                           :show="true"
                           :ai-enabled="isAiEnabled"
                           @time-range-selected="setHistogramDate"
@@ -448,10 +446,12 @@ import {
   analyzeTracesSql,
   insertTraceIdColumn,
   isRowQuery,
+  mergesAcrossPartitions,
   sqlPaging,
   tracesFilterFromSql,
 } from "@/utils/traces/tracesSql";
 import { useTracesSqlTemplates } from "./composables/useTracesSqlTemplates";
+import { fieldsStoredInAll } from "@/utils/traces/tracesAllFields";
 import TracesSqlTemplateGallery from "./components/TracesSqlTemplateGallery.vue";
 import TracesSqlKeptLine from "./components/TracesSqlKeptLine.vue";
 import TracesSqlErrorState from "./components/TracesSqlErrorState.vue";
@@ -707,7 +707,10 @@ const statementInTraces = ref(false);
 let pendingUrlPage: number | null = null;
 let stopUrlSync = syncUrlViewState();
 // A page's stream can open with an empty batch, so only an actual write may end the replace phase.
-const tracesRequestState: Record<string, { hasWritten: boolean; isPartial?: boolean }> = {};
+const tracesRequestState: Record<
+  string,
+  { hasWritten: boolean; isPartial?: boolean; held?: any[] }
+> = {};
 const searchCancelled = ref(false);
 
 const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
@@ -1325,6 +1328,48 @@ async function getQueryData(
       searchObj.meta.resultGrid.sortBy = "start_time";
     }
 
+    // Groups can cross time partitions, so an aggregate's early batches are not its answer yet.
+    const holdRows =
+      isSpansMode &&
+      !!submittedSql &&
+      mergesAcrossPartitions(analyzeTracesSql(submittedSql, tracesParser.value));
+    if (holdRows) tracesRequestState[searchTraceId].held = [];
+
+    const showHits = (
+      rawHits: any[],
+      requestState: { hasWritten: boolean; isPartial?: boolean },
+    ) => {
+      const isFirstWrite = !requestState.hasWritten;
+
+      const formattedHits =
+        searchObj.meta.searchMode === "traces" ? formatTracesMetaData(rawHits) : rawHits;
+
+      if (searchObj.meta.searchMode === "spans") {
+        setServiceColors(rawHits);
+      }
+
+      isLLMSpanPresent.value =
+        (isFirstWrite ? false : isLLMSpanPresent.value) ||
+        formattedHits.some((hit: any) => isLLMTrace(hit));
+
+      if (isFirstWrite) {
+        searchObj.data.queryResults.hits = formattedHits;
+      } else {
+        searchObj.data.queryResults.hits = [...searchObj.data.queryResults.hits, ...formattedHits];
+      }
+      requestState.hasWritten = true;
+      shownPage = requestPage;
+      searchObj.data.queryResults.from = queryReq.query.from;
+
+      updateFieldValues(rawHits);
+
+      // load the field stored in localstorage and rebuild the columns
+      if (searchObj.meta.searchMode === "spans" || searchObj.meta.searchMode === "traces") {
+        loadLocalLogFilterField(searchObj.meta.searchMode);
+        rebuildColumns();
+      }
+    };
+
     fetchQueryDataWithHttpStream(
       {
         queryReq: isSpansMode
@@ -1383,38 +1428,11 @@ async function getQueryData(
             //   }
             // }
 
-            const isFirstWrite = !requestState.hasWritten;
-
-            const formattedHits =
-              searchObj.meta.searchMode === "traces" ? formatTracesMetaData(rawHits) : rawHits;
-
-            if (searchObj.meta.searchMode === "spans") {
-              setServiceColors(rawHits);
+            if (requestState.held) {
+              requestState.held.push(...rawHits);
+              return;
             }
-
-            isLLMSpanPresent.value =
-              (isFirstWrite ? false : isLLMSpanPresent.value) ||
-              formattedHits.some((hit: any) => isLLMTrace(hit));
-
-            if (isFirstWrite) {
-              searchObj.data.queryResults.hits = formattedHits;
-            } else {
-              searchObj.data.queryResults.hits = [
-                ...searchObj.data.queryResults.hits,
-                ...formattedHits,
-              ];
-            }
-            requestState.hasWritten = true;
-            shownPage = requestPage;
-            searchObj.data.queryResults.from = queryReq.query.from;
-
-            updateFieldValues(rawHits);
-
-            // load the field stored in localstorage and rebuild the columns
-            if (searchObj.meta.searchMode === "spans" || searchObj.meta.searchMode === "traces") {
-              loadLocalLogFilterField(searchObj.meta.searchMode);
-              rebuildColumns();
-            }
+            showHits(rawHits, requestState);
           }
         },
         error: (_payload: any, err: any) => {
@@ -1487,6 +1505,8 @@ async function getQueryData(
           delete tracesRequestState[searchTraceId];
         },
         complete: (_payload: any) => {
+          const settled = tracesRequestState[searchTraceId];
+          if (settled?.held?.length) showHits(settled.held, settled);
           if (historyRun && tracesRequestState[searchTraceId]) {
             const state = tracesRequestState[searchTraceId];
             // A partial answer is not proof that nothing matched.
@@ -1631,6 +1651,7 @@ async function extractFields() {
       fieldsOwner = "";
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.hasParentColumn = false;
+      searchObj.data.stream.fieldsInAll = {};
       selectedStreamStats.value = null;
       storesExtraFieldsInAll.value = false;
     }
@@ -1693,6 +1714,9 @@ async function extractFields() {
       ftsKeys = new Set([...stream.settings.full_text_search_keys]);
       // Ingestion packs fields outside a user-defined schema into the _all column.
       storesExtraFieldsInAll.value = (stream.settings?.defined_schema_fields?.length ?? 0) > 0;
+      searchObj.data.stream.fieldsInAll = Object.fromEntries(
+        fieldsStoredInAll(stream.schema ?? [], stream.settings?.defined_schema_fields ?? []),
+      );
 
       const idFields = {
         trace_id: 1,
@@ -2622,6 +2646,25 @@ const extractTracesColName = (col: any): string | null => {
   return null;
 };
 
+const JSON_GET_FUNCTIONS = new Set([
+  "json_get_str",
+  "json_get_int",
+  "json_get_float",
+  "json_get_bool",
+]);
+
+// Click-to-filter writes a field stored in _all as json_get_*(_all, 'field'), so the sidebar reads it back by that name.
+const filterFieldName = (node: any): string | null => {
+  if (node?.type === "column_ref") return extractTracesColName(node.column);
+  if (node?.type !== "function") return null;
+  const fn = String(node.name?.name?.[0]?.value ?? "").toLowerCase();
+  const [column, key] = node.args?.value ?? [];
+  const allColumn = store.state.zoConfig?.all_fields_name || "_all";
+  if (!JSON_GET_FUNCTIONS.has(fn) || column?.type !== "column_ref") return null;
+  if (extractTracesColName(column.column) !== allColumn) return null;
+  return typeof key?.value === "string" ? key.value : null;
+};
+
 /**
  * Wraps the traces WHERE clause (stored in editorValue) into a full SQL
  * statement so that fnParsedSQL can parse it.
@@ -2666,22 +2709,18 @@ const activeIncludeFilterValues = computed((): Record<string, string[]> => {
         walkNode(node.left);
         walkNode(node.right);
       } else if (op === "=") {
-        if (node.left?.type === "column_ref") {
-          const colName = extractTracesColName(node.left.column);
-          if (colName && node.right?.value != null) {
-            const val = unescapeSqlLiteral(node.right.value);
-            if (!result[colName]) result[colName] = [];
-            if (!result[colName].includes(val)) result[colName].push(val);
-          }
+        const colName = filterFieldName(node.left);
+        if (colName && node.right?.value != null) {
+          const val = unescapeSqlLiteral(node.right.value);
+          if (!result[colName]) result[colName] = [];
+          if (!result[colName].includes(val)) result[colName].push(val);
         }
       } else if (op === "IS") {
         // IS NULL — the field values API returns null rows with key "null"
-        if (node.left?.type === "column_ref") {
-          const colName = extractTracesColName(node.left.column);
-          if (colName) {
-            if (!result[colName]) result[colName] = [];
-            if (!result[colName].includes("null")) result[colName].push("null");
-          }
+        const colName = filterFieldName(node.left);
+        if (colName) {
+          if (!result[colName]) result[colName] = [];
+          if (!result[colName].includes("null")) result[colName].push("null");
         }
       }
     };
@@ -2715,22 +2754,18 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
         walkNode(node.left);
         walkNode(node.right);
       } else if (op === "!=" || op === "<>") {
-        if (node.left?.type === "column_ref") {
-          const colName = extractTracesColName(node.left.column);
-          if (colName && node.right?.value != null) {
-            const val = unescapeSqlLiteral(node.right.value);
-            if (!result[colName]) result[colName] = [];
-            if (!result[colName].includes(val)) result[colName].push(val);
-          }
+        const colName = filterFieldName(node.left);
+        if (colName && node.right?.value != null) {
+          const val = unescapeSqlLiteral(node.right.value);
+          if (!result[colName]) result[colName] = [];
+          if (!result[colName].includes(val)) result[colName].push(val);
         }
       } else if (op === "IS NOT") {
         // IS NOT NULL — the field values API returns null rows with key "null"
-        if (node.left?.type === "column_ref") {
-          const colName = extractTracesColName(node.left.column);
-          if (colName) {
-            if (!result[colName]) result[colName] = [];
-            if (!result[colName].includes("null")) result[colName].push("null");
-          }
+        const colName = filterFieldName(node.left);
+        if (colName) {
+          if (!result[colName]) result[colName] = [];
+          if (!result[colName].includes("null")) result[colName].push("null");
         }
       }
     };

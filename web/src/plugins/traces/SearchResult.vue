@@ -230,7 +230,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             endTime: searchObj.data.datetime.endTime,
           }"
           :filter="searchObj.data.editorValue"
-          :streamFields="searchObj.data.stream.selectedStreamFields"
           :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
           :ai-enabled="aiEnabled"
           @time-range-selected="onMetricsTimeRangeSelected"
@@ -292,7 +291,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :scroll-el="scrollContainerRef"
           :offer-add-trace-id="offerAddTraceId"
           :trace-href="traceByIdHref"
+          :cap-note="sqlCapNote"
+          :opening-trace-id="openingTraceId"
           @open-trace="openTraceById"
+          @locate-trace="locateTrace"
           @add-trace-id="$emit('add-trace-id')"
         />
         <TracesGroupsTable
@@ -350,6 +352,7 @@ import {
   defineComponent,
   nextTick,
   onActivated,
+  onBeforeUnmount,
   onDeactivated,
   onMounted,
   ref,
@@ -370,6 +373,7 @@ import { buildResultColumns, fillLastColumn } from "./composables/useTracesTable
 import {
   analyzeTracesSql,
   canAddTraceId,
+  groupsByTraceIdOnly,
   histogramLosesSpans,
   isRowQuery,
   matchAllToStrMatch,
@@ -401,6 +405,9 @@ import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnTogg
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import { allNullColumns } from "@/utils/traces/tracesSqlErrors";
+import { useExemplarTraceLookup } from "@/composables/dashboard/useExemplarTraceLookup";
+import type { TraceVerdict } from "@/ts/interfaces/exemplars";
+import { traceQueryWindow } from "@/utils/rum/traceWindow";
 
 export default defineComponent({
   name: "SearchResult",
@@ -589,8 +596,7 @@ export default defineComponent({
       return router.resolve(traceDetailsLocation(row, from, to)).href;
     };
 
-    const traceByIdLocation = (row: any) => {
-      const { from, to } = pageTimeRange();
+    const traceByIdLocation = (row: any, from: number, to: number) => {
       return {
         name: "traceDetails",
         query: {
@@ -603,11 +609,54 @@ export default defineComponent({
       };
     };
 
-    const traceByIdHref = (row: any) => router.resolve(traceByIdLocation(row)).href;
+    const traceLookup = useExemplarTraceLookup();
+    onBeforeUnmount(traceLookup.dispose);
 
+    // A trace can run past the page range, so a located trace opens where it ran; anything else opens the page range.
+    const windowFromVerdict = (verdict: TraceVerdict | undefined) => {
+      const page = pageTimeRange();
+      if (
+        verdict?.state !== "found" ||
+        verdict.stream !== searchObj.data.stream.selectedStream?.value
+      )
+        return page;
+      const window = traceQueryWindow(
+        { start_time: verdict.startUs, end_time: verdict.endUs },
+        page.from,
+        page.to,
+      );
+      return { from: window.startTime, to: window.endTime };
+    };
+
+    const traceRowWindow = async (row: any): Promise<{ from: number; to: number }> => {
+      const firstSeenUs = Number(row?.first_seen);
+      if (!row?.trace_id || !Number.isFinite(firstSeenUs) || firstSeenUs <= 0)
+        return pageTimeRange();
+      return windowFromVerdict(await traceLookup.lookup(String(row.trace_id), firstSeenUs / 1000));
+    };
+
+    // The href is read on render, so a lookup started on hover moves a new-tab open to the located window.
+    const traceByIdHref = (row: any) => {
+      const { from, to } = windowFromVerdict(traceLookup.peek(String(row?.trace_id ?? "")));
+      return router.resolve(traceByIdLocation(row, from, to)).href;
+    };
+
+    const locateTrace = (row: any) => {
+      void traceRowWindow(row);
+    };
+
+    const openingTraceId = ref("");
     const openTraceById = async (row: any) => {
-      await patchUrlViewState();
-      router.push(traceByIdLocation(row));
+      if (openingTraceId.value) return;
+      openingTraceId.value = String(row?.trace_id ?? "");
+      try {
+        const { from, to } = await traceRowWindow(row);
+        // The URL write is debounced; Back restores what this entry holds, so it must land before leaving.
+        await patchUrlViewState();
+        router.push(traceByIdLocation(row, from, to));
+      } finally {
+        openingTraceId.value = "";
+      }
     };
 
     const openTraceInNewTab = (row: any) => {
@@ -684,6 +733,18 @@ export default defineComponent({
     const offerAddTraceId = computed(
       () => sqlShape.value === "rows" && !!sqlInfo.value && canAddTraceId(sqlInfo.value),
     );
+    // A result that fills its LIMIT is cut there; the note counts traces only when each row is one trace.
+    const sqlCapNote = computed(() => {
+      const limit = sqlInfo.value?.limit ?? null;
+      if (limit === null || limit <= 0 || searchObj.loading || hits.value.length < limit) return "";
+      const perTrace =
+        sqlShape.value === "traces" && groupsByTraceIdOnly(searchObj.data.queryResults?.sql ?? "");
+      return t(
+        perTrace ? "traces.sqlMode.firstTraces" : "traces.sqlMode.firstRows",
+        { count: formatLargeNumber(limit) },
+        limit,
+      );
+    });
     const sqlRowsLabel = computed(() =>
       t(
         "traces.sqlMode.rowsCount",
@@ -883,6 +944,8 @@ export default defineComponent({
       traceDetailsHref,
       traceByIdHref,
       openTraceById,
+      locateTrace,
+      openingTraceId,
       histogramLoss,
       sqlInfo,
       sqlRowsOnly,
@@ -890,6 +953,7 @@ export default defineComponent({
       sqlColumns,
       matchAllFix,
       offerAddTraceId,
+      sqlCapNote,
       sqlRowsLabel,
       openTraceInNewTab,
       onMetricsTimeRangeSelected,

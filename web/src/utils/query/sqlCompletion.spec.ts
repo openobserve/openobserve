@@ -856,6 +856,16 @@ describe("D1/N5 — field entries surface the column type", () => {
     expect(buildFieldEntry({ name: "code", type: "Int64" }).kind).toBe("Field");
   });
 
+  it("inserts the field's own expression when it has one, still matched by its name", () => {
+    const e = buildFieldEntry({
+      name: "http_status_code",
+      type: "Int64 · in _all",
+      insertText: "json_get_int(_all, 'http_status_code')",
+    });
+    expect(e.label).toBe("http_status_code");
+    expect(e.insertText).toBe("json_get_int(_all, 'http_status_code')");
+  });
+
   it("sorts fields ahead of functions and keywords", () => {
     const field = buildFieldEntry({ name: "code", type: "Int64" });
     const clause = SQL_CLAUSE_KEYWORDS[0];

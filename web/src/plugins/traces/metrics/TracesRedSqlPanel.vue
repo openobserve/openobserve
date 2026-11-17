@@ -64,6 +64,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :allowAnnotationsAPI="false"
         @updated:data-zoom="emit('data-zoom', $event)"
       />
+      <OEmptyState
+        v-else-if="status === 'ready'"
+        size="inline"
+        icon="bar-chart"
+        :title="t('traces.redCharts.noData')"
+        :backdrop="false"
+        class="h-full"
+        :data-test="`traces-red-sql-panel-${name}-no-data`"
+      />
     </div>
   </div>
 </template>
@@ -74,6 +83,7 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import PanelBar from "@/components/common/PanelBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 defineProps<{
   name: "rate" | "errors";

@@ -49,32 +49,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       pagination="none"
       data-test="traces-sql-result-table"
+      v-on="rowListeners"
     >
       <template v-if="shape === 'traces'" #cell-trace_id="{ row }">
-        <a
-          :href="traceHref(row)"
-          class="text-accent block truncate text-xs hover:underline"
-          data-test="traces-sql-result-trace-link"
-          @click="onTraceLinkClick($event, row)"
-        >
-          {{ row.trace_id }}
-          <OTooltip :content="t('traces.sqlMode.openTrace')" side="bottom" />
-        </a>
+        <span class="flex min-w-0 items-center gap-1">
+          <a
+            :href="traceHref(row)"
+            class="text-accent truncate text-xs hover:underline"
+            :aria-busy="isOpening(row) ? 'true' : undefined"
+            data-test="traces-sql-result-trace-link"
+            @click="onTraceLinkClick($event, row)"
+            @mouseenter="locateOnHover(row)"
+            @mouseleave="cancelHover"
+            @focus="emit('locate-trace', row)"
+          >
+            {{ row.trace_id }}
+            <OTooltip :content="t('traces.sqlMode.openTrace')" side="bottom" />
+          </a>
+          <OSpinner
+            v-if="isOpening(row)"
+            size="xs"
+            class="shrink-0"
+            :aria-label="t('traces.sqlMode.openingTrace')"
+            data-test="traces-sql-result-opening"
+          />
+        </span>
       </template>
       <template #empty><div /></template>
     </OTable>
+    <div
+      v-if="capNote"
+      class="border-border-default text-text-secondary border-t px-2 py-1 text-xs"
+      data-test="traces-sql-result-cap"
+    >
+      {{ capNote }}
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, onBeforeUnmount } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { TracesSqlShape } from "@/utils/traces/tracesSql";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     hits: Record<string, any>[];
     columns: OTableColumnDef<Record<string, any>>[];
@@ -84,6 +107,10 @@ withDefaults(
     scrollEl?: HTMLElement | null;
     offerAddTraceId?: boolean;
     traceHref?: (row: Record<string, any>) => string;
+    /** Says the rows stop at the query's LIMIT, so the list is not taken as complete. */
+    capNote?: string;
+    /** The trace row whose lookup is still running after a click. */
+    openingTraceId?: string;
   }>(),
   {
     loading: false,
@@ -91,18 +118,42 @@ withDefaults(
     scrollEl: null,
     offerAddTraceId: false,
     traceHref: () => "",
+    capNote: "",
+    openingTraceId: "",
   },
 );
 
 const emit = defineEmits<{
   "open-trace": [row: Record<string, any>];
   "add-trace-id": [];
+  "locate-trace": [row: Record<string, any>];
 }>();
 
 const { t } = useI18nTyped();
 
-// Modified clicks fall through so the browser opens the trace in its own tab.
+// Rows without a trace get no listener, so OTable keeps their cursor plain.
+const rowListeners = computed(() =>
+  props.shape === "traces"
+    ? { rowClick: (row: Record<string, any>) => emit("open-trace", row) }
+    : {},
+);
+
+// Each lookup is a server scan, so a pointer sweeping down the column asks only for the link it rests on.
+const HOVER_LOCATE_DELAY_MS = 200;
+let hoverTimer: ReturnType<typeof setTimeout> | undefined;
+const cancelHover = () => clearTimeout(hoverTimer);
+const locateOnHover = (row: Record<string, any>) => {
+  cancelHover();
+  hoverTimer = setTimeout(() => emit("locate-trace", row), HOVER_LOCATE_DELAY_MS);
+};
+onBeforeUnmount(cancelHover);
+
+const isOpening = (row: Record<string, any>) =>
+  props.openingTraceId !== "" && String(row.trace_id) === props.openingTraceId;
+
+// Modified clicks fall through so the browser opens the trace in its own tab; no click reaches the row as well.
 const onTraceLinkClick = (event: MouseEvent, row: Record<string, any>) => {
+  event.stopPropagation();
   if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)
     return;
   event.preventDefault();

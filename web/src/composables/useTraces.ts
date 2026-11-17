@@ -214,8 +214,12 @@ const defaultObject = {
       selectedStreamFields: [],
       selectedFields: <string[]>[],
       hasParentColumn: false,
+      /** Fields the server packs into the _all column, with their type. */
+      fieldsInAll: {} as Record<string, string>,
       filterField: "",
       addToFilter: "",
+      /** A sidebar value tick in SQL mode: the condition that replaces the field's top-level WHERE conditions. */
+      sqlFieldFilter: null as { field: string; condition: string } | null,
       removeFilterField: "",
       functions: [],
       filters: [] as any[],

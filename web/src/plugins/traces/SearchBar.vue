@@ -795,15 +795,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("traces.sqlMode.examples") }}
               </OButton>
             </template>
-            <ODropdownItem
-              v-for="tpl in sqlTemplates"
-              :key="tpl.id"
-              :description="templateDescription(tpl)"
-              data-test="traces-sql-examples-item"
-              @select="writeEditor(tpl.sql)"
+            <ODropdownGroup
+              v-for="entry in groupedTemplates(sqlTemplates)"
+              :key="entry.group"
+              :label="groupName(entry.group)"
+              data-test="traces-sql-examples-group"
             >
-              {{ templateName(tpl) }}
-            </ODropdownItem>
+              <ODropdownItem
+                v-for="tpl in entry.templates"
+                :key="tpl.id"
+                :description="templateDescription(tpl)"
+                data-test="traces-sql-examples-item"
+                @select="writeEditor(tpl.sql)"
+              >
+                {{ templateName(tpl) }}
+              </ODropdownItem>
+            </ODropdownGroup>
           </ODropdown>
         </div>
       </div>
@@ -870,7 +877,14 @@ import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAler
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { activeScopePredicate, isTracesScope, withScope } from "@/utils/traces/tracesScope";
-import { analyzeTracesSql, withFieldUnits } from "@/utils/traces/tracesSql";
+import {
+  analyzeTracesSql,
+  insertWhereCondition,
+  replaceFieldConditions,
+  withAllFieldRefs,
+  withFieldUnits,
+} from "@/utils/traces/tracesSql";
+import { allFieldRef, withAllFieldInserts } from "@/utils/traces/tracesAllFields";
 import { offsetRange, tracesSqlGuards } from "@/utils/traces/tracesSqlErrors";
 import type { TracesSqlTemplate } from "@/utils/traces/tracesSqlTemplates";
 import { useTracesSqlTemplateText } from "@/plugins/traces/composables/useTracesSqlTemplates";
@@ -1247,10 +1261,90 @@ export default defineComponent({
       }
     });
 
+    const allFieldsColumn = (): string => store.state.zoConfig?.all_fields_name || "_all";
+
+    const allFieldRefs = () => {
+      const column = allFieldsColumn();
+      return new Map(
+        Object.entries(searchObj.data.stream.fieldsInAll ?? {}).map(([name, type]) => [
+          name,
+          allFieldRef(name, type, column),
+        ]),
+      );
+    };
+
+    // Writes the edited SQL, runs it, and offers Undo that puts the exact previous text back.
+    const applySqlEdit = (before: string, after: string, message: string) => {
+      const write = (text: string) => {
+        writeEditor(text);
+        emit("searchdata");
+      };
+      write(after);
+      toast({
+        variant: "info",
+        message,
+        action: { label: t("traces.sqlMode.undo"), handler: () => write(before) },
+      });
+    };
+
+    const insertSqlCondition = (term: string) => {
+      const before = String(searchObj.data.editorValue ?? "");
+      const condition = withAllFieldRefs(term, allFieldRefs());
+      const after = insertWhereCondition(before, condition);
+      if (after === null) {
+        toast({ message: t("traces.sqlMode.putConditionInWhere"), variant: "info" });
+        return;
+      }
+      applySqlEdit(before, after, t("traces.sqlMode.conditionAdded", { condition }));
+    };
+
+    // A sidebar tick sets the field's whole condition; an empty one removes it.
+    const setSqlFieldCondition = (field: string, term: string) => {
+      const before = String(searchObj.data.editorValue ?? "");
+      const refs = allFieldRefs();
+      const condition = withAllFieldRefs(term, refs);
+      const after = replaceFieldConditions(before, field, condition, refs.get(field));
+      if (after === null) {
+        const message = condition
+          ? t("traces.sqlMode.putConditionInWhere")
+          : t("traces.sqlMode.editWhereToRemove", { field });
+        toast({ message, variant: "info" });
+        return;
+      }
+      const message = condition
+        ? t("traces.sqlMode.conditionAdded", { condition })
+        : t("traces.sqlMode.conditionRemoved", { field });
+      applySqlEdit(before, after, message);
+    };
+
     watch(
-      () => [searchObj.data.stream.selectedStreamFields, searchObj.meta.sqlMode] as const,
+      () => searchObj.data.stream.sqlFieldFilter,
+      (change) => {
+        if (!change) return;
+        searchObj.data.stream.sqlFieldFilter = null;
+        if (searchObj.meta.sqlMode) setSqlFieldCondition(change.field, change.condition);
+      },
+    );
+
+    watch(
+      () =>
+        [
+          searchObj.data.stream.selectedStreamFields,
+          searchObj.meta.sqlMode,
+          searchObj.data.stream.fieldsInAll,
+        ] as const,
       ([fields, sqlMode]) => {
-        if (fields.length) updateFieldKeywords(sqlMode ? withFieldUnits(fields) : fields);
+        if (!fields.length) return;
+        if (!sqlMode) return updateFieldKeywords(fields);
+        const column = allFieldsColumn();
+        updateFieldKeywords(
+          withAllFieldInserts(
+            withFieldUnits(fields),
+            searchObj.data.stream.fieldsInAll ?? {},
+            column,
+            t("traces.sqlMode.inAllColumn", { column }),
+          ),
+        );
       },
       { immediate: true, deep: true },
     );
@@ -1337,7 +1431,8 @@ export default defineComponent({
       setEditorValue(text);
     };
 
-    const { templateName, templateDescription } = useTracesSqlTemplateText();
+    const { templateName, templateDescription, groupName, groupedTemplates } =
+      useTracesSqlTemplateText();
     const showSqlExamples = computed(
       () =>
         !!searchObj.meta.sqlMode &&
@@ -2074,7 +2169,11 @@ export default defineComponent({
       showSqlExamples,
       templateName,
       templateDescription,
+      groupName,
+      groupedTemplates,
       writeEditor,
+      insertSqlCondition,
+      setSqlFieldCondition,
       tracesSavedViews,
       isSavingView,
       saveViewDialogOpen,
@@ -2108,8 +2207,9 @@ export default defineComponent({
   watch: {
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter !== "" && this.searchObj.meta.sqlMode) {
+        const term = this.searchObj.data.stream.addToFilter;
         this.searchObj.data.stream.addToFilter = "";
-        toast({ message: this.t("traces.sqlMode.putConditionInWhere"), variant: "info" });
+        this.insertSqlCondition(term);
         return;
       }
       if (this.searchObj.data.stream.addToFilter !== "") {
@@ -2129,6 +2229,7 @@ export default defineComponent({
       if (!fieldName) return;
       if (this.searchObj.meta.sqlMode) {
         this.searchObj.data.stream.removeFilterField = "";
+        this.setSqlFieldCondition(fieldName, "");
         return;
       }
       const newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);

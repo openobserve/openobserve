@@ -178,6 +178,7 @@ const mockSearchObj: any = {
       ],
       filterField: "",
       addToFilter: "",
+      sqlFieldFilter: null as { field: string; condition: string } | null,
       fieldValues: mockFieldValues,
     },
     editorValue: "",
@@ -277,6 +278,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
           ],
         },
         FieldExpansion: {
+          name: "FieldExpansion",
           template: '<div data-test="field-expansion">Field Expansion<slot name="caption" /></div>',
           methods: { reset: fieldExpansionReset },
           props: [
@@ -287,6 +289,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
             "selectedFields",
             "showVisibilityToggle",
             "showFilterIcon",
+            "showMultiSelect",
             "showQuickMode",
             "valueMapper",
           ],
@@ -323,6 +326,7 @@ describe("IndexList Component", () => {
     mockSearchObj.data.editorValue = "";
     mockSearchObj.data.resultGrid.currentPage = 0;
     mockSearchObj.data.stream.addToFilter = "";
+    mockSearchObj.data.stream.sqlFieldFilter = null;
     mockSearchObj.loadingStream = false;
 
     // Setup mock stream service
@@ -883,6 +887,49 @@ describe("IndexList Component", () => {
       expect(await valuesSql(clause, "service_name")).toBe(
         `SELECT * FROM "test_stream" WHERE status = '1'`,
       );
+    });
+  });
+
+  describe("value include/exclude in SQL mode", () => {
+    afterEach(() => {
+      mockSearchObj.meta.sqlMode = false;
+    });
+
+    it("offers the value include/exclude checkboxes without the put-it-in-WHERE hint", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      const w = mountIndexList();
+      await flushPromises();
+      const expansion = w.findComponent({ name: "FieldExpansion" });
+      expect(expansion.props("showMultiSelect")).not.toBe(false);
+      expect(w.find('[data-test="traces-field-values-sql-hint"]').exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("sends one condition for every ticked value, to replace the field's condition", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      const w = mountIndexList({ activeIncludeFieldValues: { service_name: ["api"] } });
+      await flushPromises();
+      (w.vm as any).handleAddMultipleSearchTerms("service_name", ["api", "o'k"], "include");
+      expect(mockSearchObj.data.stream.sqlFieldFilter).toEqual({
+        field: "service_name",
+        condition: "(service_name = 'api' OR service_name = 'o''k')",
+      });
+      expect(mockSearchObj.data.stream.addToFilter).toBe("");
+      w.unmount();
+    });
+
+    it("ANDs excluded values, ORs included ones, and reads null as IS NULL", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      const w = mountIndexList({ activeIncludeFieldValues: { service_name: ["a", "b"] } });
+      await flushPromises();
+      const condition = () => mockSearchObj.data.stream.sqlFieldFilter?.condition;
+      (w.vm as any).handleAddMultipleSearchTerms("service_name", ["a", "b"], "exclude");
+      expect(condition()).toBe("service_name != 'a' AND service_name != 'b'");
+      (w.vm as any).handleAddMultipleSearchTerms("service_name", ["a"], "include");
+      expect(condition()).toBe("service_name = 'a'");
+      (w.vm as any).handleAddMultipleSearchTerms("service_name", ["null"], "exclude");
+      expect(condition()).toBe("service_name IS NOT NULL");
+      w.unmount();
     });
   });
 

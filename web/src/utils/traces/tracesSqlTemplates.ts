@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export type TracesSqlTemplateView = "traces" | "spans";
+/** Gallery and Examples groups, in the order they show. */
+export type TracesSqlTemplateGroup = "traceQuestions" | "spanSummaries";
 
 export type TracesSqlTemplateId =
   | "slowTraces"
@@ -30,55 +31,86 @@ export type TracesSqlTemplateId =
 
 export interface TracesSqlTemplate {
   id: TracesSqlTemplateId;
+  group: TracesSqlTemplateGroup;
   sql: string;
   /** Service names filled in from the stream, in the order the SQL uses them. */
   services: string[];
 }
+
+export const TRACES_SQL_TEMPLATE_GROUPS: TracesSqlTemplateGroup[] = [
+  "traceQuestions",
+  "spanSummaries",
+];
 
 // Used only when the stream returns fewer than two service names.
 const PLACEHOLDER_SERVICES = ["service-a", "service-b"];
 
 const TOKENS_BY_MODEL_FIELDS = ["gen_ai_request_model", "gen_ai_usage_input_tokens"];
 
-/** The SQL templates offered for a view; trace templates select trace_id, Spans templates aggregate. */
+// No start_time or end_time columns: their ns values pass 2^53 and lose precision in the browser.
+const TRACE_SUMMARY_COLUMNS =
+  "SELECT trace_id, min(_timestamp) AS first_seen,\n" +
+  "  count(*) AS spans,\n" +
+  "  sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errors,\n" +
+  "  (max(end_time) - min(start_time)) / 1000000 AS duration_ms";
+
+/** The Spans SQL templates: Trace questions, one summary row per trace, then Span summaries. */
 export function tracesSqlTemplates(
-  view: TracesSqlTemplateView,
   stream: string,
   schema: { services: string[]; fields: string[] },
 ): TracesSqlTemplate[] {
   const from = `FROM "${stream.replaceAll('"', '""')}"`;
-  if (view === "spans") return spansTemplates(from, schema.fields);
-  const pair = [0, 1].map((k) => schema.services[k] ?? PLACEHOLDER_SERVICES[k]);
+  return [...traceQuestions(from, schema.services), ...spansTemplates(from, schema.fields)];
+}
+
+function traceQuestions(from: string, services: string[]): TracesSqlTemplate[] {
+  const pair = [0, 1].map((k) => services[k] ?? PLACEHOLDER_SERVICES[k]);
   const [a, b] = pair.map((name) => `'${name.replaceAll("'", "''")}'`);
-  const head = `SELECT trace_id ${from}\nGROUP BY trace_id\nHAVING`;
+  const perTrace = (having: string, orderBy: string, extra = "") =>
+    `${TRACE_SUMMARY_COLUMNS}${extra}\n${from}\nGROUP BY trace_id\nHAVING ${having}\nORDER BY ${orderBy} DESC\nLIMIT 100`;
+  const question = (
+    id: TracesSqlTemplateId,
+    sql: string,
+    names: string[] = [],
+  ): TracesSqlTemplate => ({ id, group: "traceQuestions", sql, services: names });
   return [
-    { id: "slowTraces", sql: `${head} max(end_time) - min(start_time) > 2000000000`, services: [] },
-    { id: "bigTraces", sql: `${head} count(*) > 200`, services: [] },
-    {
-      id: "errorsInTwoServices",
-      sql:
-        `${head} sum(CASE WHEN service_name = ${a}\n  AND span_status = 'ERROR' THEN 1 ELSE 0 END) > 0\n` +
-        `  AND sum(CASE WHEN service_name = ${b}\n  THEN 1 ELSE 0 END) > 0`,
-      services: pair,
-    },
-    {
-      id: "nPlusOne",
-      sql: `SELECT trace_id ${from}\nWHERE span_kind = '3'\nGROUP BY trace_id, reference_parent_span_id\nHAVING count(*) > 50`,
-      services: [],
-    },
-    {
-      id: "missingSpan",
-      sql:
-        `${head} sum(CASE WHEN service_name = ${a}\n  THEN 1 ELSE 0 END) > 0\n` +
-        `  AND sum(CASE WHEN service_name = ${b}\n  THEN 1 ELSE 0 END) = 0`,
-      services: pair,
-    },
-    { id: "manyServices", sql: `${head} count(DISTINCT service_name) >= 5`, services: [] },
+    question("slowTraces", perTrace("max(end_time) - min(start_time) > 2000000000", "duration_ms")),
+    question("bigTraces", perTrace("count(*) > 200", "spans")),
+    question(
+      "errorsInTwoServices",
+      perTrace(
+        `sum(CASE WHEN service_name = ${a}\n  AND span_status = 'ERROR' THEN 1 ELSE 0 END) > 0\n` +
+          `  AND sum(CASE WHEN service_name = ${b}\n  THEN 1 ELSE 0 END) > 0`,
+        "errors",
+      ),
+      pair,
+    ),
+    question(
+      "nPlusOne",
+      `${TRACE_SUMMARY_COLUMNS}\n${from}\nWHERE span_kind = '3'\nGROUP BY trace_id, reference_parent_span_id\nHAVING count(*) > 50\nORDER BY spans DESC\nLIMIT 100`,
+    ),
+    question(
+      "missingSpan",
+      perTrace(
+        `sum(CASE WHEN service_name = ${a}\n  THEN 1 ELSE 0 END) > 0\n` +
+          `  AND sum(CASE WHEN service_name = ${b}\n  THEN 1 ELSE 0 END) = 0`,
+        "spans",
+      ),
+      pair,
+    ),
+    question(
+      "manyServices",
+      perTrace(
+        "count(DISTINCT service_name) >= 5",
+        "services",
+        ",\n  count(DISTINCT service_name) AS services",
+      ),
+    ),
   ];
 }
 
 function spansTemplates(from: string, fields: string[]): TracesSqlTemplate[] {
-  const list: TracesSqlTemplate[] = [
+  const list: Omit<TracesSqlTemplate, "group">[] = [
     {
       id: "p95ByVersion",
       sql: `SELECT service_service_version,\n  approx_percentile_cont(duration, 0.95) AS p95\n${from} GROUP BY service_service_version`,
@@ -109,5 +141,5 @@ function spansTemplates(from: string, fields: string[]): TracesSqlTemplate[] {
       services: [],
     });
   }
-  return list;
+  return list.map((tpl) => ({ ...tpl, group: "spanSummaries" }));
 }

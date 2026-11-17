@@ -3999,6 +3999,18 @@ export class TracesPage {
       .click();
   }
 
+  getSqlTemplateGroupTitles() {
+    return this.getSqlTemplateGallery().locator('[data-test="traces-sql-template-group-title"]');
+  }
+
+  getSqlResultCap() {
+    return this.page.locator('[data-test="traces-sql-result-cap"]');
+  }
+
+  async openFirstSqlResultRow() {
+    await this.getSqlResultTable().locator('[data-test^="o2-table-row-"]').first().click();
+  }
+
   getSqlAwaitingRun() {
     return this.page.locator('[data-test="traces-sql-awaiting-run"]');
   }

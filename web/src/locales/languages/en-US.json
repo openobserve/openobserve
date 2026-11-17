@@ -17196,10 +17196,10 @@
       },
       "examples": "Examples",
       "gallery": {
-        "tracesTitle": "Find traces with SQL",
-        "tracesLede": "Your query picks the traces. The list shows each trace in full, with its spans, services and duration. Start from a template or write your own.",
-        "spansTitle": "Summarize spans with SQL",
-        "spansLede": "Your query runs over spans, and the result shows as a table with one column per field. Start from a template or write your own.",
+        "title": "Query spans with SQL",
+        "lede": "Your query runs over spans, and the result shows as a table with one column per field. Start from a template or write your own.",
+        "traceQuestions": "Trace questions",
+        "spanSummaries": "Span summaries",
         "useTemplate": "Use template"
       },
       "templates": {
@@ -17211,7 +17211,7 @@
         },
         "nPlusOne": {
           "name": "N+1 database calls",
-          "description": "One parent with more than 50 client spans"
+          "description": "One row per parent with more than 50 client spans. Columns cover client spans only, so duration_ms is not the trace duration."
         },
         "missingSpan": {
           "name": "Missing span",
@@ -17239,6 +17239,14 @@
       "noTraceIdHint": "These rows have no trace_id, so they do not open a trace.",
       "addTraceId": "Add trace_id",
       "openTrace": "Open trace",
+      "openingTrace": "Opening trace",
+      "firstTraces": "First {count} trace | First {count} traces",
+      "firstRows": "First {count} row | First {count} rows",
+      "conditionAdded": "Added {condition} to the WHERE",
+      "conditionRemoved": "Removed the {field} condition from the WHERE",
+      "editWhereToRemove": "Edit the WHERE to remove the {field} condition",
+      "undo": "Undo",
+      "inAllColumn": "in {column}",
       "awaitingRun": {
         "spansTitle": "Run the query to see results",
         "description": "Nothing has run yet. Run query sends the SQL in the editor."
@@ -17318,6 +17326,7 @@
       "notTraces": "Charts need a traces stream. Your query reads {stream}.",
       "unreadable": "Charts can't read which spans your query picks.",
       "shape": "Charts can't tell which spans this query picks.",
+      "noData": "No data",
       "showAllSpans": "Show all spans in {stream}"
     },
     "latencyHeatmap": {

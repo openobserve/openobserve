@@ -19,21 +19,33 @@ import { useI18nTyped } from "@/types/i18n";
 import useTraces from "@/composables/useTraces";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { tracesSqlTemplates, type TracesSqlTemplate } from "@/utils/traces/tracesSqlTemplates";
+import {
+  TRACES_SQL_TEMPLATE_GROUPS,
+  tracesSqlTemplates,
+  type TracesSqlTemplate,
+  type TracesSqlTemplateGroup,
+} from "@/utils/traces/tracesSqlTemplates";
 
 /** The card name and one-line description of a template, with its service names filled in. */
 export function useTracesSqlTemplateText() {
   const { t } = useI18nTyped();
+  const groupName = (group: TracesSqlTemplateGroup) => t(`traces.sqlMode.gallery.${group}`);
+  // Groups keep their fixed order and an empty one is left out.
+  const groupedTemplates = (templates: TracesSqlTemplate[]) =>
+    TRACES_SQL_TEMPLATE_GROUPS.map((group) => ({
+      group,
+      templates: templates.filter((tpl) => tpl.group === group),
+    })).filter((entry) => entry.templates.length > 0);
   const templateName = (tpl: TracesSqlTemplate) => t(`traces.sqlMode.templates.${tpl.id}.name`);
   const templateDescription = (tpl: TracesSqlTemplate) =>
     t(`traces.sqlMode.templates.${tpl.id}.description`, {
       first: tpl.services[0] ?? "",
       second: tpl.services[1] ?? "",
     });
-  return { templateName, templateDescription };
+  return { templateName, templateDescription, groupName, groupedTemplates };
 }
 
-/** The SQL templates for the current view and stream, with service names read from the stream. */
+/** The Spans SQL templates for the current stream, with service names read from the stream. */
 export function useTracesSqlTemplates() {
   const store = useStore();
   const { t } = useI18nTyped();
@@ -68,7 +80,7 @@ export function useTracesSqlTemplates() {
   // The stream and range the names were last asked for; a relative range is keyed by its period, as every Run moves its window.
   let loadedKey = "";
 
-  // Only the trace templates name services, so the Spans view never asks for them; the values API needs a range.
+  // SQL runs only in the Spans view, so the names are read there; the values API needs a range.
   watch(
     () =>
       [
@@ -82,7 +94,7 @@ export function useTracesSqlTemplates() {
           : null,
       ] as const,
     ([on, mode, stream, start, end, period]) => {
-      if (!on || mode !== "traces" || !stream) return;
+      if (!on || mode !== "spans" || !stream) return;
       if (!(Number(start) > 0 && Number(end) > Number(start))) return;
       const key = period ? `${stream}|${period}` : `${stream}|${start}|${end}`;
       if (key === loadedKey) return;
@@ -94,9 +106,8 @@ export function useTracesSqlTemplates() {
 
   const sqlTemplates = computed<TracesSqlTemplate[]>(() => {
     const stream = searchObj.data.stream.selectedStream?.value;
-    const mode = searchObj.meta.searchMode;
-    if (!stream || (mode !== "traces" && mode !== "spans")) return [];
-    return tracesSqlTemplates(mode, stream, {
+    if (!stream || searchObj.meta.searchMode !== "spans") return [];
+    return tracesSqlTemplates(stream, {
       services: services.value,
       fields: (searchObj.data.stream.selectedStreamFields ?? []).map((f: any) => f.name),
     });

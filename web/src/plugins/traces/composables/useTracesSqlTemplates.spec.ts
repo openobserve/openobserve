@@ -19,7 +19,7 @@ import { effectScope, nextTick, reactive, ref } from "vue";
 const fetchFieldValues = vi.fn();
 const fieldValues = ref<Record<string, any>>({});
 const searchObj = reactive<any>({
-  meta: { sqlMode: false, searchMode: "traces" },
+  meta: { sqlMode: false, searchMode: "spans" },
   data: {
     stream: { selectedStream: { value: "otel_demo" }, selectedStreamFields: [] },
     datetime: { startTime: 1, endTime: 2 },
@@ -45,7 +45,7 @@ describe("useTracesSqlTemplates", () => {
     fetchFieldValues.mockClear();
     fieldValues.value = {};
     searchObj.meta.sqlMode = false;
-    searchObj.meta.searchMode = "traces";
+    searchObj.meta.searchMode = "spans";
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.stream.selectedStream = { value: "otel_demo" };
     searchObj.data.datetime = { startTime: 1, endTime: 2 };
@@ -66,9 +66,9 @@ describe("useTracesSqlTemplates", () => {
 
     searchObj.data.stream.selectedStream = { value: "otel_demo" };
     searchObj.data.datetime = { startTime: 10, endTime: 20 };
-    searchObj.meta.searchMode = "spans";
-    await nextTick();
     searchObj.meta.searchMode = "traces";
+    await nextTick();
+    searchObj.meta.searchMode = "spans";
     await nextTick();
     expect(fetchFieldValues).toHaveBeenCalledTimes(1);
 
@@ -116,7 +116,7 @@ describe("useTracesSqlTemplates", () => {
     scope.stop();
   });
 
-  it("reads service names for the trace templates once SQL mode is on in the Traces view", async () => {
+  it("reads service names for the trace questions once SQL mode is on in the Spans view", async () => {
     const { sqlTemplates } = useTracesSqlTemplates();
     expect(fetchFieldValues).not.toHaveBeenCalled();
     searchObj.meta.sqlMode = true;
@@ -133,14 +133,22 @@ describe("useTracesSqlTemplates", () => {
     };
     const missing = sqlTemplates.value.find((tpl) => tpl.id === "missingSpan")!;
     expect(missing.services).toEqual(["frontend", "cart"]);
+    expect(missing.sql).toContain("service_name = 'frontend'");
   });
 
-  it("never asks for services in the Spans view and gates Tokens by model on the schema", async () => {
-    searchObj.meta.searchMode = "spans";
+  it("offers no templates and asks for nothing in the Traces view", async () => {
+    searchObj.meta.searchMode = "traces";
     const { sqlTemplates } = useTracesSqlTemplates();
     searchObj.meta.sqlMode = true;
     await nextTick();
     expect(fetchFieldValues).not.toHaveBeenCalled();
+    expect(sqlTemplates.value).toEqual([]);
+  });
+
+  it("gates Tokens by model on the schema", async () => {
+    const { sqlTemplates } = useTracesSqlTemplates();
+    searchObj.meta.sqlMode = true;
+    await nextTick();
     expect(sqlTemplates.value.map((tpl) => tpl.id)).not.toContain("tokensByModel");
     searchObj.data.stream.selectedStreamFields = [{ name: "gen_ai_request_model" }];
     expect(sqlTemplates.value.map((tpl) => tpl.id)).not.toContain("tokensByModel");
