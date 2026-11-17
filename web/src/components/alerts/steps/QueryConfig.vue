@@ -3144,7 +3144,7 @@ export default defineComponent({
         triggerThreshold.value === undefined ||
         Number.isNaN(Number(triggerThreshold.value))
       ) {
-        triggerThreshold.value = 3;
+        triggerThreshold.value = 1;
         emitTriggerUpdate();
       }
     };
@@ -3703,8 +3703,8 @@ export default defineComponent({
         localIsAggregationEnabled.value = false;
         emit("update:isAggregationEnabled", false);
         logMeasureColumn.value = "";
-        // Restore default threshold for count mode
-        triggerThreshold.value = 3;
+        // New alerts count "Any event (1+)", so count mode restores that default.
+        triggerThreshold.value = 1;
         triggerOperator.value = ">=";
       } else {
         // Measure mode — uses aggregation, always reset "having groups" to >= 1 on switch
