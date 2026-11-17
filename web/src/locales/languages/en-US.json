@@ -23313,6 +23313,7 @@
       "deleteTitle": "Delete location",
       "deleteBody": "Delete the {name} private location? Its agents will stop receiving jobs.",
       "deleteBlocked": "In use by {count} checks — unassign them first",
+      "deleteBlockedHidden": "In use by checks in folders you can't open — ask someone with access to unassign them",
       "status": {
         "online": "Online",
         "offline": "Offline",
