@@ -9,6 +9,7 @@ import {
   anomalyBandPayload,
   anomalyDetectionFunctionPayload,
   anomalyIntervalPayload,
+  anomalyMissingValueColumn,
   anomalySensitivityPayload,
   anomalyWindowSecondsToParts,
   defaultAnomalyConfig,
@@ -214,9 +215,7 @@ describe("anomalySensitivityPayload", () => {
   });
 });
 
-// custom_sql mode renders no function control, so the form's function there is a leftover
-// from the Filters tab. Sending it without its field is a server 400:
-// "detection_function max requires detection_function_field".
+// custom_sql has no function control; a leftover function with no field is a server 400.
 describe("anomalyDetectionFunctionPayload", () => {
   it("filters mode sends the picked function with its field", () => {
     expect(
@@ -261,67 +260,85 @@ describe("anomalyDetectionFunctionPayload", () => {
   it("a stored custom_sql row round-trips its combined function verbatim", () => {
     expect(
       anomalyDetectionFunctionPayload(
-        {
-          query_mode: "custom_sql",
-          custom_sql: "SELECT histogram(_timestamp) AS ts, avg(latency) AS p99_ms FROM app",
-          detection_function: "avg",
-          detection_function_field: "p99_ms",
-        },
+        { query_mode: "custom_sql", detection_function: "avg", detection_function_field: "p99_ms" },
         { detection_function: "avg(p99_ms)", detection_function_field: null },
       ),
     ).toEqual({ detection_function: "avg(p99_ms)", detection_function_field: undefined });
   });
 
-  it("a stored custom_sql row drops a value column the edited query no longer returns", () => {
+  it("a stored custom_sql row returned as a split pair keeps both halves", () => {
     expect(
       anomalyDetectionFunctionPayload(
-        {
-          query_mode: "custom_sql",
-          custom_sql: "SELECT histogram(_timestamp) AS ts, avg(latency) AS value FROM app",
-          detection_function: "avg",
-          detection_function_field: "p99_ms",
-        },
-        { detection_function: "avg(p99_ms)", detection_function_field: null },
+        { query_mode: "custom_sql", detection_function: "count", detection_function_field: "" },
+        { detection_function: "avg", detection_function_field: "p99_ms" },
       ),
-    ).toEqual({ detection_function: "count", detection_function_field: undefined });
+    ).toEqual({ detection_function: "avg", detection_function_field: "p99_ms" });
   });
 
-  it("a stored custom_sql row keeps a quoted, dotted or non-ASCII value column", () => {
-    for (const column of ["p99.ms", "latência"]) {
-      expect(
-        anomalyDetectionFunctionPayload(
-          {
-            query_mode: "custom_sql",
-            custom_sql: `SELECT max(latency) AS "${column}" FROM app WHERE status >= 500`,
-            detection_function: "max",
-            detection_function_field: column,
-          },
-          { detection_function: `max(${column})`, detection_function_field: null },
-        ),
-      ).toEqual({ detection_function: `max(${column})`, detection_function_field: undefined });
-    }
-  });
-
-  it("a stored custom_sql count row round-trips with any query", () => {
+  it("never rewrites a stored custom_sql function to count", () => {
     expect(
       anomalyDetectionFunctionPayload(
-        { query_mode: "custom_sql", custom_sql: "SELECT 1", detection_function: "max" },
+        { query_mode: "custom_sql", detection_function: "max" },
         { detection_function: "count(*)", detection_function_field: null },
       ),
     ).toEqual({ detection_function: "count(*)", detection_function_field: undefined });
   });
+});
 
-  it("a stored custom_sql row returned as a split pair keeps both halves", () => {
+// The save is blocked, not rewritten to count: a silent rewrite fails every training run.
+describe("anomalyMissingValueColumn", () => {
+  const stored = { detection_function: "avg(p99_ms)", detection_function_field: null };
+  const sql = (alias: string) =>
+    `SELECT histogram(_timestamp) AS ts, avg(latency) AS ${alias} FROM app`;
+
+  it("is null while the query still names the declared column", () => {
     expect(
-      anomalyDetectionFunctionPayload(
-        {
-          query_mode: "custom_sql",
-          custom_sql: "SELECT avg(latency) AS p99_ms FROM app",
-          detection_function: "count",
-          detection_function_field: "",
-        },
+      anomalyMissingValueColumn({ query_mode: "custom_sql", custom_sql: sql("p99_ms") }, stored),
+    ).toBeNull();
+  });
+
+  it("names the declared column once the alias is renamed", () => {
+    expect(
+      anomalyMissingValueColumn({ query_mode: "custom_sql", custom_sql: sql("p95_ms") }, stored),
+    ).toBe("p99_ms");
+  });
+
+  it("treats a case change of the alias as a missing column", () => {
+    expect(
+      anomalyMissingValueColumn({ query_mode: "custom_sql", custom_sql: sql("P99_MS") }, stored),
+    ).toBe("p99_ms");
+  });
+
+  it("reads the column from a split stored pair", () => {
+    expect(
+      anomalyMissingValueColumn(
+        { query_mode: "custom_sql", custom_sql: sql("value") },
         { detection_function: "avg", detection_function_field: "p99_ms" },
       ),
-    ).toEqual({ detection_function: "avg", detection_function_field: "p99_ms" });
+    ).toBe("p99_ms");
+  });
+
+  it("keeps a quoted, dotted or non-ASCII column", () => {
+    for (const column of ["p99.ms", "latência"]) {
+      expect(
+        anomalyMissingValueColumn(
+          { query_mode: "custom_sql", custom_sql: sql(`"${column}"`) },
+          { detection_function: `max(${column})`, detection_function_field: null },
+        ),
+      ).toBeNull();
+    }
+  });
+
+  it("is null for a count row, a new alert and filters mode", () => {
+    const count = { detection_function: "count(*)", detection_function_field: null };
+    expect(
+      anomalyMissingValueColumn({ query_mode: "custom_sql", custom_sql: "SELECT 1" }, count),
+    ).toBeNull();
+    expect(
+      anomalyMissingValueColumn({ query_mode: "custom_sql", custom_sql: "SELECT 1" }, null),
+    ).toBeNull();
+    expect(
+      anomalyMissingValueColumn({ query_mode: "filters", custom_sql: null }, stored),
+    ).toBeNull();
   });
 });

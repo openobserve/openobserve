@@ -263,40 +263,31 @@ export interface AnomalyStoredSqlFunction {
   detection_function_field?: string | null;
 }
 
-/** True when the stored function declares no value column, or the query still names it. */
-const sqlMentionsDeclaredColumn = (
-  sql: string | null | undefined,
-  storedSql: AnomalyStoredSqlFunction,
-): boolean => {
+/**
+ * The value column a stored custom_sql function declares, when the edited query no longer names
+ * it. The server reads that column as authoritative, so such a save would fail every training run.
+ */
+export const anomalyMissingValueColumn = (
+  c: { query_mode?: string; custom_sql?: string | null },
+  storedSql: AnomalyStoredSqlFunction | null,
+): string | null => {
+  if (c.query_mode !== "custom_sql" || !storedSql) return null;
   const declared = (
     storedSql.detection_function_field ||
     /\(([^)]*)\)\s*$/.exec(storedSql.detection_function)?.[1] ||
     ""
   ).trim();
-  if (!declared || declared === "*") return true;
-  // A plain substring test on purpose: a quoted or dotted alias ("p99.ms") has no word
-  // boundary to split on, and a wrong drop silently rewrites a valid row to `count`.
-  return (sql ?? "").includes(declared);
+  if (!declared || declared === "*") return null;
+  // Substring on purpose: a quoted or dotted alias ("p99.ms") has no word boundary to split on.
+  return (c.custom_sql ?? "").includes(declared) ? null : declared;
 };
 
 /**
- * The two detection-function payload fields.
- *
- * Filters mode sends the form's own pick. custom_sql mode renders no function control, so the
- * form value there is a leftover from the Filters tab, and its field is never sent: the server
- * rejects that pair ("detection_function max requires detection_function_field"). A stored
- * custom_sql row round-trips its own function VERBATIM, because there the field names the value
- * column of the query. The server treats that column as authoritative, so the row keeps it only
- * while the query still mentions it. Any other custom_sql save sends `count`, the create-form
- * default.
+ * custom_sql has no function control, so the form value there is a Filters-tab leftover: a
+ * stored custom_sql row round-trips its own function VERBATIM, any other sends `count`.
  */
 export const anomalyDetectionFunctionPayload = (
-  c: {
-    query_mode?: string;
-    custom_sql?: string | null;
-    detection_function?: string;
-    detection_function_field?: string;
-  },
+  c: { query_mode?: string; detection_function?: string; detection_function_field?: string },
   storedSql: AnomalyStoredSqlFunction | null,
 ): { detection_function: string; detection_function_field: string | undefined } => {
   if (c.query_mode !== "custom_sql") {
@@ -308,7 +299,7 @@ export const anomalyDetectionFunctionPayload = (
           : undefined,
     };
   }
-  if (storedSql && sqlMentionsDeclaredColumn(c.custom_sql, storedSql)) {
+  if (storedSql) {
     return {
       detection_function: storedSql.detection_function,
       detection_function_field: storedSql.detection_function_field || undefined,
@@ -2253,6 +2244,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         toast({
           variant: "error",
           message: t("alerts.messages.customSqlRequired"),
+        });
+        wizardStep.value = 2;
+        anomalySaving.value = false;
+        return;
+      }
+      const missingColumn = anomalyMissingValueColumn(c, anomalyStoredSqlFunction.value);
+      if (missingColumn) {
+        toast({
+          variant: "error",
+          message: t("alerts.messages.anomalyValueColumnMissing", { column: missingColumn }),
         });
         wizardStep.value = 2;
         anomalySaving.value = false;

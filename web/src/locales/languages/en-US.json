@@ -13941,6 +13941,7 @@
       "anomalyConfigLoadFailed": "Failed to load anomaly detection config.",
       "fixHighlightedFields": "Please fix the highlighted fields before saving.",
       "customSqlRequired": "Custom SQL is required in custom SQL mode.",
+      "anomalyValueColumnMissing": "This alert reads its value from the column {column}. Keep that column name in the SQL query.",
       "invalidSqlQueryLower": "Invalid SQL query",
       "anomalyConfigUpdated": "Anomaly detection config updated.",
       "anomalyConfigSaveFailed": "Failed to save anomaly config.",
