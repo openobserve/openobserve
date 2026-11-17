@@ -605,7 +605,20 @@ export const getSqlResultColumns = (rows: Record<string, unknown>[]): string[] =
 export const defaultSqlValueColumn = (columns: string[]): string | undefined =>
   columns.find((column) => !column.startsWith("_")) ?? columns[0];
 
-/** Turns SQL rows into deduped, capped options; value defaults to the first non-internal column, label to the value. */
+/** The value and label columns options read; value defaults to the first non-internal column, label to the value. */
+export const resolveSqlOptionColumns = (
+  columns: string[],
+  valueField?: string | null,
+  labelField?: string | null,
+): { valueColumn: string; labelColumn: string } | null => {
+  const valueColumn =
+    valueField && columns.includes(valueField) ? valueField : defaultSqlValueColumn(columns);
+  if (!valueColumn) return null;
+  const labelColumn = labelField && columns.includes(labelField) ? labelField : valueColumn;
+  return { valueColumn, labelColumn };
+};
+
+/** Turns SQL rows into deduped options capped at `maxRecords`, read from `resolveSqlOptionColumns`. */
 export const mapSqlRowsToOptions = (
   rows: Record<string, unknown>[],
   {
@@ -615,10 +628,9 @@ export const mapSqlRowsToOptions = (
   }: { valueField?: string | null; labelField?: string | null; maxRecords?: number },
 ): SqlRowsOptionsResult => {
   const columns = getSqlResultColumns(rows);
-  const valueColumn =
-    valueField && columns.includes(valueField) ? valueField : defaultSqlValueColumn(columns);
-  if (!valueColumn) return { options: [], columns, capped: false };
-  const labelColumn = labelField && columns.includes(labelField) ? labelField : valueColumn;
+  const picked = resolveSqlOptionColumns(columns, valueField, labelField);
+  if (!picked) return { options: [], columns, capped: false };
+  const { valueColumn, labelColumn } = picked;
 
   const seen = new Set<string>();
   const options: QueryVariableOption[] = [];

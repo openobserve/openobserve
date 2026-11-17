@@ -22,6 +22,7 @@ import {
   mapSqlRowsToOptions,
   mapValuesToOptions,
   parsePromVariableQuery,
+  resolveSqlOptionColumns,
   type QueryVariableLanguage,
   type QueryVariableOption,
 } from "./queryVariableUtils";
@@ -283,6 +284,50 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
   }
 };
 
+const quoteIdentifier = (name: string): string => `"${name.replace(/"/g, '""')}"`;
+
+// The outer ORDER BY keeps the list stable, as GROUP BY returns groups in no fixed order.
+const distinctValuesSql = (query: string, valueColumn: string, labelColumn: string): string => {
+  const value = quoteIdentifier(valueColumn);
+  const label =
+    labelColumn === valueColumn
+      ? ""
+      : `, MIN(${quoteIdentifier(labelColumn)}) AS ${quoteIdentifier(labelColumn)}`;
+  const inner = query.trim().replace(/[;\s]+$/, "");
+  return `SELECT ${value}${label} FROM (${inner}) GROUP BY ${value} ORDER BY ${value}`;
+};
+
+const loadSqlValues = async (params: QueryVariableLoadParams): Promise<QueryVariableLoadResult> => {
+  const request = {
+    streamType: params.streamType,
+    startTime: params.startTime,
+    endTime: params.endTime,
+    // One extra row tells a capped result apart from one that fills the cap.
+    size: params.maxRecords + 1,
+  };
+  const toOptions = (rows: Record<string, unknown>[]) =>
+    mapSqlRowsToOptions(rows, {
+      valueField: params.valueField,
+      labelField: params.labelField,
+      maxRecords: params.maxRecords,
+    });
+  const rows = await params.runSql({ ...request, sql: params.query });
+  const mapped = toOptions(rows);
+  const picked = resolveSqlOptionColumns(mapped.columns, params.valueField, params.labelField);
+  if (mapped.capped || rows.length <= params.maxRecords || !picked) return { ...mapped, rows };
+
+  // Duplicate rows filled the cap and may hide later values, so ask again for one row per value.
+  try {
+    const sql = distinctValuesSql(params.query, picked.valueColumn, picked.labelColumn);
+    const { options, capped } = toOptions(await params.runSql({ ...request, sql }));
+    return { options, capped, columns: mapped.columns, rows };
+  } catch (error) {
+    if (error instanceof QueryVariableCancelledError) throw error;
+    // The query itself ran; if the backend rejects the wrapper, only the exact value count is lost.
+    return { ...mapped, capped: true, rows };
+  }
+};
+
 /** Loads the options of a `query` variable whose query already has its parent values substituted. */
 export const loadQueryVariableValues = async (
   params: QueryVariableLoadParams,
@@ -291,20 +336,5 @@ export const loadQueryVariableValues = async (
     const { options, capped } = mapValuesToOptions(await loadPromValues(params), params.maxRecords);
     return { options, capped, columns: [], rows: [] };
   }
-
-  // One extra row tells a capped result apart from one that fills the cap; counted before
-  // de-duplication, as duplicate rows can hide that more values exist.
-  const rows = await params.runSql({
-    sql: params.query,
-    streamType: params.streamType,
-    startTime: params.startTime,
-    endTime: params.endTime,
-    size: params.maxRecords + 1,
-  });
-  const mapped = mapSqlRowsToOptions(rows, {
-    valueField: params.valueField,
-    labelField: params.labelField,
-    maxRecords: params.maxRecords,
-  });
-  return { ...mapped, capped: mapped.capped || rows.length > params.maxRecords, rows };
+  return loadSqlValues(params);
 };

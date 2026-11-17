@@ -250,20 +250,88 @@ describe("loadQueryVariableValues — SQL", () => {
     expect(result.columns).toEqual(["id", "name"]);
   });
 
-  it("counts a full page of rows as capped even when duplicates leave fewer values", async () => {
-    const load = (rows: Record<string, unknown>[]) =>
-      loadQueryVariableValues(
-        baseParams({
-          language: "sql",
-          query: "SELECT v FROM t",
-          maxRecords: 2,
-          runSql: vi.fn().mockResolvedValue(rows),
-        }),
-      );
-    const full = await load([{ v: "a" }, { v: "a" }, { v: "b" }]);
-    expect(full.options.map((o) => o.value)).toEqual(["a", "b"]);
-    expect(full.capped).toBe(true);
-    expect((await load([{ v: "a" }, { v: "b" }])).capped).toBe(false);
+  const sqlLoad = (runSql: QueryVariableLoadParams["runSql"], overrides = {}) =>
+    loadQueryVariableValues(
+      baseParams({
+        language: "sql",
+        query: "SELECT v FROM t;",
+        maxRecords: 2,
+        runSql,
+        ...overrides,
+      }),
+    );
+
+  it("asks again for one row per value when duplicate rows fill the cap", async () => {
+    const rawRows = [
+      { _timestamp: 3, v: "a" },
+      { _timestamp: 2, v: "a" },
+      { _timestamp: 1, v: "a" },
+    ];
+    const runSql = vi
+      .fn()
+      .mockResolvedValueOnce(rawRows)
+      .mockResolvedValueOnce([{ v: "a" }, { v: "b" }]);
+    const result = await sqlLoad(runSql);
+    expect(runSql).toHaveBeenCalledTimes(2);
+    expect(runSql.mock.calls[1][0]).toMatchObject({
+      sql: 'SELECT "v" FROM (SELECT v FROM t) GROUP BY "v" ORDER BY "v"',
+      size: 3,
+    });
+    expect(result.options.map((o) => o.value)).toEqual(["a", "b"]);
+    expect(result.capped).toBe(false);
+    expect(result.rows).toEqual(rawRows);
+    expect(result.columns).toEqual(["_timestamp", "v"]);
+  });
+
+  it("caps on distinct values and keeps the label column in the distinct query", async () => {
+    const runSql = vi
+      .fn()
+      .mockResolvedValueOnce([
+        { id: "1", name: "One" },
+        { id: "1", name: "One" },
+        { id: "1", name: "One" },
+      ])
+      .mockResolvedValueOnce([
+        { id: "1", name: "One" },
+        { id: "2", name: "Two" },
+        { id: "3", name: "Three" },
+      ]);
+    const result = await sqlLoad(runSql, { valueField: "id", labelField: "name" });
+    expect(runSql.mock.calls[1][0].sql).toBe(
+      'SELECT "id", MIN("name") AS "name" FROM (SELECT v FROM t) GROUP BY "id" ORDER BY "id"',
+    );
+    expect(result.options).toEqual([
+      { value: "1", label: "One" },
+      { value: "2", label: "Two" },
+    ]);
+    expect(result.capped).toBe(true);
+  });
+
+  it("runs once when the rows fit, or already hold more values than the cap", async () => {
+    const fits = vi.fn().mockResolvedValue([{ v: "a" }, { v: "a" }]);
+    expect((await sqlLoad(fits)).capped).toBe(false);
+    const full = vi.fn().mockResolvedValue([{ v: "a" }, { v: "b" }, { v: "c" }]);
+    expect((await sqlLoad(full)).capped).toBe(true);
+    expect(fits).toHaveBeenCalledTimes(1);
+    expect(full).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the first result, marked capped, when the distinct query fails", async () => {
+    const runSql = vi
+      .fn()
+      .mockResolvedValueOnce([{ v: "a" }, { v: "a" }, { v: "b" }])
+      .mockRejectedValueOnce(new Error("subquery not supported"));
+    const result = await sqlLoad(runSql);
+    expect(result.options.map((o) => o.value)).toEqual(["a", "b"]);
+    expect(result.capped).toBe(true);
+  });
+
+  it("passes a cancel of the distinct query through", async () => {
+    const runSql = vi
+      .fn()
+      .mockResolvedValueOnce([{ v: "a" }, { v: "a" }, { v: "a" }])
+      .mockRejectedValueOnce(new QueryVariableCancelledError());
+    await expect(sqlLoad(runSql)).rejects.toBeInstanceOf(QueryVariableCancelledError);
   });
 });
 

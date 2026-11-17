@@ -288,6 +288,21 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     await qv.expectOptionValues("ns", ["default"]);
   });
 
+  test("max records counts values, so a query without DISTINCT still lists every service", async ({ page }) => {
+    const qv = new PageManager(page).dashboardQueryVariable;
+    await startCustomVariable(qv);
+    // Sorted raw rows put dozens of auth rows first, so a cap on rows would list auth alone.
+    await qv.fillQuery(`SELECT service_name FROM "${S}" ORDER BY service_name`);
+    await qv.runPreview();
+    await expect(qv.previewCount).toHaveText(`${fx.ALL_SERVICES.length} values`);
+    await expect(qv.previewCapped).toBeHidden();
+
+    await qv.setMaxRecordSize(3);
+    await qv.runPreview();
+    await expect(qv.previewCount).toHaveText("3 values");
+    await expect(qv.previewCapped).toHaveText(/Capped at 3/);
+  });
+
   test("multi-select, default value choices, All and hide on dashboard work for a custom SQL variable", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const id = await startCustomVariable(qv, { panelWhere: "service_name IN ($svc)" });
