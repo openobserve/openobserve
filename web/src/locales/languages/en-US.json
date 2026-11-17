@@ -15153,7 +15153,10 @@
       "aws-cloudwatch": {
         "title": "AWS CloudWatch",
         "description": "EC2, RDS, load balancer, Lambda and SQS health from a CloudWatch metric stream.",
-        "pausedImpact": "an AWS resource fails, fills up or starts erroring"
+        "pausedImpact": "an AWS resource fails, fills up or starts erroring",
+        "roles": {
+          "metrics": "CloudWatch metrics"
+        }
       },
       "genai": {
         "title": "AI (LLM apps)",
@@ -15163,7 +15166,10 @@
       "github": {
         "title": "GitHub (Actions)",
         "description": "Workflow runs, failures and duration from GitHub Actions events.",
-        "pausedImpact": "a GitHub Actions job logs errors or job logs stop arriving"
+        "pausedImpact": "a GitHub Actions job logs errors or job logs stop arriving",
+        "roles": {
+          "job_logs": "GitHub Actions job logs"
+        }
       },
       "argocd": {
         "title": "Argo CD",

@@ -396,6 +396,20 @@
           "opentelemetry/aws_cloudwatch_metric_stream_stopped"
         ]
       },
+      "roles": [
+        {
+          "id": "metrics",
+          "title": "CloudWatch metrics",
+          "stream": "cloudwatch_metrics",
+          "fields": ["namespace", "metric_name", "account_id", "region", "value_sum", "value_count"],
+          "identity": [
+            {
+              "field": "namespace",
+              "pattern": "^AWS/"
+            }
+          ]
+        }
+      ],
       "saved_views": [],
       "paused_impact": "an AWS resource fails, fills up or starts erroring"
     },
@@ -472,6 +486,20 @@
         ],
         "more": []
       },
+      "roles": [
+        {
+          "id": "job_logs",
+          "title": "GitHub Actions job logs",
+          "stream": "githubactions",
+          "fields": ["run_id", "job_id", "log"],
+          "identity": [
+            {
+              "field": "log",
+              "pattern": "##\\[(group|endgroup|error|warning)\\]"
+            }
+          ]
+        }
+      ],
       "saved_views": [],
       "paused_impact": "a GitHub Actions job logs errors or job logs stop arriving"
     },

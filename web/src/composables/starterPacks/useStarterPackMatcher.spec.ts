@@ -18,13 +18,15 @@ const fake = vi.hoisted(() => ({
   fail: false,
   clusters: ["staging-eu-1"],
   sql: [] as string[],
+  forced: [] as string[],
   cancel: vi.fn(),
 }));
 
 vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: false }));
 vi.mock("@/composables/query/readQuery", () => ({
-  readQuery: async (options: { queryKey: unknown[] }) => {
+  readQuery: async (options: { queryKey: unknown[] }, force?: boolean) => {
     if (fake.fail) throw new Error("down");
+    if (force && options.queryKey.length === 3) fake.forced.push(String(options.queryKey[2]));
     const key = JSON.stringify(options.queryKey);
     if ((options.queryKey as string[]).length === 2 && key.includes("metrics")) {
       return fake.metrics.map((name) => ({ name }));
@@ -73,7 +75,15 @@ const setup = (poll = false, pack?: StarterPack) => {
 describe("useStarterPackMatcher", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    Object.assign(fake, { metrics: [], logs: [], traces: [], columns: {}, fail: false, sql: [] });
+    Object.assign(fake, {
+      metrics: [],
+      logs: [],
+      traces: [],
+      columns: {},
+      fail: false,
+      sql: [],
+      forced: [],
+    });
   });
   afterEach(() => vi.useRealTimers());
 
@@ -198,6 +208,18 @@ describe("useStarterPackMatcher", () => {
       await api.check();
       expect(api.state.value).toBe("matched");
       expect(api.streams.value).toEqual(["cloudwatch_metrics"]);
+    });
+
+    it("guesses a renamed CloudWatch stream without forcing a schema read", async () => {
+      const role = packById("aws-cloudwatch")!.roles![0];
+      fake.logs = ["web", "empty_logs", "aws_metrics"];
+      fake.columns = { aws_metrics: role.fields, web: ["message"] };
+      const { api } = setup(false, packById("aws-cloudwatch")!);
+      await api.check();
+      expect(api.state.value).toBe("matched");
+      expect(api.streams.value).toEqual(["aws_metrics"]);
+      // Only the confirm read of the found stream is forced, never the guess's reads.
+      expect(fake.forced).toEqual(["aws_metrics"]);
     });
 
     it("reports none for AWS CloudWatch without its logs stream", async () => {

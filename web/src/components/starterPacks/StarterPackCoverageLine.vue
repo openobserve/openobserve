@@ -27,6 +27,7 @@ import { readQuery } from "@/composables/query/readQuery";
 import { detectedStreams } from "@/composables/starterPacks/packDetect";
 import {
   matchPack,
+  readCachedColumns,
   readOrgStreams,
   readSchemaColumns,
 } from "@/composables/starterPacks/packMatchData";
@@ -70,7 +71,10 @@ const matches = async (
   streams: Awaited<ReturnType<typeof readOrgStreams>>,
 ): Promise<boolean> => {
   const readColumns = (type: string, name: string) => readSchemaColumns(props.org, type, name);
-  if (!(await detectedStreams(pack, streams, readColumns)).length) return false;
+  const readGuess = (type: string, name: string) => readCachedColumns(props.org, type, name);
+  if (!(await detectedStreams(pack, streams, readColumns, readGuess)).length) {
+    return false;
+  }
   const match = await matchPack(props.org, pack, streams, { loadManifest, loadAlertFile });
   if (match.alerts) {
     const fit = [...match.alerts.values()].filter(Boolean).length;

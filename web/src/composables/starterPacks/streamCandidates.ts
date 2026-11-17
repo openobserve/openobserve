@@ -85,6 +85,18 @@ const closeToBest = (candidates: PackCandidate[]) => {
     .sort((left, right) => share(right) - share(left));
 };
 
+/** The stream that fits a role best on fields alone; identity is left to the setup popup. */
+export const bestRoleStream = (
+  role: PackStreamRole,
+  streams: StreamFacts[],
+  sources: BindingSources,
+): string | undefined => {
+  // Detection may list streams without ingest times, and then none is dropped for it.
+  const timed = streams.some(({ lastIngested }) => lastIngested > 0);
+  const present = timed ? withData(streams) : streams;
+  return closeToBest(present.map((stream) => toCandidate(stream, role.fields, sources)))[0]?.stream;
+};
+
 /** Names a metric question may offer; only a strict rename can skip the question. */
 export const metricCandidates = (
   want: MetricWant,

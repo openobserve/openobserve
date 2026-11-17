@@ -29,7 +29,13 @@ import {
 } from "@/views/Infrastructure/kubernetes2/kubernetesQueries";
 
 import { detectedStreams } from "./packDetect";
-import { isPackStream, matchPack, readOrgStreams, readSchemaColumns } from "./packMatchData";
+import {
+  isPackStream,
+  matchPack,
+  readCachedColumns,
+  readOrgStreams,
+  readSchemaColumns,
+} from "./packMatchData";
 import { packById } from "./usePackCatalog";
 import { windowEnd } from "./useStreamValues";
 import type { StarterPack } from "./types";
@@ -140,8 +146,11 @@ export function useStarterPackMatcher(
     found: string[];
   }> => {
     const streams = library ? await readOrgStreams(org) : await readDetectNames(org, pack);
-    const present = await detectedStreams(pack, streams, (type, name) =>
-      readSchemaColumns(org, type, name, !library),
+    const present = await detectedStreams(
+      pack,
+      streams,
+      (type, name) => readSchemaColumns(org, type, name, !library),
+      (type, name) => readCachedColumns(org, type, name),
     );
     // Without a detected stream the pack cannot fit, so the Library match is not paid for.
     if (!present.length) return { next: "none", seen: [], found: [] };

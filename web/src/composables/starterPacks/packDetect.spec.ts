@@ -105,6 +105,56 @@ describe("detectedStreams", () => {
     ).toEqual([]);
   });
 
+  describe("a named stream the user renamed", () => {
+    const role = {
+      id: "metrics",
+      titleKey: "x",
+      stream: "cloudwatch_metrics",
+      fields: ["namespace", "metric_name", "account_id", "region", "value_sum", "value_count"],
+      identity: [{ field: "namespace", pattern: "^AWS/" }],
+    };
+    const cloudwatch = (roles = [role]) =>
+      pack({ detectStreams: [{ type: "logs", name: "cloudwatch_metrics" }], roles } as any);
+    const columns: Record<string, string[]> = {
+      aws_metrics: [...role.fields, "_timestamp"],
+      web: ["_timestamp", "method", "status"],
+    };
+    const read = vi.fn(async (_type: string, name: string) => columns[name] ?? []);
+
+    it("finds a renamed stream that carries the role's fields", async () => {
+      const streams = org({ logs: ["web", "aws_metrics"] });
+      expect(await detectedStreams(cloudwatch(), streams, read)).toEqual(["aws_metrics"]);
+    });
+
+    it("finds no stream when none carries the role's fields", async () => {
+      expect(await detectedStreams(cloudwatch(), org({ logs: ["web"] }), read)).toEqual([]);
+    });
+
+    it("guesses even when no stream reports an ingest time", async () => {
+      const streams: StreamsByType = {
+        logs: new Map([
+          ["aws_metrics", 0],
+          ["web", 0],
+        ]),
+      };
+      expect(await detectedStreams(cloudwatch(), streams, read)).toEqual(["aws_metrics"]);
+    });
+
+    it("matches the named stream in any case without reading schemas", async () => {
+      read.mockClear();
+      const streams = org({ logs: ["CloudWatch_Metrics", "aws_metrics"] });
+      expect(await detectedStreams(cloudwatch(), streams, read)).toEqual(["CloudWatch_Metrics"]);
+      expect(read).not.toHaveBeenCalled();
+    });
+
+    it("keeps exact-name detection for a pack without a role", async () => {
+      read.mockClear();
+      const streams = org({ logs: ["aws_metrics"] });
+      expect(await detectedStreams(cloudwatch([]), streams, read)).toEqual([]);
+      expect(read).not.toHaveBeenCalled();
+    });
+  });
+
   it("finds nothing for a pack with no detection rule", async () => {
     expect(await detectedStreams(pack({}), org({ metrics: ["a"] }), noColumns)).toEqual([]);
   });
