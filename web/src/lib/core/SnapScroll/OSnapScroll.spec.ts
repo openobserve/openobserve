@@ -59,10 +59,78 @@ describe("OSnapScroll", () => {
     expect(scrollTo).not.toHaveBeenCalled();
   });
 
-  it("does not force-snap scroll positions", () => {
-    wrapper = mountScroll();
-    const classes = wrapper.find('[data-test="o-snap-scroll"]').classes();
-    expect(classes.some((c) => /snap-(y|mandatory|proximity|start)/.test(c))).toBe(false);
+  describe("when a scroll stops", () => {
+    const fullViewTops = { one: 0, two: 500, three: 1000 };
+    const stopAt = (root: HTMLElement, top: number) => {
+      root.scrollTop = top;
+      root.dispatchEvent(new Event("scrollend"));
+    };
+    const withTops = (next: Record<string, number>, run: () => void) => {
+      const saved = { ...tops };
+      Object.assign(tops, next);
+      try {
+        run();
+      } finally {
+        Object.assign(tops, saved);
+      }
+    };
+
+    it("glides on to the section it was heading for when two are in view", () => {
+      withTops(fullViewTops, () => {
+        wrapper = mountScroll();
+        const { root, scrollTo } = layOut(wrapper);
+        stopAt(root, 120);
+        expect(scrollTo).toHaveBeenLastCalledWith({ top: 500, behavior: "smooth" });
+        stopAt(root, 500);
+        scrollTo.mockClear();
+        stopAt(root, 420);
+        expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "smooth" });
+      });
+    });
+
+    it("stays anywhere inside a section taller than the view", () => {
+      withTops({ one: 0, two: 1000, three: 1400 }, () => {
+        wrapper = mountScroll();
+        const { root, scrollTo } = layOut(wrapper);
+        stopAt(root, 300);
+        expect(scrollTo).not.toHaveBeenCalled();
+      });
+    });
+
+    it("leaves the position alone while the content flows", () => {
+      withTops(fullViewTops, () => {
+        wrapper = mountScroll(false);
+        const { root, scrollTo } = layOut(wrapper);
+        stopAt(root, 120);
+        expect(scrollTo).not.toHaveBeenCalled();
+      });
+    });
+
+    it("waits for a pause in scrolling where the browser has no scrollend", () => {
+      let owner: object | null = window;
+      while (owner && !Object.prototype.hasOwnProperty.call(owner, "onscrollend")) {
+        owner = Object.getPrototypeOf(owner);
+      }
+      const descriptor = owner && Object.getOwnPropertyDescriptor(owner, "onscrollend");
+      if (owner) delete (owner as { onscrollend?: unknown }).onscrollend;
+      expect("onscrollend" in window).toBe(false);
+      vi.useFakeTimers();
+      try {
+        withTops(fullViewTops, () => {
+          wrapper = mountScroll();
+          const { root, scrollTo } = layOut(wrapper);
+          root.scrollTop = 120;
+          root.dispatchEvent(new Event("scroll"));
+          vi.advanceTimersByTime(149);
+          expect(scrollTo).not.toHaveBeenCalled();
+          vi.advanceTimersByTime(1);
+          expect(scrollTo).toHaveBeenLastCalledWith({ top: 500, behavior: "smooth" });
+        });
+      } finally {
+        vi.useRealTimers();
+        if (owner && descriptor) Object.defineProperty(owner, "onscrollend", descriptor);
+      }
+    });
   });
 
   it("pages one stop at a time", () => {

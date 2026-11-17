@@ -8,7 +8,10 @@
  * keeps it clear of a sticky header). A stop only counts while its
  * section is taller than the scroller. Every section is at least one view
  * tall, so one section fills the view. The wheel and trackpad scroll freely;
- * PageDown/Space moves one stop and Alt+Down/Up a whole section.
+ * a scroll that stops with two sections in view glides on to the next one in
+ * its direction, so only one shows at rest. A section taller than the view
+ * rests anywhere it covers the view. PageDown/Space moves one stop and
+ * Alt+Down/Up a whole section.
  */
 export interface OSnapScrollProps {
   /** Scroll in its own box with keyboard paging between stops. When false the content flows and the page scrolls. Default: true */
