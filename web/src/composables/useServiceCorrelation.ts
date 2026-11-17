@@ -22,6 +22,7 @@ import settingsApi from "@/services/settings";
 import type {
   ServiceMetadata,
   FieldAlias,
+  CorrelationRequest,
   CorrelationResponse,
   StreamInfo,
 } from "@/services/service_streams";
@@ -125,6 +126,7 @@ export function useServiceCorrelation() {
     sourceType: TelemetryType,
     timeWindowMinutes: number = 5,
     currentStream?: string,
+    window?: { start: number; end: number },
   ): Promise<CorrelationResult | null> {
     error.value = null;
     noMatch.value = false;
@@ -163,11 +165,15 @@ export function useServiceCorrelation() {
       // This matches the backend logic and reduces unnecessary data sent to API
       const dimensions = filterDimensionsForCorrelation(allDimensions, identityConfig);
 
-      // Call the new _correlate API
-      const correlationRequest = {
+      // The record's own service is picked from every dimension it carries, tracked or not.
+      const correlationRequest: CorrelationRequest = {
         source_stream: currentStream,
         source_type: sourceType,
         available_dimensions: dimensions,
+        source_dimensions: allDimensions,
+        resolve_from_source: true,
+        start_time: window?.start,
+        end_time: window?.end,
       };
 
       const response = await serviceStreamsApi.correlate(orgIdentifier.value, correlationRequest);

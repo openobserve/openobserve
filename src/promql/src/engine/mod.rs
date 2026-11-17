@@ -293,7 +293,6 @@ pub(crate) mod tests {
             org_id: org_id.to_string(),
             query_exemplars: false,
             query_data: false,
-            need_wal: false,
             use_cache: false,
             timeout,
             search_event_type: None,

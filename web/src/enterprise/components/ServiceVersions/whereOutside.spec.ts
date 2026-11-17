@@ -106,21 +106,14 @@ describe("no-env, no-where scope on every surface", () => {
     expect(wrapper.text()).not.toMatch(/default/i);
   });
 
-  it("correlation header: env and where chips print no default", async () => {
+  it("correlation header: no env chip and no default printed", async () => {
     wrapper = mount(CorrelationScopeChips, {
-      props: { scope: noEnvNoWhere },
+      props: { scope: noEnvNoWhere, service: noEnvNoWhere.service, instanceVersion: null },
       global: { stubs: { ...tip, VerdictChip: true } },
     });
     await flushPromises();
-    expect(wrapper.get('[data-test="svcver-correlation-where"]').text()).toContain(
-      "Outside Kubernetes",
-    );
-    expect(wrapper.find('[data-test="svcver-env-none"]').exists()).toBe(true);
-    const envAndWhere = [
-      wrapper.get('[data-test="svcver-correlation-env-chip"]').text(),
-      wrapper.get('[data-test="svcver-correlation-where"]').text(),
-    ].join(" ");
-    expect(envAndWhere).not.toMatch(/default/i);
+    expect(wrapper.find('[data-test="svcver-correlation-env-chip"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toMatch(/default/i);
   });
 });
 

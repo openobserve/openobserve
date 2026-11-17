@@ -80,36 +80,11 @@ pub fn is_ranked_by_non_timestamp(
         .is_some_and(|(field, _)| !is_timestamp_field(field, ts_column))
 }
 
-/// Extracts the min and max timestamps from a set of hits.
-///
-/// For time-ordered results, this uses an optimization by only checking the first and last hits.
-/// For non-ordered results (e.g., histogram with `ORDER BY count DESC`), it scans all hits.
-///
-/// # Arguments
-/// * `hits` - The result hits to scan
-/// * `ts_column` - The timestamp column name
-/// * `is_time_ordered` - If `true`, uses first/last optimization; if `false`, scans all hits
-///
-/// # Returns
-/// A tuple of `(min_timestamp, max_timestamp)`
-pub fn extract_timestamp_range(
-    hits: &[config::utils::json::Value],
-    ts_column: &str,
-    is_time_ordered: bool,
-) -> (i64, i64) {
-    if is_time_ordered {
-        // Fast path: results are sorted by time, just check first and last
-        let first_ts = get_ts_value(ts_column, hits.first().unwrap());
-        let last_ts = get_ts_value(ts_column, hits.last().unwrap());
-        (first_ts.min(last_ts), first_ts.max(last_ts))
-    } else {
-        // Slow path: results are not time-ordered, must scan all hits
-        hits.iter()
-            .map(|hit| get_ts_value(ts_column, hit))
-            .fold((i64::MAX, i64::MIN), |(min_ts, max_ts), ts| {
-                (min_ts.min(ts), max_ts.max(ts))
-            })
-    }
+/// Returns `(min, max)` of the first and last hit; cached hits are always time-ordered.
+pub fn extract_timestamp_range(hits: &[config::utils::json::Value], ts_column: &str) -> (i64, i64) {
+    let first_ts = get_ts_value(ts_column, hits.first().unwrap());
+    let last_ts = get_ts_value(ts_column, hits.last().unwrap());
+    (first_ts.min(last_ts), first_ts.max(last_ts))
 }
 
 #[cfg(test)]
@@ -206,31 +181,18 @@ mod tests {
             json!({"_timestamp": 2000i64}),
             json!({"_timestamp": 3000i64}),
         ];
-        let (min_ts, max_ts) = extract_timestamp_range(&hits, "_timestamp", true);
-        assert_eq!(min_ts, 1000);
-        assert_eq!(max_ts, 3000);
-    }
-
-    #[test]
-    fn test_extract_timestamp_range_not_time_ordered() {
-        let hits = vec![
-            json!({"_timestamp": 3000i64}),
-            json!({"_timestamp": 1000i64}),
-            json!({"_timestamp": 2000i64}),
-        ];
-        let (min_ts, max_ts) = extract_timestamp_range(&hits, "_timestamp", false);
+        let (min_ts, max_ts) = extract_timestamp_range(&hits, "_timestamp");
         assert_eq!(min_ts, 1000);
         assert_eq!(max_ts, 3000);
     }
 
     #[test]
     fn test_extract_timestamp_range_reverse_ordered() {
-        // time_ordered=true but reversed — function uses first/last min/max
         let hits = vec![
             json!({"_timestamp": 3000i64}),
             json!({"_timestamp": 1000i64}),
         ];
-        let (min_ts, max_ts) = extract_timestamp_range(&hits, "_timestamp", true);
+        let (min_ts, max_ts) = extract_timestamp_range(&hits, "_timestamp");
         assert_eq!(min_ts, 1000);
         assert_eq!(max_ts, 3000);
     }

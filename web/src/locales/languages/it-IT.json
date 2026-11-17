@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "Il numero di pagina è fuori intervallo. Fornisci un numero di pagina valido.",
       "noMatchingService": "Nessun servizio corrispondente trovato per la correlazione",
       "unableToRetrieveCorrelation": "Impossibile recuperare i dati di correlazione",
-      "noMetricStreams": "Nessuno stream di metrica trovato per il servizio \"{service}\"",
       "correlationError": "Errore di correlazione: {error}",
       "contentCopied": "Contenuto copiato con successo!",
       "noTraceIdForInspection": "Nessun ID traccia disponibile per l'ispezione"

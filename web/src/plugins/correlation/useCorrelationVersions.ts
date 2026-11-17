@@ -6,18 +6,22 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import { isTraceBacked } from "@/types/serviceRef";
 import { streamTraceRows } from "./correlationStream";
 import {
+  instancePinSql,
+  instanceVersionFilter,
+  instanceWhereSql,
+  instanceWheres,
+  instanceWindow,
+  latestVersion,
   pickScope,
-  podWhereColumns,
-  podWheres,
-  podWhereSql,
-  podWindow,
   scopeByOwnPlace,
   summarizeVersions,
   versionColumns,
   versionsSql,
+  whereColumns,
+  type CorrelationInstance,
   type CorrelationPlace,
-  type PodWhereRow,
   type VersionPodRow,
+  type WhereRow,
 } from "./correlationVersions";
 
 export interface CorrelationScopeInput {
@@ -27,9 +31,12 @@ export interface CorrelationScopeInput {
   displaySource: Ref<string | undefined>;
   place: Ref<CorrelationPlace>;
   enabled: Ref<boolean>;
-  /** The trace stream and log time (microseconds) a pod read needs; without them the pod step is skipped. */
+  /** The trace stream, its applied filters and the log time (microseconds) the instance reads need. */
   traceStream?: Ref<string | undefined>;
+  traceFilter?: Ref<string>;
   logTime?: Ref<number | undefined>;
+  /** The record's own instance; without one the header keeps the catalogue version. */
+  instance?: Ref<CorrelationInstance | undefined>;
 }
 
 export interface CorrelationVersionsInput extends CorrelationScopeInput {
@@ -41,13 +48,7 @@ export interface CorrelationVersionsInput extends CorrelationScopeInput {
   endTime: Ref<number>;
 }
 
-/** How a scope was picked from the log row's pod, for the where chip's tooltip. */
-export interface ScopeByPod {
-  pod: string;
-  logCluster?: string;
-}
-
-/** The column names of a trace stream, shared by the versions read and the pod read. */
+/** The column names of a trace stream, shared by the versions read and the instance reads. */
 function useTraceFields(org: Ref<string>, stream: Ref<string | undefined>, enabled: Ref<boolean>) {
   const schema = useQuery(
     computed(() => ({
@@ -67,20 +68,22 @@ function useTraceFields(org: Ref<string>, stream: Ref<string | undefined>, enabl
   );
 }
 
-/** The scope (env, where, version, verdict) of a trace-backed display name, or null. */
+/** The scope (env, where, version, verdict) of a trace-backed display name, and the version its log's instance runs. */
 export function useCorrelationScope(input: CorrelationScopeInput) {
   const service = computed(() =>
     isTraceBacked(input.displaySource.value) ? input.displayName.value || "" : "",
   );
   const tracesLock = useLicenseLock("traces");
+  const servicesEnabled = computed(
+    () => input.enabled.value && !!service.value && !!input.org.value && !tracesLock.locked.value,
+  );
   const services = useQuery(
     computed(() => ({
       ...servicesQuery(input.org.value, input.user.value, {
         signal: "traces",
         service: service.value,
       }),
-      enabled:
-        input.enabled.value && !!service.value && !!input.org.value && !tracesLock.locked.value,
+      enabled: servicesEnabled.value,
       retry: false,
     })),
   );
@@ -89,74 +92,144 @@ export function useCorrelationScope(input: CorrelationScopeInput) {
   );
   const traceStream = computed(() => input.traceStream?.value);
   const logTime = computed(() => input.logTime?.value);
-  // The pod is asked only when the row's own place cannot decide, so most rows make no extra read.
-  const podWanted = computed(
+  const applied = computed(() => input.traceFilter?.value ?? "");
+  // The record's spans are asked only when its own place cannot decide, so most rows make no extra read.
+  const whereWanted = computed(
     () =>
+      servicesEnabled.value &&
       !!scopes.value &&
-      !!input.place.value.pod &&
+      !!applied.value &&
       !!traceStream.value &&
       logTime.value !== undefined &&
       scopeByOwnPlace(scopes.value, service.value, input.place.value) === undefined,
   );
-  const fields = useTraceFields(input.org, traceStream, podWanted);
+  const fields = useTraceFields(input.org, traceStream, whereWanted);
   const columns = computed(() =>
-    Array.isArray(fields.value) ? podWhereColumns(fields.value) : null,
+    Array.isArray(fields.value) ? whereColumns(fields.value, input.place.value.groups) : null,
   );
-  const podRead = useQuery(
+  const instance = computed(() => input.instance?.value);
+  // The source instance names one place where service-only filters span several.
+  const wherePin = computed(() =>
+    Array.isArray(fields.value) && instance.value
+      ? instancePinSql(fields.value, instance.value)
+      : null,
+  );
+  const whereRead = useQuery(
     computed(() => ({
       queryKey: [
-        "svcver-correlation-pod-where",
+        "svcver-correlation-instance-where",
         input.org.value,
         traceStream.value,
         service.value,
-        input.place.value.pod,
+        applied.value,
+        wherePin.value,
         logTime.value,
         columns.value,
       ],
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        const rows = await streamTraceRows<PodWhereRow>({
+        const rows = await streamTraceRows<WhereRow>({
           org: input.org.value,
-          sql: podWhereSql(
+          sql: instanceWhereSql(
             traceStream.value || "",
             service.value,
-            input.place.value.pod || "",
-            columns.value ?? { pod: "", service: null },
+            applied.value,
+            columns.value ?? { service: [] },
+            wherePin.value,
           ),
-          ...podWindow(logTime.value ?? 0),
+          ...instanceWindow(logTime.value ?? 0),
           size: 2,
           signal,
         });
-        return podWheres(rows);
+        return instanceWheres(rows);
       },
-      enabled: podWanted.value && !!columns.value,
+      enabled: whereWanted.value && !!columns.value,
       retry: false,
       staleTime: 60_000,
     })),
   );
-  // A stream with no pod or where column cannot answer, so the pod step falls through as if no pod were known.
-  const podState = computed<string[] | null | undefined | "pending">(() => {
-    if (!podWanted.value) return undefined;
-    if (fields.value === null || podRead.isError.value) return null;
+  // A stream with no where column cannot answer, so the step falls through as if the spans named nothing.
+  const whereState = computed<string[] | null | undefined | "pending">(() => {
+    if (!whereWanted.value) return undefined;
+    if (fields.value === null || whereRead.isError.value) return null;
     if (fields.value === "pending") return "pending";
     if (!columns.value) return undefined;
-    return podRead.data.value ?? "pending";
+    return whereRead.data.value ?? "pending";
   });
   const scope = computed(() => {
-    const state = podState.value;
+    const state = whereState.value;
     if (!scopes.value || state === "pending") return null;
     return pickScope(scopes.value, service.value, input.place.value, state);
   });
-  const byPod = computed<ScopeByPod | null>(() => {
-    const state = podState.value;
-    if (!scope.value || !Array.isArray(state) || state.length !== 1) return null;
-    return { pod: input.place.value.pod || "", logCluster: input.place.value.cluster };
+  const scopePending = computed(
+    () => (servicesEnabled.value && services.isPending.value) || whereState.value === "pending",
+  );
+  const instanceKnown = computed(
+    () => !!instance.value?.pinned || Object.keys(instance.value?.dimensions ?? {}).length > 0,
+  );
+  // Pinned to the resolved scope's place: a same-named instance elsewhere must not lend its version.
+  const instanceWanted = computed(
+    () =>
+      servicesEnabled.value &&
+      instanceKnown.value &&
+      !!scope.value &&
+      !!applied.value &&
+      !!traceStream.value &&
+      logTime.value !== undefined,
+  );
+  const instanceFields = useTraceFields(input.org, traceStream, instanceWanted);
+  // Another instance of the service may run a newer version, so an unpinned read falls back to the catalogue.
+  const instanceQuery = computed(() => {
+    if (!Array.isArray(instanceFields.value) || !scope.value || !instance.value) return null;
+    const pin = instancePinSql(instanceFields.value, instance.value);
+    if (!pin && !instance.value.pinned) return null;
+    return instanceVersionFilter(
+      instanceFields.value,
+      applied.value,
+      scope.value,
+      pin,
+      instance.value.groups,
+    );
   });
-  return { scope, byPod };
+  const instanceRead = useQuery(
+    computed(() => ({
+      queryKey: [
+        "svcver-correlation-instance-version",
+        input.org.value,
+        traceStream.value,
+        logTime.value,
+        instanceQuery.value,
+      ],
+      queryFn: async ({ signal }: { signal: AbortSignal }) => {
+        const filter = instanceQuery.value;
+        if (!filter) return null;
+        const rows = await streamTraceRows<VersionPodRow>({
+          org: input.org.value,
+          sql: versionsSql(traceStream.value || "", filter, { pod: null }),
+          ...instanceWindow(logTime.value ?? 0),
+          size: 50,
+          signal,
+        });
+        return latestVersion(rows);
+      },
+      enabled: instanceWanted.value && !!instanceQuery.value,
+      retry: false,
+      staleTime: 60_000,
+    })),
+  );
+  // Undefined while the read is still out, so the header never shows one version and then swaps it.
+  const instanceVersion = computed<string | null | undefined>(() => {
+    if (!instanceWanted.value) return scopePending.value ? undefined : null;
+    if (instanceFields.value === null || instanceRead.isError.value) return null;
+    if (instanceFields.value === "pending") return undefined;
+    if (!instanceQuery.value) return null;
+    return instanceRead.data.value === undefined ? undefined : instanceRead.data.value;
+  });
+  return { scope, instanceVersion };
 }
 
 /** The scope and the per-version pod counts of the correlated trace stream. */
 export function useCorrelationVersions(input: CorrelationVersionsInput) {
-  const { scope, byPod } = useCorrelationScope({
+  const { scope, instanceVersion } = useCorrelationScope({
     ...input,
     enabled: computed(() => input.enabled.value && input.scopeEnabled.value),
   });
@@ -166,7 +239,7 @@ export function useCorrelationVersions(input: CorrelationVersionsInput) {
   // Streams stamped before versions existed, or sent without Kubernetes attributes, lack a column the read needs.
   const fields = useTraceFields(input.org, input.traceStream, ready);
   const columns = computed(() =>
-    Array.isArray(fields.value) ? versionColumns(fields.value) : null,
+    Array.isArray(fields.value) ? versionColumns(fields.value, input.instance?.value) : null,
   );
   const versionRows = useQuery(
     computed(() => ({
@@ -200,8 +273,8 @@ export function useCorrelationVersions(input: CorrelationVersionsInput) {
   );
   const summary = computed(() =>
     versionRows.data.value && !versionRows.isError.value && columns.value
-      ? summarizeVersions(versionRows.data.value, input.place.value.pod, !!columns.value.pod)
-      : { versions: [], sourcePodVersion: null },
+      ? summarizeVersions(versionRows.data.value, !!columns.value.pod)
+      : { versions: [] },
   );
-  return { scope, byPod, summary };
+  return { scope, instanceVersion, summary };
 }

@@ -37,7 +37,7 @@ export class QuickFilterCardsPage {
   }
 
   async gotoPublicLinks() {
-    await this.page.goto(`/web/dashboards/public-links?org_identifier=${ORG()}`);
+    await this.page.goto(`/web/dashboards?org_identifier=${ORG()}&folder=__public_links__`);
     await expect(this.page.locator(LISTS.publicLinks.table)).toBeVisible({ timeout: 30000 });
   }
 

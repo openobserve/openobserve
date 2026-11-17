@@ -368,6 +368,7 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { correlatedByKeys, correlatedByLabel, useLocationDimensions } from "./correlationHeader";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -1365,18 +1366,26 @@ const subjectSemanticIds = computed<Set<string>>(() => {
     : new Set();
 });
 
+const locationIds = useLocationDimensions(
+  computed(() => store.state.selectedOrganization.identifier),
+);
 const unifiedChips = computed<DimensionChip[]>(() =>
-  Object.keys(chipDimensionSource.value)
-    .filter((key) => !subjectSemanticIds.value.has(key))
-    .map(
-      (key) =>
-        ({
-          key,
-          label: raw(dimensionDisplayLabel(key)),
-          value: chipDimensionSource.value[key],
-          kind: "context" as DimensionChip["kind"],
-        }) as DimensionChip,
-    ),
+  correlatedByKeys(
+    Object.keys(chipDimensionSource.value).filter((key) => !subjectSemanticIds.value.has(key)),
+    props.logStreams,
+    props.semanticGroups ?? [],
+    locationIds.value,
+  ).map(
+    (key) =>
+      ({
+        key,
+        label: raw(
+          correlatedByLabel(key, props.semanticGroups ?? []) ?? dimensionDisplayLabel(key),
+        ),
+        value: chipDimensionSource.value[key],
+        kind: "context" as DimensionChip["kind"],
+      }) as DimensionChip,
+  ),
 );
 </script>
 

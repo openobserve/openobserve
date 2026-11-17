@@ -265,7 +265,6 @@ mod tests {
             org_id: "o".to_string(),
             query_exemplars,
             query_data: false,
-            need_wal: false,
             use_cache: false,
             timeout: 1,
             search_event_type: None,

@@ -31,6 +31,7 @@
 import { type I18nKey } from "@/types/i18n";
 import type { AiAlertKind } from "@/utils/alerts/prefill/fromAi";
 import { LLM_ERRORS_COLOR, LLM_TRACES_COLOR } from "@/utils/dashboard/colorPalette";
+import { quoteStream } from "@/composables/firstEvent/confirmQuery";
 
 export type LLMPanelType =
   | "stacked-area"
@@ -152,7 +153,7 @@ export const PARENT_SPAN_FIELD = "reference_parent_span_id";
 
 /** Joins each span to its `invoke_agent` parent; without the parent column every agent span is top-level. Mirrors `agent_parents_join` in session.rs. */
 export function agentParentsJoin(stream: string, hasParentSpan: boolean): string {
-  const agents = `SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS agent_parent_span FROM "${stream}"`;
+  const agents = `SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS agent_parent_span FROM ${quoteStream(stream)}`;
   return hasParentSpan
     ? ` LEFT JOIN (${agents} WHERE ${AGENT_SPAN}) AS agent_parents ` +
         `ON trace_id = agent_parent_trace AND ${PARENT_SPAN_FIELD} = agent_parent_span`
@@ -392,7 +393,7 @@ export function renderPanelSql(
 ): string {
   const marked = sql.includes("{{scope}}");
   const rendered = sql
-    .replace(/\{\{stream\}\}/g, `"${ctx.stream}"`)
+    .replace(/\{\{stream\}\}/g, () => quoteStream(ctx.stream))
     .replace(/\{\{startTime\}\}/g, String(ctx.startTime))
     .replace(/\{\{endTime\}\}/g, String(ctx.endTime))
     .replace(/\{\{interval\}\}/g, ctx.interval)

@@ -72,12 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
             variant="outline"
-            size="icon-toolbar"
+            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
             @click="addPanelData"
             data-test="dashboard-panel-add"
             icon-left="add"
             :aria-label="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
           >
+            <template v-if="!isMobile">{{ t("panel.add") }}</template>
             <OTooltip
               :content="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
               shortcut-id="dashboardAddPanel"

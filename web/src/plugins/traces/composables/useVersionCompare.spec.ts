@@ -32,7 +32,8 @@ vi.mock("./useLLMInsights", () => ({
       hasLoadedOnce: ref(false),
       availableStreams: ref([]),
       streamsLoaded: ref(false),
-      fetchAll: vi.fn(async () => {}),
+      // Like the real composable: resolves to a snapshot, or null when failed or superseded.
+      fetchAll: vi.fn(async () => ({ kpi: {}, sparklines: {} })),
       cancelAll: vi.fn(),
     };
     mockInstances.push(instance);
@@ -276,6 +277,61 @@ describe("useVersionCompare — run", () => {
 
     expect(vc.sampledNote.value).toBeTruthy();
     expect(typeof vc.sampledNote.value).toBe("string");
+  });
+});
+
+describe("useVersionCompare — a run that cannot finish writes no result", () => {
+  const pair = () => [
+    makeAgent({ version: "1.5.0" }),
+    makeAgent({ version: "1.4.0", first_seen: 1000 * H - 200 * H, last_seen: 1000 * H - 100 * H }),
+  ];
+
+  it.each([
+    {
+      // A re-run for a new window keeps the pair, so the earlier result must be cleared.
+      name: "an arm's KPI fetch failed on a re-run",
+      act: async (vc: any) => {
+        await vc.run("traces_stream");
+        expect(vc.result.value).not.toBeNull();
+        mockInstances[1].fetchAll = vi.fn(async () => null);
+        await vc.run("traces_stream");
+      },
+    },
+    {
+      name: "a new pair was set while the arms were fetching",
+      act: async (vc: any) => {
+        const run = vc.run("traces_stream");
+        const [a, b] = pair();
+        mockInstances[0].cancelAll.mockClear();
+        vc.setPair(b, a);
+        // The old pair's arm queries are cancelled, not left to write into the arms.
+        expect(mockInstances[0].cancelAll).toHaveBeenCalled();
+        await run;
+      },
+    },
+    {
+      // The raw-sample query never answers; cancel() must settle it so run() resolves.
+      name: "compare was cancelled during the raw-sample queries",
+      act: async (vc: any) => {
+        mockFetchRawSample.mockImplementation(
+          async (_s: string, _f: string, start: number, end: number, runner: any) => {
+            await runner("SELECT 1", start, end);
+            return { durations: [1], costs: [1] };
+          },
+        );
+        const run = vc.run("traces_stream");
+        await vi.waitFor(() => expect(mockFetchRawSample).toHaveBeenCalledTimes(2));
+        vc.cancel();
+        await run;
+      },
+    },
+  ])("$name", async ({ act }) => {
+    const vc = useVersionCompare();
+    const [a, b] = pair();
+    vc.setPair(a, b);
+    await act(vc);
+    expect(vc.result.value).toBeNull();
+    expect(vc.sampledNote.value).toBeNull();
   });
 });
 
