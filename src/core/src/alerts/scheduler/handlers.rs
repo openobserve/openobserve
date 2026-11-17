@@ -6233,10 +6233,6 @@ fn next_run_after(
     }
 }
 
-#[cfg(test)]
-#[path = "derived_stream_run_tests.rs"]
-mod derived_stream_run_tests;
-
 /// Compares full keys, because a parsed key holds only the first part of a name with a slash.
 async fn check_trigger_key(
     trigger: &db::scheduler::Trigger,
@@ -10814,3 +10810,7 @@ mod tests {
         assert!(infra::scheduler::get(&org, module, "engine").await.is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "derived_stream_run_tests.rs"]
+mod derived_stream_run_tests;
