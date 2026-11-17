@@ -194,10 +194,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         v-else-if="searchObj.data.errorMsg !== '' && !searchObj.loading"
                         data-test="traces-search-error-message"
-                        class="bg-card-glass-bg h-full"
+                        class="bg-card-glass-bg flex h-full flex-col"
                       >
+                        <!-- D4: the RED strip keeps its place above a failed query, each panel with its own state. -->
+                        <TracesMetricsDashboard
+                          v-if="searchObj.meta.sqlMode && searchObj.meta.searchMode === 'spans'"
+                          v-show="searchObj.meta.showHistogram"
+                          class="shrink-0"
+                          :stream-name="searchObj.data.stream.selectedStream.value"
+                          :stream-fields="searchObj.data.stream.selectedStreamFields"
+                          :show="true"
+                          :ai-enabled="isAiEnabled"
+                          @time-range-selected="setHistogramDate"
+                          @editor-filter-set="onMetricsEditorFilterSet"
+                          @editor-filter-run="onMetricsEditorFilterRun"
+                          @send-to-ai-chat="sendToAiChat"
+                        />
                         <TracesSqlErrorState
                           v-if="searchObj.meta.sqlMode"
+                          class="min-h-0 flex-1"
                           :error-code="searchObj.data.errorCode"
                           :error-msg="searchObj.data.errorMsg"
                           :error-detail="searchObj.data.errorDetail"
@@ -404,7 +419,11 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
-import { tracesRunIsStaged, tracesSearchRunSignature } from "./tracesSearchBar.utils";
+import {
+  tracesEditorIsStaged,
+  tracesRunIsStaged,
+  tracesSearchRunSignature,
+} from "./tracesSearchBar.utils";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import analytics from "@/services/product_analytics";
@@ -499,6 +518,9 @@ defineOptions({ name: "AppTraces" });
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
 const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
+const TracesMetricsDashboard = defineAsyncComponent(
+  () => import("./metrics/TracesMetricsDashboard.vue"),
+);
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 const ServicesCatalog = defineAsyncComponent(() => import("./ServicesCatalog.vue"));
 
@@ -1334,10 +1356,6 @@ async function getQueryData(
 
             if (response.content?.results?.is_partial === true) requestState.isPartial = true;
 
-            const eligible = response.content?.results?.is_histogram_eligible;
-            if (submittedSql && typeof eligible === "boolean") {
-              searchObj.data.queryResults.is_histogram_eligible = eligible;
-            }
             if (submittedSql && response.content?.results?.is_partial === true) {
               searchObj.data.queryResults.is_partial = true;
             }
@@ -2253,9 +2271,7 @@ const onSearchModeChange = (mode: TraceSearchMode, entrySql?: string) => {
   const { view, waitForRun } = normalizeTracesView(mode, { kind: "move", sql: entrySql });
   if (view === "service-graph" || view === "services-catalog") return;
   // SQL that stayed on through a graph or catalog view runs again only if it ran here unedited.
-  const edited =
-    searchObj.meta.sqlMode &&
-    String(searchObj.data.editorValue ?? "") !== searchObj.data.appliedEditorValue;
+  const edited = searchObj.meta.sqlMode && tracesEditorIsStaged(searchObj);
   if (waitForRun || edited) sqlRanView.value = null;
   showViewResults(!waitForRun && !sqlAwaitingRun.value);
 };

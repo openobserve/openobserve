@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, reactive } from "vue";
 import { createStore } from "vuex";
@@ -33,6 +33,36 @@ import {
 // ---------------------------------------------------------------------------
 vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   default: { template: '<div data-test="render-dashboard-charts"></div>' },
+}));
+
+vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
+  default: {
+    name: "PanelSchemaRenderer",
+    template: '<div data-test="panel-schema-renderer-stub"></div>',
+    props: [
+      "panelSchema",
+      "selectedTimeObj",
+      "variablesData",
+      "forceLoad",
+      "searchResponse",
+      "searchType",
+    ],
+    emits: ["updated:data-zoom"],
+  },
+}));
+
+// The combined RED query goes out here; each call waits for the test to answer it.
+const stream = vi.hoisted(() => ({
+  calls: [] as { payload: any; handlers: any }[],
+  cancel: vi.fn(),
+}));
+
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: (payload: any, handlers: any) =>
+      stream.calls.push({ payload, handlers }),
+    cancelStreamQueryBasedOnRequestId: stream.cancel,
+  }),
 }));
 
 vi.mock("./TracesLatencyHeatmap.vue", () => ({
@@ -81,6 +111,7 @@ const mockSearchObj = reactive({
       selectedStream: { value: "default" },
       selectedStreamFields: [],
       userDefinedSchema: [],
+      streamLists: [] as { value: string }[],
     },
   },
   meta: {
@@ -137,6 +168,7 @@ vi.mock("@/utils/zincutils", () => ({
   }),
   useLocalTimezone: vi.fn().mockReturnValue("UTC"),
   b64EncodeUnicode: vi.fn().mockImplementation((str: string) => btoa(str)),
+  generateTraceContext: vi.fn(() => ({ traceId: `trace-${stream.calls.length}` })),
   b64DecodeUnicode: vi.fn().mockImplementation((str: string) => atob(str)),
 }));
 
@@ -247,6 +279,13 @@ function getHeatmapSql(wrapper: VueWrapper<any>): string {
   return wrapper.vm.heatmapRequest?.sql ?? "";
 }
 
+let realParser: unknown;
+
+beforeAll(async () => {
+  const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
+  realParser = new mod.default.Parser();
+});
+
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
@@ -269,6 +308,9 @@ describe("TracesMetricsDashboard", () => {
     mockSearchObj.data.stream.selectedStream.value = "default";
     mockSearchObj.data.stream.selectedStreamFields = [];
     mockSearchObj.data.stream.userDefinedSchema = [];
+    mockSearchObj.data.stream.streamLists = [];
+    mockTracesParser.value = null;
+    stream.calls.length = 0;
 
     wrapper = mountComponent();
     await flushPromises();
@@ -510,9 +552,12 @@ describe("TracesMetricsDashboard", () => {
         mockSearchObj.meta.searchMode = "spans";
         mockSearchObj.meta.sqlMode = true;
         mockSearchObj.data.editorValue = `SELECT * FROM "default" WHERE a = 1`;
+        mockTracesParser.value = realParser;
         await wrapper.vm.loadDashboard();
         await flushPromises();
-        expect(getPanelQuery(wrapper, "Rate")).not.toContain("reference_parent_span_id");
+        expect(atob(stream.calls.at(-1)!.payload.queryReq.query.sql)).not.toContain(
+          "reference_parent_span_id",
+        );
       });
 
       it("gives a brush comparison the scope the charts ran with", async () => {
@@ -670,6 +715,8 @@ describe("TracesMetricsDashboard", () => {
         sql: getHeatmapSql(wrapper),
         startTime: 3_000_000,
         endTime: 4_000_000,
+        intervalSec: 1,
+        size: -1,
       });
     });
 
@@ -1807,43 +1854,236 @@ describe("TracesMetricsDashboard", () => {
   });
 
   describe("SQL mode", () => {
+    const START = Date.UTC(2026, 9, 6, 10, 0, 0) * 1000;
+    const END = START + 5 * 60 * 1_000_000;
     const typed = `SELECT * FROM "default" WHERE service_name = 'a OR b' AND x IN (SELECT x FROM "default" WHERE y = 1) -- note
 ORDER BY start_time DESC`;
 
+    beforeEach(() => {
+      mockTracesParser.value = realParser;
+    });
+
+    afterEach(() => {
+      mockTracesParser.value = null;
+    });
+
     const remountWith = async (sql: string) => {
       wrapper.unmount();
+      stream.calls.length = 0;
       mockSearchObj.meta.sqlMode = true;
       mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.data.datetime = { startTime: START, endTime: END };
       mockSearchObj.data.editorValue = sql;
+      mockSearchObj.data.appliedEditorValue = sql;
       wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.loadDashboard();
       await flushPromises();
     };
 
-    it("feeds the panels the typed SQL's top-level WHERE, bracketed and as typed", async () => {
+    const sentSql = (index = -1) => atob(stream.calls.at(index)!.payload.queryReq.query.sql);
+    const caption = () => wrapper.find('[data-test="traces-red-caption"]');
+    const panel = (name: "rate" | "errors") =>
+      wrapper.find(`[data-test="traces-red-sql-panel-${name}"]`);
+    const panelHits = (name: "rate" | "errors") =>
+      wrapper
+        .findAllComponents({ name: "PanelSchemaRenderer" })
+        .find((c: any) => c.props("panelSchema").title === (name === "rate" ? "Rate" : "Errors"))!
+        .props("searchResponse").hits;
+    const answer = async (hits: unknown[], index = -1) => {
+      const call = stream.calls.at(index)!;
+      call.handlers.data(call.payload, {
+        type: "search_response_hits",
+        content: { results: { hits } },
+      });
+      call.handlers.complete(call.payload, {});
+      await flushPromises();
+    };
+
+    it("sends one combined query on the span set, with the WHERE once and bracketed", async () => {
       await remountWith(typed);
+      expect(stream.calls).toHaveLength(1);
       const where = `(service_name = 'a OR b' AND x IN (SELECT x FROM "default" WHERE y = 1))`;
-      expect(getPanelQuery(wrapper, "Rate")).toContain(`WHERE ${where}`);
-      expect(getPanelQuery(wrapper, "Errors")).toContain(`span_status = 'ERROR' AND ${where}`);
+      expect(sentSql()).toContain(`FROM "default" WHERE ${where} GROUP BY time_bucket`);
+      expect(sentSql().split(where)).toHaveLength(2);
+      expect(sentSql()).toContain("count(*) FILTER (WHERE span_status = 'ERROR') AS errors");
+      expect(sentSql()).not.toContain("ORDER BY start_time");
+      expect(wrapper.vm.dashboardData).toBeNull();
       expect(getHeatmapSql(wrapper)).toContain(where);
-      expect(getPanelQuery(wrapper, "Rate")).not.toContain("ORDER BY start_time");
     });
 
-    it("keeps the typed FROM alias in every panel, so an aliased WHERE resolves", async () => {
+    it("buckets by modulo and sends size -999 while the span set keeps a subquery", async () => {
+      await remountWith(typed);
+      expect(sentSql()).toContain("_timestamp - (_timestamp % 10000000) AS time_bucket");
+      expect(stream.calls[0].payload.queryReq.query.size).toBe(-999);
+      expect(wrapper.vm.heatmapRequest).toMatchObject({ size: -999, intervalSec: 10 });
+      expect(getHeatmapSql(wrapper)).toContain("_timestamp - (_timestamp % 10000000) AS x_axis");
+    });
+
+    it("keeps histogram() and size -1 for a span set with no subquery", async () => {
+      await remountWith(`SELECT * FROM "default" WHERE a = 1`);
+      expect(sentSql()).toContain("histogram(_timestamp, '10 second') AS time_bucket");
+      expect(stream.calls[0].payload.queryReq.query.size).toBe(-1);
+      expect(stream.calls[0].payload.pageType).toBe("traces");
+    });
+
+    it("keeps the typed FROM alias, so an aliased WHERE resolves", async () => {
       await remountWith(`SELECT * FROM "default" AS d WHERE d.duration > 1`);
-      expect(getPanelQuery(wrapper, "Rate")).toContain(
-        `FROM "default" AS d WHERE (d.duration > 1)`,
-      );
-      expect(getPanelQuery(wrapper, "Errors")).toContain(
-        `FROM "default" AS d WHERE span_status = 'ERROR'`,
-      );
+      expect(sentSql()).toContain(`FROM "default" AS d WHERE (d.duration > 1)`);
       expect(getHeatmapSql(wrapper)).toContain(`FROM "default" AS d WHERE (d.duration > 1)`);
     });
 
-    it("leaves the WHERE out when the typed SQL has none", async () => {
-      await remountWith(`SELECT * FROM "default" ORDER BY start_time DESC`);
-      expect(getPanelQuery(wrapper, "Rate")).not.toMatch(/WHERE/);
+    it.each([
+      `SELECT service_name, count(*) AS n FROM "default" GROUP BY service_name`,
+      `SELECT * FROM "default" WHERE a = 1 LIMIT 10`,
+      `SELECT a FROM "default" WHERE a = 1 UNION SELECT a FROM "default" WHERE a = 2`,
+      `SELECT * FROM "default" p JOIN "default" c ON p.trace_id = c.trace_id WHERE c.a = 1`,
+    ])("keeps the strip and runs RED for %s", async (sql) => {
+      await remountWith(sql);
+      expect(stream.calls).toHaveLength(1);
+      expect(panel("rate").exists()).toBe(true);
+      expect(panel("errors").exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-latency-heatmap"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-red-frame"]').exists()).toBe(false);
+    });
+
+    it.each([
+      [
+        `SELECT service_name, count(*) AS n FROM "default" WHERE a = 1 GROUP BY service_name HAVING count(*) > 1`,
+        "Charts: all 7 matched spans · GROUP BY, HAVING not applied · Scope: all spans (your SQL decides)",
+      ],
+      [
+        `SELECT * FROM "default" WHERE a = 1 ORDER BY duration DESC LIMIT 10`,
+        "Charts: all 7 matched spans · ORDER BY, LIMIT not applied · Scope: all spans (your SQL decides)",
+      ],
+      [
+        `SELECT DISTINCT a FROM "default"`,
+        "Charts: all 7 matched spans · DISTINCT not applied · Scope: all spans (your SQL decides)",
+      ],
+      [
+        `SELECT * FROM "default" WHERE a = 1`,
+        "Charts: all 7 matched spans · Scope: all spans (your SQL decides)",
+      ],
+      [
+        `SELECT a FROM "default" WHERE a = 1 UNION ALL SELECT a FROM "default" WHERE a = 2`,
+        "Charts: spans matching any of 2 branches (overlaps counted once) · 7 spans · Scope: all spans (your SQL decides)",
+      ],
+      [
+        `SELECT * FROM "default" p JOIN "default" c ON p.trace_id = c.trace_id WHERE c.a = 1`,
+        "Charts: left-side spans in traces where your join matched · 7 spans · Scope: all spans (your SQL decides)",
+      ],
+      [
+        `WITH s AS (SELECT * FROM "default" WHERE duration > 1) SELECT * FROM s`,
+        "Charts: spans from CTE s · 7 spans · Scope: all spans (your SQL decides)",
+      ],
+      [
+        `SELECT * FROM (SELECT *, row_number() OVER (ORDER BY duration) AS rn FROM "default") WHERE rn < 3`,
+        "Charts: spans from the inner query · 7 spans · window function, outer WHERE not applied · Scope: all spans (your SQL decides)",
+      ],
+    ])("captions %s", async (sql, text) => {
+      await remountWith(sql);
+      expect(caption().text()).toContain("Charts:");
+      await answer([{ time_bucket: "2026-10-06T10:01:00", spans: 7, errors: 1 }]);
+      expect(caption().text()).toBe(text);
+    });
+
+    it("says 0 spans matched and draws flat zeros on Rate and Errors for an empty result", async () => {
+      await remountWith(`SELECT * FROM "default" WHERE a = 1`);
+      await answer([]);
+      expect(caption().text()).toBe(
+        "Charts: 0 spans matched · Scope: all spans (your SQL decides)",
+      );
+      const rate = panelHits("rate");
+      expect(rate).toHaveLength(30);
+      expect(rate.every((h: any) => h.max_rate === 0)).toBe(true);
+      expect(panelHits("errors").every((h: any) => h.error_rate === 0)).toBe(true);
+    });
+
+    it("zero-fills Rate and Errors to every bucket and keeps the counts it got", async () => {
+      await remountWith(`SELECT * FROM "default" WHERE a = 1`);
+      await answer([{ time_bucket: "2026-10-06T10:00:20", spans: 4, errors: 3 }]);
+      const rate = panelHits("rate");
+      expect(rate).toHaveLength(30);
+      expect(rate[2]).toEqual({ time_bucket: "2026-10-06T10:00:20", max_rate: 0.4 });
+      expect(rate[3]).toEqual({ time_bucket: "2026-10-06T10:00:30", max_rate: 0 });
+      expect(panelHits("errors")[2]).toEqual({ time_bucket: "2026-10-06T10:00:20", error_rate: 3 });
+    });
+
+    it("keeps only the latest batch when the server streams aggregates, so partitions are not counted twice", async () => {
+      await remountWith(`SELECT * FROM "default" WHERE a = 1`);
+      const call = stream.calls[0];
+      const hitsEvent = (hits: unknown[]) => ({
+        type: "search_response_hits",
+        content: { results: { hits } },
+      });
+      call.handlers.data(call.payload, {
+        type: "search_response_metadata",
+        content: { results: { hits: [], streaming_aggs: true } },
+      });
+      call.handlers.data(
+        call.payload,
+        hitsEvent([{ time_bucket: "2026-10-06T10:00:20", spans: 4, errors: 1 }]),
+      );
+      call.handlers.data(
+        call.payload,
+        hitsEvent([{ time_bucket: "2026-10-06T10:00:30", spans: 2, errors: 0 }]),
+      );
+      call.handlers.complete(call.payload, {});
+      await flushPromises();
+      const rate = panelHits("rate");
+      expect(rate[2]).toEqual({ time_bucket: "2026-10-06T10:00:20", max_rate: 0 });
+      expect(rate[3]).toEqual({ time_bucket: "2026-10-06T10:00:30", max_rate: 0.2 });
+    });
+
+    it("shows the error and Retry on Rate and Errors when their query fails, and Retry runs it again", async () => {
+      await remountWith(`SELECT * FROM "default" WHERE a = 1`);
+      const call = stream.calls[0];
+      call.handlers.error(call.payload, { content: { message: "Resources exhausted" } });
+      await flushPromises();
+      for (const name of ["rate", "errors"] as const) {
+        expect(panel(name).text()).toContain("Resources exhausted");
+      }
+      expect(wrapper.find('[data-test="traces-latency-heatmap"]').exists()).toBe(true);
+      expect(caption().exists()).toBe(true);
+
+      await wrapper.find('[data-test="traces-red-sql-panel-rate-retry"]').trigger("click");
+      expect(stream.calls).toHaveLength(2);
+      expect(sentSql(1)).toBe(sentSql(0));
+    });
+
+    it("cancels a RED run still going when the query runs again", async () => {
+      await remountWith(`SELECT * FROM "default" WHERE a = 1`);
+      const first = stream.calls[0].payload.traceId;
+      await wrapper.vm.loadDashboard();
+      expect(stream.cancel).toHaveBeenCalledWith({ trace_id: first, org_id: "test-org" });
+      await answer([{ time_bucket: "2026-10-06T10:00:02", spans: 9, errors: 0 }], 0);
+      expect(caption().text()).not.toContain("9");
+    });
+
+    it("keeps its place with the reason and runs nothing for a stream that is not traces", async () => {
+      mockSearchObj.data.stream.streamLists = [{ value: "default" }];
+      await remountWith(`SELECT * FROM "k8s_events" WHERE reason = 'Failed'`);
+      const frame = wrapper.find('[data-test="traces-red-frame"]');
+      expect(frame.text()).toContain("Charts need a traces stream. Your query reads k8s_events.");
+      expect(stream.calls).toHaveLength(0);
+      expect(wrapper.vm.heatmapRequest).toBeNull();
+      expect(panel("rate").exists()).toBe(false);
+
+      await frame.find("button").trigger("click");
+      await flushPromises();
+      expect(stream.calls).toHaveLength(1);
+      expect(sentSql()).toContain(`FROM "default" GROUP BY time_bucket`);
+      expect(sentSql()).not.toContain(`FROM "default" WHERE`);
+      expect(caption().text()).toBe(
+        "Charts: all spans in default · your query's filter not applied",
+      );
+      expect(wrapper.find('[data-test="traces-red-frame"]').exists()).toBe(false);
+    });
+
+    it("names the selected stream on the frame's button and says when the query cannot be read", async () => {
+      await remountWith(`SELECT * FROM "default" WHERE (a = `);
+      const frame = wrapper.find('[data-test="traces-red-frame"]');
+      expect(frame.text()).toContain("Charts can't read which spans your query picks.");
+      expect(frame.find("button").text()).toBe("Show all spans in default");
+      expect(stream.calls).toHaveLength(0);
     });
 
     it("moves only the time picker on an Errors brush", async () => {
@@ -1855,35 +2095,36 @@ ORDER BY start_time DESC`;
       expect(mockMetricsRangeFilters.size).toBe(0);
     });
 
-    it.each(["traces", "spans"] as const)(
-      "waits for Run when it mounts over unrun SQL in the %s view",
-      async (mode) => {
-        wrapper.unmount();
-        mockSearchObj.meta.sqlMode = true;
-        mockSearchObj.meta.searchMode = mode;
-        mockSearchObj.data.appliedEditorValue = `SELECT trace_id FROM "default"`;
-        mockSearchObj.data.editorValue = `SELECT trace_id FROM "default" WHERE duration > 1`;
-        wrapper = mountComponent();
-        await flushPromises();
-        expect(wrapper.vm.dashboardData).toBeNull();
-        expect(wrapper.vm.heatmapRequest).toBeNull();
+    it("waits for Run when it mounts over unrun SQL", async () => {
+      wrapper.unmount();
+      stream.calls.length = 0;
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.data.appliedEditorValue = `SELECT trace_id FROM "default"`;
+      mockSearchObj.data.editorValue = `SELECT trace_id FROM "default" WHERE duration > 1`;
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(stream.calls).toHaveLength(0);
+      expect(wrapper.vm.heatmapRequest).toBeNull();
 
-        wrapper.unmount();
-        mockSearchObj.data.appliedEditorValue = mockSearchObj.data.editorValue;
-        wrapper = mountComponent();
-        await flushPromises();
-        expect(getPanelQuery(wrapper, "Rate")).not.toBe("");
-      },
-    );
+      wrapper.unmount();
+      mockSearchObj.data.appliedEditorValue = `${mockSearchObj.data.editorValue}\n`;
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(stream.calls).toHaveLength(1);
+    });
 
-    it("loads on mount in filter mode even with an unrun edit", async () => {
+    it("loads on mount in filter mode even with an unrun edit, with no caption", async () => {
       wrapper.unmount();
       mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.searchMode = "spans";
       mockSearchObj.data.appliedEditorValue = "duration > 1";
       mockSearchObj.data.editorValue = "duration > 2";
       wrapper = mountComponent();
       await flushPromises();
       expect(getPanelQuery(wrapper, "Rate")).toContain("duration > 2");
+      expect(caption().exists()).toBe(false);
+      expect(stream.calls).toHaveLength(0);
     });
 
     it("tells the heatmap it is showing typed SQL", async () => {

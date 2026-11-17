@@ -16278,7 +16278,6 @@
         "errors": "Errors"
       },
       "noData": "ไม่มีข้อมูล",
-      "unavailable": "The latency heatmap is not available for this search",
       "loadFailed": "Failed to load the latency heatmap",
       "selection": {
         "label": "การเลือกในฮีตแมป",

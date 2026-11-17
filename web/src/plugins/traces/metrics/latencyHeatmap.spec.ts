@@ -161,6 +161,16 @@ describe("buildHeatmapGrid", () => {
     expect(grid.cells).toEqual([[2, 0, 1, 3, 0, 0]]);
   });
 
+  it("reads a modulo bucket given in microseconds like a histogram bucket", () => {
+    const fromUs = buildHeatmapGrid(
+      [{ x_axis: T0 + 20 * S, duration_bucket: 5, span_count: 3, error_count: 0 }],
+      10,
+      T0 + 5 * S,
+      T0 + 60 * S,
+    )!;
+    expect(fromUs.cells).toEqual([[2, 0, 1, 3, 0, 0]]);
+  });
+
   it("keeps empty duration rows between two modes", () => {
     const grid = buildHeatmapGrid([hit(0, 3, 1), hit(0, 9, 1)], 10, T0, T0 + 10 * S)!;
     expect(grid.rows).toEqual([3, 4, 5, 6, 7, 8, 9]);

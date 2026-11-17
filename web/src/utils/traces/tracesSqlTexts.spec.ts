@@ -84,6 +84,18 @@ describe("two texts", () => {
     expect(ctx.sqlTexts.prefill).toBeNull();
   });
 
+  it("SQL off over an erased pre-fill gives back the scope it folded in", () => {
+    const ctx = setup();
+    ctx.host.meta.scope = "root";
+    ctx.turnSqlOn();
+    ctx.host.data.editorValue = "";
+    ctx.leaveSql();
+    expect(ctx.host.meta.scope).toBe("root");
+    expect(ctx.sqlTexts.prefill).toBeNull();
+    expect(ctx.sqlTexts.scopeBeforePrefill).toBeNull();
+    expect(ctx.sqlTexts.sql).toBe("");
+  });
+
   it("gives back the folded scope only while the select still shows All spans", () => {
     const ctx = setup();
     ctx.host.meta.scope = "root";
@@ -249,6 +261,27 @@ describe("normalizeTracesView: the seven paths", () => {
     expect(ctx.host.meta.sqlMode).toBe(true);
     expect(ctx.host.data.editorValue).toBe(GROUPED);
     expect(ctx.sqlTexts.filter).toBe("service_name = 'api'");
+  });
+
+  it("3: Back or Forward to a Spans entry with the staged SQL changes nothing and does not wait", () => {
+    const ctx = spansWithSql();
+    ctx.host.meta.searchMode = "service-graph";
+    const out = ctx.normalizeTracesView("spans", { kind: "move", sql: GROUPED });
+    expect(out).toEqual({ view: "spans", waitForRun: false });
+    expect(ctx.host.data.editorValue).toBe(GROUPED);
+    expect(ctx.sqlTexts.filter).toBe("service_name = 'api'");
+  });
+
+  it("3: an entry's SQL over an untouched pre-fill gives back the scope and drops the pre-fill", () => {
+    const ctx = setup();
+    ctx.host.meta.scope = "root";
+    ctx.turnSqlOn();
+    ctx.host.meta.searchMode = "service-graph";
+    ctx.normalizeTracesView("spans", { kind: "move", sql: GROUPED });
+    expect(ctx.host.data.editorValue).toBe(GROUPED);
+    expect(ctx.sqlTexts.prefill).toBeNull();
+    expect(ctx.sqlTexts.scopeBeforePrefill).toBeNull();
+    expect(ctx.host.meta.scope).toBe("root");
   });
 
   it.each(["service-graph", "services-catalog"] as const)(

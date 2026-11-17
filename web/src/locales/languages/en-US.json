@@ -17174,7 +17174,7 @@
       "actionUnavailable": "Not available in SQL mode yet",
       "putConditionInWhere": "In SQL mode, put the condition in your WHERE clause",
       "rowsCount": "{count} row | {count} rows",
-      "redUnavailable": "RED charts are off for queries that group, aggregate, join, limit or use DISTINCT, WITH or UNION: they would not describe the rows in the table.",
+      "histogramLossWarning": "This query shape can lose spans across time partitions",
       "openInSpans": "Open in Spans view",
       "runsInSpans": "SQL runs in the Spans view",
       "backToTraces": "Back to Traces",
@@ -17286,6 +17286,40 @@
         "days": "This chart keeps the {count}-day bars you see now."
       }
     },
+    "redCaption": {
+      "matched": "Charts: all matched spans",
+      "matchedCount": "Charts: {count} matched span | Charts: all {count} matched spans",
+      "noneMatched": "Charts: 0 spans matched",
+      "cte": "Charts: spans from CTE {name}",
+      "branches": "Charts: spans matching any of {count} branch | Charts: spans matching any of {count} branches (overlaps counted once)",
+      "joinMatched": "Charts: left-side spans in traces where your join matched",
+      "joinLeft": "Charts: left-side spans matching your WHERE",
+      "inner": "Charts: spans from the inner query",
+      "stream": "Charts: all spans in {stream} · your query's filter not applied",
+      "count": "{count} span | {count} spans",
+      "notApplied": "{clauses} not applied",
+      "scope": "Scope: all spans (your SQL decides)",
+      "clause": {
+        "groupBy": "GROUP BY",
+        "having": "HAVING",
+        "distinct": "DISTINCT",
+        "orderBy": "ORDER BY",
+        "limit": "LIMIT",
+        "offset": "OFFSET",
+        "window": "window function",
+        "qualify": "QUALIFY",
+        "outerWhere": "outer WHERE",
+        "bothSidesWhere": "WHERE across both sides",
+        "join": "join"
+      }
+    },
+    "redCharts": {
+      "loadFailed": "Couldn't load this chart",
+      "notTraces": "Charts need a traces stream. Your query reads {stream}.",
+      "unreadable": "Charts can't read which spans your query picks.",
+      "shape": "Charts can't tell which spans this query picks.",
+      "showAllSpans": "Show all spans in {stream}"
+    },
     "latencyHeatmap": {
       "title": "Duration",
       "tooltipSpans": "{count} span | {count} spans",
@@ -17296,7 +17330,6 @@
         "errors": "Errors"
       },
       "noData": "No data",
-      "unavailable": "The latency heatmap is not available for this search",
       "loadFailed": "Failed to load the latency heatmap",
       "selection": {
         "label": "Heatmap selection",

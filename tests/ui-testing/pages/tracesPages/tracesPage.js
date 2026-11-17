@@ -3980,8 +3980,8 @@ export class TracesPage {
     return this.page.locator('[data-test="traces-sql-result-table"]');
   }
 
-  getRedUnavailableIcon() {
-    return this.page.locator('[data-test="traces-red-unavailable-icon"]');
+  getRedCaption() {
+    return this.page.locator('[data-test="traces-red-caption"]');
   }
 
   getRedMetricsDashboard() {

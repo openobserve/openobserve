@@ -926,6 +926,7 @@ import {
 } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
+  tracesEditorIsStaged,
   tracesRunIsStaged,
   tracesToolbarLayout,
   TRACES_TOOLBAR_WIDTHS,
@@ -1104,9 +1105,7 @@ export default defineComponent({
     // Pending when auto-run is off and the state differs from the last Run, or the editor differs from the last applied query.
     const showRunQueryPending = computed(() => {
       if (tracesRunIsStaged(searchObj, store.state.zoConfig?.auto_query_enabled)) return true;
-      const applied: unknown = searchObj.data.appliedEditorValue;
-      if (typeof applied !== "string") return false;
-      return String(searchObj.data.editorValue ?? "").trim() !== applied.trim();
+      return tracesEditorIsStaged(searchObj);
     });
     const recentListActive = ref(false);
     const { enabled: recentSearchesEnabled } = useRecentSearches();

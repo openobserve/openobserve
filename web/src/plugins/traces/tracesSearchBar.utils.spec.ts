@@ -11,6 +11,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isDatetimeChanged,
+  tracesEditorIsStaged,
   tracesRunIsStaged,
   tracesRunSignature,
   tracesSearchRunSignature,
@@ -334,5 +335,23 @@ describe("tracesToolbarLayout", () => {
 
   it("never reaches Reset in More on a mode without Reset", () => {
     expect(layout(0, { reset: false, drillDown: false }).stage).toBe("iconToggle");
+  });
+});
+
+describe("tracesEditorIsStaged", () => {
+  const obj = (editorValue: string, appliedEditorValue: unknown) => ({
+    data: { editorValue, appliedEditorValue },
+  });
+
+  it("is staged when the editor differs from the applied text", () => {
+    expect(tracesEditorIsStaged(obj("a = 2", "a = 1"))).toBe(true);
+  });
+
+  it("ignores whitespace at either end", () => {
+    expect(tracesEditorIsStaged(obj("a = 1\n ", " a = 1"))).toBe(false);
+  });
+
+  it("is not staged before anything was applied", () => {
+    expect(tracesEditorIsStaged(obj("a = 1", undefined))).toBe(false);
   });
 });
