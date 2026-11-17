@@ -23,7 +23,7 @@ import {
   nextTick,
   type Ref,
 } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, debounce, set } from "lodash-es";
@@ -2478,7 +2478,7 @@ export function useAlertForm(
     const qc = formData.value.query_condition;
     if (formData.value.is_real_time !== "false" || qc?.type !== "sql") return "passed";
     if (!String(qc.sql ?? "").trim()) return "passed";
-    const blockOnQuery = (message?: string) => {
+    const blockOnQuery = (message?: I18nText) => {
       activeTab.value = "condition";
       hooks.showSection?.("condition");
       if (message) toast({ variant: "error", message });

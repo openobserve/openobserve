@@ -9,7 +9,7 @@ import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
-import type { I18nText } from "@/types/i18n";
+import { raw, type I18nText } from "@/types/i18n";
 
 /**
  * Injected translator. Same shape as the one the alerts `*.schema.ts` factories
@@ -660,7 +660,7 @@ export const validateSqlQuery = async (
     if (sqlErrorRanges) {
       rangesFromServerError({
         code: response.data?.code,
-        message,
+        message: raw(message),
         errorDetail: response.data?.error_detail,
         sqlMode: true,
         query: formData.query_condition.sql,
