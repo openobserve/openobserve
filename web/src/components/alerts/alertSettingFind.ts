@@ -30,16 +30,14 @@ export type AlertFindId =
   | "queryMode"
   | "filters"
   | "queryEditor"
-  | "vrl"
   | "threshold"
   | "checkEvery"
-  | "cron"
   | "timezone"
   | "lookBack"
   | "cooldown"
   | "name"
   | "folder"
-  | "suppressRepeats"
+  | "destinations"
   | AnomalyFindId;
 
 /** Controls only the anomaly ("When unusual") editor has. */
@@ -50,11 +48,11 @@ export type AnomalyFindId =
   | "anomalyTraining"
   | "anomalyRetrain"
   | "anomalySensitivity"
-  | "anomalyNotifications"
+  | "anomalyRecordOnly"
   | "anomalyDestination"
   | "anomalyTemplate"
   | "anomalyDirection"
-  | "anomalyWindowShare"
+  | "anomalyWindow"
   | "anomalyPriority"
   | "anomalyTags"
   | "anomalyCheckEvery"
@@ -66,7 +64,8 @@ export interface AlertFindEntry {
   /** Older names and synonyms people search by; matched, never shown. */
   aliases: readonly string[];
   section: AlertSectionId;
-  tier: AlertSettingTier;
+  /** The control's tier, or "shown" for one that is always on screen. */
+  tier: AlertSettingTier | "shown";
   /** The block of the section the control sits in. */
   groupKey: I18nKey;
   /** The tiered setting that shows or hides this control, when it is not the entry itself. */
@@ -99,7 +98,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     section: "watch",
     tier: "shown",
     groupKey: "alerts.find.groups.data",
-    targets: ["add-alert-stream-type-cards"],
+    targets: ["add-alert-stream-type-select-dropdown"],
   },
   {
     id: "stream",
@@ -139,12 +138,12 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
   },
   {
     id: "vrl",
-    labelKey: "alerts.find.labels.vrl",
+    labelKey: "alerts.tiers.names.vrl",
     aliases: ["vrl", "function", "transform"],
     section: "condition",
-    tier: "shown",
-    groupKey: "alerts.find.groups.query",
-    targets: ["step2-view-editor-btn"],
+    tier: "more",
+    groupKey: MORE,
+    targets: ["alert-vrl-toggle", "step2-view-editor-btn"],
   },
   {
     id: "threshold",
@@ -164,7 +163,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.find.labels.warning",
     aliases: ["warn", "warning threshold", "severity"],
     section: "condition",
-    tier: "tucked",
+    tier: "add",
     groupKey: MORE,
     targets: [
       "alert-warning-threshold-input-136",
@@ -179,10 +178,10 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
   },
   {
     id: "holdFor",
-    labelKey: "alerts.find.labels.holdFor",
+    labelKey: "alerts.tiers.names.holdFor",
     aliases: ["hold", "pending", "pending period", "for at least", "sustained"],
     section: "condition",
-    tier: "tucked",
+    tier: "smart",
     groupKey: MORE,
     targets: ["alert-settings-pending-period-input"],
   },
@@ -191,7 +190,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.find.labels.groupBy",
     aliases: ["group", "multi", "multi alert", "per", "split by", "simple", "aggregation"],
     section: "condition",
-    tier: "tucked",
+    tier: "more",
     groupKey: MORE,
     targets: ["alert-group-by-select-0", "alert-group-by-add-btn", "alerts-alertmultitoggle-row"],
   },
@@ -200,7 +199,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.plain.compareTitle",
     aliases: ["compare", "multi time range", "past", "previous", "baseline", "offset"],
     section: "condition",
-    tier: "tucked",
+    tier: "more",
     groupKey: MORE,
     targets: ["multi-time-range-alerts-add-btn"],
   },
@@ -218,8 +217,8 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.plain.openIncident",
     aliases: ["incident", "incidents", "creates incident"],
     section: "notify",
-    tier: "one",
-    groupKey: "alerts.tiers.rowFires",
+    tier: "add",
+    groupKey: "alerts.form.incident.label",
     targets: ["alert-creates-incident-toggle"],
   },
   {
@@ -227,8 +226,8 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.plain.messageTemplate",
     aliases: ["template", "template override", "message", "body", "payload"],
     section: "notify",
-    tier: "one",
-    groupKey: "alerts.tiers.rowMessage",
+    tier: "add",
+    groupKey: "alerts.form.messageRow",
     targets: ["advanced-template-override-select"],
   },
   {
@@ -236,8 +235,8 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.plain.variables",
     aliases: ["variable", "context attributes", "vars"],
     section: "notify",
-    tier: "one",
-    groupKey: "alerts.tiers.rowMessage",
+    tier: "add",
+    groupKey: "alerts.form.messageRow",
     targets: ["alert-variables-key-input", "alert-variables-add-btn"],
   },
   {
@@ -245,7 +244,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.plain.notifyOnRecovery",
     aliases: ["recovery", "recover", "resolved", "notify on recovery"],
     section: "notify",
-    tier: "tucked",
+    tier: "smart",
     groupKey: MORE,
     targets: ["alert-notify-on-recovery-toggle"],
   },
@@ -254,7 +253,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.oncallTeam",
     aliases: ["oncall", "on call", "rotation", "escalation", "pager"],
     section: "notify",
-    tier: "tucked",
+    tier: "smart",
     groupKey: MORE,
     targets: ["alert-oncall-team-select"],
   },
@@ -263,7 +262,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.alertSettings.suppressRepeats",
     aliases: ["suppress", "repeat", "once per state", "dedup", "deduplication", "duplicates"],
     section: "notify",
-    tier: "shown",
+    tier: "more",
     groupKey: MORE,
     targets: ["alert-suppress-repeats-toggle"],
   },
@@ -272,7 +271,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.plain.keepFiringFor",
     aliases: ["keep firing", "keep firing for", "flapping"],
     section: "notify",
-    tier: "tucked",
+    tier: "smart",
     groupKey: MORE,
     targets: ["alert-settings-keep-firing-for-input"],
   },
@@ -290,9 +289,9 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.find.labels.cron",
     aliases: ["cron", "cron expression", "crontab"],
     section: "schedule",
-    tier: "shown",
+    tier: "add",
     groupKey: "alerts.find.groups.schedule",
-    targets: ["alert-cron-input", "alert-check-every-unit-select"],
+    targets: ["add-alert-add-cron", "alert-cron-input"],
   },
   {
     id: "timezone",
@@ -314,11 +313,11 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
   },
   {
     id: "cooldown",
-    labelKey: "alerts.plain.cooldown",
+    labelKey: "alerts.form.remind.label",
     aliases: ["cooldown", "silence", "silence notification", "throttle", "snooze", "at most once"],
-    section: "schedule",
+    section: "notify",
     tier: "shown",
-    groupKey: "alerts.find.groups.schedule",
+    groupKey: "alerts.find.groups.destinations",
     targets: ["alert-settings-silence-duration-input"],
   },
   {
@@ -337,14 +336,14 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     section: "details",
     tier: "shown",
     groupKey: "alerts.find.groups.details",
-    targets: ["inline-select-folder-dropdown"],
+    targets: ["add-alert-details-folder-select"],
   },
   {
     id: "description",
     labelKey: "alerts.description",
     aliases: ["notes", "summary", "about"],
     section: "details",
-    tier: "shown",
+    tier: "add",
     groupKey: "alerts.find.groups.details",
     targets: ["add-alert-description-textarea"],
   },
@@ -352,9 +351,9 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     id: "rowTemplate",
     labelKey: "alerts.plain.rowTemplate",
     aliases: ["row template", "row", "per row", "row format"],
-    section: "details",
-    tier: "tucked",
-    groupKey: "alerts.find.groups.details",
+    section: "notify",
+    tier: "add",
+    groupKey: "alerts.form.messageRow",
     targets: ["add-alert-row-input-textarea"],
   },
   {
@@ -362,7 +361,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.priority",
     aliases: ["urgency", "severity", "p1"],
     section: "details",
-    tier: "tucked",
+    tier: "smart",
     groupKey: MORE,
     targets: ["alert-priority-select"],
   },
@@ -371,9 +370,84 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.tags",
     aliases: ["tag", "labels", "label"],
     section: "details",
-    tier: "shown",
+    tier: "more",
     groupKey: MORE,
     targets: ["alert-tags-input"],
+  },
+  {
+    id: "generatedSql",
+    labelKey: "alerts.tiers.names.generatedSql",
+    aliases: ["generated sql", "view query", "sql preview"],
+    section: "condition",
+    tier: "more",
+    groupKey: MORE,
+    targets: ["add-alert-generated-sql"],
+  },
+  {
+    id: "ruleExpression",
+    labelKey: "alerts.tiers.names.ruleExpression",
+    aliases: ["rule mode", "rule expression", "recording rule"],
+    section: "condition",
+    tier: "smart",
+    groupKey: MORE,
+    targets: ["alert-prom-rule-mode"],
+  },
+  {
+    id: "forecast",
+    labelKey: "alerts.forecast.modeForecast",
+    aliases: ["forecast", "predict", "trend"],
+    section: "condition",
+    tier: "add",
+    groupKey: "alerts.find.groups.condition",
+    targets: ["add-alert-add-forecast", "alert-promql-mode-forecast"],
+  },
+  {
+    id: "anomalySql",
+    labelKey: "alerts.tiers.add.anomalySql",
+    aliases: ["custom sql", "sql"],
+    section: "condition",
+    tier: "add",
+    groupKey: "alerts.find.groups.query",
+    targets: ["add-alert-add-anomalySql", "anomaly-custom-sql", "anomaly-query-tabs"],
+  },
+  {
+    id: "anomalySqlPreview",
+    labelKey: "alerts.tiers.names.anomalySqlPreview",
+    aliases: ["generated sql", "sql preview"],
+    section: "condition",
+    tier: "more",
+    groupKey: MORE,
+    targets: ["anomaly-sql-preview", "anomaly-sql-preview-row"],
+  },
+  {
+    id: "compositeExpression",
+    labelKey: "alerts.tiers.add.compositeExpression",
+    aliases: ["expression", "advanced expression", "fire when"],
+    section: "condition",
+    tier: "add",
+    groupKey: "alerts.find.groups.condition",
+    targets: [
+      "alerts-composite-expression-advanced",
+      "alerts-composite-expression-advanced-toggle",
+    ],
+  },
+  {
+    id: "compositeWarningCounts",
+    labelKey: "alerts.tiers.names.compositeWarningCounts",
+    aliases: ["warning counts", "warning as firing"],
+    section: "condition",
+    tier: "more",
+    groupKey: MORE,
+    targets: ["alerts-composite-warning-counts-as-firing", "alerts-composite-warning-row"],
+  },
+  {
+    id: "compositeStalePolicy",
+    labelKey: "alerts.tiers.names.compositeStalePolicy",
+    aliases: ["stale", "stale policy", "stops reporting"],
+    section: "condition",
+    tier: "more",
+    groupKey: MORE,
+    targets: ["alerts-composite-stale-policy", "alerts-composite-stale-policy-row"],
   },
   {
     id: "anomalyQuery",
@@ -416,7 +490,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.anomaly.retrainEvery",
     aliases: ["retrain", "retraining", "refresh model"],
     section: "condition",
-    tier: "shown",
+    tier: "add",
     groupKey: "alerts.find.groups.condition",
     targets: ["anomaly-retrain-interval", "anomaly-retrain-every-row"],
   },
@@ -430,12 +504,19 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     targets: ["anomaly-budget-tiers", "anomaly-sensitivity-tier", "anomaly-sensitivity-row"],
   },
   {
-    id: "anomalyNotifications",
-    labelKey: "alerts.anomaly.notifications",
-    aliases: ["notify", "notification", "alerting", "enable alerts"],
+    id: "anomalyRecordOnly",
+    labelKey: "alerts.tiers.names.anomalyRecordOnly",
+    aliases: [
+      "notify",
+      "notification",
+      "notifications",
+      "alerting",
+      "enable alerts",
+      "record only",
+    ],
     section: "notify",
-    tier: "shown",
-    groupKey: "alerts.find.groups.destinations",
+    tier: "more",
+    groupKey: MORE,
     targets: ["anomaly-alert-enabled", "anomaly-notifications-row"],
   },
   {
@@ -452,34 +533,34 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.templateOverride.label",
     aliases: ["template", "message", "body", "payload"],
     section: "notify",
-    tier: "shown",
-    groupKey: "alerts.find.groups.destinations",
+    tier: "add",
+    groupKey: "alerts.form.messageRow",
     targets: ["anomaly-template-row", "anomaly-notifications-row"],
   },
   {
     id: "anomalyDirection",
     labelKey: "alerts.anomaly.alertDirection",
     aliases: ["direction", "spike", "drop", "above", "below", "both"],
-    section: "notify",
-    tier: "shown",
-    groupKey: "alerts.find.groups.condition",
+    section: "condition",
+    tier: "smart",
+    groupKey: MORE,
     targets: ["anomaly-alert-direction", "anomaly-alert-direction-row"],
   },
   {
-    id: "anomalyWindowShare",
-    labelKey: "alerts.anomaly.windowShare",
-    aliases: ["window", "share", "fire", "recover", "percent", "flapping"],
-    section: "notify",
-    tier: "shown",
-    groupKey: "alerts.find.groups.condition",
+    id: "anomalyWindow",
+    labelKey: "alerts.tiers.names.anomalyWindow",
+    aliases: ["window share", "window", "share", "fire", "recover", "percent", "flapping"],
+    section: "condition",
+    tier: "more",
+    groupKey: MORE,
     targets: ["anomaly-window-buckets", "anomaly-window-share-row"],
   },
   {
     id: "anomalyPriority",
     labelKey: "alerts.priority",
     aliases: ["urgency", "severity", "p1"],
-    section: "notify",
-    tier: "shown",
+    section: "details",
+    tier: "more",
     groupKey: MORE,
     targets: ["anomaly-priority-select", "anomaly-priority-row"],
   },
@@ -487,8 +568,8 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     id: "anomalyTags",
     labelKey: "alerts.tags",
     aliases: ["tag", "labels", "label"],
-    section: "notify",
-    tier: "shown",
+    section: "details",
+    tier: "more",
     groupKey: MORE,
     targets: ["anomaly-tags-input", "anomaly-tags-row"],
   },
@@ -528,11 +609,11 @@ const ANOMALY_ONLY_FIND_IDS: ReadonlySet<AlertFindId> = new Set<AnomalyFindId>([
   "anomalyTraining",
   "anomalyRetrain",
   "anomalySensitivity",
-  "anomalyNotifications",
+  "anomalyRecordOnly",
   "anomalyDestination",
   "anomalyTemplate",
   "anomalyDirection",
-  "anomalyWindowShare",
+  "anomalyWindow",
   "anomalyPriority",
   "anomalyTags",
   "anomalyCheckEvery",

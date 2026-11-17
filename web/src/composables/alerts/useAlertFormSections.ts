@@ -69,6 +69,8 @@ export interface AlertFormSectionsInput {
   visited?: Ref<ReadonlySet<AlertSectionId>>;
   /** Problems a save found outside the form's field meta, counted per section. */
   extraErrors?: Readonly<Ref<Partial<Record<AlertSectionId, number>>>>;
+  /** Sections that cannot save as they stand, even with no field error shown yet. */
+  invalid?: ComputedRef<Partial<Record<AlertSectionId, boolean>>>;
   t: TranslateFn;
 }
 

@@ -257,12 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div
-        :key="draftFormKey"
-        class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto"
-        @focusin="onSectionInteract"
-        @pointerdown="onSectionInteract"
-      >
+      <div :key="draftFormKey" class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
         <aside
           class="border-border-default max-lg:bg-surface-base flex w-53 shrink-0 flex-col gap-3 overflow-y-auto border-e px-2 py-3 max-lg:sticky max-lg:top-0 max-lg:z-1 max-lg:w-auto max-lg:gap-2 max-lg:border-e-0 max-lg:border-b max-lg:px-3 max-lg:py-2"
           data-test="add-alert-section-nav"
@@ -288,480 +283,542 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </aside>
 
-        <OSnapScroll
-          ref="snapScrollRef"
-          v-model:active="activeSection"
-          :snap="lgUp"
-          class="min-w-0 flex-1 max-lg:flex-none"
-          data-test="add-alert-sections"
-        >
-          <AlertFormSection
-            id="watch"
-            :current="activeSection === 'watch'"
-            :index="1"
-            :title="t('alerts.sections.watch.title')"
-            :help="t('alerts.sections.watch.help')"
-            @go="goToSection"
+        <div class="flex min-h-0 min-w-0 flex-1 flex-col max-lg:flex-none">
+          <div
+            class="border-border-default flex shrink-0 items-center justify-end border-b px-4 py-2"
+            data-test="add-alert-show-all-bar"
           >
-            <OSettingRow
-              :label="t('alerts.sections.howItChecks')"
-              fill
-              data-test="add-alert-how-it-checks-row"
+            <OSwitch
+              :model-value="showAll"
+              :label="t('alerts.form.showAll')"
+              size="sm"
+              off-tone="neutral"
+              data-test="add-alert-show-all"
+              @update:model-value="setShowAll(Boolean($event))"
+            />
+          </div>
+          <OSnapScroll
+            ref="snapScrollRef"
+            v-model:active="activeSection"
+            :snap="lgUp"
+            class="min-h-0 min-w-0 flex-1 max-lg:flex-none"
+            data-test="add-alert-sections"
+          >
+            <AlertFormSection
+              id="watch"
+              :current="activeSection === 'watch'"
+              :index="1"
+              :title="t('alerts.sections.watch.title')"
+              :help="t('alerts.sections.watch.help')"
+              @go="goToSection"
             >
-              <OChoiceCards
-                :model-value="formData.is_real_time"
-                :options="alertTypeOptions"
+              <OSettingRow
                 :label="t('alerts.sections.howItChecks')"
-                :disabled="beingUpdated || anomalyEditMode"
-                :columns="alertTypeOptions.length === 4 ? 2 : undefined"
-                data-test="add-alert-type-tabs"
-                @update:model-value="onAlertTypeChange"
-              />
-            </OSettingRow>
-            <div v-if="!isCompositeMode" data-test="add-alert-source-card" data-snap-stop>
-              <OSettingRow :label="t('alerts.sections.rows.streamTypeLabel')" required fill>
+                fill
+                data-test="add-alert-how-it-checks-row"
+              >
                 <OChoiceCards
-                  :model-value="formData.stream_type"
-                  :options="streamTypeOptions"
-                  :label="t('alerts.streamType')"
+                  :model-value="formData.is_real_time"
+                  :options="alertTypeOptions"
+                  :label="t('alerts.sections.howItChecks')"
                   :disabled="beingUpdated || anomalyEditMode"
-                  data-test="add-alert-stream-type-cards"
-                  @update:model-value="onStreamTypeChange"
+                  :columns="alertTypeOptions.length === 4 ? 2 : undefined"
+                  data-test="add-alert-type-tabs"
+                  @update:model-value="onAlertTypeChange"
                 />
               </OSettingRow>
-              <OSettingRow
-                :label="t('alerts.sections.rows.streamLabel')"
-                :description="t('alerts.sections.rows.stream')"
-                required
-                fill
-              >
-                <div class="max-w-75">
-                  <OFormSelect
-                    ref="streamNameRef"
-                    name="stream_name"
-                    :aria-label="t('alerts.stream_name')"
-                    data-test="add-alert-stream-name-select-dropdown"
-                    :options="indexOptions"
-                    :loading="isFetchingStreams"
-                    class="w-full"
-                    :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
-                    @update:model-value="updateStreamFields($event)"
+              <div v-if="!isCompositeMode" data-test="add-alert-source-card" data-snap-stop>
+                <OSettingRow :label="t('alerts.sections.rows.streamTypeLabel')" required fill>
+                  <OChoiceCards
+                    :model-value="formData.stream_type"
+                    :options="streamTypeOptions"
+                    :label="t('alerts.streamType')"
+                    :disabled="beingUpdated || anomalyEditMode"
+                    data-test="add-alert-stream-type-cards"
+                    @update:model-value="onStreamTypeChange"
                   />
-                  <OTooltip
-                    v-if="!formData.stream_type"
-                    :content="t('alerts.selectStreamTypeFirst')"
-                  />
-                </div>
-              </OSettingRow>
-              <AlertSampleEvents
-                v-if="formData.stream_name && !isAnomalyMode"
-                :stream-name="formData.stream_name"
-                :stream-type="formData.stream_type"
-              />
-            </div>
-          </AlertFormSection>
+                </OSettingRow>
+                <OSettingRow
+                  :label="t('alerts.sections.rows.streamLabel')"
+                  :description="t('alerts.sections.rows.stream')"
+                  required
+                  fill
+                >
+                  <div class="max-w-75">
+                    <OFormSelect
+                      ref="streamNameRef"
+                      name="stream_name"
+                      :aria-label="t('alerts.stream_name')"
+                      data-test="add-alert-stream-name-select-dropdown"
+                      :options="indexOptions"
+                      :loading="isFetchingStreams"
+                      class="w-full"
+                      :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
+                      @update:model-value="updateStreamFields($event)"
+                    />
+                    <OTooltip
+                      v-if="!formData.stream_type"
+                      :content="t('alerts.selectStreamTypeFirst')"
+                    />
+                  </div>
+                </OSettingRow>
+                <AlertSampleEvents
+                  v-if="formData.stream_name && !isAnomalyMode"
+                  :stream-name="formData.stream_name"
+                  :stream-type="formData.stream_type"
+                />
+              </div>
+            </AlertFormSection>
 
-          <AlertFormSection
-            id="condition"
-            :current="activeSection === 'condition'"
-            :index="2"
-            :title="t('alerts.sections.condition.title')"
-            :help="conditionHelp"
-            @go="goToSection"
-          >
-            <div data-test="add-alert-query-card" data-snap-stop>
-              <CompositeAlertForm
-                v-if="isCompositeMode"
-                :model-value="formData"
-                :org-identifier="store.state.selectedOrganization.identifier"
-                :folder-id="activeFolderId as string"
-                :available-children="availableCompositeChildren"
-                :section-targets="sectionTargets"
-                @update:model-value="updateCompositeDraft"
-                @validation="onCompositeValidation"
-              />
-              <QueryConfig
-                v-else
-                v-show="!isAnomalyMode"
-                ref="step2Ref"
-                :section-targets="sectionTargets"
-                :tab="formData.query_condition.type || 'custom'"
-                :multiTimeRange="formData.query_condition.multi_time_range"
-                :columns="filteredColumns"
-                :streamFieldsMap="streamFieldsMap"
-                :generatedSqlQuery="generatedSqlQuery"
-                :inputData="formData.query_condition"
-                :streamType="formData.stream_type"
-                :isRealTime="formData.is_real_time"
-                :sqlQuery="formData.query_condition.sql"
-                :promqlQuery="formData.query_condition.promql"
-                :vrlFunction="decodedVrlFunction"
-                :streamName="formData.stream_name"
-                :sqlQueryErrorMsg="sqlQueryErrorMsg"
-                :sqlAggColumnOptions="sqlAggColumnOptions"
-                :sqlQueryHasHaving="sqlQueryHasHaving"
-                :isAggregationEnabled="isAggregationEnabled"
-                :beingUpdated="beingUpdated"
-                :isSeeding="isLoadingPrefill"
-                :promqlCondition="formData.query_condition.promql_condition"
-                :triggerCondition="formData.trigger_condition"
-                @update:tab="updateTab"
-                @input:update="onInputUpdate"
-                @update:sqlQuery="updateSqlQuery"
-                @update:promqlQuery="updatePromqlQuery"
-                @update:vrlFunction="updateVrlFunction"
-                @validate-sql="validateSqlQuery"
-                @clear-multi-windows="clearMultiWindows"
-                @editor-closed="handleEditorClosed"
-                @editor-state-changed="handleEditorStateChanged"
-                @update:isAggregationEnabled="(value) => (isAggregationEnabled = value)"
-                @update:aggregation="updateAggregation"
-                @update:promqlCondition="updatePromqlCondition"
-                @update:triggerCondition="updateTriggerCondition"
-              />
-              <AnomalyDetectionConfig
-                v-show="isAnomalyMode"
-                ref="anomalyStep2Ref"
-                :config="anomalyConfig"
-                :preview-sql="anomalyPreviewSql"
-                :stored-intervals="anomalyStoredIntervals"
-                :stored-sql-function="anomalyStoredSqlFunction"
-                :section-targets="sectionTargets"
-              />
-            </div>
-            <div class="flex flex-col" data-snap-stop>
-              <OSettingRow
-                v-if="showsConditionPresets"
-                :label="t('alerts.sections.presets.label')"
-                :description="t('alerts.sections.presets.help')"
-                fill
-                data-test="add-alert-condition-presets"
-              >
-                <OChoiceCards
-                  :model-value="activeConditionPreset"
-                  :options="conditionPresetOptions"
-                  :label="t('alerts.sections.presets.label')"
-                  @update:model-value="applyConditionPreset"
-                />
-              </OSettingRow>
-              <p
-                v-if="formData.is_real_time === 'true'"
-                class="text-text-secondary m-0 py-3 text-sm"
-                data-test="add-alert-realtime-condition-note"
-              >
-                {{ t("alerts.summary.plainEnglish.realTime") }}
-              </p>
+            <AlertFormSection
+              id="condition"
+              :current="activeSection === 'condition'"
+              :index="2"
+              :title="t('alerts.sections.condition.title')"
+              :help="conditionHelp"
+              @go="goToSection"
+            >
               <div
+                v-if="beingUpdated"
                 v-show="!isAnomalyMode && !isCompositeMode"
                 :ref="(el) => setSectionTarget('queryCondition', el)"
                 class="empty:hidden"
+                data-test="add-alert-query-condition-slot"
                 data-snap-stop
               />
-              <AlertBacktest
-                v-if="showsBacktest"
-                :query="backtestQuery"
-                :stream-type="formData.stream_type"
-                :period="Number(formData.trigger_condition.period)"
-                :operator="formData.trigger_condition.operator"
-                :threshold="Number(formData.trigger_condition.threshold)"
-              />
-              <div
-                v-show="isCompositeMode"
-                :ref="(el) => setSectionTarget('compositeCondition', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <div
-                v-show="isAnomalyMode"
-                :ref="(el) => setSectionTarget('anomalyCondition', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <div
-                v-show="isAnomalyMode"
-                :ref="(el) => setSectionTarget('anomalyTraining', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <!-- Every optional condition setting is scheduled-only, so a real-time step would show an empty heading. -->
-              <AlertOptionalHeading
-                v-if="!isAnomalyMode && !isCompositeMode && formData.is_real_time === 'false'"
-              />
-              <div
-                v-show="!isAnomalyMode"
-                :ref="(el) => setSectionTarget('settingsHold', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <div
-                v-if="formData.is_real_time === 'false' && tiers.isVisible('compareWithPast')"
-                data-snap-stop
-              >
-                <CompareWithPast
-                  ref="step3Ref"
-                  :multiTimeRange="formData.query_condition.multi_time_range"
-                  :period="formData.trigger_condition.period"
-                  :frequency="formData.trigger_condition.frequency"
-                  :frequencyType="formData.trigger_condition.frequency_type"
-                  :cron="formData.trigger_condition.cron"
-                  :selectedTab="formData.query_condition.type || 'custom'"
-                  @update:multiTimeRange="updateMultiTimeRange"
-                />
-              </div>
-              <AlertTierLinks
-                v-if="!isAnomalyMode"
-                section="condition"
-                :view="tiers.view('condition')"
-                :auto-opened="autoOpenedTiers.has('condition')"
-                @add="onTierAdd"
-                @toggle="onTierToggle('condition')"
-              />
-              <div
-                :ref="(el) => setSectionTarget('narrowPreview', el)"
-                class="empty:hidden"
-                data-test="add-alert-narrow-preview"
-              />
-            </div>
-          </AlertFormSection>
-
-          <AlertFormSection
-            id="notify"
-            :current="activeSection === 'notify'"
-            :index="3"
-            :title="t('alerts.sections.notify.title')"
-            :help="t('alerts.sections.notify.help')"
-            @go="goToSection"
-          >
-            <div class="flex flex-col" data-snap-stop>
-              <div
-                v-show="!isAnomalyMode"
-                :ref="(el) => setSectionTarget('settingsNotify', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <div
-                v-show="!isAnomalyMode"
-                :ref="(el) => setSectionTarget('settingsNotifyMore', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <div v-show="isAnomalyMode" data-snap-stop>
-                <AnomalyAlerting
-                  :config="anomalyConfig"
-                  :destinations="destinations as (SelectOption & { name: string })[]"
-                  @refresh:destinations="$emit('refresh:destinations')"
-                />
-              </div>
-              <div
-                v-show="!isAnomalyMode"
-                :ref="(el) => setSectionTarget('advancedMessage', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <div
-                v-show="!isAnomalyMode"
-                :ref="(el) => setSectionTarget('advancedOncall', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <AlertTierLinks
-                v-if="!isAnomalyMode"
-                section="notify"
-                :view="tiers.view('notify')"
-                :auto-opened="autoOpenedTiers.has('notify')"
-                @add="onTierAdd"
-                @toggle="onTierToggle('notify')"
-              />
-            </div>
-          </AlertFormSection>
-
-          <AlertFormSection
-            id="schedule"
-            :current="activeSection === 'schedule'"
-            :index="4"
-            :title="t('alerts.sections.schedule.title')"
-            :help="t('alerts.sections.schedule.help')"
-            @go="goToSection"
-          >
-            <div class="flex flex-col" data-snap-stop>
-              <div
-                v-show="!isAnomalyMode && !isCompositeMode"
-                :ref="(el) => setSectionTarget('querySchedule', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <div
-                v-show="isAnomalyMode"
-                :ref="(el) => setSectionTarget('anomalySchedule', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <div
-                v-show="!isAnomalyMode"
-                :ref="(el) => setSectionTarget('settingsSchedule', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <AlertCheckTimeline
-                v-if="showsCheckTimeline"
-                :frequency="Number(formData.trigger_condition.frequency)"
-                :period="Number(formData.trigger_condition.period)"
-              />
-            </div>
-          </AlertFormSection>
-
-          <AlertFormSection
-            id="details"
-            :current="activeSection === 'details'"
-            :index="5"
-            :title="
-              beingUpdated || anomalyEditMode
-                ? t('alerts.sections.details.editTitle')
-                : t('alerts.sections.details.title')
-            "
-            :help="
-              beingUpdated || anomalyEditMode
-                ? t('alerts.sections.details.editHelp')
-                : t('alerts.sections.details.help')
-            "
-            @go="goToSection"
-          >
-            <div class="flex flex-col" data-snap-stop>
-              <OSettingRow
-                v-if="!(beingUpdated || anomalyEditMode)"
-                :label="t('alerts.sections.details.name')"
-                :description="t('alerts.sections.rows.name')"
-                fill
-                data-snap-stop
-              >
-                <div
-                  class="flex max-w-120 min-w-0 flex-col gap-1.5"
-                  @input="onNameInput"
-                  @focusin="onNameFocus"
-                  @keydown.enter="onNameEnter"
-                  @focusout="alertAutoName.onCommit(formData.name ?? '')"
-                >
-                  <OFormInput
-                    name="name"
-                    :placeholder="t('alerts.alertNamePlaceholder')"
-                    :aria-label="t('alerts.sections.details.name')"
-                    data-test="add-alert-details-name-input"
-                  />
-                  <span
-                    v-if="nameHasUnsupportedChars"
-                    class="text-status-error-text text-xs"
-                    role="alert"
-                    data-test="add-alert-details-name-error"
-                    >{{ t("alerts.nameNoSpecialChars") }}</span
-                  >
-                  <span
-                    v-if="alertAutoName.isAuto.value && formData.name"
-                    class="text-text-secondary text-xs"
-                    data-test="add-alert-details-name-auto"
-                    >{{ t("alerts.sections.details.autoName") }}</span
-                  >
-                  <OButton
-                    v-else-if="alertNameSuggestion && formData.name !== alertNameSuggestion"
-                    class="self-start"
-                    variant="ghost-primary"
-                    size="xs"
-                    data-test="add-alert-details-name-suggest"
-                    @click="alertAutoName.resetToAuto"
-                    >{{
-                      t("alerts.sections.details.useSuggestion", { name: alertNameSuggestion })
-                    }}</OButton
-                  >
-                </div>
-              </OSettingRow>
-              <AlertOptionalHeading v-if="!isAnomalyMode" />
-              <div
-                v-show="!isAnomalyMode"
-                :ref="(el) => setSectionTarget('advancedDetails', el)"
-                class="empty:hidden"
-                data-snap-stop
-              />
-              <div v-show="!isAnomalyMode" data-snap-stop>
-                <Advanced
+              <div data-test="add-alert-query-card" data-snap-stop>
+                <CompositeAlertForm
+                  v-if="isCompositeMode"
+                  :model-value="formData"
+                  :org-identifier="store.state.selectedOrganization.identifier"
+                  :folder-id="activeFolderId as string"
+                  :available-children="availableCompositeChildren"
                   :section-targets="sectionTargets"
-                  :template="formData.template"
-                  :templates="templates"
-                  :contextAttributes="formData.context_attributes"
-                  :description="formData.description"
-                  :rowTemplate="formData.row_template"
-                  :rowTemplateType="formData.row_template_type"
-                  :destinations="destinations"
-                  :selectedDestinations="formData.destinations"
-                  :alertName="formData.name"
-                  :streamName="formData.stream_name"
+                  @update:model-value="updateCompositeDraft"
+                  @validation="onCompositeValidation"
+                />
+                <QueryConfig
+                  v-else
+                  v-show="!isAnomalyMode"
+                  ref="step2Ref"
+                  :section-targets="sectionTargets"
+                  :tab="formData.query_condition.type || 'custom'"
+                  :multiTimeRange="formData.query_condition.multi_time_range"
+                  :columns="filteredColumns"
+                  :streamFieldsMap="streamFieldsMap"
+                  :generatedSqlQuery="generatedSqlQuery"
+                  :inputData="formData.query_condition"
                   :streamType="formData.stream_type"
+                  :isRealTime="formData.is_real_time"
+                  :sqlQuery="formData.query_condition.sql"
+                  :promqlQuery="formData.query_condition.promql"
+                  :vrlFunction="decodedVrlFunction"
+                  :streamName="formData.stream_name"
+                  :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                  :sqlAggColumnOptions="sqlAggColumnOptions"
+                  :sqlQueryHasHaving="sqlQueryHasHaving"
+                  :isAggregationEnabled="isAggregationEnabled"
+                  :beingUpdated="beingUpdated"
+                  :isSeeding="isLoadingPrefill"
+                  :promqlCondition="formData.query_condition.promql_condition"
                   :triggerCondition="formData.trigger_condition"
-                  :streamFields="filteredColumns"
-                  @update:template="updateTemplate"
-                  @refresh:templates="refreshTemplates"
-                  @update:contextAttributes="updateContextAttributes"
-                  @update:description="updateDescription"
-                  @update:rowTemplate="updateRowTemplate"
-                  @update:rowTemplateType="updateRowTemplateType"
+                  @update:tab="updateTab"
+                  @input:update="onInputUpdate"
+                  @update:sqlQuery="updateSqlQuery"
+                  @update:promqlQuery="updatePromqlQuery"
+                  @update:vrlFunction="updateVrlFunction"
+                  @validate-sql="validateSqlQuery"
+                  @clear-multi-windows="clearMultiWindows"
+                  @editor-closed="handleEditorClosed"
+                  @editor-state-changed="handleEditorStateChanged"
+                  @update:isAggregationEnabled="(value) => (isAggregationEnabled = value)"
+                  @update:aggregation="updateAggregation"
+                  @update:promqlCondition="updatePromqlCondition"
+                  @update:triggerCondition="updateTriggerCondition"
+                />
+                <AnomalyDetectionConfig
+                  v-show="isAnomalyMode"
+                  ref="anomalyStep2Ref"
+                  :config="anomalyConfig"
+                  :preview-sql="anomalyPreviewSql"
+                  :stored-intervals="anomalyStoredIntervals"
+                  :stored-sql-function="anomalyStoredSqlFunction"
+                  :section-targets="sectionTargets"
                 />
               </div>
-              <!-- AlertSettings renders nothing inline in the sectioned editor: every slice lives in a section slot. -->
-              <AlertSettings
-                v-show="!isAnomalyMode"
-                ref="step4Ref"
-                :section-targets="sectionTargets"
-                :formData="formData"
-                :isRealTime="formData.is_real_time"
-                :columns="filteredColumns"
-                :isAggregationEnabled="isAggregationEnabled"
-                :destinations="formData.destinations"
-                :recoveryDestinations="formData.recovery_destinations"
-                :formattedDestinations="getFormattedDestinations"
-                :destinationObjects="destinations"
-                :workflows="formData.workflows"
-                :destinationRequired="destinationRequired"
-                @update:trigger="updateTriggerCondition"
-                @update:aggregation="updateAggregation"
-                @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
-                @update:promqlCondition="updatePromqlCondition"
-                @update:destinations="updateDestinations"
-                @update:recoveryDestinations="updateRecoveryDestinations"
-                @refresh:destinations="refreshDestinations"
-                @update:workflows="updateWorkflows"
-              />
-              <AlertTierLinks
-                v-if="!isAnomalyMode"
-                section="details"
-                :view="tiers.view('details')"
-                :auto-opened="autoOpenedTiers.has('details')"
-                @add="onTierAdd"
-                @toggle="onTierToggle('details')"
-              />
-              <div
-                class="border-border-default mt-3 flex flex-col gap-2 border-t pt-3"
-                data-test="add-alert-review"
-              >
-                <span class="text-text-heading text-sm font-medium">{{
-                  t("alerts.sections.review.title")
-                }}</span>
-                <dl class="m-0 grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-3">
-                  <div v-for="item in reviewItems" :key="item.id" class="min-w-0">
-                    <dt class="text-text-secondary text-xs">{{ item.title }}</dt>
-                    <dd class="m-0 min-w-0">
-                      <button
-                        type="button"
-                        class="text-accent block max-w-full cursor-pointer truncate text-sm hover:underline"
-                        :data-test="`add-alert-review-${item.id}`"
-                        @click="goToSection(item.id)"
-                      >
-                        {{ item.summary }}
-                      </button>
-                    </dd>
-                  </div>
-                </dl>
+              <AlertSuggestionLine section="condition" anchor="query" />
+              <div class="flex flex-col" data-snap-stop>
+                <OSettingRow
+                  v-if="showsConditionPresets"
+                  :label="t('alerts.sections.presets.label')"
+                  :description="t('alerts.sections.presets.help')"
+                  fill
+                  data-test="add-alert-condition-presets"
+                >
+                  <OChoiceCards
+                    :model-value="activeConditionPreset"
+                    :options="conditionPresetOptions"
+                    :label="t('alerts.sections.presets.label')"
+                    @update:model-value="applyConditionPreset"
+                  />
+                </OSettingRow>
+                <p
+                  v-if="formData.is_real_time === 'true'"
+                  class="text-text-secondary m-0 py-3 text-sm"
+                  data-test="add-alert-realtime-condition-note"
+                >
+                  {{ t("alerts.summary.plainEnglish.realTime") }}
+                </p>
+                <div
+                  v-if="!beingUpdated"
+                  v-show="!isAnomalyMode && !isCompositeMode"
+                  :ref="(el) => setSectionTarget('queryCondition', el)"
+                  class="empty:hidden"
+                  data-test="add-alert-query-condition-slot"
+                  data-snap-stop
+                />
+                <AlertBacktest
+                  v-if="showsBacktest"
+                  :query="backtestQuery"
+                  :stream-type="formData.stream_type"
+                  :period="Number(formData.trigger_condition.period)"
+                  :operator="formData.trigger_condition.operator"
+                  :threshold="Number(formData.trigger_condition.threshold)"
+                  :trigger-condition="formData.trigger_condition"
+                />
+                <div
+                  v-show="isCompositeMode"
+                  :ref="(el) => setSectionTarget('compositeCondition', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <div
+                  v-show="isAnomalyMode"
+                  :ref="(el) => setSectionTarget('anomalyCondition', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <div
+                  v-show="isAnomalyMode"
+                  :ref="(el) => setSectionTarget('anomalyTraining', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <div
+                  v-show="isAnomalyMode"
+                  :ref="(el) => setSectionTarget('anomalyConditionMore', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <!-- Every optional condition setting is scheduled-only, so a real-time step would show an empty heading. -->
+                <AlertOptionalHeading
+                  v-if="!isAnomalyMode && !isCompositeMode && formData.is_real_time === 'false'"
+                />
+                <div
+                  v-show="!isAnomalyMode"
+                  :ref="(el) => setSectionTarget('settingsHold', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <div
+                  v-if="formData.is_real_time === 'false' && tiers.isVisible('compareWithPast')"
+                  data-snap-stop
+                >
+                  <CompareWithPast
+                    ref="step3Ref"
+                    :multiTimeRange="formData.query_condition.multi_time_range"
+                    :period="formData.trigger_condition.period"
+                    :frequency="formData.trigger_condition.frequency"
+                    :frequencyType="formData.trigger_condition.frequency_type"
+                    :cron="formData.trigger_condition.cron"
+                    :selectedTab="formData.query_condition.type || 'custom'"
+                    @update:multiTimeRange="updateMultiTimeRange"
+                  />
+                </div>
+                <AlertSuggestionLine section="condition" anchor="end" />
+                <AlertTierLinks
+                  section="condition"
+                  :view="tiers.view('condition')"
+                  @add="onTierAdd"
+                  @toggle="tiers.toggle('condition')"
+                />
+                <div
+                  :ref="(el) => setSectionTarget('narrowPreview', el)"
+                  class="empty:hidden"
+                  data-test="add-alert-narrow-preview"
+                />
               </div>
-            </div>
-          </AlertFormSection>
-        </OSnapScroll>
+            </AlertFormSection>
+
+            <AlertFormSection
+              id="notify"
+              :current="activeSection === 'notify'"
+              :index="3"
+              :title="t('alerts.sections.notify.title')"
+              :help="t('alerts.sections.notify.help')"
+              @go="goToSection"
+            >
+              <div class="flex flex-col" data-snap-stop>
+                <div
+                  v-show="!isAnomalyMode"
+                  :ref="(el) => setSectionTarget('settingsNotify', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <div
+                  v-show="!isAnomalyMode"
+                  :ref="(el) => setSectionTarget('settingsNotifyMore', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <div v-show="isAnomalyMode" data-snap-stop>
+                  <AnomalyAlerting
+                    :config="anomalyConfig"
+                    :section-targets="sectionTargets"
+                    :destinations="destinations as (SelectOption & { name: string })[]"
+                    @refresh:destinations="$emit('refresh:destinations')"
+                  />
+                </div>
+                <div
+                  v-show="!isAnomalyMode"
+                  :ref="(el) => setSectionTarget('advancedMessage', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <div
+                  v-show="!isAnomalyMode"
+                  :ref="(el) => setSectionTarget('advancedOncall', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <AlertSuggestionLine section="notify" anchor="end" />
+                <AlertTierLinks
+                  section="notify"
+                  :view="tiers.view('notify')"
+                  @add="onTierAdd"
+                  @toggle="tiers.toggle('notify')"
+                />
+              </div>
+            </AlertFormSection>
+
+            <AlertFormSection
+              id="schedule"
+              :current="activeSection === 'schedule'"
+              :index="4"
+              :title="t('alerts.sections.schedule.title')"
+              :help="t('alerts.sections.schedule.help')"
+              @go="goToSection"
+            >
+              <div class="flex flex-col" data-snap-stop>
+                <OSettingRow
+                  v-if="formData.is_real_time === 'false' && !isCronSchedule"
+                  :label="t('alerts.sections.rows.checkEvery')"
+                  fill
+                  data-test="add-alert-schedule-row"
+                  data-snap-stop
+                >
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div :ref="(el) => setSectionTarget('querySchedule', el)" class="contents" />
+                    <div :ref="(el) => setSectionTarget('settingsSchedule', el)" class="contents" />
+                  </div>
+                </OSettingRow>
+                <template v-else>
+                  <div
+                    v-show="!isAnomalyMode && !isCompositeMode"
+                    :ref="(el) => setSectionTarget('querySchedule', el)"
+                    class="empty:hidden"
+                    data-snap-stop
+                  />
+                  <div
+                    v-show="!isAnomalyMode"
+                    :ref="(el) => setSectionTarget('settingsSchedule', el)"
+                    class="empty:hidden"
+                    data-snap-stop
+                  />
+                </template>
+                <div
+                  v-show="isAnomalyMode"
+                  :ref="(el) => setSectionTarget('anomalySchedule', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <p
+                  v-if="formData.is_real_time === 'true' || isCompositeMode"
+                  class="text-text-secondary m-0 py-3 text-sm"
+                  data-test="add-alert-schedule-note"
+                >
+                  {{
+                    isCompositeMode
+                      ? t("alerts.form.schedule.composite")
+                      : t("alerts.form.schedule.realtime")
+                  }}
+                </p>
+                <AlertCheckTimeline
+                  v-if="showsCheckTimeline"
+                  :frequency="Number(formData.trigger_condition.frequency)"
+                  :period="Number(formData.trigger_condition.period)"
+                />
+              </div>
+            </AlertFormSection>
+
+            <AlertFormSection
+              id="details"
+              :current="activeSection === 'details'"
+              :index="5"
+              :title="
+                beingUpdated || anomalyEditMode
+                  ? t('alerts.sections.details.editTitle')
+                  : t('alerts.sections.details.title')
+              "
+              :help="
+                beingUpdated || anomalyEditMode
+                  ? t('alerts.sections.details.editHelp')
+                  : t('alerts.sections.details.help')
+              "
+              @go="goToSection"
+            >
+              <div class="flex flex-col" data-snap-stop>
+                <OSettingRow
+                  v-if="!(beingUpdated || anomalyEditMode)"
+                  :label="t('alerts.sections.details.name')"
+                  :description="t('alerts.sections.rows.name')"
+                  fill
+                  data-snap-stop
+                >
+                  <div
+                    class="flex max-w-120 min-w-0 flex-col gap-1.5"
+                    @input="onNameInput"
+                    @focusin="onNameFocus"
+                    @keydown.enter="onNameEnter"
+                    @focusout="alertAutoName.onCommit(formData.name ?? '')"
+                  >
+                    <OFormInput
+                      name="name"
+                      :placeholder="t('alerts.alertNamePlaceholder')"
+                      :aria-label="t('alerts.sections.details.name')"
+                      data-test="add-alert-details-name-input"
+                    />
+                    <span
+                      v-if="nameHasUnsupportedChars"
+                      class="text-status-error-text text-xs"
+                      role="alert"
+                      data-test="add-alert-details-name-error"
+                      >{{ t("alerts.nameNoSpecialChars") }}</span
+                    >
+                    <span
+                      v-if="alertAutoName.isAuto.value && formData.name"
+                      class="text-text-secondary text-xs"
+                      data-test="add-alert-details-name-auto"
+                      >{{ t("alerts.sections.details.autoName") }}</span
+                    >
+                    <OButton
+                      v-else-if="alertNameSuggestion && formData.name !== alertNameSuggestion"
+                      class="self-start"
+                      variant="ghost-primary"
+                      size="xs"
+                      data-test="add-alert-details-name-suggest"
+                      @click="alertAutoName.resetToAuto"
+                      >{{
+                        t("alerts.sections.details.useSuggestion", { name: alertNameSuggestion })
+                      }}</OButton
+                    >
+                  </div>
+                </OSettingRow>
+                <AlertOptionalHeading v-if="!isAnomalyMode" />
+                <div
+                  v-show="!isAnomalyMode"
+                  :ref="(el) => setSectionTarget('advancedDetails', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <div v-show="!isAnomalyMode" data-snap-stop>
+                  <Advanced
+                    :section-targets="sectionTargets"
+                    :template="formData.template"
+                    :templates="templates"
+                    :contextAttributes="formData.context_attributes"
+                    :description="formData.description"
+                    :rowTemplate="formData.row_template"
+                    :rowTemplateType="formData.row_template_type"
+                    :destinations="destinations"
+                    :selectedDestinations="formData.destinations"
+                    :alertName="formData.name"
+                    :streamName="formData.stream_name"
+                    :streamType="formData.stream_type"
+                    :triggerCondition="formData.trigger_condition"
+                    :streamFields="filteredColumns"
+                    @update:template="updateTemplate"
+                    @refresh:templates="refreshTemplates"
+                    @update:contextAttributes="updateContextAttributes"
+                    @update:description="updateDescription"
+                    @update:rowTemplate="updateRowTemplate"
+                    @update:rowTemplateType="updateRowTemplateType"
+                  />
+                </div>
+                <!-- AlertSettings renders nothing inline in the sectioned editor: every slice lives in a section slot. -->
+                <AlertSettings
+                  v-show="!isAnomalyMode"
+                  ref="step4Ref"
+                  :section-targets="sectionTargets"
+                  :formData="formData"
+                  :isRealTime="formData.is_real_time"
+                  :columns="filteredColumns"
+                  :isAggregationEnabled="isAggregationEnabled"
+                  :destinations="formData.destinations"
+                  :recoveryDestinations="formData.recovery_destinations"
+                  :formattedDestinations="getFormattedDestinations"
+                  :destinationObjects="destinations"
+                  :workflows="formData.workflows"
+                  :destinationRequired="destinationRequired"
+                  @update:trigger="updateTriggerCondition"
+                  @update:aggregation="updateAggregation"
+                  @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
+                  @update:promqlCondition="updatePromqlCondition"
+                  @update:destinations="updateDestinations"
+                  @update:recoveryDestinations="updateRecoveryDestinations"
+                  @refresh:destinations="refreshDestinations"
+                  @update:workflows="updateWorkflows"
+                />
+                <div
+                  v-show="isAnomalyMode"
+                  :ref="(el) => setSectionTarget('anomalyDetails', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <AlertSuggestionLine section="details" anchor="end" />
+                <AlertTierLinks
+                  section="details"
+                  :view="tiers.view('details')"
+                  @add="onTierAdd"
+                  @toggle="tiers.toggle('details')"
+                />
+                <div
+                  class="border-border-default mt-3 flex flex-col gap-2 border-t pt-3"
+                  data-test="add-alert-review"
+                >
+                  <span class="text-text-heading text-sm font-medium">{{
+                    t("alerts.sections.review.title")
+                  }}</span>
+                  <dl class="m-0 grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-3">
+                    <div v-for="item in reviewItems" :key="item.id" class="min-w-0">
+                      <dt class="text-text-secondary text-xs">{{ item.title }}</dt>
+                      <dd class="m-0 min-w-0">
+                        <button
+                          type="button"
+                          class="text-accent block max-w-full cursor-pointer truncate text-sm hover:underline"
+                          :data-test="`add-alert-review-${item.id}`"
+                          @click="goToSection(item.id)"
+                        >
+                          {{ item.summary }}
+                        </button>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+            </AlertFormSection>
+          </OSnapScroll>
+        </div>
 
         <aside
           class="border-border-default w-83 shrink-0 flex-col overflow-y-auto border-s p-3 max-lg:w-auto max-lg:border-s-0 max-lg:border-t"
@@ -984,7 +1041,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import { defineComponent, computed, watch, provide, ref, reactive, onMounted, nextTick } from "vue";
+import { defineComponent, computed, watch, provide, ref, reactive, onMounted } from "vue";
 import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -1051,11 +1108,31 @@ import {
 import { useAlertSettingFind } from "@/composables/alerts/useAlertSettingFind";
 import AlertFormSection from "./AlertFormSection.vue";
 import AlertTierLinks from "./AlertTierLinks.vue";
-import type { AlertSettingId } from "./alertSettingTiers";
+import AlertSuggestionLine from "./AlertSuggestionLine.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import {
+  alertTierContext,
+  tierAvailable as tierAvailableIn,
+  tierIsSet as tierIsSetIn,
+  type AlertSettingId,
+} from "./alertSettingTiers";
 import {
   ALERT_SETTING_TIERS_KEY,
   useAlertSettingTiers,
 } from "@/composables/alerts/useAlertSettingTiers";
+import { useShowAllSettings } from "@/composables/alerts/useShowAllSettings";
+import {
+  ALERT_BACKTEST_SIGNAL_KEY,
+  ALERT_SUGGESTIONS_KEY,
+  useAlertSuggestions,
+} from "@/composables/alerts/useAlertSuggestions";
+import {
+  RESOLVING_PLATFORMS,
+  type BacktestSignal,
+  type SuggestionContext,
+} from "./alertSuggestions";
+import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
+import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import {
   describeAlertInPlainWords,
   describeCompositeInPlainWords,
@@ -1157,6 +1234,8 @@ export default defineComponent({
     OCommandSearch,
     AlertFormSection,
     AlertTierLinks,
+    AlertSuggestionLine,
+    OSwitch,
     AlertEditStatus,
     AlertEditActions,
     AlertUnsavedChanges,
@@ -1591,6 +1670,10 @@ export default defineComponent({
         condition: submitAttempted.value && querySaveProblem.value ? 1 : 0,
         schedule: submitAttempted.value && cronSaveProblem.value ? 1 : 0,
       })),
+      invalid: computed(() => ({
+        condition: !!querySaveProblem.value,
+        schedule: !!cronSaveProblem.value,
+      })),
       fieldMeta: alertForm.form.useStore((s) => s.fieldMeta as FieldMetaMap),
       formData: alertForm.formData,
       anomalyConfig: alertForm.anomalyConfig,
@@ -1635,76 +1718,27 @@ export default defineComponent({
       };
     });
 
-    const has = (v: unknown) => v !== undefined && v !== null && v !== "";
-    const tierAvailable = (id: AlertSettingId): boolean => {
-      const fd = alertForm.formData.value;
-      const scheduled = fd.is_real_time === "false" && !alertForm.isAnomalyMode.value;
-      const anomaly = alertForm.isAnomalyMode.value;
-      switch (id) {
-        case "warning":
-        case "holdFor":
-        case "recovery":
-        case "keepFiring":
-          return scheduled;
-        case "groupBy":
-          return (
-            scheduled &&
-            fd.query_condition?.type === "custom" &&
-            alertForm.isAggregationEnabled.value
-          );
-        case "compareWithPast":
-          return scheduled && fd.query_condition?.type === "sql";
-        case "createsIncident":
-          return !anomaly && incidentsEnabled.value;
-        case "oncall":
-          return !anomaly && store.state.zoConfig?.oncall_enabled === true;
-        default:
-          return !anomaly;
-      }
-    };
-    const tierIsSet = (id: AlertSettingId): boolean => {
-      const fd = alertForm.formData.value;
-      const qc = fd.query_condition ?? {};
-      switch (id) {
-        case "warning":
-          return (
-            has(fd.trigger_condition?.warning_threshold) ||
-            has(qc.aggregation?.warning_value) ||
-            has(qc.promql_warning_value)
-          );
-        case "holdFor":
-          return Number(fd.pending_period_sec) > 0;
-        case "groupBy":
-          return (
-            (fd.logGroupBy ?? []).some(has) ||
-            (qc.aggregation?.group_by ?? []).some(has) ||
-            qc.multi_alert === true
-          );
-        case "compareWithPast":
-          return (qc.multi_time_range ?? []).length > 0;
-        case "createsIncident":
-          return fd.creates_incident === true;
-        case "template":
-          return has(fd.template);
-        case "variables":
-          return (fd.context_attributes ?? []).length > 0;
-        case "recovery":
-          return fd.notify_on_recovery === true || (fd.recovery_destinations ?? []).length > 0;
-        case "oncall":
-          return has(fd.oncall_team);
-        case "keepFiring":
-          return Number(fd.keep_firing_for) > 0;
-        case "priority":
-          return has(fd.priority);
-        case "tags":
-          return (fd.tags ?? []).length > 0;
-        case "rowTemplate":
-          return has(fd.row_template);
-        default:
-          return false;
-      }
-    };
-    const tiers = useAlertSettingTiers({ available: tierAvailable, isSet: tierIsSet });
+    const tierContext = computed(() =>
+      alertTierContext({
+        isRealTime: String(alertForm.formData.value.is_real_time),
+        queryType: alertForm.formData.value.query_condition?.type,
+        aggregate: alertForm.isAggregationEnabled.value,
+        incidentsEnabled: incidentsEnabled.value,
+        oncallEnabled: store.state.zoConfig?.oncall_enabled === true,
+        suppressRepeatsEnabled: config.isEnterprise === "true" || config.isCloud === "true",
+      }),
+    );
+    const tierAvailable = (id: AlertSettingId) => tierAvailableIn(id, tierContext.value);
+    const tierIsSet = (id: AlertSettingId) =>
+      tierIsSetIn(id, {
+        form: alertForm.formData.value,
+        anomaly: alertForm.isAnomalyMode.value ? alertForm.anomalyConfig.value : null,
+      });
+    const { showAll, setShowAll } = useShowAllSettings(() => ({
+      user: store.state.userInfo?.email ?? "",
+      org: store.state.selectedOrganization?.identifier ?? "",
+    }));
+    const tiers = useAlertSettingTiers({ available: tierAvailable, isSet: tierIsSet, showAll });
     provide(ALERT_SETTING_TIERS_KEY, tiers);
 
     const findAvailable = (id: AlertFindId): boolean => {
@@ -1713,7 +1747,7 @@ export default defineComponent({
         if (id === "name" || id === "folder") {
           return !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value;
         }
-        return isAnomalyFindId(id);
+        return isAnomalyFindId(id) || (isTieredSetting(id) && tierAvailable(id));
       }
       if (isAnomalyOnlyFindId(id)) return false;
       const composite = isCompositeMode.value;
@@ -1731,23 +1765,14 @@ export default defineComponent({
           return !composite && mode === "custom";
         case "queryEditor":
           return !composite && mode !== "custom";
-        case "vrl":
-          return !composite && mode === "sql";
         case "threshold":
         case "checkEvery":
-        case "cron":
         case "timezone":
         case "lookBack":
           return fd.is_real_time === "false";
         case "name":
         case "folder":
           return !alertForm.beingUpdated.value;
-        case "suppressRepeats":
-          return (
-            fd.is_real_time === "false" &&
-            !alertForm.isAnomalyMode.value &&
-            (config.isEnterprise === "true" || config.isCloud === "true")
-          );
         default:
           return true;
       }
@@ -1760,74 +1785,57 @@ export default defineComponent({
       reveal: (el) => snapScrollRef.value?.revealElement(el),
     });
 
-    // A section opens all its settings while they fit the view; one the user touched is never closed under them.
-    const userToggledTiers = new Set<AlertSectionId>();
-    const touchedSections = new Set<AlertSectionId>();
-    const autoOpenedTiers = reactive(new Set<AlertSectionId>());
-    const onTierToggle = (section: AlertSectionId) => {
-      userToggledTiers.add(section);
-      autoOpenedTiers.delete(section);
-      tiers.toggle(section);
-    };
-    const onSectionInteract = (event: Event) => {
-      const target = event.target as Element | null;
-      // Section jumps focus the heading, which is navigation rather than a touch.
-      if (event.type === "focusin" && target?.matches?.("[data-snap-heading]")) return;
-      const section = target?.closest?.("[data-snap-section]")?.getAttribute("data-snap-section");
-      if (ALERT_SECTIONS.some((def) => def.id === section)) {
-        touchedSections.add(section as AlertSectionId);
-      }
-    };
-    // Discard remounts the form, so what the user touched before no longer pins any section.
-    watch(alertEditorDraft.formKey, () => {
-      userToggledTiers.clear();
-      touchedSections.clear();
+    // Only the 24 h check writes this; null until it has a finished result.
+    const backtestSignal = ref<BacktestSignal | null>(null);
+    provide(ALERT_BACKTEST_SIGNAL_KEY, backtestSignal);
+
+    const { detectPrebuiltType } = usePrebuiltDestinations();
+    const resolvingDestinations = computed(() =>
+      (alertForm.formData.value.destinations ?? []).filter((name: string) => {
+        const destination = (props.destinations as { name?: string }[]).find(
+          (d) => d?.name === name,
+        );
+        const platform = destination ? detectPrebuiltType(destination as any) : null;
+        return (RESOLVING_PLATFORMS as readonly string[]).includes(platform ?? "");
+      }),
+    );
+    const suggestionContext = computed<SuggestionContext>(() => {
+      const fd = alertForm.formData.value;
+      return {
+        shape: tierContext.value.shape,
+        kind: tierContext.value.kind,
+        promql: String(fd.query_condition?.promql ?? ""),
+        ruleMode: fd.query_condition?.promql_rule_mode === true,
+        backtest: backtestSignal.value,
+        resolvingDestinations: resolvingDestinations.value,
+        createsIncident: fd.creates_incident === true,
+        oncallSet: tierIsSet("oncall"),
+        available: tierAvailable,
+        isSet: tierIsSet,
+      };
     });
-    const sectionsScroller = () => (snapScrollRef.value as { $el?: HTMLElement } | null)?.$el;
-    const overflowsView = (id: AlertSectionId, scroller: HTMLElement): boolean => {
-      const section = scroller.querySelector<HTMLElement>(`[data-snap-section="${id}"]`);
-      const body = section?.lastElementChild;
-      if (!section || !body) return false;
-      const top = section.getBoundingClientRect().top;
-      const bottoms = Array.from(body.children).map(
-        (child) => child.getBoundingClientRect().bottom,
-      );
-      return Math.max(top, ...bottoms) - top > scroller.clientHeight;
-    };
-    // Runs only right after an auto-open, never as content grows, so a toggle never folds the rows around it.
-    const closeOverflowingTiers = () => {
-      const scroller = sectionsScroller();
-      if (!scroller) return;
-      for (const id of autoOpenedTiers) {
-        if (touchedSections.has(id) || !overflowsView(id, scroller)) continue;
-        autoOpenedTiers.delete(id);
-        tiers.collapse(id);
-      }
-    };
-    const openSettingsThatFit = async () => {
-      if (!lgUp.value || !sectionsScroller() || alertForm.isAnomalyMode.value) return;
-      for (const { id } of ALERT_SECTIONS) {
-        const view = tiers.view(id);
-        if (userToggledTiers.has(id) || view.expanded) continue;
-        if (!view.tucked.length && !view.addLinks.length) continue;
-        tiers.expand(id);
-        autoOpenedTiers.add(id);
-      }
-      await nextTick();
-      closeOverflowingTiers();
-    };
-    onMounted(() => {
-      nextTick(openSettingsThatFit);
+    const suggestions = useAlertSuggestions({
+      context: suggestionContext,
+      scope: () => ({
+        user: store.state.userInfo?.email ?? "",
+        org: store.state.selectedOrganization?.identifier ?? "",
+        alertId: isEditingAlert.value && editAlertId.value ? editAlertId.value : null,
+      }),
+      tiers,
+      t: alertForm.t,
+      focus: (id) => settingFind.select(id),
     });
-    watch(
-      () => [
-        lgUp.value,
-        alertForm.formData.value.stream_name,
-        alertForm.formData.value.is_real_time,
-        alertForm.formData.value.query_condition?.type,
-      ],
-      openSettingsThatFit,
-      { flush: "post" },
+    provide(ALERT_SUGGESTIONS_KEY, suggestions);
+
+    provide(ALERT_FORM_CONTEXT_KEY, {
+      isEditing: computed(() => alertForm.beingUpdated.value || alertForm.anomalyEditMode.value),
+      showAll,
+      goToSection,
+      reveal: (el: HTMLElement) => snapScrollRef.value?.revealElement(el),
+    });
+
+    const isCronSchedule = computed(
+      () => alertForm.formData.value.trigger_condition?.frequency_type === "cron",
     );
 
     const railInCondition = computed(() => !lgUp.value && !!sectionTargets.narrowPreview);
@@ -2010,9 +2018,9 @@ export default defineComponent({
       RAIL_VERDICT_ICONS,
       tiers,
       onTierAdd,
-      onTierToggle,
-      onSectionInteract,
-      autoOpenedTiers,
+      showAll,
+      setShowAll,
+      isCronSchedule,
       railInCondition,
       conditionHelp,
       settingFind,

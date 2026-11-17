@@ -90,10 +90,9 @@ export function useAlertSettingFind(opts: {
     const entry = ALERT_FIND_ENTRIES.find((e) => e.id === id);
     if (!entry) return;
     const setting = gatingSetting(entry);
-    if (setting && !opts.tiers.isVisible(setting)) {
-      if (entry.tier === "tucked") opts.tiers.expand(entry.section);
-      else opts.tiers.reveal(setting);
-    }
+    // An entry that lands on its own "+ add" link leaves the adding to that link.
+    const landsOnLink = entry.targets[0]?.startsWith("add-alert-add-");
+    if (setting && !landsOnLink && !opts.tiers.isVisible(setting)) opts.tiers.reveal(setting);
     // One tick renders the revealed block, the next lets teleported slices land in their slots.
     await nextTick();
     await nextTick();

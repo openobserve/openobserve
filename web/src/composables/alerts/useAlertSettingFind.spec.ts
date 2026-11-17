@@ -4,7 +4,6 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { nextTick, reactive } from "vue";
 import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
-import type { AlertSectionId } from "@/components/alerts/alertFormSections";
 import type { AlertSettingId } from "@/components/alerts/alertSettingTiers";
 import type { AlertSettingTiers } from "./useAlertSettingTiers";
 import { findControl, focusControl, useAlertSettingFind } from "./useAlertSettingFind";
@@ -22,24 +21,18 @@ const mountControl = (testId: string, inner = "<input />") => {
   return el;
 };
 
-// Tiers whose tucked/one-click settings only render once expanded or revealed, like AddAlert.
+// Tiers whose rare settings only render once revealed, like AddAlert.
 const fakeTiers = (onShow: (id: AlertSettingId) => void) => {
-  const state = reactive({ expanded: new Set<AlertSectionId>(), revealed: new Set<string>() });
+  const state = reactive({ revealed: new Set<string>() });
   const tiers: AlertSettingTiers = {
-    isVisible: (id) =>
-      ["destinations", "description", "rowTemplate"].includes(id) || state.revealed.has(id),
-    view: () => ({ addLinks: [], tucked: [], expanded: false }),
+    isVisible: (id) => ["description", "rowTemplate"].includes(id) || state.revealed.has(id),
+    view: () => ({ addLinks: [], more: [], expanded: false }),
     reveal: vi.fn((id: AlertSettingId) => {
       state.revealed.add(id);
       onShow(id);
     }),
+    conceal: vi.fn(),
     toggle: vi.fn(),
-    expand: vi.fn((section: AlertSectionId) => {
-      state.expanded.add(section);
-      ALERT_FIND_ENTRIES.filter((e) => e.section === section && e.tier === "tucked").forEach((e) =>
-        onShow(e.id as AlertSettingId),
-      );
-    }),
   };
   return tiers;
 };
@@ -73,10 +66,11 @@ describe("useAlertSettingFind", () => {
     expect(find.countText.value).toMatch(/setting/);
   });
 
-  it("expands a tucked group, then scrolls to and focuses the control", async () => {
+  it("reveals only the hidden setting, then scrolls to and focuses it", async () => {
     const { find, tiers, reveal } = setup();
     await find.select("keepFiring");
-    expect(tiers.expand).toHaveBeenCalledWith("notify");
+    expect(tiers.reveal).toHaveBeenCalledWith("keepFiring");
+    expect(tiers.toggle).not.toHaveBeenCalled();
     const control = document.querySelector<HTMLElement>(
       '[data-test="alert-settings-keep-firing-for-input"]',
     );
@@ -84,18 +78,18 @@ describe("useAlertSettingFind", () => {
     expect(document.activeElement).toBe(control?.querySelector("input"));
   });
 
-  it("reveals a one-click setting without expanding its section", async () => {
-    const { find, tiers } = setup();
-    await find.select("template");
-    expect(tiers.reveal).toHaveBeenCalledWith("template");
-    expect(tiers.expand).not.toHaveBeenCalled();
+  it("lands on a + add link without adding the setting", async () => {
+    const { find, tiers, reveal } = setup();
+    const link = mountControl("add-alert-add-cron", "");
+    await find.select("cron");
+    expect(tiers.reveal).not.toHaveBeenCalled();
+    expect(reveal).toHaveBeenCalledWith(link);
   });
 
   it("does not touch the tiers for an always-shown control", async () => {
     const { find, tiers, reveal } = setup();
     const control = mountControl("alert-settings-silence-duration-input");
     await find.select("cooldown");
-    expect(tiers.expand).not.toHaveBeenCalled();
     expect(tiers.reveal).not.toHaveBeenCalled();
     expect(reveal).toHaveBeenCalledWith(control);
   });

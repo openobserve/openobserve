@@ -15302,8 +15302,6 @@
       "warnLine": "warn"
     },
     "tiers": {
-      "rowFires": "When it fires",
-      "rowMessage": "Customize message",
       "showFewer": "Show fewer",
       "names": {
         "holdFor": "Must last at least",

@@ -287,6 +287,7 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
 import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import {
   ANOMALY_DIRECTION_KEYS,
   anomalyWindowShareEffective,
@@ -315,6 +316,10 @@ export default defineComponent({
     destinations: {
       type: Array as PropType<(SelectOption & { name: string; destination_type_name?: string })[]>,
       default: () => [],
+    },
+    sectionTargets: {
+      type: Object as PropType<AlertSectionTargets>,
+      default: undefined,
     },
   },
 

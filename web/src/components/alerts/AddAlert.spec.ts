@@ -20,7 +20,7 @@
 // composed schema still validates from the seeded form values + default `_meta`.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach, onTestFinished } from "vitest";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import alertsService from "@/services/alerts";
@@ -1510,73 +1510,56 @@ describe("AddAlert (OForm owner)", () => {
       breakpoint.lgUp!.value = true;
     });
 
-    it("opens every setting while it fits, with no link to hide them", async () => {
+    it.each([true, false])("the tiers are the same below lg and at lg (lg %s)", async (lg) => {
+      breakpoint.lgUp!.value = lg;
       wrapper = mountAlert();
       await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-section-condition-more"]').exists()).toBe(true);
       for (const section of ["condition", "notify", "details"] as const) {
-        expect(wrapper.vm.tiers.view(section).expanded).toBe(true);
-        expect(wrapper.find(`[data-test="add-alert-section-${section}-more"]`).exists()).toBe(
-          false,
-        );
+        expect(wrapper.vm.tiers.view(section).expanded).toBe(false);
       }
-      expect(wrapper.vm.tiers.isVisible("template")).toBe(true);
-      expect(wrapper.vm.tiers.view("notify").addLinks).toEqual([]);
-      expect(wrapper.vm.form.getFieldValue("context_attributes") ?? []).toHaveLength(0);
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(false);
     });
 
-    it("closes a section that no longer fits and offers the link back", async () => {
+    it("Show all on hides every More options line and opens every + link", async () => {
       wrapper = mountAlert();
       await flushPromises();
-      wrapper.vm.autoOpenedTiers.delete("condition");
-      wrapper.vm.tiers.collapse("condition");
+      await wrapper.get('[data-test="add-alert-show-all"] button').trigger("click");
       await flushPromises();
-      const more = wrapper.find('[data-test="add-alert-section-condition-more"]');
-      expect(more.attributes("aria-expanded")).toBe("false");
-      await more.trigger("click");
-      wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
-      await flushPromises();
-      expect(wrapper.vm.tiers.view("condition").expanded).toBe(true);
-      expect(wrapper.find('[data-test="add-alert-section-condition-more"]').text()).toBe(
-        "Show fewer",
+      // Show all is remembered per user, so later tests must not inherit it.
+      const { setShowAll } = wrapper.vm;
+      onTestFinished(() => setShowAll(false));
+      expect(wrapper.find('[data-test$="-more"][data-test^="add-alert-section-"]').exists()).toBe(
+        false,
       );
+      expect(wrapper.find('[data-test^="add-alert-add-"]').exists()).toBe(false);
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(true);
+      expect(wrapper.vm.tiers.isVisible("description")).toBe(true);
     });
 
-    it("never folds a section the user has touched when the form re-fits", async () => {
-      wrapper = mountAlert();
+    it("section 4 puts Check every and Looking at the last in one row", async () => {
+      wrapper = mountAlert(
+        {},
+        {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, QueryConfig: false, AlertSettings: false },
+          },
+        },
+      );
       await flushPromises();
-      expect(wrapper.vm.autoOpenedTiers.has("notify")).toBe(true);
-      const rect = vi
-        .spyOn(Element.prototype, "getBoundingClientRect")
-        .mockReturnValue({ top: 0, bottom: 5000 } as DOMRect);
-      try {
-        wrapper
-          .get('[data-snap-section="notify"]')
-          .element.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
-        wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
-        await flushPromises();
-      } finally {
-        rect.mockRestore();
-      }
-      expect(wrapper.vm.tiers.view("notify").expanded).toBe(true);
-      expect(wrapper.vm.tiers.view("condition").expanded).toBe(false);
+      const row = wrapper.get('[data-test="add-alert-schedule-row"]');
+      expect(row.find('[data-test="alert-check-every-input"]').exists()).toBe(true);
+      expect(row.find('[data-test="alert-settings-period-input"]').exists()).toBe(true);
     });
 
-    it("does not count a jump that focuses a section heading as touching it", async () => {
-      wrapper = mountAlert();
+    it("edit puts the limit before the query", async () => {
+      wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
       await flushPromises();
-      const rect = vi
-        .spyOn(Element.prototype, "getBoundingClientRect")
-        .mockReturnValue({ top: 0, bottom: 5000 } as DOMRect);
-      try {
-        wrapper
-          .get('[data-snap-section="notify"] [data-snap-heading]')
-          .element.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
-        wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
-        await flushPromises();
-      } finally {
-        rect.mockRestore();
-      }
-      expect(wrapper.vm.tiers.view("notify").expanded).toBe(false);
+      const slot = wrapper.get('[data-test="add-alert-query-condition-slot"]').element;
+      const card = wrapper.get('[data-test="add-alert-query-card"]').element;
+      expect(slot.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("moves the preview under the condition step below lg and back beside it at lg", async () => {
@@ -1730,38 +1713,40 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="alerts-alert-summary"]').exists()).toBe(false);
     });
 
-    it("tucks the rare condition settings behind one link that expands in place", async () => {
-      breakpoint.lgUp!.value = false;
+    it("names the rare condition settings on one line that expands in place", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const more = () => wrapper.find('[data-test="add-alert-section-condition-more"]');
-      expect(more().text()).toBe("More options: warning level, how long it must last");
+      expect(wrapper.vm.tiers.view("condition").more.map((d: { id: string }) => d.id)).toEqual([
+        "holdFor",
+        "generatedSql",
+      ]);
+      expect(wrapper.find('[data-test="add-alert-section-condition-more-names"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(false);
-      expect(wrapper.vm.tiers.isVisible("warning")).toBe(false);
 
       await more().trigger("click");
-      expect(more().text()).toBe("Show fewer");
+      expect(more().attributes("aria-expanded")).toBe("true");
       expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(true);
-      expect(wrapper.vm.tiers.isVisible("warning")).toBe(true);
+      expect(wrapper.vm.tiers.isVisible("warning")).toBe(false);
 
       await more().trigger("click");
       expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(false);
     });
 
-    it("shows a tucked setting that holds a value and drops it from the count", async () => {
-      breakpoint.lgUp!.value = false;
+    it("shows a rare setting that holds a value and drops it from the line", async () => {
       wrapper = mountAlert();
       await flushPromises();
       wrapper.vm.form.setFieldValue("pending_period_sec", 5);
       await flushPromises();
       expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(true);
-      expect(wrapper.find('[data-test="add-alert-section-condition-more"]').text()).toBe(
-        "More options: warning level",
-      );
+      expect(wrapper.vm.tiers.view("condition").more.map((d: { id: string }) => d.id)).toEqual([
+        "generatedSql",
+      ]);
     });
 
-    it("keeps the message settings one click away, shows tags and tucks priority", async () => {
-      breakpoint.lgUp!.value = false;
+    it("keeps the message settings one click away and names tags and priority on the line", async () => {
       wrapper = mountAlert();
       await flushPromises();
       expect(wrapper.vm.tiers.isVisible("template")).toBe(false);
@@ -1770,17 +1755,15 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-add-template"]').exists()).toBe(false);
       await wrapper.find('[data-test="add-alert-add-variables"]').trigger("click");
       expect(wrapper.vm.form.getFieldValue("context_attributes")).toHaveLength(1);
-      expect(wrapper.vm.tiers.isVisible("tags")).toBe(true);
-      expect(wrapper.find('[data-test="add-alert-section-details-more"]').text()).toBe(
-        "More options: row template, priority",
-      );
+      expect(wrapper.vm.tiers.isVisible("tags")).toBe(false);
+      expect(wrapper.vm.tiers.view("details").more.map((d: { id: string }) => d.id)).toEqual([
+        "tags",
+        "priority",
+      ]);
     });
 
-    it("finds a setting by its old name and expands its tucked group when picked", async () => {
+    it("finds a setting by its old name and reveals just that setting when picked", async () => {
       wrapper = mountAlert();
-      await flushPromises();
-      wrapper.vm.autoOpenedTiers.delete("notify");
-      wrapper.vm.tiers.collapse("notify");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-find-setting"]').exists()).toBe(true);
       wrapper.vm.settingFind.query.value = "flapping";
@@ -1801,7 +1784,9 @@ describe("AddAlert (OForm owner)", () => {
       delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
       expect(wrapper.vm.tiers.isVisible("keepFiring")).toBe(true);
       expect(scrollTo).toHaveBeenCalled();
-      expect(wrapper.find('[data-test="add-alert-section-notify-more"]').text()).toBe("Show fewer");
+      expect(wrapper.vm.tiers.view("notify").more.map((d: { id: string }) => d.id)).not.toContain(
+        "keepFiring",
+      );
     });
 
     it("lists only the settings the alert type has", async () => {

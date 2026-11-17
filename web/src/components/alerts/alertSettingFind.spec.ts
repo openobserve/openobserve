@@ -35,10 +35,19 @@ describe("ALERT_FIND_ENTRIES", () => {
     for (const def of ALERT_SETTING_TIERS) {
       const entry = ALERT_FIND_ENTRIES.find((e) => e.id === def.id);
       expect(entry, def.id).toBeDefined();
-      expect([entry?.section, entry?.tier]).toEqual([def.section, def.tier]);
+      expect([entry?.section, entry?.tier], def.id).toEqual([def.section, def.tier]);
       expect(isTieredSetting(def.id)).toBe(true);
     }
-    expect(isTieredSetting("cron")).toBe(false);
+    expect(isTieredSetting("threshold")).toBe(false);
+  });
+
+  it("Remind at most every is found by cooldown and lives in Who to tell", () => {
+    const hit = searchAlertSettings("cooldown", t, all)[0]?.entry;
+    expect([hit?.id, hit?.section, hit?.labelKey]).toEqual([
+      "cooldown",
+      "notify",
+      "alerts.form.remind.label",
+    ]);
   });
 });
 

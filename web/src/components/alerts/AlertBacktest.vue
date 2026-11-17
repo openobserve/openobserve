@@ -30,6 +30,14 @@ const props = defineProps<{
   period: number;
   operator: string;
   threshold: number;
+  /** The alert's schedule; read by the replay of real check times. */
+  triggerCondition?: {
+    frequency: number;
+    frequency_type: string;
+    cron?: string;
+    timezone?: string;
+    silence: number;
+  };
 }>();
 
 const DAY_MS = 24 * 60 * 60 * 1000;

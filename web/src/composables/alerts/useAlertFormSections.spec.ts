@@ -232,16 +232,17 @@ describe("useAlertFormSections", () => {
     expect(summary("!=")).toBe("not 3 events");
   });
 
-  it("counts invalid fields per section from the form's field meta", () => {
+  it("counts invalid fields per section from the form's field meta; a silence error counts against Who to tell", () => {
     const { items, errorCounts } = setup(scheduled({ stream_name: "k8s_logs", name: "x" }), {
       "trigger_condition.period": { errors: ["Required"] },
       "trigger_condition.silence": { errors: ["Required"] },
       "trigger_condition.threshold": { errors: [] },
     });
-    expect(errorCounts.value.schedule).toBe(2);
+    expect(errorCounts.value.schedule).toBe(1);
+    expect(errorCounts.value.notify).toBe(1);
     expect(byId(items.value, "schedule")).toMatchObject({
       state: "error",
-      stateLabel: "2 things to fix",
+      stateLabel: "1 thing to fix",
     });
     expect(byId(items.value, "condition").state).toBe("done");
   });
@@ -277,7 +278,8 @@ describe("sectionOfField", () => {
     expect(sectionOfField("destinations")).toBe("notify");
     expect(sectionOfField(AGGREGATION_ENABLED_FIELD)).toBe("condition");
     expect(sectionOfField("trigger_condition.frequency")).toBe("schedule");
-    expect(sectionOfField("row_template_type")).toBe("details");
+    expect(sectionOfField("row_template_type")).toBe("notify");
+    expect(sectionOfField("trigger_condition.silence")).toBe("notify");
   });
   it("in edit mode mutes saved sections and words the changed ones", () => {
     const { items } = useAlertFormSections({

@@ -31,9 +31,11 @@ export type AlertSectionSlot =
   | "advancedDetails"
   | "anomalyCondition"
   | "anomalyTraining"
+  | "anomalyConditionMore"
   | "anomalySchedule"
   | "compositeCondition"
   | "compositePreview"
+  | "anomalyDetails"
   | "narrowPreview";
 
 /** Teleport targets a step renders its slices into; absent or null keeps the slice inline. */
@@ -121,6 +123,8 @@ const FIELD_SECTION_PREFIXES: ReadonlyArray<[string, AlertSectionId]> = [
   ["trigger_condition.warning", "condition"],
   ["_ui.forecast", "condition"],
   ["_ui.pendingPeriod", "condition"],
+  ["trigger_condition.silence", "notify"],
+  ["row_template", "notify"],
   ["trigger_condition", "schedule"],
   ["_ui", "schedule"],
   ["destinations", "notify"],
@@ -135,7 +139,6 @@ const FIELD_SECTION_PREFIXES: ReadonlyArray<[string, AlertSectionId]> = [
   ["suppress_repeats", "notify"],
   ["name", "details"],
   ["description", "details"],
-  ["row_template", "details"],
   ["priority", "details"],
   ["tags", "details"],
 ];
