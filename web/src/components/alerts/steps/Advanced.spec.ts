@@ -26,7 +26,7 @@
 
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { defineComponent, nextTick } from "vue";
+import { defineComponent, nextTick, provide, ref } from "vue";
 import Advanced from "./Advanced.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -34,6 +34,11 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import { createAdvancedSchema } from "@/components/alerts/AddAlert.schema";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { tierIsSet, type AlertSettingId } from "@/components/alerts/alertSettingTiers";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
 
 const listTeamsMock = vi.fn().mockResolvedValue({ data: [] });
 vi.mock("@/services/oncall", () => ({
@@ -124,9 +129,9 @@ describe("Advanced — descendant (binds into ancestor OForm) mode", () => {
     const host = mountDescendant();
     const parentForm = hostForm(host);
 
-    const textareas = host.findAll("textarea");
-    // first textarea = description, second = row template
-    await textareas[0].setValue("a description");
+    await host
+      .find('[data-test="add-alert-description-textarea"] textarea')
+      .setValue("a description");
     await flushPromises();
     expect(parentForm.state.values.description).toBe("a description");
 
@@ -351,5 +356,63 @@ describe("Advanced — on-call team picker", () => {
 
     expect(host.find('[data-test="alert-oncall-team-select"]').exists()).toBe(true);
     expect(host.findComponent({ name: "Step6Advanced" }).vm.oncallTeamOptions).toEqual([]);
+  });
+});
+
+// The sectioned editor: tiers decide which rows show, the section slots decide where.
+describe("Advanced — in the sectioned editor", () => {
+  const slot = () => document.body.appendChild(document.createElement("div"));
+  const mountSectioned = (values: Record<string, unknown> = {}, reveal: AlertSettingId[] = []) => {
+    const targets = { advancedMessage: slot(), advancedOncall: slot(), advancedDetails: slot() };
+    const defaultValues = {
+      template: "",
+      context_attributes: [],
+      description: "",
+      row_template: "",
+      row_template_type: "String",
+      ...values,
+    };
+    const Host = defineComponent({
+      components: { OForm, Advanced },
+      setup() {
+        const tiers = useAlertSettingTiers({
+          available: () => true,
+          isSet: (id) => tierIsSet(id, { form: defaultValues, anomaly: null }),
+          showAll: ref(false),
+        });
+        reveal.forEach(tiers.reveal);
+        provide(ALERT_SETTING_TIERS_KEY, tiers);
+        return { schema: createAdvancedSchema(), defaultValues, targets };
+      },
+      template: `<OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+        <Advanced :section-targets="targets" />
+      </OForm>`,
+    });
+    const host = mount(Host, { ...globalCfg, attachTo: document.body });
+    const has = (target: HTMLElement, dt: string) => !!target.querySelector(`[data-test="${dt}"]`);
+    return { host, targets, has };
+  };
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("row template and the template's refresh sit in Who to tell", () => {
+    const { host, targets, has } = mountSectioned({}, ["template", "rowTemplate"]);
+    expect(has(targets.advancedMessage, "add-alert-row-input-textarea")).toBe(true);
+    expect(has(targets.advancedDetails, "add-alert-row-input-textarea")).toBe(false);
+    (
+      targets.advancedMessage.querySelector(
+        '[data-test="advanced-template-refresh-btn"]',
+      ) as HTMLElement
+    ).click();
+    expect(host.findComponent(Advanced).emitted("refresh:templates")).toHaveLength(1);
+  });
+
+  it("each message link adds only its own row", () => {
+    const { targets, has } = mountSectioned({}, ["rowTemplate"]);
+    expect(has(targets.advancedMessage, "add-alert-row-input-textarea")).toBe(true);
+    expect(has(targets.advancedMessage, "advanced-template-override-select")).toBe(false);
+    expect(has(targets.advancedMessage, "advanced-variables-info-btn")).toBe(false);
   });
 });

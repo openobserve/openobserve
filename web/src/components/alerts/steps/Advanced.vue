@@ -45,7 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <Teleport
             :to="sectionTargets?.advancedMessage"
             :disabled="!sectionTargets?.advancedMessage"
-            ><div v-if="tierShows('template') || tierShows('variables')" class="flex flex-col">
+            ><div
+              v-if="tierShows('template') || tierShows('rowTemplate') || tierShows('variables')"
+              class="flex flex-col"
+            >
               <OSettingRow
                 v-if="tierShows('template')"
                 :label="t('alerts.plain.messageTemplate')"
@@ -67,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="ghost"
                       size="icon-circle-sm"
                       :title="t('alerts.advanced.refreshTemplates')"
+                      data-test="advanced-template-refresh-btn"
                       @click="$emit('refresh:templates')"
                     >
                       <OIcon name="refresh" size="sm" />
@@ -84,6 +88,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div></OSettingRow
               >
+
+              <OSettingRow
+                v-if="tierShows('rowTemplate')"
+                :label="t('alerts.plain.rowTemplate')"
+                :description="t('alerts.sections.rows.rowTemplate')"
+                fill
+              >
+                <div class="flex flex-col gap-2">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                      <span class="text-text-secondary text-xs">{{
+                        t("alerts.advanced.templateType")
+                      }}</span>
+                      <OFormToggleGroup
+                        data-test="add-alert-row-template-type-toggle"
+                        name="row_template_type"
+                      >
+                        <OToggleGroupItem value="String" size="sm">
+                          <template #icon-left><OIcon name="title" size="sm" /></template>
+                          {{ t("alerts.advanced.templateTypeString") }}
+                        </OToggleGroupItem>
+                        <OToggleGroupItem value="Json" size="sm">
+                          <template #icon-left><OIcon name="data-object" size="sm" /></template>
+                          {{ t("alerts.advanced.templateTypeJson") }}
+                        </OToggleGroupItem>
+                      </OFormToggleGroup>
+                    </div>
+                    <OButton
+                      data-test="add-alert-row-input-info-btn"
+                      variant="ghost-primary"
+                      size="xs"
+                      class="gap-1 font-medium"
+                      @click="openHelp('rowTemplate')"
+                    >
+                      <OIcon name="help" size="xs" />
+                      <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
+                    </OButton>
+                  </div>
+                  <OFormTextarea
+                    :aria-label="t('alerts.row')"
+                    data-test="add-alert-row-input-textarea"
+                    name="row_template"
+                    :placeholder="rowTemplatePlaceholder"
+                    :rows="4"
+                  />
+                  <span
+                    v-if="isForecastMode"
+                    class="text-text-secondary mt-1 block text-xs"
+                    data-test="add-alert-row-forecast-hint"
+                    >{{ t("alerts.forecast.rowTemplateHint") }}</span
+                  >
+                </div>
+              </OSettingRow>
 
               <OSettingRow v-if="tierShows('variables')" :label="t('alerts.plain.variables')" fill
                 ><div class="flex flex-col items-start gap-1">
@@ -160,7 +217,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div></Teleport
           >
 
-          <!-- Priority & tags (Feature 2, PT-10) -->
           <div class="flex flex-col">
             <OSettingRow
               v-if="tierShows('priority')"
@@ -231,73 +287,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <Teleport
             :to="sectionTargets?.advancedDetails"
             :disabled="!sectionTargets?.advancedDetails"
-            ><div class="flex flex-col">
-              <!-- Description -->
-              <OSettingRow :label="t('alerts.description')" fill>
-                <OFormTextarea
-                  name="description"
-                  :aria-label="t('alerts.description')"
-                  data-test="add-alert-description-textarea"
-                  :placeholder="t('alerts.sections.rows.descriptionPlaceholder')"
-                  :rows="2"
-                />
-              </OSettingRow>
-
-              <!-- Row Template -->
-              <OSettingRow
-                v-if="tierShows('rowTemplate')"
-                :label="t('alerts.plain.rowTemplate')"
-                :description="t('alerts.sections.rows.rowTemplate')"
-                fill
-              >
-                <div class="flex flex-col gap-2">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                      <span class="text-text-secondary text-xs">{{
-                        t("alerts.advanced.templateType")
-                      }}</span>
-                      <OFormToggleGroup
-                        data-test="add-alert-row-template-type-toggle"
-                        name="row_template_type"
-                      >
-                        <OToggleGroupItem value="String" size="sm">
-                          <template #icon-left><OIcon name="title" size="sm" /></template>
-                          {{ t("alerts.advanced.templateTypeString") }}
-                        </OToggleGroupItem>
-                        <OToggleGroupItem value="Json" size="sm">
-                          <template #icon-left><OIcon name="data-object" size="sm" /></template>
-                          {{ t("alerts.advanced.templateTypeJson") }}
-                        </OToggleGroupItem>
-                      </OFormToggleGroup>
-                    </div>
-                    <OButton
-                      data-test="add-alert-row-input-info-btn"
-                      variant="ghost-primary"
-                      size="xs"
-                      class="gap-1 font-medium"
-                      @click="openHelp('rowTemplate')"
-                    >
-                      <OIcon name="help" size="xs" />
-                      <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
-                    </OButton>
-                  </div>
-                  <OFormTextarea
-                    :aria-label="t('alerts.row')"
-                    data-test="add-alert-row-input-textarea"
-                    name="row_template"
-                    :placeholder="rowTemplatePlaceholder"
-                    :rows="4"
-                  />
-                  <span
-                    v-if="isForecastMode"
-                    class="text-text-secondary mt-1 block text-xs"
-                    data-test="add-alert-row-forecast-hint"
-                    >{{ t("alerts.forecast.rowTemplateHint") }}</span
-                  >
-                </div>
-              </OSettingRow>
-            </div></Teleport
           >
+            <OSettingRow :label="t('alerts.description')" fill>
+              <OFormTextarea
+                name="description"
+                :aria-label="t('alerts.description')"
+                data-test="add-alert-description-textarea"
+                :placeholder="t('alerts.sections.rows.descriptionPlaceholder')"
+                :rows="2"
+              />
+            </OSettingRow>
+          </Teleport>
         </div>
       </div>
     </div>
