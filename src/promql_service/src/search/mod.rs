@@ -28,10 +28,7 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
-    utils::{
-        time::{now_micros, second_micros},
-        took_watcher::TookWatcher,
-    },
+    utils::{time::now_micros, took_watcher::TookWatcher},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -420,6 +417,16 @@ async fn search_in_cluster(
         partition: 0,
     };
 
+    // one probe for the whole query, so no worker reads the WAL past its head without late samples
+    let wal_start_time = if grpc::wal_probe::needs_probe(&window, start, end) {
+        match grpc::query_streams(&req.org_id, &ast, query_exemplars).await {
+            Ok(streams) => grpc::wal_probe::wal_start_time(trace_id, &req.org_id, &streams).await,
+            Err(_) => 0,
+        }
+    } else {
+        0
+    };
+
     // make cluster request
     let mut tasks = Vec::with_capacity(nodes.len());
     let mut worker_start = start;
@@ -432,22 +439,19 @@ async fn search_in_cluster(
             partition: node.id as _,
             ..job.clone()
         });
-        let mut req = cluster_rpc::MetricsQueryRequest { job, ..req.clone() };
+        let mut req = cluster_rpc::MetricsQueryRequest {
+            job,
+            wal_start_time,
+            ..req.clone()
+        };
         let req_query = req.query.as_mut().unwrap();
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
-        // if the end time is within the last 3 retention time, we need to fetch wal data
-        let wal_floor = now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
-        if window.reaches(req_query.end, wal_floor) {
-            req.need_wal = true;
-        }
-        let req_need_wal = req.need_wal;
         worker_start += worker_dt;
 
         log::info!(
-            "[trace_id {trace_id}] promql->search->partition: node: {}, need_wal: {}, time_range: [{},{})",
+            "[trace_id {trace_id}] promql->search->partition: node: {}, wal_start_time: {wal_start_time}, time_range: [{},{})",
             node.grpc_addr,
-            req_need_wal,
             req_query.start,
             req_query.end,
         );
@@ -479,7 +483,7 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {req_need_wal}, files: {}, scan_size: {} mb, took: {} ms",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, files: {}, scan_size: {} mb, took: {} ms",
                     node.get_grpc_addr(),
                     scan_stats.files,
                     scan_stats.original_size,
