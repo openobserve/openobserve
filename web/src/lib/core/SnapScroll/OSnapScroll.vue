@@ -119,9 +119,9 @@ const nearest = (stops: number[], top: number): number =>
     Infinity,
   );
 
-// A section start inside the view means two sections show. A tall section rests on its nearest
-// stop so its end stays reachable; a short one rests on the one the scroll was heading for.
-const settleTarget = (top: number, direction: number): number | null => {
+// A section start inside the view means two sections show. A tall section rests on its nearest stop
+// past where the scroll began, so its end stays reachable and is never a trap; a short one rests ahead.
+const settleTarget = (top: number, from: number): number | null => {
   const scroller = root.value;
   if (!scroller) return null;
   const view = scroller.clientHeight;
@@ -129,10 +129,13 @@ const settleTarget = (top: number, direction: number): number | null => {
   const lower = list.map(offsetOf).find((start) => start > top + EDGE && start < top + view - EDGE);
   if (lower === undefined) return null;
   const upper = list.filter((section) => offsetOf(section) <= top + EDGE).pop();
+  const direction = Math.sign(top - from);
   let target: number;
   if (upper && upper.offsetHeight > view + EDGE) {
     markStops();
-    target = nearest(stopOffsets(false), top);
+    const ahead = stopOffsets(false).filter((s) => !direction || (s - from) * direction > EDGE);
+    if (!ahead.length) return null;
+    target = nearest(ahead, top);
   } else {
     const up = direction < 0 || (direction === 0 && top - (lower - view) < lower - top);
     target = up ? lower - view : lower;
@@ -264,12 +267,12 @@ const settle = (): void => {
   const scroller = root.value;
   if (!scroller || !props.snap) return;
   const top = scroller.scrollTop;
-  const direction = Math.sign(top - restTop);
+  const from = restTop;
   restTop = top;
   const wanted = driven;
   driven = false;
   if (!wanted || reducedMotion()) return;
-  const target = settleTarget(top, direction);
+  const target = settleTarget(top, from);
   if (target === null || Math.abs(target - top) <= EDGE || leavesFocus(target)) return;
   scroller.scrollTo({ top: target, behavior: "smooth" });
 };

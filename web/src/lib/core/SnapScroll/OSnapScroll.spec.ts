@@ -110,6 +110,31 @@ describe("OSnapScroll", () => {
     });
 
     it.each([
+      { wheels: "six 120 px down", start: 500, delta: 120, count: 6, reach: 1300 },
+      { wheels: "twelve 60 px down", start: 500, delta: 60, count: 12, reach: 1300 },
+      { wheels: "four 200 px down", start: 500, delta: 200, count: 4, reach: 1300 },
+      { wheels: "four 120 px up", start: 1300, delta: -120, count: 4, reach: 0 },
+    ])("short wheels leave a tall section and never glide back: $wheels", (row) => {
+      withTops({ one: 0, two: 500, three: 1300 }, () => {
+        wrapper = mountScroll();
+        const { root, scrollTo } = layOut(wrapper, row.start);
+        Object.defineProperty(root, "scrollHeight", { configurable: true, value: 2300 });
+        Object.defineProperty(root.querySelector("#two"), "offsetHeight", { value: 800 });
+        root.dispatchEvent(new Event("scrollend"));
+        const rests = [row.start];
+        for (let i = 0; i < row.count; i++) {
+          const calls = scrollTo.mock.calls.length;
+          stopAt(root, root.scrollTop + row.delta);
+          if (scrollTo.mock.calls.length > calls)
+            stopAt(root, scrollTo.mock.lastCall![0].top, false);
+          expect(Math.sign(root.scrollTop - rests[rests.length - 1])).toBe(Math.sign(row.delta));
+          rests.push(root.scrollTop);
+        }
+        expect((root.scrollTop - row.reach) * Math.sign(row.delta)).toBeGreaterThanOrEqual(0);
+      });
+    });
+
+    it.each([
       { when: "a press inside a section during the scroll", press: "#two", glides: false },
       { when: "a scroll nobody drove, such as a test runner's", driven: false, glides: false },
       { when: "focus in the section the glide would leave", focus: "#one", glides: false },

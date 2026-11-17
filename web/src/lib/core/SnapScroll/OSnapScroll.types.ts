@@ -11,7 +11,8 @@
  * a wheel, touch or scrollbar scroll that stops with two sections in view
  * glides on to the next one in its direction, so only one shows at rest. A
  * section taller than the view rests anywhere it covers the view, and on its
- * nearest stop when the next one shows. No glide follows a press on content,
+ * nearest stop past where the scroll began when the next one shows, so short
+ * wheels move on section by section. No glide follows a press on content,
  * leaves the section holding focus, or runs under reduced motion. A sticky
  * header in a section pads the scroller's top. PageDown/Space moves one stop
  * and Alt+Down/Up a whole section.
