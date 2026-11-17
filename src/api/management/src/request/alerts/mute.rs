@@ -15,12 +15,9 @@
 
 //! The alert-scoped mute routes (§6, Q1): enterprise only, 403 "Not Supported" in the OSS build.
 
-use axum::{
-    Extension, Json,
-    extract::{Path, Query},
-    http::HeaderMap,
-    response::Response,
-};
+use axum::{Extension, extract::Path, http::HeaderMap, response::Response};
+#[cfg(feature = "enterprise")]
+use axum::{Json, extract::Query};
 use config::meta::{
     alerts::ack::ActRefusal,
     downtimes::{
@@ -66,7 +63,7 @@ pub async fn mute_alert(
     Headers(user_email): Headers<UserEmail>,
     delegated: Option<Extension<DelegatedCaller>>,
     headers: HeaderMap,
-    Json(req): Json<AlertMuteRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<AlertMuteRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -84,7 +81,7 @@ pub async fn mute_alert(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, alert_id, user_email, delegated, headers, req);
+        let _ = (org_id, alert_id, user_email, delegated, headers);
         crate::request::downtimes::not_supported()
     }
 }
@@ -123,7 +120,7 @@ pub async fn mute_alert(
 pub async fn extend_alert_mute(
     Path((org_id, alert_id, downtime_id)): Path<(String, String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<AlertMuteExtendRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<AlertMuteExtendRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -145,7 +142,7 @@ pub async fn extend_alert_mute(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, alert_id, downtime_id, user_email, req);
+        let _ = (org_id, alert_id, downtime_id, user_email);
         crate::request::downtimes::not_supported()
     }
 }
@@ -182,7 +179,7 @@ pub async fn extend_alert_mute(
 )]
 pub async fn cancel_alert_mute(
     Path((org_id, alert_id, downtime_id)): Path<(String, String, String)>,
-    Query(query): Query<CancelDowntimeQuery>,
+    #[cfg(feature = "enterprise")] Query(query): Query<CancelDowntimeQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -205,7 +202,7 @@ pub async fn cancel_alert_mute(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, alert_id, downtime_id, query, user_email);
+        let _ = (org_id, alert_id, downtime_id, user_email);
         crate::request::downtimes::not_supported()
     }
 }
@@ -257,16 +254,9 @@ mod tests {
         let one = || Path(("default".to_string(), "a1".to_string()));
         let two = || Path(("default".to_string(), "a1".to_string(), "d1".to_string()));
         let responses = [
-            mute_alert(
-                one(),
-                user(),
-                None,
-                HeaderMap::new(),
-                Json(AlertMuteRequest::default()),
-            )
-            .await,
-            extend_alert_mute(two(), user(), Json(AlertMuteExtendRequest::default())).await,
-            cancel_alert_mute(two(), Query(CancelDowntimeQuery::default()), user()).await,
+            mute_alert(one(), user(), None, HeaderMap::new()).await,
+            extend_alert_mute(two(), user()).await,
+            cancel_alert_mute(two(), user()).await,
         ];
         for response in responses {
             assert_eq!(response.status(), StatusCode::FORBIDDEN);

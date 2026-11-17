@@ -19,10 +19,15 @@
 use serde_json::{Value, json};
 
 use super::{
-    DEFAULT_LINK_LABEL, clamp, dispatchable_url,
+    clamp, dispatchable_url,
     markdown::{escape_html, markdown_to_plaintext},
 };
-use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
+use crate::alerts::notifications::{
+    NotificationContext,
+    resolve::{LinkRole, RenderedContent},
+};
+
+const MAX_CARD_ACTIONS: usize = 4;
 
 /// Body only: other surfaces hold raw values, which a markdown parse would cut, such as `>`.
 fn card_text(s: &str) -> String {
@@ -103,19 +108,14 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
     let actions: Vec<Value> = c
         .links
         .iter()
-        .filter_map(|(label, url)| dispatchable_url(url).map(|url| (label, url)))
-        .map(|(label, url)| {
-            let is_default_link = label.is_empty();
+        .filter_map(|link| dispatchable_url(&link.url).map(|url| (link, url)))
+        .map(|(link, url)| {
             let mut action = json!({
                 "type": "Action.OpenUrl",
-                "title": if is_default_link { DEFAULT_LINK_LABEL.to_string() } else { label.clone() },
+                "title": link.display_label(),
                 "url": url,
             });
-            // Mirrors the Slack "primary"-style fix: the default
-            // "View in OpenObserve" action is the card's primary CTA and
-            // gets Adaptive Card's "positive" style (renders filled/green in
-            // Teams) so it stands out from author-added links.
-            if is_default_link {
+            if link.role == LinkRole::Primary {
                 action["style"] = json!("positive");
             }
             action
@@ -181,6 +181,41 @@ pub fn render_teams_message_card(c: &RenderedContent) -> Value {
             text_parts.push(t);
         }
     }
+    // `OpenUri` targets must be absolute http(s) URIs — the O365 connector
+    // rejects anything else, so undispatchable links are dropped (see #13742).
+    let dispatchable: Vec<_> = c
+        .links
+        .iter()
+        .filter_map(|link| dispatchable_url(&link.url).map(|url| (link, url)))
+        .collect();
+    // MessageCard allows four actions, so authored links past that become text links.
+    let mut room =
+        MAX_CARD_ACTIONS.saturating_sub(dispatchable.iter().filter(|(l, _)| l.reserved).count());
+    let mut actions = Vec::new();
+    let mut overflow = Vec::new();
+    for (link, url) in dispatchable {
+        let label = if link.label.is_empty() {
+            link.display_label().to_string()
+        } else {
+            escape_html(&link.label)
+        };
+        if !link.reserved && room == 0 {
+            overflow.push(format!("<a href=\"{}\">{label}</a>", escape_html(url)));
+            continue;
+        }
+        if !link.reserved {
+            room -= 1;
+        }
+        actions.push(json!({
+            "@type": "OpenUri",
+            "name": label,
+            "targets": [{"os": "default", "uri": url}],
+        }));
+    }
+    if !overflow.is_empty() {
+        text_parts.push(overflow.join(" &middot; "));
+    }
+
     section["text"] = json!(text_parts.join("<br><br>"));
 
     if !c.fields.is_empty() {
@@ -191,22 +226,6 @@ pub fn render_teams_message_card(c: &RenderedContent) -> Value {
                 .collect::<Vec<_>>()
         );
     }
-
-    // `OpenUri` targets must be absolute http(s) URIs — the O365 connector
-    // rejects anything else, so undispatchable links are dropped (see the
-    // Adaptive Card renderer above and #13742).
-    let actions: Vec<Value> = c
-        .links
-        .iter()
-        .filter_map(|(label, url)| dispatchable_url(url).map(|url| (label, url)))
-        .map(|(label, url)| {
-            json!({
-                "@type": "OpenUri",
-                "name": if label.is_empty() { DEFAULT_LINK_LABEL.to_string() } else { escape_html(label) },
-                "targets": [{"os": "default", "uri": url}],
-            })
-        })
-        .collect();
 
     json!({
         "@type": "MessageCard",

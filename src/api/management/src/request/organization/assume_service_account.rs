@@ -234,10 +234,7 @@ pub async fn assume_service_account(
         ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
-pub async fn assume_service_account(
-    Path(_org_id): Path<String>,
-    Json(_req): Json<AssumeServiceAccountRequest>,
-) -> Response {
+pub async fn assume_service_account(Path(_org_id): Path<String>) -> Response {
     (
         StatusCode::NOT_IMPLEMENTED,
         Json(serde_json::json!({

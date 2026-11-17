@@ -24,6 +24,8 @@ export interface StreamRowsRequest {
   endTime: number;
   size: number;
   signal?: AbortSignal;
+  /** Resolve a partial answer with the rows that arrived; errors still reject. */
+  keepPartial?: boolean;
 }
 
 interface StreamResults {
@@ -40,7 +42,7 @@ interface StreamEvent {
 
 export class IncompleteStreamError extends Error {}
 
-/** Reads every row of a trace SQL over `_search_stream`; rejects on an error, a partial answer or an abort. */
+/** Reads every row of a trace SQL over `_search_stream`; rejects on an error, an abort or (unless kept) a partial answer. */
 export function streamTraceRows<T>(request: StreamRowsRequest): Promise<T[]> {
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
   const { traceId } = generateTraceContext();
@@ -75,7 +77,8 @@ export function streamTraceRows<T>(request: StreamRowsRequest): Promise<T[]> {
       {
         data: (_request: unknown, event: StreamEvent) => {
           const results = event?.content?.results;
-          if (searchFailed(results as Record<string, unknown> | undefined)) partial = true;
+          const body = request.keepPartial ? { ...results, is_partial: false } : results;
+          if (searchFailed(body as Record<string, unknown> | undefined)) partial = true;
           if (event?.type === "search_response_metadata") {
             snapshot = event.content?.streaming_aggs === true ? [] : null;
             return;

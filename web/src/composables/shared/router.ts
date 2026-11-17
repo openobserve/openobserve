@@ -19,6 +19,11 @@ import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
 import { featureState, withLicenseFeature } from "@/utils/featureGate";
+import {
+  featureLockedLocation,
+  withFeatureGate,
+  type FeatureKey,
+} from "@/utils/enterpriseFeatures";
 import { loadSecurityAccess, securityFeatureState } from "@/composables/security/useSecurityAccess";
 import { loadSecurityMessages } from "@/locales";
 import {
@@ -26,6 +31,7 @@ import {
   hasMetricsOverrideParams,
 } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES, redirectHeatmaps } from "@/utils/rum/productAnalyticsRoutes";
+import { ALERT_LIST_ALL_FOLDERS } from "@/utils/alerts/alertListLink";
 import { endSignedInSession } from "@/utils/drafts/signOutFlow";
 import { silenceUnloadPrompts } from "@/utils/sessionServices";
 import {
@@ -79,8 +85,8 @@ const DbmTableHealthPage = () => import("@/views/DatabaseMonitoring/TableHealthP
 /**
  * The SECTION gate. Runtime flag only — no build-type conjunct, because the
  * Database Monitoring section itself is not enterprise-only. The build-type
- * gate for its three enterprise tabs is `dbmEnterpriseGuard` below, applied per
- * route; adding an isEnterprise conjunct here would close the whole section on
+ * gate for its three enterprise tabs is `withFeatureGate("dbmInsights", ...)`, applied
+ * per route; adding an isEnterprise conjunct here would close the whole section on
  * OSS instead.
  *
  * The store is IMPORTED, not read off `window`: nothing in the app ever assigns
@@ -116,59 +122,52 @@ const publicDashboardsEnabled = (): boolean => {
   return !configLoaded || zoConfig.public_dashboards_enabled === true;
 };
 
-/**
- * Guard for the three enterprise-only DBM tabs — Deadlocks, Blocked queries and
- * Table health, whose reads an OSS backend answers 403 on. Disabling the tabs
- * cannot stop a PASTED or bookmarked URL, so each route needs its own guard.
- *
- * It lands on the DBM overview, keeping the reader inside the section they
- * aimed at, rather than on a page that renders empty because every fetch was
- * refused. The scope travels so the window and filters survive the bounce.
- *
- * `isEnterprise` is a STRING — compared against the literal `"true"`, never
- * coerced, since `Boolean("false")` is true and would open the gate on OSS.
- * Same shape as the `serviceGraph` guard below.
- */
-const dbmEnterpriseGuard = (to: any, from: any, next: any) => {
-  if (config.isEnterprise !== "true") {
-    next({ name: "dbmDatabases", query: to.query });
-    return;
-  }
-  routeGuard(to, from, next);
-};
-
 // A locked license also turns the feature's runtime flag off, yet its page still renders, locked.
 const isLicenseLocked = (key: string): boolean =>
   featureState(store.state.zoConfig?.features, key) === "locked";
 
-// `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
-const downtimesRouteGuard = (to: any, from: any, next: any) => {
-  const zoConfig = store.state.zoConfig;
-  const isOss = zoConfig?.build_type === "opensource";
-  if (
-    isOss ||
-    (config.isEnterprise !== "true" && config.isCloud !== "true") ||
-    (zoConfig?.downtimes_enabled === false && !isLicenseLocked("alerts"))
-  ) {
-    next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+// A backend that reports itself as open source locks the page even in an enterprise-built UI.
+const isRuntimeOpenSource = (): boolean => store.state.zoConfig?.build_type === "opensource";
+
+// Inner guard for a route with no runtime flag of its own; pair it with `withFeatureGate`.
+const runtimeOssGuard = (key: FeatureKey) => (to: any, from: any, next: any) => {
+  if (isRuntimeOpenSource()) {
+    next(featureLockedLocation(key, to));
     return;
   }
   routeGuard(to, from, next);
 };
 
 // `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
-const alertCalibrationRouteGuard = (to: any, from: any, next: any) => {
+const downtimesRouteGuard = withFeatureGate("downtimes", (to: any, from: any, next: any) => {
   const zoConfig = store.state.zoConfig;
-  if (
-    zoConfig?.build_type === "opensource" ||
-    (config.isEnterprise !== "true" && config.isCloud !== "true") ||
-    (zoConfig?.alert_calibration_enabled === false && !isLicenseLocked("alerts"))
-  ) {
+  if (isRuntimeOpenSource()) {
+    next(featureLockedLocation("downtimes", to));
+    return;
+  }
+  if (zoConfig?.downtimes_enabled === false && !isLicenseLocked("alerts")) {
     next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
     return;
   }
   routeGuard(to, from, next);
-};
+});
+
+// `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
+const alertCalibrationRouteGuard = withFeatureGate(
+  "alertCalibration",
+  (to: any, from: any, next: any) => {
+    const zoConfig = store.state.zoConfig;
+    if (isRuntimeOpenSource()) {
+      next(featureLockedLocation("alertCalibration", to));
+      return;
+    }
+    if (zoConfig?.alert_calibration_enabled === false && !isLicenseLocked("alerts")) {
+      next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+      return;
+    }
+    routeGuard(to, from, next);
+  },
+);
 
 // `=== false`, as for Downtimes: a cold load with `/config` still in flight must not bounce.
 const profilesRouteGuard = (to: any, from: any, next: any) => {
@@ -205,7 +204,6 @@ const LogStream = () => import("@/views/LogStream.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const PublicDashboardLinks = () => import("@/views/Dashboards/PublicLinks.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
-const FiringAlerts = () => import("@/components/alerts/FiringAlerts.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
@@ -399,9 +397,7 @@ const useRoutes = () => {
         titleKey: "logs.searchJobInspector.title",
         licenseFeatureFromStreamType: true,
       },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
+      beforeEnter: withFeatureGate("searchInspector", routeGuard),
     },
     {
       // Standalone page (was a `?action=history` overlay on /logs). Not
@@ -422,7 +418,7 @@ const useRoutes = () => {
     {
       // Standalone page (was a `?action=search_scheduler` overlay on /logs).
       // Enterprise-only: the scheduled-search endpoints 403 in OSS, so a
-      // hand-typed URL is bounced back to the logs page.
+      // hand-typed URL lands on the upgrade screen.
       path: "logs/search-scheduler",
       name: "searchScheduler",
       component: SearchSchedulersList,
@@ -431,13 +427,7 @@ const useRoutes = () => {
         titleKey: "routeTitles.searchScheduler",
         licenseFeatureFromStreamType: true,
       },
-      beforeEnter(to: any, from: any, next: any) {
-        if (config.isEnterprise !== "true") {
-          next({ name: "logs" });
-          return;
-        }
-        routeGuard(to, from, next);
-      },
+      beforeEnter: withFeatureGate("scheduledSearch", routeGuard),
     },
     {
       // A link carrying the editor's params (a shared chart, a link from logs or an alert) opens in Visualize.
@@ -583,7 +573,7 @@ const useRoutes = () => {
           path: "deadlocks",
           name: "dbmDeadlocks",
           component: DbmDeadlocksPage,
-          beforeEnter: dbmEnterpriseGuard,
+          beforeEnter: withFeatureGate("dbmInsights", routeGuard),
           meta: {
             keepAlive: true,
             title: "Databases",
@@ -595,7 +585,7 @@ const useRoutes = () => {
           path: "blocking",
           name: "dbmBlocking",
           component: DbmBlockedQueriesPage,
-          beforeEnter: dbmEnterpriseGuard,
+          beforeEnter: withFeatureGate("dbmInsights", routeGuard),
           meta: {
             keepAlive: true,
             title: "Databases",
@@ -605,7 +595,7 @@ const useRoutes = () => {
           path: "table-health",
           name: "dbmTableHealth",
           component: DbmTableHealthPage,
-          beforeEnter: dbmEnterpriseGuard,
+          beforeEnter: withFeatureGate("dbmInsights", routeGuard),
           meta: {
             keepAlive: true,
             title: "Databases",
@@ -838,6 +828,10 @@ const useRoutes = () => {
         titleKey: "billing.memberSubscription.title",
       },
       beforeEnter(to: any, from: any, next: any) {
+        if (config.isCloud !== "true") {
+          next("/");
+          return;
+        }
         routeGuard(to, from, next);
       },
     },
@@ -934,9 +928,7 @@ const useRoutes = () => {
               meta: {
                 titleKey: "routeTitles.pipelineBackfillJobs",
               },
-              beforeEnter(to: any, from: any, next: any) {
-                routeGuard(to, from, next);
-              },
+              beforeEnter: withFeatureGate("pipelineBackfill", routeGuard),
             },
           ],
         }),
@@ -1017,16 +1009,20 @@ const useRoutes = () => {
       },
     },
     {
+      // Old Firing bookmarks land on the same rows: the list's Firing tile across every folder.
       path: "alerts/firing",
-      name: "alertFiring",
-      component: FiringAlerts,
-      meta: {
-        titleKey: "alerts.firing.title",
-        licenseFeature: "alerts",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
+      redirect: (to: any) =>
+        // A bookmark naming one alert opens that alert's page, where its firing detail lives.
+        typeof to.query.alert === "string" && to.query.alert
+          ? {
+              name: "alertDetail",
+              params: { alert_id: to.query.alert },
+              query: { org_identifier: to.query.org_identifier },
+            }
+          : {
+              name: "alertList",
+              query: { ...to.query, state: "firing", all_folders: ALERT_LIST_ALL_FOLDERS },
+            },
     },
     {
       // Notification destinations and templates: alerting configuration, so
@@ -1087,8 +1083,7 @@ const useRoutes = () => {
       // Moved out of /settings/alert_sources, which redirects here.
       //
       // Enterprise/cloud-only (unlike destinations/templates): the route stays
-      // registered so the redirect below has somewhere to land, but bounces to
-      // Alerts on OSS builds — mirrors the anomaly-detection routes above.
+      // registered, but OSS builds land on the upgrade screen.
       path: "alert-sources",
       name: "alertSources",
       component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
@@ -1096,15 +1091,7 @@ const useRoutes = () => {
         titleKey: "alert_sources.header",
         licenseFeature: "incidents",
       },
-      beforeEnter(to: any, from: any, next: any) {
-        const store = (window as any).store;
-        const isOss = store?.state?.zoConfig?.build_type === "opensource";
-        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
-          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
-          return;
-        }
-        routeGuard(to, from, next);
-      },
+      beforeEnter: withFeatureGate("incidents", runtimeOssGuard("incidents")),
     },
     {
       path: "alert-calibration",
@@ -1235,15 +1222,7 @@ const useRoutes = () => {
         titleKey: "alerts.addAnomalyMode",
         licenseFeature: "anomaly_detection",
       },
-      beforeEnter(to: any, from: any, next: any) {
-        const store = (window as any).store;
-        const isOss = store?.state?.zoConfig?.build_type === "opensource";
-        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
-          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
-          return;
-        }
-        routeGuard(to, from, next);
-      },
+      beforeEnter: withFeatureGate("anomalyDetection", runtimeOssGuard("anomalyDetection")),
     },
     {
       path: "alerts/anomaly/edit/:anomaly_id",
@@ -1253,15 +1232,7 @@ const useRoutes = () => {
         titleKey: "alerts.editAnomalyMode",
         licenseFeature: "anomaly_detection",
       },
-      beforeEnter(to: any, from: any, next: any) {
-        const store = (window as any).store;
-        const isOss = store?.state?.zoConfig?.build_type === "opensource";
-        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
-          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
-          return;
-        }
-        routeGuard(to, from, next);
-      },
+      beforeEnter: withFeatureGate("anomalyDetection", runtimeOssGuard("anomalyDetection")),
     },
     {
       path: "alerts/history",
@@ -1288,7 +1259,6 @@ const useRoutes = () => {
       },
     },
     {
-      // Correlation engine is enterprise/cloud-only: bounce to Alerts on OSS — mirrors anomaly/alert-sources guards.
       path: "alerts/import-semantic-groups",
       name: "importSemanticGroups",
       component: () => import("@/components/alerts/ImportSemanticGroups.vue"),
@@ -1296,15 +1266,7 @@ const useRoutes = () => {
         titleKey: "correlation.importSemanticGroups.title",
         licenseFeature: "alerts",
       },
-      beforeEnter(to: any, from: any, next: any) {
-        const store = (window as any).store;
-        const isOss = store?.state?.zoConfig?.build_type === "opensource";
-        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
-          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
-          return;
-        }
-        routeGuard(to, from, next);
-      },
+      beforeEnter: withFeatureGate("semanticGroups", runtimeOssGuard("semanticGroups")),
     },
     {
       path: "ai/shared/:token",
@@ -1314,6 +1276,7 @@ const useRoutes = () => {
       meta: {
         titleKey: "routeTitles.sharedChat",
       },
+      beforeEnter: withFeatureGate("aiAssistant", (to: any, from: any, next: any) => next()),
     },
     {
       path: "short/:id",

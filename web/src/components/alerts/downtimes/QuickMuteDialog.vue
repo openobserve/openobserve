@@ -129,6 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
+      <OBanner
+        v-if="tooMany"
+        variant="error"
+        dense
+        :content="t('alerts.downtimes.mute.tooMany', { max: MAX_QUICK_MUTE_IDS })"
+        data-test="quick-mute-too-many"
+      />
       <template v-if="!(alert && noFolder)">
         <OBanner
           v-if="noFolder"
@@ -168,8 +175,10 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { useQuickMute } from "@/composables/downtimes/useQuickMute";
 import { useAlertActions, type AlertMuteScope } from "@/composables/alerts/useAlertActions";
 import {
+  MAX_QUICK_MUTE_IDS,
   QUICK_MUTE_PRESETS,
   groupOptionLabel,
+  overIdCap,
   presetSeconds,
   selectionCount,
   tomorrowEndTime,
@@ -186,6 +195,7 @@ import {
 } from "./QuickMuteDialog.schema";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -223,7 +233,11 @@ const { t } = useI18nTyped();
 const { mute, timezone, defaultFolderId } = useQuickMute();
 const alertActions = useAlertActions();
 
-const nowMicros = () => Date.now() * 1000;
+// The server clock, so presets, the custom-end check and the request agree with the server.
+const nowMicros = () => Math.round(serverNowMs()) * 1000;
+
+// The server refuses more than 200 ids per module, so the dialog says so and sends nothing.
+const tooMany = computed(() => !props.alert && overIdCap(props.selection));
 
 // The permitted folder list answered empty, so there is nowhere to file the mute.
 const noFolder = computed(() => defaultFolderId.value === null);
@@ -235,7 +249,7 @@ const confirming24h = ref(false);
 
 const defaults = (): QuickMuteForm => {
   const base = quickMuteDefaults(
-    Date.now(),
+    serverNowMs(),
     timezone.value,
     defaultFolderId.value ?? "",
     props.alert ? "untilClear" : "1h",
@@ -287,6 +301,7 @@ const form = useOForm<QuickMuteForm>({
       await submitAlertMute(values, props.alert);
       return;
     }
+    if (tooMany.value) return;
     const endsAt = quickMuteEndsAt(values, nowMicros(), timezone.value);
     if (endsAt === null) return;
     const id = await mute(props.selection, endsAt, values.reason, values.folder_id);
@@ -313,7 +328,7 @@ const groupOptions = computed(() =>
 );
 
 const primaryDisabled = computed(() => {
-  if (!props.alert) return noFolder.value;
+  if (!props.alert) return noFolder.value || tooMany.value;
   return hasGroups.value && values.value.group_scope === "this" && !values.value.groups?.length;
 });
 

@@ -23,6 +23,13 @@ pub const O2_SERVICE_WHERE: &str = "o2_service_where";
 pub const O2_SERVICE_ENV: &str = "o2_service_env";
 pub const O2_SERVICE_VERSION: &str = "o2_service_version";
 pub const O2_SERVICE_IMAGE: &str = "o2_service_image";
+/// The stamped columns; a client may not send them and a UDS list may not drop them.
+pub const SERVICE_IDENTITY_FIELDS: [&str; 4] = [
+    O2_SERVICE_WHERE,
+    O2_SERVICE_ENV,
+    O2_SERVICE_VERSION,
+    O2_SERVICE_IMAGE,
+];
 pub const SIGNAL_TRACES: &str = "traces";
 pub const SIGNAL_RUM: &str = "rum";
 pub const RULE_TYPE_ENV_OVERRIDE: &str = "env_override";

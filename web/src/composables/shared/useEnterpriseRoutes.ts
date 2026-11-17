@@ -52,16 +52,19 @@ const syntheticsRouteGuard = (to: any, from: any, next: any) => {
 // narrower flag as well. Same `=== false` stance as above: /config is fetched
 // without await, so redirecting on "not yet known" would bounce a bookmarked
 // link on a cold load.
-const privateLocationRouteGuard = (to: any, from: any, next: any) => {
-  if (
-    store.state.zoConfig?.synthetics_private_locations_enabled === false &&
-    !isLicenseLocked("synthetics")
-  ) {
-    next("/");
-    return;
-  }
-  syntheticsRouteGuard(to, from, next);
-};
+const privateLocationRouteGuard = withFeatureGate(
+  "privateLocations",
+  (to: any, from: any, next: any) => {
+    if (
+      store.state.zoConfig?.synthetics_private_locations_enabled === false &&
+      !isLicenseLocked("synthetics")
+    ) {
+      next("/");
+      return;
+    }
+    syntheticsRouteGuard(to, from, next);
+  },
+);
 
 // Workflows routes are gated on the backend /config flag `workflows_enabled`
 // (enterprise O2_WORKFLOWS_ENABLED); `withFeatureGate("workflows", ...)` at

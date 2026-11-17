@@ -86,6 +86,22 @@ pub async fn read_from_immutable(
     Ok((ids, batches))
 }
 
+pub(crate) async fn immutable_min_ts(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+) -> Option<i64> {
+    let shared_memtable = config::get_config().common.feature_shared_memtable_enabled;
+    let r = IMMUTABLES.read().await;
+    r.iter()
+        .filter(|(_, i)| {
+            stream_type == i.key.stream_type.as_ref()
+                && (shared_memtable || org_id == i.key.org_id.as_ref())
+        })
+        .filter_map(|(_, i)| i.memtable.min_ts(org_id, stream_name))
+        .min()
+}
+
 /// Delete a file. Returns whether the file existed (false = already deleted).
 async fn remove_file_if_exists(path: &PathBuf) -> Result<bool> {
     match fs::remove_file(path).await {

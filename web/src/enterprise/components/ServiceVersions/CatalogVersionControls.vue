@@ -1,12 +1,12 @@
 <template>
-  <div class="flex min-w-64 shrink items-center gap-2" data-test="svcver-catalog-controls">
-    <div class="w-44 min-w-24 shrink" data-test="svcver-env-filter-slot">
+  <div class="flex shrink-0 items-center gap-2" data-test="svcver-catalog-controls">
+    <div class="w-36 shrink-0" data-test="svcver-env-filter-slot">
       <OSelect
         :searchable="false"
-        :model-value="env || null"
+        :model-value="envDisabled ? null : env || null"
         class="w-full"
         data-test="svcver-env-filter"
-        :disabled="state !== 'ready'"
+        :disabled="envDisabled"
         @update:model-value="$emit('env', String($event || ''))"
       >
         <template #trigger>
@@ -14,11 +14,11 @@
             ><span class="text-text-secondary shrink-0 text-xs">{{
               t("serviceVersions.catalog.env")
             }}</span
-            ><span v-if="envIdentity" class="min-w-0 truncate"
-              ><ServiceEnvChip :identity="envIdentity" readonly hide-inferred /></span
-            ><span v-else :class="state === 'ready' ? 'text-select-text' : ''">{{
-              t("serviceVersions.catalog.allEnvs")
-            }}</span></span
+            ><OTruncatedText
+              :class="envDisabled ? '' : 'text-select-text'"
+              data-test="svcver-env-filter-value"
+              >{{ envLabel }}</OTruncatedText
+            ></span
           >
         </template>
         <OSelectItem
@@ -28,7 +28,12 @@
         >
           <span class="flex w-full items-center justify-between gap-3"
             >{{ t("serviceVersions.catalog.allEnvs")
-            }}<span class="text-text-secondary tabular-nums">{{ serviceTotal }}</span></span
+            }}<span
+              v-if="envTotal !== undefined"
+              class="text-text-secondary tabular-nums"
+              data-test="svcver-env-option-all-count"
+              >{{ envTotal }}</span
+            ></span
           >
         </OSelectItem>
         <OSeparator v-if="realEnvs.length" class="my-1" />
@@ -39,24 +44,23 @@
           :label="raw(item.env)"
           :data-test="`svcver-env-option-${item.env}`"
         >
-          <span class="flex w-full items-center justify-between gap-3"
+          <span class="flex w-full min-w-0 items-center justify-between gap-3"
             ><span class="min-w-0 truncate"
               >{{ item.env
               }}<span
-                v-if="envCounts.get(item.env)?.inferred"
+                v-if="envFacts.get(item.env)?.inferred"
                 class="text-text-secondary"
                 :data-test="`svcver-env-option-${item.env}-inferred`"
                 >{{ raw(" · ") }}{{ t("serviceVersions.env.inferred") }}</span
               ></span
             ><span
-              v-if="envCounts.get(item.env)"
-              class="text-text-secondary tabular-nums"
+              class="text-text-secondary shrink-0 tabular-nums"
               :data-test="`svcver-env-option-${item.env}-count`"
-              >{{ envCounts.get(item.env)?.services }}</span
+              >{{ item.count }}</span
             ></span
           >
         </OSelectItem>
-        <template v-if="noEnvShown">
+        <template v-if="noEnvCount">
           <OSeparator class="my-1" />
           <OSelectItem
             :value="NO_ENV"
@@ -65,15 +69,18 @@
           >
             <span class="flex w-full items-center justify-between gap-3"
               >{{ t("serviceVersions.env.noEnv")
-              }}<span v-if="noEnvCount" class="text-text-secondary tabular-nums">{{
-                noEnvCount
-              }}</span></span
+              }}<span
+                class="text-text-secondary tabular-nums"
+                data-test="svcver-env-option-none-count"
+                >{{ noEnvCount }}</span
+              ></span
             >
           </OSelectItem>
         </template>
       </OSelect>
+      <OTooltip v-if="envReason" :content="envReason" />
     </div>
-    <div class="w-52 min-w-38 shrink" data-test="svcver-verdict-filter-slot">
+    <div class="w-64 shrink-0" data-test="svcver-verdict-filter-slot">
       <OSelect
         :searchable="false"
         :model-value="filterDisabled ? null : verdict || null"
@@ -91,9 +98,9 @@
               :class="['min-w-0 truncate', filterDisabled ? '' : 'text-select-text']"
               data-test="svcver-verdict-filter-value"
               >{{
-                filterDisabled
+                verdictOff
                   ? t("serviceVersions.catalog.disabled")
-                  : verdict
+                  : verdict && !filterDisabled
                     ? label(verdict)
                     : t("serviceVersions.catalog.any")
               }}</span
@@ -115,6 +122,7 @@
           :key="value"
           :value="value"
           :label="label(value)"
+          :disabled="!summary.counts[value] && verdict !== value"
           :data-test="`svcver-verdict-option-${value}`"
         >
           <span class="flex w-full items-center justify-between gap-3"
@@ -125,7 +133,7 @@
           >
         </OSelectItem>
       </OSelect>
-      <OTooltip v-if="filterDisabled" :content="t('serviceVersions.catalog.unavailable')" />
+      <OTooltip v-if="verdictReason" :content="verdictReason" />
     </div>
   </div>
 </template>
@@ -136,15 +144,16 @@ import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Scope, ServicesResponse } from "@/services/service_versions";
 import { identityQuery } from "@/services/service_versions.queries";
-import { NO_ENV, scopesInEnv } from "@/services/service_versions.envs";
+import { NO_ENV } from "@/services/service_versions.envs";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import ServiceEnvChip from "@/components/shared/ServiceEnvChip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
   catalogExtraVerdictOptions,
   catalogSummary,
+  catalogVerdictLabel,
   catalogVerdictOptions,
   type CatalogVerdictFilter,
 } from "@/plugins/traces/servicesCatalogVersions";
@@ -154,19 +163,27 @@ const props = defineProps<{
   state: "loading" | "locked" | "error" | "ready";
   env: string;
   verdict: string;
+  // Spans that never carry an env cannot match any env or verdict, so both filters would empty the table.
+  noEnvStamps?: boolean;
+  // From the selected stream's last complete load; absent while its first load runs.
+  envCounts?: Map<string, number>;
+  // The stream has no spans in the range, a different reason from spans that carry no env.
+  noSpans?: boolean;
+  // Rows of that same load; an env-scoped row can count under several envs, so the counts cannot sum to it.
+  envTotal?: number;
 }>();
 defineEmits<{ env: [string]; verdict: [string] }>();
 const { t } = useI18nTyped();
 const store = useStore();
 const org = computed(() => String(store?.state?.selectedOrganization?.identifier || ""));
-// The env read counts services per env and says which envs were only ever inferred; the menu works without it.
+// Read only for the inferred marker; its counts are org-wide, not the stream's.
 const envsRead = useQuery(
   computed(() => ({
     ...identityQuery(org.value, String(store?.state?.userInfo?.email || ""), "identityEnvs"),
     enabled: props.state === "ready" && Boolean(org.value),
   })),
 );
-const envCounts = computed(
+const envFacts = computed(
   () =>
     new Map(
       (envsRead.isError.value ? [] : envsRead.data.value?.envs || [])
@@ -174,22 +191,33 @@ const envCounts = computed(
         .map((item) => [item.env, item]),
     ),
 );
-const realEnvs = computed(() => (props.data?.envs || []).filter((item) => !item.no_env));
-const noEnvCount = computed(() =>
-  envsRead.isError.value
-    ? 0
-    : (envsRead.data.value?.envs.find((item) => item.no_env)?.services ?? 0),
+const realEnvs = computed(() =>
+  [...(props.envCounts || [])]
+    .filter(([env]) => env && env !== NO_ENV)
+    .map(([env, count]) => ({ env, count }))
+    .sort((a, b) => a.env.localeCompare(b.env)),
 );
-// The catalog's own no-env group keeps the option when the counts read fails.
-const noEnvShown = computed(
-  () => noEnvCount.value > 0 || Boolean(props.data?.envs.some((item) => item.no_env)),
-);
-const serviceTotal = computed(
-  () => new Set((props.data?.services || []).map((scope) => scope.service)).size,
-);
+const noEnvCount = computed(() => props.envCounts?.get(NO_ENV) || 0);
+// Both filters wait for the stream's rows, so neither offers zero counts mid-load and then turns off.
+const rowsMissing = computed(() => !props.envCounts || props.noSpans || props.noEnvStamps);
+const envDisabled = computed(() => props.state !== "ready" || rowsMissing.value);
+const rowsReason = computed(() => {
+  if (props.noSpans) return t("serviceVersions.catalog.noSpansInRange");
+  return props.noEnvStamps ? t("serviceVersions.catalog.noEnvStamps") : "";
+});
 const summary = computed(() => catalogSummary(props.data, props.env, props.scopes));
-const filterDisabled = computed(
+const filterUnavailable = computed(
   () => props.state !== "ready" || props.data?.verdict_status === "unavailable",
+);
+const filterDisabled = computed(() => filterUnavailable.value || rowsMissing.value);
+// A loading filter keeps its placeholder; "Disabled" is only for a verdict that will not come.
+const verdictOff = computed(() => props.state !== "loading" && filterUnavailable.value);
+const envReason = computed(() => (props.state === "ready" ? rowsReason.value : ""));
+const verdictReason = computed(() =>
+  props.state === "error" ||
+  (props.state === "ready" && props.data?.verdict_status === "unavailable")
+    ? t("serviceVersions.catalog.unavailable")
+    : envReason.value,
 );
 // Rare states stay out of the menu until a scope actually has them, so the default list matches the design.
 const options = computed<CatalogVerdictFilter[]>(() => [
@@ -198,19 +226,10 @@ const options = computed<CatalogVerdictFilter[]>(() => [
     (value) => summary.value.counts[value] || props.verdict === value,
   ),
 ]);
-// The trigger names the selected env, which may be a scope's other env rather than its pinned one.
-const envIdentity = computed(() => {
-  const scope = props.env ? scopesInEnv(props.data?.services || [], props.env)[0] : undefined;
-  if (!scope) return undefined;
-  return props.env === NO_ENV
-    ? { ...scope, envs: undefined }
-    : { ...scope, env: props.env, envs: undefined, no_env: false };
+// The trigger already says Env, so it names the pick as plain text rather than a keyed chip.
+const envLabel = computed(() => {
+  if (!props.env || envDisabled.value) return t("serviceVersions.catalog.allEnvs");
+  return props.env === NO_ENV ? t("serviceVersions.env.noEnv") : raw(props.env);
 });
-function label(value: string) {
-  if (value === "no_version") return t("serviceVersions.catalog.noVersion");
-  if (value === "not_serving") return t("serviceVersions.verdict.notServing");
-  if (value === "first_version") return t("serviceVersions.verdict.firstVersion");
-  if (value === "pre_existing") return t("serviceVersions.verdict.preExisting");
-  return t(`serviceVersions.verdict.${value}`);
-}
+const label = (value: string) => catalogVerdictLabel(value, t);
 </script>

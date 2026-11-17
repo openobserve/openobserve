@@ -26,7 +26,6 @@ import { downtimeKeys } from "./downtimes.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
 import type {
   AckAlertRequest,
-  AckAlertResponse,
   AckView,
   ExtendAlertMuteRequest,
   MuteAlertRequest,
@@ -36,13 +35,6 @@ import type { FiringPage } from "@/utils/alerts/firingAlerts";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 type AlertSqlSource = { stream_name: string; stream_type: string; query_condition: unknown };
-
-export interface BulkAckFailure {
-  alertId: string;
-  error: unknown;
-}
-
-const BULK_ACK_CONCURRENCY = 10;
 
 export const alertsListQuery = (
   org: string,
@@ -68,7 +60,11 @@ export const alertsListQuery = (
       const res = await (options
         ? alerts.listByFolderId(...args, undefined, options)
         : alerts.listByFolderId(...args));
-      return res.data?.list ?? [];
+      const list = res.data?.list ?? [];
+      // Rows stay the cached shape every patch edits; each one carries that its live fields are unknown.
+      return res.data?.status_unavailable
+        ? list.map((row: Record<string, unknown>) => ({ ...row, status_unavailable: true }))
+        : list;
     },
     staleTime: LIVE_STALE_TIME,
   });
@@ -253,7 +249,7 @@ export const retrainAnomalyMutation = (org: string) =>
     meta: { invalidates: [anomalyKeys.all(org)], silentError: true },
   });
 
-/** Only the Firing read drops: the caller patches the list row, since refetching the whole folder for one cell would take the scroll with it. */
+/** Only the org-wide firing read drops: the caller patches the list row, since refetching the whole folder for one cell would take the scroll with it. */
 export const toggleAlertStateMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { alertId: string; enabled: boolean; folderId?: string }) =>
@@ -279,35 +275,6 @@ export const ackAlertMutation = (org: string) =>
       if (answer?.changed) analytics.track("alert_acknowledged", { count: 1 });
     },
     // Callers render refusals and stale-firing answers themselves.
-    meta: { invalidates: oneAckScopes(org), silentError: true },
-  });
-
-/** One invalidation for the whole batch; a failed request is reported apart from an unchanged alert. */
-export const ackAlertsMutation = (org: string) =>
-  mutationOptions({
-    mutationFn: async (
-      targets: { alertId: string; body: AckAlertRequest; folderId?: string }[],
-    ): Promise<{ acked: number; failures: BulkAckFailure[] }> => {
-      const answers: AckAlertResponse[] = [];
-      const failures: BulkAckFailure[] = [];
-      for (let i = 0; i < targets.length; i += BULK_ACK_CONCURRENCY) {
-        const batch = targets.slice(i, i + BULK_ACK_CONCURRENCY);
-        const results = await Promise.allSettled(
-          batch.map((t) => alerts.ackAlert(org, t.alertId, t.body, t.folderId)),
-        );
-        results.forEach((result, index) => {
-          if (result.status === "fulfilled") answers.push(result.value.data);
-          else failures.push({ alertId: batch[index].alertId, error: result.reason });
-        });
-      }
-      // One write acks the whole incident, so its other rows answer unchanged yet were acked here.
-      const written = new Set(answers.flatMap((a) => (a.changed && a.incident?.id) || []));
-      const acked = answers.filter((a) => a.changed || written.has(a.incident?.id ?? "")).length;
-      return { acked, failures };
-    },
-    onSuccess: ({ acked }) => {
-      if (acked > 0) analytics.track("alert_acknowledged", { count: acked });
-    },
     meta: { invalidates: oneAckScopes(org), silentError: true },
   });
 

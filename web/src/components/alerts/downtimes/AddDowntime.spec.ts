@@ -8,7 +8,6 @@ import AddDowntime from "./AddDowntime.vue";
 import downtimes from "@/services/downtimes";
 import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
-import { isoWeekday, utcMicrosToLocal } from "@/utils/downtimes/schedule";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import DowntimeConditionSection from "./DowntimeConditionSection.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -516,15 +515,15 @@ describe("AddDowntime", () => {
     wrapper.unmount();
   });
 
-  it("picks today's weekday and shows Starts on when the repeat becomes weekly", async () => {
+  it("selects no weekday and shows Starts on when the repeat becomes weekly", async () => {
     const { wrapper } = await mountPage();
     await seeSchedule(wrapper);
     await wrapper.get('[data-test="downtime-schedule-repeat-weekly"]').trigger("click");
     await flushPromises();
-    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    const today = utcMicrosToLocal(Date.now() * 1000, zone).date;
-    const day = wrapper.get(`[data-test="downtime-schedule-weekday-${isoWeekday(today)}"]`);
-    expect(day.attributes("data-state")).toBe("on");
+    for (const day of [1, 2, 3, 4, 5, 6, 7]) {
+      const item = wrapper.get(`[data-test="downtime-schedule-weekday-${day}"]`);
+      expect(item.attributes("data-state")).toBe("off");
+    }
     expect(wrapper.find('[data-test="downtime-schedule-starts-on"]').exists()).toBe(true);
     wrapper.unmount();
   });
@@ -744,5 +743,70 @@ describe("AddDowntime", () => {
       expect(body.end_on_clear).toBeNull();
       wrapper.unmount();
     });
+  });
+
+  it("locks the schedule of a started downtime and keeps its end editable", async () => {
+    const started = (startOffsetMs: number) => ({
+      id: "d1",
+      org: "default",
+      folder_id: "default",
+      name: "Started",
+      targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1"] }],
+      schedule: {
+        repeat: "none",
+        starts_at: (Date.now() + startOffsetMs) * 1000,
+        ends_at: (Date.now() + 7_200_000) * 1000,
+        timezone: "UTC",
+        duration_secs: 3600,
+        weekdays: [],
+      },
+      show_banner: true,
+      created_by: "lin",
+      created_at: 1,
+      updated_by: "lin",
+      updated_at: 1,
+      version: 1,
+      status: startOffsetMs < 0 ? "active" : "scheduled",
+      current_window: null,
+      next_window: null,
+      matched_alerts: 1,
+      matched_anomalies: 0,
+      matched_synthetics: 0,
+      matched_slos: 0,
+      affected: { alerts: [], anomalies: [], synthetics: [], slos: [] },
+    });
+    const open = async (row: ReturnType<typeof started>) => {
+      queryClient.clear();
+      vi.mocked(downtimes.get).mockResolvedValue({ data: row } as any);
+      const router = makeRouter();
+      await router.push({
+        name: "editDowntime",
+        params: { id: "d1" },
+        query: { org_identifier: "default", folder: "default" },
+      });
+      await router.isReady();
+      const wrapper = mount(AddDowntime, {
+        global: { plugins: [store, router] },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      await wrapper.get('[data-test="add-downtime-tab-schedule"]').trigger("click");
+      await flushPromises();
+      return wrapper;
+    };
+    const disabled = (wrapper: ReturnType<typeof mount>, dataTest: string) =>
+      wrapper.get(`[data-test="${dataTest}"]`).find("input, button").attributes("disabled") !==
+      undefined;
+
+    const active = await open(started(-600_000));
+    expect(active.find('[data-test="downtime-schedule-locked"]').exists()).toBe(true);
+    expect(disabled(active, "downtime-schedule-start-date")).toBe(true);
+    expect(disabled(active, "downtime-schedule-end-date")).toBe(false);
+    active.unmount();
+
+    const scheduled = await open(started(3_600_000));
+    expect(scheduled.find('[data-test="downtime-schedule-locked"]').exists()).toBe(false);
+    expect(disabled(scheduled, "downtime-schedule-start-date")).toBe(false);
+    scheduled.unmount();
   });
 });

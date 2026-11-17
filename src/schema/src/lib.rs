@@ -33,6 +33,7 @@ use config::{
             BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
             VALUE_LABEL,
         },
+        service_identity::SERVICE_IDENTITY_FIELDS,
         stream::{StreamSettings, StreamType},
         traces::{ALL_INFER_FIELDS, GEN_AI_UDS_KEEP_FIELDS},
     },
@@ -958,6 +959,7 @@ pub fn required_uds_fields(stream_type: StreamType) -> HashSet<String> {
             fields.insert("events".to_string());
             // ingest-derived join keys are not user attributes, so UDS keeps them
             fields.extend(ALL_INFER_FIELDS.iter().map(|f| f.to_string()));
+            fields.extend(SERVICE_IDENTITY_FIELDS.iter().map(|f| f.to_string()));
             fields.extend(GEN_AI_UDS_KEEP_FIELDS.iter().map(|f| f.to_string()));
         }
         StreamType::Profiles => {
@@ -1297,7 +1299,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_schema_for_defined_schema_fields_keeps_infer_columns_for_traces() {
+    fn test_generate_schema_for_defined_schema_fields_keeps_derived_columns_for_traces() {
         let mut fields = vec![Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true)];
         let query_columns = [
             "gen_ai_usage_cost",
@@ -1309,8 +1311,14 @@ mod tests {
             "llm_request_type",
             "llm_agent_id",
         ];
-        for name in ALL_INFER_FIELDS.iter().copied().chain(query_columns) {
-            fields.push(Field::new(name, DataType::Utf8, true));
+        let kept: Vec<&str> = ALL_INFER_FIELDS
+            .iter()
+            .chain(SERVICE_IDENTITY_FIELDS.iter())
+            .copied()
+            .chain(query_columns)
+            .collect();
+        for name in &kept {
+            fields.push(Field::new(*name, DataType::Utf8, true));
         }
         for i in 0..15 {
             fields.push(Field::new(format!("field{i}"), DataType::Utf8, true));
@@ -1335,9 +1343,9 @@ mod tests {
         };
 
         let traces = names(StreamType::Traces);
-        for name in ALL_INFER_FIELDS.iter().copied().chain(query_columns) {
+        for name in &kept {
             assert!(
-                traces.contains(name),
+                traces.contains(*name),
                 "{name} dropped from the traces UDS schema"
             );
         }
@@ -1345,13 +1353,7 @@ mod tests {
         assert!(!traces.contains("field1"));
 
         let logs = names(StreamType::Logs);
-        assert!(
-            ALL_INFER_FIELDS
-                .iter()
-                .copied()
-                .chain(query_columns)
-                .all(|name| !logs.contains(name))
-        );
+        assert!(kept.iter().all(|name| !logs.contains(*name)));
     }
 
     #[test]

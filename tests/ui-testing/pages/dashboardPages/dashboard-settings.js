@@ -628,7 +628,19 @@ export default class DashboardSetting {
       '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
     );
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    const saved = this.waitForDashboardPut();
     await saveBtn.click();
+    await saved;
+  }
+
+  // Tab rename and delete both persist through PUT /dashboards/<id>; on a slow backend it can take seconds.
+  waitForDashboardPut() {
+    return this.page.waitForResponse(
+      (response) =>
+        response.request().method() === "PUT" &&
+        /\/dashboards\/[^/?]+(\?|$)/.test(response.url()),
+      { timeout: 30000 }
+    );
   }
 
   // Delete tab in edit tab options//
@@ -653,6 +665,8 @@ export default class DashboardSetting {
     await page
       .locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]')
       .waitFor({ state: "visible" });
+    const deleted = this.waitForDashboardPut();
     await page.locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]').click();
+    await deleted;
   }
 }

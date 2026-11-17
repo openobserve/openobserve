@@ -176,11 +176,11 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
+  IncidentsTile,
   OverviewAlertLevel,
   OverviewAlertsData,
   OverviewSection,
 } from "@/ts/interfaces/overview";
-import type { IncidentsTile, OverviewTarget } from "./OverviewHeadlineStrip.vue";
 import OverviewAskAiButton from "./OverviewAskAiButton.vue";
 import OverviewRowButton from "./OverviewRowButton.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
@@ -197,8 +197,7 @@ import type { OverviewAskAiTarget } from "./overviewAskAi";
 import { useOverviewAskAi } from "./useOverviewAskAi";
 import { useOverviewTime } from "./useOverviewTime";
 
-export type AlertsBoxTarget =
-  Extract<OverviewTarget, "firing" | "failing" | "incidents"> | "critical" | "warning";
+export type AlertsBoxTarget = "firing" | "failing" | "incidents" | "critical" | "warning";
 
 interface CountBox {
   key: string;

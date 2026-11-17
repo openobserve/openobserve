@@ -226,6 +226,25 @@ pub fn is_wal_file(file: &str) -> bool {
         || columns[9].contains("="))
 }
 
+/// Oldest timestamp of a stream's data on this node that is not uploaded yet, from metadata only.
+/// Sources are read in data-flow order, so data moving between them during the probe is still seen.
+pub async fn wal_min_ts(org_id: &str, stream_type: &str, stream_name: &str) -> Option<i64> {
+    let parquet_dir = PathBuf::from(&config::get_config().common.data_wal_dir)
+        .join("files")
+        .join(org_id)
+        .join(stream_type)
+        .join(stream_name);
+    [
+        writer::memtable_min_ts(org_id, stream_type, stream_name).await,
+        immutable::immutable_min_ts(org_id, stream_type, stream_name).await,
+        wal::parquet_files_min_ts(parquet_dir).await,
+        pack::pack_min_ts(org_id, stream_type, stream_name).await,
+    ]
+    .into_iter()
+    .flatten()
+    .min()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

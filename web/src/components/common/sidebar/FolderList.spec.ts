@@ -204,6 +204,17 @@ describe("FolderList.vue", () => {
       expect(events[events.length - 1]).toEqual(["default"]);
     });
 
+    it("marks no folder active under hide-active, and a click still picks the kept one", async () => {
+      const activeTabs = () => wrapper.findAll('[role="tab"][data-state="active"]');
+      expect(activeTabs()).toHaveLength(1);
+      await wrapper.setProps({ hideActive: true });
+      expect(activeTabs()).toHaveLength(0);
+      expect(wrapper.vm.activeFolderId).toBe("default");
+
+      await wrapper.find('[data-test="dashboard-folder-tab-default"]').trigger("click");
+      expect(wrapper.emitted("update:activeFolderId")?.at(-1)).toEqual(["default"]);
+    });
+
     it("renders a Favorites entry FIRST when show-favorites is on", async () => {
       const favWrapper = mount(FolderList, {
         global: {

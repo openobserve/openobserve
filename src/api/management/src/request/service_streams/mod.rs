@@ -288,7 +288,7 @@ pub async fn list_services(
 pub async fn correlate_streams(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>, // Require authentication
-    #[allow(unused_variables)] Json(req): Json<CorrelationRequest>,
+    #[cfg(feature = "enterprise")] Json(req): Json<CorrelationRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {

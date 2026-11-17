@@ -64,12 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`svcver-tile-${tile.id}`"
         >
           <span class="text-text-secondary text-xs">{{ tile.label }}</span>
-          <span class="flex min-w-0 items-center justify-between gap-2">
+          <span
+            class="flex min-w-0 items-center justify-between gap-2 max-xl:flex-col max-xl:items-start max-xl:gap-0.5"
+          >
             <span class="text-text-heading text-xl font-semibold tabular-nums">{{
               tile.value
             }}</span>
             <OButton
-              v-if="tile.id === 'overrides'"
+              v-if="tile.id === 'overrides' && tile.linked"
               variant="ghost-primary"
               size="xs"
               data-test="svcver-tile-overrides-view"
@@ -79,16 +81,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</span></OButton
             >
             <OButton
-              v-else-if="tile.id === 'names'"
+              v-else-if="tile.id === 'names' && tile.linked"
               variant="ghost-primary"
               size="xs"
               data-test="svcver-tile-names-review"
               @click="setView('name-review')"
               >{{ t("serviceVersions.discovered.tiles.review") }}</OButton
             >
-            <OTruncatedText v-else-if="tile.sub" class="text-text-secondary min-w-0 text-xs">{{
-              tile.sub
-            }}</OTruncatedText>
+            <span v-else-if="tile.sub" class="flex min-w-0">
+              <OTruncatedText
+                :lines="2"
+                class="text-text-secondary text-xs"
+                :tooltip="tile.full ? false : undefined"
+                :data-test="`svcver-tile-${tile.id}-sub`"
+                >{{ tile.sub }}</OTruncatedText
+              ><OTooltip v-if="tile.full" :content="tile.full" side="top" />
+            </span>
           </span>
         </div>
       </div>
@@ -120,6 +128,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span></OToggleGroupItem
           >
         </OToggleGroup>
+        <span
+          v-if="versionsEnabled"
+          tabindex="0"
+          role="img"
+          class="text-text-muted rounded-default inline-flex shrink-0"
+          :aria-label="t('serviceVersions.discovered.banner')"
+          data-test="svcver-discovered-help"
+          ><OIcon name="info-outline" size="sm" /><OTooltip
+            :content="t('serviceVersions.discovered.banner')"
+            side="top"
+        /></span>
         <!-- The table toolbar owns these while the table is on screen. -->
         <div v-if="!tableShown" class="ms-auto flex items-center gap-2">
           <OButton
@@ -163,14 +182,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <template v-else>
-        <InfoNotice
-          v-if="versionsEnabled"
-          class="mx-page-edge mt-3 shrink-0"
-          data-test="svcver-discovered-banner"
-          >{{ t("serviceVersions.discovered.banner") }}</InfoNotice
-        >
         <OBanner
-          v-else
+          v-if="!versionsEnabled"
           variant="info"
           icon="info"
           inline-actions
@@ -196,7 +209,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="refreshing"
             :forbidden="forbidden"
             row-key="id"
-            pagination="client"
+            pagination="server"
+            :total-count="filteredGroupCount"
             :page-size="pageSize"
             :page-size-options="[20, 50, 100, 250, 500]"
             sorting="server"
@@ -208,14 +222,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :persist-columns="true"
             table-id="settings-discovered-services-v2"
             :show-global-filter="false"
-            :pivot-row-columns="[{ name: 'service_name' }]"
-            :keep-page-on-data-change="true"
-            :current-page="currentPage"
+            :pivot-row-columns="[{ name: '__group' }, { name: 'service_name' }]"
+            :current-page="shownPage"
             wrap
             data-test="services-list-table"
             @sort-change="onSortChange"
             @row-click="handleRowClick"
-            @pagination-change="({ page }: { page: number }) => (currentPage = page)"
+            @pagination-change="onPageChange"
           >
             <template #toolbar>
               <OSearchInput
@@ -298,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="service-collapse-toggle"
                   class="rounded-default text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body inline-flex h-4.5 w-4.5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
                   :aria-expanded="row.__type === 'summary' ? 'false' : 'true'"
-                  @click.stop="toggleServiceCollapse(row.service_name)"
+                  @click.stop="toggleServiceCollapse(row.__group)"
                 >
                   <OIcon
                     :name="row.__type === 'summary' ? 'chevron-right' : 'expand-more'"
@@ -328,125 +341,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t("settings.correlation.instancePlural")
                 }}
               </OTag>
+              <OTag v-else variant="default-outline" size="sm" class="max-w-full min-w-0"
+                ><OTruncatedText>{{ row.set_id }}</OTruncatedText></OTag
+              >
+            </template>
+            <template #cell-k8s_workload="{ row }">
+              <span v-if="row.__type === 'summary'" class="text-text-muted text-xs">{{
+                raw("—")
+              }}</span>
               <OTruncatedText
                 v-else-if="workloadOf(row)"
                 class="font-mono text-xs"
                 data-test="svcver-discovered-workload"
                 >{{ workloadOf(row) }}</OTruncatedText
               >
-              <span
+              <OTruncatedText
                 v-else-if="proposedWorkloadText(row)"
                 class="text-text-muted text-xs"
                 data-test="svcver-discovered-workload-proposed"
-                >{{ proposedWorkloadText(row) }}</span
+                >{{ proposedWorkloadText(row) }}</OTruncatedText
               >
-              <span v-else class="text-text-muted text-xs" data-test="svcver-discovered-no-workload"
-                >{{ raw("—") }}<OTooltip :content="t('serviceVersions.discovered.noWorkload')"
+              <span v-else class="text-xs" data-test="svcver-discovered-no-workload"
+                ><NotComparedMark :reason="t('serviceVersions.discovered.noWorkload')"
               /></span>
             </template>
             <template #cell-identity="{ row }">
               <span v-if="row.__type === 'summary'" class="text-text-muted text-xs">&mdash;</span>
-              <!-- One line per row: the first chips, then a count whose tooltip names the rest. -->
-              <div
+              <span
+                v-else-if="Object.keys(row.disambiguation).length === 0"
+                class="no-dimensions-text text-xs"
+                ><NotComparedMark :reason="t('settings.correlation.noDimensions')"
+              /></span>
+              <OnCallFitChips
                 v-else
-                class="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden py-1"
+                :items="identityChips(row.disambiguation)"
+                :tooltip="chipsTooltip(identityChips(row.disambiguation))"
+                class="py-1"
                 data-test="svcver-discovered-identity"
               >
-                <ODimensionChip
-                  v-for="[key, value] in identityChips(row.disambiguation).shown"
-                  :key="`${key}=${value}`"
-                  :dim-key="key"
-                  :key-label="dimensionLabel(key, t)"
-                  :value="String(value)"
-                  tooltip
-                />
-                <span v-if="identityChips(row.disambiguation).rest.length" class="shrink-0">
-                  <OTag variant="default-outline" size="sm">{{
-                    raw(`+${identityChips(row.disambiguation).rest.length}`)
-                  }}</OTag>
-                  <OTooltip
-                    :content="
-                      raw(
-                        identityChips(row.disambiguation)
-                          .rest.map(([k, v]) => `${dimensionLabel(k, t)}: ${v}`)
-                          .join(', '),
-                      )
-                    "
-                    content-class="text-xs"
+                <template #item="{ item }">
+                  <ODimensionChip
+                    :dim-key="item.key"
+                    :key-label="dimensionLabel(item.key, t, true)"
+                    :value="item.value"
+                    :variant="IDENTITY_CHIP_VARIANT"
                   />
-                </span>
-                <span
-                  v-if="Object.keys(row.disambiguation).length === 0"
-                  class="no-dimensions-text text-text-muted text-xs"
-                  >{{ raw("—") }}<OTooltip :content="t('settings.correlation.noDimensions')"
-                /></span>
-              </div>
+                </template>
+              </OnCallFitChips>
             </template>
             <template #cell-telemetry="{ row }">
-              <div
-                v-if="row.__type === 'summary'"
-                class="instance-telemetry-row flex flex-wrap items-center gap-1 py-1"
+              <OnCallFitChips
+                :items="telemetryChips(row)"
+                :tooltip="chipsTooltip(telemetryChips(row))"
+                class="instance-telemetry-row py-1"
               >
-                <OTag v-if="row.totalLogs > 0" type="streamType" :value="'logs'">
-                  {{ t("settings.correlation.logsWithCount", { count: row.totalLogs }) }}
-                </OTag>
-                <OTag v-if="row.totalTraces > 0" type="streamType" :value="'traces'">
-                  {{ t("settings.correlation.tracesWithCount", { count: row.totalTraces }) }}
-                </OTag>
-                <OTag v-if="row.totalMetrics > 0" type="streamType" :value="'metrics'">
-                  {{ t("settings.correlation.metricsWithCount", { count: row.totalMetrics }) }}
-                </OTag>
-              </div>
-              <div v-else class="instance-telemetry-row flex flex-wrap items-center gap-1 py-1">
-                <span v-if="row.logs_streams.length > 0" class="inline-flex shrink-0">
-                  <OTag type="streamType" :value="'logs'">
-                    {{
-                      t("settings.correlation.logsWithCount", {
-                        count: row.logs_streams.length,
-                      })
-                    }}
-                  </OTag>
-                  <OTooltip :content="row.logs_streams.join(', ')" content-class="text-xs" />
-                </span>
-                <span v-if="row.traces_streams.length > 0" class="inline-flex shrink-0">
-                  <OTag type="streamType" :value="'traces'">
-                    {{
-                      t("settings.correlation.tracesWithCount", {
-                        count: row.traces_streams.length,
-                      })
-                    }}
-                  </OTag>
-                  <OTooltip :content="row.traces_streams.join(', ')" content-class="text-xs" />
-                </span>
-                <span v-if="row.metrics_streams.length > 0" class="inline-flex shrink-0">
-                  <OTag type="streamType" :value="'metrics'">
-                    {{
-                      t("settings.correlation.metricsWithCount", {
-                        count: row.metrics_streams.length,
-                      })
-                    }}
-                  </OTag>
-                  <OTooltip :content="row.metrics_streams.join(', ')" content-class="text-xs" />
-                </span>
-              </div>
+                <template #item="{ item }">
+                  <OTag type="streamType" :value="item.key">{{ item.label }}</OTag>
+                  <OTooltip
+                    v-if="item.streams.length"
+                    :content="raw(item.streams.join(', '))"
+                    content-class="text-xs"
+                  />
+                </template>
+              </OnCallFitChips>
             </template>
             <template #cell-env="{ row }"
+              ><span v-if="row.__type === 'summary'" class="text-text-muted text-xs">{{
+                raw("—")
+              }}</span
               ><ServiceEnvChip
-                v-if="row.__type !== 'summary' && scopeFor(row)"
+                v-else-if="scopeFor(row)"
                 :identity="scopeFor(row)!"
                 :service="scopeFor(row)!.service"
-            /></template>
+                hide-key
+                hide-inferred /><span v-else class="text-xs"
+                ><NotComparedMark :reason="t(scopeGap(row))" /></span
+            ></template>
             <template #cell-version="{ row }"
-              ><span
-                v-if="row.__type !== 'summary' && scopeFor(row)?.newest_version"
+              ><span v-if="row.__type === 'summary'" class="text-text-muted text-xs">{{
+                raw("—")
+              }}</span
+              ><OTruncatedText
+                v-else-if="scopeFor(row)?.newest_version"
                 class="font-mono text-xs"
-                >{{ scopeFor(row)!.newest_version }}</span
-              ><span
-                v-else-if="row.__type !== 'summary'"
-                class="text-text-muted text-xs"
-                data-test="svcver-discovered-no-version"
-                >{{ raw("—")
-                }}<OTooltip :content="t('serviceVersions.discovered.noVersion')" /></span
+                >{{ scopeFor(row)!.newest_version }}</OTruncatedText
+              ><span v-else class="text-xs" data-test="svcver-discovered-no-version"
+                ><NotComparedMark
+                  :reason="
+                    t(scopeFor(row) ? 'serviceVersions.catalog.notTracked' : scopeGap(row))
+                  " /></span
             ></template>
             <template #cell-last_seen="{ row }">
               <OTimeCell
@@ -457,19 +440,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
 
-            <!-- Bottom -->
-            <template v-if="filteredGroupCount > 0" #footer-note>
-              <span class="max-md:hidden">
+            <!-- The pager counts services; instances are the one count it cannot say. -->
+            <template v-if="totalInstances > filteredGroupCount" #footer-note>
+              <span class="max-md:hidden" data-test="discovered-services-footer-instances">
                 {{
                   t(
-                    "settings.correlation.serviceCountSingular",
-                    { count: shownServiceCount.toLocaleString(locale) },
-                    shownServiceCount,
-                  )
-                }}
-                {{
-                  t(
-                    "settings.correlation.instancesCount",
+                    "serviceVersions.discovered.footerInstances",
                     { count: totalInstances.toLocaleString(locale) },
                     totalInstances,
                   )
@@ -533,6 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :dim-key="key"
               :key-label="dimensionLabel(key, t)"
               :value="value"
+              :variant="IDENTITY_CHIP_VARIANT"
             />
           </div>
           <div v-else class="panel-empty-text text-compact text-text-muted italic">
@@ -629,8 +606,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('settings.correlation.resetServicesConfirmTitle')"
-      :message="t('settings.correlation.resetServicesConfirmMessage')"
-      :warningMessage="t('settings.correlation.resetServicesConfirmWarning')"
+      :message="t('settings.correlation.resetServicesConfirmBody')"
+      :ok-label="t('settings.correlation.resetServices')"
       ok-variant="destructive"
       @update:ok="doResetServices"
       @update:cancel="confirmResetOpen = false"
@@ -659,14 +636,19 @@ export interface ServiceRecord extends ServiceDisplayFields {
 }
 
 const WORKLOAD_KEYS = ["k8s-deployment", "k8s-statefulset", "k8s-daemonset", "k8s-workload"];
+const SERVICE_NAME_MIN = 176;
+// Width of one semibold name character, plus the collapse toggle and cell padding.
+const NAME_CHAR_PX = 8;
+const NAME_CELL_PAD = 56;
 export const DISCOVERED_COLUMN_SIZES = {
-  service_name: 196,
-  workload: 136,
-  identity: 280,
-  telemetry: 212,
-  env: 70,
+  service_name: 296,
+  workload: 104,
+  identity: 192,
+  telemetry: 140,
+  last_seen: 120,
+  k8s_workload: 104,
+  env: 100,
   version: 80,
-  last_seen: 130,
 } as const;
 
 function dimension(row: Pick<ServiceRecord, "disambiguation" | "all_dimensions">, key: string) {
@@ -675,6 +657,15 @@ function dimension(row: Pick<ServiceRecord, "disambiguation" | "all_dimensions">
 
 export function displayOf(row: Pick<ServiceRecord, "service_name" | "display_name">) {
   return row.display_name || row.service_name;
+}
+
+// The name column takes the longest name's width before the flex columns share what is left.
+export function serviceNameColumnSize(names: readonly string[]) {
+  const longest = names.reduce((max, name) => Math.max(max, name.length), 0);
+  return Math.min(
+    DISCOVERED_COLUMN_SIZES.service_name,
+    Math.max(SERVICE_NAME_MIN, longest * NAME_CHAR_PX + NAME_CELL_PAD),
+  );
 }
 
 export function workloadOf(row: Pick<ServiceRecord, "disambiguation" | "all_dimensions">) {
@@ -732,6 +723,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import serviceStreamsService from "@/services/service_streams";
+import { servicesListQuery } from "@/services/service_streams.queries";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { useQuery } from "@tanstack/vue-query";
@@ -751,7 +743,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import InfoNotice from "@/components/shared/InfoNotice.vue";
+import NotComparedMark from "@/enterprise/components/ServiceVersions/NotComparedMark.vue";
+import OnCallFitChips from "@/components/oncall/OnCallFitChips.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -761,7 +754,9 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import { dimensionLabel } from "@/utils/dimensionLabels";
-import { serviceNameCount } from "@/utils/serviceCount";
+import { serviceIdentityOf, serviceNameCount } from "@/utils/serviceCount";
+import { shortList } from "@/utils/shortList";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -778,11 +773,14 @@ const emit = defineEmits<{
 const { t, locale } = useI18nTyped();
 const versionsEnabled = config.isEnterprise === "true" || config.isCloud === "true";
 
+// A service is one display name, the unit the tiles, the tab and the pager all count.
 interface ServiceGroup {
-  service_name: string;
+  name: string;
   instances: ServiceRecord[];
   lastSeen: number;
 }
+// Identity values are plain facts here; the shared dimension palette puts some keys in warning hues.
+const IDENTITY_CHIP_VARIANT: BadgeVariant = "default-soft";
 
 const store = useStore();
 const org = computed(() => String(store.state.selectedOrganization?.identifier || ""));
@@ -859,17 +857,58 @@ const filterValue = ref<string | null>(null);
 const selectedService = ref<ServiceRecord | null>(null);
 const pageSize = ref(20);
 const lastLoadedAt = ref<number | null>(null);
-const IDENTITY_CHIPS_SHOWN = 2;
 
-const identityChips = (dims: Record<string, string>) => {
-  const all = Object.entries(dims).sort(([a], [b]) => a.localeCompare(b));
-  return { shown: all.slice(0, IDENTITY_CHIPS_SHOWN), rest: all.slice(IDENTITY_CHIPS_SHOWN) };
+interface CellChip {
+  key: string;
+  label: I18nText;
+}
+
+const identityChips = (dims: Record<string, string>) =>
+  Object.entries(dims)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => ({
+      key,
+      value,
+      label: raw(`${dimensionLabel(key, t)}: ${value}`),
+    }));
+
+// A collapsed service's summary row carries totals and no stream names.
+const telemetryChips = (row: any) => {
+  const summary = row.__type === "summary";
+  const signal = (key: "logs" | "traces" | "metrics", total: number, streams: string[]) => {
+    const count = summary ? total : streams.length;
+    if (count <= 0) return [];
+    const label = t(`settings.correlation.${key}WithCount`, { count });
+    return [{ key, label, streams: summary ? [] : streams }];
+  };
+  return [
+    ...signal("logs", row.totalLogs, row.logs_streams),
+    ...signal("traces", row.totalTraces, row.traces_streams),
+    ...signal("metrics", row.totalMetrics, row.metrics_streams),
+  ];
 };
+
+const chipsTooltip = (chips: CellChip[]) =>
+  raw(
+    new Intl.ListFormat(String(locale.value), { type: "unit" }).format(
+      chips.map((chip) => chip.label),
+    ),
+  );
+
 const currentPage = ref(1);
 
 watch([filterKey, filterValue, searchQuery], () => {
   currentPage.value = 1;
 });
+
+function onPageChange({ page, size }: { page: number; size?: number }) {
+  if (size && size !== pageSize.value) {
+    pageSize.value = size;
+    currentPage.value = 1;
+    return;
+  }
+  currentPage.value = page;
+}
 
 // Label override for internal field keys shown in the filter dropdown
 const KEY_DISPLAY_LABELS: Record<string, I18nText> = {
@@ -927,21 +966,22 @@ function onSortChange({ column, order }: { column: string; order: "asc" | "desc"
   }
 }
 
-const columns: OTableColumnDef[] = [
+// The first five columns keep their long-standing order; later additions go after them.
+const columns = computed((): OTableColumnDef[] => [
   {
     id: "service_name",
-    header: t("serviceVersions.discovered.cols.service"),
+    header: t("settings.correlation.serviceName"),
     accessorKey: "service_name",
     sortable: true,
     resizable: true,
     hideable: true,
-    size: DISCOVERED_COLUMN_SIZES.service_name,
+    size: serviceNameColumnSize(services.value.map(displayOf)),
     minSize: 160,
     meta: { align: "left" },
   },
   {
     id: "workload",
-    header: t("serviceVersions.discovered.cols.workload"),
+    header: t("settings.correlation.workload"),
     accessorKey: "set_id",
     resizable: true,
     hideable: true,
@@ -950,7 +990,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "identity",
-    header: t("serviceVersions.discovered.cols.identity"),
+    header: t("settings.correlation.instanceIdentity"),
     accessorKey: "identity",
     resizable: true,
     hideable: true,
@@ -959,12 +999,31 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "telemetry",
-    header: t("serviceVersions.discovered.cols.telemetry"),
+    header: t("settings.correlation.telemetryCoverage"),
     accessorKey: "telemetry",
     resizable: true,
     hideable: true,
     size: DISCOVERED_COLUMN_SIZES.telemetry,
     minSize: DISCOVERED_COLUMN_SIZES.telemetry,
+    meta: { align: "left", flex: true },
+  },
+  {
+    id: "last_seen",
+    header: t("settings.correlation.lastSeen"),
+    accessorKey: "lastSeen",
+    sortable: true,
+    resizable: true,
+    hideable: true,
+    size: DISCOVERED_COLUMN_SIZES.last_seen,
+    meta: { align: "left" },
+  },
+  {
+    id: "k8s_workload",
+    header: t("serviceVersions.discovered.cols.workload"),
+    accessorKey: "k8s_workload",
+    resizable: true,
+    hideable: true,
+    size: DISCOVERED_COLUMN_SIZES.k8s_workload,
     meta: { align: "left" },
   },
   ...(versionsEnabled
@@ -989,17 +1048,7 @@ const columns: OTableColumnDef[] = [
         },
       ]
     : []),
-  {
-    id: "last_seen",
-    header: t("serviceVersions.discovered.cols.lastSeen"),
-    accessorKey: "lastSeen",
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    size: DISCOVERED_COLUMN_SIZES.last_seen,
-    meta: { align: "left" },
-  },
-];
+]);
 
 // Per-service collapse: a collapsed service renders one aggregated summary
 // row instead of its instance rows. Session-only state.
@@ -1017,21 +1066,23 @@ function toggleServiceCollapse(name: string) {
 
 function handleRowClick(row: any) {
   if (row.__type === "summary") {
-    toggleServiceCollapse(row.service_name);
+    toggleServiceCollapse(row.__group);
     return;
   }
   selectedService.value = row;
 }
 
-// Group services by service_name
 const serviceGroups = computed((): ServiceGroup[] => {
-  const groupMap: Record<string, ServiceRecord[]> = {};
+  // A Map, so a service named like an Object prototype key (constructor, __proto__) groups like any name.
+  const groupMap = new Map<string, ServiceRecord[]>();
   for (const s of services.value) {
-    if (!groupMap[s.service_name]) groupMap[s.service_name] = [];
-    groupMap[s.service_name].push(s);
+    const name = serviceIdentityOf(s);
+    const group = groupMap.get(name);
+    if (group) group.push(s);
+    else groupMap.set(name, [s]);
   }
 
-  return Object.entries(groupMap)
+  return [...groupMap]
     .map(([name, instances]) => {
       let latestSeen = 0;
       for (const inst of instances) {
@@ -1039,19 +1090,13 @@ const serviceGroups = computed((): ServiceGroup[] => {
       }
 
       return {
-        service_name: name,
+        name,
         instances,
         lastSeen: latestSeen,
       };
     })
     .sort((a, b) => b.lastSeen - a.lastSeen);
 });
-
-// The newest instance names the group, matching the label the merged cell renders.
-function groupDisplay(group: ServiceGroup) {
-  const newest = group.instances.reduce((a, b) => (b.last_seen > a.last_seen ? b : a));
-  return displayOf(newest);
-}
 
 function filterInstances(instances: ServiceRecord[]): ServiceRecord[] {
   if (!filterKey.value || !filterValue.value) return instances;
@@ -1092,27 +1137,32 @@ const visibleGroups = computed((): ServiceGroup[] => {
   const dir = sortOrder.value === "desc" ? -1 : 1;
   return [...groups].sort((a, b) =>
     sortColumn.value === "service_name"
-      ? dir *
-        (groupDisplay(a).localeCompare(groupDisplay(b)) ||
-          a.service_name.localeCompare(b.service_name))
+      ? dir * a.name.localeCompare(b.name)
       : dir * ((a.lastSeen || 0) - (b.lastSeen || 0)),
   );
 });
 
-// Flat rows: every instance is a visible row. Instances of a service stay
-// adjacent so the service_name pivot merge can join them. A collapsed service
-// contributes a single aggregated summary row instead — except while a search
-// or key/value filter is active, which overrides collapse so a match can
-// never hide inside a collapsed group.
+const filteredGroupCount = computed(() => visibleGroups.value.length);
+// A refresh or filter can leave fewer pages than the one the user was on.
+const shownPage = computed(() =>
+  Math.min(currentPage.value, Math.max(1, Math.ceil(filteredGroupCount.value / pageSize.value))),
+);
+const pagedGroups = computed(() =>
+  visibleGroups.value.slice(
+    (shownPage.value - 1) * pageSize.value,
+    shownPage.value * pageSize.value,
+  ),
+);
+
+// Pages hold whole services. A collapsed service is one summary row, except while a
+// search or filter is active, so a match never hides inside a collapsed group.
 const flatRows = computed((): any[] => {
   const dir = sortOrder.value === "desc" ? -1 : 1;
-  // Instances within a group are always ordered by recency — latest on top by
-  // default, following the header direction when sorting by Last Seen.
   const instDir = sortColumn.value === "last_seen" ? dir : -1;
   const filtersActive = !!searchQuery.value || !!(filterKey.value && filterValue.value);
 
-  return visibleGroups.value.flatMap((g): any[] => {
-    if (!filtersActive && collapsedServices.value.has(g.service_name) && g.instances.length > 1) {
+  return pagedGroups.value.flatMap((g): any[] => {
+    if (!filtersActive && collapsedServices.value.has(g.name) && g.instances.length > 1) {
       const logs = new Set<string>();
       const traces = new Set<string>();
       const metrics = new Set<string>();
@@ -1121,11 +1171,17 @@ const flatRows = computed((): any[] => {
         inst.traces_streams.forEach((s) => traces.add(s));
         inst.metrics_streams.forEach((s) => metrics.add(s));
       }
+      const newest = g.instances.reduce((a, b) => (b.last_seen > a.last_seen ? b : a));
       return [
         {
-          id: `service-summary:${g.service_name}`,
+          id: `service-summary:${g.name}`,
           __type: "summary",
-          service_name: g.service_name,
+          __group: g.name,
+          service_name: newest.service_name,
+          display_name: newest.display_name,
+          display_source: newest.display_source,
+          display_candidates: newest.display_candidates,
+          display_qualifier: newest.display_qualifier,
           instanceCount: g.instances.length,
           totalLogs: logs.size,
           totalTraces: traces.size,
@@ -1134,60 +1190,84 @@ const flatRows = computed((): any[] => {
         },
       ];
     }
+    // Same-key instances stay adjacent so the name cell merges once per detected key.
     return [...g.instances]
-      .sort((a, b) => instDir * (a.last_seen - b.last_seen))
-      .map((inst) => ({ ...inst, lastSeen: inst.last_seen, __groupSize: g.instances.length }));
+      .sort(
+        (a, b) =>
+          a.service_name.localeCompare(b.service_name) || instDir * (a.last_seen - b.last_seen),
+      )
+      .map((inst) => ({
+        ...inst,
+        lastSeen: inst.last_seen,
+        __group: g.name,
+        __groupSize: g.instances.length,
+      }));
   });
 });
 
-const filteredGroupCount = computed(() => visibleGroups.value.length);
-// Tile, tab and footer count with one helper over one list, the same count the service card uses.
+// Tile, tab and pager count with one helper over one list, the same count the service card uses.
 const serviceCount = computed(() => serviceNameCount(services.value));
-const shownServiceCount = computed(() =>
-  serviceNameCount(visibleGroups.value.flatMap((group) => group.instances)),
-);
 
 const tiles = computed(() => {
   const traced = serviceNameCount(
-    services.value.filter((record) => record.display_source === "trace"),
+    services.value.filter((record) => record.traces_streams.length > 0),
   );
-  const envs = envList.data.value?.envs;
-  const versions = catalog.data.value
-    ? new Set(scopes.value.map((scope) => scope.newest_version).filter(Boolean)).size
+  // The no-env bucket is not an environment, so neither the count nor the names include it.
+  const envs = (envList.data.value?.envs ?? [])
+    .filter((row) => !row.no_env && row.env.trim())
+    .map((row) => row.env);
+  const versioned = catalog.data.value
+    ? new Set(scopes.value.filter((scope) => scope.newest_version).map((scope) => scope.service))
+        .size
     : undefined;
   const stripped = catalog.data.value?.stripped_versions ?? 0;
+  const envNames = (max: number) =>
+    shortList(envs, max, String(locale.value), (count) =>
+      t("serviceVersions.discovered.tiles.more", { count }),
+    );
+  const envsShort = envNames(1);
   return [
     {
       id: "discovered",
       label: t("serviceVersions.discovered.tiles.discovered"),
       value: raw(serviceCount.value),
       sub: t("serviceVersions.discovered.tiles.discoveredSub", { n: traced }),
+      full: null,
+      linked: false,
     },
     {
       id: "envs",
       label: t("serviceVersions.discovered.tiles.envs"),
-      value: raw(envs ? envs.length : DASH),
-      sub: raw(envs ? envs.map((row) => row.env).join(", ") : ""),
+      value: raw(envList.data.value?.envs ? envs.length : DASH),
+      sub: raw(envsShort),
+      full: envs.length > 2 ? raw(envNames(envs.length)) : null,
+      linked: false,
     },
     {
       id: "overrides",
       label: t("serviceVersions.discovered.tiles.overrides"),
       value: raw(overrideTotal.data.value?.total ?? DASH),
       sub: null,
+      full: null,
+      linked: Boolean(overrideTotal.data.value?.total),
     },
     {
       id: "names",
       label: t("serviceVersions.discovered.tiles.names"),
       value: raw(namesTotal.value ?? DASH),
       sub: null,
+      full: null,
+      linked: Boolean(namesTotal.value),
     },
     {
       id: "versions",
-      label: t("serviceVersions.discovered.tiles.versions"),
-      value: raw(versions ?? DASH),
+      label: t("serviceVersions.discovered.tiles.versioned"),
+      value: raw(versioned ?? DASH),
       sub: stripped
         ? t("serviceVersions.discovered.tiles.versionsStripped", { count: stripped }, stripped)
         : null,
+      full: null,
+      linked: false,
     },
   ];
 });
@@ -1211,11 +1291,21 @@ function scopeFor(row: ServiceRecord) {
   return scopeForRow(row, scopes.value);
 }
 
+function scopeGap(row: ServiceRecord) {
+  return row.traces_streams.length
+    ? "serviceVersions.discovered.noTracePlace"
+    : "serviceVersions.discovered.noTraces";
+}
+
 const totalInstances = computed(() =>
   visibleGroups.value.reduce((sum, g) => sum + g.instances.length, 0),
 );
 
-const loadServices = async (isRefresh = false) => {
+// Only the latest read publishes, so a read a reset superseded never brings the deleted rows back.
+let loadGeneration = 0;
+
+const loadServices = async (isRefresh = false, afterReset = false) => {
+  const generation = ++loadGeneration;
   if (isRefresh) {
     refreshing.value = true;
   } else {
@@ -1230,8 +1320,14 @@ const loadServices = async (isRefresh = false) => {
       throw new Error(t("settings.discoveredServices.noOrganizationSelected"));
     }
 
-    const response = await serviceStreamsService.getServicesList(orgId);
-    const raw: ServiceRecord[] = response.data || [];
+    // Through the shared query, so the Detection Rules tab mounted beside this one reuses the same read.
+    const query = servicesListQuery(orgId);
+    // fetchQuery joins a read in flight, and one from before the reset returns the rows it deleted.
+    if (afterReset) await queryClient.cancelQueries({ queryKey: query.queryKey });
+    const raw = (await queryClient.fetchQuery(
+      isRefresh || afterReset ? { ...query, staleTime: 0 } : query,
+    )) as ServiceRecord[];
+    if (generation !== loadGeneration) return;
     services.value = raw.map((s) => ({
       ...s,
       logs_streams: unique(s.logs_streams),
@@ -1240,14 +1336,17 @@ const loadServices = async (isRefresh = false) => {
     }));
     lastLoadedAt.value = Date.now();
   } catch (err: any) {
+    if (generation !== loadGeneration) return;
     console.error("Failed to load services:", err);
     forbidden.value = forbiddenState(err);
     if (!forbidden.value) {
       error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
     }
   } finally {
-    loading.value = false;
-    refreshing.value = false;
+    if (generation === loadGeneration) {
+      loading.value = false;
+      refreshing.value = false;
+    }
   }
 };
 
@@ -1278,7 +1377,7 @@ const doResetServices = async () => {
       timeout: 5000,
     });
 
-    await loadServices();
+    await loadServices(false, true);
   } catch (err: any) {
     toast({
       variant: "error",

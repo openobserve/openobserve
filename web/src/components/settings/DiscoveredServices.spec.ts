@@ -18,7 +18,10 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import DiscoveredServices, { DISCOVERED_COLUMN_SIZES } from "./DiscoveredServices.vue";
+import DiscoveredServices, {
+  DISCOVERED_COLUMN_SIZES,
+  serviceNameColumnSize,
+} from "./DiscoveredServices.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import i18n from "@/locales";
@@ -41,6 +44,7 @@ vi.mock("@/components/common/GroupHeader.vue", () => ({
 import serviceStreamsService from "@/services/service_streams";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
+import { servicesListQuery } from "@/services/service_streams.queries";
 
 // ODrawer stub mirrors the migrated component API: open/title/size + slots
 // (default, header-right) and emits update:open + click:primary/secondary/neutral.
@@ -195,6 +199,7 @@ describe("DiscoveredServices", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+    queryClient.clear();
   });
 
   describe("initial render", () => {
@@ -233,7 +238,7 @@ describe("DiscoveredServices", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(wrapper.vm.serviceGroups).toHaveLength(2);
-      const names = wrapper.vm.serviceGroups.map((g: any) => g.service_name);
+      const names = wrapper.vm.serviceGroups.map((g: any) => g.name);
       expect(names).toContain("api-server");
       expect(names).toContain("worker");
     });
@@ -436,35 +441,98 @@ describe("DiscoveredServices", () => {
       expect(wrapper.vm.totalInstances).toBe(3);
     });
 
-    it("gives the tile, the tab and the footer one service count, by display name", async () => {
-      const renamed = multiInstanceResponse.map((row) =>
-        row.service_name === "worker"
-          ? { ...row, service_name: "worker-v2", display_name: "api-server" }
-          : { ...row, display_name: "api-server", display_source: "trace" },
-      );
-      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
-        data: renamed,
-      } as any);
-      wrapper = mountComponent();
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      const discovered = vm.tiles.find((tile: any) => tile.id === "discovered");
-      expect(vm.filteredGroupCount).toBe(2);
-      expect(vm.serviceCount).toBe(1);
-      expect(Number(discovered.value)).toBe(1);
-      expect(vm.shownServiceCount).toBe(1);
-      expect(vm.totalInstances).toBe(3);
-    });
+    // A collision kept on purpose shows each key with its own qualifier, so they stay two services.
+    it.each([
+      ["one display name", undefined, 1],
+      ["the same name under two qualifiers", "staging", 2],
+    ])(
+      "gives the tile, the tab and the footer one service count: %s",
+      async (_case, workerQualifier, count) => {
+        const renamed = multiInstanceResponse.map((row) =>
+          row.service_name === "worker"
+            ? {
+                ...row,
+                service_name: "worker-v2",
+                display_name: "api-server",
+                display_qualifier: workerQualifier,
+              }
+            : {
+                ...row,
+                display_name: "api-server",
+                display_source: "trace",
+                display_qualifier: workerQualifier && "prod",
+              },
+        );
+        vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+          data: renamed,
+        } as any);
+        wrapper = mountComponent();
+        await flushPromises();
+        const vm = wrapper.vm as any;
+        const discovered = vm.tiles.find((tile: any) => tile.id === "discovered");
+        expect(vm.filteredGroupCount).toBe(count);
+        expect(vm.serviceCount).toBe(count);
+        expect(Number(discovered.value)).toBe(count);
+        expect(wrapper.findComponent(OTable).props("totalCount")).toBe(count);
+        expect(vm.totalInstances).toBe(3);
+      },
+    );
+
+    it.each(["constructor", "__proto__", "toString"])(
+      "groups a service whose display name is %s like any other name",
+      async (name) => {
+        vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+          data: [{ ...multiInstanceResponse[0], display_name: name }],
+        } as any);
+        wrapper = mountComponent();
+        await flushPromises();
+        expect(wrapper.vm.serviceGroups.map((group: any) => group.name)).toEqual([name]);
+        expect(wrapper.vm.flatRows.map((row: any) => row.id)).toEqual(["a1"]);
+      },
+    );
   });
 
   describe("column widths at 1600 px", () => {
-    it("fit beside the settings menu, so Last seen is never cut", () => {
+    it("fit beside the settings menu, whatever the longest service name", () => {
       const TABLE_WIDTH_AT_1600 = 1230;
       const { identity, telemetry, ...fixed } = DISCOVERED_COLUMN_SIZES;
-      const total = Object.values(fixed).reduce((sum, size) => sum + size, identity + telemetry);
+      const name = serviceNameColumnSize(["a".repeat(200)]);
+      const total = Object.values({ ...fixed, service_name: name }).reduce(
+        (sum, size) => sum + size,
+        identity + telemetry,
+      );
       expect(total).toBeLessThanOrEqual(TABLE_WIDTH_AT_1600);
-      expect(DISCOVERED_COLUMN_SIZES.last_seen).toBeGreaterThanOrEqual(130);
     });
+  });
+
+  it("pages through whole services, never splitting one across pages", async () => {
+    const record = (id: string, service_name: string, last_seen: number) => ({
+      ...mockServicesResponse[0],
+      id,
+      service_name,
+      display_name: undefined,
+      last_seen,
+    });
+    vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+      data: [
+        record("a1", "api-server", 3),
+        record("a2", "api-server", 1),
+        record("w1", "worker", 2),
+      ],
+    } as any);
+    wrapper = mountComponent();
+    await flushPromises();
+    const table = wrapper.findComponent(OTable);
+    table.vm.$emit("pagination-change", { page: 1, size: 1 });
+    await nextTick();
+    expect(table.props("totalCount")).toBe(2);
+    expect(wrapper.vm.flatRows.map((row: any) => row.service_name)).toEqual([
+      "api-server",
+      "api-server",
+    ]);
+    table.vm.$emit("pagination-change", { page: 2, size: 1 });
+    await nextTick();
+    expect(wrapper.vm.flatRows.map((row: any) => row.service_name)).toEqual(["worker"]);
   });
 
   describe("per-service collapse", () => {
@@ -663,7 +731,10 @@ describe("DiscoveredServices", () => {
       await flushPromises();
       const table = wrapper.findComponent(OTable);
       expect(table.exists()).toBe(true);
-      expect(table.props("pivotRowColumns")).toEqual([{ name: "service_name" }]);
+      expect(table.props("pivotRowColumns")).toEqual([
+        { name: "__group" },
+        { name: "service_name" },
+      ]);
       expect(table.props("expansion")).toBe("none");
       expect(table.props("sorting")).toBe("server");
     });
@@ -686,10 +757,13 @@ describe("DiscoveredServices", () => {
       await flushPromises();
       await nextTick();
 
-      // All three instance rows render with no expansion interaction; the workload column shows the Kubernetes workload, not the identity set.
+      // All three instance rows render with no expansion interaction.
       const cellText = (sel: string) =>
         wrapper.findAll(`[data-test="o2-table-cell-${sel}"]`).map((c) => c.text());
-      expect(cellText("workload")).toEqual(["api-server", "—", "worker"]);
+      expect(cellText("workload")).toEqual(["set-one", "set-two", "worker-set"]);
+      const k8s = wrapper.findAll('[data-test="o2-table-cell-k8s_workload"]');
+      expect([k8s[0].text(), k8s[2].text()]).toEqual(["api-server", "worker"]);
+      expect(k8s[1].find('[data-test="svcver-not-compared"]').exists()).toBe(true);
 
       // The pivot merge collapses the repeated name: "api-server" appears in
       // exactly one service_name cell even though it owns two rows.
@@ -735,12 +809,20 @@ describe("DiscoveredServices", () => {
       await flushPromises();
       const callCount = vi.mocked(serviceStreamsService.getServicesList).mock.calls.length;
 
-      await wrapper.vm.loadServices();
+      await wrapper.vm.loadServices(true);
       await flushPromises();
 
       expect(vi.mocked(serviceStreamsService.getServicesList).mock.calls.length).toBe(
         callCount + 1,
       );
+    });
+
+    it("reuses the list the Detection Rules tab is already reading on mount", async () => {
+      void queryClient.fetchQuery(servicesListQuery("test-org"));
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(serviceStreamsService.getServicesList).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.services).toHaveLength(2);
     });
   });
 
@@ -884,6 +966,28 @@ describe("DiscoveredServices", () => {
       expect(serviceStreamsService.getServicesList).toHaveBeenCalledTimes(1);
     });
 
+    it("reads the list again after a reset instead of keeping a refresh started before it", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      let finishRefresh: (value: unknown) => void = () => {};
+      vi.mocked(serviceStreamsService.getServicesList).mockImplementationOnce(
+        () => new Promise((resolve) => (finishRefresh = resolve)) as never,
+      );
+      const refresh = wrapper.vm.loadServices(true);
+      await flushPromises();
+      let finishPostReset: (value: unknown) => void = () => {};
+      vi.mocked(serviceStreamsService.getServicesList).mockImplementationOnce(
+        () => new Promise((resolve) => (finishPostReset = resolve)) as never,
+      );
+      const reset = wrapper.vm.doResetServices();
+      await flushPromises();
+      finishRefresh({ data: mockServicesResponse });
+      await flushPromises();
+      finishPostReset({ data: [] });
+      await Promise.all([refresh, reset]);
+      expect(wrapper.vm.services).toEqual([]);
+    });
+
     it("should not throw and reset resetting flag when resetServices fails", async () => {
       vi.mocked(serviceStreamsService.resetServices).mockRejectedValueOnce(new Error("boom"));
       wrapper = mountComponent();
@@ -932,6 +1036,42 @@ describe("DiscoveredServices", () => {
       // resetServices must not be called when org is missing
       expect(serviceStreamsService.resetServices).not.toHaveBeenCalled();
       expect(wrapper.vm.resetting).toBe(false);
+    });
+  });
+
+  describe("identity chips wider than the cell", () => {
+    it("fold into a +N chip whose tooltip names the rest", async () => {
+      const rect = HTMLElement.prototype.getBoundingClientRect;
+      vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (
+        this: HTMLElement,
+      ) {
+        return this.dataset.test === "svcver-discovered-identity" ? 200 : 0;
+      });
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+        this: HTMLElement,
+      ) {
+        if (this.dataset.test === "svcver-discovered-identity") return { left: 0 } as DOMRect;
+        if (this.dataset.test === "oncall-fit-chips-more") return { width: 30 } as DOMRect;
+        if (this.hasAttribute("data-fit-chip")) {
+          const index = [...this.parentElement!.children].indexOf(this);
+          return { right: 120 * (index + 1) } as DOMRect;
+        }
+        return rect.call(this);
+      });
+      wrapper = mount(DiscoveredServices, {
+        global: { plugins: [i18n], provide: { store: mockStore }, stubs: globalStubs },
+      });
+      await flushPromises();
+
+      const cell = wrapper.find('[data-test="svcver-discovered-identity"]');
+      const shown = cell.findAll("[data-fit-chip]").filter((chip) => chip.isVisible());
+      expect(shown.map((chip) => chip.text())).toEqual(["Clusterprod"]);
+      const more = cell.find('[data-test="oncall-fit-chips-more"]');
+      expect(more.text()).toBe("+1");
+      expect(more.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "K8s Cluster: prod, K8s StatefulSet: worker",
+      );
+      vi.restoreAllMocks();
     });
   });
 

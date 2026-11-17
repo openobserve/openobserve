@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="t('alerts.downtimes.form.checkSchedule')"
                   data-test="add-downtime-check-schedule"
                 />
-                <DowntimeScheduleFields />
+                <DowntimeScheduleFields :locked="scheduleLocked" />
                 <DowntimeNotifySection />
               </div>
 
@@ -475,7 +475,8 @@ import DowntimeScheduleFields from "./DowntimeScheduleFields.vue";
 import DowntimeNotifySection from "./DowntimeNotifySection.vue";
 import DowntimePreviewPane from "./DowntimePreviewPane.vue";
 import DowntimeSummary from "./DowntimeSummary.vue";
-import { browserTimezone } from "@/utils/timezoneAliases";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
+import { firstWindowStart } from "@/utils/downtimes/listOrder";
 import { groupRefLabels } from "@/utils/alerts/ackState";
 import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { useEditorDraft } from "@/composables/useEditorDraft";
@@ -502,7 +503,8 @@ const queryList = (value: unknown): string[] =>
     .map((v) => String(v ?? "").trim())
     .filter(Boolean);
 
-const browserZone = browserTimezone();
+// The app's chosen zone, like every other downtime view, else the browser's.
+const viewerZone = useViewerTimezone();
 const moduleLocks = useTargetModuleLocks();
 const prefillModule = MODULE_ORDER.find(
   (m) => m === route.query.module && !moduleLocks[m].locked.value,
@@ -513,7 +515,7 @@ const folderDefault = useDefaultDowntimeFolder();
 const explicitFolder = String(route.query.folder_id ?? "");
 
 const initialValues = (): DowntimeFormValues => {
-  const base = defaultDowntimeValues(Date.now(), browserZone);
+  const base = defaultDowntimeValues(Date.now(), viewerZone.value);
   const folderId = explicitFolder || folderDefault.folderId.value || "";
   return applyPrefill(
     { ...base, folder_id: folderId },
@@ -757,6 +759,12 @@ const folderSettled = computed(() =>
     ? loadedFrom.value === sourceId.value
     : !!explicitFolder || folderDefault.ready.value,
 );
+
+// After the first window started, the server refuses a schedule change, so the controls lock.
+const scheduleLocked = computed(() => {
+  const row = isEdit.value ? detailQuery.data.value : null;
+  return !!row && firstWindowStart(row.schedule) <= serverNowMs() * 1000;
+});
 
 const editStatus = computed<DowntimeStatus | null>(() =>
   isEdit.value ? (detailQuery.data.value?.status ?? null) : null,

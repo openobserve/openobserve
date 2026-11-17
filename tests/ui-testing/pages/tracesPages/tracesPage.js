@@ -3869,7 +3869,9 @@ export class TracesPage {
     await expect(this.page.locator('[data-test^="trace-tree-span-operation-name-container-"]').first()).toBeVisible({ timeout: 30000 });
   }
 
-  async expectWarningToast(message) {
-    await expect(this.page.locator('[data-test-variant="warning"]').filter({ hasText: message }).first()).toBeVisible({ timeout: 30000 });
+  async expectSpanNoLogsNotice(message) {
+    const notice = this.page.locator('[data-test="traces-span-drawer-no-logs-notice"]');
+    await expect(notice).toBeVisible({ timeout: 30000 });
+    await expect(notice).toContainText(message);
   }
 }

@@ -245,7 +245,8 @@ pub struct DowntimeRequest {
     pub show_banner: bool,
     #[serde(default)]
     pub notifications: Option<DowntimeNotifications>,
-    /// The version the edit was loaded at; a newer stored row makes the edit a 409.
+    /// The version the edit was loaded at; required on update, and a newer stored row makes the
+    /// edit a 409. Extend accepts it optionally.
     #[serde(default)]
     pub version: Option<i64>,
     /// Three-state (D8): absent keeps the stored value on an edit, `null` clears it.
@@ -580,10 +581,11 @@ pub struct CorrectionRef {
 pub struct ListDowntimesQuery {
     /// Absent means every folder the user may list.
     pub folder_id: Option<String>,
-    /// `scheduled`, `active`, `ended`, `ended_early` or `cancelled`.
+    /// `scheduled`, `active`, `ended`, `ended_early` or `cancelled`. Any other value is a 400.
     pub status: Option<String>,
-    /// `none`, `daily`, `weekly`, or `recurring` for both.
+    /// `none` (or `once`), `daily`, `weekly`, or `recurring` for both. Any other value is a 400.
     pub repeat: Option<String>,
+    /// Case-insensitive substring of the name, reason or creator.
     pub search: Option<String>,
     /// Rows whose alerts target names this alert, or whose condition matches its dimensions.
     pub alert_id: Option<String>,
@@ -820,6 +822,16 @@ pub enum AlertMuteConflict {
 
 pub fn default_folder() -> String {
     DEFAULT_FOLDER.to_string()
+}
+
+/// The local date of an instant in a schedule's zone; `None` for an unknown zone.
+pub fn local_date(micros: i64, timezone: &str) -> Option<chrono::NaiveDate> {
+    let tz: chrono_tz::Tz = timezone.parse().ok()?;
+    Some(
+        chrono::DateTime::from_timestamp_micros(micros)?
+            .with_timezone(&tz)
+            .date_naive(),
+    )
 }
 
 /// Two group lists cover the same groups: order and labels do not count, and none equals empty.
