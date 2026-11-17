@@ -30,7 +30,7 @@ const props = defineProps<{
   title: I18nText;
   /** One sentence under the title. */
   help: I18nText;
-  /** False while another section is in view: its step buttons hide so only one pair shows. */
+  /** False while another section is in view: its step buttons fade out but stay in the Tab order. */
   current?: boolean;
 }>();
 
@@ -96,8 +96,8 @@ provide(SETTING_ROW_BARE_KEY, true);
         </p>
       </div>
       <div
-        class="flex shrink-0 gap-1 max-md:hidden"
-        :class="current === false && 'invisible'"
+        class="flex shrink-0 gap-1"
+        :class="current === false && 'opacity-0 focus-within:opacity-100'"
         :data-test="`add-alert-section-${id}-steps`"
       >
         <OButton
