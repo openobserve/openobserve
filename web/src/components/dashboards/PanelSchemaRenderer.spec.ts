@@ -639,6 +639,53 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
     });
 
+    describe("multi-query SQL panel (#16901)", () => {
+      const mountBar = async (data: any, hideSecond = false) => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+          data: ref(data),
+          loading: ref(false),
+          errorDetail: ref({ message: "", code: "" }),
+          metadata: ref({}),
+          resultMetaData: ref({}),
+          annotations: ref([]),
+          lastTriggeredAt: ref(null),
+          isCachedDataDifferWithCurrentTimeRange: ref(false),
+          searchRequestTraceIds: ref([]),
+          loadingProgressPercentage: ref(0),
+          isPartialData: ref(false),
+        } as any);
+        const query = defaultProps.panelSchema.queries[0];
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "bar",
+            queries: [query, { ...query, config: { ...query.config, hide: hideSecond } }],
+          },
+        });
+        await flushPromises();
+        wrapper.vm.panelData = { chartType: "bar", options: { series: [{ data: [1] }] } };
+        await flushPromises();
+        return wrapper.vm.noData;
+      };
+      const rows = [{ x_axis_1: "a", y_axis_1: 1 }];
+
+      it("keeps the chart when only a later query has rows", async () => {
+        expect(await mountBar([[], rows])).toBe("");
+      });
+
+      it("keeps the chart when the first query has rows", async () => {
+        expect(await mountBar([rows, []])).toBe("");
+      });
+
+      it("shows No Data when every query is empty", async () => {
+        expect(await mountBar([[], []])).toBe("No Data");
+      });
+
+      it("shows No Data when the only non-empty query is hidden", async () => {
+        expect(await mountBar([[], rows], true)).toBe("No Data");
+      });
+    });
+
     describe("a named missing value replaces No Data", () => {
       const nullMapping = { type: "special", match: "null", text: "N/A", color: null };
       const mountEmpty = async (panelSchema: any, data: any) => {
