@@ -140,7 +140,8 @@ pub fn change_of(method: &str, path: &str, query: &str, body: &str) -> Option<Ch
         ("PATCH", [_, "ingestion-tokens", name]) => (ChangeKind::TokenChanged, token(name, true)),
         ("POST" | "PUT", [_, "pipelines"]) => {
             // A create without `overwrite` gets its id from the server, not from the body.
-            let kept = method == "PUT" || query_value(query, "overwrite") == Some("true");
+            let kept =
+                method == "PUT" || query_value(query, "overwrite").as_deref() == Some("true");
             (
                 ChangeKind::PipelineChanged,
                 Object::Pipeline {
@@ -152,7 +153,9 @@ pub fn change_of(method: &str, path: &str, query: &str, body: &str) -> Option<Ch
         ("DELETE", [_, "pipelines", id]) if *id != "bulk" => {
             (ChangeKind::PipelineChanged, pipeline_id(id))
         }
-        ("PUT", [_, "pipelines", id, "enable"]) if query_value(query, "value") == Some("false") => {
+        ("PUT", [_, "pipelines", id, "enable"])
+            if query_value(query, "value").as_deref() == Some("false") =>
+        {
             (ChangeKind::PipelineChanged, pipeline_id(id))
         }
         ("POST", ["v2", _, "alerts"]) => (
@@ -392,16 +395,15 @@ fn token(id: &str, named: bool) -> Object {
     }
 }
 
-fn query_value<'a>(query: &'a str, key: &str) -> Option<&'a str> {
-    query
-        .split('&')
-        .filter_map(|pair| pair.split_once('='))
-        .find_map(|(k, v)| (k == key).then_some(v))
+/// Decoded the way the handlers' query extractor decodes it, so `%6detrics` reads as `metrics`.
+fn query_value(query: &str, key: &str) -> Option<String> {
+    url::form_urlencoded::parse(query.as_bytes())
+        .find_map(|(k, v)| (k == key).then(|| v.into_owned()))
 }
 
 /// The stream routes default to logs when the call names no type.
 fn stream_type_of(query: &str) -> StreamType {
-    query_value(query, "type").map_or(StreamType::Logs, StreamType::from)
+    query_value(query, "type").map_or(StreamType::Logs, |t| StreamType::from(t.as_str()))
 }
 
 fn body_stream(body: &str) -> Option<EntityRef> {
@@ -485,6 +487,16 @@ mod tests {
                 ),
             ),
             (
+                "PUT",
+                "acme/streams/cpu/settings",
+                "type=%6detrics",
+                "",
+                change(
+                    ChangeKind::SettingsChanged,
+                    Object::Stream(stream_ref(StreamType::Metrics, "cpu")),
+                ),
+            ),
+            (
                 "DELETE",
                 "acme/streams/app",
                 "",
@@ -548,6 +560,16 @@ mod tests {
                 ),
             ),
             (
+                "POST",
+                "acme/pipelines",
+                "overwrite=%74rue",
+                r#"{"pipeline_id":"p1","name":"mask"}"#,
+                change(
+                    ChangeKind::PipelineChanged,
+                    pipeline(Some("p1"), Some("mask")),
+                ),
+            ),
+            (
                 "DELETE",
                 "acme/pipelines/p1",
                 "",
@@ -562,6 +584,13 @@ mod tests {
                 change(ChangeKind::PipelineChanged, pipeline(Some("p1"), None)),
             ),
             ("PUT", "acme/pipelines/p1/enable", "value=true", "", None),
+            (
+                "PUT",
+                "acme/pipelines/p1/enable",
+                "value=%66alse",
+                "",
+                change(ChangeKind::PipelineChanged, pipeline(Some("p1"), None)),
+            ),
             ("DELETE", "acme/pipelines/bulk", "", "", None),
             (
                 "POST",
