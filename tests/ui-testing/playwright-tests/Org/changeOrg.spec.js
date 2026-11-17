@@ -286,7 +286,6 @@ test.describe("Change Organisation on a dashboard opened by id", { tag: ['@chang
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         const pm = new PageManager(page);
-        await pm.ingestionPage.ingestion();
         const orgName = `orgsw${Date.now()}${Math.floor(Math.random() * 1000)}`;
         const newOrgId = await pm.createOrgPage.createOrg(orgName);
         expect(newOrgId, 'new org identifier').toBeTruthy();
@@ -309,9 +308,6 @@ test.describe("Change Organisation on a dashboard opened by id", { tag: ['@chang
         expect(oldIdInNewOrg, 'the old dashboard id must not be loaded in the new org').toEqual([]);
         await pm.dashboardList.expectNoDashboardNotFoundToast();
 
-        await page.goBack();
-        await expect(page).not.toHaveURL(new RegExp(`dashboard=${dashboardId}`));
-        expect(oldIdInNewOrg).toEqual([]);
-        await pm.dashboardList.expectNoDashboardNotFoundToast();
+        await pm.dashboardList.expectNoHistoryEntryForDashboard(dashboardId);
     });
 });

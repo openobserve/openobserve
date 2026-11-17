@@ -31,6 +31,12 @@ export default class DashboardListPage {
     await expect(this.dashboardNotFoundToast).toHaveCount(0);
   }
 
+  // The list pushes its folder as a second entry, so one Back never reaches an old id; the Navigation API lists them all.
+  async expectNoHistoryEntryForDashboard(dashboardId) {
+    const entries = await this.page.evaluate(() => window.navigation.entries().map((entry) => entry.url));
+    expect(entries.filter((url) => url.includes(`dashboard=${dashboardId}`)), 'history entries holding the old dashboard id').toEqual([]);
+  }
+
   // Duplicate dashboard
   async duplicateDashboard() {
     await this.page.locator('[data-test="dashboard-duplicate"]').click();
