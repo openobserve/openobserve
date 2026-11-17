@@ -1821,6 +1821,17 @@ describe("Commons Utility Functions", () => {
       expect(commonService.delete_Folder).toHaveBeenCalledWith("test-org", type, folderId);
     });
 
+    it("keeps deleting the last listable synthetics folder a success when the refresh is a 403", async () => {
+      const denied = { response: { status: 403, data: {} } };
+      (commonService.delete_Folder as any).mockResolvedValue({ success: true });
+      (commonService.list_Folders as any).mockRejectedValue(denied);
+
+      await deleteFolderByIdByType(mockStore, "team", "synthetics");
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setFoldersByType", { synthetics: [] });
+
+      await expect(deleteFolderByIdByType(mockStore, "team", "alerts")).rejects.toBe(denied);
+    });
+
     // The dashboards module keeps a second, legacy folder list
     // (organizationData.folders) consumed by SelectFolderDropdown and the
     // move-dashboard dialogs. The *ByType mutations must refresh it too, or a

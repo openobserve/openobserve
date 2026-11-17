@@ -88,8 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabs
             orientation="vertical"
             dense
-            v-model="activeFolderId"
+            :model-value="hideActive ? '' : activeFolderId"
             data-test="dashboards-folder-tabs"
+            @update:model-value="(v) => (activeFolderId = String(v))"
           >
             <OTab
               v-for="tab in filteredTabs"
@@ -212,6 +213,7 @@ import AddFolder from "./AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 import { useFolderIcons } from "@/composables/useFolderIcons";
+import { selectSyntheticsFolder } from "@/utils/synthetics/selectFolder";
 import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
@@ -247,8 +249,13 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // The owner is listing every folder, so none reads as the open one; the active id is kept for its return.
+    hideActive: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["update:folders", "update:activeFolderId"],
+  emits: ["update:folders", "update:activeFolderId", "folders-loaded"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
@@ -270,8 +277,10 @@ export default defineComponent({
           }
         : {},
     );
-    const activeFolderName = computed(
-      () => filteredTabs.value.find((f: any) => f.folderId === activeFolderId.value)?.name ?? "",
+    const activeFolderName = computed(() =>
+      props.hideActive
+        ? ""
+        : (filteredTabs.value.find((f: any) => f.folderId === activeFolderId.value)?.name ?? ""),
     );
     const showAddFolderDialog = ref(false);
     const isFolderEditMode = ref(false);
@@ -292,13 +301,24 @@ export default defineComponent({
 
     const router = useRouter();
 
+    const fallbackFolder = (urlFolder?: string) =>
+      props.type === "synthetics"
+        ? (selectSyntheticsFolder(
+            store.state.organizationData.foldersByType.synthetics ?? [],
+            urlFolder,
+          ) ?? "")
+        : urlFolder || "default";
+
     onMounted(async () => {
       // A folder-list 403 must not strand the folder selection below.
-      await getFoldersListByType(store, props.type).catch(() => null);
-      if (router.currentRoute.value.query.folder) {
-        activeFolderId.value = router.currentRoute.value.query.folder as string;
+      await getFoldersListByType(store, props.type)
+        .then(() => emit("folders-loaded"))
+        .catch(() => null);
+      const urlFolder = router.currentRoute.value.query.folder as string | undefined;
+      if (urlFolder) {
+        activeFolderId.value = fallbackFolder(urlFolder);
       } else if (!props.showFavorites) {
-        activeFolderId.value = "default";
+        activeFolderId.value = fallbackFolder();
       }
       // With showFavorites, the owning view decides the landing folder
       // (favorites-first) and pushes it to the route; self-assigning
@@ -309,7 +329,7 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.folder as string | undefined,
       (newVal) => {
-        activeFolderId.value = newVal || "default";
+        activeFolderId.value = fallbackFolder(newVal);
       },
     );
     const addFolder = () => {
@@ -339,7 +359,8 @@ export default defineComponent({
           await deleteFolderByIdByType(store, selectedFolderDelete.value, props.type);
 
           //check activeFolderId to be deleted
-          if (activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
+          if (activeFolderId.value === selectedFolderDelete.value)
+            activeFolderId.value = fallbackFolder();
 
           showPositiveNotification(
             t(folderKey(props.type, "toastMessages.sidebar.folderDeletedSuccessfully")),

@@ -22,7 +22,7 @@ use config::{
         cluster::{CompactionJobType, Role},
         stream::{PartitionTimeLevel, StreamType},
     },
-    utils::time::{hour_micros, now_micros, second_micros},
+    utils::time::{hour_micros, second_micros},
 };
 use infra::{
     cluster::get_node_from_consistent_hash,
@@ -470,8 +470,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub(crate) fn is_past_hour(offset: i64) -> bool {
-    let now = now_micros();
+pub(crate) fn is_past_hour(offset: i64, now: i64) -> bool {
     let hour = hour_micros(1);
     let offset_hour_end = offset - offset % hour + hour;
     now - offset_hour_end > settle_micros()

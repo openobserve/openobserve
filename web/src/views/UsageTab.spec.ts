@@ -18,6 +18,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import i18n from "@/locales";
 
 // ── Mock data ───────────────────────────────────────────────────────────────
@@ -578,6 +579,23 @@ describe("UsageTab", () => {
 
       const btn = wrapper.findComponent('[data-test="home-usage-tab-view-alerts-btn"]');
       expect(String(btn.props("ariaLabel"))).toContain("Locked: needs");
+    });
+
+    it("opens every alert in every folder from the Alerts view button, as its counts do", async () => {
+      wrapper = mountUsageTab();
+      await flushPromises();
+      const alertLinks = wrapper
+        .findAllComponents('[data-test="usage-tab-router-link"]')
+        .map((l) => l.props("to"))
+        .filter((to: any) => to?.name === "alertList");
+      expect(alertLinks).toEqual([
+        expect.objectContaining({
+          query: expect.objectContaining({
+            state: ALERT_LIST_ALL_STATES,
+            all_folders: ALERT_LIST_ALL_FOLDERS,
+          }),
+        }),
+      ]);
     });
 
     it("renders every signal as a link when none is locked", async () => {

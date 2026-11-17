@@ -2339,6 +2339,29 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.findComponent({ name: "ServiceGraphSidePanel" }).props("visible")).toBe(true);
     });
 
+    it.each([
+      { link: "checkout.service", opens: "checkout.service" },
+      { link: "Checkout", opens: "Checkout" },
+      // No node carries the linked spelling, so the first folded one stands in.
+      { link: "CHECKOUT", opens: "Checkout" },
+    ])("opens the node a $link link names, before any other spelling", async (c) => {
+      mockRoute.query = { panel: "operations", panelSvc: c.link, panelWhere: "" };
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: ["Checkout", "checkout.service"].map((id) => ({
+            id,
+            label: id,
+            requests: 1,
+            errors: 0,
+          })),
+          edges: [],
+        },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.selectedNode.id).toBe(c.opens);
+    });
+
     it("closes the panel route when the open node is clicked again, so a reload keeps it closed", async () => {
       mockRouterReplace.mockImplementation(({ query }: { query: Record<string, string> }) => {
         mockRoute.query = query;

@@ -266,8 +266,10 @@ export function noVerdictText(
   t: TranslateFn,
   now = Date.now() * 1000,
   scopeStarted?: boolean,
+  noData = false,
 ) {
-  const state = noVerdictState(tracking, now, scopeStarted);
+  const state = noVerdictState(tracking, now, scopeStarted, noData);
+  if (state === "noData") return t("serviceVersions.sentence.noData");
   if (state === "warming")
     return t("serviceVersions.catalog.warmingUp", {
       time: formatDeployTime(tracking!.warmup_ends_at!),
@@ -284,8 +286,11 @@ export function noVerdictRule(
   t: TranslateFn,
   now = Date.now() * 1000,
   scopeStarted?: boolean,
+  noData = false,
 ) {
-  return noVerdictState(tracking, now, scopeStarted).startsWith("warming")
+  const state = noVerdictState(tracking, now, scopeStarted, noData);
+  if (state === "noData") return t("serviceVersions.compare.baselineRule.no_data");
+  return state.startsWith("warming")
     ? t("serviceVersions.compare.baselineRule.warming_up")
     : t("serviceVersions.compare.baselineRule.pre_existing");
 }
@@ -310,9 +315,12 @@ function noVerdictState(
   tracking: Tracking | null | undefined,
   now: number,
   scopeStarted?: boolean,
+  noData = false,
 ) {
   const end = tracking?.epoch ? tracking.warmup_ends_at : null;
   const warming = end && end > now ? end : null;
+  // Missing rollup rows outside warm-up mean the metrics have not reached the window yet.
+  if (noData) return warming ? "warming" : "noData";
   if (trackingNotStarted(tracking, scopeStarted)) return warming ? "warming" : "warmingUntimed";
   if (warming) return "warming";
   return tracking?.epoch ? "preExistingSince" : "preExisting";

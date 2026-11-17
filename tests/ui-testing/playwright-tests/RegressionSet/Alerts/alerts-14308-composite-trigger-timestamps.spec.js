@@ -87,7 +87,7 @@ test.describe('Composite alert trigger timestamps & status timeline', {
       await route.fulfill({ response, json: body });
     });
 
-    await page.goto(`/web/alerts?org_identifier=${urls().org}&folder=default`);
+    await page.goto(`/web/alerts?org_identifier=${urls().org}&folder=default&state=all`);
     await pm.compositeAlertsPage.openListTab('composite');
     await expect(pm.compositeAlertsPage.listNameCell(composite.name)).toBeVisible();
 
@@ -100,7 +100,7 @@ test.describe('Composite alert trigger timestamps & status timeline', {
     const second = await createChild(page, uniq('composite_never_b'));
     const composite = await createCompositeFixture(page, [first, second]);
 
-    await page.goto(`/web/alerts?org_identifier=${urls().org}&folder=default`);
+    await page.goto(`/web/alerts?org_identifier=${urls().org}&folder=default&state=all`);
     await pm.compositeAlertsPage.openListTab('composite');
     await expect(pm.compositeAlertsPage.listNameCell(composite.name)).toBeVisible();
 

@@ -12,6 +12,17 @@ service Metrics {
     rpc Query (MetricsQueryRequest) returns (MetricsQueryResponse) {}
     // Server-streaming RPC: Data will stream multiple MetricsQueryResponse messages
     rpc Data (MetricsQueryRequest) returns (stream MetricsQueryResponse) {}
+    // Oldest timestamp of each metrics stream's data not yet uploaded by this node, from metadata only
+    rpc WalMinTs (WalMinTsRequest) returns (WalMinTsResponse) {}
+}
+
+message WalMinTsRequest {
+    string          org_id = 1;
+    repeated string streams = 2;
+}
+
+message WalMinTsResponse {
+    map<string, int64> min_ts = 1; // key: stream name, 0 means nothing unflushed
 }
 
 message MetricsQueryRequest {

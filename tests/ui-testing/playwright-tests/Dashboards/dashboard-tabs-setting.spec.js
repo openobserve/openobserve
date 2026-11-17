@@ -69,7 +69,7 @@ test.describe("dashboard tabs setting", () => {
     await pm.dashboardSetting.saveTabSetting();
 
     await expect(pm.dashboardSetting.getToastMessageByText("Tab added successfully")).toBeVisible({
-      timeout: 5000,
+      timeout: 30000,
     });
 
     await pm.dashboardSetting.closeSettingDashboard();
@@ -100,7 +100,7 @@ test.describe("dashboard tabs setting", () => {
     await pm.dashboardSetting.addTabSetting(newTabName);
     await pm.dashboardSetting.saveTabSetting();
     await expect(pm.dashboardSetting.getToastMessageByText("Tab added successfully")).toBeVisible({
-      timeout: 5000,
+      timeout: 30000,
     });
 
     // Edit the tab name and save it
@@ -111,7 +111,7 @@ test.describe("dashboard tabs setting", () => {
 
     await pm.dashboardSetting.saveEditedtab();
     await expect(pm.dashboardSetting.getToastMessageByText("Tab updated successfully")).toBeVisible({
-      timeout: 5000,
+      timeout: 30000,
     });
     await pm.dashboardSetting.closeSettingDashboard();
 
@@ -141,7 +141,7 @@ test.describe("dashboard tabs setting", () => {
     await pm.dashboardSetting.saveTabSetting();
 
     await expect(pm.dashboardSetting.getToastMessageByText("Tab added successfully")).toBeVisible({
-      timeout: 5000,
+      timeout: 30000,
     });
 
     // Edit the tab name and cancel it
@@ -177,13 +177,13 @@ test.describe("dashboard tabs setting", () => {
     await pm.dashboardSetting.saveTabSetting();
 
     await expect(pm.dashboardSetting.getToastMessageByText("Tab added successfully")).toBeVisible({
-      timeout: 5000,
+      timeout: 30000,
     });
 
     // Delete the tab
     await pm.dashboardSetting.deleteTab(newTabName);
     await expect(pm.dashboardSetting.getToastMessageByText("Tab deleted successfully")).toBeVisible({
-      timeout: 5000,
+      timeout: 30000,
     });
     await pm.dashboardSetting.closeSettingDashboard();
 

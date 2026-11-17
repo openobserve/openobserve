@@ -22,12 +22,14 @@ import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 const DEFAULT_FOLDER: Folder = { name: "default", folderId: "default", description: "default" };
 
 /** "default" first, then the rest alphabetically — the order the sidebar expects. */
-const normalizeFolders = (list: Folder[]): Folder[] => {
-  const defaultFolder = list.find((f) => f.folderId === "default") ?? DEFAULT_FOLDER;
+const normalizeFolders = (list: Folder[], type: string): Folder[] => {
+  // The synthetics server lists "default" only to callers who may list it, so it is not added.
+  const injected = type === "synthetics" ? undefined : DEFAULT_FOLDER;
+  const defaultFolder = list.find((f) => f.folderId === "default") ?? injected;
   const rest = list
     .filter((f) => f.folderId !== "default")
     .sort((a, b) => a.name.localeCompare(b.name));
-  return [defaultFolder, ...rest];
+  return defaultFolder ? [defaultFolder, ...rest] : rest;
 };
 
 /** Needed before the sidebar can paint on Dashboards, Alerts, Reports and Synthetics. */
@@ -35,7 +37,7 @@ export const foldersQuery = (org: string, type: string) =>
   queryOptions({
     queryKey: folderKeys.list(org, type),
     queryFn: async (): Promise<Folder[]> =>
-      normalizeFolders((await common.list_Folders(org, type)).data.list ?? []),
+      normalizeFolders((await common.list_Folders(org, type)).data.list ?? [], type),
     staleTime: NORMAL_STALE_TIME,
   });
 
@@ -61,7 +63,7 @@ export const optionalFoldersQuery = (org: string, type: string) =>
     queryFn: async (): Promise<OptionalFolders> => {
       try {
         const res = await common.list_Folders(org, type, { skipAccessToast: true });
-        return { folders: normalizeFolders(res.data.list ?? []), forbidden: false };
+        return { folders: normalizeFolders(res.data.list ?? [], type), forbidden: false };
       } catch (err: any) {
         if (err?.response?.status === 403) return { folders: [], forbidden: true };
         throw err;

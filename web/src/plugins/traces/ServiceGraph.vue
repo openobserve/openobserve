@@ -621,9 +621,7 @@ export default defineComponent({
           showSidePanel.value = false;
           return;
         }
-        const node = nodes.find((node: { id: string; name?: string; label?: string }) =>
-          panelRoute.owns(node),
-        );
+        const node = panelRoute.find(nodes);
         if (node && (!showSidePanel.value || selectedNode.value?.id !== node.id)) {
           selectedNode.value = node;
           showSidePanel.value = true;

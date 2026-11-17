@@ -609,7 +609,9 @@ export class SanityPage {
         // Open the per-folder dropdown via its more-icon (scoped to this folder's tab).
         const folderMoreIcon = this.getDashboardFolderMoreIconByName(folderName);
         await folderMoreIcon.click();
-        await this.deleteFolderIcon.click({ force: true });
+        // A forced click can land while the reka menu is still opening and never fires @select.
+        await expect(this.deleteFolderIcon).toBeVisible({ timeout: 10000 });
+        await this.deleteFolderIcon.click();
         // ConfirmDialog renders an ODialog with data-test="confirm-dialog"; its primary
         // footer button surfaces as "o-dialog-primary-btn" inside the open dialog.
         // Use the generic locator to avoid timing issues with the scoped ancestor query.

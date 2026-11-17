@@ -325,6 +325,21 @@ pub(crate) async fn wal_scan_files(
         .await)
 }
 
+/// Oldest min_ts parsed from the `.parquet` file names under `dir`; the files are never opened.
+pub(crate) async fn parquet_files_min_ts(dir: PathBuf) -> Option<i64> {
+    // a .par file stays in IMMUTABLES until its rename, so only a .parquet can be the sole copy
+    wal_scan_files(dir, "parquet")
+        .await
+        .ok()?
+        .iter()
+        .filter_map(|f| {
+            let name = f.file_name()?.to_str()?;
+            let (min_ts, _) = config::utils::parquet::parse_time_range_from_filename(name);
+            (min_ts > 0).then_some(min_ts)
+        })
+        .min()
+}
+
 /// Collect parquet file metrics from the files directory
 /// Counts parquet files that are pending upload to object store
 pub async fn collect_wal_parquet_metrics() -> Result<()> {
@@ -373,6 +388,38 @@ pub async fn collect_wal_parquet_metrics() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_parquet_files_min_ts_reads_file_names() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(parquet_files_min_ts(dir.path().join("missing")).await, None);
+
+        let hour_dir = dir.path().join("0/2026/10/15/00/2adf99cbc1277d5c");
+        std::fs::create_dir_all(&hour_dir).unwrap();
+        let other_hour = dir.path().join("1/2026/10/15/03/2adf99cbc1277d5c");
+        std::fs::create_dir_all(&other_hour).unwrap();
+        assert_eq!(parquet_files_min_ts(dir.path().to_path_buf()).await, None);
+
+        for (dir, name) in [
+            (
+                &hour_dir,
+                "1760500000000000.1760500100000000.7abc_1.parquet",
+            ),
+            (
+                &other_hour,
+                "1760510000000000.1760510100000000.7abd_2.parquet",
+            ),
+            (&hour_dir, "1760400000000000.1760400100000000.7abe_3.par"),
+            (&hour_dir, "not_a_time_range.parquet"),
+            (&hour_dir, "abc.def.ghi.parquet"),
+        ] {
+            std::fs::write(dir.join(name), b"not parquet").unwrap();
+        }
+        assert_eq!(
+            parquet_files_min_ts(dir.path().to_path_buf()).await,
+            Some(1760500000000000)
+        );
+    }
 
     #[tokio::test]
     async fn startup_replay_does_not_delete_a_live_writer_wal() {

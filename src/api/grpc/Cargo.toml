@@ -43,6 +43,7 @@ futures-util.workspace = true
 http.workspace = true
 http-auth-basic.workspace = true
 infra.workspace = true
+ingester.workspace = true
 ingestion-common.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
