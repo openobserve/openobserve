@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import {
   anomalyBandPayload,
+  anomalyDetectionFunctionPayload,
   anomalyIntervalPayload,
   anomalySensitivityPayload,
   anomalyWindowSecondsToParts,
@@ -210,5 +211,64 @@ describe("anomalySensitivityPayload", () => {
       threshold: 97,
       alert_budget_per_day: null,
     });
+  });
+});
+
+// custom_sql mode renders no function control, so the form's function there is a leftover
+// from the Filters tab. Sending it without its field is a server 400:
+// "detection_function max requires detection_function_field".
+describe("anomalyDetectionFunctionPayload", () => {
+  it("filters mode sends the picked function with its field", () => {
+    expect(
+      anomalyDetectionFunctionPayload(
+        { query_mode: "filters", detection_function: "max", detection_function_field: "latency" },
+        null,
+      ),
+    ).toEqual({ detection_function: "max", detection_function_field: "latency" });
+  });
+
+  it("filters mode sends count with no field", () => {
+    expect(
+      anomalyDetectionFunctionPayload(
+        { query_mode: "filters", detection_function: "count", detection_function_field: "stale" },
+        null,
+      ),
+    ).toEqual({ detection_function: "count", detection_function_field: undefined });
+  });
+
+  it("a new custom_sql alert drops the function left over from the Filters tab", () => {
+    expect(
+      anomalyDetectionFunctionPayload(
+        { query_mode: "custom_sql", detection_function: "max", detection_function_field: "" },
+        null,
+      ),
+    ).toEqual({ detection_function: "count", detection_function_field: undefined });
+  });
+
+  it("a new custom_sql alert does not send the Filters tab field as a value column", () => {
+    expect(
+      anomalyDetectionFunctionPayload(
+        { query_mode: "custom_sql", detection_function: "avg", detection_function_field: "latency" },
+        null,
+      ),
+    ).toEqual({ detection_function: "count", detection_function_field: undefined });
+  });
+
+  it("a stored custom_sql row round-trips its combined function verbatim", () => {
+    expect(
+      anomalyDetectionFunctionPayload(
+        { query_mode: "custom_sql", detection_function: "avg", detection_function_field: "p99_ms" },
+        { detection_function: "avg(p99_ms)", detection_function_field: null },
+      ),
+    ).toEqual({ detection_function: "avg(p99_ms)", detection_function_field: undefined });
+  });
+
+  it("a stored custom_sql row returned as a split pair keeps both halves", () => {
+    expect(
+      anomalyDetectionFunctionPayload(
+        { query_mode: "custom_sql", detection_function: "count", detection_function_field: "" },
+        { detection_function: "avg", detection_function_field: "p99_ms" },
+      ),
+    ).toEqual({ detection_function: "avg", detection_function_field: "p99_ms" });
   });
 });

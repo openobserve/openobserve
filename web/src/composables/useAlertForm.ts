@@ -257,6 +257,43 @@ export const anomalyWindowSecondsToParts = (
   return { value: secs, unit: "s" };
 };
 
+/** The function a stored custom_sql row carries, as the edit fetch returned it. */
+export interface AnomalyStoredSqlFunction {
+  detection_function: string;
+  detection_function_field?: string | null;
+}
+
+/**
+ * The two detection-function payload fields.
+ *
+ * Filters mode sends the form's own pick. custom_sql mode renders no function control, so the
+ * form value there is a leftover from the Filters tab, and its field is never sent: the server
+ * rejects that pair ("detection_function max requires detection_function_field"). A stored
+ * custom_sql row round-trips its own function VERBATIM, because there the field names the value
+ * column of the query. Any other custom_sql save sends `count`, the create-form default.
+ */
+export const anomalyDetectionFunctionPayload = (
+  c: { query_mode?: string; detection_function?: string; detection_function_field?: string },
+  storedSql: AnomalyStoredSqlFunction | null,
+): { detection_function: string; detection_function_field: string | undefined } => {
+  if (c.query_mode !== "custom_sql") {
+    return {
+      detection_function: c.detection_function || "count(*)",
+      detection_function_field:
+        c.query_mode === "filters" && c.detection_function !== "count"
+          ? c.detection_function_field || undefined
+          : undefined,
+    };
+  }
+  if (storedSql) {
+    return {
+      detection_function: storedSql.detection_function,
+      detection_function_field: storedSql.detection_function_field || undefined,
+    };
+  }
+  return { detection_function: "count", detection_function_field: undefined };
+};
+
 /** The three governing payload fields; an untouched stored field round-trips its raw wire value VERBATIM (N11). */
 export const anomalyIntervalPayload = (
   c: {
@@ -659,6 +696,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const anomalyConfig = ref(defaultAnomalyConfig());
   // Captured ONCE from the edit-fetch response — never from anomalyConfig, which the form live-mutates (D4).
   const anomalyStoredIntervals = ref<AnomalyStoredIntervals | null>(null);
+  // Same rule as the intervals: the function of a stored custom_sql row, captured from the fetch.
+  const anomalyStoredSqlFunction = ref<AnomalyStoredSqlFunction | null>(null);
   const anomalyStep2Ref = ref<any>(null);
   const showAnomalySummary = ref(true);
   const anomalyEditMode = ref(false);
@@ -2246,11 +2285,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           query_mode: c.query_mode,
           filters: c.query_mode === "filters" ? (c.filters ?? []) : null,
           custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : null,
-          detection_function: c.detection_function || "count(*)",
-          detection_function_field:
-            c.query_mode === "filters" && c.detection_function !== "count"
-              ? c.detection_function_field || undefined
-              : undefined,
+          ...anomalyDetectionFunctionPayload(c, anomalyStoredSqlFunction.value),
           ...anomalyIntervalPayload(c, anomalyStoredIntervals.value),
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
@@ -3228,6 +3263,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           : rawDestIds
             ? [rawDestIds]
             : [];
+        anomalyStoredSqlFunction.value =
+          data.query_mode === "custom_sql" &&
+          typeof data.detection_function === "string" &&
+          data.detection_function
+            ? {
+                detection_function: data.detection_function,
+                detection_function_field: data.detection_function_field,
+              }
+            : null;
         const rawFn: string = data.detection_function || "count";
         const fnMatch = rawFn.match(/^(\w+)\(([^)]*)\)$/);
         const parsedFn = fnMatch ? fnMatch[1] : rawFn;
