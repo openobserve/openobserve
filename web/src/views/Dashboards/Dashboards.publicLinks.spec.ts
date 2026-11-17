@@ -28,6 +28,7 @@ vi.mock("@/utils/commons", () => ({
   loadDashboardsByFolderId: vi.fn().mockResolvedValue(undefined),
   getDashboard: vi.fn().mockResolvedValue({}),
   getFoldersList: vi.fn().mockResolvedValue(undefined),
+  getFoldersListByType: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/services/settings", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -44,6 +45,9 @@ vi.mock("@/composables/useNotifications", () => ({
 }));
 
 import Dashboards from "./Dashboards.vue";
+import { loadDashboardsByFolderId } from "@/utils/commons";
+
+const PUBLIC_ID = "__public_links__";
 
 const buildStore = (enabled: boolean) =>
   createStore({
@@ -63,18 +67,15 @@ const buildStore = (enabled: boolean) =>
 const buildRouter = () =>
   createRouter({
     history: createWebHistory(),
-    routes: [
-      { path: "/dashboards", name: "dashboards", component: { template: "<div />" } },
-      {
-        path: "/dashboards/public-links",
-        name: "publicDashboardLinks",
-        component: { template: "<div />" },
-      },
-    ],
+    routes: [{ path: "/dashboards", name: "dashboards", component: { template: "<div />" } }],
   });
 
-const mountAt = async (router: Router, enabled: boolean) => {
-  await router.push({ path: "/dashboards", query: { folder: "default" } });
+const mountAt = async (
+  router: Router,
+  enabled: boolean,
+  { folder = "default", realRail = false }: { folder?: string; realRail?: boolean } = {},
+) => {
+  await router.push({ path: "/dashboards", query: { folder } });
   const store = buildStore(enabled);
   const w = shallowMount(Dashboards, {
     global: {
@@ -86,12 +87,19 @@ const mountAt = async (router: Router, enabled: boolean) => {
         },
         OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
         OTable: { name: "OTable", template: "<div data-test='dashboard-table' />" },
-        FolderList: { name: "FolderList", template: "<div />" },
+        PublicLinksTable: { template: "<div data-test='dashboards-public-links' />" },
+        ...(realRail ? { FolderList: false } : {}),
       },
     },
   });
   await flushPromises();
   return w;
+};
+
+const rail = (w: VueWrapper) => w.findComponent({ name: "FolderList" });
+const pick = async (w: VueWrapper, folderId: string) => {
+  rail(w).vm.$emit("update:activeFolderId", folderId);
+  await flushPromises();
 };
 
 describe("Dashboards.vue public links entry", () => {
@@ -108,26 +116,65 @@ describe("Dashboards.vue public links entry", () => {
     wrapper = undefined;
   });
 
-  it("opens the org-wide public links page from the header", async () => {
+  it("offers the entry in the folder rail, not the header, while the feature is on", async () => {
     wrapper = await mountAt(router, true);
-    await wrapper.find('[data-test="dashboard-public-links"]').trigger("click");
+    expect(rail(wrapper).props("showPublicDashboards")).toBe(true);
+    expect(wrapper.find('[data-test="dashboard-public-links"]').exists()).toBe(false);
+  });
+
+  it("leaves the rail without the entry when the feature is off", async () => {
+    wrapper = await mountAt(router, false);
+    expect(rail(wrapper).props("showPublicDashboards")).toBe(false);
+    expect(wrapper.find('[data-test="dashboard-table"]').exists()).toBe(true);
+  });
+
+  it("swaps the dashboards table for the public links table when the entry is picked", async () => {
+    wrapper = await mountAt(router, true);
+    vi.mocked(loadDashboardsByFolderId).mockClear();
+    await pick(wrapper, PUBLIC_ID);
+
+    expect(wrapper.find('[data-test="dashboards-public-links"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="dashboard-table"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="dashboards-first-data"]').exists()).toBe(false);
+    expect(router.currentRoute.value.query.folder).toBe(PUBLIC_ID);
+    expect(loadDashboardsByFolderId).not.toHaveBeenCalled();
+
+    await pick(wrapper, "default");
+    expect(wrapper.find('[data-test="dashboards-public-links"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="dashboard-table"]').exists()).toBe(true);
+    expect(router.currentRoute.value.query.folder).toBe("default");
+  });
+
+  it("opens the public links table from ?folder on load, without a folder fetch", async () => {
+    wrapper = await mountAt(router, true, { folder: PUBLIC_ID });
+
+    expect(wrapper.find('[data-test="dashboards-public-links"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="dashboard-table"]').exists()).toBe(false);
+    expect(loadDashboardsByFolderId).not.toHaveBeenCalledWith(
+      expect.anything(),
+      PUBLIC_ID,
+      expect.anything(),
+    );
+  });
+
+  it("falls back to the Default folder when ?folder names the entry but the feature is off", async () => {
+    wrapper = await mountAt(router, false, { folder: PUBLIC_ID });
+
+    expect(wrapper.find('[data-test="dashboards-public-links"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="dashboard-table"]').exists()).toBe(true);
+    expect(router.currentRoute.value.query.folder).toBe("default");
+  });
+
+  it("follows the real rail: its entry renders and selecting it shows the public links", async () => {
+    wrapper = await mountAt(router, true, { realRail: true });
+    const folderList = rail(wrapper);
+    expect((folderList.vm as any).filteredTabs.map((t: any) => t.folderId)).toContain(PUBLIC_ID);
+
+    (folderList.vm as any).activeFolderId = PUBLIC_ID;
     await flushPromises();
 
-    expect(router.currentRoute.value.name).toBe("publicDashboardLinks");
-    expect(router.currentRoute.value.query.org_identifier).toBe("test-org");
-  });
-
-  it("tags the public links entry as beta", async () => {
-    wrapper = await mountAt(router, true);
-    const entry = wrapper.find('[data-test="dashboard-public-links"]');
-    expect(entry.findComponent({ name: "BetaBadge" }).exists()).toBe(true);
-  });
-
-  it("hides the header button when the feature is off", async () => {
-    wrapper = await mountAt(router, false);
-
-    expect(wrapper.find('[data-test="dashboard-public-links"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="dashboard-table"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="dashboards-public-links"]').exists()).toBe(true);
+    expect(router.currentRoute.value.query.folder).toBe(PUBLIC_ID);
   });
 
   it("warns that deleting a dashboard deletes its public links while the feature is on", async () => {

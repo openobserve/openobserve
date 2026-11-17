@@ -32,6 +32,7 @@ import {
 } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES, redirectHeatmaps } from "@/utils/rum/productAnalyticsRoutes";
 import { ALERT_LIST_ALL_FOLDERS } from "@/utils/alerts/alertListLink";
+import { PUBLIC_LINKS_FOLDER_ID } from "@/components/dashboards/publicLinksFolder";
 import { endSignedInSession } from "@/utils/drafts/signOutFlow";
 import { silenceUnloadPrompts } from "@/utils/sessionServices";
 import {
@@ -202,7 +203,6 @@ const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
-const PublicDashboardLinks = () => import("@/views/Dashboards/PublicLinks.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
@@ -790,20 +790,18 @@ const useRoutes = () => {
       },
     },
     {
+      // The public links list lives in the dashboards folder rail; old links land on that entry.
       path: "/dashboards/public-links",
       name: "publicDashboardLinks",
-      component: PublicDashboardLinks,
-      meta: {
-        titleKey: "dashboard.publicLinks.pageTitle",
-        licenseFeature: "dashboards",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        if (!publicDashboardsEnabled() && !isLicenseLocked("dashboards")) {
-          next({ name: "dashboards", query: { org_identifier: to.query.org_identifier } });
-          return;
-        }
-        routeGuard(to, from, next);
-      },
+      redirect: (to: any) => ({
+        name: "dashboards",
+        query: {
+          org_identifier: to.query.org_identifier,
+          ...(publicDashboardsEnabled() || isLicenseLocked("dashboards")
+            ? { folder: PUBLIC_LINKS_FOLDER_ID }
+            : {}),
+        },
+      }),
     },
     {
       path: "/dashboards/add_panel",

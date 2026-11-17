@@ -48,17 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="truncate">{{ homeDashboard.label }}</span>
       </OButton>
       <OTooltip v-if="homeDashboard" side="bottom" :content="t('dashboard.openHomeDashboard')" />
-      <OButton
-        v-if="publicLinksEnabled"
-        variant="outline"
-        size="sm"
-        icon-left="language"
-        data-test="dashboard-public-links"
-        @click="openPublicLinks"
-      >
-        {{ t("dashboard.publicLinks.pageTitle") }}
-        <BetaBadge size="xs" class="ms-1.5 max-md:hidden" />
-      </OButton>
       <!-- import dashboard button with dropdown -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
@@ -125,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <FolderList
             type="dashboards"
             show-favorites
+            :show-public-dashboards="publicLinksEnabled"
             @update:activeFolderId="updateActiveFolderId"
           />
         </div>
@@ -132,7 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Right: dashboards table -->
       <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
         <div class="bg-card-glass-bg flex h-full flex-col">
+          <PublicLinksTable v-if="showPublicLinks" class="min-h-0 w-full flex-1" />
           <div
+            v-if="!showPublicLinks"
             v-show="showFirstData"
             class="shrink-0 px-5 pt-5 empty:hidden"
             data-test="dashboards-first-data"
@@ -140,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <FirstDataPanel v-if="showFirstData" signal="any" variant="compact" />
           </div>
           <OTable
+            v-if="!showPublicLinks"
             class="min-h-0 w-full flex-1"
             ref="oTableRef"
             :data="dashboards"
@@ -499,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="addDashboardRef"
         @close="showAddDashboardDialog = false"
         @updated="updateDashboardList"
-        :activeFolderId="activeFolderId ?? undefined"
+        :activeFolderId="(showPublicLinks ? 'default' : activeFolderId) ?? undefined"
       />
     </ODialog>
 
@@ -590,7 +583,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -659,6 +651,7 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import { PUBLIC_LINKS_FOLDER_ID } from "@/components/dashboards/publicLinksFolder";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PlaylistDialog from "@/components/dashboards/kiosk/PlaylistDialog.vue";
 import {
@@ -678,6 +671,10 @@ const AddDashboard = defineAsyncComponent(() => {
 
 const AddDashboardFromGitHub = defineAsyncComponent(() => {
   return import("@/components/dashboards/AddDashboardFromGitHub.vue");
+});
+
+const PublicLinksTable = defineAsyncComponent(() => {
+  return import("@/components/dashboards/PublicLinksTable.vue");
 });
 
 interface DashboardRow {
@@ -713,8 +710,8 @@ const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 export default defineComponent({
   name: "Dashboards",
   components: {
-    BetaBadge,
     FirstDataPanel,
+    PublicLinksTable,
     OTruncatedText,
     OUserCell,
     OTimeCell,
@@ -836,12 +833,10 @@ export default defineComponent({
     const publicLinksEnabled = computed(
       () => store.state.zoConfig?.public_dashboards_enabled === true,
     );
-    const openPublicLinks = () => {
-      router.push({
-        name: "publicDashboardLinks",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
-      });
-    };
+    // Public dashboards is a rail location like Favorites, with no dashboards list of its own.
+    const showPublicLinks = computed(
+      () => publicLinksEnabled.value && activeFolderId.value === PUBLIC_LINKS_FOLDER_ID,
+    );
     const toggleFavorite = (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       const userId = store.state.userInfo?.email;
@@ -925,7 +920,7 @@ export default defineComponent({
     // Listen for AI assistant dashboard mutations to auto-refresh the list
     const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
-      const folderId = event.folderId || activeFolderId.value;
+      const folderId = event.folderId || (showPublicLinks.value ? null : activeFolderId.value);
       if (folderId) {
         // The AI agent just changed this folder, so refetch rather than serving
         // the cached list.
@@ -1071,6 +1066,24 @@ export default defineComponent({
         if (switching) currentPage.value = 1;
         const { page: _page, ...carriedQuery } = route.query;
         const baseQuery = switching ? carriedQuery : route.query;
+        if (activeFolderId.value === PUBLIC_LINKS_FOLDER_ID) {
+          if (!publicLinksEnabled.value) {
+            activeFolderId.value = "default";
+            return;
+          }
+          loading.value = false;
+          forbidden.value = false;
+          if (switching) searchAcrossFolders.value = false;
+          router.push({
+            path: "/dashboards",
+            query: {
+              ...carriedQuery,
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+            },
+          });
+          return;
+        }
         // The Favorites pseudo-folder has no backend list. Rows render
         // immediately from the stored favorites; fetch the involved folders'
         // lists in the background purely to enrich them (owner/created/fresh
@@ -1255,7 +1268,7 @@ export default defineComponent({
         path: "/dashboards/import",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: activeFolderId.value || "default",
+          folder: (showPublicLinks.value ? null : activeFolderId.value) || "default",
         },
       });
     };
@@ -1379,6 +1392,7 @@ export default defineComponent({
     const refreshDashboards = () => getDashboards(true);
 
     const getDashboards = async (force = false) => {
+      if (showPublicLinks.value) return;
       const dismiss = toast({
         variant: "loading",
         message: t("dashboard.dashboards.loadingDashboards"),
@@ -2082,7 +2096,7 @@ export default defineComponent({
       toggleFavorite,
       showFavoritesOnly,
       publicLinksEnabled,
-      openPublicLinks,
+      showPublicLinks,
     };
   },
   methods: {
