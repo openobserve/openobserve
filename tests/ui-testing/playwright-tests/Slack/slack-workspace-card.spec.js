@@ -17,6 +17,7 @@ test.describe('Slack workspace card', { tag: ['@slack', '@enterprise'] }, () => 
   let slackOn = false;
   let install;
   const orgs = {};
+  const orgNames = {};
   const dest = { a: `slack_pw_card_a_${api.uniq()}`, b: `slack_pw_card_b_${api.uniq()}`, c: `slack_pw_card_c_${api.uniq()}` };
 
   test.beforeAll(async ({ browser, playwright }) => {
@@ -24,7 +25,9 @@ test.describe('Slack workspace card', { tag: ['@slack', '@enterprise'] }, () => 
     const config = await api.orgConfig(apiContext, process.env.ORGNAME || 'default');
     slackOn = config.slack_enabled === true;
     if (!slackOn) return;
-    orgs.main = (await api.createOrg(apiContext, 'slack_pw_card')).id;
+    const main = await api.createOrg(apiContext, 'slack_pw_card');
+    orgs.main = main.id;
+    orgNames.main = main.name;
     orgs.other = (await api.createOrg(apiContext, 'slack_pw_card_other')).id;
     orgs.leaving = (await api.createOrg(apiContext, 'slack_pw_card_leaving')).id;
     install = await api.storedInstall(apiContext, orgs.main, TEAM);
@@ -52,14 +55,20 @@ test.describe('Slack workspace card', { tag: ['@slack', '@enterprise'] }, () => 
     await slack.settings.goto(orgs.main);
     await slack.card.waitLoaded();
     await expect(slack.card.name).toHaveText(TEAM.teamName);
-    await expect(slack.card.meta).toContainText('root@example.com');
+    const rootEmail = process.env.ZO_ROOT_USER_EMAIL || 'root@example.com';
+    const rootName = await api.displayName(apiContext, orgs.main, rootEmail);
+    await expect(slack.card.meta).toContainText(`Connected by ${rootName} on `);
+    if (rootName !== rootEmail) {
+      await slack.card.meta.hover();
+      await expect(slack.card.tooltip.filter({ hasText: rootEmail })).toBeVisible();
+    }
     await expect(slack.card.status).toBeVisible();
     await expect(slack.card.refreshToken).toBeVisible();
     await expect(slack.card.sockets).toBeVisible();
 
     const thisOrgRow = slack.card.connectedOrgs.locator('tbody:not([data-test="o2-table-skeleton-body"]) tr');
     await expect(thisOrgRow).toHaveCount(1);
-    await expect(thisOrgRow).toContainText(`${orgs.main} (this org)`);
+    await expect(thisOrgRow).toContainText(`${orgNames.main} (this org)`);
     await expect(thisOrgRow).toContainText('2');
     await expect(slack.card.connectedOrgs).toContainText('2 other orgs');
     await expect(slack.card.connectedOrgs).not.toContainText(orgs.other);

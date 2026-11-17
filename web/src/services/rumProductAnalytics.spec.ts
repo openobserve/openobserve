@@ -17,6 +17,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const client = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() };
 vi.mock("@/services/http", () => ({ default: vi.fn(() => client) }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
+import analytics from "@/services/product_analytics";
 
 import api from "@/services/rumProductAnalytics";
 import contract from "@/utils/rum/__fixtures__/rumPaApi.json";
@@ -86,5 +89,49 @@ describe("pa gap fixes: app settings service (P6)", () => {
     await api.putAppSettings("org1", "web/app", body);
     expect(client.get.mock.calls).toEqual([[`${BASE}/settings`, app]]);
     expect(client.put.mock.calls).toEqual([[`${BASE}/settings`, body, app]]);
+  });
+});
+
+describe("rumProductAnalytics product analytics events", () => {
+  beforeEach(() => {
+    for (const f of Object.values(client)) f.mockReset().mockResolvedValue({ data: {} });
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks named event and saved funnel mutations once they succeed", async () => {
+    await api.createEvent("org1", "web/app", { name: "n", rules: [{}, {}] as never });
+    await api.updateEvent("org1", "web/app", ID, { name: "n", rules: [{}] as never, version: 1 });
+    await api.deleteEvent("org1", "web/app", ID, true);
+    await api.createFunnel("org1", "web/app", contract.createFunnel as never);
+    await api.updateFunnel("org1", "web/app", FID, contract.updateFunnel as never);
+    await api.deleteFunnel("org1", "web/app", FID);
+    expect(vi.mocked(analytics.track).mock.calls).toEqual([
+      ["rum_named_event_created", { rules: 2 }],
+      ["rum_named_event_updated", { rules: 1 }],
+      ["rum_named_event_deleted", { force: true }],
+      ["rum_funnel_saved", { steps: contract.createFunnel.def.s.length }],
+      ["rum_funnel_updated", { steps: contract.updateFunnel.def.s.length }],
+      ["rum_funnel_deleted"],
+    ]);
+  });
+
+  it("tracks an app settings save with rule counts only", async () => {
+    await api.putAppSettings("org1", "web/app", {
+      bots: false,
+      sessions: [{}] as never,
+      pages: [],
+      version: 0,
+    });
+    expect(analytics.track).toHaveBeenCalledWith("rum_app_settings_updated", {
+      bots: false,
+      session_rules: 1,
+      page_rules: 0,
+    });
+  });
+
+  it("does not track a failed mutation", async () => {
+    client.delete.mockRejectedValueOnce(new Error("boom"));
+    await expect(api.deleteFunnel("org1", "web/app", FID)).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

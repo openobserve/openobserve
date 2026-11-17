@@ -514,8 +514,8 @@ describe("CustomChartRenderer", () => {
       const echarts = await import("echarts");
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      expect(MockResizeObserver.instances).toHaveLength(1);
-      const observer = MockResizeObserver.instances[0];
+      expect(MockResizeObserver.instances).toHaveLength(2);
+      const observer = MockResizeObserver.instances[1];
 
       observer.callback();
       expect(mockChart.dispose).not.toHaveBeenCalled();
@@ -529,13 +529,17 @@ describe("CustomChartRenderer", () => {
       expect(echarts.init).toHaveBeenCalledTimes(2);
     });
 
-    it("does not watch the size when the container already has one", async () => {
+    it("does not re-init a chart that started with a size", async () => {
+      const echarts = await import("echarts");
       setSize(HTMLElement.prototype, 400, 300);
       try {
         wrapper = createWrapper();
         await waitForChartInit(wrapper);
 
-        expect(MockResizeObserver.instances).toHaveLength(0);
+        expect(MockResizeObserver.instances).toHaveLength(1);
+        MockResizeObserver.instances[0].callback();
+        expect(mockChart.dispose).not.toHaveBeenCalled();
+        expect(echarts.init).toHaveBeenCalledTimes(1);
       } finally {
         delete (HTMLElement.prototype as any).clientWidth;
         delete (HTMLElement.prototype as any).clientHeight;
@@ -548,7 +552,35 @@ describe("CustomChartRenderer", () => {
 
       wrapper.unmount();
 
-      expect(MockResizeObserver.instances[0].disconnected).toBe(true);
+      expect(MockResizeObserver.instances.every((observer) => observer.disconnected)).toBe(true);
+    });
+  });
+
+  describe("Container size", () => {
+    it("resizes a sized chart when its own box changes size, as when a drawer finishes opening", async () => {
+      Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+        configurable: true,
+        value: 400,
+      });
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+        configurable: true,
+        value: 300,
+      });
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+        mockChart.resize.mockClear();
+
+        expect(MockResizeObserver.instances).toHaveLength(1);
+        MockResizeObserver.instances[0].callback();
+        expect(mockChart.resize).toHaveBeenCalled();
+
+        wrapper.unmount();
+        expect(MockResizeObserver.instances[0].disconnected).toBe(true);
+      } finally {
+        delete (HTMLElement.prototype as any).clientWidth;
+        delete (HTMLElement.prototype as any).clientHeight;
+      }
     });
   });
 
@@ -847,6 +879,8 @@ describe("CustomChartRenderer", () => {
 
     it("pixel-snaps its canvases only while the ratio is fractional", async () => {
       display = fakeDevicePixelRatio(1.25);
+      const painter = fakeCanvasPainter(1.25);
+      mockChart.getZr.mockImplementation(() => ({ painter }));
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
       const pixelated = () => wrapper.classes().includes("chart-canvas-pixelated");
@@ -861,6 +895,21 @@ describe("CustomChartRenderer", () => {
       display.setRatio(1.5);
       await flushPromises();
       expect(pixelated()).toBe(true);
+    });
+
+    it("stays smooth at a fractional ratio its echarts-gl canvas could not be re-rasterized at", async () => {
+      display = fakeDevicePixelRatio(1);
+      const painter = fakeCanvasPainter(1);
+      painter.getLayers.mockReturnValue({ ...painter.layers, gl: { dpr: 1, resize: vi.fn() } });
+      mockChart.getZr.mockImplementation(() => ({ painter }));
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      display.setRatio(1.5);
+      await flushPromises();
+
+      expect(painter.dpr).toBe(1);
+      expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
     });
 
     it("re-rasterizes the instance in place when the window changes display", async () => {

@@ -27,15 +27,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <OCardSection role="body" dense>
-      <ODescriptionList dense>
-        <ODescriptionItem :label="t('alerts.groups.criticalCondition')">
-          <span class="font-mono text-sm wrap-anywhere" data-test="oncall-what-fired-condition">
+      <ODescriptionList dense label-width="narrow">
+        <ODescriptionItem
+          :label="t('alerts.groups.criticalCondition')"
+          :stacked="conditionIsQuery"
+          data-test="oncall-what-fired-condition-item"
+        >
+          <span
+            class="font-mono text-sm wrap-anywhere whitespace-pre-wrap"
+            data-test="oncall-what-fired-condition"
+          >
             {{ raw(conditionText) }}
           </span>
         </ODescriptionItem>
 
         <ODescriptionItem v-if="hasWarning" :label="t('alerts.groups.warningCondition')">
-          <span class="font-mono text-sm wrap-anywhere" data-test="oncall-what-fired-warning">
+          <span
+            class="font-mono text-sm wrap-anywhere whitespace-pre-wrap"
+            data-test="oncall-what-fired-warning"
+          >
             {{ raw(warningText) }}
           </span>
         </ODescriptionItem>
@@ -52,12 +62,16 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
-import { alertConditionText, alertWarningConditionText } from "@/utils/alerts/alertCondition";
+import {
+  alertConditionIsQuery,
+  alertConditionText,
+  alertWarningConditionText,
+} from "@/utils/alerts/alertCondition";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const props = defineProps<{
   /** The alert record fetched for this page's subject — same shape the alert's own config summary reads. */
-  alert: any;
+  alert: Record<string, unknown>;
 }>();
 
 const { t } = useI18nTyped();
@@ -65,4 +79,5 @@ const { t } = useI18nTyped();
 const conditionText = computed(() => alertConditionText(props.alert));
 const warningText = computed(() => alertWarningConditionText(props.alert));
 const hasWarning = computed(() => warningText.value !== "—");
+const conditionIsQuery = computed(() => alertConditionIsQuery(props.alert));
 </script>

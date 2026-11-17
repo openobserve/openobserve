@@ -36,7 +36,6 @@ import type {
   OnCallTeamContext,
   OnCallTeamMember,
   L0Policy,
-  PolicyFinalAction,
   PriorityRung,
   Rotation,
   CauseAnalytics,
@@ -238,10 +237,6 @@ const oncall = {
       destinations?: string[];
       p1_parallel?: boolean;
       p4_pages?: boolean;
-      /** How many full passes the ladder runs before `final_action`. 1 = once;
-       *  there is no zero. */
-      repeat_count?: number;
-      final_action?: PolicyFinalAction;
       /** Absent = unchanged. Only send when the user touched the L0 panel —
        *  editing rungs must not silently un-configure the gate. */
       l0?: L0Policy;

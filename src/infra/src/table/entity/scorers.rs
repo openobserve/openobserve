@@ -16,27 +16,14 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    Default,
-    PartialEq,
-    Eq,
-    Hash,
-    EnumIter,
-    DeriveActiveEnum,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(50))")]
 pub enum ScorerType {
     #[default]
-    #[sea_orm(string_value = "llm_judge")]
     LlmJudge,
-    #[sea_orm(string_value = "remote")]
     Remote,
+    /// A JavaScript `function score(...)` run in the QuickJS sandbox.
+    Code,
 }
 
 impl ScorerType {
@@ -44,6 +31,7 @@ impl ScorerType {
         match self {
             Self::LlmJudge => "llm_judge",
             Self::Remote => "remote",
+            Self::Code => "code",
         }
     }
 }
@@ -55,6 +43,7 @@ impl std::str::FromStr for ScorerType {
         match value {
             "llm_judge" => Ok(Self::LlmJudge),
             "remote" => Ok(Self::Remote),
+            "code" => Ok(Self::Code),
             _ => Err(value.to_string()),
         }
     }
@@ -81,8 +70,9 @@ pub struct Model {
     pub entity_id: String,
     pub name: String,
     pub version: i32,
+    /// Text, not [`ScorerType`], so rows of unknown types from newer nodes still load.
     #[sea_orm(column_type = "String(StringLen::N(50))")]
-    pub scorer_type: ScorerType,
+    pub scorer_type: String,
     pub description: Option<String>,
     pub produces_score_config_id: Option<String>,
     pub produces_score_config_version: Option<i32>,
@@ -111,7 +101,7 @@ mod tests {
             entity_id: "scorer-entity-1".to_string(),
             name: "faithfulness_judge".to_string(),
             version: 1,
-            scorer_type: ScorerType::LlmJudge,
+            scorer_type: ScorerType::LlmJudge.to_string(),
             description: Some("LLM-based faithfulness scoring".to_string()),
             produces_score_config_id: Some("scfg-entity-1".to_string()),
             produces_score_config_version: Some(1),
@@ -144,7 +134,7 @@ mod tests {
             entity_id: "scorer-entity-2".to_string(),
             name: "compliance_remote".to_string(),
             version: 1,
-            scorer_type: ScorerType::Remote,
+            scorer_type: ScorerType::Remote.to_string(),
             description: None,
             produces_score_config_id: None,
             produces_score_config_version: None,

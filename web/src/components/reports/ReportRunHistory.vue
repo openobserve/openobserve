@@ -50,24 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @sort-change="onSortChange"
       @row-click="openRun"
     >
-      <template #subheader>
-        <div
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="reports-reportrunhistory-summary"
-        >
-          <OStatStrip
-            :items="tiles"
-            :loading="history.isLoading.value"
-            selectable
-            compact
-            :selected-key="tile"
-            @select="onTileSelect"
-          />
-        </div>
-      </template>
-
       <template #toolbar>
-        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-md:contents">
+        <div class="contents">
           <slot name="toolbar-start" />
           <OToggleGroup
             :model-value="range"
@@ -116,6 +100,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("reports.history.triggerManual") }}
             </OToggleGroupItem>
           </OToggleGroup>
+          <OStatStrip
+            :items="tiles"
+            :loading="history.isLoading.value"
+            selectable
+            compact
+            :row="false"
+            default-key="all"
+            :selected-key="tile"
+            class="max-md:order-last"
+            data-test="reports-reportrunhistory-summary"
+            @select="onTileSelect"
+          />
         </div>
       </template>
 

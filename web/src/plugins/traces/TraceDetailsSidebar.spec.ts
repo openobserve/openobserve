@@ -527,22 +527,210 @@ describe("TraceDetailsSidebar", async () => {
         pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
       });
 
-      it("should toast a warning instead of navigating when nothing is correlated", async () => {
-        const viewLogsBtn = viewLogsWrapper.find(
-          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
-        );
-        expect(viewLogsBtn.exists()).toBe(true);
+      const viewLogsButton = () =>
+        viewLogsWrapper.find('[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]');
+      const notice = () => viewLogsWrapper.find('[data-test="traces-span-drawer-no-logs-notice"]');
 
-        await viewLogsBtn.trigger("click");
+      it("stays on the trace and shows the amber notice as a status, with focus back on View Logs", async () => {
+        expect(viewLogsButton().exists()).toBe(true);
+        (viewLogsButton().element as HTMLElement).focus();
+
+        await viewLogsButton().trigger("click");
         await flushPromises();
 
-        expect(mockToast).toHaveBeenCalledWith(
-          expect.objectContaining({
-            variant: "warning",
-            message: "No correlated logs found for this span",
-          }),
-        );
+        expect(mockToast).not.toHaveBeenCalled();
         expect(pushSpy).not.toHaveBeenCalled();
+        expect(notice().exists()).toBe(true);
+        expect(notice().attributes("role")).toBe("status");
+        expect(notice().text()).toContain("No log stream has logs for this trace.");
+        expect(document.activeElement).toBe(viewLogsButton().element);
+      });
+
+      it("is busy at once and keeps its label while the lookup runs", async () => {
+        let resolveLookup: (v: any) => void = () => {};
+        mockFindRelatedTelemetry.mockImplementationOnce(
+          () => new Promise((resolve) => (resolveLookup = resolve)),
+        );
+        await viewLogsButton().trigger("click");
+        await viewLogsWrapper.vm.$nextTick();
+
+        expect(viewLogsButton().attributes("aria-busy")).toBe("true");
+        expect(viewLogsButton().attributes("disabled")).toBeUndefined();
+        expect(viewLogsButton().text()).toContain("View Logs");
+
+        resolveLookup(null);
+        await flushPromises();
+        expect(viewLogsButton().attributes("aria-busy")).toBeUndefined();
+      });
+
+      it("shows the notice when every correlated stream turns out to lack the trace", async () => {
+        mockFindRelatedTelemetry.mockResolvedValueOnce({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+        mockNavigateToCorrelatedLogs.mockResolvedValueOnce("none");
+
+        await viewLogsButton().trigger("click");
+        await flushPromises();
+
+        expect(mockNavigateToCorrelatedLogs).toHaveBeenCalledTimes(1);
+        expect(notice().exists()).toBe(true);
+      });
+
+      it("shows a red couldn't-load alert, not the none notice, when every probe failed on the server", async () => {
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({
+          parentMode: "standalone",
+          streamName: "default",
+          serviceStreamsEnabled: true,
+        });
+        mockFindRelatedTelemetry.mockResolvedValueOnce({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+        mockNavigateToCorrelatedLogs.mockResolvedValueOnce({
+          failed: true,
+          error: { response: { status: 502 } },
+        });
+        (viewLogsButton().element as HTMLElement).focus();
+
+        await viewLogsButton().trigger("click");
+        await flushPromises();
+
+        const failed = viewLogsWrapper.find('[data-test="traces-span-drawer-logs-failed-notice"]');
+        expect(notice().exists()).toBe(false);
+        expect(failed.exists()).toBe(true);
+        expect(failed.attributes("role")).toBe("alert");
+        expect(failed.classes()).toContain("bg-status-error-bg");
+        expect(failed.text()).toContain(
+          "Couldn't load: the server returned an error. Refresh to try again.",
+        );
+        expect(failed.text()).not.toContain("No log stream has logs");
+        expect(failed.find('[data-test="traces-span-drawer-open-logs-tab"]').text()).toBe(
+          "Open Logs tab",
+        );
+        expect(mockToast).not.toHaveBeenCalled();
+        expect(pushSpy).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(viewLogsButton().element);
+      });
+
+      it("names a timeout as the cause when the probes ran out of time", async () => {
+        mockFindRelatedTelemetry.mockResolvedValueOnce({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+        mockNavigateToCorrelatedLogs.mockResolvedValueOnce({
+          failed: true,
+          error: { code: "ETIMEDOUT" },
+        });
+
+        await viewLogsButton().trigger("click");
+        await flushPromises();
+
+        expect(
+          viewLogsWrapper.find('[data-test="traces-span-drawer-logs-failed-notice"]').text(),
+        ).toContain("Couldn't load: the request timed out. Refresh to try again.");
+      });
+
+      it("opens the drawer's Logs tab from the notice and clears it", async () => {
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({
+          parentMode: "standalone",
+          streamName: "default",
+          serviceStreamsEnabled: true,
+        });
+        await viewLogsButton().trigger("click");
+        await flushPromises();
+
+        const open = viewLogsWrapper.find('[data-test="traces-span-drawer-open-logs-tab"]');
+        expect(open.text()).toBe("Open Logs tab");
+        await open.trigger("click");
+
+        expect(viewLogsWrapper.emitted("update:activeTab")?.at(-1)).toEqual(["correlated-logs"]);
+        expect(notice().exists()).toBe(false);
+      });
+
+      it("says it is finding logs only once the lookup passes 1 s, and withdraws it after", async () => {
+        vi.useFakeTimers();
+        try {
+          let resolveLookup: (v: any) => void = () => {};
+          mockFindRelatedTelemetry.mockImplementationOnce(
+            () => new Promise((resolve) => (resolveLookup = resolve)),
+          );
+          const region = () => document.querySelector('[data-test="region-announcer"]');
+          const run = viewLogsWrapper.vm.viewSpanLogs();
+          await vi.advanceTimersByTimeAsync(900);
+          expect(region()?.textContent ?? "").toBe("");
+          await vi.advanceTimersByTimeAsync(200);
+          expect(region()?.textContent).toBe("Finding logs for this trace…");
+          resolveLookup(null);
+          await run;
+          expect(region()?.textContent).toBe("");
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("keeps the View Logs label beside its spinner, which waits 300 ms", async () => {
+        vi.useFakeTimers();
+        try {
+          let resolveLookup: (v: any) => void = () => {};
+          mockFindRelatedTelemetry.mockImplementationOnce(
+            () => new Promise((resolve) => (resolveLookup = resolve)),
+          );
+          const spinner = () =>
+            viewLogsButton().find(
+              '[data-test="trace-details-sidebar-header-toolbar-view-logs-spinner"]',
+            );
+          const run = viewLogsWrapper.vm.viewSpanLogs();
+          await vi.advanceTimersByTimeAsync(0);
+          expect(viewLogsButton().attributes("aria-busy")).toBe("true");
+          expect(spinner().exists()).toBe(false);
+          await vi.advanceTimersByTimeAsync(300);
+          expect(spinner().exists()).toBe(true);
+          expect(viewLogsButton().text()).toBe("View Logs");
+          expect(viewLogsButton().find(".text-transparent").exists()).toBe(false);
+          resolveLookup(null);
+          await run;
+          await vi.advanceTimersByTimeAsync(0);
+          expect(spinner().exists()).toBe(false);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("drops the notice when another span is shown", async () => {
+        await viewLogsButton().trigger("click");
+        await flushPromises();
+        expect(notice().exists()).toBe(true);
+
+        await viewLogsWrapper.setProps({ span: { ...mockSpan, span_id: "span-other" } });
+
+        expect(notice().exists()).toBe(false);
       });
 
       it("should not call navigateToCorrelatedLogs when nothing is correlated", async () => {

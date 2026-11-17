@@ -47,10 +47,9 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::{
-    exec::TableBuilder,
+use search::{
+    datafusion::{exec::TableBuilder, sort_order::FileSortOrder},
     merge::{self, MergeMode, MergeOutput},
-    sort_order::FileSortOrder,
 };
 use tantivy_utils::index_builder::{TantivyIndexOptions, create_tantivy_index};
 use tokio::{
@@ -427,10 +426,26 @@ async fn move_files(
 
     // check data retention
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema).unwrap_or_default();
-    let mut stream_data_retention_days = cfg.compact.data_retention_days;
-    if stream_settings.data_retention > 0 {
-        stream_data_retention_days = stream_settings.data_retention;
-    }
+    let stream_data_retention_days = match db::organization::stream_retention_days(
+        &org_id,
+        stream_type,
+        &stream_name,
+        stream_settings.data_retention,
+    )
+    .await
+    {
+        Ok(days) => days,
+        Err(e) => {
+            log::error!(
+                "[INGESTER:JOB:{thread_id}] can't read retention of [{org_id}/{stream_type}/{stream_name}], retry later: {e}"
+            );
+            let mut processing = PROCESSING_FILES.write().await;
+            for file in &files {
+                processing.remove(&file.key);
+            }
+            return Ok(());
+        }
+    };
     let num_uds_fields = stream_settings.defined_schema_fields.len();
 
     let stream_fields_num = if num_uds_fields > 0 {
@@ -962,7 +977,7 @@ pub(crate) async fn queue_service_streams_if_needed(
     }
 }
 
-/// Internal streams such as `_o2_db_stats` never feed service discovery.
+/// Streams O2 writes or derives itself, such as `triggers`, never feed service discovery.
 #[cfg(any(feature = "enterprise", test))]
 fn is_service_discovery_candidate(
     org_id: &str,
@@ -970,11 +985,7 @@ fn is_service_discovery_candidate(
     stream_name: &str,
 ) -> bool {
     org_id != config::META_ORG_ID
-        && matches!(
-            stream_type,
-            StreamType::Logs | StreamType::Metrics | StreamType::Traces
-        )
-        && !config::meta::self_reporting::usage::is_internal_stream(stream_name)
+        && infra::schema::is_service_source_stream(stream_type, stream_name)
 }
 
 /// Deletes the file, then its directory chain if the hour is old enough that late data is unlikely.
@@ -1232,6 +1243,16 @@ mod tests {
             StreamType::Metrics,
             "_agent_signals"
         ));
+        for (stream_type, name) in [
+            (StreamType::Logs, "triggers"),
+            (StreamType::Traces, "_evaluator"),
+            (StreamType::Metrics, "traces_service_graph_request_total"),
+        ] {
+            assert!(
+                !is_service_discovery_candidate("default", stream_type, name),
+                "{name}"
+            );
+        }
         // A user stream may legitimately start with `_`.
         assert!(is_service_discovery_candidate(
             "default",

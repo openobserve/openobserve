@@ -636,7 +636,8 @@ describe("Login.vue", () => {
       await wrapper.vm.getDefaultOrganization();
 
       expect(zincutils.checkCallBackValues).toHaveBeenCalledWith("", "new_user_login");
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith("isFirstTimeLogin", "true");
+      // The flag names its user, so another sign-in on this browser never reads it as theirs.
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith("isFirstTimeLogin", "test@example.com");
     });
 
     it("should not set first time login flag for an invited user even when new_user_login is true", async () => {
@@ -648,7 +649,10 @@ describe("Login.vue", () => {
       await wrapper.vm.getDefaultOrganization();
 
       expect(zincutils.checkCallBackValues).toHaveBeenCalledWith("", "pending_invites");
-      expect(mockLocalStorage.setItem).not.toHaveBeenCalledWith("isFirstTimeLogin", "true");
+      expect(mockLocalStorage.setItem).not.toHaveBeenCalledWith(
+        "isFirstTimeLogin",
+        expect.anything(),
+      );
     });
 
     it("should not set first time login flag when not cloud", async () => {
@@ -656,7 +660,10 @@ describe("Login.vue", () => {
 
       await wrapper.vm.getDefaultOrganization();
 
-      expect(mockLocalStorage.setItem).not.toHaveBeenCalledWith("isFirstTimeLogin", "true");
+      expect(mockLocalStorage.setItem).not.toHaveBeenCalledWith(
+        "isFirstTimeLogin",
+        expect.anything(),
+      );
     });
 
     it("should call redirectUser after processing organizations", async () => {
@@ -1243,7 +1250,7 @@ describe("Login.vue", () => {
       mockSessionStorage.setItem.mockReset();
     });
 
-    it("keeps the signup link's utm_content for the Get started dialog", () => {
+    it("keeps the signup link's utm_content for the onboarding pick", () => {
       mountWith({ utm_content: "kubernetes" });
       expect(JSON.parse(session.get(PREFILL)!)).toEqual({ utm_content: "kubernetes" });
     });

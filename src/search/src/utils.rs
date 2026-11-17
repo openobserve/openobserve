@@ -25,7 +25,7 @@ use infra::runtime::DATAFUSION_RUNTIME;
 use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
 
-use super::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
+use super::datafusion::distributed::remote_scan::remote_scan_exec::RemoteScanExec;
 use crate::{CAPPED_RESULTS_MSG, sql::Sql};
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;

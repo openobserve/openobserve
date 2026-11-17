@@ -123,7 +123,7 @@ fn undelivered_status(resp: &IngestionResponse) -> Option<(StatusCode, String)> 
     ),
     request_body(content = String, description = "Ingest data (ndjson)", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"took":2,"errors":true,"items":[{"index":{"_index":"olympics","_id":1,"status":200,"error":{"type":"Too old data, only last 5 hours data can be ingested. Data discarded.","reason":"Too old data, only last 5 hours data can be ingested. Data discarded.","index_uuid":"1","shard":"1","index":"olympics"},"original_record":{"athlete":"CHASAPIS, Spiridon","city":"BER","country":"USA","discipline":"Swimming","event":"100M Freestyle For Sailors","gender":"Men","medal":"Silver","onemore":1,"season":"summer","sport":"Aquatics","year":1986}}}]})),
+        (status = 200, description = "Success", content_type = "application/json", body = ingestion_common::BulkResponse, example = json!({"took":2,"errors":true,"items":[{"index":{"_index":"olympics","_id":1,"status":200,"error":{"type":"Too old data, only last 5 hours data can be ingested. Data discarded.","reason":"Too old data, only last 5 hours data can be ingested. Data discarded.","index_uuid":"1","shard":"1","index":"olympics"},"original_record":{"athlete":"CHASAPIS, Spiridon","city":"BER","country":"USA","discipline":"Swimming","event":"100M Freestyle For Sailors","gender":"Men","medal":"Silver","onemore":1,"season":"summer","sport":"Aquatics","year":1986}}}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -201,7 +201,7 @@ pub async fn bulk(
     ),
     request_body(content = String, description = "Ingest data (multiple line json)", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
+        (status = 200, description = "Success", content_type = "application/json", body = ingestion_common::IngestionResponse, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -285,7 +285,7 @@ pub async fn multi(
     ),
     request_body(content = String, description = "Ingest data (json array)", content_type = "application/json", example = json!([{"Year": 1896, "City": "Athens", "Sport": "Aquatics", "Discipline": "Swimming", "Athlete": "Alfred", "Country": "HUN"},{"Year": 1896, "City": "Athens", "Sport": "Aquatics", "Discipline": "Swimming", "Athlete": "HERSCHMANN", "Country":"CHN"}])),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
+        (status = 200, description = "Success", content_type = "application/json", body = ingestion_common::IngestionResponse, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -449,7 +449,7 @@ pub async fn handle_kinesis_request(
     ),
     request_body(content = inline(GCPIngestionRequest), description = "Pub/Sub push envelope", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse),
         (status = 400, description = "Request rejected, or no record stored because the message was rejected", content_type = "application/json", body = Object, example = json!({"code": 400, "message": "stream logs: Stream name too long"})),
         (status = 500, description = "Write to storage failed, or the stream started deleting mid-write", content_type = "application/json", body = Object, example = json!({"code": 500, "message": "write to storage failed"})),
     ),
@@ -526,7 +526,7 @@ pub async fn handle_gcp_request(
     request_body(description = "ExportLogsServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "ExportLogsServiceResponse, encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 200, description = "ExportLogsServiceResponse, encoded like the request", content((common::meta::otlp::OtlpProtobufBody = "application/x-protobuf"), (common::meta::otlp::OtlpLogsExportJson = "application/json"))),
         (status = 400, description = "google.rpc.Status: invalid body, unsupported Content-Type, ingestion refused (e.g. stream being deleted), or write rejected (e.g. columns limit)", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 429, description = "google.rpc.Status: trial period expired", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 500, description = "google.rpc.Status: internal write error", content(("application/x-protobuf"), (Object = "application/json"))),

@@ -6,7 +6,7 @@ import {
   ensureIds,
   type V2Group,
 } from "@/utils/alerts/alertDataTransforms";
-import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import { conditionHasValue as hasOperatorValue } from "@/utils/alerts/conditionsFormatter";
 
 export function createEmptyJobFilterGroup(): V2Group {
   return ensureIds(convertV0ToV2([])) as V2Group;
@@ -45,7 +45,7 @@ export function normalizeJobFilterCondition(value: any): V2Group {
   }
 
   const version = detectConditionsVersion(conditionValue);
-  if (version === 2) return ensureIds(cloneJson(conditionValue)) as V2Group;
+  if (version === 2) return cloneJson(conditionValue) as V2Group;
   if (Array.isArray(conditionValue)) return ensureIds(convertV0ToV2(conditionValue)) as V2Group;
   if (conditionValue?.label && conditionValue?.items) {
     return ensureIds(convertV1ToV2(conditionValue)) as V2Group;
@@ -54,9 +54,7 @@ export function normalizeJobFilterCondition(value: any): V2Group {
   return ensureIds(convertV1BEToV2(conditionValue)) as V2Group;
 }
 
-const conditionHasValue = (item: any): boolean =>
-  isUnaryOperator(item?.operator) ||
-  (item?.value !== undefined && item?.value !== null && item?.value !== "");
+const conditionHasValue = (item: any): boolean => hasOperatorValue(item?.operator, item?.value);
 
 export function cleanFilterGroup(group: any): V2Group {
   const logicalOperator = group?.logicalOperator === "OR" ? "OR" : "AND";
@@ -82,6 +80,7 @@ export function cleanFilterGroup(group: any): V2Group {
         value: item.value ?? "",
         values: item.values || [],
         logicalOperator: item.logicalOperator === "OR" ? "OR" : "AND",
+        ...(item.case_insensitive === true ? { case_insensitive: true } : {}),
       };
     })
     .filter(Boolean);

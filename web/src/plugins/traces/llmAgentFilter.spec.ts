@@ -31,13 +31,18 @@ describe("llmAgentFilter", () => {
     expect(buildAgentTraceFilter(agentWithId, "")).toBe("");
   });
 
+  // agentWithId has no env: it is the env-less variant.
+  const ENV_LESS = "(gen_ai_agent_env IS NULL OR gen_ai_agent_env = '')";
+
   it("filters directly by gen_ai_agent_id when present", () => {
-    expect(buildAgentTraceFilter(agentWithId, "default")).toBe(`gen_ai_agent_id = 'agent-123'`);
+    expect(buildAgentTraceFilter(agentWithId, "default")).toBe(
+      `gen_ai_agent_id = 'agent-123' AND ${ENV_LESS}`,
+    );
   });
 
   it("falls back to gen_ai_agent_name when the agent has no id (§6.3)", () => {
     expect(buildAgentTraceFilter({ ...agentWithId, id: null }, "default")).toBe(
-      `gen_ai_agent_name = 'support-agent'`,
+      `gen_ai_agent_name = 'support-agent' AND ${ENV_LESS}`,
     );
   });
 
@@ -56,15 +61,24 @@ describe("llmAgentFilter", () => {
   it("adds an env predicate when the agent has an env", () => {
     const where = buildAgentTraceFilter({ ...agentWithId, env: "production" }, "default");
     expect(where).toContain("gen_ai_agent_env = 'production'");
+    expect(where).not.toContain("IS NULL");
+  });
+
+  it("scopes an env-less agent row to spans without an env, not every env", () => {
+    const where = buildAgentTraceFilter({ ...agentWithId, env: null, version: "2.0" }, "default");
+    expect(where).toContain(ENV_LESS);
+    expect(where).not.toContain("gen_ai_agent_env = 'production'");
   });
 
   it("builds a direct agent predicate for session selection", () => {
-    expect(buildAgentSessionFilter(agentWithId, "default")).toBe(`gen_ai_agent_id = 'agent-123'`);
+    expect(buildAgentSessionFilter(agentWithId, "default")).toBe(
+      buildAgentTraceFilter(agentWithId, "default"),
+    );
   });
 
   it("keeps the same predicate when the backend uses a custom session field", () => {
     expect(buildAgentSessionFilter(agentWithId, "default", "llm_session_id")).toBe(
-      `gen_ai_agent_id = 'agent-123'`,
+      buildAgentTraceFilter(agentWithId, "default"),
     );
   });
 

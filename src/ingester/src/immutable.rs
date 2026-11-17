@@ -86,6 +86,22 @@ pub async fn read_from_immutable(
     Ok((ids, batches))
 }
 
+pub(crate) async fn immutable_min_ts(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+) -> Option<i64> {
+    let shared_memtable = config::get_config().common.feature_shared_memtable_enabled;
+    let r = IMMUTABLES.read().await;
+    r.iter()
+        .filter(|(_, i)| {
+            stream_type == i.key.stream_type.as_ref()
+                && (shared_memtable || org_id == i.key.org_id.as_ref())
+        })
+        .filter_map(|(_, i)| i.memtable.min_ts(org_id, stream_name))
+        .min()
+}
+
 /// Delete a file. Returns whether the file existed (false = already deleted).
 async fn remove_file_if_exists(path: &PathBuf) -> Result<bool> {
     match fs::remove_file(path).await {
@@ -93,6 +109,19 @@ async fn remove_file_if_exists(path: &PathBuf) -> Result<bool> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(e) => Err(e).context(DeleteFileSnafu { path }),
     }
+}
+
+/// Rename a tmp file to `.parquet`, returning false if its stream deleted it first.
+async fn rename_tmp_file(path: &PathBuf) -> Result<bool> {
+    match fs::rename(path, path.with_extension("parquet")).await {
+        Ok(_) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(e).context(RenameFileSnafu { path }),
+    }
+}
+
+fn all_persisted(pending_ids: impl IntoIterator<Item = u64>, memtable_id: u64) -> bool {
+    pending_ids.into_iter().all(|id| id > memtable_id)
 }
 
 impl Immutable {
@@ -151,10 +180,14 @@ impl Immutable {
         }
         // 4. rename the tmp files to parquet files
         for (path, stat) in paths {
+            // counted even when skipped: the whole memtable is released either way
             persist_stat += stat;
-            fs::rename(&path, &path.with_extension("parquet"))
-                .await
-                .context(RenameFileSnafu { path: &path })?;
+            if !rename_tmp_file(&path).await? {
+                log::warn!(
+                    "tmp file {} is gone, its stream was deleted while persisting, skipping it",
+                    path.display()
+                );
+            }
         }
         // 5. delete the lock file
         remove_file_if_exists(&done_path).await?;
@@ -339,17 +372,10 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-// check if the persist is done for the given seq_id
-// if there is no id less than the given seq_id, return true
-pub async fn check_persist_done(seq_id: u64) -> bool {
+/// Whether every memtable with an id up to `memtable_id` has been persisted.
+pub async fn check_persist_done(memtable_id: u64) -> bool {
     let r = IMMUTABLES.read().await;
-    let mut min_id = u64::MAX;
-    for (_, i) in r.iter() {
-        if i.memtable.id() < seq_id {
-            min_id = min_id.min(i.memtable.id());
-        }
-    }
-    min_id < seq_id
+    all_persisted(r.values().map(|i| i.memtable.id()), memtable_id)
 }
 
 pub async fn get_immutables_cache_stats() -> (usize, usize, usize) {
@@ -429,5 +455,30 @@ mod tests {
         // Both functions should be callable independently
         let _ = get_immutables_cache_stats().await;
         let _ = get_processing_tables_cache_stats().await;
+    }
+
+    #[tokio::test]
+    async fn test_rename_tmp_file_skips_missing_and_renames_existing() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("deleted_stream.par");
+        assert!(!rename_tmp_file(&missing).await.unwrap());
+        assert!(!missing.with_extension("parquet").exists());
+
+        let existing = dir.path().join("live_stream.par");
+        std::fs::write(&existing, b"data").unwrap();
+        assert!(rename_tmp_file(&existing).await.unwrap());
+        assert!(!existing.exists());
+        assert_eq!(
+            std::fs::read(existing.with_extension("parquet")).unwrap(),
+            b"data"
+        );
+    }
+
+    #[test]
+    fn test_all_persisted_waits_for_ids_up_to_the_given_one() {
+        assert!(all_persisted([], 10));
+        assert!(all_persisted([11, 12], 10));
+        assert!(!all_persisted([9, 11], 10));
+        assert!(!all_persisted([10], 10));
     }
 }

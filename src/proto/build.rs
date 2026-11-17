@@ -156,6 +156,28 @@ fn main() -> Result<()> {
         .unwrap();
     file.write_all(code.as_str().as_ref()).unwrap();
 
+    tonic_prost_build::configure()
+        .compile_protos(
+            &[
+                "proto/datadog/agentpayload/agent_payload.proto",
+                "proto/datadog/trace/agent_payload.proto",
+            ],
+            &["proto"],
+        )
+        .unwrap();
+
+    for (package, path) in [
+        (
+            "datadog.agentpayload.rs",
+            "src/generated/datadog_agentpayload.rs",
+        ),
+        ("datadog.trace.rs", "src/generated/datadog_trace.rs"),
+        ("datadog.trace.idx.rs", "src/generated/datadog_trace_idx.rs"),
+    ] {
+        let code = std::fs::read_to_string(out.join(package)).unwrap();
+        std::fs::write(path, code).unwrap();
+    }
+
     Ok(())
 }
 

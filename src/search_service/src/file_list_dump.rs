@@ -33,8 +33,8 @@ use itertools::Itertools;
 use rayon::slice::ParallelSliceMut;
 
 use crate::datafusion::{
+    datasource::uniontable::NewUnionTable,
     exec::{DataFusionContextBuilder, TableBuilder},
-    table_provider::uniontable::NewUnionTable,
 };
 
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
@@ -379,7 +379,7 @@ async fn query_inner(
     } else {
         let max_ts_upper_bound = calculate_max_ts_upper_bound(
             range.1,
-            max_ts_bound_level(org_id, stream_type, stream_name).await,
+            max_ts_bound_level(org_id, stream_type, stream_name, range.1).await,
         );
         format!(
             "SELECT {fields} FROM file_list WHERE org = '{org_id}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",

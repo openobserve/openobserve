@@ -25,4 +25,6 @@ import { orgKey } from "@/composables/query/keys";
 export const templateKeys = {
   all: (org: string) => orgKey(org, "alerts", "templates"),
   list: (org: string) => orgKey(org, "alerts", "templates"),
+  // The dependency graph's read carries `used_by` counts; pickers keep the plain list.
+  listWithUsage: (org: string) => orgKey(org, "alerts", "templates", "with-usage"),
 };

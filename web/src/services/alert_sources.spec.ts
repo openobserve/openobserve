@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import http from "./http";
 import alertSources from "./alert_sources";
+import analytics from "./product_analytics";
+
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("./http", () => {
+  const ok = () => Promise.resolve({ data: {} });
   const mockClient = {
     get: vi.fn(),
-    post: vi.fn(),
-    patch: vi.fn(),
+    post: vi.fn(ok),
+    patch: vi.fn(ok),
+    delete: vi.fn(ok),
   };
   return { default: vi.fn(() => mockClient) };
 });
@@ -49,5 +54,28 @@ describe("alert_sources service", () => {
     expect(mockClient.get).toHaveBeenCalledWith(
       "/api/v2/myorg/incidents/integrations/int-1/senders",
     );
+  });
+
+  it("tracks each mutation once it succeeds", async () => {
+    await alertSources.create("myorg", { name: "x" });
+    await alertSources.setEnabled("myorg", "int-1", false);
+    await alertSources.setEnabled("myorg", "int-1", true);
+    await alertSources.rotate("myorg", "int-1");
+    await alertSources.update("myorg", "int-1", { destinations: ["d"] });
+    await alertSources.delete("myorg", "int-1");
+    expect(vi.mocked(analytics.track).mock.calls).toEqual([
+      ["alert_source_created"],
+      ["alert_source_disabled"],
+      ["alert_source_enabled"],
+      ["alert_source_token_rotated"],
+      ["alert_source_updated", { name_changed: false, destinations_changed: true }],
+      ["alert_source_deleted", { count: 1 }],
+    ]);
+  });
+
+  it("does not track a failed mutation", async () => {
+    vi.mocked(mockClient.delete).mockRejectedValueOnce(new Error("boom"));
+    await expect(alertSources.delete("myorg", "int-1")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

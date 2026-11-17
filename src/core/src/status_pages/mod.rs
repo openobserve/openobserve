@@ -351,12 +351,14 @@ pub async fn mark_false_positive(
     org_id: &str,
     notice_id: &str,
     snooze_hours: i64,
+    reason: &str,
     actor: &str,
 ) -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::status_pages::notices::mark_false_positive(
         org_id,
         notice_id,
         snooze_hours,
+        reason,
         actor,
     )
     .await
@@ -367,8 +369,20 @@ pub async fn mark_false_positive(
     _org_id: &str,
     _notice_id: &str,
     _snooze_hours: i64,
+    _reason: &str,
     _actor: &str,
 ) -> Result<(), anyhow::Error> {
+    enterprise_required()
+}
+
+/// Undoes [`mark_false_positive`]: the incident and its downtime count again. Licensed.
+#[cfg(feature = "enterprise")]
+pub async fn undo_false_positive(org_id: &str, notice_id: &str) -> Result<(), anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::notices::undo_false_positive(org_id, notice_id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn undo_false_positive(_org_id: &str, _notice_id: &str) -> Result<(), anyhow::Error> {
     enterprise_required()
 }
 
@@ -613,6 +627,15 @@ pub fn pw_version(password_hash: &str) -> String {
     format!("{:08x}", h.finish() as u32)
 }
 
+/// The one error of every OSS Notices and Custom Domains stub; the handler's
+/// `map_err` turns it into 403, and the OSS handlers return it before reading the body.
+#[cfg(not(feature = "enterprise"))]
+pub fn enterprise_required<T>() -> Result<T, anyhow::Error> {
+    Err(anyhow::anyhow!(
+        "enterprise: Notices and Custom Domains require an enterprise license"
+    ))
+}
+
 /// Real HMAC-SHA256 over a domain-separated message — the same primitive the
 /// chart signer uses. NOT a plain hash: an auth cookie needs a keyed MAC.
 fn unlock_mac(key: &[u8], slug: &str, pw_version: &str, exp: i64) -> String {
@@ -743,16 +766,6 @@ fn to_admin_view(
         component_count,
         components: None,
     }
-}
-
-/// Every OSS stub for a Notices/Custom-Domains function returns this same
-/// error so the handler's `map_err` can map it to one 403, regardless of
-/// which licensed action was attempted.
-#[cfg(not(feature = "enterprise"))]
-fn enterprise_required<T>() -> Result<T, anyhow::Error> {
-    Err(anyhow::anyhow!(
-        "enterprise: Notices and Custom Domains require an enterprise license"
-    ))
 }
 
 #[cfg(test)]

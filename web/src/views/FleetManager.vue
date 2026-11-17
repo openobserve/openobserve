@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #header-tabs>
-      <OTabs :model-value="activeTab" align="left" @change="go($event as FleetTab)">
+      <OTabs :model-value="activeTab" align="left" @change="onTabChange($event as FleetTab)">
         <OTab
           v-for="tab in tabs"
           :key="tab.name"
@@ -88,6 +88,7 @@ import FleetAudit from "@/components/fleet/FleetAudit.vue";
 import { fleetLocation, resolveFleetTab, type FleetTab } from "@/components/fleet/fleetRoute";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import analytics from "@/services/product_analytics";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -126,5 +127,10 @@ function onCreate() {
 
 function go(tab: FleetTab, extra: Record<string, string> = {}) {
   router.replace(fleetLocation(tab, extra, route.query));
+}
+
+function onTabChange(tab: FleetTab) {
+  analytics.track("fleet_tab_switched", { tab });
+  go(tab);
 }
 </script>

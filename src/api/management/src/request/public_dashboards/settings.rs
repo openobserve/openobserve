@@ -36,7 +36,7 @@ use crate::service::auth::UserEmail;
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = OrgPublicDashboardSettings),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
@@ -67,7 +67,7 @@ pub async fn get(Path(org_id): Path<String>, Headers(user): Headers<UserEmail>) 
     ),
     request_body(content = OrgPublicDashboardSettings, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = OrgPublicDashboardSettings),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})),

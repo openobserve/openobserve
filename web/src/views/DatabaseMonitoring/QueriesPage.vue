@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <DbmSubheaderBand data-test="dbm-queries-summary">
+          <div data-test="dbm-queries-summary">
             <OStatStrip
               :items="visibleSummaryStats"
               :loading="loading"
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               default-key="queries"
               @select="onStatSelect"
             />
-          </DbmSubheaderBand>
+          </div>
           <DbmInsightStrip
             v-if="!insightsHidden && stripInsights.length"
             :insights="stripInsights"
@@ -525,9 +525,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                the failure tile — which only traces can answer — is absent
                rather than claiming an all-clear. -->
           <template #subheader>
-            <DbmSubheaderBand data-test="dbm-server-queries-summary">
-              <OStatStrip :items="visibleSummaryStats" :loading="loading" />
-            </DbmSubheaderBand>
+            <OStatStrip
+              :items="visibleSummaryStats"
+              :loading="loading"
+              row
+              data-test="dbm-server-queries-summary"
+            />
           </template>
           <template #cell-query="{ row }">
             <DbmQueryCell
@@ -604,7 +607,6 @@ import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
-import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -631,6 +633,7 @@ import dbMonitoringService, {
   type ServerQueryRow,
 } from "@/services/db_monitoring";
 import config from "@/aws-exports";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
 import { useDbmQueryDetailHop } from "@/composables/dbm/useDbmQueryDetailHop";
@@ -1998,6 +2001,7 @@ const rowActions = computed<DbmRowAction[]>(() => [
 ]);
 
 const onRowAction = async (id: string, row: QueryRow) => {
+  analytics.track("dbm_row_action_clicked", { page: "queries", action: id });
   if (id === "open" || id === "traces") {
     openQueryDetail(row, id === "traces" ? "samples" : undefined);
     return;

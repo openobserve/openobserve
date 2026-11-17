@@ -1087,13 +1087,13 @@ describe("validatePanel on the flame graph", () => {
 });
 
 describe("validatePanel on a gauge range", () => {
-  const run = (configs: any[]) => {
+  const run = (configs: any[], type = "gauge") => {
     const errors: string[] = [];
     validatePanel(
       gt,
       {
         data: {
-          type: "gauge",
+          type,
           queryType: "promql",
           queries: configs.map((config) => ({ query: "up", config })),
         },
@@ -1127,6 +1127,13 @@ describe("validatePanel on a gauge range", () => {
         { min: 5, max: 1 },
       ]),
     ).toEqual([gt("dashboard.utils.queryErrorPrefix", { index: 2, error: message })]);
+  });
+
+  it("blocks a bar gauge fixed range whose min is not below its max, but not its default auto range", () => {
+    expect(run([{ range_mode: "fixed", min: 30000, max: 10000 }], "bar-gauge")).toEqual([message]);
+    expect(run([{ range_mode: "fixed", min: 20000, max: 20000 }], "bar-gauge")).toEqual([message]);
+    expect(run([{ range_mode: "fixed", min: 0, max: 40000 }], "bar-gauge")).toEqual([]);
+    expect(run([{ min: 20, max: 10 }], "bar-gauge")).toEqual([]);
   });
 });
 

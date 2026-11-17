@@ -15,8 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 import type { Incident, RcaSummary } from "@/services/incidents";
-import { gt } from "@/types/i18n";
-import { isLiveRca, rcaCellModel, type RcaCellModel } from "./rcaCell";
+import { gt, raw } from "@/types/i18n";
+import { RCA_BADGE_VARIANT, isLiveRca, rcaCellModel, type RcaCellModel } from "./rcaCell";
 
 const NOW = Date.UTC(2026, 9, 16, 12, 0, 0);
 const minutesAgoMicros = (m: number) => (NOW - m * 60_000) * 1000;
@@ -400,6 +400,41 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
     expect(model).toMatchObject(expected);
   });
 
+  it("names the license lock in place of RCA disabled", () => {
+    const row = { rca: null, rca_off_reason: "l0_off", severity: "P4" } as Row;
+    const lockedReason = raw("Locked: needs AI Assistant");
+
+    const model = rcaCellModel(row, { rcaEnabled: false, lockedReason, now: NOW });
+
+    expect(model).toMatchObject({
+      kind: "state",
+      label: "Locked: needs AI Assistant",
+      tone: "muted",
+      locked: true,
+      showAnalyzeOnHover: false,
+    });
+    expect(rcaCellModel(row, { rcaEnabled: false, now: NOW })).toMatchObject({
+      label: "RCA disabled",
+      locked: false,
+    });
+  });
+
+  it("ignores the lock reason while RCA is on and for a past run", () => {
+    const lockedReason = raw("Locked: needs AI Assistant");
+
+    expect(
+      rcaCellModel(
+        { rca: null, rca_off_reason: null, severity: "P2" },
+        { rcaEnabled: true, lockedReason, now: NOW },
+      ).kind,
+    ).toBe("analyze");
+    const past = { rca: rca({ state: "failed" }), severity: "P2" } as Row;
+    expect(rcaCellModel(past, { rcaEnabled: false, lockedReason, now: NOW })).toMatchObject({
+      label: "Failed",
+      locked: false,
+    });
+  });
+
   it("shows persisted progress instead of elapsed time once the stage is known", () => {
     const row = {
       rca: rca({ summary: { stage: "log_patterns", stage_index: 5, stage_count: 7 } }),
@@ -455,6 +490,46 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
   });
 });
 
+describe("rcaCellModel stored not-run reasons (D9ux-Q1 b)", () => {
+  it("the list cell names a stored reason as the card does", () => {
+    const reasons = [
+      ["rca_disabled", "Not analyzed", "muted", "AI analysis was off when this incident opened."],
+      [
+        "ai_unavailable",
+        "Not analyzed",
+        "muted",
+        "AI analysis wasn't available when this incident opened.",
+      ],
+      [
+        "quota_exceeded",
+        "Not analyzed",
+        "warn",
+        "The organization had reached its AI analysis limit.",
+      ],
+      [
+        "cooling_down",
+        "Not analyzed",
+        "muted",
+        "An analysis had just run, so a new one did not start.",
+      ],
+      ["start_failed", "Failed", "err", "The analysis couldn't start."],
+    ] as const;
+    for (const [reason, label, tone, detail] of reasons) {
+      const model = rcaCellModel(
+        { rca: null, rca_off_reason: reason, severity: "P2" },
+        { rcaEnabled: true, now: NOW },
+      );
+      expect(model).toMatchObject({ kind: "state", label, tone, detail, showAnalyzeOnHover: true });
+    }
+    expect(
+      rcaCellModel(
+        { rca: null, rca_off_reason: "budget_x", severity: "P2" },
+        { rcaEnabled: true, now: NOW },
+      ),
+    ).toMatchObject({ kind: "analyze", showAnalyzeOnHover: false });
+  });
+});
+
 describe("isLiveRca (RR-34)", () => {
   it.each([
     ["running", true],
@@ -468,5 +543,17 @@ describe("isLiveRca (RR-34)", () => {
 
   it("no run is not live", () => {
     expect(isLiveRca(null)).toBe(false);
+  });
+});
+
+describe("RCA_BADGE_VARIANT (D9-web)", () => {
+  it("the moved badge map keeps the cell's colours", () => {
+    expect(RCA_BADGE_VARIANT).toEqual({
+      muted: "default",
+      warn: "warning",
+      "warn-strong": "orange-outline",
+      ok: "success",
+      err: "error",
+    });
   });
 });

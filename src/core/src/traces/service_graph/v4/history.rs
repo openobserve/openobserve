@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use config::meta::{promql::value::RangeValue, service_graph::EdgeTrendDataPoint};
 
 use super::{
-    read::{QUANTILES, V4_ONLY, count, label_eq, range, secs_to_ns, selector},
+    read::{QUANTILES, count, label_eq, range, secs_to_ns, selector, visible_matcher},
     schedule::align_down,
     writer::{LABEL_TRACE_STREAM, M_CLIENT_SECONDS, M_REQUEST_FAILED_TOTAL, M_REQUEST_TOTAL},
 };
@@ -36,6 +36,8 @@ pub struct EdgeFilter {
     pub client: Option<String>,
     pub server: Option<String>,
     pub trace_stream: Option<String>,
+    /// The trace streams the caller may read; `None` is every stream, collector series included.
+    pub visible_streams: Option<Vec<String>>,
 }
 
 impl EdgeFilter {
@@ -53,10 +55,15 @@ impl EdgeFilter {
         .into_iter()
         .filter_map(|(label, v)| v.as_deref().map(|v| label_eq(label, v)))
         .collect::<Result<Vec<_>, _>>()?;
-        if v4_only && self.trace_stream.is_none() {
-            parts.push(V4_ONLY.to_string());
+        if self.trace_stream.is_none() {
+            parts.extend(visible_matcher(self.visible_streams.as_deref(), v4_only)?);
         }
         Ok(parts.join(","))
+    }
+
+    /// Collector series carry no `trace_stream`, so only a reader of every stream may fall back.
+    fn reads_every_stream(&self) -> bool {
+        self.trace_stream.is_none() && self.visible_streams.is_none()
     }
 }
 
@@ -82,7 +89,7 @@ pub async fn fetch_edge_history(
     };
     let mut results = run(true).await?;
     // Collector series are read only for an edge v4 never wrote, so the two never add up.
-    if filter.trace_stream.is_none() && results[0].is_empty() {
+    if filter.reads_every_stream() && results[0].is_empty() {
         results = run(false).await?;
     }
     Ok(assemble(&results))
@@ -153,7 +160,7 @@ fn assemble(results: &[Vec<RangeValue>]) -> Vec<EdgeTrendDataPoint> {
 mod tests {
     use config::meta::promql::value::Sample;
 
-    use super::*;
+    use super::{super::read::V4_ONLY, *};
 
     const MIN: i64 = 60_000_000;
 
@@ -173,6 +180,7 @@ mod tests {
             client: Some("a\"b".to_string()),
             server: None,
             trace_stream: Some("default".to_string()),
+            visible_streams: Some(vec!["default".to_string(), "other".to_string()]),
         };
         for v4_only in [true, false] {
             assert_eq!(
@@ -197,6 +205,28 @@ mod tests {
         assert_eq!(f.matcher(true).unwrap(), "server=\"b\",trace_stream!=\"\"");
         assert_eq!(f.matcher(false).unwrap(), "server=\"b\"");
         assert_eq!(EdgeFilter::default().matcher(true).unwrap(), V4_ONLY);
+    }
+
+    #[test]
+    fn test_matcher_without_a_stream_reads_only_the_visible_streams() {
+        let f = EdgeFilter {
+            server: Some("b".to_string()),
+            visible_streams: Some(vec!["a-1".to_string(), "c".to_string()]),
+            ..Default::default()
+        };
+        for v4_only in [true, false] {
+            assert_eq!(
+                f.matcher(v4_only).unwrap(),
+                "server=\"b\",trace_stream=~\"a\\\\-1|c\""
+            );
+        }
+        assert!(!f.reads_every_stream());
+        assert!(EdgeFilter::default().reads_every_stream());
+        let none_visible = EdgeFilter {
+            visible_streams: Some(vec![]),
+            ..Default::default()
+        };
+        assert!(none_visible.validate().is_err());
     }
 
     #[test]

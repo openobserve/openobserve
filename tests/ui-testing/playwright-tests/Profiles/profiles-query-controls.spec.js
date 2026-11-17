@@ -187,9 +187,10 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.expectUrlParam('filters', 'service_version=v1.5.0');
   });
 
-  test('A second value of the same label replaces the first', { tag: ['@all', '@profiles', '@P1'] }, async () => {
+  test('A label keeps one filter: it leaves the picker and a new value replaces the old', { tag: ['@all', '@profiles', '@P1'] }, async () => {
     await pm.profilesPage.gotoRef(ref, { filters: 'service_version=v1.5.0' });
-    await pm.profilesPage.addFilter('service_version', 'v1.4.0');
+    await pm.profilesPage.expectLabelNotOffered('service_version');
+    await pm.profilesPage.editFilter('service_version', 'v1.4.0');
     await pm.profilesPage.expectFilterChipCount(1);
     await pm.profilesPage.expectFilterChip('service_version', 'v1.4.0');
     const calls = pm.profilesPage.trackRequests();
@@ -225,9 +226,9 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.expectUrlParamAbsent('filters');
   });
 
-  test('The value select stays disabled until a label is picked', { tag: ['@all', '@profiles', '@P2'] }, async () => {
+  test('The filter picker lists labels before any value', { tag: ['@all', '@profiles', '@P2'] }, async () => {
     await pm.profilesPage.gotoRef(ref);
-    await pm.profilesPage.expectValueSelectDisabled();
+    await pm.profilesPage.expectLabelsBeforeValues('service_version', 'v1.5.0');
   });
 
   test('Changing stream clears the filters and the service', { tag: ['@all', '@profiles', '@P2'] }, async () => {

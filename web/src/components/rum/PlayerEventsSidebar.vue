@@ -156,6 +156,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PlayerTracesTab from "./PlayerTracesTab.vue";
+import analytics from "@/services/product_analytics";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
@@ -203,6 +204,8 @@ const props = defineProps({
 const markedSet = computed(() => new Set(props.markedTimestamps));
 
 const activeTab = ref<string>("breadcrumbs");
+watch(activeTab, (tab) => analytics.track("rum_session_sidebar_tab_switched", { tab }));
+
 const tabs: Array<{
   label: I18nText;
   value: string;

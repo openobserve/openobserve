@@ -3,7 +3,7 @@
 // Schema-level tests for the conditions-tree pieces of QueryConfig.schema.ts
 // (alerts-migration.md §A item 4): the recursive refineConditionsTree walker +
 // the loose node schemas. Component-level (real <OForm>) coverage lives in
-// FilterCondition.spec.ts / FilterGroup.spec.ts.
+// the shared condition builder's own specs.
 
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
@@ -32,7 +32,7 @@ const AGGREGATION_COLUMN_REQUIRED_MESSAGE = t("alerts.validation.aggregationColu
 const PROMQL_OPERATOR_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
 const PROMQL_VALUE_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
 
-// Builders matching the LIVE shapes FilterGroup.addCondition / addGroup seed.
+// Builders matching the V2 shapes the condition builder writes.
 const leaf = (overrides: Record<string, unknown> = {}) => ({
   filterType: "condition",
   column: "field1",
@@ -215,6 +215,13 @@ describe("QueryConfig.schema — conditions tree", () => {
 
     it("a valid scheduled count alert passes", () => {
       expect(parse().success).toBe(true);
+    });
+
+    it("blocks save while the condition builder reports an unfinished filter", () => {
+      const r = parse({ _meta: { conditionsValid: false } });
+      expect(paths(r)).toContain("query_condition.conditions");
+      expect(parse({ _meta: { conditionsValid: true } }).success).toBe(true);
+      expect(parse({ _meta: { conditionsValid: false, tab: "sql" } }).success).toBe(true);
     });
 
     // ── Threshold (REHOMED, scheduled) ──────────────────────────────────────
@@ -748,7 +755,7 @@ describe("QueryConfig.schema — conditions tree", () => {
     });
   });
 
-  describe("isConditionGroupNode (mirrors FilterGroup.isGroup)", () => {
+  describe("isConditionGroupNode", () => {
     it("recognises V2 groups and rejects condition leaves", () => {
       expect(isConditionGroupNode(group([]))).toBe(true);
       expect(isConditionGroupNode(leaf())).toBe(false);

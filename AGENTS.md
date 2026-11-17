@@ -15,6 +15,12 @@
 - Before finishing a task: run `cargo fmt --all` and make the CI clippy command
   pass: `cargo clippy --workspace --all-targets -- -W clippy::too_many_lines
   -W clippy::cognitive_complexity -W clippy::excessive_nesting -D warnings`.
+- At the end of every task, after verification, run `cargo clean` in the task's
+  Rust workspace to remove compilation artifacts. Do not interrupt active builds
+  or clean a shared target directory still used by another task.
+- Remove temporary worktrees when the task is complete and their results are
+  preserved. Archive app-managed worktrees with `archive_worktree`; preserve any
+  needed ignored files first. Keep primary checkouts and worktrees still in use.
 
 ## Frontend (web/)
 
@@ -63,9 +69,9 @@ Item order inside a file/module, top to bottom (clippy's default grouping):
 STRICT, and enforced in review — a comment that breaks these is deleted, not
 reworded:
 
-- **One line, or none.** A comment is at most a single line. No multi-line
-  comment blocks in code (the license header is the only exception). If the
-  point needs more than one line, it does not belong in a comment.
+- **Two lines, or none.** A comment is at most two lines. No longer comment
+  blocks in code (the license header is the only exception). If the point
+  needs more than two lines, it does not belong in a comment.
 - **Only logical comments — explain WHY.** The single allowed reason to write a
   comment is to state a non-obvious constraint, invariant, or gotcha the code
   itself cannot express. If a comment is not explaining logic, do not write it;
@@ -74,7 +80,7 @@ reworded:
   spacing, `px`, "matches the header height"), change/modification notes ("now
   we...", "changed to...", "was X"), and narration that restates what the code
   plainly does.
-- `///` / JSDoc doc comments on public APIs: one summary sentence, and only when
+- `///` / JSDoc doc comments on public APIs: at most two lines, and only when
   the behaviour is non-obvious; never to restate the signature.
 
 ## Database schema (migrations / SeaORM entities)

@@ -161,6 +161,7 @@ async fn register() -> Result<()> {
         broadcasted: false,
         metrics: Default::default(),
         version: config::VERSION.to_string(),
+        commit: config::COMMIT_HASH.to_string(),
     };
     let val = json::to_vec(&node).unwrap();
 
@@ -233,6 +234,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             broadcasted: false,
             metrics: Default::default(),
             version: config::VERSION.to_string(),
+            commit: config::COMMIT_HASH.to_string(),
         },
     };
 
@@ -251,6 +253,9 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
 
     // update node status metrics
     node.metrics = update_node_status_metrics().await;
+
+    // the cache only learns our own writes from the watcher, so it can hold an old value here
+    node.scheduled = LOCAL_NODE_SCHEDULED.load(Ordering::Acquire);
 
     let val = json::to_string(&node).unwrap();
 
@@ -290,6 +295,12 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
 mod tests {
     use super::*;
 
+    async fn published_local_node() -> Node {
+        let key = format!("/nodes/{}", LOCAL_NODE.uuid);
+        let stored = get_coordinator().await.get(&key).await.unwrap();
+        json::from_slice(&stored).unwrap()
+    }
+
     #[tokio::test]
     async fn test_nats_update_local_node() {
         let node = Node::default();
@@ -299,6 +310,33 @@ mod tests {
     #[tokio::test]
     async fn test_nats_set_status() {
         let _ = set_status(NodeStatus::Online).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_heartbeat_does_not_republish_stale_cached_scheduled() {
+        config::cache_instance_id("instance");
+        infra::db_init().await.unwrap();
+        add_node_to_cache(Node {
+            scheduled: false,
+            ..LOCAL_NODE.clone()
+        })
+        .await;
+
+        super::super::set_schedulable().await.unwrap();
+        set_status(NodeStatus::Online).await.unwrap();
+
+        assert!(published_local_node().await.scheduled);
+    }
+
+    #[tokio::test]
+    async fn test_heartbeat_publishes_scheduled_when_node_is_not_cached() {
+        config::cache_instance_id("instance");
+        infra::db_init().await.unwrap();
+
+        super::super::set_schedulable().await.unwrap();
+        set_status(NodeStatus::Online).await.unwrap();
+
+        assert!(published_local_node().await.scheduled);
     }
 
     #[tokio::test]

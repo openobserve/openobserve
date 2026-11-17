@@ -1,7 +1,7 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from './draftSignOut.js';
-import { openNavFlyoutChild, gotoMetricsVisualize, clickNavUntilRoute } from '../commonActions.js';
+import { openNavFlyoutChild, gotoMetricsVisualize, clickNavUntilRoute, showAllAlertStates } from '../commonActions.js';
 
 export class HomePage {
     constructor(page) {
@@ -16,7 +16,6 @@ export class HomePage {
         this.dashboardsMenu = page.locator('[data-test="menu-link-\\/dashboards-item"]');
         this.streamsMenu = page.locator('[data-test="menu-link-\\/streams-item"]');
         this.alertsMenu = page.locator('[data-test="menu-link-\\/alerts-item"]');
-        this.iamMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
 
         // ===== HEADER SELECTORS (VERIFIED) =====
         this.orgSelector = page.locator('[data-test="navbar-organizations-select"]');
@@ -118,6 +117,7 @@ export class HomePage {
         await this.alertsMenu.waitFor({ state: 'visible', timeout: 10000 });
         await clickNavUntilRoute(this.page, '[data-test="menu-link-\\/alerts-item"]', '/alerts');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await showAllAlertStates(this.page);
     }
 
     async navigateToIngestion() {
@@ -143,8 +143,7 @@ export class HomePage {
     }
 
     async navigateToIam() {
-        await this.iamMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.iamMenu.click();
+        await openNavFlyoutChild(this.page, 'iam');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 

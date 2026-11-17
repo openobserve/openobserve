@@ -70,15 +70,16 @@ static ORG_HAS_TEAMS_CACHE: LazyLock<RwHashMap<String, (bool, Instant)>> =
 /// arrived.
 const TEAM_CACHE_TTL: Duration = Duration::from_secs(60);
 
-/// How long "this org has no teams" is believed without asking again.
-///
-/// Shorter than [`TEAM_CACHE_TTL`], because this is the one entry whose
-/// staleness makes the product look broken: an operator creating their first
-/// team and seeing nothing happen concludes on-call does not work.
-const NO_TEAMS_CACHE_TTL: Duration = Duration::from_secs(10);
+/// Both answers decide who an incident pages, so each bounds how long a lost event goes unseen.
+const ORG_HAS_TEAMS_CACHE_TTL: Duration = Duration::from_secs(10);
 
 fn team_cache_key(org_id: &str, id: &str) -> String {
     format!("{org_id}/{id}")
+}
+
+fn cached_has_any(org_id: &str) -> Option<bool> {
+    let (any, cached_at) = *ORG_HAS_TEAMS_CACHE.get(org_id)?;
+    (cached_at.elapsed() < ORG_HAS_TEAMS_CACHE_TTL).then_some(any)
 }
 
 /// Drops one team from the definition cache, and the org's "has any team"
@@ -456,24 +457,10 @@ pub async fn get_cached(org_id: &str, id: &str) -> Result<Option<Team>, errors::
     Ok(found)
 }
 
-/// Whether this org has any on-call team at all, served from
-/// [`ORG_HAS_TEAMS_CACHE`] when fresh.
-///
-/// The negative IS cached, unlike a missing team in [`get_cached`], because it
-/// is the answer for nearly every org and is asked on every firing. [`create`]
-/// publishes an invalidation, so the first team an org makes drops this entry on
-/// every node before the next firing reads it.
+/// Caches "no team" too, unlike [`get_cached`], because every firing asks and most orgs have none.
 pub async fn has_any_cached(org_id: &str) -> Result<bool, errors::Error> {
-    if let Some(entry) = ORG_HAS_TEAMS_CACHE.get(org_id) {
-        let (any, cached_at) = *entry;
-        let ttl = if any {
-            TEAM_CACHE_TTL
-        } else {
-            NO_TEAMS_CACHE_TTL
-        };
-        if cached_at.elapsed() < ttl {
-            return Ok(any);
-        }
+    if let Some(any) = cached_has_any(org_id) {
+        return Ok(any);
     }
     let client = get_orm_client_rw().await;
     let any = oncall_teams::Entity::find()
@@ -824,6 +811,27 @@ mod tests {
         );
         assert!(ORG_HAS_TEAMS_CACHE.contains_key("inv_team_ab"));
         invalidate_org("inv_team_ab");
+    }
+
+    #[test]
+    fn a_stale_has_any_answer_expires_as_fast_whether_it_says_yes_or_no() {
+        let at = |secs| {
+            Instant::now()
+                .checked_sub(Duration::from_secs(secs))
+                .expect("uptime exceeds the probe age")
+        };
+        let stale = ORG_HAS_TEAMS_CACHE_TTL.as_secs() + 1;
+        for (org, entry, want) in [
+            ("has_any_stale_yes", (true, at(stale)), None),
+            ("has_any_stale_no", (false, at(stale)), None),
+            ("has_any_fresh_yes", (true, at(0)), Some(true)),
+            ("has_any_fresh_no", (false, at(0)), Some(false)),
+        ] {
+            ORG_HAS_TEAMS_CACHE.insert(org.to_string(), entry);
+            assert_eq!(cached_has_any(org), want, "{org}");
+            ORG_HAS_TEAMS_CACHE.remove(org);
+        }
+        assert_eq!(cached_has_any("has_any_never_asked"), None);
     }
 
     /// RO-1, CM-3: `here` stores the room, a channel save keeps it or sets the same-room

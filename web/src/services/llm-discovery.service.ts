@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
 
 // ─── LLM Annotation · Discovery ─────────────────────────────────────────────
 // Discovery is the stateless triage list: "find unhealthy traces/spans/sessions
@@ -215,6 +216,7 @@ const llmDiscoveryService = {
         }),
       ),
     );
+    analytics.track("llm_discovery_items_queued", { count: items.length });
     return items.length;
   },
 };

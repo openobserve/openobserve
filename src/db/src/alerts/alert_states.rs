@@ -29,7 +29,7 @@
 use config::meta::alerts::{
     dispatch::DeliveryEpisode,
     grouping::GroupPlan,
-    state::{EvalLedgerWrite, StateUpdate},
+    state::{EvalLedgerWrite, ROLLUP_GROUP_KEY, StateUpdate},
 };
 use infra::{
     errors::Result,
@@ -159,6 +159,12 @@ pub async fn delete_all_groups(alert_id: &str) -> Result<u64> {
     .await;
 
     Ok(deleted)
+}
+
+/// Drop every state row of an alert, rollup included, keeping its transition history.
+pub async fn delete_states(alert_id: &str) -> Result<()> {
+    delete_all_groups(alert_id).await?;
+    delete_groups(alert_id, &[ROLLUP_GROUP_KEY.to_string()]).await
 }
 
 /// Drop an alert's state rows.

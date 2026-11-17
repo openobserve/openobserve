@@ -21,6 +21,9 @@
       <div v-else-if="matchedLoading" class="text-text-secondary m-0 text-xs leading-normal">
         {{ t(`onlineEvals.job.preview.scopes.${targetScope}.matchedLoading`) }}
       </div>
+      <div v-else-if="noSessionColumn" class="text-text-secondary m-0 text-xs leading-normal">
+        {{ t("onlineEvals.job.preview.noSessionColumn") }}
+      </div>
       <div v-else-if="matchedError" class="text-status-error-text m-0 text-xs">
         {{ t("onlineEvals.job.preview.matchedError") }}
       </div>
@@ -29,6 +32,17 @@
         <span class="text-text-secondary text-xs">
           {{ t(`onlineEvals.job.preview.scopes.${targetScope}.matchedSuffix`) }}
         </span>
+      </div>
+      <!-- The Cost section's figure, repeated so it stays in view while editing. -->
+      <div
+        v-if="stream"
+        class="border-dialog-header-border mt-2.5 flex flex-col gap-0.5 border-t pt-2.5"
+        data-test="job-preview-daily-cost"
+      >
+        <span class="text-text-heading text-sm font-semibold tabular-nums">{{
+          dailyCostText
+        }}</span>
+        <span class="text-2xs text-text-secondary">{{ t("evalSpend.preview.note") }}</span>
       </div>
     </section>
 
@@ -62,6 +76,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { EvalTargetScope } from "@/services/online-evals.service";
 import { useJobMatchedTargets } from "../../composables/useJobMatchedTargets";
+import { formatUsd } from "../../utils/evalSpend";
 
 const props = defineProps<{
   name: string;
@@ -74,6 +89,11 @@ const props = defineProps<{
   filterWhere: string;
   /** False while a filter condition is half-filled — pauses the count query. */
   filterReady: boolean;
+  /** Field names of the stream's schema (null while loading); session scope needs a session column. */
+  streamFields: string[] | null;
+  /** Estimated judge spend a day; null when it cannot be estimated. */
+  dailyCost?: number | null;
+  costLoading?: boolean;
 }>();
 
 const { t } = useI18nTyped();
@@ -82,12 +102,21 @@ const {
   count: matchedCount,
   isLoading: matchedLoading,
   error: matchedError,
+  noSessionColumn,
 } = useJobMatchedTargets(
   toRef(props, "stream"),
   toRef(props, "filterWhere"),
   toRef(props, "filterReady"),
   toRef(props, "targetScope"),
+  toRef(props, "streamFields"),
 );
+
+const dailyCostText = computed(() => {
+  if (props.costLoading) return t("evalSpend.preview.estimating");
+  return props.dailyCost == null
+    ? t("evalSpend.preview.cannot")
+    : t("evalSpend.preview.perDay", { amount: formatUsd(props.dailyCost) });
+});
 
 const formattedCount = computed(() =>
   matchedCount.value == null ? "—" : matchedCount.value.toLocaleString(),

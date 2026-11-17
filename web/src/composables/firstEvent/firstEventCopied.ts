@@ -26,3 +26,19 @@ export const provideSnippetCopied = (
   provide(FIRST_EVENT_SNIPPET_COPIED, copied);
   return copied;
 };
+
+/** Every bar under a host joins with its `start`; the returned function leaves. */
+export const FIRST_EVENT_BARS: InjectionKey<(start: (reason: "copy") => void) => () => void> =
+  Symbol("firstEventBars");
+
+/** For a host whose copies sit outside the card or page that holds its bar: they restart whichever bars run under it. */
+export const provideBarsCopied = (): (() => void) => {
+  const starts = new Set<(reason: "copy") => void>();
+  provide(FIRST_EVENT_BARS, (start) => {
+    starts.add(start);
+    return () => starts.delete(start);
+  });
+  const copied = () => starts.forEach((start) => start("copy"));
+  provide(FIRST_EVENT_SNIPPET_COPIED, copied);
+  return copied;
+};

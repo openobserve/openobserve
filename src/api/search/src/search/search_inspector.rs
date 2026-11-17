@@ -68,7 +68,7 @@ use crate::{
         ("end_time" = Option<i64>, Query, description = "end time; defaults from the trace id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = SearchInspector, example = json!({
           "sql": "SELECT count(*) FROM \"default\" WHERE match_all('m')",
           "start_time": "1744168877746000",
           "end_time": "1744773677746000",

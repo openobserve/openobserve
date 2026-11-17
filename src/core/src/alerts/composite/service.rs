@@ -72,6 +72,7 @@ pub struct CompositeCreate {
     pub owner: Option<String>,
     pub last_edited_by: Option<String>,
     pub pending_period_sec: i64,
+    pub incident_title_template: Option<String>,
 }
 
 /// Errors the composite service surfaces to the API layer; each variant maps to
@@ -112,6 +113,8 @@ pub enum CompositeServiceError {
     NegativePendingPeriod,
     #[error("{0}")]
     JiraDestinationNotSupported(String),
+    #[error(transparent)]
+    NotificationTarget(crate::alerts::alert::AlertError),
 }
 
 pub async fn create_composite(
@@ -156,6 +159,9 @@ pub async fn set_composite_enabled(
     }
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
     let db = get_orm_client_rw().await;
+    if enabled {
+        reset_if_re_enabled(db, org, id, enabled).await?;
+    }
     let result = composite_entity::Entity::update_many()
         .col_expr(composite_entity::Column::Enabled, Expr::value(enabled))
         .col_expr(
@@ -213,21 +219,17 @@ async fn increment_and_advance(
     Ok(())
 }
 
-pub async fn move_composite(
+/// The folder `id` sits in, when `editor` may move it out of there.
+pub async fn check_move_composite(
     org: &str,
     id: &str,
-    folder_id: &str,
     editor: &str,
-) -> Result<(), CompositeServiceError> {
+) -> Result<String, CompositeServiceError> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
     ensure_mutation_allowed()?;
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
-    let db = get_orm_client_rw().await;
-    // Resolve the current folder for the authorization check and OpenFGA
-    // relation rewrite below, mirroring alert::move_to_folder.
-    #[cfg(feature = "enterprise")]
     let current = composite_entity::Entity::find_by_id(id)
         .filter(composite_entity::Column::Org.eq(org))
-        .one(db)
+        .one(get_orm_client_rw().await)
         .await?
         .ok_or(CompositeServiceError::NotFound)?;
     #[cfg(feature = "enterprise")]
@@ -247,6 +249,21 @@ pub async fn move_composite(
     {
         return Err(CompositeServiceError::PermissionDenied);
     }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = editor;
+    Ok(current.folder_id)
+}
+
+/// Moves `id` from `_src_folder_id`, which [`check_move_composite`] returned, to `folder_id`.
+pub async fn move_composite(
+    org: &str,
+    id: &str,
+    _src_folder_id: &str,
+    folder_id: &str,
+    editor: &str,
+) -> Result<(), CompositeServiceError> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
+    let db = get_orm_client_rw().await;
     let result = composite_entity::Entity::update_many()
         .col_expr(composite_entity::Column::FolderId, Expr::value(folder_id))
         .col_expr(composite_entity::Column::LastEditedBy, Expr::value(editor))
@@ -275,7 +292,7 @@ pub async fn move_composite(
         remove_parent_relation(
             id,
             &get_ofga_type("alerts"),
-            &current.folder_id,
+            _src_folder_id,
             &get_ofga_type("alert_folders"),
         )
         .await;
@@ -323,6 +340,7 @@ pub async fn clone_composite(
         owner: current.owner,
         last_edited_by: Some(editor),
         pending_period_sec: current.pending_period_sec,
+        incident_title_template: current.incident_title_template,
     })
     .await
 }
@@ -336,12 +354,28 @@ async fn persist(
     if request.pending_period_sec < 0 {
         return Err(CompositeServiceError::NegativePendingPeriod);
     }
+    crate::alerts::alert::validate_template_and_destinations(
+        &request.org,
+        request.template.as_deref(),
+        &request.destinations,
+    )
+    .await
+    .map_err(CompositeServiceError::NotificationTarget)?;
     validate_jira_destinations(&request.org, &request.destinations, request.silence_seconds)
         .await?;
     let references = collect_references(&parsed).map_err(map_expression_error)?;
     validate_children(&references).map_err(map_expression_error)?;
     let expression = canonical_expression(&parsed);
     let id = request.id.clone().expect("service assigns an ID");
+    if update {
+        reset_if_re_enabled(
+            get_orm_client_rw().await,
+            &request.org,
+            &id,
+            request.enabled,
+        )
+        .await?;
+    }
     let graph_guard = composite_graph_lock::lock(&request.org)
         .await
         .map_err(|error| CompositeServiceError::Lock(error.to_string()))?;
@@ -371,6 +405,28 @@ async fn persist(
 
     schedule_definition(&definition).await;
     Ok(definition)
+}
+
+/// Before the write that enables a disabled composite, drops its own rollup so it starts fresh.
+async fn reset_if_re_enabled(
+    db: &DatabaseConnection,
+    org: &str,
+    id: &str,
+    enabled: bool,
+) -> Result<(), CompositeServiceError> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    let was_enabled = composite_entity::Entity::find_by_id(id)
+        .filter(composite_entity::Column::Org.eq(org))
+        .one(db)
+        .await?
+        .map(|definition| definition.enabled);
+    if crate::alerts::alert::re_enables(was_enabled, enabled) {
+        crate::alerts::alert::reset_run_state(org, id, TriggerModule::CompositeAlert)
+            .await
+            .map_err(|error| CompositeServiceError::Scheduler(error.into()))?;
+    }
+    Ok(())
 }
 
 /// The alert's Jira rules; a composite is never real-time or multi-alert, so only silence refuses.
@@ -430,6 +486,7 @@ async fn persist_under_lock(
         updated_at: Set(Some(config::utils::time::now_micros())),
         evaluation_generation: Set(0),
         pending_period_sec: Set(request.pending_period_sec),
+        incident_title_template: Set(request.incident_title_template),
     };
     let children = resolved
         .into_iter()
@@ -884,10 +941,213 @@ pub async fn startup_preflight() -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::destinations::{Destination, DestinationType, Endpoint, Module};
+    use config::meta::destinations::{Destination, DestinationType, Endpoint, Module, Template};
 
-    use super::validate_jira_destinations;
+    use super::{
+        CompositeCreate, create_composite, set_composite_enabled, update_composite,
+        validate_jira_destinations,
+    };
     use crate::alerts::notifications::jira;
+
+    fn composite_request(
+        org: &str,
+        expression: String,
+        destination: &str,
+        template: Option<&str>,
+    ) -> CompositeCreate {
+        CompositeCreate {
+            id: None,
+            org: org.to_string(),
+            folder_id: "default".to_string(),
+            name: "composite".to_string(),
+            description: None,
+            expression,
+            warning_counts_as_firing: false,
+            stale_child_policy: 0,
+            destinations: vec![destination.to_string()],
+            template: template.map(str::to_string),
+            context_attributes: None,
+            enabled: false,
+            silence_seconds: 0,
+            creates_incident: false,
+            workflows: vec![],
+            priority: None,
+            tags: vec![],
+            owner: None,
+            last_edited_by: None,
+            pending_period_sec: 0,
+            incident_title_template: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_composite_naming_a_missing_destination_or_template_is_refused() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("composite_targets_{}", config::utils::time::now_micros());
+        let org = org.as_str();
+        let folder = config::meta::folder::Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(org, folder, config::meta::folder::FolderType::Alerts)
+            .await
+            .unwrap();
+        let conn = infra::db::get_orm_client_rw().await;
+        let mut children = Vec::new();
+        for name in ["child_a", "child_b"] {
+            let mut child = config::meta::alerts::alert::Alert::default();
+            child.name = name.to_string();
+            let child = infra::table::alerts::create(conn, org, "default", child, false)
+                .await
+                .unwrap();
+            children.push(child.id.unwrap());
+        }
+        let expression = format!("{{{}}} && {{{}}}", children[0], children[1]);
+        common::infra::config::DESTINATIONS.insert(
+            format!("{org}/real"),
+            Destination {
+                org_id: org.into(),
+                name: "real".into(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type: DestinationType::Http(Endpoint::default()),
+                },
+                ..Default::default()
+            },
+        );
+        infra::table::templates::put(Template {
+            org_id: org.to_string(),
+            name: "real".to_string(),
+            body: r#"{"text":"{alert_name}"}"#.to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let request = |dest: &str, template: Option<&str>| {
+            composite_request(org, expression.clone(), dest, template)
+        };
+
+        let refused = create_composite(request("nope", None)).await;
+        assert_eq!(
+            refused.map(|_| ()).map_err(|e| e.to_string()),
+            Err("Alert destination nope not found".to_string())
+        );
+        let refused = create_composite(request("real", Some("nope"))).await;
+        assert_eq!(
+            refused.map(|_| ()).map_err(|e| e.to_string()),
+            Err("Alert template nope not found".to_string())
+        );
+
+        let saved = create_composite(request("real", Some("real")))
+            .await
+            .unwrap();
+        let refused = update_composite(&saved.id, request("nope", Some("real"))).await;
+        assert_eq!(
+            refused.map(|_| ()).map_err(|e| e.to_string()),
+            Err("Alert destination nope not found".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn re_enabling_a_composite_restarts_its_pending_period() {
+        use config::meta::{
+            alerts::{level::AlertLevel, state::ROLLUP_GROUP_KEY},
+            self_reporting::usage::RunOutcome,
+        };
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("composite_re_enable_{}", config::utils::time::now_micros());
+        let org = org.as_str();
+        let folder = config::meta::folder::Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(org, folder, config::meta::folder::FolderType::Alerts)
+            .await
+            .unwrap();
+        let conn = infra::db::get_orm_client_rw().await;
+        let mut children = Vec::new();
+        for name in ["child_a", "child_b"] {
+            let mut child = config::meta::alerts::alert::Alert::default();
+            child.name = name.to_string();
+            let child = infra::table::alerts::create(conn, org, "default", child, false)
+                .await
+                .unwrap();
+            children.push(child.id.unwrap());
+        }
+        common::infra::config::DESTINATIONS.insert(
+            format!("{org}/real"),
+            Destination {
+                org_id: org.into(),
+                name: "real".into(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type: DestinationType::Http(Endpoint::default()),
+                },
+                ..Default::default()
+            },
+        );
+        let mut request = composite_request(
+            org,
+            format!("{{{}}} && {{{}}}", children[0], children[1]),
+            "real",
+            None,
+        );
+        request.pending_period_sec = 300;
+        let saved = create_composite(request.clone()).await.unwrap();
+        let id = saved.id.as_str();
+        let pending_since = |at: i64| async move {
+            let update = config::meta::alerts::state::apply_outcome(
+                id,
+                ROLLUP_GROUP_KEY,
+                None,
+                RunOutcome::Pending,
+                Some(AlertLevel::Critical),
+                at,
+            );
+            db::alerts::alert_states::persist(&update, None)
+                .await
+                .unwrap();
+        };
+        let rollup = || async {
+            infra::table::alert_states::get(&saved.id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+        };
+
+        pending_since(1_000).await;
+        set_composite_enabled(org, &saved.id, true).await.unwrap();
+        assert!(rollup().await.is_none(), "the old pending start is gone");
+
+        pending_since(2_000).await;
+        set_composite_enabled(org, &saved.id, true).await.unwrap();
+        assert!(
+            rollup().await.is_some(),
+            "enabling an enabled composite resets nothing"
+        );
+
+        set_composite_enabled(org, &saved.id, false).await.unwrap();
+        request.enabled = true;
+        update_composite(&saved.id, request).await.unwrap();
+        assert!(
+            rollup().await.is_none(),
+            "a full save that enables it resets too"
+        );
+    }
 
     #[tokio::test]
     async fn jira_refuses_a_composite_silenced_under_ten_minutes() {

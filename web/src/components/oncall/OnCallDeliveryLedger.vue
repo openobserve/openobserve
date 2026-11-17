@@ -15,8 +15,6 @@
 -->
 <template>
   <div class="flex flex-col gap-2" data-test="oncall-delivery-ledger">
-    <p class="text-text-secondary text-xs">{{ t("oncall.deliveriesHint") }}</p>
-
     <OInnerLoading v-if="loading" showing />
 
     <OEmptyState
@@ -46,11 +44,26 @@
           class="border-border-subtle flex flex-wrap items-center gap-2 border-b py-1.5 last:border-b-0"
           :data-test="`oncall-delivery-row-${group.run}-${index}`"
         >
-          <OTag :variant="row.delivered ? 'success-soft' : 'error-soft'" size="sm">
+          <OTag
+            :variant="row.delivered ? 'success-soft' : 'error-soft'"
+            size="sm"
+            data-test="oncall-delivery-status"
+          >
             {{ row.delivered ? t("oncall.deliveryLanded") : t("oncall.deliveryFailed") }}
           </OTag>
-          <OUserCell v-if="row.recipient" :value="row.recipient" />
-          <OTag v-if="row.channel" variant="default-soft" size="sm">
+          <OnCallPersonName
+            v-if="row.recipient"
+            class="text-text-body text-sm"
+            :email="row.recipient"
+            :data-test="`oncall-delivery-recipient-${group.run}-${index}`"
+            :data-test-email="row.recipient"
+          />
+          <OTag
+            v-if="row.channel"
+            variant="default-soft"
+            size="sm"
+            data-test="oncall-delivery-channel"
+          >
             {{ t(`oncall.channel_${row.channel}`) }}
           </OTag>
           <span
@@ -127,7 +140,7 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import type { Channel, DeliveryRecord } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";

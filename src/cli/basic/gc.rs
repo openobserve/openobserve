@@ -22,14 +22,13 @@
 //! directory on remote storage whose data is entirely older than the cutoff.
 //!
 //! The deletion decision mirrors the compactor retention logic
-//! ([`compaction::retention`]): a stream's effective retention is
-//! `stream_settings.data_retention` (falling back to
-//! `ZO_COMPACT_DATA_RETENTION_DAYS`), and any day overlapping an
+//! ([`compaction::retention`]): a stream's effective retention comes from
+//! `db::organization::stream_retention_days`, and any day overlapping an
 //! `extended_retention_days` range is preserved.
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::{
-    get_config, is_local_disk_storage,
+    is_local_disk_storage,
     meta::stream::{StreamType, TimeRange},
     utils::time::now,
 };
@@ -56,9 +55,7 @@ pub async fn run(
 
     infra::init().await?;
 
-    let cfg = get_config();
     let now = now();
-    let default_retention_days = cfg.compact.data_retention_days;
     let stream_filter = stream_filter.filter(|s| !s.is_empty());
 
     let mut total_dirs = 0usize;
@@ -78,7 +75,6 @@ pub async fn run(
             org_id,
             stream_type,
             stream_name,
-            default_retention_days,
             now,
             account_override,
             dry_run,
@@ -104,7 +100,6 @@ pub async fn run(
                         &org_id,
                         stream_type,
                         &stream_name,
-                        default_retention_days,
                         now,
                         account_override,
                         dry_run,
@@ -134,7 +129,6 @@ async fn gc_stream(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    default_retention_days: i64,
     now: DateTime<Utc>,
     account_override: Option<&str>,
     dry_run: bool,
@@ -143,11 +137,22 @@ async fn gc_stream(
         .await
         .unwrap_or_default();
 
-    // effective retention: stream override wins over global config
-    let mut retention_days = default_retention_days;
-    if stream_settings.data_retention > 0 {
-        retention_days = stream_settings.data_retention;
-    }
+    let retention_days = match db::organization::stream_retention_days(
+        org_id,
+        stream_type,
+        stream_name,
+        stream_settings.data_retention,
+    )
+    .await
+    {
+        Ok(days) => days,
+        Err(e) => {
+            log::error!(
+                "[GC] skip {org_id}/{stream_type}/{stream_name}: can't read its retention: {e}"
+            );
+            return Ok((0, 0));
+        }
+    };
     if retention_days <= 1 {
         // retention disabled (0) or 1 day: skip as a safety guard so this tool
         // never deletes near-current data

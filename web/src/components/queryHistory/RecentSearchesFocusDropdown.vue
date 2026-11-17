@@ -52,6 +52,8 @@ const DROPDOWN_Z_INDEX = 6000;
 const EDGE_GAP_PX = 8;
 const MIN_ROOM_PX = 160;
 const CARET_SELECTOR = ".monaco-editor .cursors-layer .cursor";
+// Controls the user still needs while the panel is open, such as the stream picker under the editor.
+const AVOID_SELECTOR = "[data-recent-searches-avoid]";
 
 const props = withDefaults(
   defineProps<{
@@ -97,21 +99,50 @@ const position = computed(() => {
 
 const caretRect = () => props.anchor?.querySelector(CARET_SELECTOR)?.getBoundingClientRect();
 
+const clampLeft = (left: number, width: number) =>
+  Math.max(EDGE_GAP_PX, Math.min(left, window.innerWidth - width - EDGE_GAP_PX));
+
+// Slides the panel right of any avoided control it would cover, but only when it still fits on screen.
+const clearOfAvoided = (left: number, width: number, top: number, bottom: number): number => {
+  let next = left;
+  for (const el of document.querySelectorAll(AVOID_SELECTOR)) {
+    const rect = el.getBoundingClientRect();
+    const overlaps =
+      rect.width > 0 &&
+      rect.top < bottom &&
+      rect.bottom > top &&
+      rect.left < next + width &&
+      rect.right > next;
+    if (!overlaps) continue;
+    const shifted = rect.right + EDGE_GAP_PX;
+    if (shifted + width + EDGE_GAP_PX <= window.innerWidth) next = shifted;
+  }
+  return next;
+};
+
 const place = (): Placement | null => {
   const caret = caretRect();
   if (!caret || caret.bottom <= 0 || caret.top >= window.innerHeight) return null;
   const width = panelRef.value?.offsetWidth ?? 0;
-  const left = Math.max(EDGE_GAP_PX, Math.min(caret.left, window.innerWidth - width - EDGE_GAP_PX));
+  const height = panelRef.value?.offsetHeight ?? 0;
+  const left = clampLeft(caret.left, width);
   const roomBelow = window.innerHeight - caret.bottom - EDGE_GAP_PX;
   if (roomBelow >= MIN_ROOM_PX) {
-    return { side: "below", viewportOffset: caret.bottom, left, maxHeight: roomBelow };
+    const bottom = caret.bottom + Math.min(height, roomBelow);
+    return {
+      side: "below",
+      viewportOffset: caret.bottom,
+      left: clearOfAvoided(left, width, caret.bottom, bottom),
+      maxHeight: roomBelow,
+    };
   }
   const roomAbove = caret.top - EDGE_GAP_PX;
   if (roomAbove >= MIN_ROOM_PX) {
+    const top = caret.top - Math.min(height, roomAbove);
     return {
       side: "above",
       viewportOffset: window.innerHeight - caret.top,
-      left,
+      left: clearOfAvoided(left, width, top, caret.top),
       maxHeight: roomAbove,
     };
   }
@@ -139,8 +170,9 @@ let panelSizes: ResizeObserver | null = null;
 const caretKey = () => {
   const caret = caretRect();
   const width = panelRef.value?.offsetWidth ?? 0;
+  const height = panelRef.value?.offsetHeight ?? 0;
   if (!caret) return "";
-  return `${caret.left}|${caret.top}|${caret.bottom}|${width}|${window.innerWidth}|${window.innerHeight}`;
+  return `${caret.left}|${caret.top}|${caret.bottom}|${width}|${height}|${window.innerWidth}|${window.innerHeight}`;
 };
 
 const reposition = () => {

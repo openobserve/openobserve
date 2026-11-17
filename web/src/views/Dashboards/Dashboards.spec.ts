@@ -1201,6 +1201,47 @@ describe("Dashboards.vue", () => {
       expect(dashboardService.bulkDelete).toHaveBeenCalled();
       expect(analytics.track).not.toHaveBeenCalledWith("dashboard_deleted", expect.anything());
     });
+
+    describe("home unpin", () => {
+      const pinD1 = () => {
+        useHomeDashboard(gt).homeDashboard.value = {
+          dashboardId: "d1",
+          folderId: "default",
+          label: "Pinned",
+        };
+      };
+
+      afterEach(() => {
+        useHomeDashboard(gt).homeDashboard.value = null;
+      });
+
+      it("tracks home_dashboard_unpinned once the pin is cleared", async () => {
+        await mountDashboards();
+        pinD1();
+
+        await wrapper.vm.toggleHome({ id: "d1" });
+
+        expect(analytics.track).toHaveBeenCalledWith("home_dashboard_unpinned", {
+          source: "dashboard_list",
+        });
+      });
+
+      it("does not track an unpin the server refused", async () => {
+        vi.mocked(settingsService.deleteOrgSetting).mockRejectedValueOnce({
+          response: { status: 500 },
+        });
+        await mountDashboards();
+        pinD1();
+
+        await wrapper.vm.toggleHome({ id: "d1" });
+
+        expect(useHomeDashboard(gt).homeDashboard.value?.dashboardId).toBe("d1");
+        expect(analytics.track).not.toHaveBeenCalledWith(
+          "home_dashboard_unpinned",
+          expect.anything(),
+        );
+      });
+    });
   });
   describe("Cross-folder search failure", () => {
     it("keeps the list renderable when the debounced search fails", async () => {

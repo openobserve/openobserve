@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    :title="t('invitation.pendingInvitations')"
+    :title="t('iam.invitations')"
     :subtitle="t('iam.invitationList.subtitle')"
     icon="mail"
     bleed
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar-trailing>
             <OButton
               variant="outline"
-              size="icon-sm"
+              size="icon-toolbar"
               icon-left="refresh"
               :loading="loading"
               data-test="invitation-list-refresh-btn"
@@ -202,6 +202,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -387,6 +388,7 @@ export default defineComponent({
 
       try {
         await organizationsService.process_subscription(selected.token, "confirm", selected.org_id);
+        analytics.track("invitation_accepted", { source: "invitation_list" });
 
         // Refresh the organizations list in the store
         const orgResponse = await organizationsService.list(0, 1000000, "name", false, "");
@@ -432,6 +434,7 @@ export default defineComponent({
 
       try {
         await organizationsService.decline_subscription(selected.token);
+        analytics.track("invitation_declined");
         dismiss();
         toast({
           message: t("iam.invitationList.rejectedSuccess"),

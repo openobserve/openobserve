@@ -224,7 +224,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
-  test.skip("Should apply the filter group inside group", async ({ page }) => {
+  test("Should apply the filter group inside group", async ({ page }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
@@ -281,8 +281,9 @@ test.describe("dashboard filter testcases", () => {
       "$variablename"
     );
 
-    await pm.dashboardFilter.clickAddConditionWithinRowText(/^kubernetes_container_namearrow_drop_downcloseadd$/);
-    await pm.dashboardFilter.clickAddGroupDivByNth(3);
+    // A group typed while the first one is open nests inside it.
+    await pm.dashboardFilter.clickAddConditionInGroup(1);
+    await pm.dashboardFilter.clickAddGroupOptionLast();
 
     await pm.dashboardFilter.addGroupFilterCondition(
       0,
@@ -294,13 +295,27 @@ test.describe("dashboard filter testcases", () => {
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    await expect(pm.dashboardPanelActions.getVisibleText("'$variablename'").first()).toBeVisible();
+    await expect(
+      pm.dashboardFilter.getAddConditionLabel(0, "kubernetes_container_name")
+    ).toContainText("$variablename");
+
+    // The second group sits inside the first, holding the image condition.
+    await expect(pm.dashboardFilter.groups).toHaveCount(2);
+    await expect(
+      pm.dashboardFilter
+        .getGroup(2)
+        .locator('[data-test="dashboard-filter-builder-chip-kubernetes_container_image"]')
+    ).toBeVisible();
+    expect(await pm.dashboardFilter.conditionCount()).toBe(2);
 
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
     await pm.dashboardPanelEdit.waitForQueryInspector();
 
     await expect(pm.dashboardPanelEdit.getExecutedQuery(0)).toContainText(
       'SELECT histogram(_timestamp) as "x_axis_1"'
+    );
+    await expect(pm.dashboardPanelEdit.getExecutedQuery(0)).toContainText(
+      "WHERE (kubernetes_container_name = 'ziox' AND (kubernetes_container_image <> 'ziox'))"
     );
 
     await pm.logsVisualise.closeQueryInspector();
@@ -802,7 +817,9 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify the variable is displayed
-    await expect(pm.dashboardPanelActions.getVisibleText("'$variablename'").first()).toBeVisible();
+    await expect(
+      pm.dashboardFilter.getAddConditionLabel(0, "kubernetes_container_name")
+    ).toContainText("$variablename");
 
     // Verify the generated query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();

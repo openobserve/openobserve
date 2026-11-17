@@ -3,6 +3,8 @@
  *
  * Row-level controls interpolate the team **id** (a ksuid), not its name:
  *   oncall-team-edit-<id> / oncall-team-delete-<id> / oncall-teams-primary-gap-<id>
+ * Edit and Delete are icon buttons on the row; there is no row menu. The default
+ * team is set from the Edit drawer's `oncall-team-form-default` switch, on Save.
  * so a spec holds the id its fixture returned rather than searching by text.
  * That is the opposite of the SLO list, whose selectors carry the name.
  *
@@ -63,8 +65,11 @@ export class OnCallTeamsPage {
       formAddEveryone: '[data-test="oncall-team-form-add-everyone"]',
       formShift: '[data-test="oncall-team-form-shift"]',
       formHandover: '[data-test="oncall-team-form-handover"]',
+      formHandoverDate: '[data-test="oncall-team-form-handover-date-group"]',
+      formHandoverYear: '[data-test="oncall-team-form-handover-date-group"] [data-reka-date-field-segment="year"]',
       formSecondary: '[data-test="oncall-team-form-secondary"]',
       formManageLink: '[data-test="oncall-team-form-manage-link"]',
+      formDefault: '[data-test="oncall-team-form-default"]',
 
       // The delete confirmation is a ConfirmDialog, which forwards its own
       // data-test onto the panel so the button below can be scoped to it.
@@ -77,6 +82,8 @@ export class OnCallTeamsPage {
   // Row-scoped selectors are built, not stored, because they carry the team id.
   editButton(teamId) { return `[data-test="oncall-team-edit-${teamId}"]`; }
   deleteButton(teamId) { return `[data-test="oncall-team-delete-${teamId}"]`; }
+  /** Phone only: the row's ⋯, holding `<edit|delete>Button(id)-menu` items. */
+  moreButton(teamId) { return `[data-test="oncall-team-more-${teamId}"]`; }
   primaryGapTag(teamId) { return `[data-test="oncall-teams-primary-gap-${teamId}"]`; }
   /** Any team row, keyed by the id-carrying edit control — used to count rows. */
   anyRow() { return '[data-test^="oncall-team-edit-"]'; }
@@ -102,6 +109,8 @@ export class OnCallTeamsPage {
   getAddButton() { return this.page.locator(this.locators.addButton); }
   getEditButton(teamId) { return this.page.locator(this.editButton(teamId)); }
   getDeleteButton(teamId) { return this.page.locator(this.deleteButton(teamId)); }
+  /** The Edit drawer's switch that makes the team the org's default when the drawer saves. */
+  getFormDefaultSwitch() { return this.page.locator(this.locators.formDefault); }
 
   /** Every rendered team row. `toHaveCount(n)` against this is how a spec counts the list. */
   getRows() { return this.page.locator(this.anyRow()); }
@@ -269,6 +278,14 @@ export class OnCallTeamsPage {
     await this.page.keyboard.press('Escape');
   }
 
+  getFormHandoverDate() { return this.page.locator(this.locators.formHandoverDate); }
+
+  /** One key at a time, because the year bug re-read the half-typed value after each digit. */
+  async typeFormHandoverYear(year) {
+    await this.page.locator(this.locators.formHandoverYear).click();
+    await this.page.keyboard.type(year, { delay: 150 });
+  }
+
   /** Creation only — once the team exists, membership has a screen of its own. */
   async addEveryone() {
     await this.page.locator(this.locators.formAddEveryone).click();
@@ -276,6 +293,14 @@ export class OnCallTeamsPage {
 
   async saveDrawer() {
     await this.getDrawerSave().click();
+  }
+
+  /** Save a new team; `staffed` is left pending so the caller can record the team for cleanup before waiting on the schedule write. */
+  async saveNewTeamAndReadWrites() {
+    const created = this.page.waitForResponse((r) => r.request().method() === 'POST' && /\/oncall\/teams$/.test(new URL(r.url()).pathname));
+    const staffed = this.page.waitForResponse((r) => r.request().method() === 'PUT' && /\/oncall\/teams\/[^/]+\/schedule$/.test(new URL(r.url()).pathname));
+    await this.saveDrawer();
+    return { team: await (await created).json(), staffed };
   }
 
   async cancelDrawer() {

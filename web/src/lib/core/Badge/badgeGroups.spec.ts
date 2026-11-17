@@ -5,6 +5,21 @@ import { resolveBadge, normalizeKey, BADGE_GROUPS } from "./badgeGroups";
 import enUS from "@/locales/languages/en-US.json";
 
 describe("badgeGroups", () => {
+  it("resolves cwvBand wire values to the compare band labels", () => {
+    expect(resolveBadge("cwvBand", "good")).toMatchObject({
+      variant: "success-soft",
+      labelKey: "serviceVersions.compare.cwv.good",
+    });
+    expect(resolveBadge("cwvBand", "needs_improvement")).toMatchObject({
+      variant: "warning-soft",
+      labelKey: "serviceVersions.compare.cwv.ni",
+    });
+    expect(resolveBadge("cwvBand", "poor")).toMatchObject({
+      variant: "error-soft",
+      labelKey: "serviceVersions.compare.cwv.poor",
+    });
+  });
+
   it("normalizes separators and case", () => {
     expect(normalizeKey("Real-Time")).toBe("realtime");
     expect(normalizeKey("real_time")).toBe("realtime");
@@ -24,6 +39,16 @@ describe("badgeGroups", () => {
     const r = resolveBadge("oncallResponseState", "exhausted");
     expect(r.variant).toBe("error-soft");
     expect(r.labelKey).toBe("oncall.state_exhausted");
+  });
+
+  it("resolves the on-call routing groups as pills", () => {
+    expect(resolveBadge("oncallRuleHealth", "shadowed").variant).toBe("warning-soft");
+    expect(resolveBadge("oncallUnroutedOutcome", "nobody").labelKey).toBe(
+      "oncall.unroutedPagedNobody",
+    );
+    for (const group of ["oncallRuleHealth", "oncallUnroutedOutcome"] as const) {
+      expect(BADGE_GROUPS[group].shape).toBe("pill");
+    }
   });
 
   it("resolves alertStatus to dot mode (no icon)", () => {

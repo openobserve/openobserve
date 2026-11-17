@@ -70,11 +70,12 @@ afterEach(() => {
 });
 
 describe("SlackUninstallDialog: Disconnect this org (row 17)", () => {
-  it("AC-12.2 says nobody relinks, counts this org's destinations, then lists the ones that stopped", async () => {
+  it("AC-12.2 says in one line what stops for on-call, counts this org's destinations, then lists the ones that stopped", async () => {
     mountDialog("disconnect");
     await flushPromises();
     expect(body().text()).toContain("Disconnect this org from Acme Corp?");
-    expect(body().text()).toContain("nobody relinks");
+    expect(body().text()).toContain("on-call pages stop posting to team channels");
+    expect(body().text()).toContain("Acknowledge and Resolve in Slack stop working");
     expect(body().text()).toContain("4 alert destinations in this org stop posting.");
 
     await primary()!.trigger("click");
@@ -83,6 +84,30 @@ describe("SlackUninstallDialog: Disconnect this org (row 17)", () => {
     const result = body().find('[data-test="slack-dialog-result"]');
     expect(body().text()).toContain("Disconnected from Acme Corp");
     expect(result.text()).toContain("sre-prod-slack");
+  });
+});
+
+describe("SlackUninstallDialog: disconnect warning", () => {
+  it("names the org by name and never reads as safe when no alert destination uses it", async () => {
+    const store = makeSlackStore();
+    store.state.selectedOrganization.label = "Acme Inc";
+    mount(SlackUninstallDialog, {
+      props: {
+        open: true,
+        mode: "disconnect",
+        installation: installationView({
+          this_org: { ...installationView().this_org, destination_count: 0 },
+        }),
+      },
+      attachTo: document.body,
+      global: { plugins: [i18n, store], config: { errorHandler } },
+    });
+    await flushPromises();
+    const message = body().find('[data-test="slack-dialog-disconnect-message"]');
+    expect(message.find("span.font-semibold").text()).toBe("Acme Inc");
+    expect(message.text()).toContain("on-call pages stop posting to team channels");
+    expect(body().find('[data-test="slack-dialog-disconnect-destinations"]').exists()).toBe(false);
+    expect(body().text()).not.toContain("No alert destination");
   });
 });
 
@@ -100,7 +125,7 @@ describe("SlackUninstallDialog: named confirm", () => {
     await flushPromises();
     const message = body().find('[data-test="slack-dialog-uninstall-message"]');
     expect(message.find("span.font-semibold").text()).toBe("Acme Corp");
-    expect(message.text()).toContain("Removes the app from Acme Corp for every connected org.");
+    expect(message.text()).toContain("Removes the app from Acme Corp for every connected org:");
   });
 });
 
@@ -109,7 +134,8 @@ describe("SlackUninstallDialog: Uninstall from workspace (row 19)", () => {
     mountDialog("uninstall");
     await flushPromises();
     expect(body().text()).toContain("Uninstall from Acme Corp?");
-    expect(body().text()).toContain("Everyone must relink");
+    expect(body().text()).toContain("everyone must relink");
+    expect(body().text()).toContain("on-call pages stop posting to Slack");
     expect(body().text()).toContain("1 other org is connected too.");
   });
 

@@ -56,6 +56,7 @@ const {
   resolveResponse,
   shortenPolicyForSpeed,
   deleteTeamExpectingStatus,
+  deleteAlertById,
 } = require('../utils/oncall-seed-ext.js');
 
 const PREFIX = 'e2e_oncall_teams';
@@ -269,6 +270,8 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     tag: ['@P2'],
   }, async ({ page }, testInfo) => {
     const name = uniqueName(workerPrefix(testInfo));
+    // The search box only renders once the org has a team.
+    await createTeam(page, { name: uniqueName(`${workerPrefix(testInfo)}_anchor`) });
 
     await pm.oncallTeamsPage.goto(ORG);
     await pm.oncallTeamsPage.openCreateDrawer();
@@ -475,6 +478,11 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
       'the second rung must still be pending when the team is deleted').toEqual(
       ledgerAtDelete.deliveries.map(() => 0),
     );
+
+    const refused = await deleteTeamExpectingStatus(page, team.id);
+    expect(refused.status, `an alert still names the team: ${refused.text}`).toBe(409);
+    expect(refused.text).toContain(alert.name);
+    await deleteAlertById(page, alert.id);
 
     const deletedAtMicros = Date.now() * 1000;
     const deleted = await deleteTeamExpectingStatus(page, team.id);

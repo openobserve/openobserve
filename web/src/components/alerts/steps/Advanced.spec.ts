@@ -24,7 +24,7 @@
 // form.state.values) shifted correctly — proving the v-for `:key` is the array
 // index, not a stable id.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, nextTick } from "vue";
 import Advanced from "./Advanced.vue";
@@ -268,6 +268,61 @@ describe("Advanced — on-call team picker", () => {
       { label: "Payments", value: "tm_pay" },
       { label: "Platform", value: "tm_plat" },
     ]);
+  });
+
+  describe("while the license locks on-call", () => {
+    const lockOnCall = () => {
+      store.state.zoConfig = {
+        ...store.state.zoConfig,
+        oncall_enabled: false,
+        features: { ...store.state.zoConfig.features, oncall: "locked" },
+        feature_names: { oncall: "On-Call" },
+      };
+    };
+    const seedTeam = async (host: any, team: string, names?: Record<string, string>) => {
+      hostForm(host).setFieldValue("oncall_team", team);
+      hostForm(host).setFieldValue("_ui", { lockedTargetNames: names });
+      await flushPromises();
+    };
+    const options = (host: any) =>
+      host.findComponent({ name: "Step6Advanced" }).vm.oncallTeamOptions;
+    let savedConfig: any;
+
+    beforeEach(() => {
+      savedConfig = store.state.zoConfig;
+      lockOnCall();
+    });
+    afterEach(() => {
+      store.state.zoConfig = savedConfig;
+    });
+
+    it("shows a kept team by name with the lock, and fetches nothing", async () => {
+      const host = mountDescendant();
+      await seedTeam(host, "tm_sre", { tm_sre: "Platform SRE" });
+
+      expect(host.find('[data-test="alert-oncall-team-select"]').exists()).toBe(true);
+      expect(host.find('[data-test="alert-oncall-team-locked"]').exists()).toBe(true);
+      expect(options(host)).toEqual([{ label: "Platform SRE", value: "tm_sre" }]);
+      expect(listTeamsMock).not.toHaveBeenCalled();
+    });
+
+    it("falls back to a generic label when the name is unknown", async () => {
+      const host = mountDescendant();
+      await seedTeam(host, "tm_gone");
+      expect(options(host)).toEqual([{ label: "Locked team", value: "tm_gone" }]);
+    });
+
+    it("stays hidden with no team, and hides once the team is cleared", async () => {
+      const host = mountDescendant();
+      await flushPromises();
+      expect(host.find('[data-test="alert-oncall-team-select"]').exists()).toBe(false);
+
+      await seedTeam(host, "tm_sre");
+      expect(host.find('[data-test="alert-oncall-team-select"]').exists()).toBe(true);
+
+      await seedTeam(host, "");
+      expect(host.find('[data-test="alert-oncall-team-select"]').exists()).toBe(false);
+    });
   });
 
   // S14: an unset priority still pages, at P2, and the field says so while on-call is on.

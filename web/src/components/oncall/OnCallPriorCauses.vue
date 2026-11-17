@@ -15,14 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard variant="glass" data-test="oncall-prior-causes">
-    <OCardSection role="header" dense>
-      <OText variant="card-title">{{ t("oncall.priorCauses") }}</OText>
-    </OCardSection>
-
-    <OCardSection role="body" dense>
-      <p class="text-text-secondary mb-3 text-xs">{{ t("oncall.priorCausesHint") }}</p>
-
+  <section class="flex flex-col gap-2" data-test="oncall-prior-causes">
+    <OText variant="card-title" as="h3">{{ t("oncall.priorCauses") }}</OText>
+    <div>
       <!-- Reserves the list's shape while the fetch is in flight, so it does
            not flash "no history yet" — the wrong answer — for a moment before
            the real one arrives. -->
@@ -62,23 +57,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OButton
             variant="outline"
-            size="sm-action"
+            size="sm"
             :data-test="`oncall-prior-cause-open-${group.cause}`"
             @click="emit('open', group.last_response_id)"
           >
-            {{ t("oncall.openThatOne") }}
+            <OIcon name="open-in-new" size="sm" />{{ t("oncall.openThatOne") }}
           </OButton>
         </li>
       </ul>
-    </OCardSection>
-  </OCard>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

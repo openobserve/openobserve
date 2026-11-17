@@ -60,8 +60,8 @@ test.describe('Synthetics create — HTTP', { tag: ['@synthetics', '@all'] }, ()
     await pm.syntheticsCreatePage.gotoCreate(ORG, 'http');
     await pm.syntheticsCreatePage.fillName(name);
     await pm.syntheticsCreatePage.fillTarget('https://example.com');
-    // The form seeds one status_code assertion; this appends a second row.
-    await pm.syntheticsCreatePage.addAssertion(1, 'response_time_ms', 'lt', 5000);
+    // The form seeds one status_code assertion; this appends a second one.
+    await pm.syntheticsCreatePage.addAssertion('response_time_ms', 'lt', 5000);
     testLogger.info('Selecting a location and saving the check disabled');
     await pm.syntheticsCreatePage.selectLocation(locationId);
     await pm.syntheticsCreatePage.setEnabled(false);

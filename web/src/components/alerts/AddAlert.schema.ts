@@ -121,6 +121,7 @@ export const makeAddAlertSchema = (t: Translator) =>
       children: z.array(z.looseObject({})).optional(),
       destinations: z.array(z.string()).optional(),
       creates_incident: z.boolean().optional(),
+      incident_title_template: z.string().optional(),
       trigger_condition: z.looseObject({}).optional(),
       query_condition: z.looseObject({}).optional(),
       logGroupBy: z.array(z.string()).optional(),

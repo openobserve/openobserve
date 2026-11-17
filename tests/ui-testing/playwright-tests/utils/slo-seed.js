@@ -880,6 +880,75 @@ async function deleteSlosByPrefix(page, prefix) {
   }
 }
 
+/** Create an alert folder (SLOs live in alert folders) and return its folderId. */
+async function createSloFolder(page, name) {
+  const org = getOrgIdentifier();
+  const res = await postWithRetry(page, `${baseUrl()}/api/v2/${org}/folders/alerts`, {
+    name,
+    description: 'e2e SLO folder',
+  });
+  if (!res.ok()) {
+    throw new Error(`Folder create failed: HTTP ${res.status()} — ${await res.text()}`);
+  }
+  const body = await res.json();
+  if (!body?.folderId) throw new Error(`Folder created but no folderId: ${JSON.stringify(body)}`);
+  testLogger.info('SLO folder created via API', { name, folderId: body.folderId });
+  return body.folderId;
+}
+
+/** Delete an alert folder by id and fail loudly when the server refuses. */
+async function deleteSloFolder(page, folderId) {
+  const org = getOrgIdentifier();
+  const res = await page.request.delete(`${baseUrl()}/api/v2/${org}/folders/alerts/${folderId}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok()) {
+    throw new Error(`Folder delete failed: HTTP ${res.status()} — ${await res.text()}`);
+  }
+}
+
+/** Delete every alert folder whose name carries the e2e prefix; best effort. */
+async function deleteSloFoldersByPrefix(page, prefix) {
+  const org = getOrgIdentifier();
+  try {
+    const res = await page.request.get(`${baseUrl()}/api/v2/${org}/folders/alerts`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok()) return;
+    const body = await res.json().catch(() => ({}));
+    for (const folder of body?.list ?? []) {
+      if (typeof folder?.name === 'string' && folder.name.startsWith(prefix)) {
+        await deleteSloFolder(page, folder.folderId).catch((e) =>
+          testLogger.debug('SLO folder cleanup failed (non-fatal)', { error: e.message }));
+      }
+    }
+  } catch (e) {
+    testLogger.debug('SLO folder prefix cleanup failed (non-fatal)', { prefix, error: e.message });
+  }
+}
+
+/** The user-authored part of an SLO, for comparing an import against its source. */
+function sloDefinitionOf(slo) {
+  const fields = [
+    'name', 'description', 'sli_type', 'config', 'target', 'window_secs',
+    'slice_interval_secs', 'group_by', 'groups_estimate', 'tags', 'enabled',
+  ];
+  return Object.fromEntries(fields.map((k) => [k, slo?.[k]]));
+}
+
+/** Every SLO in the org with exactly this name, across all folders. */
+async function listSlosByName(page, name) {
+  const org = getOrgIdentifier();
+  const res = await page.request.get(`${baseUrl()}/api/${org}/slos`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok()) {
+    throw new Error(`SLO list failed: HTTP ${res.status()} — ${await res.text()}`);
+  }
+  const body = await res.json();
+  return (body?.list ?? []).filter((slo) => slo?.name === name);
+}
+
 module.exports = {
   SEED_DAYS,
   SEED_INTERVAL_SECS,
@@ -906,4 +975,9 @@ module.exports = {
   deleteSloById,
   deleteSlosByPrefix,
   deleteFixturesByPrefix,
+  createSloFolder,
+  deleteSloFolder,
+  deleteSloFoldersByPrefix,
+  listSlosByName,
+  sloDefinitionOf,
 };

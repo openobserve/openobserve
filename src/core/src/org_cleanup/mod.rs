@@ -1214,15 +1214,48 @@ async fn delete_org_fleet_resources(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn delete_org_search_jobs(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    search_service::search_jobs::delete_org_result_files(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_job_results: {e}"))?;
+    infra::table::search_job::search_jobs::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_jobs: {e}"))?;
+
+    Ok(())
+}
+
+async fn delete_org_pipelines(org_id: &str) -> Result<(), anyhow::Error> {
+    // Through the service layer, so triggers, backfill jobs, ownership and caches go cluster-wide.
+    let pipelines = infra::pipeline::list_by_org_fully_decoded(org_id).await?;
+    for p in pipelines {
+        let id = p.id.clone();
+        crate::pipeline::delete_listed_pipeline(p)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline {id}: {e}"))?;
+    }
+    // One delete takes any pipeline the listing missed; its triggers and jobs go at later steps.
+    for id in infra::pipeline::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipelines: {e}"))?
+    {
+        crate::db::authz::remove_ownership(
+            org_id,
+            "pipelines",
+            common::meta::authz::Authz::new(&id),
+        )
+        .await;
+    }
+    crate::db::pipeline_errors::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline_last_errors: {e}"))?;
+    Ok(())
+}
+
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
-    #[cfg(not(feature = "enterprise"))]
-    use infra::table::service_streams;
     #[cfg(feature = "cloud")]
     use infra::table::trial_quota_usage;
-    // `service_streams` is NOT imported here: this branch routes the enterprise
-    // build through the storage layer instead, and imports the table module only
-    // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
-    // collide on the OSS build.
     use infra::table::{
         ai_chat_sessions, ai_chat_shares, ai_chat_turns, alert_acks, alert_calibration,
         alert_incidents, anomaly_detection, compactor_manual_jobs, distinct_values,
@@ -1494,24 +1527,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     crate::db::org_ingestion_tokens::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ingestion_tokens: {e}"))?;
-    // Same F6 pattern as the `_reset` handler: the table-layer delete alone leaves
-    // every node's org cache intact forever (no TTL). On enterprise builds go
-    // through the storage layer (clears local cache + super-cluster replication)
-    // and emit an org-scope reload so remote nodes drop their cached copies too.
-    #[cfg(feature = "enterprise")]
-    {
-        o2_enterprise::enterprise::service_streams::evict_org(org_id).await;
-        o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(org_id)
-            .await
-            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
-        infra::coordinator::service_streams::emit_reload_event(org_id)
-            .await
-            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams_reload: {e}"))?;
-    }
-    #[cfg(not(feature = "enterprise"))]
-    service_streams::delete_all(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
+    delete_org_service_rows(org_id).await?;
     crate::db::system_settings::delete_org_settings(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/system_settings: {e}"))?;
@@ -1519,32 +1535,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/functions: {e}"))?;
 
-    // Delete pipelines through the service layer so derived-stream triggers,
-    // backfill jobs, OFGA ownership, and the executable-pipeline caches are all
-    // torn down and evicted cluster-wide — a raw infra::pipeline::delete would
-    // leave those side effects (and stale cache entries) behind.
-    let pipelines = infra::pipeline::list_by_org(org_id).await?;
-    for p in pipelines {
-        let id = p.id.clone();
-        crate::pipeline::delete_listed_pipeline(p)
-            .await
-            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline {id}: {e}"))?;
-    }
-    // One delete takes any pipeline the listing missed; its triggers and jobs go at later steps.
-    for id in infra::pipeline::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipelines: {e}"))?
-    {
-        crate::db::authz::remove_ownership(
-            org_id,
-            "pipelines",
-            common::meta::authz::Authz::new(&id),
-        )
-        .await;
-    }
-    crate::db::pipeline_errors::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline_last_errors: {e}"))?;
+    delete_org_pipelines(org_id).await?;
 
     // Delete saved views from the meta key-value store. Reuse the canonical key
     // prefix const rather than hardcoding the path, so this stays correct if the
@@ -1577,17 +1568,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     alert_calibration::delete_by_org(get_orm_client_rw().await, org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_calibration: {e}"))?;
-    // Delete the S3 result objects backing this org's search jobs BEFORE dropping
-    // the DB rows — the result paths are derived from each job's created_at/trace_id,
-    // so once the rows are gone the objects can no longer be located and would leak.
-    // (search_jobs service is enterprise-only; OSS just drops the rows below.)
-    #[cfg(feature = "enterprise")]
-    search_service::search_jobs::delete_org_result_files(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_job_results: {e}"))?;
-    infra::table::search_job::search_jobs::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_jobs: {e}"))?;
+    delete_org_search_jobs(org_id).await?;
 
     // Cloud-only resources: pending org invites, billing-group invites, and
     // billing-group memberships. The enterprise crate owns the ordering/error
@@ -1609,6 +1590,51 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_setting: {e}"))?;
 
+    Ok(())
+}
+
+async fn delete_org_service_rows(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(not(feature = "enterprise"))]
+    use infra::table::service_streams;
+    use infra::table::{
+        service_identity_rules, service_name_aliases, service_version_deploys,
+        service_version_verdicts, service_versions, service_where_summary,
+    };
+
+    // Org caches on every node never expire, so a plain table delete is not enough here.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::service_streams::evict_org(org_id).await;
+        o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
+        infra::coordinator::service_streams::emit_reload_event(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams_reload: {e}"))?;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    service_streams::delete_all(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
+    service_version_verdicts::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_version_verdicts: {e}"))?;
+    service_version_deploys::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_version_deploys: {e}"))?;
+    service_versions::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_versions: {e}"))?;
+    service_identity_rules::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_identity_rules: {e}"))?;
+    service_name_aliases::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_name_aliases: {e}"))?;
+    db::service_identity::invalidate_aliases(org_id).await;
+    service_where_summary::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_where_summary: {e}"))?;
     Ok(())
 }
 
@@ -1707,6 +1733,8 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
     {
         use o2_enterprise::enterprise::common::auditor;
         audit::audit(auditor::AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: actor.to_string(),
             org_id: org_id.to_string(),
             _timestamp: config::utils::time::now_micros(),
@@ -1833,6 +1861,8 @@ pub fn forget_gone_org(org_id: &str) {
     crate::self_reporting::triggers_schema::forget_org(org_id);
     #[cfg(feature = "enterprise")]
     crate::ai_chat::forget_org(org_id);
+    #[cfg(feature = "enterprise")]
+    crate::service_identity::signals::snapshot::forget_org(org_id);
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::oncall::notify::forget_org_breakers(org_id);
 }
@@ -4786,8 +4816,10 @@ mod tests {
 
     #[test]
     fn test_pipeline_teardown_deletes_the_listed_pipeline_without_a_re_read() {
+        position_of("delete_org_pipelines(org_id)");
         assert!(
-            db_resources_step().contains("crate::pipeline::delete_listed_pipeline(p)"),
+            fn_body(SOURCE, "delete_org_pipelines")
+                .contains("crate::pipeline::delete_listed_pipeline(p)"),
             "the pipeline teardown must delete the pipeline it listed"
         );
         let body = fn_body(include_str!("../pipeline/mod.rs"), "delete_listed_pipeline");
@@ -4881,6 +4913,25 @@ mod tests {
             !body.contains("delete_dashboard(") && !body.contains("get_by_id("),
             "the dashboard teardown must not re-read the row through the read pool"
         );
+    }
+
+    #[test]
+    fn test_db_resources_deletes_the_orgs_service_identity_rows() {
+        for table in [
+            "service_version_verdicts",
+            "service_version_deploys",
+            "service_versions",
+            "service_identity_rules",
+            "service_where_summary",
+            "service_name_aliases",
+        ] {
+            let call = format!("{table}::delete_by_org(get_orm_client_rw().await, org_id)");
+            assert!(
+                fn_body(SOURCE, "delete_org_service_rows").contains(&call),
+                "the service identity teardown never calls {call}"
+            );
+        }
+        position_of("delete_org_service_rows(org_id)");
     }
 
     #[test]

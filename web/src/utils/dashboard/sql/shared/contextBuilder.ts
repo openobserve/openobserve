@@ -146,7 +146,7 @@ export function buildSQLContext(
             // The alert preview passes show_label:false — its lines are
             // colour-coded, and a text label clips at the chart top.
             show: markLine.show_label !== false,
-            formatter: markLine.name ? "{b}:{c}" : "{c}",
+            formatter: markLine.label_formatter ?? (markLine.name ? "{b}:{c}" : "{c}"),
             position: "insideEndTop",
           },
           ...(markLine.color ? { lineStyle: { color: markLine.color } } : {}),

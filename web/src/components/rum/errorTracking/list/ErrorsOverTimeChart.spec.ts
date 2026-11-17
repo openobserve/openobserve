@@ -71,11 +71,18 @@ const deployOutsideBuckets = {
   firstSeen: makeTs(-100_000),
 };
 
+const asMarker = (deploy: { version: string; firstSeen: number }, extra = {}) => ({
+  version: deploy.version,
+  at: deploy.firstSeen,
+  label: { formatter: deploy.version },
+  ...extra,
+});
+
 function mountChart(props: Record<string, unknown> = {}): VueWrapper {
   return mount(ErrorsOverTimeChart, {
     props: {
       buckets: nonZeroBuckets,
-      deploy: null,
+      markers: [],
       spikeFactor: null,
       loading: false,
       ...props,
@@ -315,7 +322,7 @@ describe("ErrorsOverTimeChart", () => {
 
   describe("deploy markLine", () => {
     it("adds markLine to the Unhandled series when deploy is provided and within buckets", async () => {
-      const w = mountChart({ deploy: deployWithinBuckets });
+      const w = mountChart({ markers: [asMarker(deployWithinBuckets)] });
 
       const stub = w.findComponent({ name: "ChartRenderer" });
       const { options } = stub.props("data") as {
@@ -335,7 +342,7 @@ describe("ErrorsOverTimeChart", () => {
     });
 
     it("sets markLine xAxis index to the bucket where firstSeen falls", async () => {
-      const w = mountChart({ deploy: deployWithinBuckets });
+      const w = mountChart({ markers: [asMarker(deployWithinBuckets)] });
 
       const stub = w.findComponent({ name: "ChartRenderer" });
       const { options } = stub.props("data") as {
@@ -355,7 +362,7 @@ describe("ErrorsOverTimeChart", () => {
     });
 
     it("includes the deploy version in the markLine label formatter", async () => {
-      const w = mountChart({ deploy: deployWithinBuckets });
+      const w = mountChart({ markers: [asMarker(deployWithinBuckets)] });
 
       const stub = w.findComponent({ name: "ChartRenderer" });
       const { options } = stub.props("data") as {
@@ -370,7 +377,7 @@ describe("ErrorsOverTimeChart", () => {
       };
 
       const unhandledSeries = options.series.find((s) => s.name === "Unhandled");
-      expect(unhandledSeries!.markLine!.label!.formatter).toContain("v1.0.6");
+      expect((unhandledSeries!.markLine as any).data[0].label.formatter).toContain("v1.0.6");
 
       w.unmount();
     });
@@ -389,7 +396,7 @@ describe("ErrorsOverTimeChart", () => {
     });
 
     it("does not add markLine to the Handled series", async () => {
-      const w = mountChart({ deploy: deployWithinBuckets });
+      const w = mountChart({ markers: [asMarker(deployWithinBuckets)] });
 
       const stub = w.findComponent({ name: "ChartRenderer" });
       const { options } = stub.props("data") as {
@@ -405,7 +412,7 @@ describe("ErrorsOverTimeChart", () => {
     });
 
     it("adds markLine when deploy.firstSeen is before the first bucket (deployIndex = 0)", () => {
-      const w = mountChart({ deploy: deployOutsideBuckets });
+      const w = mountChart({ markers: [asMarker(deployOutsideBuckets)] });
 
       const stub = w.findComponent({ name: "ChartRenderer" });
       const { options } = stub.props("data") as {
@@ -432,7 +439,7 @@ describe("ErrorsOverTimeChart", () => {
   describe("spike caption", () => {
     it("shows the spike caption when deploy and spikeFactor are both provided", () => {
       const w = mountChart({
-        deploy: deployWithinBuckets,
+        markers: [asMarker(deployWithinBuckets)],
         spikeFactor: 3.6,
       });
 
@@ -443,7 +450,7 @@ describe("ErrorsOverTimeChart", () => {
 
     it("spike caption contains the formatted factor and version", () => {
       const w = mountChart({
-        deploy: deployWithinBuckets,
+        markers: [asMarker(deployWithinBuckets)],
         spikeFactor: 3.6,
       });
 
@@ -457,7 +464,7 @@ describe("ErrorsOverTimeChart", () => {
 
     it("spike caption contains 'spike right after the'", () => {
       const w = mountChart({
-        deploy: deployWithinBuckets,
+        markers: [asMarker(deployWithinBuckets)],
         spikeFactor: 2.1,
       });
 
@@ -470,7 +477,7 @@ describe("ErrorsOverTimeChart", () => {
 
     it("does not show spike caption when spikeFactor is null (even with deploy)", () => {
       const w = mountChart({
-        deploy: deployWithinBuckets,
+        markers: [asMarker(deployWithinBuckets)],
         spikeFactor: null,
       });
 
@@ -481,7 +488,7 @@ describe("ErrorsOverTimeChart", () => {
 
     it("does not show spike caption when deploy is null (even with spikeFactor)", () => {
       const w = mountChart({
-        deploy: null,
+        markers: [],
         spikeFactor: 4.0,
       });
 
@@ -499,7 +506,7 @@ describe("ErrorsOverTimeChart", () => {
 
     it("formats spikeFactor to one decimal place in caption", () => {
       const w = mountChart({
-        deploy: deployWithinBuckets,
+        markers: [asMarker(deployWithinBuckets)],
         spikeFactor: 5,
       });
 
@@ -609,7 +616,7 @@ describe("ErrorsOverTimeChart", () => {
 
     it("renders without crashing when spikeFactor is 1.5 (minimum meaningful spike)", () => {
       const w = mountChart({
-        deploy: deployWithinBuckets,
+        markers: [asMarker(deployWithinBuckets)],
         spikeFactor: 1.5,
       });
 
@@ -664,6 +671,54 @@ describe("ErrorsOverTimeChart", () => {
       await flushPromises();
       // If no unhandled promise rejection / Vue warning occurred, test passes.
       expect(true).toBe(true);
+    });
+  });
+
+  describe("version compare actions", () => {
+    const keyed = asMarker(deployWithinBuckets, { deployKey: "dk1", where: "env:prod" });
+    it("emits compare with the clicked marker for a keyed markLine click", () => {
+      const w = mountChart({ markers: [keyed] });
+      w.findComponent({ name: "ChartRenderer" }).vm.$emit("click", {
+        componentType: "markLine",
+        data: { deployKey: "dk1" },
+      });
+      expect(w.emitted("compare")?.[0]).toEqual([keyed]);
+      w.unmount();
+    });
+    it("ignores series clicks and markLines without a deploy key", () => {
+      const w = mountChart({ markers: [keyed] });
+      const chart = w.findComponent({ name: "ChartRenderer" });
+      chart.vm.$emit("click", { componentType: "series", data: { deployKey: "dk1" } });
+      chart.vm.$emit("click", { componentType: "markLine", data: {} });
+      expect(w.emitted("compare")).toBeUndefined();
+      w.unmount();
+    });
+    it("offers Compare with previous for a keyed marker and Retry for an unavailable one", async () => {
+      const grey = asMarker(deployWithinBuckets, { version: "v1.0.7", unavailable: true });
+      const w = mountChart({
+        markers: [keyed, grey, asMarker(deployWithinBuckets, { version: "plain" })],
+      });
+      const compare = w.findAll('[data-test="svcver-marker-compare-previous"]');
+      expect(compare).toHaveLength(1);
+      expect(compare[0].attributes("data-deploy-key")).toBe("dk1");
+      await compare[0].trigger("click");
+      expect(w.emitted("compare")?.[0]).toEqual([keyed]);
+      await w.find('[data-test="svcver-marker-unavailable-retry"]').trigger("click");
+      expect(w.emitted("retry")).toHaveLength(1);
+      w.unmount();
+    });
+    it("draws one markLine per marker inside the bucket range", () => {
+      const late = asMarker({ version: "late", firstSeen: makeTs(10_000_000) });
+      const w = mountChart({
+        markers: [keyed, asMarker(deployOutsideBuckets, { version: "early" }), late],
+      });
+      const { options } = w.findComponent({ name: "ChartRenderer" }).props("data") as any;
+      const unhandled = options.series.find((s: any) => s.name === "Unhandled");
+      expect(unhandled.markLine.data.map((row: any) => [row.version, row.xAxis])).toEqual([
+        ["v1.0.6", 1],
+        ["early", 0],
+      ]);
+      w.unmount();
     });
   });
 });

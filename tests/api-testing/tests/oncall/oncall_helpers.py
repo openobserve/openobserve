@@ -198,8 +198,8 @@ def oncall_enabled(client: OpenObserveClient, org: str) -> bool:
         return False
     raise AssertionError(
         f"on-call is off on this {kind} build: {org}/oncall/teams answered 404. "
-        "Start the server with O2_ONCALL_ENABLED=true (off by default since "
-        "o2-enterprise#2748) — this suite fails rather than skips on an enterprise build."
+        "On-call is on by default, so check for O2_ONCALL_ENABLED=false "
+        "— this suite fails rather than skips on an enterprise build."
     )
 
 
@@ -207,12 +207,7 @@ def shift_rule(name: str, members: list[str], *, priority: int = 0,
                restrictions: list[dict[str, Any]] | None = None,
                shift_micros: int = 7 * 24 * 60 * 60 * MICROS,
                anchor_micros: int | None = None) -> dict[str, Any]:
-    """One layer of a rotation: a roster, a cadence, and when it applies.
-
-    The anchor is pinned a week in the past so `members[0]` is the one on call
-    right now — a rotation anchored in the future puts nobody on call at all,
-    which looks configured on a calendar and pages no one.
-    """
+    """One layer of a rotation: a roster, a cadence, and when it applies."""
     rule: dict[str, Any] = {
         "name": name,
         "members": members,
@@ -831,7 +826,8 @@ class OnCallClient:
 
 def make_user(client: OpenObserveClient, org: str, role: str,
               password: str = "Complexpass#123", *,
-              domain: str = "test.invalid") -> tuple[str, OpenObserveClient]:
+              domain: str = "test.invalid",
+              first_name: str = "OnCall") -> tuple[str, OpenObserveClient]:
     """Create an org user with `role` and return (email, a client acting as them).
 
     The returned client authenticates as that user, which is the only way to
@@ -840,7 +836,7 @@ def make_user(client: OpenObserveClient, org: str, role: str,
     """
     email = f"{PREFIX}_{role}_{uuid.uuid4().hex[:8]}@{domain}"
     payload = {
-        "email": email, "password": password, "first_name": "OnCall",
+        "email": email, "password": password, "first_name": first_name,
         "last_name": role.capitalize(), "role": role, "organization": org,
     }
     resp = client.users.create(payload, org=org)

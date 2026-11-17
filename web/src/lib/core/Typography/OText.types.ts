@@ -70,6 +70,9 @@ export interface TextProps {
    * Useful for table cells and labels that must stay on one line.
    */
   nowrap?: boolean;
+
+  /** Text that may run to a second line: a readable line height instead of the variant's tight one. */
+  wrap?: boolean;
 }
 
 export interface TextSlots {

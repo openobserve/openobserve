@@ -5,14 +5,14 @@
       :org-id="orgId"
       :mode="formPage.mode"
       :row="formPage.row"
-      @saved="handleSaved"
-      @cancel="closeForm"
+      @saved="leaveForm"
+      @cancel="leaveForm"
     />
 
     <OPageLayout
       v-else
       icon="smart-toy"
-      :subtitle="t('settings.llmProvidersSettings.subtitle')"
+      :subtitle="t('llmProviders.subtitle')"
       bleed
       :scroll="false"
     >
@@ -64,6 +64,8 @@
           :forbidden="forbidden"
           :global-filter="searchQuery"
           :show-global-filter="false"
+          :row-actions="rowActions"
+          row-actions-more-data-test="llm-providers-row-more-actions"
           :default-columns="false"
           show-index
           :enable-column-resize="true"
@@ -121,61 +123,6 @@
           <template #cell-defaultModel="{ row }">
             <span class="font-mono text-xs">{{ defaultModelOf(row) || "—" }}</span>
           </template>
-
-          <template #cell-actions="{ row }">
-            <div class="actions-container flex items-center">
-              <OButton
-                :data-test="`llm-providers-${row.name}-edit-btn`"
-                data-row-action="edit"
-                variant="ghost"
-                size="icon-sm"
-                class="max-md:hidden"
-                :title="t('onlineEvals.actions.edit')"
-                icon-left="edit"
-                @click.stop="openEdit(row)"
-              />
-              <OButton
-                :data-test="`llm-providers-${row.name}-delete-btn`"
-                data-row-action="delete"
-                variant="ghost-destructive"
-                size="icon-sm"
-                class="max-md:hidden"
-                :title="t('onlineEvals.actions.delete')"
-                icon-left="delete"
-                @click.stop="confirmDelete(row)"
-              />
-              <ODropdown side="bottom" align="end">
-                <template #trigger>
-                  <OButton
-                    :aria-label="t('common.moreActions')"
-                    icon-left="more-vert"
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    class="md:hidden"
-                    data-test="llm-providers-row-more-actions"
-                    @click.stop
-                  />
-                </template>
-                <ODropdownItem
-                  icon-left="edit"
-                  class="md:hidden"
-                  :data-test="`llm-providers-${row.name}-edit-btn-menu`"
-                  @select="openEdit(row)"
-                >
-                  <span>{{ t("onlineEvals.actions.edit") }}</span>
-                </ODropdownItem>
-                <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
-                  class="md:hidden"
-                  :data-test="`llm-providers-${row.name}-delete-btn-menu`"
-                  @select="confirmDelete(row)"
-                >
-                  <span>{{ t("onlineEvals.actions.delete") }}</span>
-                </ODropdownItem>
-              </ODropdown>
-            </div>
-          </template>
         </OTable>
       </div>
     </OPageLayout>
@@ -198,8 +145,6 @@ import { useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -208,6 +153,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { type Provider } from "@/services/online-evals.service";
 import { deleteProviderMutation, providersQuery } from "@/services/online-evals.service.queries";
+import analytics from "@/services/product_analytics";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   defaultModelOf,
@@ -220,11 +166,12 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { COL } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
+import { isSameOriginRedirect } from "@/utils/safeUrl";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -299,7 +246,7 @@ const columns = computed(() => [
     hideable: true,
     size: COL.name,
     minSize: 160,
-    meta: { align: "left", flex: true },
+    meta: { align: "left", flex: true, link: (row: Provider) => () => openEdit(row) },
   },
   {
     id: "type",
@@ -337,7 +284,24 @@ const columns = computed(() => [
     sortable: false,
     isAction: true,
     size: 100,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    meta: { cellClass: "actions-column" },
+  },
+]);
+
+const rowActions = computed<OTableRowAction<Provider>[]>(() => [
+  {
+    id: "edit",
+    label: t("onlineEvals.actions.edit"),
+    icon: "edit",
+    onSelect: openEdit,
+    dataTest: (row) => `llm-providers-${row.name}-edit-btn`,
+  },
+  {
+    id: "delete",
+    label: t("onlineEvals.actions.delete"),
+    icon: "delete",
+    onSelect: confirmDelete,
+    dataTest: (row) => `llm-providers-${row.name}-delete-btn`,
   },
 ]);
 
@@ -396,15 +360,17 @@ function openEdit(row: Provider) {
   pushRouteAction({ action: "update", id: String(row.id) });
 }
 
-function closeForm() {
-  formPage.value = null;
-  clearRouteAction();
+// Only an in-app `return_to` path is followed.
+function returnTarget(): string | null {
+  const to = route.query.return_to;
+  return typeof to === "string" && to.startsWith("/") && isSameOriginRedirect(to) ? to : null;
 }
 
-// The save mutation's `invalidates` already refetches the list.
-function handleSaved() {
+function leaveForm() {
   formPage.value = null;
-  clearRouteAction();
+  const to = returnTarget();
+  if (to) router.push(to).catch(() => {});
+  else clearRouteAction();
 }
 
 function syncFromRoute() {
@@ -439,6 +405,7 @@ async function performDelete() {
   if (!row) return;
   try {
     await deleteProvider.mutateAsync(row.id);
+    analytics.track("llm_provider_deleted");
     toast({
       variant: "success",
       message: t("onlineEvals.deleted", { label: t("onlineEvals.singular.providers") }),

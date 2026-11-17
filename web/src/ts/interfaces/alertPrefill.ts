@@ -126,6 +126,18 @@ export interface AlertPrefillQueryChoice {
 export interface AlertBuildOptions {
   patternMode?: AlertPatternMode;
   queryIndex?: number;
+  /** The threshold the user typed into the dialog's threshold field. */
+  threshold?: number;
+}
+
+/** A threshold the source could not measure: a drafted value, or the dialog asks for one and keeps Continue off until it is set. */
+export interface AlertPrefillThresholdInput {
+  label: string;
+  suffix: string;
+  reason: string;
+  /** Shown while the drafted value stands, to say what it does. */
+  note?: string;
+  value: number | null;
 }
 
 /** Bumped whenever the persisted shape changes; a stale blob is ignored. */
@@ -169,6 +181,9 @@ export interface AlertPrefill {
   /** Comparison for `triggerThreshold`; only meaningful alongside it. */
   triggerOperator?: string;
 
+  /** The alert opens an incident when it fires, so on-call is paged even with no destination. */
+  createsIncident?: boolean;
+
   /** Rolling evaluation window in minutes, already clamped. */
   periodMinutes?: number;
   frequencyMinutes?: number;
@@ -182,6 +197,9 @@ export interface AlertPrefill {
   /** Present when the surface can fold its patterns into the query. */
   patternFilter?: AlertPrefillPatternFilter;
 
+  /** Present when the query's threshold must come from the user before the alert can fire. */
+  thresholdInput?: AlertPrefillThresholdInput;
+
   /** Present when the surface has several queries and the user must pick one. */
   queryChoices?: AlertPrefillQueryChoice[];
   /** The `queryChoices` index this prefill was built from. */
@@ -191,4 +209,32 @@ export interface AlertPrefill {
 
   /** Source-specific; never read by the form. Summary / telemetry only. */
   meta?: Record<string, unknown>;
+}
+
+/** One suggested setting change, `from` being the value the analysis read off the alert. */
+export interface AlertFieldChange<T> {
+  from: T;
+  to: T;
+}
+
+/** The settings a calibration suggestion may change, keyed as the design names them (D:L383). */
+export interface AlertFieldPatch {
+  pendingPeriodSecs?: AlertFieldChange<number>;
+  keepFiringForSecs?: AlertFieldChange<number>;
+  silenceMinutes?: AlertFieldChange<number>;
+  destinations?: AlertFieldChange<string[]>;
+}
+
+/** The alert editor's focus-manager field ids a handoff may focus. */
+export type AlertEditFocus =
+  "query" | "threshold" | "pending_period" | "silence" | "destinations" | "keep_firing_for";
+
+/** Opens an existing alert's editor from a calibration finding; unlike `AlertPrefill` it never creates an alert. */
+export interface AlertEditHandoff {
+  version: typeof ALERT_PREFILL_VERSION;
+  source: "calibration";
+  target: { alertId: string; findingId: string };
+  focus?: AlertEditFocus;
+  /** Absent for a Review handoff, which only focuses a field. */
+  patch?: AlertFieldPatch;
 }

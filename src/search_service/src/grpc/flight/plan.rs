@@ -24,11 +24,7 @@ use config::{
     cluster::LOCAL_NODE,
     datafusion::request::FlightSearchRequest,
     get_config,
-    meta::{
-        search::ScanStats,
-        sql::TableReferenceExt,
-        stream::{FileKey, StreamType},
-    },
+    meta::{search::ScanStats, sql::TableReferenceExt, stream::StreamType},
 };
 use datafusion::{
     common::TableReference,
@@ -43,17 +39,15 @@ use infra::errors::{Error, ErrorCodes};
 use super::scan::{PrecomputedAggregates, collect_stats};
 use crate::{
     datafusion::{
-        distributed_plan::{
-            NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
-            rewrite::aggregate_optimize_rewrite,
-        },
+        datasource::{enrich_table::EnrichTable, uniontable::NewUnionTable},
+        distributed::codec::get_physical_extension_codec,
         exec::{DataFusionContextBuilder, register_udf},
+        physical_optimizer::index_optimizer::index_aggregate_rewrite::aggregate_optimize_rewrite,
+        physical_plan::empty_exec::{NewEmptyExecVisitor, ReplaceTableScanExec},
         sort_order::FileSortOrder,
-        table_provider::{enrich_table::EnrichTable, uniontable::NewUnionTable},
     },
     grpc::QueryParams,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    tantivy::aggregate::IndexAggregate,
 };
 
 /// The stream the leader plan reads, taken from its empty exec before any rewrite.
@@ -129,14 +123,12 @@ pub(super) async fn decode_plan(
     Ok((ctx, physical_plan, source))
 }
 
-pub(super) async fn finalize_plan(
+pub(super) async fn replace_table_scan(
     query: &QueryParams,
     req: &FlightSearchRequest,
     ctx: &SessionContext,
     physical_plan: Arc<dyn ExecutionPlan>,
     mut tables: Vec<Arc<dyn TableProvider>>,
-    aggregates: PrecomputedAggregates,
-    scan_stats: &mut ScanStats,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
     let trace_id = query.trace_id.as_str();
 
@@ -215,42 +207,20 @@ pub(super) async fn finalize_plan(
         )
     );
 
-    let physical_plan = apply_pushdowns_and_optimizations(
-        trace_id,
-        ctx,
-        physical_plan,
-        scan_stats,
-        aggregates.metadata_count_files,
-        aggregates.index_aggregate,
-    )?;
-
-    log::info!(
-        "{}",
-        search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
-                start.elapsed().as_millis()
-            ),
-            SearchInspectorFieldsBuilder::new()
-                .trace_id(trace_id.to_string())
-                .node_name(LOCAL_NODE.name.clone())
-                .component("flight:do_get::search generated physical plan".to_string())
-                .search_role("follower".to_string())
-                .duration(start.elapsed().as_millis() as usize)
-                .build()
-        )
-    );
     Ok(physical_plan)
 }
 
-fn apply_pushdowns_and_optimizations(
+pub(super) fn apply_pushdown_rules(
     trace_id: &str,
     ctx: &SessionContext,
     mut physical_plan: Arc<dyn ExecutionPlan>,
+    aggregates: PrecomputedAggregates,
     scan_stats: &mut ScanStats,
-    metadata_count_file_list: Vec<FileKey>,
-    index_aggregate: Option<IndexAggregate>,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
+    let PrecomputedAggregates {
+        metadata_count_files: metadata_count_file_list,
+        index_aggregate,
+    } = aggregates;
     let cfg = get_config();
 
     let pushdown_filter = FilterPushdown::new();
@@ -327,7 +297,7 @@ mod tests {
 
     use super::*;
     use crate::datafusion::{
-        distributed_plan::empty_exec::NewEmptyExec, table_provider::empty_table::NewEmptyTable,
+        datasource::empty_table::NewEmptyTable, physical_plan::empty_exec::NewEmptyExec,
     };
 
     #[tokio::test]

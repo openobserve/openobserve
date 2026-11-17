@@ -162,6 +162,11 @@ fn extract_mcp_extensions(api: &OpenApi) -> HashMap<String, McpExtension> {
     extensions
 }
 
+/// Only a parsable `x-o2-mcp` with `enabled: false` hides a tool; anything else leaves it on.
+fn is_tool_enabled(extension: Option<&McpExtension>) -> bool {
+    extension.is_none_or(|extension| extension.enabled)
+}
+
 /// All MCP tools, each behind an `Arc` so the tool -- most of its weight is
 /// its JSON input schema -- is stored once and shared with the search index
 /// instead of being cloned per lookup structure.
@@ -470,7 +475,7 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
 
     // Only extract metadata - this is fast (~186ms for 209 tools)
     // We skip generate_openapi_tools which creates 200+ HTTP clients (~19.5s)
-    let tools_metadata = spec.to_tool_metadata(None, false, false)?;
+    let tools_metadata = spec.to_tool_metadata(None, false, false, false)?;
 
     let mut tools: Vec<Arc<MCPTool>> = Vec::with_capacity(tools_metadata.len());
     let mut metadata_map: HashMap<String, rmcp_openapi::ToolMetadata> =
@@ -481,10 +486,7 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     let mut custom_desc_count = 0;
 
     for metadata in tools_metadata {
-        // Check x-o2-mcp extension for enabled/disabled
-        if let Some(mcp_ext) = mcp_extensions.get(&metadata.name)
-            && !mcp_ext.enabled
-        {
+        if !is_tool_enabled(mcp_extensions.get(&metadata.name)) {
             excluded_count += 1;
             continue;
         }
@@ -621,6 +623,20 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     Ok(())
 }
 
+/// Names of the tools `init_mcp_tools` would expose for `api`, without touching the caches.
+pub fn enabled_tool_names(api: &OpenApi) -> Result<Vec<String>> {
+    let mcp_extensions = extract_mcp_extensions(api);
+    let spec = rmcp_openapi::Spec::from_value(serde_json::to_value(api)?)?;
+    let mut names: Vec<String> = spec
+        .to_tool_metadata(None, false, false, false)?
+        .into_iter()
+        .map(|metadata| metadata.name)
+        .filter(|name| is_tool_enabled(mcp_extensions.get(name)))
+        .collect();
+    names.sort();
+    Ok(names)
+}
+
 /// Get all MCP tools derived from OpenObserve's OpenAPI spec
 pub fn get_mcp_tools() -> Vec<MCPTool> {
     TOOLS_CACHE
@@ -680,7 +696,7 @@ pub async fn init_test_tools() {
             // Convert to rmcp_openapi spec and extract metadata
             let api_json = serde_json::to_value(&api).unwrap_or_default();
             let spec = rmcp_openapi::Spec::from_value(api_json).unwrap();
-            let tools_metadata = spec.to_tool_metadata(None, false, false).unwrap();
+            let tools_metadata = spec.to_tool_metadata(None, false, false, false).unwrap();
 
             // Convert to MCPTool format with simplified schemas
             let mut tools: Vec<Arc<MCPTool>> = tools_metadata
@@ -908,6 +924,45 @@ mod tests {
         assert_eq!(
             public_tool_schema("/api/organizations", schema.clone()),
             schema
+        );
+    }
+
+    #[test]
+    fn only_a_parsable_enabled_false_hides_a_tool() {
+        let cases = [
+            ("Missing", None),
+            ("Empty", Some(json!({}))),
+            ("Hidden", Some(json!({"enabled": false}))),
+            ("Shown", Some(json!({"enabled": true}))),
+            ("StringFlag", Some(json!({"enabled": "false"}))),
+            (
+                "BadSibling",
+                Some(json!({"enabled": false, "pinned": "yes"})),
+            ),
+            ("NotAnObject", Some(json!(false))),
+        ];
+        let mut paths = serde_json::Map::new();
+        for (name, extension) in &cases {
+            let mut op = json!({"operationId": name, "responses": {"200": {"description": "ok"}}});
+            if let Some(extension) = extension {
+                op["x-o2-mcp"] = extension.clone();
+            }
+            paths.insert(format!("/{name}"), json!({ "get": op }));
+        }
+        let spec = json!({
+            "openapi": "3.1.0", "info": {"title": "t", "version": "1"}, "paths": paths,
+        });
+        let api: utoipa::openapi::OpenApi = serde_json::from_value(spec).unwrap();
+        assert_eq!(
+            super::enabled_tool_names(&api).unwrap(),
+            [
+                "BadSibling",
+                "Empty",
+                "Missing",
+                "NotAnObject",
+                "Shown",
+                "StringFlag"
+            ]
         );
     }
 }

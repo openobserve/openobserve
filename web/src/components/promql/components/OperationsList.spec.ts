@@ -19,6 +19,9 @@ import OperationsList from "./OperationsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { PromqlStepId } from "@/components/promql/types";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
@@ -222,6 +225,10 @@ describe("OperationsList", () => {
       expect(emitted![0][0]).toHaveLength(1);
       expect(emitted![0][0][0].id).toBe(PromqlStepId.Rate);
       expect(emitted![0][0][0].params).toEqual(["5m"]);
+      expect(analytics.track).toHaveBeenCalledWith("promql_builder_operation_added", {
+        operation: PromqlStepId.Rate,
+        group: "Rate & range",
+      });
     });
   });
 

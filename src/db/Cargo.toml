@@ -50,7 +50,11 @@ tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
 transform.workspace = true
+utoipa.workspace = true
 vrl.workspace = true
 
 [dev-dependencies]
 async-trait.workspace = true
+infra = { workspace = true, features = ["test-utils"] }
+o2_enterprise = { workspace = true, features = ["test-utils"] }
+sha256.workspace = true

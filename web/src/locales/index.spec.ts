@@ -33,7 +33,17 @@ import {
   toLocaleUnit,
   toSupportedNumberLocale,
 } from "@/locales/numberFormat";
-import { applyDocumentLocale, getLocale, isRtlLocale, localeFileMap } from "@/locales";
+import i18n, {
+  applyDocumentLocale,
+  getLocale,
+  isRtlLocale,
+  loadLazyLocaleBlocks,
+  loadLocaleMessages,
+  localeFileMap,
+} from "@/locales";
+import enMessages from "@/locales/languages/en-US.json";
+import enSecurityMessages from "@/locales/languages/security/en-US.json";
+import entryMessages from "@/locales/languages/en-US.json?without=serviceVersions";
 
 const withNavigatorLanguage = (language: string, assertion: () => void) => {
   const descriptor = Object.getOwnPropertyDescriptor(navigator, "language");
@@ -71,8 +81,25 @@ describe("locale registry stays in sync", () => {
     expect(onDisk).toEqual(mapped);
   });
 
+  it("has a Security namespace file for every locale it can load", () => {
+    const onDisk = readdirSync(resolve(languagesDir, "security"))
+      .filter((f) => f.endsWith(".json"))
+      .sort();
+    const mapped = Object.values(localeFileMap)
+      .map((f) => `${f}.json`)
+      .sort();
+    expect(onDisk).toEqual(mapped);
+  });
+
   it("formats numbers for every locale it can load", () => {
     expect(Object.keys(APP_LOCALE_TO_BCP47).sort()).toEqual(Object.keys(localeFileMap).sort());
+  });
+
+  it("restores every en-US message once the blocks left out of the entry load", async () => {
+    expect(entryMessages).not.toHaveProperty("serviceVersions");
+    await loadLazyLocaleBlocks();
+    // setupTests merges the Security namespace into en-us as well.
+    expect(i18n.global.getLocaleMessage("en-us")).toEqual({ ...enMessages, ...enSecurityMessages });
   });
 });
 
@@ -224,5 +251,17 @@ describe("document locale", () => {
     applyDocumentLocale(locale);
     expect(document.documentElement.lang).toBe(language);
     expect(document.documentElement.dir).toBe(direction);
+  });
+});
+
+describe("untranslated keys fall back to en-US", () => {
+  it("shows English for a filterBar key the locale file lacks and keeps its translated ones", async () => {
+    await loadLocaleMessages("de");
+    const t = (key: string, params?: Record<string, unknown>) =>
+      (i18n.global as any).t(key, params ?? {}, { locale: "de" });
+    expect(t("filterBar.addFilter")).toBe("Add filter");
+    expect(t("filterBar.validation.regexLength", { max: 5 })).toBe(
+      "Verwenden Sie für das Muster höchstens 5 Zeichen.",
+    );
   });
 });

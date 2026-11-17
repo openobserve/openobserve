@@ -17,12 +17,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   promRulePreviewQuery,
   alertHistoryQuery,
+  alertHistorySummaryQuery,
   alertAcksQuery,
+  alertDetailQuery,
   ackAlertMutation,
+  toggleAlertStateMutation,
+  toggleAnomalyAlertStateMutation,
   unackAlertMutation,
   muteAlertMutation,
   extendAlertMuteMutation,
   cancelAlertMuteMutation,
+  retrainAnomalyMutation,
 } from "./alerts.queries";
 import { alertKeys } from "./alerts.querykeys";
 import { incidentKeys } from "./incidents.querykeys";
@@ -37,12 +42,15 @@ import { downtimeKeys } from "./downtimes.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
 import alerts from "./alerts";
 import search from "./search";
+import analytics from "./product_analytics";
 
 vi.mock("./search", () => ({ default: { metrics_query: vi.fn() } }));
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("./alerts", () => ({
   default: {
     getHistory: vi.fn().mockResolvedValue({ data: { hits: [], total: 0 } }),
+    getHistorySummary: vi.fn().mockResolvedValue({ data: { rows: [] } }),
     listAlertAcks: vi.fn(),
     ackAlert: vi.fn(),
     unackAlert: vi.fn(),
@@ -79,18 +87,21 @@ describe("alertHistoryQuery", () => {
     expect(JSON.stringify(first.queryKey)).toContain(String(BUCKETED_END_US));
   });
 
-  it("requests the caller's exact window — a bucketed end hides the current minute's evaluations", async () => {
-    const options = alertHistoryQuery(ORG, {
-      alert_id: "a1",
-      start_time: START_US,
-      end_time: END_US,
-    });
-    await (options.queryFn as any)();
-    expect(alerts.getHistory).toHaveBeenCalledWith(
-      ORG,
-      expect.objectContaining({ start_time: START_US, end_time: END_US }),
-    );
-  });
+  it.each([
+    ["history", alertHistoryQuery, () => alerts.getHistory],
+    ["summary", alertHistorySummaryQuery, () => alerts.getHistorySummary],
+  ] as const)(
+    "the %s requests the caller's exact window — a bucketed end hides the current minute's evaluations",
+    async (_name, query, api) => {
+      const options = query(ORG, { start_time: START_US, end_time: END_US, from: 0, size: 1 });
+      expect(JSON.stringify(options.queryKey)).toContain(String(BUCKETED_END_US));
+      await (options.queryFn as any)();
+      expect(api()).toHaveBeenCalledWith(
+        ORG,
+        expect.objectContaining({ start_time: START_US, end_time: END_US }),
+      );
+    },
+  );
 });
 
 describe("promRulePreviewQuery", () => {
@@ -130,6 +141,23 @@ describe("promRulePreviewQuery", () => {
   });
 });
 
+describe("alert state toggles", () => {
+  // The cache's error handler skips a mutation with no meta, so the toast needs meta present and not silent.
+  it.each([
+    ["alert", toggleAlertStateMutation],
+    ["anomaly", toggleAnomalyAlertStateMutation],
+  ])("leaves a failed %s toggle to the central mutation toast", (_kind, build) => {
+    const { meta } = build(ORG);
+    expect(meta).toBeDefined();
+    expect(meta?.silentError).toBeUndefined();
+  });
+
+  // The list toasts a failed retrain itself, so a central toast would report it twice.
+  it("keeps a failed retrain out of the central mutation toast", () => {
+    expect(retrainAnomalyMutation(ORG).meta?.silentError).toBe(true);
+  });
+});
+
 describe("ack and mute queries", () => {
   const ACK = {
     group_key: "",
@@ -146,6 +174,16 @@ describe("ack and mute queries", () => {
     expect(options.queryKey.slice(0, alertKeys.all(ORG).length)).toEqual(alertKeys.all(ORG));
     expect(await (options.queryFn as () => Promise<unknown>)()).toEqual([ACK]);
     expect(alerts.listAlertAcks).toHaveBeenCalledWith(ORG, "a1", undefined);
+  });
+
+  it("re-reads an alert once its folder is known, since the folder decides the route check", () => {
+    expect(alertAcksQuery(ORG, "a1", "f1").queryKey).not.toEqual(
+      alertAcksQuery(ORG, "a1").queryKey,
+    );
+    expect(alertDetailQuery(ORG, "a1", "f1").queryKey).not.toEqual(
+      alertDetailQuery(ORG, "a1").queryKey,
+    );
+    expect(alertDetailQuery(ORG, "a1").queryKey).toEqual(alertKeys.detail(ORG, "a1"));
   });
 
   it("returns the server's ack answer and refreshes every alert read", async () => {
@@ -176,6 +214,22 @@ describe("ack and mute queries", () => {
     ]) {
       expect(scopes).toContainEqual(key);
     }
+  });
+
+  it("tracks an ack only when it changed something", () => {
+    vi.mocked(analytics.track).mockClear();
+    const single = ackAlertMutation(ORG).onSuccess as (answer: unknown) => void;
+    single({ changed: false, acks: [] });
+    expect(analytics.track).not.toHaveBeenCalled();
+    single({ changed: true, acks: [] });
+    expect(analytics.track).toHaveBeenCalledWith("alert_acknowledged", { count: 1 });
+  });
+
+  it("refreshes the Firing read after a pause or resume", () => {
+    expect(toggleAlertStateMutation(ORG).meta?.invalidates).toContainEqual(alertKeys.firing(ORG));
+    expect(toggleAnomalyAlertStateMutation(ORG).meta?.invalidates).toContainEqual(
+      alertKeys.firing(ORG),
+    );
   });
 
   it("refreshes alerts and downtimes after a mute, and the banner after extend or cancel", async () => {
@@ -216,8 +270,9 @@ describe("ack and mute queries", () => {
     await (cancel.mutationFn as (v: unknown) => Promise<unknown>)({
       alertId: "a1",
       downtimeId: "d1",
+      version: 4,
     });
-    expect(alerts.cancelAlertMute).toHaveBeenCalledWith(ORG, "a1", "d1", undefined);
+    expect(alerts.cancelAlertMute).toHaveBeenCalledWith(ORG, "a1", "d1", undefined, 4);
     expect(cancel.meta?.invalidates).toEqual(withBanner);
   });
 });

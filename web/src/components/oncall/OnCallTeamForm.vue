@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OFormInput
         name="name"
         :label="t('oncall.teamName')"
-        :help-text="t('oncall.teamNameHint')"
         required
         data-test="oncall-team-form-name"
       />
@@ -39,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="timezone"
         :label="t('oncall.timezone')"
         :options="timezoneOptions"
-        :help-text="t('oncall.timezoneHint')"
         required
         data-test="oncall-team-form-timezone"
       />
@@ -48,6 +46,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('oncall.description')"
         data-test="oncall-team-form-description"
       />
+
+      <!-- Saved with the team, after it: the default is a routing setting, so the team's own write goes first. -->
+      <div v-if="isEdit && offerDefault" class="flex flex-col gap-1">
+        <OFormSwitch
+          name="make_default"
+          :label="t('oncall.defaultTeamTitle')"
+          :disabled="isDefault"
+          data-test="oncall-team-form-default"
+        />
+        <!-- The blocking reason, or the outcome once switched on; nothing while the switch is off. -->
+        <OText
+          v-if="isDefault || makingDefault"
+          variant="meta"
+          data-test="oncall-team-form-default-hint"
+        >
+          {{ isDefault ? t("oncall.deleteDefaultTeamBlocked") : t("oncall.defaultTeamBadgeTip") }}
+        </OText>
+      </div>
 
       <!-- The fields above are the whole of what this drawer can change. A
            reader who opened it to fix "nobody on call" needs a way out to the
@@ -59,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm-action"
         icon-right="arrow-right-alt"
         class="self-start"
+        icon-left="open-in-new"
         data-test="oncall-team-form-manage-link"
         @click="goToTeamDetail"
       >
@@ -84,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
+              icon-left="group-add"
               data-test="oncall-team-form-add-everyone"
               @click="addEveryone"
             >
@@ -147,6 +165,8 @@ import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
@@ -178,13 +198,20 @@ import {
 import OnCallRotationPreview from "./OnCallRotationPreview.vue";
 
 import { makeOnCallTeamSchema, type OnCallTeamFormValues } from "./OnCallTeamForm.schema";
+import { serverMessageOf, statusOf } from "@/utils/slackLink";
 
 const FORM_ID = "oncall-team-form";
 
-const props = defineProps<{ open: boolean; team: OnCallTeam | null }>();
+const props = defineProps<{
+  open: boolean;
+  team: OnCallTeam | null;
+  /** Shows the Default team switch; the host sets the default when `saved` says so. */
+  offerDefault?: boolean;
+  isDefault?: boolean;
+}>();
 const emit = defineEmits<{
   "update:open": [value: boolean];
-  saved: [teamId: string];
+  saved: [teamId: string, makeDefault: boolean];
 }>();
 
 const { t } = useI18nTyped();
@@ -259,6 +286,7 @@ const defaultValues = computed<OnCallTeamFormValues>(() => {
     // Ticked. A team with one position and no backup is the state almost
     // nobody wants and nobody notices until a page goes unanswered.
     create_secondary: true,
+    make_default: !!props.isDefault,
   };
 });
 
@@ -269,6 +297,9 @@ const form = useOForm<OnCallTeamFormValues>({
   onSubmit,
 });
 const memberCount = form.useStore((s: any) => (s.values?.members ?? []).length as number);
+const makingDefault = form.useStore(
+  (s: { values: OnCallTeamFormValues }) => !!s.values?.make_default,
+);
 
 const primaryLabel = computed(() => {
   if (isEdit.value) return t("oncall.save");
@@ -344,15 +375,15 @@ async function onSubmit(values: OnCallTeamFormValues) {
       variant: "success",
       message: props.team ? t("oncall.teamUpdated") : t("oncall.teamCreated"),
     });
-    emit("saved", teamId);
-  } catch (err: any) {
+    emit("saved", teamId, !!props.offerDefault && !props.isDefault && !!values.make_default);
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.saveTeamFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.saveTeamFailed"),
     });
   }
 }
@@ -367,10 +398,10 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
 
   try {
     await staffMembersWrite.mutateAsync({ teamId, userEmails: emails });
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "warning",
-      message: raw(err?.response?.data?.message) || t("oncall.teamCreatedWithoutMembers"),
+      message: raw(serverMessageOf(err)) || t("oncall.teamCreatedWithoutMembers"),
     });
     return;
   }
@@ -400,10 +431,10 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
         ),
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "warning",
-      message: raw(err?.response?.data?.message) || t("oncall.teamCreatedWithoutRotation"),
+      message: raw(serverMessageOf(err)) || t("oncall.teamCreatedWithoutRotation"),
     });
   }
 }

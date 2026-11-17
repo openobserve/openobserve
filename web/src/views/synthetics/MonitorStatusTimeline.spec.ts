@@ -26,18 +26,20 @@ interface TimelineExecution {
   device: string;
   status: "pass" | "warning" | "fail" | "error";
   errorSnippet: string | null;
+  confirm?: { location: string; status: "pass" | "warning" | "fail" | "error" } | null;
 }
 
 interface StatusTally {
   passed: number;
   warning: number;
   failed: number;
+  notMeasured?: number;
   total: number;
 }
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
+  status: "all-pass" | "all-warning" | "mixed" | "all-fail" | "not-measured";
   color: string;
   title: string;
   timestampMs: number;
@@ -350,6 +352,52 @@ describe("MonitorStatusTimeline", () => {
         .find('[data-test="monitor-status-timeline"]')
         .findAll('[class*="bg-"]');
       expect(bars_in_scroll.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe("not measured runs", () => {
+    it("should explain a run that did not test the site", () => {
+      const execs = [makeFailExec({ status: "error" }), makePassExec({ status: "error" })];
+      wrapper = makeWrapper({
+        segments: [
+          makeSegment({
+            status: "not-measured",
+            executions: execs,
+            tally: { passed: 0, warning: 0, failed: 0, notMeasured: 2, total: 2 },
+          }),
+        ],
+        notMeasuredCount: "1",
+      });
+      expect(wrapper.find('[data-test="synthetics-timeline-not-measured-note"]').text()).toBe(
+        "Not measured. OpenObserve could not reach the probe. Your site was not tested.",
+      );
+      expect(wrapper.find('[data-test="synthetics-timeline-not-measured-count"]').text()).toContain(
+        "1",
+      );
+      expect(wrapper.find(".otooltip-stub").text()).toContain("2 not measured");
+    });
+
+    it("should hide the Not measured legend entry when there is none", () => {
+      wrapper = makeWrapper({ segments: [makeSegment()] });
+      expect(wrapper.find('[data-test="synthetics-timeline-not-measured-count"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="synthetics-timeline-not-measured-note"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("should show a confirm job under the failure it re-tested", () => {
+      const failed = makeFailExec({
+        status: "warning",
+        confirm: { location: "aws-us-west-1", status: "pass" },
+      });
+      wrapper = makeWrapper({
+        segments: [makeSegment({ status: "all-warning", executions: [failed] })],
+      });
+      expect(wrapper.find('[data-test="synthetics-timeline-confirm"]').text()).toContain(
+        "Confirm from aws-us-west-1: passed",
+      );
     });
   });
 });

@@ -109,12 +109,17 @@ export async function copyToClipboard(
     }
     return true;
   } catch {
-    if (!silent) {
+    if (silent) return false;
+    const toastError = () =>
       toast({
         variant: "error",
         message: raw(errorMessage || t("common.copyError")),
         timeout,
       });
+    if (isShown(anchor)) {
+      confirmCopy(anchor, raw(errorMessage || t("common.couldntCopy")), toastError, "error");
+    } else {
+      toastError();
     }
     return false;
   }

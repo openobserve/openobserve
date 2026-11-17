@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import service_accounts from "@/services/service_accounts";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -280,5 +283,26 @@ describe("service_accounts service", () => {
         `/api/test-org/service_accounts/${email}`,
       );
     });
+  });
+});
+
+describe("service_accounts analytics", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (http as any).mockReturnValue({
+      put: vi.fn().mockResolvedValue({ data: {} }),
+      delete: vi.fn().mockResolvedValue({ data: { successful: ["a"], unsuccessful: ["b"] } }),
+    });
+  });
+
+  it("tracks deletes and token rotation, but not create", async () => {
+    await service_accounts.delete("o", "a@x");
+    await service_accounts.bulkDelete("o", { ids: ["a", "b"] });
+    await service_accounts.refresh_token("o", "a@x");
+
+    expect(analytics.track).toHaveBeenNthCalledWith(1, "service_account_deleted", { count: 1 });
+    expect(analytics.track).toHaveBeenNthCalledWith(2, "service_account_deleted", { count: 1 });
+    expect(analytics.track).toHaveBeenNthCalledWith(3, "service_account_token_rotated");
+    expect(analytics.track).toHaveBeenCalledTimes(3);
   });
 });

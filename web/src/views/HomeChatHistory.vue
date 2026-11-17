@@ -18,6 +18,7 @@ import AiChatShareDialog from "@/components/ai-assistant/share/AiChatShareDialog
 import AiChatSharedByMe from "@/components/ai-assistant/share/AiChatSharedByMe.vue";
 import { isChatPersistenceEnabled } from "@/components/ai-assistant/share/chatShare";
 import { activeShareCount } from "@/components/ai-assistant/share/useChatShareDialog";
+import analytics from "@/services/product_analytics";
 
 const emit = defineEmits<{
   (e: "load-chat", id: number): void;
@@ -70,6 +71,7 @@ const activeChatId = computed(() => store.state.currentChatTimestamp);
 function selectChat(id: number) {
   store.dispatch("setCurrentChatTimestamp", id);
   emit("load-chat", id);
+  analytics.track("home_chat_history_opened");
 }
 
 function newChat() {
@@ -98,7 +100,7 @@ async function confirmDeleteChat() {
   const chat = chatToDelete.value?.chat;
   chatToDelete.value = null;
   if (!chat) return;
-  await deleteChatById(chat.id);
+  if (await deleteChatById(chat.id)) analytics.track("home_chat_history_deleted");
   if (activeChatId.value === chat.id) newChat();
   await refresh();
 }
@@ -116,7 +118,7 @@ async function clearAll() {
     confirmVariant: "destructive",
   });
   if (ok) {
-    await clearAllHistory();
+    if (await clearAllHistory()) analytics.track("home_chat_history_cleared");
     newChat();
     await refresh();
   }

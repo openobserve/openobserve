@@ -17,7 +17,6 @@
 
 use config::{
     cluster::LOCAL_NODE,
-    get_config,
     meta::{self_reporting::ai_chat::AI_CHAT_EVENTS_STREAM, stream::StreamType},
     spawn_pausable_job,
     utils::time::now_micros,
@@ -54,11 +53,20 @@ async fn sweep() -> Result<(), infra::errors::Error> {
             infra::schema::get_settings(&org_id, AI_CHAT_EVENTS_STREAM, StreamType::Logs)
                 .await
                 .unwrap_or_default();
-        let Some(days) = effective_retention_days(
+        let days = match db::organization::stream_retention_days(
+            &org_id,
+            StreamType::Logs,
+            AI_CHAT_EVENTS_STREAM,
             settings.data_retention,
-            get_config().compact.data_retention_days,
-        ) else {
-            continue;
+        )
+        .await
+        {
+            Ok(0) => continue,
+            Ok(days) => days,
+            Err(e) => {
+                log::error!("[AI_CHAT_RETENTION] {org_id}: can't read retention: {e}");
+                continue;
+            }
         };
         refresh_in_use(&org_id, days, now).await;
         let cutoff = now - purge_age(days);
@@ -178,16 +186,6 @@ async fn purge_deleted_replicas(org_id: &str) {
     }
 }
 
-/// The stream's retention in days as the compactor resolves it; `None` keeps data forever.
-fn effective_retention_days(stream_days: i64, global_days: i64) -> Option<i64> {
-    let days = if stream_days > 0 {
-        stream_days
-    } else {
-        global_days
-    };
-    (days > 0).then_some(days)
-}
-
 /// Age (micros) past which a row goes: before its events may, but beyond the refresh horizon (R/2).
 fn purge_age(days: i64) -> i64 {
     let retention = days * MICROS_PER_DAY;
@@ -197,13 +195,6 @@ fn purge_age(days: i64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn stream_retention_wins_and_zero_keeps_forever() {
-        assert_eq!(effective_retention_days(30, 7), Some(30));
-        assert_eq!(effective_retention_days(0, 7), Some(7));
-        assert_eq!(effective_retention_days(0, 0), None);
-    }
 
     #[test]
     fn rows_go_before_their_events_and_never_inside_the_refresh_horizon() {

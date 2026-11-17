@@ -345,12 +345,22 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
             down_runs,
             up_runs,
             run_ts,
+            run_class,
+            run_class_at,
+            tested_at,
+            recovered_at,
+            signed,
         } => {
             let streaks = table::synthetics_checks::StatusStreaks {
                 last_check_status: status,
                 down_runs,
                 up_runs,
                 run_ts,
+                run_class,
+                run_class_at,
+                tested_at,
+                recovered_at,
+                signed,
             };
             apply_last_check_status(conn, &org_id, &id, &streaks).await?;
         }
@@ -653,6 +663,15 @@ mod tests {
             status_down_runs: 0,
             status_up_runs: 0,
             status_run_ts: 0,
+            last_run_class: 0,
+            last_run_class_at: 0,
+            last_tested_at: 0,
+            status_recovered_at: 0,
+            status_streak_sig: 0,
+            gap_since: 0,
+            gap_runs: 0,
+            gap_notified_at: 0,
+            gap_resumed_at: 0,
             owner: None,
             created_at: 0,
             updated_at: 0,
@@ -704,9 +723,139 @@ mod tests {
                 run_ts: 0,
                 down_runs: 0,
                 up_runs: 0,
+                run_class: 0,
+                run_class_at: 0,
+                tested_at: 0,
+                recovered_at: 0,
+                signed: false,
                 ..
             }
         ));
+    }
+
+    #[tokio::test]
+    async fn a_message_from_an_older_producer_leaves_the_row_unsigned() {
+        let db = db_with_a_check(0).await;
+        let legacy = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 3,
+            down_runs: 2,
+            run_ts: 200,
+            run_class: 3,
+            signed: false,
+            ..Default::default()
+        };
+        apply_last_check_status(&db, "org1", "check-1", &legacy)
+            .await
+            .unwrap();
+        let voided = stored_streaks(&db).await;
+        assert!(!voided.signed, "no hold may trust it");
+        // A signed copy with an older stamp than the moved one still reads as unsigned.
+        let stale = infra::table::synthetics_checks::StatusStreaks {
+            run_ts: 300,
+            recovered_at: 0,
+            signed: true,
+            ..legacy
+        };
+        apply_last_check_status(&db, "org1", "check-1", &stale)
+            .await
+            .unwrap();
+        assert!(!stored_streaks(&db).await.signed);
+        // The next recovery on the producer finishes later and signs the row again.
+        let signed = infra::table::synthetics_checks::StatusStreaks {
+            run_ts: 400,
+            recovered_at: voided.recovered_at + 1,
+            ..stale
+        };
+        apply_last_check_status(&db, "org1", "check-1", &signed)
+            .await
+            .unwrap();
+        assert!(stored_streaks(&db).await.signed);
+        // A badge-only message comes only from an older producer.
+        apply_last_check_status(&db, "org1", "check-1", &status_only(1))
+            .await
+            .unwrap();
+        assert!(!stored_streaks(&db).await.signed);
+    }
+
+    #[tokio::test]
+    async fn a_late_unsigned_message_ends_any_hold_even_when_its_run_is_older() {
+        let db = db_with_a_check(0).await;
+        let down = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 3,
+            down_runs: 2,
+            run_ts: 500,
+            run_class: 3,
+            recovered_at: 1_000,
+            signed: true,
+            ..Default::default()
+        };
+        apply_last_check_status(&db, "org1", "check-1", &down)
+            .await
+            .unwrap();
+        assert_eq!(stored_streaks(&db).await.recovered_at, 1_000);
+        // An older producer's Up from before the newest run: the run_ts filter drops its streaks.
+        let late_up = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 1,
+            down_runs: 0,
+            up_runs: 1,
+            run_ts: 400,
+            run_class: 1,
+            recovered_at: 0,
+            signed: false,
+            ..Default::default()
+        };
+        apply_last_check_status(&db, "org1", "check-1", &late_up)
+            .await
+            .unwrap();
+        let after = stored_streaks(&db).await;
+        assert_eq!(
+            after.run_ts, 500,
+            "the older run does not replace the newer one"
+        );
+        assert!(
+            after.recovered_at > 1_000,
+            "a mark armed on 1000 must not match"
+        );
+        assert!(!after.signed);
+        // A delayed signed copy of the Down row cannot bring the old stamp back.
+        apply_last_check_status(&db, "org1", "check-1", &down)
+            .await
+            .unwrap();
+        assert_eq!(stored_streaks(&db).await.recovered_at, after.recovered_at);
+    }
+
+    #[tokio::test]
+    async fn an_older_snapshot_with_the_same_run_cannot_sign_a_newer_stamp() {
+        let db = db_with_a_check(0).await;
+        // A late Up corrected the newest run: Up, stamp 900.
+        let corrected = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 1,
+            up_runs: 1,
+            run_ts: 300,
+            run_class: 1,
+            recovered_at: 900,
+            signed: true,
+            ..Default::default()
+        };
+        apply_last_check_status(&db, "org1", "check-1", &corrected)
+            .await
+            .unwrap();
+        assert!(stored_streaks(&db).await.signed);
+        // The copy from before the correction arrives late: same run, Down, stamp 100.
+        let older = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 3,
+            down_runs: 2,
+            up_runs: 0,
+            run_class: 3,
+            recovered_at: 100,
+            ..corrected
+        };
+        apply_last_check_status(&db, "org1", "check-1", &older)
+            .await
+            .unwrap();
+        let row = stored_streaks(&db).await;
+        assert_eq!((row.down_runs, row.recovered_at), (2, 900));
+        assert!(!row.signed, "a mark here must not arm stamp 900");
     }
 
     #[tokio::test]
@@ -717,6 +866,11 @@ mod tests {
             down_runs: 2,
             up_runs: 0,
             run_ts: 200,
+            run_class: 3,
+            run_class_at: 200,
+            tested_at: 200,
+            recovered_at: 0,
+            signed: true,
         };
         apply_last_check_status(&db, "org1", "check-1", &newer)
             .await
@@ -728,6 +882,11 @@ mod tests {
             down_runs: 0,
             up_runs: 1,
             run_ts: 100,
+            run_class: 1,
+            run_class_at: 100,
+            tested_at: 100,
+            recovered_at: 0,
+            signed: true,
         };
         apply_last_check_status(&db, "org1", "check-1", &older)
             .await
@@ -805,6 +964,11 @@ mod tests {
             down_runs: 0,
             up_runs: 0,
             run_ts: 0,
+            run_class: 0,
+            run_class_at: 0,
+            tested_at: 0,
+            recovered_at: 0,
+            signed: true,
         })
         .unwrap();
         let msg = Message::new(
@@ -877,6 +1041,15 @@ mod tests {
                 status_down_runs INTEGER NOT NULL DEFAULT 0,
                 status_up_runs INTEGER NOT NULL DEFAULT 0,
                 status_run_ts BIGINT NOT NULL DEFAULT 0,
+                last_run_class INTEGER NOT NULL DEFAULT 0,
+                last_run_class_at BIGINT NOT NULL DEFAULT 0,
+                last_tested_at BIGINT NOT NULL DEFAULT 0,
+                status_recovered_at BIGINT NOT NULL DEFAULT 0,
+                status_streak_sig BIGINT NOT NULL DEFAULT 0,
+                gap_since BIGINT NOT NULL DEFAULT 0,
+                gap_runs INTEGER NOT NULL DEFAULT 0,
+                gap_notified_at BIGINT NOT NULL DEFAULT 0,
+                gap_resumed_at BIGINT NOT NULL DEFAULT 0,
                 owner TEXT NULL,
                 created_at BIGINT NOT NULL,
                 updated_at BIGINT NOT NULL

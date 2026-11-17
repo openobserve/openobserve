@@ -23,6 +23,10 @@ import type * as I18n from "@/types/i18n";
 const route = { query: {} as Record<string, string> };
 const replace = vi.fn((_to: { query: Record<string, string> }) => Promise.resolve());
 vi.mock("vue-router", () => ({ useRoute: () => route, useRouter: () => ({ replace }) }));
+// The date controller keeps the URL's org in step with the store's when it writes the URL.
+vi.mock("vuex", () => ({
+  useStore: () => ({ state: { selectedOrganization: { identifier: "default" } } }),
+}));
 
 vi.mock("@/types/i18n", async (importOriginal) => {
   const actual = await importOriginal<typeof I18n>();

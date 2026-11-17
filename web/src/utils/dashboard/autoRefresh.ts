@@ -34,6 +34,15 @@ export const autoRefreshLabel = (seconds: number, t: TranslateFn): I18nText => {
   return t("common.secShort", { count: seconds });
 };
 
+/** Compact label for an interval ("30s", "5m", "1h"); 0 is Off. */
+export const autoRefreshShortLabel = (seconds: number, t: TranslateFn): I18nText => {
+  if (!seconds) return t("common.off");
+  if (seconds % 86400 === 0) return t("common.dayCompact", { count: seconds / 86400 });
+  if (seconds % 3600 === 0) return t("common.hrCompact", { count: seconds / 3600 });
+  if (seconds % 60 === 0) return t("common.minCompact", { count: seconds / 60 });
+  return t("common.secCompact", { count: seconds });
+};
+
 /** The server's `min_auto_refresh_interval`, or the built-in floor when it is not published. */
 export const minAutoRefreshSeconds = (configured: unknown): number => {
   const n = Number(configured);

@@ -157,7 +157,7 @@ const OInputStub = {
 const OTimeStub = {
   name: "OTime",
   props: ["modelValue", "label", "helpText", "clearable"],
-  emits: ["update:modelValue"],
+  emits: ["update:modelValue", "invalid"],
   template: `
     <input
       data-test="o-time-stub"
@@ -294,6 +294,17 @@ describe("TestModelMatchDialog", () => {
       await nextTick();
       const dialog = wrapper.findComponent(ODialogStub);
       expect(dialog.props("primaryButtonDisabled")).toBe(false);
+    });
+
+    it("disables the primary button while the typed time is unreadable (V-N3)", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-4";
+      wrapper.findComponent(OTimeStub).vm.$emit("invalid", true);
+      await nextTick();
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(true);
+      wrapper.findComponent(OTimeStub).vm.$emit("invalid", false);
+      await nextTick();
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(false);
     });
 
     it("reflects the testing state in primaryButtonLoading", async () => {

@@ -410,7 +410,7 @@ describe("JobInputMapping", () => {
     it("names the variables' origin in the heading, not a long hint", () => {
       const wrapper = mountMapping("trace");
 
-      expect(wrapper.text()).toContain("Prompt variables");
+      expect(wrapper.text()).toContain("Scorer variables");
       expect(wrapper.text()).toContain(
         "Map each variable to a system-provided value or span attribute.",
       );

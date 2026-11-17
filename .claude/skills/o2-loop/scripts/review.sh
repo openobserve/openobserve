@@ -6,22 +6,18 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASE="main"
 ROUND=""
 LEDGER=""
-BACKEND="auto"
-EFFORT=""
-MODEL=""
+MODEL="opus"
 TIMEOUT_SECS=1800
-MAX_BUDGET_USD=""
+MAX_BUDGET_USD=15
 CANDIDATES=1
 DRY_RUN=0
 UNSANDBOXED=0
 ALSO_REPOS=()
-PROGRESS_PREFIX=""
 NO_SANDBOX=0
 
 usage() {
   cat <<'USAGE'
-Usage: review.sh --round N [--ledger DIR] [--base BRANCH] [--backend auto|codex|claude|both]
-                       [--effort low|medium|high] [--model MODEL] [--timeout SECS]
+Usage: review.sh --round N [--ledger DIR] [--base BRANCH] [--model MODEL] [--timeout SECS]
                        [--max-budget-usd N] [--no-candidates] [--unsandboxed] [--dry-run]
                        [--also PATH ...]
 
@@ -29,7 +25,7 @@ Each round first records the working tree as a local WIP commit ("wip(o2-loop): 
 so the reviewer sees an immutable snapshot and the caller can prove nothing changed afterwards by
 checking that HEAD still equals DIR/round-N/commit and `git status --porcelain` is empty.
 Round 1 reviews the whole change set against BASE. Round N>1 verifies earlier findings against
-Claude's responses and reviews the delta between round N-1's commit and round N's commit.
+the coder's responses and reviews the delta between round N-1's commit and round N's commit.
 
 DIR defaults to ~/.claude/o2-loop/<repo name>/<branch with / replaced by ->. It must be outside
 the checkout, otherwise it would be swept into the WIP commit.
@@ -39,32 +35,22 @@ commit, disposable worktree, patch, and prompt section, so one reviewer sees eve
 cross-repo change. Its artifacts live in DIR/round-N/also/<repo name>/ (commit, path, diff.patch,
 delta.patch, and the coder's evidence.md and coder-response.json). BASE must exist in every repo.
 
-Backends:
-  codex   `codex exec` in its read-only sandbox. --effort sets model_reasoning_effort (default high).
-  claude  a fresh `claude -p --restricted` process with Read/Grep/Glob and read-only git only.
-          --model defaults to opus; pick a model different from the one that wrote the code.
-          --max-budget-usd caps the whole round (default 15): unless --no-candidates, a separate
-          `claude -p "/code-review high <range>"` pre-run supplies candidate findings using at most
-          half of it, and the reviewer gets exactly what remains; the pre-run gets at most half of
-          --timeout and the reviewer gets the remaining seconds.
-          Neither process has MCP servers, Write/Edit, or web access; the pre-run keeps Skill and
-          Agent so /code-review can run its verification pass.
+The reviewer is a fresh `claude -p --restricted` process with Read/Grep/Glob and read-only git only.
+--model defaults to opus; pick a model different from the one that wrote the code.
+--max-budget-usd caps the whole round (default 15): unless --no-candidates, a separate
+`claude -p "/code-review high <range>"` pre-run supplies candidate findings using at most
+half of it, and the reviewer gets exactly what remains; the pre-run gets at most half of
+--timeout and the reviewer gets the remaining seconds.
+Neither process has MCP servers, Write/Edit, or web access; the pre-run keeps Skill and
+Agent so /code-review can run its verification pass.
 Every reviewer process runs inside a disposable `git worktree` of the reviewed commit that is removed
-afterwards. The claude processes are additionally wrapped in a macOS seatbelt (sandbox-exec) that denies
-every file write except the worktree's git metadata, temp directories, and claude's own session state
-under ~/.claude (settings, skills, agents and hooks stay read-only); the worktree is verified unchanged
-after each process. Without sandbox-exec the claude backend refuses to run unless --unsandboxed is
-passed, and then the reviewer gets no Bash, no ledger access and no pre-run: the harness's own
-working-directory confinement of Read/Grep/Glob is the only wall, and the patches are inlined instead
-(200 KB per patch, 600 KB per prompt in total).
-  auto    (default) codex when the CLI is found, otherwise claude with a loud warning: a Claude
-          reviewer is a weaker second opinion than a different vendor's model.
-  both    codex and claude review the same commit in parallel; their verdicts are merged into one
-          (request_changes if either says so; findings re-numbered CX<round>-<n> and CL<round>-<n>,
-          near-duplicates merged; a prior finding stays open if either reviewer says so). Each
-          reviewer's own files live in DIR/round-N/codex/ and DIR/round-N/claude/. Later rounds hand
-          every finding to both reviewers, so each verifies the other's.
-A flag that does not apply to the selected backend is rejected.
+afterwards, wrapped in a macOS seatbelt (sandbox-exec) that denies every file write except the
+worktree's git metadata, temp directories, and claude's own session state under ~/.claude (settings,
+skills, agents and hooks stay read-only); the worktree is verified unchanged after each process.
+Without sandbox-exec the review refuses to run unless --unsandboxed is passed, and then the reviewer
+gets no Bash, no ledger access and no pre-run: the harness's own working-directory confinement of
+Read/Grep/Glob is the only wall, and the patches are inlined instead (200 KB per patch, 600 KB per
+prompt in total).
 
 Inputs the caller must prepare before running:
   DIR/spec.md                          the confirmed plan (optional, embedded in the prompt when present)
@@ -75,18 +61,16 @@ Inputs the caller must prepare before running:
 
 Outputs written into DIR/round-N/:
   commit         sha of the WIP commit the reviewer saw
-  backend        which backend reviewed this round
   prompt.md      the exact prompt sent to the reviewer
   diff.patch     git diff merge-base(BASE, HEAD)..commit
   delta.patch    git diff <previous commit>..<commit> (round > 1)
-  candidates.md  code-review pre-run output (claude backend only), candidates.cost its spend
+  candidates.md  code-review pre-run output, candidates.cost its spend
   progress.log   one timestamped line per reviewer action, written live; tail -f it to watch
-                 (with both, lines carry a "codex |" or "claude |" prefix and end with one final done: line)
   events.jsonl   raw reviewer event stream
   verdict.json   structured review result
   reviewer.err   reviewer stderr
 
---dry-run does everything except invoke the backend. It never touches an existing verdict.json.
+--dry-run does everything except invoke the reviewer. It never touches an existing verdict.json.
 Exit code: 0 verdict approve, 10 verdict request_changes, 1 on any error.
 USAGE
 }
@@ -100,13 +84,7 @@ repo_name_of() { basename "$(dirname "$(git -C "$1" rev-parse --path-format=abso
 # Appending the error line (never truncating) is what lets a watcher on progress.log end, even on a refused rerun.
 die() {
   log "$*"
-  if [ -d "${ROUND_DIR:-/nonexistent}" ]; then
-    if [ -n "$PROGRESS_PREFIX" ]; then
-      echo "$(date +%H:%M:%S) $PROGRESS_PREFIX | failed: $*" >> "$ROUND_DIR/progress.log"
-    else
-      echo "$(date +%H:%M:%S) error: $*" >> "$ROUND_DIR/progress.log"
-    fi
-  fi
+  [ ! -d "${ROUND_DIR:-/nonexistent}" ] || echo "$(date +%H:%M:%S) error: $*" >> "$ROUND_DIR/progress.log"
   exit 1
 }
 
@@ -116,8 +94,6 @@ parse_args() {
       --ledger) LEDGER="$2"; shift 2 ;;
       --round) ROUND="$2"; shift 2 ;;
       --base) BASE="$2"; shift 2 ;;
-      --backend) BACKEND="$2"; shift 2 ;;
-      --effort) EFFORT="$2"; shift 2 ;;
       --model) MODEL="$2"; shift 2 ;;
       --timeout) TIMEOUT_SECS="$2"; shift 2 ;;
       --max-budget-usd) MAX_BUDGET_USD="$2"; shift 2 ;;
@@ -133,50 +109,14 @@ parse_args() {
   [[ "$ROUND" =~ ^[0-9]+$ ]] && [ "$ROUND" -ge 1 ] || die "--round must be a positive integer"
 }
 
-find_codex() {
-  if command -v codex >/dev/null 2>&1; then
-    command -v codex
-    return
+check_reviewer() {
+  command -v claude >/dev/null 2>&1 || die "claude CLI not found on PATH"
+  NO_SANDBOX=0
+  if ! command -v sandbox-exec >/dev/null 2>&1; then
+    [ "$UNSANDBOXED" -eq 1 ] || [ "$DRY_RUN" -eq 1 ] || die "sandbox-exec not found: the reviewer needs a filesystem sandbox; pass --unsandboxed to run without one"
+    NO_SANDBOX=1
+    log "WARNING: no sandbox-exec; the reviewer runs without Bash, without ledger access, and without the code-review pre-run"
   fi
-  local bundled
-  # Newer ChatGPT.app builds ship the CLI under codex-cli/bin; older ones put it directly in Resources.
-  for bundled in /Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex /Applications/ChatGPT.app/Contents/Resources/codex; do
-    [ -f "$bundled" ] && [ -x "$bundled" ] && { echo "$bundled"; return; }
-  done
-  return 1
-}
-
-select_backend() {
-  CODEX="$(find_codex || true)"
-  case "$BACKEND" in
-    auto)
-      if [ -n "$CODEX" ]; then
-        BACKEND="codex"
-      else
-        BACKEND="claude"
-        log "WARNING: codex CLI not found, falling back to the claude backend; this round is Claude reviewing Claude"
-      fi ;;
-    codex|both)
-      [ -n "$CODEX" ] || die "codex CLI not found: install it (npm i -g @openai/codex) or install the ChatGPT desktop app" ;;
-    claude) ;;
-    *) die "unknown backend: $BACKEND" ;;
-  esac
-  if [ "$BACKEND" = "claude" ] || [ "$BACKEND" = "both" ]; then
-    command -v claude >/dev/null 2>&1 || die "claude CLI not found on PATH"
-    NO_SANDBOX=0
-    if ! command -v sandbox-exec >/dev/null 2>&1; then
-      [ "$UNSANDBOXED" -eq 1 ] || [ "$DRY_RUN" -eq 1 ] || die "sandbox-exec not found: the claude backend needs a filesystem sandbox; pass --unsandboxed to run without one"
-      NO_SANDBOX=1
-      log "WARNING: no sandbox-exec; the claude reviewer runs without Bash, without ledger access, and without the code-review pre-run"
-    fi
-    MAX_BUDGET_USD="${MAX_BUDGET_USD:-15}"
-    MODEL="${MODEL:-opus}"
-  fi
-  if [ "$BACKEND" = "codex" ] || [ "$BACKEND" = "both" ]; then
-    EFFORT="${EFFORT:-high}"
-  fi
-  [ "$BACKEND" != "claude" ] || [ -z "$EFFORT" ] || die "--effort applies to the codex backend only"
-  [ "$BACKEND" != "codex" ] || [ -z "$MAX_BUDGET_USD" ] || die "--max-budget-usd applies to the claude backend only"
 }
 
 verdict_needs_response() {
@@ -234,8 +174,7 @@ resolve_paths() {
   mkdir -p "$ROUND_DIR"
   [ ! -e "$ROUND_DIR/verdict.json" ] || die "round $ROUND already has a verdict in $ROUND_DIR/verdict.json; use the next round number, or delete the round directory to redo it"
   : > "$ROUND_DIR/progress.log"
-  rm -f "$ROUND_DIR"/candidates.md "$ROUND_DIR"/candidates.cost "$ROUND_DIR"/candidates.err \
-    "$ROUND_DIR"/*/candidates.md "$ROUND_DIR"/*/candidates.cost "$ROUND_DIR"/*/candidates.err
+  rm -f "$ROUND_DIR"/candidates.md "$ROUND_DIR"/candidates.cost "$ROUND_DIR"/candidates.err
 }
 
 check_inputs() {
@@ -359,7 +298,7 @@ sandbox_profile() {
   done
 }
 
-# No die() here: this runs as a pipeline stage, where an exit would only end the subshell. select_backend gates it.
+# No die() here: this runs as a pipeline stage, where an exit would only end the subshell. check_reviewer gates it.
 run_claude_sandboxed() {
   local secs="$1"
   shift
@@ -435,9 +374,8 @@ claude_prerun_args() {
   printf '%s\n' --tools "Skill,Agent,Read,Grep,Glob,Bash,ReportFindings"
 }
 
-# Runs the code-review pre-run for the claude reviewer; sets REVIEWER_BUDGET and REVIEWER_TIMEOUT for what is left.
+# Runs the code-review pre-run for the reviewer; sets REVIEWER_BUDGET and REVIEWER_TIMEOUT for what is left.
 gather_candidates() {
-  local out="$1"
   REVIEWER_BUDGET="$MAX_BUDGET_USD"
   REVIEWER_TIMEOUT="$TIMEOUT_SECS"
   [ "$CANDIDATES" -eq 1 ] || return 0
@@ -450,20 +388,20 @@ gather_candidates() {
   fi
   if [ -z "$(git diff --name-only "$from" "$COMMIT")" ]; then
     log "candidates: the primary checkout has no diff in $range; skipping the code-review pre-run"
-    echo "(no changes in the primary checkout for $range; pre-run skipped)" > "$out/candidates.md"
+    echo "(no changes in the primary checkout for $range; pre-run skipped)" > "$ROUND_DIR/candidates.md"
     return 0
   fi
   # The pre-run gets half the budget and half the timeout; the reviewer gets what the budget leaves.
   local prerun_budget
   prerun_budget="$(python3 -c 'print(round(float(__import__("sys").argv[1]) / 2, 2))' "$MAX_BUDGET_USD")"
   local started=$SECONDS
-  log "candidates: running /code-review high $range in $REVIEW_DIR (budget \$$prerun_budget, output $out/candidates.md)"
+  log "candidates: running /code-review high $range in $REVIEW_DIR (budget \$$prerun_budget, output $ROUND_DIR/candidates.md)"
   local args=()
   while IFS= read -r a; do args+=("$a"); done < <(claude_prerun_args "$prerun_budget")
   set +e
   ( cd "$REVIEW_DIR" && printf '%s' "/code-review high $range" \
-      | run_claude_sandboxed $((TIMEOUT_SECS / 2)) -p "${args[@]}" --output-format stream-json --verbose 2> "$out/candidates.err" \
-      | python3 "$SKILL_DIR/scripts/candidates.py" "$out/candidates.md" "$out/candidates.cost"
+      | run_claude_sandboxed $((TIMEOUT_SECS / 2)) -p "${args[@]}" --output-format stream-json --verbose 2> "$ROUND_DIR/candidates.err" \
+      | python3 "$SKILL_DIR/scripts/candidates.py" "$ROUND_DIR/candidates.md" "$ROUND_DIR/candidates.cost"
   )
   local status=$?
   set -e
@@ -471,14 +409,14 @@ gather_candidates() {
   REVIEWER_TIMEOUT=$((TIMEOUT_SECS - (SECONDS - started)))
   [ "$REVIEWER_TIMEOUT" -ge 60 ] || die "round timeout ${TIMEOUT_SECS}s exhausted by the pre-run; raise --timeout or use --no-candidates"
   local cost
-  cost="$(cat "$out/candidates.cost" 2>/dev/null || true)"
+  cost="$(cat "$ROUND_DIR/candidates.cost" 2>/dev/null || true)"
   # A pre-run that died without a result event is charged its whole cap, so the round can never exceed the budget.
   cost="${cost:-$prerun_budget}"
   REVIEWER_BUDGET="$(python3 -c 'print(max(0.0, round(float(__import__("sys").argv[1]) - float(__import__("sys").argv[2]), 2)))' "$MAX_BUDGET_USD" "$cost")" \
     || die "could not compute the reviewer budget from pre-run cost '$cost'"
-  if [ "$status" -ne 0 ] || [ ! -s "$out/candidates.md" ]; then
+  if [ "$status" -ne 0 ] || [ ! -s "$ROUND_DIR/candidates.md" ]; then
     log "warning: code-review pre-run failed (exit $status, cost \$$cost); the reviewer proceeds without candidates"
-    echo "(code-review pre-run produced no output, exit $status)" > "$out/candidates.md"
+    echo "(code-review pre-run produced no output, exit $status)" > "$ROUND_DIR/candidates.md"
   else
     log "candidates: done, cost \$$cost, reviewer budget \$$REVIEWER_BUDGET"
   fi
@@ -507,23 +445,18 @@ inline_patch() {
 }
 
 write_prompt() {
-  local backend="$1" out="$2"
-  PROMPT="$out/prompt.md"
+  PROMPT="$ROUND_DIR/prompt.md"
   {
     if [ "$ROUND" -eq 1 ]; then cat "$SKILL_DIR/prompts/review.md"; else cat "$SKILL_DIR/prompts/verify.md"; fi
     echo
-    if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
-      cat "$SKILL_DIR/prompts/backend-claude-nosandbox.md"
-    else
-      cat "$SKILL_DIR/prompts/backend-$backend.md"
-    fi
+    if [ "$NO_SANDBOX" -eq 1 ]; then cat "$SKILL_DIR/prompts/reviewer-nosandbox.md"; else cat "$SKILL_DIR/prompts/reviewer.md"; fi
     echo
     echo "## Change set"
     echo "- Repository name: $REPO_NAME (use it as the \`repo\` of every finding in this checkout)"
     echo "- Your working directory is a disposable checkout of the commit under review; the real checkout is elsewhere and not yours to touch."
     echo "- Base branch: $BASE (merge-base $MERGE_BASE)"
     echo "- Commit under review: $COMMIT (this is HEAD; the working tree is clean and identical to it)"
-    if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
+    if [ "$NO_SANDBOX" -eq 1 ]; then
       echo "- Full patch: inlined at the end of this prompt"
     else
       echo "- Full patch: \`$ROUND_DIR/diff.patch\` (absolute path, outside your checkout), or run \`git diff $MERGE_BASE $COMMIT\`"
@@ -544,7 +477,7 @@ write_prompt() {
       echo "- Repository name: $name (use it as the \`repo\` of findings in this checkout)"
       echo "- Disposable checkout (read-only): ${ALSO_REVIEW_DIRS[$i]}"
       echo "- Commit under review: $(cat "$dir/commit") (merge-base $(cat "$dir/merge-base"))"
-      if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
+      if [ "$NO_SANDBOX" -eq 1 ]; then
         if [ "$ROUND" -gt 1 ] && [ -s "$dir/delta.patch" ]; then
           echo "- Full patch and delta: inlined at the end of this prompt"
         elif [ -s "$dir/diff.patch" ]; then
@@ -562,7 +495,7 @@ write_prompt() {
         echo "### Evidence from the $name coder (round $ROUND)"
         cat "$dir/evidence.md"
       fi
-      if [ "$ROUND" -gt 1 ] && [ -s "$dir/delta.patch" ] && ! { [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; }; then
+      if [ "$ROUND" -gt 1 ] && [ -s "$dir/delta.patch" ] && [ "$NO_SANDBOX" -eq 0 ]; then
         echo "- Delta since the previous round: \`$dir/delta.patch\` ($(wc -l < "$dir/delta.patch" | tr -d ' ') lines)"
       fi
     done
@@ -610,13 +543,13 @@ write_prompt() {
       echo
       echo "## Delta since the previous round"
       echo "- Previous round commit: $PREV_COMMIT"
-      if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
+      if [ "$NO_SANDBOX" -eq 1 ]; then
         echo "- Delta: inlined at the end of this prompt ($(wc -l < "$ROUND_DIR/delta.patch" | tr -d ' ') lines)"
       else
         echo "- Delta: \`$ROUND_DIR/delta.patch\` ($(wc -l < "$ROUND_DIR/delta.patch" | tr -d ' ') lines), or run \`git diff $PREV_COMMIT $COMMIT\`"
       fi
     fi
-    if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
+    if [ "$NO_SANDBOX" -eq 1 ]; then
       echo
       echo "## Patches (inline, because ledger files are not readable in this mode; at most 600 KB in total)"
       INLINE_REMAINING=600000
@@ -628,57 +561,37 @@ write_prompt() {
         [ "$ROUND" -le 1 ] || [ ! -s "$name/delta.patch" ] || inline_patch "Delta of the paired repository $(basename "$name") since the previous round" "$name/delta.patch"
       done
     fi
-    if [ "$backend" = "claude" ] && [ "$CANDIDATES" -eq 1 ] && [ "$DRY_RUN" -eq 0 ] && [ -s "$out/candidates.md" ]; then
+    if [ "$CANDIDATES" -eq 1 ] && [ "$DRY_RUN" -eq 0 ] && [ -s "$ROUND_DIR/candidates.md" ]; then
       echo
       echo "## Candidate findings from a separate code-review pre-run"
       echo "Verify each against the code before adopting it; drop what you cannot confirm."
       echo
-      cat "$out/candidates.md"
+      cat "$ROUND_DIR/candidates.md"
     fi
   } > "$PROMPT"
 }
 
-# One reviewer process end to end: pre-run (claude), prompt, run, verdict in $out. Prefix tags progress lines when two run at once.
-run_backend() {
-  local backend="$1" out="$2"
-  PROGRESS_PREFIX="${3:-}"
-  mkdir -p "$out"
-  if [ "$backend" = "claude" ]; then
-    gather_candidates "$out"
-  else
-    REVIEWER_BUDGET=""
-    REVIEWER_TIMEOUT="$TIMEOUT_SECS"
-  fi
-  write_prompt "$backend" "$out"
+# One reviewer process end to end: pre-run, prompt, run, verdict in the round directory.
+run_reviewer() {
+  gather_candidates
+  write_prompt
   if [ "$DRY_RUN" -eq 1 ]; then
-    log "dry run: prompt written to $PROMPT, $backend not invoked"
-    return 0
+    log "dry run: prompt written to $PROMPT, reviewer not invoked"
+    exit 0
   fi
-  local cmd=()
-  if [ "$backend" = "codex" ]; then
-    cmd=(run_with_timeout "$REVIEWER_TIMEOUT" "$CODEX" exec --sandbox read-only --ephemeral --json -C "$REVIEW_DIR"
-         --output-schema "$SKILL_DIR/schema/review.json"
-         -o "$out/verdict.json"
-         -c "model_reasoning_effort=\"$EFFORT\"")
-    [ -z "$MODEL" ] || [ "$BACKEND" = "both" ] || cmd+=(-m "$MODEL")
-    cmd+=(-)
-  else
-    local args=()
-    while IFS= read -r a; do args+=("$a"); done < <(claude_reviewer_args "$REVIEWER_BUDGET")
-    # stream-json is the only output mode that both streams progress and honours --json-schema.
-    cmd=(run_claude_sandboxed "$REVIEWER_TIMEOUT" -p "${args[@]}" --output-format stream-json --verbose
-         --json-schema "$(cat "$SKILL_DIR/schema/review.json")")
-  fi
-  rm -f "$out/verdict.json" "$out/events.jsonl"
-  # Both backends need the prompt on stdin; stderr gets its own file so it can never corrupt the parsed stream.
+  local args=()
+  while IFS= read -r a; do args+=("$a"); done < <(claude_reviewer_args "$REVIEWER_BUDGET")
+  rm -f "$ROUND_DIR/verdict.json" "$ROUND_DIR/events.jsonl"
+  # stream-json is the only output mode that both streams progress and honours --json-schema; stderr gets its own file so it can never corrupt the parsed stream.
   set +e
-  ( cd "$REVIEW_DIR" && "${cmd[@]}" < "$PROMPT" 2> "$out/reviewer.err" ) \
-    | python3 -u "$SKILL_DIR/scripts/progress.py" "$backend" "$out/events.jsonl" "$ROUND_DIR/progress.log" "$out/verdict.json" "$PROGRESS_PREFIX" >&2
+  ( cd "$REVIEW_DIR" && run_claude_sandboxed "$REVIEWER_TIMEOUT" -p "${args[@]}" --output-format stream-json --verbose \
+      --json-schema "$(cat "$SKILL_DIR/schema/review.json")" < "$PROMPT" 2> "$ROUND_DIR/reviewer.err" ) \
+    | python3 -u "$SKILL_DIR/scripts/progress.py" "$ROUND_DIR/events.jsonl" "$ROUND_DIR/progress.log" "$ROUND_DIR/verdict.json" >&2
   local status=${PIPESTATUS[0]}
   set -e
-  if [ "$status" -ne 0 ] || [ ! -s "$out/verdict.json" ]; then
-    tail -20 "$out/reviewer.err" >&2
-    die "$backend failed (exit $status); see $out/reviewer.err and progress.log"
+  if [ "$status" -ne 0 ] || [ ! -s "$ROUND_DIR/verdict.json" ]; then
+    tail -20 "$ROUND_DIR/reviewer.err" >&2
+    die "reviewer failed (exit $status); see $ROUND_DIR/reviewer.err and progress.log"
   fi
 }
 
@@ -705,49 +618,18 @@ check_drift() {
     fi
   done
   [ -z "$why" ] && return 0
-  local f
-  for f in "$ROUND_DIR/verdict.json" "$ROUND_DIR/codex/verdict.json" "$ROUND_DIR/claude/verdict.json"; do
-    [ -f "$f" ] && mv "$f" "$f.discarded"
-  done
+  [ ! -f "$ROUND_DIR/verdict.json" ] || mv "$ROUND_DIR/verdict.json" "$ROUND_DIR/verdict.json.discarded"
   die "$why; verdict discarded"
 }
 
-run_reviewers() {
-  echo "$BACKEND" > "$ROUND_DIR/backend"
-  log "backend: $BACKEND${CODEX:+ (codex at $CODEX)}"
-  case "$BACKEND" in
-    codex) log "round $ROUND, effort $EFFORT, base $BASE, commit $COMMIT" ;;
-    claude) log "round $ROUND, model $MODEL, budget \$$MAX_BUDGET_USD, base $BASE, commit $COMMIT" ;;
-    both) log "round $ROUND, codex effort $EFFORT + claude model $MODEL budget \$$MAX_BUDGET_USD, base $BASE, commit $COMMIT" ;;
-  esac
+run_review() {
+  log "round $ROUND, model $MODEL, budget \$$MAX_BUDGET_USD, base $BASE, commit $COMMIT"
   local paired=""
   [ -z "${ALSO_REVIEW_DIRS[*]+x}" ] || paired="; paired: ${ALSO_REVIEW_DIRS[*]}"
   log "review checkout $REVIEW_DIR (removed on exit)$paired"
   log "ledger $ROUND_DIR (tail -f progress.log to watch)"
-  if [ "$BACKEND" != "both" ]; then
-    run_backend "$BACKEND" "$ROUND_DIR" ""
-    [ "$DRY_RUN" -eq 0 ] || exit 0
-    check_drift
-    return 0
-  fi
-  # Both reviewers see the same frozen trees; they run in parallel and only their merged verdict counts.
-  local pid_codex pid_claude s_codex s_claude
-  run_backend codex "$ROUND_DIR/codex" codex &
-  pid_codex=$!
-  run_backend claude "$ROUND_DIR/claude" claude &
-  pid_claude=$!
-  set +e
-  wait "$pid_codex"; s_codex=$?
-  wait "$pid_claude"; s_claude=$?
-  set -e
-  [ "$DRY_RUN" -eq 0 ] || exit 0
-  [ "$s_codex" -eq 0 ] && [ "$s_claude" -eq 0 ] || die "both mode needs both reviewers to finish (codex exit $s_codex, claude exit $s_claude); see $ROUND_DIR/*/reviewer.err"
+  run_reviewer
   check_drift
-  # Merge into a scratch file first so a failed merge never leaves an empty verdict.json behind.
-  python3 "$SKILL_DIR/scripts/merge-verdicts.py" "$ROUND" "$ROUND_DIR/codex/verdict.json" "$ROUND_DIR/claude/verdict.json" "$LEDGER" > "$ROUND_DIR/verdict.merging" \
-    || { rm -f "$ROUND_DIR/verdict.merging"; die "could not merge the two verdicts; the per-backend verdicts are in $ROUND_DIR/codex and $ROUND_DIR/claude"; }
-  mv "$ROUND_DIR/verdict.merging" "$ROUND_DIR/verdict.json"
-  echo "$(date +%H:%M:%S) done: both reviewers finished, verdicts merged" >> "$ROUND_DIR/progress.log"
 }
 
 summarize() {
@@ -768,8 +650,7 @@ print(f"new findings: {len(r['findings'])} {sev}")
 if prior:
     print(f"prior findings: {prior}")
 for x in r["findings"]:
-    src = f" ({'+'.join(x['sources'])})" if x.get("sources") else ""
-    print(f"  [{x['severity']}] {x['id']}{src} {x.get('repo', '')}:{x['file']}:{x['line']} {x['title']}")
+    print(f"  [{x['severity']}] {x['id']} {x.get('repo', '')}:{x['file']}:{x['line']} {x['title']}")
 for x in r["prior_findings"]:
     print(f"  prior {x['id']} -> {x['status']}: {x['note'][:120]}")
 no_line = [x["id"] for x in r["findings"] if x["line"] is None and x["severity"] != "low"]
@@ -782,11 +663,11 @@ PY
 main() {
   parse_args "$@"
   resolve_paths
-  select_backend
+  check_reviewer
   check_inputs
   snapshot
   make_review_worktree
-  run_reviewers
+  run_review
   summarize
 }
 

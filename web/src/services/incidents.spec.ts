@@ -19,6 +19,7 @@ import http, { attemptTokenRefresh } from "./http";
 import serviceStreamsApi from "./service_streams";
 import { gt } from "@/types/i18n";
 import analytics from "./product_analytics";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 // Mock the http module
 vi.mock("./http");
@@ -427,6 +428,38 @@ describe("incidents service", () => {
   });
 
   describe("getCorrelatedStreams", () => {
+    it("returns the display props and keeps serviceName and the request on the key", async () => {
+      const row = labelRows.qualified;
+      const mockIncident = {
+        id: "incident-9",
+        group_values: { service: row.service_name },
+        group_values_display: { service: row.display_name },
+      } as any;
+      vi.mocked(serviceStreamsApi.correlate).mockResolvedValue({
+        data: {
+          ...row,
+          matched_dimensions: { service: row.service_name },
+          additional_dimensions: {},
+          related_streams: { logs: [], metrics: [], traces: [], profiles: [] },
+        },
+      } as any);
+
+      const result = await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
+
+      expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
+        source_stream: "",
+        source_type: "incident",
+        available_dimensions: { service: row.service_name },
+      });
+      expect(result.serviceName).toBe(row.service_name);
+      expect(result.displayServiceName).toBe(row.display_name);
+      expect(result.serviceDisplay).toEqual({
+        display_source: row.display_source,
+        display_candidates: undefined,
+        display_qualifier: row.display_qualifier,
+      });
+    });
+
     it("should call correlate API with incident stable dimensions", async () => {
       const mockIncident = {
         id: "incident-123",
@@ -457,8 +490,8 @@ describe("incidents service", () => {
       const result = await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
-        source_stream: "api-gateway",
-        source_type: "logs",
+        source_stream: "",
+        source_type: "incident",
         available_dimensions: mockIncident.group_values,
       });
 
@@ -468,7 +501,7 @@ describe("incidents service", () => {
       expect(result.traceStreams).toHaveLength(1);
     });
 
-    it("should fallback to default when service dimension missing", async () => {
+    it("should send an empty source stream when the service dimension is missing", async () => {
       const mockIncident = {
         id: "incident-123",
         group_values: {
@@ -490,13 +523,13 @@ describe("incidents service", () => {
       await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
-        source_stream: "default",
-        source_type: "logs",
+        source_stream: "",
+        source_type: "incident",
         available_dimensions: mockIncident.group_values,
       });
     });
 
-    it("should check multiple service dimension variations", async () => {
+    it("should never send a service name variation as the source stream", async () => {
       const mockIncident = {
         id: "incident-123",
         group_values: {
@@ -518,8 +551,8 @@ describe("incidents service", () => {
       await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
-        source_stream: "api-gateway",
-        source_type: "logs",
+        source_stream: "",
+        source_type: "incident",
         available_dimensions: mockIncident.group_values,
       });
     });

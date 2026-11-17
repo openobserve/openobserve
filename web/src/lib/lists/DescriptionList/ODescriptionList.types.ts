@@ -8,6 +8,7 @@
 // Distinct from OFieldList (lib/lists/FieldList), which is a stream-schema field
 // BROWSER — searchable, typed, interactive. This is static metadata.
 
+import type { ComputedRef, InjectionKey } from "vue";
 import type { I18nText } from "@/types/i18n";
 
 export interface DescriptionListProps {
@@ -18,7 +19,15 @@ export interface DescriptionListProps {
   columns?: 1 | 2;
   /** Tighter row rhythm, for a list inside a card rather than a page column. */
   dense?: boolean;
+  /** Width of every item's label column; `narrow` gives the value the room in a side-column card. */
+  labelWidth?: DescriptionLabelWidth;
 }
+
+export type DescriptionLabelWidth = "default" | "narrow";
+
+/** The list's label width, read by each item so one prop sets the whole column. */
+export const DESCRIPTION_LABEL_WIDTH: InjectionKey<ComputedRef<DescriptionLabelWidth>> =
+  Symbol("descriptionLabelWidth");
 
 export interface DescriptionItemProps {
   label: I18nText;

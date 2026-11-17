@@ -249,6 +249,19 @@ describe("signOutThroughLeaveGuards", () => {
     expect(store.dispatch).toHaveBeenCalledWith("logout");
     expect(assign).toHaveBeenCalledTimes(1);
   });
+
+  // a deep-link first login keeps the flag for a later Home visit; the next user on this browser must not inherit it
+  it("clears the first-login flag", async () => {
+    localStorage.setItem("isFirstTimeLogin", email);
+    await expect(signOutThroughLeaveGuards(router, makeStore())).resolves.toBe(true);
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+  });
+
+  it("clears the sample data tour, so the next user does not open it", async () => {
+    localStorage.setItem("o2_sample_tour", JSON.stringify({ org: "acme", index: 2 }));
+    await expect(signOutThroughLeaveGuards(router, makeStore())).resolves.toBe(true);
+    expect(localStorage.getItem("o2_sample_tour")).toBeNull();
+  });
 });
 
 describe("signOutDraftsToConfirm", () => {

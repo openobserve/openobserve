@@ -29,12 +29,7 @@ import worldMap from "@/assets/dashboard/maps/map.json";
 import { withChartFont } from "@/utils/fonts";
 import { chartColor } from "@/utils/chartTheme";
 import useTheme from "@/composables/useTheme";
-import {
-  applyDevicePixelRatio,
-  currentDevicePixelRatio,
-  isFractionalDevicePixelRatio,
-  useDevicePixelRatioChange,
-} from "@/composables/useDevicePixelRatio";
+import { currentDevicePixelRatio, useChartPixelRatio } from "@/composables/useDevicePixelRatio";
 
 echarts.use([MapChart]);
 // Registering once per app keeps panels and theme switches from re-parsing the GeoJSON.
@@ -128,17 +123,16 @@ export default defineComponent({
       chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light", {
         devicePixelRatio: currentDevicePixelRatio(),
       });
+      syncPixelRatio();
       chart.setOption(withChartFont(currentOptions(view)), true);
     };
 
     watch(isDark, () => {
       if (chart) initChart();
     });
-    const fractionalPixelRatio = ref(isFractionalDevicePixelRatio(currentDevicePixelRatio()));
-    useDevicePixelRatioChange((ratio) => {
-      fractionalPixelRatio.value = isFractionalDevicePixelRatio(ratio);
-      applyDevicePixelRatio(chart, ratio);
-    });
+    const { pixelated: fractionalPixelRatio, sync: syncPixelRatio } = useChartPixelRatio(
+      () => chart,
+    );
 
     onMounted(async () => {
       await nextTick();

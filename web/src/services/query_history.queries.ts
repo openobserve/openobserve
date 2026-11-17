@@ -87,6 +87,17 @@ export const queryHistoryCountQuery = (org: string, source: string, starred: boo
     staleTime: 0,
   });
 
+/** How many entries match the drawer's server-side filters. */
+export const queryHistoryFilteredCountQuery = (org: string, filters: QueryHistoryListParams) =>
+  queryOptions({
+    queryKey: queryHistoryKeys.list(org, { ...filters, count_only: true }),
+    queryFn: async (): Promise<number> => {
+      const res = await queryHistory.count(org, filters);
+      return Number(res.data?.count ?? 0);
+    },
+    staleTime: 0,
+  });
+
 const isEntry = (data: unknown): data is QueryHistoryEntry =>
   !!data && typeof data === "object" && typeof (data as QueryHistoryEntry).id === "string";
 

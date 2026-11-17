@@ -7,10 +7,10 @@ const SHORT = [
   [1000, 600],
   [960, 480],
 ];
-// Billing is Cloud-only; on this OSS stack the deep-link set is Settings and IAM.
+// Billing is Cloud-only; on this OSS stack the deep-link set is Settings and IAM, which lights the Settings tile.
 const DEEP_LINKS = [
   ['/settings', '/settings'],
-  ['/iam', '/iam'],
+  ['/iam', '/settings'],
 ];
 
 test.describe('nav rail on short screens', () => {

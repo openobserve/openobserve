@@ -100,6 +100,8 @@
   --color-grey-200: #e5e5e5;
   --color-grey-300: #d4d4d4;
   --color-grey-400: #a3a3a3;
+  /* The lightest grey that clears 3:1 on white and on grey-100. */
+  --color-grey-450: #8a8a8a;
   --color-grey-500: #737373;
   --color-grey-600: #525252;
   --color-grey-700: #404040;
@@ -274,9 +276,8 @@
   /* Expected-range band fill; alpha lives in the token so the legend swatch matches. */
   --color-chart-band: rgba(115, 115, 115, 0.22);
 
-  /* --- Chart crosshair label chip is intentionally NOT declared here (light): it is
-     dark-only (#333 in dark.css). chartColor() returns "" in light, which is the
-     empty value ECharts reads as its own "auto" default — preserving today's look. --- */
+  /* Crosshair axis-pointer label chip; set explicitly because ECharts' "auto" copies the axis line colour, which is too light for white text. */
+  --color-chart-crosshair-bg: var(--color-grey-600);
 
   /* --- Trace span palette (16 colors) — light values; dark overrides in dark.css.
      Read by traceColors.ts getSpanColorHex()/getAllSpanColors() via chartColor().

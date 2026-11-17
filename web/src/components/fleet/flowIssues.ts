@@ -72,6 +72,12 @@ export const SIGNAL_STROKE: Record<Telemetry, string> = {
   traces: "stroke-signal-traces",
 };
 
+export const SIGNAL_DOT: Record<Telemetry, string> = {
+  logs: "bg-signal-logs",
+  metrics: "bg-signal-metrics",
+  traces: "bg-signal-traces",
+};
+
 export const SEVERITY_TEXT: Record<PathSeverity, string> = {
   error: "text-status-error-text",
   warning: "text-status-warning-text",

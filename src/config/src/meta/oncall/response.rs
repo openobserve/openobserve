@@ -516,6 +516,7 @@ impl std::fmt::Display for ResolutionCause {
 
 /// The record itself, as the API and the UI see it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = OnCallResponse)]
 pub struct Response {
     pub id: String,
     pub org_id: String,

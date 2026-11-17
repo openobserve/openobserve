@@ -165,8 +165,6 @@ test.describe('On-call pages list', {
       // than climbing for the rest of the run.
       await setTeamPolicy(page, team.id, {
         rungs: [rungEscalatingToTeam(1, rotationId)],
-        repeatCount: 1,
-        finalAction: 'stop',
       });
     } else {
       await setTeamPolicy(page, team.id, { rungs: [rungPagingRotation(1, rotationId)] });

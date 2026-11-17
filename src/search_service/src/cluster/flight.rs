@@ -53,11 +53,11 @@ use crate::{
     QueryTracker, SearchResult,
     datafusion::{
         context::{SearchContextBuilder, register_table},
-        optimizer::{
-            context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
-            create_physical_plan,
+        memory_pool::get_peak_memory_from_ctx,
+        optimizer::create_physical_plan,
+        physical_optimizer::context::{
+            PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
         },
-        plan_metrics::get_peak_memory_from_ctx,
     },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     sql::Sql,

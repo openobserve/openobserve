@@ -16,6 +16,8 @@ class FleetFleetsPage {
     this.dialogPrimaryBtn = '[data-test="o-dialog-primary-btn"]';
     this.rolloutsDrawer = '[data-test="fleet-rollouts-drawer"]';
     this.rolloutStatus = '[data-test="fleet-rollouts-status"]';
+    this.outcomeFixForward = '[data-test="fleet-rollout-outcome-fix_forward"]';
+    this.confirmDialog = '[data-test="confirm-dialog-provider"]';
   }
 
   railItem(fleetId) {
@@ -54,6 +56,16 @@ class FleetFleetsPage {
     await expect(dialog).toBeVisible({ timeout: PAGE_TIMEOUT_MS });
     await dialog.locator(this.nameDialogField).fill(name);
     await dialog.locator(this.dialogPrimaryBtn).click();
+  }
+
+  async fixForwardFromRolloutDrawer() {
+    await expect(this.page.locator(this.rolloutsDrawer)).toBeVisible({ timeout: PAGE_TIMEOUT_MS });
+    const fixForward = this.page.locator(this.outcomeFixForward);
+    await expect(fixForward).toBeEnabled({ timeout: PAGE_TIMEOUT_MS });
+    await fixForward.click();
+    const confirm = this.page.locator(this.confirmDialog);
+    await expect(confirm).toBeVisible({ timeout: PAGE_TIMEOUT_MS });
+    await confirm.locator(this.dialogPrimaryBtn).click();
   }
 
   async expectRolloutDrawerStatus(text) {

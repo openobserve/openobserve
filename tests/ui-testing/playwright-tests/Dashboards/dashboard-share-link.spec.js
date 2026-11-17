@@ -339,28 +339,8 @@ test.describe("dashboard share URL button testcases", () => {
       .getVariableSelectorLocator(variableName)
       .waitFor({ state: "visible", timeout: 15000 });
 
-    // Wait for variable loading to complete
-    await pm.dashboardShareExport
-      .getVariableLoadingIndicatorLocator(variableName)
-      .waitFor({ state: "hidden", timeout: 10000 })
-      .catch(() => {});
-
-    // Click the variable dropdown (inner select element)
-    const variableDropdown =
-      pm.dashboardShareExport.getVariableDropdownInner(variableName);
-    await variableDropdown.waitFor({ state: "visible", timeout: 10000 });
-    await variableDropdown.click();
-
-    // Wait for dropdown menu to open
-    await pm.dashboardShareExport
-      .getMenu()
-      .waitFor({ state: "visible", timeout: 5000 });
-
-    // Select the first option
-    const firstOption = pm.dashboardShareExport.getFirstRoleOption();
-    await firstOption.waitFor({ state: "visible", timeout: 5000 });
-    const selectedValue = await firstOption.textContent();
-    await firstOption.click();
+    const selectedValue =
+      await pm.dashboardShareExport.selectFirstVariableValue(variableName);
 
     testLogger.info("Selected variable value:", { selectedValue });
 
@@ -368,12 +348,9 @@ test.describe("dashboard share URL button testcases", () => {
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Get current URL to verify variable parameter
-    const currentURL = page.url();
-    testLogger.info("Current URL with variable:", { currentURL });
-
-    // Verify URL contains the variable parameter
-    expect(currentURL).toContain(`var-${variableName}`);
+    // The URL updates after the selection commits, and the waits above swallow their timeouts.
+    await expect.poll(() => page.url(), { timeout: 15000 }).toContain(`var-${variableName}`);
+    testLogger.info("Current URL with variable:", { currentURL: page.url() });
 
     // Click the share button
     await pm.dashboardShareExport.clickShareButton();
@@ -570,23 +547,7 @@ test.describe("dashboard share URL button testcases", () => {
       .getVariableSelectorLocator(variableName)
       .waitFor({ state: "visible", timeout: 15000 });
 
-    // Wait for variable loading to complete
-    await pm.dashboardShareExport
-      .getVariableLoadingIndicatorLocator(variableName)
-      .waitFor({ state: "hidden", timeout: 10000 })
-      .catch(() => {});
-
-    // Click the variable dropdown (inner select element)
-    const variableDropdown =
-      pm.dashboardShareExport.getVariableDropdownInner(variableName);
-    await variableDropdown.waitFor({ state: "visible", timeout: 10000 });
-    await variableDropdown.click();
-
-    // Wait for dropdown menu to open and select first option
-    await pm.dashboardShareExport
-      .getMenu()
-      .waitFor({ state: "visible", timeout: 5000 });
-    await pm.dashboardShareExport.getFirstRoleOption().click();
+    await pm.dashboardShareExport.selectFirstVariableValue(variableName);
 
     // Wait for dropdown to close and selection to apply
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });

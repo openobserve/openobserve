@@ -47,14 +47,23 @@ vi.mock("@/components/ingestion/FirstDataPanel.vue", async () => {
     }),
   };
 });
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/views/OverviewTab.vue", () => ({
-  default: { name: "OverviewTab", template: '<div data-test="overview-tab-stub" />' },
+  default: {
+    name: "OverviewTab",
+    emits: ["sendToAiChat"],
+    template: '<div data-test="overview-tab-stub" />',
+  },
 }));
 vi.mock("@/views/UsageTab.vue", () => ({
   default: { name: "UsageTab", template: '<div data-test="usage-tab-stub" />' },
 }));
 vi.mock("@/components/O2AIChat.vue", () => ({
-  default: { name: "O2AIChat", template: '<div data-test="ai-chat-stub" />' },
+  default: {
+    name: "O2AIChat",
+    props: { aiChatPayload: { type: Object, default: null } },
+    template: '<div data-test="ai-chat-stub" />',
+  },
 }));
 vi.mock("@/views/HomeChatHistory.vue", () => ({
   default: { name: "HomeChatHistory", template: "<div />" },
@@ -73,8 +82,33 @@ vi.mock("@/components/shared/HomeViewSkeleton.vue", () => ({
   default: { name: "HomeViewSkeleton", template: '<div data-test="home-skeleton-stub" />' },
 }));
 
+// whether the org holds any stream; true keeps the saved tab the rest of this file tests.
+// One ref per call: a test flips the ones made since its mount (`orgData.flip`).
+const orgData = vi.hoisted(() => ({
+  initial: true as boolean | undefined,
+  // the _meta org: no user data, but O2's own streams to ask the assistant about
+  ownStreamsOnly: false,
+  refs: [] as { value: boolean | undefined }[],
+  flip(value: boolean | undefined) {
+    this.refs.forEach((r) => (r.value = value));
+  },
+}));
+vi.mock("@/composables/useOrgHasUserData", async () => {
+  const { ref } = await import("vue");
+  return {
+    useOrgHasUserData: () => {
+      const hasUserData = ref(orgData.initial);
+      orgData.refs.push(hasUserData);
+      const hasAnyStream = orgData.ownStreamsOnly ? ref(true) : hasUserData;
+      return { hasUserData, isFetching: ref(false), hasAnyStream };
+    },
+  };
+});
+
 import config from "@/aws-exports";
 import HomeView from "./HomeView.vue";
+import analytics from "@/services/product_analytics";
+import settings from "@/services/settings";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { raw } from "@/types/i18n";
 
@@ -141,6 +175,40 @@ describe("HomeView", () => {
       expect(has(`home-tab-${TAB}`)).toBe(true);
       expect(has(`home-tab-lock-${TAB}`)).toBe(false);
     });
+
+    it("tracks a tab the user picks, naming a pinned dashboard by its kind only", async () => {
+      wrapper = mountHome();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", TAB);
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "overview");
+      expect(analytics.track).toHaveBeenCalledWith("home_tab_switched", { tab: "dashboard" });
+      expect(analytics.track).toHaveBeenCalledWith("home_tab_switched", { tab: "overview" });
+    });
+
+    it("tracks an unpin from the tab's close button once the pin is cleared", async () => {
+      vi.spyOn(settings, "deleteOrgSetting").mockResolvedValue({} as never);
+      wrapper = mountHome();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.find(`[data-test="home-tab-close-${TAB}"]`).trigger("click");
+      await flushPromises();
+      expect(analytics.track).toHaveBeenCalledWith("home_dashboard_unpinned", {
+        source: "home_tab",
+      });
+    });
+
+    it("does not track an unpin the server refused", async () => {
+      vi.spyOn(settings, "deleteOrgSetting").mockRejectedValue({ response: { status: 500 } });
+      wrapper = mountHome();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.find(`[data-test="home-tab-close-${TAB}"]`).trigger("click");
+      await flushPromises();
+      expect(analytics.track).not.toHaveBeenCalledWith("home_dashboard_unpinned", {
+        source: "home_tab",
+      });
+    });
   });
 
   describe("the AI Assistant tab", () => {
@@ -182,6 +250,79 @@ describe("HomeView", () => {
 
       expect(has("home-tab-lock-ai")).toBe(false);
       expect(has("ai-chat-stub")).toBe(true);
+    });
+  });
+
+  describe("an Ask AI hand-off from the Overview tab", () => {
+    const handoff = {
+      query: "Why are 3 alerts firing and what should I check first?",
+      chipName: raw("Firing alerts"),
+      newChat: true,
+      autoSend: false,
+      context: { currentPage: "Alerts", org_id: "default" },
+    };
+    const sendFromOverview = async () => {
+      setFlag(false);
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: true,
+        features: { ai_assistant: "enabled" },
+      });
+      openTab("overview");
+      wrapper = mountHome();
+      await flushPromises();
+      wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
+      await flushPromises();
+    };
+    const tab = () => (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab;
+    const chat = () => wrapper.findComponent({ name: "O2AIChat" });
+
+    it("switches to the AI tab and passes the chip payload with a unique id", async () => {
+      await sendFromOverview();
+
+      expect(tab()).toBe("ai");
+      expect(chat().exists()).toBe(true);
+      expect(chat().props("aiChatPayload")).toMatchObject({
+        text: handoff.query,
+        chipName: "Firing alerts",
+        newChat: true,
+        autoSend: false,
+        context: handoff.context,
+      });
+      expect(typeof chat().props("aiChatPayload").id).toBe("number");
+    });
+
+    it("ignores a hand-off while the AI tab is locked", async () => {
+      setFlag(false);
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: false,
+        features: { ai_assistant: "locked" },
+      });
+      openTab("overview");
+      wrapper = mountHome();
+      await flushPromises();
+      wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
+      await flushPromises();
+
+      expect(tab()).toBe("overview");
+      expect((wrapper.vm as unknown as { aiChatPayload: unknown }).aiChatPayload).toBeNull();
+    });
+
+    it("gives a second hand-off a fresh id so the chat watcher fires again", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        await sendFromOverview();
+        const first = chat().props("aiChatPayload").id;
+        vi.setSystemTime(Date.now() + 5);
+        (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab = "overview";
+        await flushPromises();
+        wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
+        await flushPromises();
+        expect(chat().props("aiChatPayload").id).toBeGreaterThan(first);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -361,6 +502,82 @@ describe("HomeView", () => {
 
       expect(has("first-data-panel-stub")).toBe(false);
       expect(has("home-first-data-hero")).toBe(false);
+    });
+  });
+
+  describe("an org with no data", () => {
+    beforeEach(() => {
+      setFlag(false);
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+      openTab("ai");
+      orgData.refs.length = 0;
+    });
+    afterEach(() => {
+      orgData.initial = true;
+      orgData.ownStreamsOnly = false;
+    });
+    const savedTab = () => localStorage.getItem("o2_home_active_tab");
+    const activeTab = () => (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab;
+
+    it("opens Overview instead of the assistant, without saving that as the user's tab", async () => {
+      orgData.initial = false;
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("overview-tab-stub")).toBe(true);
+      expect(has("ai-chat-stub")).toBe(false);
+      expect(savedTab()).toBe("ai");
+    });
+
+    it("saves the next tab the user picks", async () => {
+      orgData.initial = false;
+      wrapper = mountHome();
+      await flushPromises();
+      (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab = "usage";
+      await flushPromises();
+
+      expect(savedTab()).toBe("usage");
+    });
+
+    it("switches once the data check resolves with no data", async () => {
+      orgData.initial = undefined;
+      wrapper = mountHome();
+      await flushPromises();
+      expect(activeTab()).toBe("ai");
+
+      orgData.flip(false);
+      await flushPromises();
+
+      expect(activeTab()).toBe("overview");
+      expect(savedTab()).toBe("ai");
+    });
+
+    it.each([true, undefined])("keeps the assistant when the data check is %s", async (value) => {
+      orgData.initial = value;
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("ai-chat-stub")).toBe(true);
+      expect(savedTab()).toBe("ai");
+    });
+
+    it("keeps the assistant for an org with only O2's own streams, such as _meta", async () => {
+      orgData.initial = false;
+      orgData.ownStreamsOnly = true;
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(activeTab()).toBe("ai");
+      expect(has("ai-chat-stub")).toBe(true);
+    });
+
+    it("leaves a saved Usage tab alone", async () => {
+      orgData.initial = false;
+      openTab("usage");
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(activeTab()).toBe("usage");
     });
   });
 });

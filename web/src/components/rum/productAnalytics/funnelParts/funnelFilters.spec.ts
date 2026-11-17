@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
+import { ref } from "vue";
 import {
   condOf,
   conditionOf,
@@ -21,7 +22,9 @@ import {
   draftOf,
   removeFilter,
   setFilter,
+  valuesLoader,
   withConds,
+  type FilterValuesState,
 } from "./funnelFilters";
 import { whyLines, type WhyInput } from "./whyEntered";
 import { fitsLink } from "./funnelEdits";
@@ -228,5 +231,35 @@ describe("Why N? lines", () => {
 
   it("is not exact when the lines cannot add up", () => {
     expect(whyLines({ ...base, entered: 250 }).exact).toBe(false);
+  });
+});
+
+describe("valuesLoader", () => {
+  const settled = <T>(promise: Promise<T>) =>
+    Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve("waiting"), 50))]);
+
+  it("answers when the request fills the state synchronously", async () => {
+    const state = ref<FilterValuesState>({ field: null, status: "idle", rows: [] });
+    const load = valuesLoader(
+      () => state.value,
+      (field) => {
+        state.value = { field, status: "ok", rows: [{ value: "Chrome", sessions: 3 }] };
+      },
+    );
+    expect(await settled(load("browser", ""))).toEqual(["Chrome"]);
+  });
+
+  it("waits for rows that arrive after the request", async () => {
+    const state = ref<FilterValuesState>({ field: null, status: "idle", rows: [] });
+    const load = valuesLoader(
+      () => state.value,
+      (field) => {
+        state.value = { field, status: "loading", rows: [] };
+        setTimeout(() => {
+          state.value = { field, status: "ok", rows: [{ value: "Firefox", sessions: 1 }] };
+        }, 0);
+      },
+    );
+    expect(await settled(load("browser", "fire"))).toEqual(["Firefox"]);
   });
 });

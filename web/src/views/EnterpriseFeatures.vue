@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="cta"
             data-test="enterprise-features-primary-btn"
             class="text-theme-accent! bg-white!"
-            @click="handlePrimaryButtonClick"
+            @click="trackCta('primary', handlePrimaryButtonClick)"
           >
             {{ dialogConfig.primaryButtonText }}
             <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
@@ -59,11 +59,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="dialogConfig.showContactSales"
             variant="on-dark-ghost"
             size="cta"
-            @click="contactSales"
+            @click="trackCta('contact_sales', contactSales)"
           >
             {{ t("about.enterprise_offer.buttons.contact_sales") }}
           </OButton>
-          <OButton v-else variant="on-dark-ghost" size="cta" @click="openDocsLink">
+          <OButton
+            v-else
+            variant="on-dark-ghost"
+            size="cta"
+            @click="trackCta('learn_more', openDocsLink)"
+          >
             {{ t("about.enterprise_offer.buttons.learn_more") }}
           </OButton>
         </div>
@@ -161,6 +166,7 @@ import {
   useEnterpriseOfferContent,
   type EnterpriseFeatureCategory,
 } from "@/composables/useEnterpriseOfferContent";
+import analytics from "@/services/product_analytics";
 
 const { t } = useI18nTyped();
 
@@ -176,6 +182,11 @@ const {
 } = useEnterpriseOfferContent();
 
 const DOCS_URL = "https://openobserve.ai/docs/";
+
+const trackCta = (action: "primary" | "contact_sales" | "learn_more", run: () => void) => {
+  analytics.track("enterprise_features_cta_clicked", { action });
+  run();
+};
 
 const CATEGORY_ORDER: EnterpriseFeatureCategory[] = ["security", "scale", "ai", "analysis"];
 

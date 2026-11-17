@@ -60,7 +60,7 @@ pub enum AssociationDeleteEvent {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, utoipa::ToSchema)]
 pub enum WorkflowTriggerType {
     #[default]
     AlertFired,

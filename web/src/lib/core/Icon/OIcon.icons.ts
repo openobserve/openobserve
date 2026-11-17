@@ -57,6 +57,8 @@ import EditNote from "~icons/material-symbols/edit-note-outline";
 import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
+import EventAvailable from "~icons/material-symbols/event-available-outline";
+import EventBusy from "~icons/material-symbols/event-busy-outline";
 import ExpandMore from "~icons/material-symbols/expand-more";
 import Extension from "~icons/material-symbols/extension-outline";
 import UploadFile from "~icons/material-symbols/upload-file-outline";
@@ -136,6 +138,7 @@ import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
 import AlignRight from "~icons/material-symbols/format-align-right";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
+import Apps from "~icons/material-symbols/apps";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
@@ -159,6 +162,7 @@ import Label from "~icons/material-symbols/label-outline";
 import Layers from "~icons/material-symbols/layers-outline";
 import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
+import MarkEmailUnread from "~icons/material-symbols/mark-email-unread-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
 import MoreHoriz from "~icons/material-symbols/more-horiz";
@@ -167,6 +171,7 @@ import Notifications from "~icons/material-symbols/notifications-outline";
 import OpenInFull from "~icons/material-symbols/open-in-full";
 import PlayCircle from "~icons/material-symbols/play-circle-outline";
 import SmartToy from "~icons/material-symbols/smart-toy-outline";
+import Terminal from "~icons/material-symbols/terminal";
 import Speed from "~icons/material-symbols/speed-outline";
 import Target from "~icons/material-symbols/target";
 import TrackChanges from "~icons/material-symbols/track-changes";
@@ -365,8 +370,18 @@ import AndroidIcon from "~icons/material-symbols/android";
 import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
 import CallIcon from "~icons/material-symbols/call-outline";
 
-// Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
+// Batch 6: Folder icon picker (2026-11-06)
+import BugReportIcon from "~icons/material-symbols/bug-report-outline";
+import ApiIcon from "~icons/material-symbols/api";
+import ShoppingCartIcon from "~icons/material-symbols/shopping-cart-outline";
+import DeployedCodeIcon from "~icons/material-symbols/deployed-code-outline";
+import RouterIcon from "~icons/material-symbols/router-outline";
+import SupportAgentIcon from "~icons/material-symbols/support-agent";
+import CloudSyncIcon from "~icons/material-symbols/cloud-sync-outline";
+
+// Brand marks (not Material Symbols) — local inline SVG components using currentColor.
 import McpLogo from "./McpLogo.vue";
+import SlackLogo from "./SlackLogo.vue";
 
 import type { Component } from "vue";
 
@@ -374,6 +389,7 @@ export const iconRegistry = {
   alarm: Alarm,
   add: Add,
   mcp: McpLogo,
+  slack: SlackLogo,
   "arrow-back": ArrowBack,
   "arrow-back-ios-new": ArrowBackIosNew,
   "arrow-downward": ArrowDownward,
@@ -417,6 +433,8 @@ export const iconRegistry = {
   error: Error,
   "error-outline": ErrorOutline,
   event: Event,
+  "event-available": EventAvailable,
+  "event-busy": EventBusy,
   "expand-more": ExpandMore,
   extension: Extension,
   "upload-file": UploadFile,
@@ -497,6 +515,7 @@ export const iconRegistry = {
   "align-left": AlignLeft,
   "align-right": AlignRight,
   "all-inclusive": AllInclusive,
+  apps: Apps,
   "assignment-turned-in": AssignmentTurnedIn,
   "auto-awesome": AutoAwesome,
   "bar-chart": BarChart,
@@ -551,6 +570,7 @@ export const iconRegistry = {
   layers: Layers,
   public: Public,
   mail: Mail,
+  "mark-email-unread": MarkEmailUnread,
   "manage-search": ManageSearch,
   merge: Merge,
   "more-horiz": MoreHoriz,
@@ -559,6 +579,7 @@ export const iconRegistry = {
   "open-in-full": OpenInFull,
   "play-circle": PlayCircle,
   "smart-toy": SmartToy,
+  terminal: Terminal,
   speed: Speed,
   target: Target,
   "track-changes": TrackChanges,
@@ -739,6 +760,15 @@ export const iconRegistry = {
   // Batch 5: Downtimes (2026-09-24)
   "notifications-paused": NotificationsPaused,
   repeat: RepeatIcon,
+
+  // Batch 6: Folder icon picker (2026-11-06)
+  "bug-report": BugReportIcon,
+  api: ApiIcon,
+  "shopping-cart": ShoppingCartIcon,
+  "deployed-code": DeployedCodeIcon,
+  router: RouterIcon,
+  "support-agent": SupportAgentIcon,
+  "cloud-sync": CloudSyncIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

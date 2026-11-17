@@ -140,7 +140,7 @@ pub struct TakeOverRequest {
 }
 
 /// A link's state as the admin UI shows it; `NeedsAttention` comes from the batch status call.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PublicLinkStatus {
     Live,
@@ -186,7 +186,7 @@ pub struct PublicLinkState {
 }
 
 /// Why a panel is withheld; deliberately generic, it never names a stream on the public plane.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NotAvailableReason {
     Unauthorized,
@@ -232,14 +232,14 @@ impl PanelState {
 }
 
 /// A panel the result file masks on every serve, and why.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct WithheldPanel {
     pub panel_id: String,
     pub reason: NotAvailableReason,
 }
 
 /// One range's result on the querier that owns the link, as the publisher's status call reports.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RangeState {
     Cached,
@@ -249,7 +249,7 @@ pub enum RangeState {
 }
 
 /// Status of one offered range, read from the owning querier's result file.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RangeStatus {
     pub key: String,
     pub state: RangeState,
@@ -263,11 +263,12 @@ pub struct RangeStatus {
     pub next_retry_at: Option<i64>,
     /// Panel id to the typed streams its data was read from; left out of the batch call.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<BTreeMap<String, Vec<Vec<String>>>>)]
     pub sources: Option<BTreeMap<String, Vec<(StreamType, String)>>>,
 }
 
 /// One link's status call: its ranges from the owning querier and its access counters.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LinkStatusReport {
     pub link_id: String,
     pub ranges: Vec<RangeStatus>,

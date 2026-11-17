@@ -1,24 +1,27 @@
 <script setup lang="ts">
 import {
   TOOLTIP_TRIGGER_ATTR,
+  INERT_TRIGGER_ATTR,
   TOOLTIP_TRIGGER_OVERFLOW,
   type TooltipEmits,
   type TooltipProps,
   type TooltipSlots,
 } from "./OTooltip.types";
 import {
-  TooltipProvider,
   TooltipRoot,
   TooltipTrigger,
   TooltipPortal,
   TooltipContent,
   TooltipArrow,
+  injectTooltipProviderContext,
 } from "reka-ui";
 import {
   ref,
   computed,
   onMounted,
+  onBeforeUnmount,
   onUnmounted,
+  onActivated,
   onDeactivated,
   useAttrs,
   watch,
@@ -27,7 +30,11 @@ import {
 } from "vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import { isElementTruncated, readElementText } from "./useIsTruncated";
-import { tooltipNameTarget } from "./triggerName";
+import { hoversNestedTrigger } from "./nestedTrigger";
+import { isDisplayContents, tooltipHoverTarget, tooltipNameTarget } from "./triggerName";
+import { claimTooltip, releaseTooltip } from "./exclusiveTooltip";
+import { LinkedTooltipProvider, countOpenTooltip, sharedTooltipProvider } from "./tooltipProvider";
+import { TOOLTIP_DELAY_MS } from "@/lib/styles/motion";
 
 // Both modes render a fragment (provider + portalled content, or the child-mode
 // anchor pair), so Vue has no single root to fall attributes onto: anything a
@@ -42,7 +49,8 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   align: "center",
   sideOffset: 4,
   alignOffset: 0,
-  delay: 700,
+  arrowClass: "fill-surface-overlay",
+  delay: TOOLTIP_DELAY_MS,
   maxWidth: "20rem",
   disabled: false,
   hoverable: false,
@@ -54,6 +62,7 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   // forever. Child mode was unaffected because it drives `open` itself.
   open: undefined,
   overflowOnly: false,
+  exclusive: false,
   anchor: undefined,
 });
 
@@ -62,6 +71,10 @@ const emit = defineEmits<TooltipEmits>();
 defineSlots<TooltipSlots>();
 
 const slots = useSlots();
+// The app root's provider shares one skip-delay window across every tooltip; a tree mounted outside it has none.
+const appProvider = sharedTooltipProvider(injectTooltipProviderContext(null));
+// A kept-alive page that is away holds every root shut, so none of them keeps the shared skip window open.
+const suspended = ref(false);
 const hasDefaultSlot = computed(() => !!slots.default);
 const isAnchored = computed(() => props.anchor !== undefined);
 
@@ -73,25 +86,37 @@ const hasNothingToShow = () =>
   props.content === undefined && !slots.content && overflowText.value === "";
 const triggerMarker = computed(() => (props.overflowOnly ? TOOLTIP_TRIGGER_OVERFLOW : ""));
 
-// ─── Wrapper mode, overflow-only: controlled so a fitting trigger never opens ──
+// ─── Wrapper mode: controlled so a fitting overflow-only trigger never opens, and another exclusive tooltip can close this one ──
 const wrapperTriggerRef = ref<ComponentPublicInstance | null>(null);
 const wrapperOpen = ref(false);
-const wrapperRootOpen = computed(() => {
-  if (props.open !== undefined) return { open: props.disabled ? false : props.open };
-  if (props.overflowOnly) return { open: props.disabled ? false : wrapperOpen.value };
-  return {};
+const wrapperUncontrolledOpen = ref(false);
+let resettingHover = false;
+// Always controlled, so a deactivated page can shut a root that opened on its own hover.
+const wrapperRootOpen = computed<boolean>(() => {
+  if (props.disabled || suspended.value) return false;
+  if (props.open !== undefined) return props.open;
+  if (props.overflowOnly || props.exclusive) return wrapperOpen.value;
+  return wrapperUncontrolledOpen.value;
 });
+const isPlainWrapper = () => props.open === undefined && !props.overflowOnly && !props.exclusive;
 function onWrapperOpenChange(next: boolean) {
+  // Reka's hover timer still fires for a disabled root, which would leave it open once re-enabled.
+  if (suspended.value || resettingHover || (next && props.disabled)) return;
+  // A plain tooltip reports only real changes, as Reka's uncontrolled root does.
+  if (isPlainWrapper() && next === wrapperUncontrolledOpen.value) return;
+  wrapperUncontrolledOpen.value = next;
   emit("update:open", next);
-  if (props.open !== undefined || !props.overflowOnly) return;
+  if (isPlainWrapper() || props.open !== undefined) return;
   if (!next) {
     wrapperOpen.value = false;
     return;
   }
-  const el = wrapperTriggerRef.value?.$el as Element | undefined;
-  if (!el || !isElementTruncated(el)) return;
-  overflowText.value = readElementText(el);
-  if (hasNothingToShow()) return;
+  if (props.overflowOnly) {
+    const el = wrapperTriggerRef.value?.$el as Element | undefined;
+    if (!el || !isElementTruncated(el)) return;
+    overflowText.value = readElementText(el);
+    if (hasNothingToShow()) return;
+  }
   wrapperOpen.value = true;
 }
 
@@ -126,6 +151,8 @@ let childShowTimer: ReturnType<typeof setTimeout> | null = null;
 // trigger we wait briefly before closing so the pointer can travel onto the
 // bubble; entering the bubble cancels this timer and keeps the tooltip open.
 let childHideTimer: ReturnType<typeof setTimeout> | null = null;
+// The portalled bubble sits outside the trigger, so moving within it is not moving away.
+let pointerInBubble = false;
 const HOVERABLE_GRACE_MS = 120;
 let labelledEl: Element | null = null;
 
@@ -152,6 +179,7 @@ watch(() => props.content, syncTriggerName);
 // bubble cancels a pending close; leaving it closes the tooltip.
 const onContentEnter = () => {
   if (!props.hoverable) return;
+  pointerInBubble = true;
   if (childHideTimer) {
     clearTimeout(childHideTimer);
     childHideTimer = null;
@@ -159,22 +187,48 @@ const onContentEnter = () => {
 };
 const onContentLeave = () => {
   if (!props.hoverable) return;
+  pointerInBubble = false;
   childOpen.value = false;
 };
 
 const childRootOpen = computed(() => {
-  if (props.disabled) return false;
+  if (props.disabled || suspended.value) return false;
   return isAnchored.value ? !!props.open && !!props.anchor : childOpen.value;
 });
+const rootOpen = computed<boolean>(() =>
+  hasDefaultSlot.value ? wrapperRootOpen.value : childRootOpen.value,
+);
+let countedOpen = false;
+// Reka reports to its own provider only on a change, missing a root that mounts open, so the shared window is driven from here.
+watch(
+  rootOpen,
+  (open) => {
+    if (!appProvider || open === countedOpen) return;
+    countedOpen = open;
+    countOpenTooltip(appProvider, open ? 1 : -1);
+  },
+  { immediate: true },
+);
+// Reka reports nothing when an open root unmounts, which would leave the skip window open for good.
+function releaseProviderOpen() {
+  if (!appProvider || !countedOpen) return;
+  countedOpen = false;
+  countOpenTooltip(appProvider, -1);
+}
 function onChildOpenChange(next: boolean) {
+  if (suspended.value) return;
   if (isAnchored.value) emit("update:open", next);
   else childOpen.value = next;
 }
 
-// getComputedStyle forces a style recalc on every mount, so only ask when a class or inline style can set display:contents.
-function mayBeDisplayContents(el: Element): boolean {
-  if ((el as HTMLElement).style?.display === "contents") return true;
-  return [...el.classList].some((c) => c === "contents" || c.endsWith(":contents"));
+function isInertTrigger(): boolean {
+  return !!parentEl.value?.hasAttribute(INERT_TRIGGER_ATTR);
+}
+
+// Reka dismisses on any outside pointerdown, which would close the tooltip the click on its own trigger opens.
+function onChildPointerDownOutside(event: Event) {
+  const target = event.target as Node | null;
+  if (isInertTrigger() && target && parentEl.value?.contains(target)) event.preventDefault();
 }
 
 onMounted(() => {
@@ -192,14 +246,12 @@ onMounted(() => {
       // Fallback: walk up past display:contents ancestors — they have no layout box
       // and getBoundingClientRect() returns all-zeros, sending the tooltip to (0,0).
       candidate = childAnchorRef.value.parentElement;
-      while (
-        candidate &&
-        mayBeDisplayContents(candidate) &&
-        window.getComputedStyle(candidate).display === "contents"
-      ) {
+      while (candidate && isDisplayContents(candidate)) {
         candidate = candidate.parentElement;
       }
     }
+    // An overflow-only tooltip measures its own text element, so it never widens to the control.
+    if (candidate && !props.overflowOnly) candidate = tooltipHoverTarget(candidate);
     parentEl.value = candidate;
     if (parentEl.value) {
       parentEl.value.setAttribute(TOOLTIP_TRIGGER_ATTR, triggerMarker.value);
@@ -211,6 +263,8 @@ onMounted(() => {
       // cheap.
       const activateAndOpen = () => {
         childShowTimer = null;
+        // Only the innermost tooltip that will actually open wins.
+        if (hoversNestedTrigger(parentEl.value)) return;
         if (props.overflowOnly) {
           // Measured now, not at mount: width and text may have changed since.
           if (!parentEl.value || !isElementTruncated(parentEl.value)) return;
@@ -223,7 +277,13 @@ onMounted(() => {
       const show = () => {
         if (props.disabled) return;
         if (childShowTimer) clearTimeout(childShowTimer);
-        if (props.delay > 0) {
+        // A return inside the hoverable grace window would otherwise be closed by the pending hide.
+        if (childHideTimer) {
+          clearTimeout(childHideTimer);
+          childHideTimer = null;
+        }
+        const insideSkipWindow = appProvider ? !appProvider.isOpenDelayed.value : false;
+        if (props.delay > 0 && !insideSkipWindow) {
           childShowTimer = setTimeout(activateAndOpen, props.delay);
         } else {
           activateAndOpen();
@@ -246,15 +306,43 @@ onMounted(() => {
           childOpen.value = false;
         }
       };
-      parentEl.value.addEventListener("mouseenter", show);
-      parentEl.value.addEventListener("mouseleave", hide);
+      // A trigger with no action of its own opens on click too, so touch and click users can read it.
+      const openOnClick = () => {
+        if (props.disabled || props.overflowOnly || !isInertTrigger()) return;
+        if (childShowTimer) {
+          clearTimeout(childShowTimer);
+          childShowTimer = null;
+        }
+        childActivated.value = true;
+        childOpen.value = true;
+      };
+      // Chrome drops mouseleave when the hovered child is re-rendered, so the first move off the trigger also ends the hover.
+      const hideOnMoveAway = (e: MouseEvent) => {
+        if (pointerInBubble || parentEl.value?.contains(e.target as Node)) return;
+        document.removeEventListener("mousemove", hideOnMoveAway);
+        hide();
+      };
+      const enter = () => {
+        pointerInBubble = false;
+        document.addEventListener("mousemove", hideOnMoveAway, { passive: true });
+        show();
+      };
+      const leave = () => {
+        document.removeEventListener("mousemove", hideOnMoveAway);
+        hide();
+      };
+      parentEl.value.addEventListener("click", openOnClick);
+      parentEl.value.addEventListener("mouseenter", enter);
+      parentEl.value.addEventListener("mouseleave", leave);
       // Keyboard-focus parity with hover, so a Tab-reachable trigger (e.g. an
       // inert locked tile) can surface its tooltip without a pointer.
       parentEl.value.addEventListener("focus", show);
       parentEl.value.addEventListener("blur", hide);
       cleanupFn = () => {
-        parentEl.value?.removeEventListener("mouseenter", show);
-        parentEl.value?.removeEventListener("mouseleave", hide);
+        parentEl.value?.removeEventListener("click", openOnClick);
+        parentEl.value?.removeEventListener("mouseenter", enter);
+        parentEl.value?.removeEventListener("mouseleave", leave);
+        document.removeEventListener("mousemove", hideOnMoveAway);
         parentEl.value?.removeEventListener("focus", show);
         parentEl.value?.removeEventListener("blur", hide);
         parentEl.value?.removeAttribute(TOOLTIP_TRIGGER_ATTR);
@@ -264,18 +352,17 @@ onMounted(() => {
   }
 });
 
-onUnmounted(() => {
-  if (childShowTimer) clearTimeout(childShowTimer);
-  if (childHideTimer) clearTimeout(childHideTimer);
-  cleanupFn?.();
-});
+// Exclusive tooltips show one at a time; a caller-controlled one (`open`) is left to its caller.
+const closeSelf = () => {
+  wrapperOpen.value = false;
+  childOpen.value = false;
+};
+watch(
+  () => props.exclusive && (wrapperOpen.value || childOpen.value),
+  (open) => (open ? claimTooltip(closeSelf) : releaseTooltip(closeSelf)),
+);
 
-// A kept-alive page deactivates WITHOUT unmounting, and a detached trigger
-// never fires `mouseleave` — so a tooltip open at the moment of a tab switch
-// stayed open forever: its portalled bubble lives in <body>, its anchor's rect
-// collapses to all-zeros, and floating-ui parks the orphan at the viewport's
-// top-left next to the new page's own, correct copy of the same tooltip.
-onDeactivated(() => {
+function cancelChildTimers() {
   if (childShowTimer) {
     clearTimeout(childShowTimer);
     childShowTimer = null;
@@ -284,28 +371,94 @@ onDeactivated(() => {
     clearTimeout(childHideTimer);
     childHideTimer = null;
   }
+}
+
+function dropOpenState() {
+  cancelChildTimers();
   childOpen.value = false;
+  wrapperOpen.value = false;
+  wrapperUncontrolledOpen.value = false;
+}
+
+// A hover delay that runs out while disabled must not open the tooltip once it is re-enabled.
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (!disabled || !childShowTimer) return;
+    clearTimeout(childShowTimer);
+    childShowTimer = null;
+  },
+);
+// Reka re-attaches the trigger's listeners only after this render, still latched by a hover that left while disabled.
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (!disabled && !wrapperRootOpen.value) resetHoverLatch();
+  },
+  { flush: "post" },
+);
+// Reka drops a disabled trigger's listeners, so only this sees the hover end that must keep it shut on re-enable.
+function onWrapperTriggerLeave() {
+  if (!props.disabled) return;
+  wrapperOpen.value = false;
+  wrapperUncontrolledOpen.value = false;
+}
+
+let bubbleMounted = false;
+let hoverResetPending = false;
+// Reka's trigger latches its first pointermove until a pointerleave, which a detached trigger never gets.
+function resetWrapperTriggerHover() {
+  hoverResetPending = false;
+  const node = wrapperTriggerRef.value?.$el as Node | undefined;
+  const trigger = node instanceof CharacterData ? node.nextElementSibling : node;
+  resettingHover = true;
+  trigger?.dispatchEvent(new Event("pointerleave"));
+  resettingHover = false;
+}
+function resetHoverLatch() {
+  // A mounted hoverable bubble turns the trigger's pointerleave into a grace area, so the reset waits for it to go.
+  if (bubbleMounted && props.hoverable) hoverResetPending = true;
+  else resetWrapperTriggerHover();
+}
+function onBubbleMounted() {
+  bubbleMounted = true;
+}
+function onBubbleUnmounted() {
+  bubbleMounted = false;
+  if (hoverResetPending) resetWrapperTriggerHover();
+}
+
+onBeforeUnmount(() => {
+  hoverResetPending = false;
+});
+onUnmounted(() => {
+  releaseTooltip(closeSelf);
+  cancelChildTimers();
+  cleanupFn?.();
+  releaseProviderOpen();
+});
+
+// A kept-alive page deactivates WITHOUT unmounting, and a detached trigger
+// never fires `mouseleave` — so a tooltip open at the moment of a tab switch
+// stayed open forever: its portalled bubble lives in <body>, its anchor's rect
+// collapses to all-zeros, and floating-ui parks the orphan at the viewport's
+// top-left next to the new page's own, correct copy of the same tooltip.
+onDeactivated(() => {
+  dropOpenState();
+  suspended.value = true;
+  resetHoverLatch();
+});
+onActivated(() => {
+  suspended.value = false;
 });
 
 const effectiveSideOffset = computed(() => props.sideOffset);
 
-// filter:drop-shadow composites the bubble + SVG arrow as one silhouette so
-// the shadow wraps the full speech-bubble shape with no seam at the arrow base.
-// Layer 1: zero-offset soft halo — uniform separation from any background.
-// Layer 2: directional depth shadow for elevation.
-const contentStyle = computed(() => ({
-  maxWidth: props.maxWidth,
-  filter: [
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
-    "drop-shadow(0 0 1px rgba(0,0,0,0.15))",
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
-    "drop-shadow(0 4px 12px rgba(0,0,0,0.14))",
-  ].join(" "),
-}));
+const contentStyle = computed(() => ({ maxWidth: props.maxWidth }));
 
 const contentClasses = computed(() => [
   "z-10100 px-2.5 py-1.5",
-  "bg-surface-overlay rounded-default",
+  "bg-surface-overlay rounded-default border border-tooltip-border shadow-md",
   "text-xs text-text-body font-medium leading-snug",
   // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the
   // max-width box instead of overflowing onto the content behind the tooltip.
@@ -326,15 +479,20 @@ const contentClasses = computed(() => [
 
 <template>
   <!-- ΓöÇΓöÇ Wrapper mode: default slot provides the trigger ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
-  <TooltipProvider v-if="hasDefaultSlot">
+  <LinkedTooltipProvider v-if="hasDefaultSlot" :shared="appProvider">
     <TooltipRoot
       :delay-duration="delay"
       :disable-hoverable-content="!hoverable"
-      v-bind="wrapperRootOpen"
+      :open="wrapperRootOpen"
       :disabled="disabled"
       @update:open="onWrapperOpenChange"
     >
-      <TooltipTrigger ref="wrapperTriggerRef" as-child :data-o-tooltip-trigger="triggerMarker">
+      <TooltipTrigger
+        ref="wrapperTriggerRef"
+        as-child
+        :data-o-tooltip-trigger="triggerMarker"
+        @pointerleave="onWrapperTriggerLeave"
+      >
         <slot />
       </TooltipTrigger>
       <TooltipPortal>
@@ -348,21 +506,25 @@ const contentClasses = computed(() => [
           :style="contentStyle"
           :class="contentClasses"
         >
-          <span :class="shortcut || shortcutId ? 'inline-flex items-center gap-1.5' : ''">
+          <span
+            :class="shortcut || shortcutId ? 'inline-flex items-center gap-1.5' : ''"
+            @vue:mounted="onBubbleMounted"
+            @vue:unmounted="onBubbleUnmounted"
+          >
             <slot name="content">{{ contentText }}</slot>
             <OShortcut v-if="shortcut || shortcutId" :keys="shortcut" :id="shortcutId" />
           </span>
-          <TooltipArrow :width="10" :height="5" :class="'fill-surface-overlay'" />
+          <TooltipArrow :width="10" :height="5" :class="arrowClass" />
         </TooltipContent>
       </TooltipPortal>
     </TooltipRoot>
-  </TooltipProvider>
+  </LinkedTooltipProvider>
 
   <!-- ── Child mode: no default slot, attaches to parent element as its tooltip.
        The reka tree is mounted lazily (v-if) on first hover — see childActivated
        — so un-hovered rows in a long/virtualized table cost next to nothing. -->
   <template v-else>
-    <TooltipProvider v-if="childActivated || isAnchored">
+    <LinkedTooltipProvider v-if="childActivated || isAnchored" :shared="appProvider">
       <TooltipRoot :delay-duration="0" :open="childRootOpen" @update:open="onChildOpenChange">
         <!-- Hidden trigger span; reference overrides positioning anchor to parentEl -->
         <!-- NOTE: `style="display:none"` here is a FUNCTIONAL CONTRACT, not
@@ -387,6 +549,7 @@ const contentClasses = computed(() => [
             :align-offset="alignOffset"
             :style="contentStyle"
             :class="contentClasses"
+            @pointer-down-outside="onChildPointerDownOutside"
             @mouseenter="onContentEnter"
             @mouseleave="onContentLeave"
           >
@@ -394,11 +557,11 @@ const contentClasses = computed(() => [
               <slot name="content">{{ contentText }}</slot>
               <OShortcut v-if="shortcut || shortcutId" :keys="shortcut" :id="shortcutId" />
             </span>
-            <TooltipArrow :width="10" :height="5" :class="'fill-surface-overlay'" />
+            <TooltipArrow :width="10" :height="5" :class="arrowClass" />
           </TooltipContent>
         </TooltipPortal>
       </TooltipRoot>
-    </TooltipProvider>
+    </LinkedTooltipProvider>
     <!-- Anchor placeholder: inserted at the real DOM position to resolve parentElement.
          `style="display:none"` is required, not decorative — see the note above. -->
     <span ref="childAnchorRef" style="display: none" aria-hidden="true" />

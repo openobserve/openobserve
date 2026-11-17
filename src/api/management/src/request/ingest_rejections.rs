@@ -46,7 +46,8 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Ingestion", "operation": "list"}))
     )
 )]
 pub async fn recent_rejections(

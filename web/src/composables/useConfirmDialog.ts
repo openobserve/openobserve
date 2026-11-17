@@ -11,6 +11,9 @@ export interface ConfirmDialogOptions {
   // Takes precedence over `message`; the key must contain a {name} placeholder.
   messageKeypath?: I18nKey;
   messageName?: string;
+  /** A bulleted list under `message`, which then reads left-aligned with it. */
+  lines?: I18nText[];
+  linesDataTest?: string;
   confirmLabel?: I18nText;
   cancelLabel?: I18nText;
   persistent?: boolean;

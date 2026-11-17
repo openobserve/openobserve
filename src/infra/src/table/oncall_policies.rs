@@ -304,6 +304,26 @@ pub async fn teams_using_template(
     Ok(query.into_tuple::<(String, String)>().all(client).await?)
 }
 
+/// The template each policy in scope names, one entry per policy, for the template list's usage
+/// counts.
+pub async fn templates_in_use(org_id: Option<&str>) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let mut query = oncall_policies::Entity::find()
+        .select_only()
+        .column(oncall_policies::Column::Template)
+        .filter(oncall_policies::Column::Template.is_not_null());
+    if let Some(org) = org_id {
+        query = query.filter(oncall_policies::Column::OrgId.eq(org));
+    }
+    Ok(query
+        .into_tuple::<Option<String>>()
+        .all(client)
+        .await?
+        .into_iter()
+        .flatten()
+        .collect())
+}
+
 /// Every policy of every org; read once at boot for the upgrade notice.
 pub async fn list_all() -> Result<Vec<EscalationPolicy>, errors::Error> {
     let client = get_orm_client_ro().await;

@@ -26,7 +26,7 @@ pub struct AgentTokenInfo {
 
 /// A freshly created/rotated token — the ONLY response that carries the raw
 /// value (shown once, then only ever masked).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct AgentTokenSecret {
     pub name: String,
     pub token: String,

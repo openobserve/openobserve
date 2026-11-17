@@ -48,10 +48,13 @@ test.describe('nav rail hover intent', () => {
 
         let realCrossings = 0;
         for (const { from, across, towards } of pairs) {
-          await rail.resetPointer();
-          await rail.setDir(dir);
-          await rail.restOn(rail.groupTile(from));
-          expect(await rail.openFlyoutKeys(), `${from} flyout opens on rest`).toEqual([from]);
+          const restOnFrom = async () => {
+            await rail.resetPointer();
+            await rail.setDir(dir);
+            await rail.restOn(rail.groupTile(from));
+            expect(await rail.openFlyoutKeys(), `${from} flyout opens on rest`).toEqual([from]);
+          };
+          await restOnFrom();
 
           const items = rail.flyoutItems(from);
           const n = await items.count();
@@ -62,13 +65,13 @@ test.describe('nav rail hover intent', () => {
           const acrossBox = await rail.groupTile(across).boundingBox();
           if (crosses(start, end, acrossBox)) realCrossings++;
 
-          const seen = new Set();
-          await rail.glide(start, end, CALM_MS, async () => {
-            for (const k of await rail.openFlyoutKeys()) seen.add(k);
-          });
+          const scan = await rail.scan(start, end, CALM_MS, { redo: restOnFrom });
           // A human clicks ~150 ms after the cursor settles.
           await page.waitForTimeout(150);
-          expect([...seen].filter((k) => k !== from), `no neighbour hijacks ${from} -> ${across}`).toEqual([]);
+          expect(
+            scan.seen.filter((k) => k !== from),
+            `no neighbour hijacks ${from} -> ${across} (scan ${scan.attempt}, max move gap ${scan.maxGapMs} ms)`,
+          ).toEqual([]);
           expect(await rail.openFlyoutKeys(), `${from} still open at click time`).toEqual([from]);
 
           const href = await item.getAttribute('href');
@@ -138,17 +141,8 @@ test.describe('nav rail hover intent', () => {
     const metrics = await rail.centre(rail.tile('/metrics'));
     const start = { x: metrics.x, y: metrics.y + 12 };
     const end = await rail.centre(rail.tile('/settings'));
-    const seen = new Set();
-    await rail.glide(
-      start,
-      end,
-      600,
-      async () => {
-        for (const k of await rail.openFlyoutKeys()) seen.add(k);
-      },
-      'linear',
-    );
-    expect([...seen], 'tiles only passed over open no flyout').toEqual([]);
+    const scan = await rail.scan(start, end, 600, { profile: 'linear', redo: () => rail.resetPointer() });
+    expect(scan.seen, `tiles only passed over open no flyout (scan ${scan.attempt}, max move gap ${scan.maxGapMs} ms)`).toEqual([]);
 
     // Rest on Data: the flyout must appear within 300 ms of the rest starting.
     await rail.resetPointer();
@@ -167,11 +161,20 @@ test.describe('nav rail hover intent', () => {
     expect(openedAfter).toBeLessThanOrEqual(300);
 
     // An open header dropdown is not dismissed by tiles merely passed over.
-    await rail.resetPointer();
-    await rail.profileMenuBtn.click();
-    await page.locator('[data-reka-popper-content-wrapper]').first().waitFor({ state: 'visible' });
-    await rail.glide(start, end, 600, null, 'linear');
-    expect(await page.locator('[data-reka-popper-content-wrapper]').count()).toBeGreaterThan(0);
+    const dropdown = rail.headerDropdown;
+    const openDropdown = async () => {
+      if ((await dropdown.count()) > 0) await page.keyboard.press('Escape');
+      await expect(dropdown).toHaveCount(0);
+      await rail.resetPointer();
+      await rail.profileMenuBtn.click();
+      await dropdown.first().waitFor({ state: 'visible' });
+    };
+    await openDropdown();
+    const dropdownScan = await rail.scan(start, end, 600, { profile: 'linear', redo: openDropdown });
+    expect(
+      await dropdown.count(),
+      `the dropdown survives the scan (scan ${dropdownScan.attempt}, max move gap ${dropdownScan.maxGapMs} ms)`,
+    ).toBeGreaterThan(0);
     await page.keyboard.press('Escape');
   });
 });

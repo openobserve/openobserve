@@ -293,6 +293,7 @@ async fn service_volumes(
             search_type: Some(SearchEventType::DerivedStream),
             search_event_context: None,
             use_cache: false,
+            use_index: true,
             clear_cache: false,
             local_mode: None,
             agent_options: None,

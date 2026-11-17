@@ -5,7 +5,7 @@
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"
-      @searchdata="getQueryData"
+      @searchdata="runSearch"
       @update-query="updateQuery"
       :is-loading="isLoading"
       @change:date-time="updateDateTime"
@@ -51,6 +51,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
 import stream from "@/services/stream";
 import search from "@/services/search";
+import analytics from "@/services/product_analytics";
 import { logsErrorMessage } from "@/utils/common";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -121,7 +122,11 @@ function onPaginationChange(params: { page: number; size: number }) {
   getQueryData();
 }
 
-function getQueryData() {
+function runSearch() {
+  getQueryData(true);
+}
+
+function getQueryData(userRun = false) {
   try {
     isLoading.value = true;
     queryData.value.errorMsg = "";
@@ -152,6 +157,11 @@ function getQueryData() {
           _rowKey: `row_${(currentPage.value - 1) * pageSize.value + index}`,
         }));
         totalCount.value = res.data.total || 0;
+        if (userRun) {
+          analytics.track("stream_explorer_search_run", {
+            stream_type: streamData.value?.stream_type || "logs",
+          });
+        }
       })
       .catch((err) => {
         isLoading.value = false;

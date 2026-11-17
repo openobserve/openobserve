@@ -76,6 +76,13 @@ let mockCorrelationDataRef = ref<any>(createMockCorrelationData());
 let mockHasBackendTrace = ref(true);
 let mockBackendSpanCount = ref(2);
 let mockPerformanceData = ref<any>(createMockPerformanceData());
+const TRACE_LOCATION = {
+  stream: "payments_traces",
+  traceId: "01a034c1aabc72f78880daf6c9755cff",
+  startTime: 1_700_000_000_000_000,
+  endTime: 1_700_000_090_000_000,
+};
+const mockTraceLocation = ref<any>(TRACE_LOCATION);
 
 vi.mock("@/composables/rum/useTraceCorrelation", () => ({
   default: () => ({
@@ -85,6 +92,7 @@ vi.mock("@/composables/rum/useTraceCorrelation", () => ({
     hasBackendTrace: mockHasBackendTrace,
     backendSpanCount: mockBackendSpanCount,
     performanceData: mockPerformanceData,
+    traceLocation: mockTraceLocation,
     fetchCorrelation: mockFetchCorrelation,
     cancelTracesStream: vi.fn(),
   }),
@@ -171,6 +179,7 @@ describe("TraceCorrelationCard", () => {
     mockHasBackendTrace.value = true;
     mockBackendSpanCount.value = 2;
     mockPerformanceData.value = createMockPerformanceData();
+    mockTraceLocation.value = TRACE_LOCATION;
 
     wrapper = mountComponent();
     await flushPromises();
@@ -461,6 +470,39 @@ describe("TraceCorrelationCard", () => {
 
       // Assert
       expect(viewBtn?.attributes("disabled")).toBeUndefined();
+    });
+
+    it("opens the found trace in trace details, in the stream and window it was found in", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ props: { traceId: "1A034C1AABC72F78880DAF6C9755CFF" } });
+      await flushPromises();
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+
+      await findButtonByText(wrapper, "View Trace Details")?.trigger("click");
+
+      expect(push).toHaveBeenCalledWith({
+        name: "traceDetails",
+        query: {
+          stream: "payments_traces",
+          trace_id: "01a034c1aabc72f78880daf6c9755cff",
+          from: 1_700_000_000_000_000,
+          to: 1_700_000_090_000_000,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      push.mockRestore();
+    });
+
+    it("does not open the previous error's trace while the card still holds its location", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ props: { traceId: "b2c3d4e5f60718293a4b5c6d7e8f9012" } });
+      await flushPromises();
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+
+      await findButtonByText(wrapper, "View Trace Details")?.trigger("click");
+
+      expect(push).not.toHaveBeenCalled();
+      push.mockRestore();
     });
 
     it("disables View Trace Details button when no backend trace", async () => {

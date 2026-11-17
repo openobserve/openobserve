@@ -62,6 +62,7 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { terminateStatement } from "@/utils/dbm/blocking";
@@ -106,6 +107,7 @@ const copy = async () => {
   if (!statement.value) return;
   const ok = await copyToClipboard(statement.value, t);
   if (!ok) return;
+  analytics.track("dbm_terminate_sql_copied", { db_system: props.dbSystem });
   copied.value = true;
   window.clearTimeout(resetTimer);
   resetTimer = window.setTimeout(() => {

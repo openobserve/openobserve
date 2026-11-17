@@ -202,4 +202,14 @@ describe("OProgressBar", () => {
       );
     });
   });
+
+  describe("indeterminate", () => {
+    it("slides a short fill and reports no value", () => {
+      const wrapper = mount(OProgressBar, { props: { value: 0.7, indeterminate: true } });
+      const fill = wrapper.find("[role='progressbar'] div");
+      expect(fill.classes()).toContain("o-progress-indeterminate");
+      expect(fill.attributes("style") ?? "").not.toContain("width: 70%");
+      expect(wrapper.find("[role='progressbar']").attributes("aria-valuenow")).toBeUndefined();
+    });
+  });
 });

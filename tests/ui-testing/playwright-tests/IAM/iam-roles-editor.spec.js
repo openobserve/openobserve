@@ -16,6 +16,7 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
+const { openNavFlyoutChild } = require('../../pages/commonActions.js');
 const testLogger = require('../utils/test-logger.js');
 const {
     ns, req, listRoles, createRole, setRolePerms, makeTracker, uniq, org, rbacEnabled,
@@ -93,7 +94,7 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
         pm = new PageManager(page);
         // Capability is decided by the API, not by how fast a tab paints.
         test.skip(!(await rbacEnabled(page)), 'RBAC is off (OSS build)');
-        await page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await openNavFlyoutChild(page, 'iam');
         await pm.rolesPage.rolesTab.waitFor({ state: 'visible', timeout: 30000 });
 
         await pm.rolesPage.rolesTab.click();

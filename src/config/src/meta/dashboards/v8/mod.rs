@@ -173,13 +173,29 @@ pub enum AnnotationConditionItem {
 }
 
 /// One leaf condition in an annotation source's filter tree.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct AnnotationConditionLeaf {
     pub column: String,
     pub operator: String,
     pub value: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_insensitive: Option<bool>,
     #[serde(rename = "logicalOperator")]
     pub logical_operator: AnnotationLogicalOperator,
+}
+
+// An unset case_insensitive must hash as before so dashboard update hashes stay stable across
+// versions.
+impl Hash for AnnotationConditionLeaf {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.column.hash(state);
+        self.operator.hash(state);
+        self.value.hash(state);
+        if let Some(case_insensitive) = self.case_insensitive {
+            case_insensitive.hash(state);
+        }
+        self.logical_operator.hash(state);
+    }
 }
 
 /// AND/OR logical operator joining sibling conditions in an annotation source's filter tree.

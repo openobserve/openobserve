@@ -31,7 +31,8 @@ const props = withDefaults(
     tokens: number;
     unpricedTokens?: number;
     unpricedModels?: string[];
-    scope: "session" | "trace";
+    /** What the row covers, named in the tooltip; "row" for a Users / Cost by aggregate. */
+    scope: "session" | "trace" | "row";
     /** Trace stream, for the "Add a price" link. */
     stream?: string;
     /** The list's window (µs), so "Add a price" lists this row's models; else the last 24 h. */
@@ -62,7 +63,9 @@ const tooltip = computed(() => {
     scope:
       props.scope === "session"
         ? t("llmDataTrust.cost.scopeSession")
-        : t("llmDataTrust.cost.scopeTrace"),
+        : props.scope === "row"
+          ? t("llmDataTrust.cost.scopeRow")
+          : t("llmDataTrust.cost.scopeTrace"),
   };
   return kind.value === "unknown"
     ? t("llmDataTrust.cost.unknownTooltip", params)

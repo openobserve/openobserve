@@ -27,6 +27,9 @@ vi.mock("@/services/http", () => ({
   }),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
+import analytics from "@/services/product_analytics";
 import llmDiscoveryService from "./llm-discovery.service";
 
 beforeEach(() => {
@@ -254,6 +257,7 @@ describe("llmDiscoveryService.addToQueue", () => {
     ]);
 
     expect(count).toBe(2);
+    expect(analytics.track).toHaveBeenCalledWith("llm_discovery_items_queued", { count: 2 });
     expect(mockPost).toHaveBeenCalledTimes(2);
     expect(mockPost).toHaveBeenNthCalledWith(1, "/api/acme/annotation_queues/queue-1/items", {
       refType: "span",

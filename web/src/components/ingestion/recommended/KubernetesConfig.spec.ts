@@ -85,6 +85,7 @@ describe("kubernetesCard builder", () => {
     expect(card.provider.name).toBe("Kubernetes");
     expect(card.provider.metaBadges).toEqual(["Logs", "Metrics", "Events", "Traces"]);
     expect(card.steps.map((s) => s.id)).toEqual(["install", "instrument", "network", "verify"]);
+    expect(card.steps.map((s) => !!s.collapsed)).toEqual([false, false, false, false]);
     expect(card.detect).toMatchObject({
       streamType: "logs",
       streamName: "default",

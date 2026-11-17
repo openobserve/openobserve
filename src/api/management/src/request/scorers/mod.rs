@@ -60,7 +60,8 @@ fn scorer_error_response(value: ScorerError) -> Response {
         | ScorerError::ProducesScoreConfigIdImmutable
         | ScorerError::ScoreConfigVersionNotFound
         | ScorerError::InvalidOutputSchema(_)
-        | ScorerError::InvalidProviderConfig(_) => MetaHttpResponse::bad_request(value),
+        | ScorerError::InvalidProviderConfig(_)
+        | ScorerError::InvalidCodeSignature => MetaHttpResponse::bad_request(value),
         ScorerError::DuplicateName => MetaHttpResponse::conflict(value),
         ScorerError::InUseByEvalJob => MetaHttpResponse::conflict(value),
     }
@@ -117,7 +118,7 @@ async fn redact_unwritable(org_id: &str, user_id: &str, scorers: &mut [ScorerRes
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("scorerType" = Option<String>, Query, description = "Filter by scorer_type (llm_judge or remote)"),
+        ("scorerType" = Option<String>, Query, description = "Filter by scorer_type (llm_judge, remote or code)"),
     ),
     responses(
         (status = 200, body = inline(ListScorersResponseBody)),
@@ -655,6 +656,37 @@ async fn run_scorer_test(
                 }
             }
         }
+        infra::table::scorers::ScorerType::Code => {
+            let prepared =
+                openobserve_core::llm_evaluations::prepared_scorers::PreparedCodeScorer::prepare(
+                    org_id, &scorer,
+                )
+                .await
+                .map_err(|e| {
+                    ScorerError::InfraError(infra::errors::Error::Message(e.to_string()))
+                })?;
+
+            // Runs in the sandbox, so it calls no provider and costs nothing.
+            let result = prepared.run(&attrs).await;
+            let latency_ms = start.elapsed().as_millis() as i64;
+            Ok(match result {
+                Ok(output) => ScorerTestResponseBody {
+                    success: true,
+                    value_numeric: output.value_numeric,
+                    value_categorical: output.value_categorical,
+                    value_boolean: output.value_boolean,
+                    raw_response: Some(output.raw_response),
+                    latency_ms,
+                    ..Default::default()
+                },
+                Err(e) => ScorerTestResponseBody {
+                    success: false,
+                    latency_ms,
+                    error: Some(format!("{e}")),
+                    ..Default::default()
+                },
+            })
+        }
         infra::table::scorers::ScorerType::Remote => {
             let remote_cfg =
                 openobserve_core::llm_evaluations::prepared_scorers::PreparedRemoteScorer::prepare(
@@ -713,6 +745,7 @@ mod tests {
             (ScorerError::InvalidProviderConfig("bad".to_string()), 400),
             (ScorerError::ProviderNotFound("p".to_string()), 404),
             (ScorerError::ProviderNotReadable("p".to_string()), 403),
+            (ScorerError::InvalidCodeSignature, 400),
             (ScorerError::DuplicateName, 409),
             (ScorerError::InUseByEvalJob, 409),
         ];

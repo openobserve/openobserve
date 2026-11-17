@@ -664,6 +664,30 @@ describe("EditRole - tabs behavior", () => {
     await wrapper.find(".tab-serviceAccounts").trigger("click");
     expect(wrapper.vm.activeTab).toBe("serviceAccounts");
   });
+
+  it.each(["users", "serviceAccounts"])("opens on the %s tab named in ?tab=", async (tab) => {
+    router.currentRoute.value.query = { tab };
+    const wrapper = await mountEditRole();
+    router.currentRoute.value.query = {};
+    expect(wrapper.vm.activeTab).toBe(tab);
+  });
+
+  it("ignores ?tab=serviceAccounts when service accounts are off", async () => {
+    const original = store.state.zoConfig;
+    store.state.zoConfig = { ...original, service_account_enabled: false };
+    router.currentRoute.value.query = { tab: "serviceAccounts" };
+    const wrapper = await mountEditRole();
+    router.currentRoute.value.query = {};
+    store.state.zoConfig = original;
+    expect(wrapper.vm.activeTab).toBe("permissions");
+  });
+
+  it("ignores an unknown ?tab= value", async () => {
+    router.currentRoute.value.query = { tab: "bogus" };
+    const wrapper = await mountEditRole();
+    router.currentRoute.value.query = {};
+    expect(wrapper.vm.activeTab).toBe("permissions");
+  });
 });
 
 // 4. Permission mapping helpers
@@ -983,6 +1007,52 @@ describe("EditRole - read-only preset", () => {
     router.currentRoute.value.query = {};
     const wrapper = await mountEditRole();
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+});
+
+describe("EditRole - role just created from a preset", () => {
+  it("saves the preset grants without a second Save", async () => {
+    const { updateRole } = await import("@/services/iam");
+    vi.mocked(updateRole).mockClear();
+    router.currentRoute.value.query = { preset: "readonly", created: "1" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
+    const payload = vi.mocked(updateRole).mock.calls[0][0].payload;
+    expect(payload.add.length).toBeGreaterThan(0);
+    expect(payload.add.map((p) => p.permission)).toContain("AllowGet");
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+
+  it("keeps the grants staged and warns when the save fails", async () => {
+    const { updateRole } = await import("@/services/iam");
+    vi.mocked(updateRole).mockClear();
+    vi.mocked(updateRole).mockRejectedValueOnce({ response: { status: 500 } });
+    mockToast.mockClear();
+    router.currentRoute.value.query = { preset: "readonly", created: "1" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBeGreaterThan(0);
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "warning", message: expect.stringContaining("preset") }),
+    );
+  });
+
+  it("only stages the preset when the role was not just created", async () => {
+    const { updateRole } = await import("@/services/iam");
+    vi.mocked(updateRole).mockClear();
+    router.currentRoute.value.query = { preset: "readonly" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+
+    expect(vi.mocked(updateRole)).not.toHaveBeenCalled();
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBeGreaterThan(0);
   });
 });
 
@@ -3921,5 +3991,21 @@ describe("EditRole - nothing stages while a save is in flight", () => {
     drawer().vm.$emit("add", [streamsList]);
     expect(drawer().props("saving")).toBe(false);
     expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([streamsList]);
+  });
+});
+
+describe("EditRole - job preset from the query", () => {
+  it("stages a job preset an access lock links to", async () => {
+    const wrapper = await mountWithPreset("dashboard_viewer");
+    const staged = Object.values(wrapper.vm.addedPermissions);
+    expect(staged.length).toBeGreaterThan(0);
+    expect(staged.every((p) => p.permission === "AllowGet" || p.permission === "AllowList")).toBe(
+      true,
+    );
+  });
+
+  it("stages nothing for a preset that needs a module this org lacks", async () => {
+    const wrapper = await mountWithPreset("soc_analyst");
+    expect(Object.keys(wrapper.vm.addedPermissions)).toHaveLength(0);
   });
 });

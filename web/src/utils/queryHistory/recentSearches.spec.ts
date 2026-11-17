@@ -18,7 +18,6 @@ import type { QueryHistoryEntry } from "@/services/query_history";
 import {
   buildQueryKey,
   buildRecents,
-  dayBoundsUs,
   defaultRestoreTime,
   fitContext,
   groupByDay,
@@ -313,20 +312,6 @@ describe("drawer helpers", () => {
     );
     expect(defaultRestoreTime(lateEvening, now, "UTC")).toBe("original");
     expect(defaultRestoreTime(lateEvening, now, "Asia/Kolkata")).toBe("now");
-  });
-
-  it("turns a Ran on date into that day's bounds in the given timezone", () => {
-    const bounds = dayBoundsUs("2026-10-27", "Asia/Kolkata");
-    expect(bounds?.ran_from).toBe(Date.UTC(2026, 9, 26, 18, 30) * 1000);
-    expect(bounds?.ran_to).toBe(Date.UTC(2026, 9, 27, 18, 30) * 1000 - 1);
-    expect(dayBoundsUs("2026-02-31", "UTC")).toBeNull();
-  });
-
-  it("turns a Ran on date into local-day bounds in microseconds", () => {
-    const bounds = dayBoundsUs("2026-10-27");
-    expect(bounds?.ran_from).toBe(new Date(2026, 9, 27).getTime() * 1000);
-    expect(bounds?.ran_to).toBe(new Date(2026, 9, 28).getTime() * 1000 - 1);
-    expect(dayBoundsUs("yesterday")).toBeNull();
   });
 });
 

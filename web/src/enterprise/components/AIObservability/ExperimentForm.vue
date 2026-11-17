@@ -224,7 +224,7 @@
                           class="text-accent font-semibold no-underline hover:underline"
                           target="_blank"
                         >
-                          {{ t("aiObservability.experiments.form.providerHelpSettingsLink") }}
+                          {{ t("aiObservability.experiments.form.providerHelpLink") }}
                         </router-link>
                       </template>
                     </i18n-t>

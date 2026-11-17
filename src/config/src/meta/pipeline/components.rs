@@ -322,6 +322,23 @@ impl NodeData {
             Self::Stream(_) | Self::RemoteStream(_) | Self::Destination(_)
         )
     }
+
+    /// Save-time extended-operator checks: condition values, and Query-node thresholds.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        match self {
+            Self::Condition(params) => params.validate_operator_values(),
+            Self::Query(query) => query
+                .trigger_condition
+                .validate_threshold_operator()
+                .and_then(|_| query.query_condition.validate_threshold_operators()),
+            Self::Branch(branch) => branch
+                .cases
+                .iter()
+                .filter_map(|case| case.conditions.as_ref())
+                .try_for_each(ConditionParams::validate_operator_values),
+            _ => Ok(()),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -530,6 +547,16 @@ pub enum ConditionParams {
     V1 { conditions: ConditionList },
     /// v2 format: Linear ConditionGroup (version: 2)
     V2 { conditions: ConditionGroup },
+}
+
+impl ConditionParams {
+    /// Save-time value checks for the extended operators; other operators always pass.
+    pub fn validate_operator_values(&self) -> Result<(), String> {
+        match self {
+            ConditionParams::V1 { conditions } => conditions.validate_operator_values(),
+            ConditionParams::V2 { conditions } => conditions.validate_operator_values(),
+        }
+    }
 }
 
 impl MemorySize for ConditionParams {
@@ -1404,5 +1431,59 @@ mod tests {
         // re-serializing Unsupported rewrites the newer node's data; every allowlist must reject it
         assert!(!node.is_workflow_node());
         assert!(!node.is_pipeline_node());
+    }
+
+    #[test]
+    fn test_saved_condition_nodes_validate_and_round_trip_unchanged() {
+        let v1 = r#"{"node_type":"condition","conditions":{"and":[{"column":"level","operator":"=","value":"error","ignore_case":false}]}}"#;
+        let node: NodeData = serde_json::from_str(v1).unwrap();
+        assert!(node.validate_operator_values().is_ok());
+        assert_eq!(serde_json::to_string(&node).unwrap(), v1);
+
+        let v2 = r#"{"node_type":"condition","version":2,"conditions":{"filterType":"group","logicalOperator":"AND","conditions":[{"filterType":"condition","column":"level","operator":"contains","value":"err","logicalOperator":"AND"}]}}"#;
+        let node: NodeData = serde_json::from_str(v2).unwrap();
+        assert!(node.validate_operator_values().is_ok());
+        assert_eq!(serde_json::to_string(&node).unwrap(), v2);
+    }
+
+    #[test]
+    fn test_branch_and_condition_nodes_reject_bad_extended_values() {
+        let bad = serde_json::json!({
+            "node_type": "branch",
+            "cases": [{"handle": "a", "conditions": {"version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND",
+                "conditions": [{"filterType": "condition", "column": "c", "operator": "in",
+                                "value": [], "logicalOperator": "AND"}]
+            }}}]
+        });
+        let node: NodeData = serde_json::from_value(bad).unwrap();
+        assert!(node.validate_operator_values().is_err());
+
+        let good = serde_json::json!({
+            "node_type": "condition", "version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND",
+                "conditions": [{"filterType": "condition", "column": "c", "operator": "re_match",
+                                "value": "^a", "logicalOperator": "AND"}]
+            }
+        });
+        let node: NodeData = serde_json::from_value(good).unwrap();
+        assert!(node.validate_operator_values().is_ok());
+    }
+
+    #[test]
+    fn test_query_node_rejects_extended_threshold_operators() {
+        let node = |op: &str| -> NodeData {
+            serde_json::from_value(serde_json::json!({
+                "node_type": "query",
+                "org_id": "o",
+                "stream_type": "logs",
+                "query_condition": {"type": "sql", "sql": "select 1"},
+                "trigger_condition": {"period": 5, "operator": op, "threshold": 1}
+            }))
+            .unwrap()
+        };
+        assert!(node(">=").validate_operator_values().is_ok());
+        let err = node("re_match").validate_operator_values().unwrap_err();
+        assert!(err.contains("trigger condition"), "{err}");
     }
 }

@@ -603,6 +603,7 @@ export const useSearchResponseHandler = () => {
       searchObj.data.errorDetail =
         error_detail || (logsErrorMessage(code || 0) && message ? message : "");
       searchObj.data.errorMsg = errorMsg;
+      searchObj.data.errorCode = code || 0;
       notificationMsg.value = errorMsg;
 
       // Surface backend query errors as Monaco squiggles. rangesFromServerError

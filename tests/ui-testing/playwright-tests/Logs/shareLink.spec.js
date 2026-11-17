@@ -462,13 +462,15 @@ test.describe("Share Link Test Cases", () => {
 
 const path = require('path');
 const { ingestRows } = require('../utils/auto-run-helpers.js');
-const { getAuthHeaders } = require('../utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const APICleanup = require('../../pages/apiCleanup.js');
 
-const LINK_ORG = `lnk${Date.now()}`;
-const LINE_STREAM = 'line_logs';
-const OTHER_STREAM = 'other_logs';
-const WIDE_STREAM = 'wide_logs';
-const ORIG_STREAM = 'orig_logs';
+const LINK_ORG = getOrgIdentifier() || 'default';
+const LINK_RUN = Math.random().toString(36).slice(2, 7);
+const LINE_STREAM = `e2e_lnk_line_${LINK_RUN}`;
+const OTHER_STREAM = `e2e_lnk_other_${LINK_RUN}`;
+const WIDE_STREAM = `e2e_lnk_wide_${LINK_RUN}`;
+const ORIG_STREAM = `e2e_lnk_orig_${LINK_RUN}`;
 let savedViewName = null;
 const AUTH_FILE = path.join(__dirname, '..', 'utils', 'auth', 'user.json');
 const BASE_US = (Date.now() - 4 * 60 * 1000) * 1000;
@@ -682,6 +684,11 @@ test.describe('Line links (4c Part C)', () => {
       );
     };
     await expect.poll(statsReady, poll).toBe(true);
+  });
+
+  // The org is shared, so the view J-C17 saves must not outlive the run.
+  test.afterAll(async () => {
+    if (savedViewName) await new APICleanup().deleteSavedViewByName(savedViewName);
   });
 
   test('J-C1/J-C2/J-C5: the sharer copies a tied line; the recipient sees that exact line, A\'s columns, and a clean close', async ({

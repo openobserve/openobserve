@@ -17,6 +17,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import http from "./http";
 import slack from "./slack";
+import analytics from "./product_analytics";
+
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("./http", () => {
   const ok = () => Promise.resolve({ data: {} });
@@ -276,5 +279,38 @@ describe("slack service", () => {
     const res = await slack.installStart(ORG, { source: "destination_form" });
 
     expect(res.data.authorization_url).toBe("https://slack.com/x");
+  });
+});
+
+describe("slack analytics", () => {
+  beforeEach(() => vi.mocked(analytics.track).mockClear());
+
+  it("tracks setup and linking mutations with their low-cardinality properties", async () => {
+    await slack.createInstallation(ORG, { mode: "socket", config_refresh_token: "t" });
+    await slack.updateLinking(ORG, ID, { enabled: true });
+    await slack.uninstallInstallation(ORG, ID);
+
+    expect(analytics.track).toHaveBeenCalledWith("slack_installation_created", {
+      mode: "socket",
+      setup: "token",
+    });
+    expect(analytics.track).toHaveBeenCalledWith("slack_linking_updated", { enabled: true });
+    expect(analytics.track).toHaveBeenCalledWith("slack_app_uninstalled");
+  });
+
+  it("counts bulk-linked users from the response", async () => {
+    client.post.mockResolvedValueOnce({ data: { linked: 4, complete: true } });
+
+    await slack.linkAll(ORG, ID);
+
+    expect(analytics.track).toHaveBeenCalledWith("slack_users_bulk_linked", { count: 4 });
+  });
+
+  it("does not track reads or a failed write", async () => {
+    await slack.listInstallations(ORG);
+    client.delete.mockRejectedValueOnce(new Error("boom"));
+    await expect(slack.deleteLink(ORG, "l1")).rejects.toThrow("boom");
+
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

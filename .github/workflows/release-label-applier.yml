@@ -32,79 +32,52 @@ jobs:
 
       - name: Apply labels to milestone issues
         uses: actions/github-script@v9
+        env:
+          RELEASE_TAG_INPUT: ${{ inputs.release_tag }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // Get the release tag
+            // Tag comes from the run payload: getWorkflowRun needs actions:read, which this job omits.
             let releaseTag;
             if (context.eventName === 'workflow_dispatch') {
-              releaseTag = '${{ inputs.release_tag }}';
+              releaseTag = process.env.RELEASE_TAG_INPUT;
             } else {
-              // Get the tag from the completed workflow
-              const runId = context.payload.workflow_run.id;
-              const workflowRun = await github.rest.actions.getWorkflowRun({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: runId
-              });
-
-              console.log('🔍 Workflow run data:', JSON.stringify({
-                head_branch: workflowRun.data.head_branch,
-                head_ref: workflowRun.data.head_ref,
-                ref: workflowRun.data.ref,
-                head_sha: workflowRun.data.head_sha
-              }, null, 2));
-
-              // Extract tag from workflow run - try multiple fields
-              // For tag-triggered workflows, the tag can be in different fields:
-              // 1. head_branch - contains tag name for tag pushes
-              // 2. ref - contains full ref like "refs/tags/v0.30.0-rc1"
-              // 3. head_ref - may contain tag for some scenarios
-              let tag = workflowRun.data.head_branch ||
-                        workflowRun.data.head_ref;
-
-              // If not found in head_branch/head_ref, extract from ref
-              if (!tag && workflowRun.data.ref) {
-                const refMatch = workflowRun.data.ref.match(/refs\/tags\/(.+)/);
-                if (refMatch) {
-                  tag = refMatch[1];
-                }
-              }
-
-              if (!tag) {
-                core.setFailed(`Could not determine release tag from workflow run. head_branch: ${workflowRun.data.head_branch}, head_ref: ${workflowRun.data.head_ref}, ref: ${workflowRun.data.ref}`);
+              const run = context.payload.workflow_run;
+              releaseTag = run.head_branch;
+              if (!releaseTag) {
+                core.setFailed(`Could not determine release tag from workflow run ${run.id} (head_branch: ${run.head_branch})`);
                 return;
               }
-              releaseTag = tag;
             }
 
             console.log(`📦 Processing release tag: ${releaseTag}`);
 
-            // Extract milestone version from tag
-            // Examples: v0.30.0-rc1 -> v0.30.0, v0.30.1 -> v0.30.0, v0.30.0 -> v0.30.0
-            // Patch releases map to their minor version milestone (e.g., v0.30.1 -> v0.30.0)
             const milestoneMatch = releaseTag.match(/^v(\d+)\.(\d+)\.(\d+)/);
             if (!milestoneMatch) {
               core.setFailed(`Invalid tag format: ${releaseTag}. Expected format: vX.Y.Z[-suffix]`);
               return;
             }
 
-            // Construct milestone version with patch set to 0
-            const milestoneVersion = `v${milestoneMatch[1]}.${milestoneMatch[2]}.0`;
-            console.log(`🎯 Target milestone: ${milestoneVersion}`);
+            // A patch with its own milestone (v1.2.5) uses it; otherwise patches map to vX.Y.0.
+            const exactVersion = `v${milestoneMatch[1]}.${milestoneMatch[2]}.${milestoneMatch[3]}`;
+            const minorVersion = `v${milestoneMatch[1]}.${milestoneMatch[2]}.0`;
 
-            // Find the milestone
-            const milestones = await github.rest.issues.listMilestones({
+            // Unpaginated, the API returns only the 30 oldest milestones, so new ones were never found.
+            const milestones = await github.paginate(github.rest.issues.listMilestones, {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              state: 'all'
+              state: 'all',
+              per_page: 100
             });
 
-            const milestone = milestones.data.find(m => m.title === milestoneVersion);
+            const milestone = milestones.find(m => m.title === exactVersion) ||
+                              milestones.find(m => m.title === minorVersion);
             if (!milestone) {
-              core.setFailed(`Milestone "${milestoneVersion}" not found`);
+              core.setFailed(`Milestone "${exactVersion}" or "${minorVersion}" not found`);
               return;
             }
+            const milestoneVersion = milestone.title;
+            console.log(`🎯 Target milestone: ${milestoneVersion}`);
 
             console.log(`✓ Found milestone: ${milestone.title} (ID: ${milestone.number})`);
 

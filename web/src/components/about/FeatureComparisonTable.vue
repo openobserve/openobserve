@@ -41,9 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="buildType === 'opensource'">{{
         t("about.feature_comparision_os_msg")
       }}</template>
-      <template v-else-if="buildType === 'enterprise'">{{
-        t("about.feature_comparision_ent_msg")
-      }}</template>
+      <span v-else-if="buildType === 'enterprise'" data-test="feature-comparison-ent-msg">{{
+        hasLockedFeature
+          ? t("about.feature_comparision_ent_partial_msg")
+          : t("about.feature_comparision_ent_msg")
+      }}</span>
       <template v-else>{{ t("about.feature_comparision_subtitle") }}</template>
     </div>
 
@@ -190,6 +192,10 @@ const store = useStore();
 const { t } = useI18nTyped();
 
 const buildType: string = store.state.zoConfig.build_type;
+
+const hasLockedFeature = computed(() =>
+  Object.values(store.state.zoConfig.features ?? {}).includes("locked"),
+);
 
 // Feature IDs shown as pillar chips (not repeated in the list below)
 const PILLAR_IDS = ["logs", "metrics", "traces", "rum", "alerts"];

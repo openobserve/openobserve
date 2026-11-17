@@ -107,13 +107,7 @@ const releaseSlot = () => {
 const useSessionActivity = () => {
   const store = useStore();
 
-  /**
-   * Event distribution over a session's own timeline, bucketed into
-   * ACTIVITY_BUCKET_COUNT slots. startTime/endTime are epoch milliseconds
-   * (the replay start/end already loaded on each row). Returns null when the
-   * session can't be bucketed (missing bounds, bad id) or the query fails —
-   * failures are not cached, so a later mount retries.
-   */
+  /** Activity buckets between epoch-ms bounds (the replay row's, else the session's _rumdata bounds); null, and not cached, when the session can't be bucketed or the query fails. */
   const fetchActivity = (
     sessionId: string,
     startTime: number,
@@ -125,7 +119,7 @@ const useSessionActivity = () => {
       return Promise.resolve(null);
     }
 
-    const key = `${sessionId}:${startTime}`;
+    const key = `${sessionId}:${startTime}:${endTime}`;
     const cached = cache.get(key);
     if (cached) return Promise.resolve(cached);
     const pending = inFlight.get(key);

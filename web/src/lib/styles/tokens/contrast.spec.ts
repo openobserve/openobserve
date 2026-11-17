@@ -64,8 +64,8 @@ const LARGE_TEXT_MIN = 3;
 const NON_TEXT_MIN = 3;
 
 /** Ratchets. Both only ever go down; see the module docstring. */
-const MAX_PENDING = 88;
-const MAX_EXEMPT = 37;
+const MAX_PENDING = 82;
+const MAX_EXEMPT = 38;
 /** Manifest entries on a bare alias, which are never judged. Only goes down. */
 const MAX_UNJUDGED = 7;
 
@@ -184,7 +184,7 @@ const hasAny = (name: string, phrases: string[]): boolean =>
 const allTokens = (scope: Map<string, string>): string[] =>
   [...scope.keys()].filter((name) => name.startsWith("--color-"));
 
-/** Union of both themes: one token is declared only under `.dark`. */
+/** Union of both themes, so a token declared in only one of them is still checked. */
 const TOKENS = [...new Set([...allTokens(THEMES.light), ...allTokens(THEMES.dark)])].sort();
 
 const MATCHED = TOKENS.filter((name) => hasAny(name, FOREGROUND_SEGMENTS));

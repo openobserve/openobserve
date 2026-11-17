@@ -20,6 +20,16 @@ export interface PreviewContext {
   sample: Record<string, string>;
 }
 
+export function segmentClass(kind: SegmentClass): string {
+  return kind === "live"
+    ? "text-text-heading font-semibold"
+    : kind === "sample"
+      ? "text-text-secondary italic underline decoration-dashed"
+      : kind === "opaque"
+        ? "rounded-default bg-surface-subtle-hover text-text-body px-1"
+        : "text-text-body";
+}
+
 // Tokens the client must never substitute (server expands these at runtime).
 const OPAQUE_PATTERNS: RegExp[] = [
   /^rows$/,
@@ -98,6 +108,9 @@ const MOCK_SAMPLE: Record<string, string> = {
   alert_start_time_millis: "1782642300000",
   alert_end_time_millis: "1782642600000",
   alert_url: "https://app.openobserve.ai/alerts/example",
+  alert_url_label: "View logs",
+  alert_detail_url: "https://app.openobserve.ai/web/alerts/detail/example?org_identifier=acme-corp",
+  alert_detail_label: "Open alert",
   alert_trigger_time: "2026-06-28T10:30:00Z",
   alert_trigger_time_millis: "1782303000000",
   alert_trigger_time_seconds: "1782303000",

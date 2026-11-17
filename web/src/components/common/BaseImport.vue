@@ -209,6 +209,7 @@ import {
 } from "vue";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import axios from "axios";
+import { debounce } from "lodash-es";
 import AppTabs from "./AppTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -448,38 +449,54 @@ export default defineComponent({
       }
     });
 
-    // Watch for URL changes
-    watch(url, async (newVal) => {
-      try {
-        if (newVal) {
-          const response = await axios.get(newVal);
-          const contentType = response.headers["content-type"] as string | undefined;
+    let urlFetchController: AbortController | null = null;
 
-          // Check if the response body is valid JSON
-          try {
-            if (contentType?.includes("application/json") || contentType?.includes("text/plain")) {
-              jsonStr.value = JSON.stringify(response.data, null, 2);
-              jsonArrayOfObj.value = Array.isArray(response.data) ? response.data : [response.data];
-              emit("update:jsonStr", jsonStr.value);
-              emit("update:jsonArray", jsonArrayOfObj.value);
-            } else {
-              toast({
-                message: t("toastMessages.common.invalidJsonFormatInTheUrl"),
-                variant: "error",
-              });
-            }
-          } catch (parseError) {
+    const fetchUrl = async (target: string) => {
+      urlFetchController?.abort();
+      const controller = new AbortController();
+      urlFetchController = controller;
+      try {
+        const response = await axios.get(target, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        const contentType = response.headers["content-type"] as string | undefined;
+
+        // Check if the response body is valid JSON
+        try {
+          if (contentType?.includes("application/json") || contentType?.includes("text/plain")) {
+            jsonStr.value = JSON.stringify(response.data, null, 2);
+            jsonArrayOfObj.value = Array.isArray(response.data) ? response.data : [response.data];
+            emit("update:jsonStr", jsonStr.value);
+            emit("update:jsonArray", jsonArrayOfObj.value);
+          } else {
             toast({
-              message: t("toastMessages.common.invalidJsonFormat"),
+              message: t("toastMessages.common.invalidJsonFormatInTheUrl"),
               variant: "error",
             });
           }
+        } catch (parseError) {
+          toast({
+            message: t("toastMessages.common.invalidJsonFormat"),
+            variant: "error",
+          });
         }
       } catch (error) {
+        if (controller.signal.aborted) return;
         toast({
           message: t("toastMessages.common.errorFetchingData"),
           variant: "error",
         });
+      }
+    };
+
+    // The URL updates on every keystroke, so only fetch once typing pauses.
+    const debouncedFetchUrl = debounce(fetchUrl, 300);
+
+    watch(url, (newVal) => {
+      urlFetchController?.abort();
+      if (newVal) {
+        debouncedFetchUrl(newVal);
+      } else {
+        debouncedFetchUrl.cancel();
       }
     });
 
@@ -513,6 +530,8 @@ export default defineComponent({
 
     // Cleanup before component unmounts to prevent Monaco editor errors
     onBeforeUnmount(() => {
+      debouncedFetchUrl.cancel();
+      urlFetchController?.abort();
       // Stop any pending updates
       isImportingLocal.value = true;
       // Clear the jsonStr to prevent Monaco from trying to update

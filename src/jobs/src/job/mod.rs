@@ -35,6 +35,8 @@ mod agent_signals;
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
+#[cfg(feature = "enterprise")]
+mod alert_transitions_reaper;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -80,6 +82,8 @@ mod red_insights;
 mod scheduler;
 #[cfg(feature = "enterprise")]
 mod service_graph;
+#[cfg(feature = "enterprise")]
+mod service_signals;
 mod session_cleanup;
 #[cfg(feature = "enterprise")]
 pub mod slack_hooks;
@@ -743,6 +747,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
     tokio::task::spawn(db::model_pricing::watch());
+    #[cfg(feature = "enterprise")]
+    openobserve_core::service_identity::display_feed::init();
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(db::service_identity::watch());
     tokio::task::spawn(openobserve_core::prompts::watch_invalidation());
     tokio::task::spawn(db::alerts::templates::watch());
     tokio::task::spawn(db::alerts::destinations::watch());
@@ -928,6 +936,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if let Err(e) = alerts::alert_calibration::backfill_org_configs().await {
         log::error!("[alert_calibration] default config backfill failed: {e}");
     }
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = openobserve_core::autoobserve::init().await {
+        log::error!("[autoobserve] engine start-up failed: {e}");
+    }
 
     // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()
@@ -957,6 +969,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
             openobserve_core::synthetics::downtime_may_mute,
         );
     }
+    // A run a confirm job kept open can finalize in the reaper or the dispatcher, where no ack
+    // sends its alert.
+    #[cfg(feature = "enterprise")]
+    openobserve_synthetics::job_api::register_run_notifier(
+        openobserve_core::synthetics::notify_finalized_run,
+    );
     // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
     // processing node so that get_coverage_deficit returns accurate data from startup
     // rather than always returning (0, 0) until files happen to be processed.
@@ -1002,6 +1020,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(flatten_compactor::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(agent_signals::run());
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(service_signals::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(service_graph::run());
     // No cfg, unlike service_graph above: parts of DBM's read API are
@@ -1254,6 +1274,21 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::health::register_budget_transition(
+            |org_id, job_id, pause_at_spend| {
+                Box::pin(async move {
+                    openobserve_core::llm_evaluations::eval_jobs::transition_for_budget(
+                        &org_id,
+                        &job_id,
+                        pause_at_spend,
+                    )
+                    .await
+                    .map(|_| ())
+                    .map_err(|error| anyhow::anyhow!(error))
+                })
+            },
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_experiment_task_runner(
             |pointer| {
                 Box::pin(async move {
@@ -1281,6 +1316,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 .get("total")
                 .copied()
             },
+        );
+
+        // Registered here: the enterprise crate can't depend on the transform crate's QuickJS.
+        o2_enterprise::enterprise::llm_evaluations::scorers::code::register_code_runner(
+            transform::js::run_score_fn,
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
@@ -1350,10 +1390,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_training_reporter(
-            |org_id, anomaly_id, anomaly_name, success, error_msg, start_us, end_us| {
+            |org_id, anomaly_id, anomaly_name, outcome, message, start_us, end_us| {
                 Box::pin(async move {
                     use config::meta::self_reporting::usage::{
                         RunOutcome, TriggerData, TriggerDataType,
+                    };
+                    // A data-readiness skip carries a reason, which must not read as an error.
+                    let (error, success_response) = if outcome == RunOutcome::Error {
+                        (message, None)
+                    } else {
+                        (None, message)
                     };
                     usage_reporting::publish_triggers_usage(TriggerData {
                         _timestamp: start_us,
@@ -1363,15 +1409,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         next_run_at: 0,
                         is_realtime: false,
                         is_silenced: false,
-                        status: if success {
-                            RunOutcome::Succeeded
-                        } else {
-                            RunOutcome::Error
-                        },
+                        status: outcome,
                         start_time: start_us,
                         end_time: end_us,
                         retries: 0,
-                        error: error_msg,
+                        error,
+                        success_response,
                         evaluation_took_in_secs: Some((end_us - start_us) as f64 / 1_000_000.0),
                         ..Default::default()
                     });
@@ -1446,6 +1489,25 @@ pub async fn init() -> Result<(), anyhow::Error> {
         {
             o2_enterprise::enterprise::llm_evaluations::agent_registry::run_once().await;
         }
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "service_versions_flush",
+        o2_enterprise::enterprise::common::config::SERVICE_VERSIONS_BATCH_FLUSH_INTERVAL_SECS,
+        {
+            // flush_all logs each failed org; the next tick retries it
+            let _ = db::service_versions::flush_all().await;
+        },
+        pause_if: !config::get_config().service_versions.enabled
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "service_display_rebuild",
+        3600,
+        {
+            openobserve_core::service_identity::display_feed::rebuild_all().await;
+        },
+        sleep_after
     );
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
@@ -1534,6 +1596,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // gated: retention deletes do not replicate, so every region reaps its own
     // copy or it grows without bound.
     alert_eval_ledger_reaper::run();
+    // Not job-cluster gated for the same reason; OSS builds keep every level change.
+    #[cfg(feature = "enterprise")]
+    alert_transitions_reaper::run();
     query_history_reaper::run();
     public_dashboards_outbox::run();
     // Reconciliation is what makes the rolling window actually roll: the

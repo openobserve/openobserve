@@ -81,7 +81,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-secondary flex flex-wrap gap-x-4 gap-y-1 text-xs">
             <span>{{ t("oncall.previewLegendActive", { rule: raw(activeRuleName) }) }}</span>
             <span>{{ t("oncall.previewLegendOthers") }}</span>
-            <span>{{ t("oncall.legendNobody") }}</span>
+            <span
+              v-if="drawn.has('off')"
+              class="flex items-center gap-1.5"
+              data-test="oncall-draft-preview-legend-off"
+            >
+              <span
+                class="bg-surface-subtle border-border-strong size-2 rounded-full border border-dashed"
+                aria-hidden="true"
+              />
+              {{ t("oncall.timelineOff") }}
+            </span>
+            <span v-if="drawn.has('gap')" data-test="oncall-draft-preview-legend-nobody">
+              {{ t("oncall.legendNobody") }}
+            </span>
           </span>
         </template>
       </OScheduleTimeline>
@@ -114,18 +127,13 @@ import type {
   ScheduleTrack,
 } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
 import { SCHEDULE_BAND_TONE_COUNT } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
-import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
+import type { OnCallPolicy, ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import {
-  dayFraction,
-  dayRows,
-  formatInZone,
-  holderStretches,
-  rotationMembers,
-} from "@/utils/oncall";
+import { dayFraction, dayRows, formatInZone, holderStretches } from "@/utils/oncall";
 import { PREVIEW_DAYS } from "@/composables/useRotationPreview";
 import OnCallUpcomingList from "./OnCallUpcomingList.vue";
+import { isOffStretch, pagedAlone } from "./OnCallScheduleTimeline.lanes";
 
 const props = defineProps<{
   rotation: Rotation;
@@ -138,6 +146,10 @@ const props = defineProps<{
   error: I18nText | null;
   showEmpty: boolean;
   nameOf: (email: string) => string;
+  /** Tells an Off stretch from a gap, as the timeline does. */
+  policy?: OnCallPolicy | null;
+  /** Not saved yet, so no step can name it; its empty stretches stay gaps. */
+  isNew?: boolean;
 }>();
 
 const page = defineModel<number>("page", { required: true });
@@ -168,16 +180,18 @@ const rangeLine = computed<I18nText>(() =>
   }),
 );
 
-// Colour is a hint that cycles; the band's label carries who it is.
+// Hue is the shift rule, in rule order like the template rows' stripes; the band's label carries who it is.
 const tones = computed(() => {
-  const order = rotationMembers(props.rotation);
-  return (email: string) => {
-    const at = order.indexOf(email);
+  const order = props.rotation.shift_rules.map((rule) => rule.name);
+  return (rule: string) => {
+    const at = order.indexOf(rule);
     return (((at < 0 ? order.length : at) % SCHEDULE_BAND_TONE_COUNT) + 1) as ScheduleBand["tone"];
   };
 });
 
 const stretches = computed(() => holderStretches(props.segments));
+
+const alone = computed(() => props.isNew || pagedAlone(props.policy, props.rotation.id));
 
 const rows = computed(() =>
   dayRows(stretches.value, props.windowFrom, PREVIEW_DAYS, props.timezone),
@@ -189,19 +203,20 @@ const tracks = computed<ScheduleTrack[]>(() =>
     label: raw(dayLabel(row.start)),
     bands: row.pieces.map<ScheduleBand>(({ from, to, segment }) => {
       const who = segment.user_email ?? "";
+      const off = isOffStretch(segment, alone.value);
       const offset = dayFraction(from, row, props.timezone);
       return {
         key: `${row.start}-${from}`,
         offset,
         width: dayFraction(to, row, props.timezone) - offset,
-        label: who ? raw(props.nameOf(who)) : t("oncall.calendarNobody"),
+        label: bandLabel(who, off),
         ariaLabel: t("oncall.previewBandAria", {
           who: who ? raw(who) : t("oncall.calendarNobody"),
           from: raw(`${dayLabel(from)} ${time(from)}`),
           to: raw(time(to)),
           rule: raw(segment.rotation ?? ""),
         }),
-        tone: who ? tones.value(who) : "gap",
+        tone: bandTone(who, off, segment.rotation ?? ""),
         variant: segment.override_id
           ? "outline"
           : !who || segment.rotation === props.activeRuleName
@@ -210,6 +225,21 @@ const tracks = computed<ScheduleTrack[]>(() =>
       };
     }),
   })),
+);
+
+function bandLabel(who: string, off: boolean): I18nText {
+  if (who) return raw(props.nameOf(who));
+  return off ? t("oncall.timelineOff") : t("oncall.calendarNobody");
+}
+
+function bandTone(who: string, off: boolean, rule: string): ScheduleBand["tone"] {
+  if (who) return tones.value(rule);
+  return off ? "off" : "gap";
+}
+
+// The legend keys only the empty kinds actually drawn, as the timeline's does.
+const drawn = computed(
+  () => new Set(tracks.value.flatMap((track) => track.bands.map((band) => band.tone))),
 );
 
 // No 24:00 tick: a label centred on the right edge would hang outside the panel.

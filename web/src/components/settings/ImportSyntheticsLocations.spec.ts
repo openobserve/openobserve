@@ -24,6 +24,7 @@ const { mockCreateLocation, mockToastFn } = vi.hoisted(() => ({
   mockToastFn: vi.fn(),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/synthetics", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -66,6 +67,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
 
 import ImportSyntheticsLocations from "./ImportSyntheticsLocations.vue";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -662,6 +664,7 @@ describe("ImportSyntheticsLocations", () => {
         }),
       );
       expect(mockToastFn.mock.calls[0][0].message).toContain("1");
+      expect(analytics.track).toHaveBeenCalledWith("synthetics_location_imported", { count: 1 });
     });
 
     it("does not show success toast when some items fail", async () => {

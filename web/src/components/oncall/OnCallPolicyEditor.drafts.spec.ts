@@ -19,7 +19,6 @@ import { defineComponent, h, nextTick, ref } from "vue";
 import { RouterView, createMemoryHistory, createRouter, type Router } from "vue-router";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import { resetOnCallPermissions } from "@/composables/useOnCallPermissions";
-import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
@@ -38,7 +37,6 @@ vi.mock("@/services/oncall", () => ({
     setPolicy: vi.fn(),
     listMembers: vi.fn(),
     whoIsOnCall: vi.fn(),
-    getRoutingConfig: vi.fn(),
     getTeamChannel: vi.fn(),
     setTeamChannel: vi.fn(),
     getContact: vi.fn(),
@@ -147,7 +145,6 @@ describe("OnCallPolicyEditor drafts", () => {
   beforeEach(() => {
     localStorage.clear();
     queryClient.clear();
-    __resetOnCallRoutingConfig();
     resetOnCallPermissions();
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -155,9 +152,6 @@ describe("OnCallPolicyEditor drafts", () => {
     saved = 0;
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: [], source: "policy" },
-    } as never);
-    service.getRoutingConfig.mockResolvedValue({
-      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
     } as never);
     service.listMembers.mockResolvedValue({ data: [] } as never);
     service.whoIsOnCall.mockResolvedValue({ data: [] } as never);
@@ -249,8 +243,6 @@ describe("OnCallPolicyEditor drafts", () => {
       data: {
         rungs: [{ ...policy.rungs[0], channels: ["email", "sms"] }],
         destinations: [],
-        repeatCount: 1,
-        finalAction: "stop",
         l0: null,
       },
     });
@@ -266,8 +258,6 @@ describe("OnCallPolicyEditor drafts", () => {
       data: {
         rungs: [{ ...policy.rungs[0], channels: ["email", "sms"] }],
         destinations: [],
-        repeatCount: 1,
-        finalAction: "stop",
         l0: null,
       },
     });
@@ -287,8 +277,6 @@ describe("OnCallPolicyEditor drafts", () => {
       data: {
         rungs: policy.rungs,
         destinations: [],
-        repeatCount: 1,
-        finalAction: "stop",
         l0: ALL_OFF,
       },
     });
@@ -349,8 +337,6 @@ describe("OnCallPolicyEditor drafts", () => {
       data: {
         rungs: policy.rungs,
         destinations: [],
-        repeatCount: 1,
-        finalAction: "stop",
         l0: { ...ALL_OFF, triage_budget_seconds: 5 },
       },
     });

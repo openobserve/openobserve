@@ -233,6 +233,8 @@ test.describe(
           // expected validation is tolerated; only real JS errors and 5xx
           // matter. Drop resource-load 4xx noise; keep everything else.
           if (/Failed to load resource: the server responded with a status of 4\d\d/.test(text)) return;
+          // Firefox reports a web-font fetch or sanitizer failure as a console error; it is not an app JS error.
+          if (text.includes('downloadable font:')) return;
           consoleErrors.push(text);
         });
         page.on('pageerror', (err) => {

@@ -186,6 +186,13 @@ pub const COVERAGE: &[Coverage] = &[
     table("search_jobs", DB),
     table("search_queue", DB),
     table("service_streams", DB),
+    table("service_identity_rules", DB),
+    table("service_name_aliases", DB),
+    table("service_version_deploys", DB),
+    table("service_version_verdict_metrics", DB),
+    table("service_version_verdicts", DB),
+    table("service_versions", DB),
+    table("service_where_summary", DB),
     exempt(
         Kind::Table,
         "sessions",
@@ -327,6 +334,11 @@ pub const COVERAGE: &[Coverage] = &[
         "files/_meta/ usage, audit and trigger rows",
         "the _meta org's own history, kept for billing and audit",
     ),
+    exempt(
+        Kind::ObjectPrefix,
+        "files/_meta/ autoobserve_* engine rows, keyed by org_id",
+        "the engine's regional history in the _meta org, kept 35 days unless an operator set its retention; per-org engine reads start at the org's creation and a node drops what it remembers of an org whose creation time changed, so an org re-created under the same id is served none of it; the region-wide stream-silence reads are not clamped",
+    ),
     covered(Kind::LocalDisk, "enrichment_table_cache/{org}/", DB),
     covered(Kind::LocalDisk, "metrics_results/{org}/", DB),
     covered(Kind::LocalDisk, "results/{org}/", DB),
@@ -465,7 +477,7 @@ mod tests {
     /// Steps the worker runs by name, beyond the fixed steps it enqueues.
     const ITEM_STEPS: [&str; 2] = ["delete_stream", "delete_stream_final"];
     /// Tables that name their org through a parent id or key that no `belongs_to` declares.
-    const PARENT_ID_SCOPED: [&str; 14] = [
+    const PARENT_ID_SCOPED: [&str; 15] = [
         "alert_state_transitions",
         "alert_states",
         "compactor_manual_jobs",
@@ -477,6 +489,7 @@ mod tests {
         "public_dashboard_outbox",
         "search_job_partitions",
         "search_job_results",
+        "service_version_verdict_metrics",
         "slo_backfill_jobs",
         "slo_status",
         "users",

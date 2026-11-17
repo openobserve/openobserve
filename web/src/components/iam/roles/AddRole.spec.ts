@@ -21,6 +21,7 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import AddRole from "@/components/iam/roles/AddRole.vue";
+import { JOB_PRESETS } from "@/components/iam/roles/jobPresets";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -157,6 +158,7 @@ describe("AddRole", () => {
         "k8s",
         "rum_viewer",
         "rum_editor",
+        ...JOB_PRESETS.map((preset) => preset.id),
       ]);
       const labels = (select.props("options") as { label: string }[]).map((o) => o.label);
       expect(labels).toContain(i18n.global.t("iam.role.startFrom.rum_viewer"));
@@ -169,6 +171,24 @@ describe("AddRole", () => {
 
     it("shows the start-from presets", () => {
       expect(wrapper.find('[data-test="add-role-start-from-section"]').exists()).toBe(true);
+    });
+
+    it("lists the Security presets, so a SOC role can start from one", () => {
+      const values = (
+        wrapper.findComponent({ name: "OSelect" }).props("options") as { value: string }[]
+      ).map((o) => o.value);
+      for (const id of ["security_viewer", "soc_analyst", "detection_engineer", "security_admin"]) {
+        expect(values).toContain(id);
+      }
+    });
+
+    it("opens on the preset a deep link names, and on custom for an unknown one", () => {
+      const linked = mountComp({ startFrom: "soc_analyst" });
+      expect(linked.findComponent({ name: "OSelect" }).props("modelValue")).toBe("soc_analyst");
+      linked.unmount();
+      const unknown = mountComp({ startFrom: "nope" });
+      expect(unknown.findComponent({ name: "OSelect" }).props("modelValue")).toBe("custom");
+      unknown.unmount();
     });
 
     it("starts the dropdown on the custom preset", () => {

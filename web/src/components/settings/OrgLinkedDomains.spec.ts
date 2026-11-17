@@ -26,6 +26,7 @@ const { mockToast, mockConfirm } = vi.hoisted(() => ({
   mockConfirm: vi.fn(),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mockToast }));
 vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: () => ({ confirm: mockConfirm }),
@@ -46,6 +47,7 @@ vi.mock("@/services/organizations", async (importOriginal) => {
 });
 
 import organizations from "@/services/organizations";
+import analytics from "@/services/product_analytics";
 const api = organizations as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 const DialogStub = defineComponent({
@@ -203,6 +205,7 @@ describe("OrgLinkedDomains", () => {
     dialog().vm.$emit("verify");
     await settle();
     expect(api.verify_org_domain).toHaveBeenCalledWith("acme", "pending.com");
+    expect(analytics.track).toHaveBeenCalledWith("org_domain_verify_checked", { verified: false });
     expect(dialog().props("open")).toBe(true);
   });
 
@@ -271,9 +274,11 @@ describe("OrgLinkedDomains", () => {
     await expect(submitFrom(wrapper)("new.com", "dns")).resolves.toBe(true);
     expect(api.link_org_domain).toHaveBeenCalledWith("acme", "new.com");
     expect(api.raise_org_domain_request).not.toHaveBeenCalled();
+    expect(analytics.track).toHaveBeenCalledWith("org_domain_linked");
 
     await expect(submitFrom(wrapper)("ask.com", "request")).resolves.toBe(true);
     expect(api.raise_org_domain_request).toHaveBeenCalledWith("acme", "ask.com");
+    expect(analytics.track).toHaveBeenCalledWith("org_domain_link_requested");
   });
 
   it("refuses a second DNS link for a domain this org already linked", async () => {
@@ -344,6 +349,7 @@ describe("OrgLinkedDomains", () => {
 
     expect(api.post_organization_settings).not.toHaveBeenCalled();
     expect(api.unlink_org_domain).toHaveBeenCalledWith("acme", "acme.com");
+    expect(analytics.track).toHaveBeenCalledWith("org_domain_unlinked", { with_mappings: false });
   });
 
   it("does nothing when the removal is not confirmed", async () => {

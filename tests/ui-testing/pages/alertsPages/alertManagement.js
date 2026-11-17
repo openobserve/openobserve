@@ -11,6 +11,12 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
+const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { holdGet } = require('../../playwright-tests/utils/route-hold.js');
+
+const alertDetailUrl = (id) => new RegExp(`/api/v2/[^/]+/alerts/${id}(\\?|$)`);
+const isAlertCreate = (r) => r.method() === 'POST' && /\/api\/v2\/[^/]+\/alerts(\?|$)/.test(r.url());
 
 export class AlertManagement {
     constructor(page, commonActions, locators) {
@@ -29,23 +35,12 @@ export class AlertManagement {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Opened alert for editing (v3)', { alertName });
 
-        // All fields are in a flat tab-based layout (v3 UI), no step navigation needed
-        // Change operator from Contains to = to verify update functionality.
-        // Wait 15s (not 5s): opening the edit wizard fetches the alert and renders the conditions
-        // section asynchronously; under concurrent CI load the operator select lands well past 5s
-        // (the intermittent "alert-conditions-operator-select not visible" flake).
-        const operatorDropdown = this.page.locator(this.locators.operatorSelect).first();
-        await expect(operatorDropdown).toBeVisible({ timeout: 15000 });
-        await operatorDropdown.click();
-        // The operator control is an OSelect: it renders an aria-hidden native
-        // <select><option>=</option> alongside the visible popover item, so an unscoped
-        // getByText('=', {exact}) matches BOTH nodes and trips a strict-mode violation.
-        // Scope the click to the popover and match by role so the hidden native select is
-        // excluded, and gate on the popover's open/close state instead of hard waits.
-        const operatorPopover = this.page.locator('[data-test="alert-conditions-operator-select-popover"]');
-        await expect(operatorPopover).toBeVisible({ timeout: 10000 });
-        await operatorPopover.getByRole('option', { name: '=', exact: true }).click();
-        await expect(operatorPopover).toBeHidden({ timeout: 10000 });
+        // Change the first condition's operator from Contains to = to verify update functionality.
+        // Wait 15s: the edit page fetches the alert and renders the conditions asynchronously.
+        const conditions = new FilterBuilderDriver(this.page, 'alert-conditions');
+        await expect(conditions.chips.first()).toBeVisible({ timeout: 15000 });
+        await conditions.changeOperator(0, '=');
+        await conditions.expectOperator(0, '=');
         testLogger.info('Changed operator from Contains to =');
 
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -76,6 +71,37 @@ export class AlertManagement {
         await expect(this.cloneDialog()).toBeVisible({ timeout: 10000 });
     }
 
+    rowLastOutcome(alertName) {
+        return this.page.locator(`[data-test="alert-list-${alertName}-last-outcome"]`);
+    }
+
+    async openAlertListAndSearch(search, org = getOrgIdentifier()) {
+        await this.page.goto(`/web/alerts?org_identifier=${org}&folder=default&state=all`);
+        await this.searchAlert(search);
+    }
+
+    async expectRowsFiring(org, search, names) {
+        await expect(async () => {
+            await this.openAlertListAndSearch(search, org);
+            for (const name of names) {
+                await expect(this.rowLastOutcome(name)).toHaveText(/firing/i, { timeout: 5000 });
+            }
+        }).toPass({ timeout: 60000 });
+    }
+
+    /** Parks the alert's detail GET; returns { requested, release }. */
+    async holdAlertDetailLoad(alertId) {
+        return holdGet(this.page, alertDetailUrl(alertId));
+    }
+
+    waitForAlertDetailLoad(alertId) {
+        return this.page.waitForResponse(alertDetailUrl(alertId));
+    }
+
+    alertDetailUrl(alertId) {
+        return alertDetailUrl(alertId);
+    }
+
     /**
      * The dialog's Save button.
      *
@@ -93,6 +119,20 @@ export class AlertManagement {
 
     async submitCloneDialog() {
         await this.page.locator(this.locators.cloneSubmitButton).click();
+    }
+
+    /** Submits the clone dialog, expects the create to answer 200, and returns the body it sent. */
+    async saveCloneDialog() {
+        const saved = this.page.waitForResponse((r) => isAlertCreate(r.request()));
+        await this.submitCloneDialog();
+        const response = await saved;
+        expect(response.status(), await response.text()).toBe(200);
+        return response.request().postDataJSON();
+    }
+
+    // A late load's continuation runs after its response event, so let queued UI tasks land before reading the form.
+    async settlePendingUiTasks() {
+        await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0))));
     }
 
     async cancelCloneDialog() {
@@ -222,9 +262,8 @@ export class AlertManagement {
         await expect(pauseButton).toBeVisible({ timeout: 5000 });
         await pauseButton.click();
 
-        await expect(
-            this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Alert Paused Successfully' }).first()
-        ).toBeVisible({ timeout: 10000 });
+        // A confirmed pause has no toast: the same button turns into Resume.
+        await expect(pauseButton).toHaveAttribute('data-row-action', 'resume', { timeout: 10000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Successfully paused alert', { alertName });
@@ -267,9 +306,7 @@ export class AlertManagement {
         await resumeButton.click();
         testLogger.info('Clicked resume button', { alertName });
 
-        await expect(
-            this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Alert Resumed Successfully' }).first()
-        ).toBeVisible({ timeout: 15000 });
+        await expect(resumeButton).toHaveAttribute('data-row-action', 'pause', { timeout: 15000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Successfully resumed alert', { alertName });
@@ -483,7 +520,7 @@ export class AlertManagement {
 
         if (!isVisible) {
             const orgName = process.env["ORGNAME"] || 'default';
-            const alertsUrl = `/web/alerts?org_identifier=${orgName}`;
+            const alertsUrl = `/web/alerts?org_identifier=${orgName}&state=all`;
             await this.page.goto(alertsUrl);
             await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
             await this.page.waitForTimeout(2000);

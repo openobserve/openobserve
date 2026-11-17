@@ -40,26 +40,33 @@ const STORE_OUTCOME_UNKNOWN_MSG: &str = "The license key may or may not have bee
 const KEY_ACCEPTED: &str = "accept";
 const KEY_ACCEPTED_MSG: &str = "This key can be applied.";
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct LicenseResponse {
     key: Option<String>,
+    #[schema(value_type = Option<Object>)]
     license: Option<License>,
     installation_id: String,
     expired: bool,
     ingestion_used: f64,
     ingestion_exceeded: u8,
+    #[schema(value_type = Vec<Object>)]
     waivers: Vec<Waiver>,
+    #[schema(value_type = Object)]
     decision: LicenseDecision,
+    #[schema(value_type = Object)]
     base: LicenseDecision,
     evaluated_at: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
     input: Option<o2_enterprise::enterprise::license::LicenseInput>,
     env_key_active: bool,
     /// Whether the loaded key is the `O2_LICENSE_KEY` one, i.e. no pasted key superseded it.
     env_key_in_use: bool,
     /// Whether `POST /license/refresh` would pass both its route check and its handler check.
     can_update_license: bool,
+    #[schema(value_type = Option<Object>)]
     rev_hwm_warning: Option<BelowHwm>,
+    #[schema(value_type = Object)]
     refresh: RefreshStatus,
 }
 
@@ -558,7 +565,7 @@ fn refresh_response(
     summary = "Get license information",
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = LicenseResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "License", "operation": "get"})),

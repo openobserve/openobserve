@@ -15,8 +15,9 @@
 
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { nextTick } from "vue";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
+import { describe, expect, it, afterEach, beforeEach, onTestFinished, vi } from "vitest";
 import MetricCard from "./MetricCard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -153,7 +154,7 @@ describe("MetricCard (ported to @/lib)", () => {
   describe("status: the function, the unit and the freshness", () => {
     const status = (w: VueWrapper<any>) => ({
       info: w.find('[data-test="metrics-explorer-card-rest-info-node_cpu_seconds_total"]'),
-      fresh: w.find('[data-test="metrics-explorer-card-last-refreshed-node_cpu_seconds_total"]'),
+      fresh: w.find('[data-test="metrics-explorer-card-data-age-node_cpu_seconds_total"]'),
     });
 
     it("shows the function · unit and the freshness both at rest and on hover or focus", async () => {
@@ -164,9 +165,111 @@ describe("MetricCard (ported to @/lib)", () => {
       await wrapper.vm.$nextTick();
       const { info, fresh } = status(wrapper);
       expect(info.text()).toBe("sum(rate) · s");
-      expect(fresh.text()).toContain("33");
+      expect(fresh.text()).toMatch(/Updated \d{2}:\d{2}/);
       expect(hidingClasses(info.element, wrapper.element)).toEqual([]);
-      expect(hidingClasses(fresh.element, wrapper.element)).toEqual([]);
+      // Only the card-width query swaps the words for the clock icon; nothing hides it on hover.
+      expect(hidingClasses(fresh.element, wrapper.element)).toEqual(["@max-md/panelbar:hidden"]);
+      const icon = wrapper.find(
+        '[data-test="metrics-explorer-card-data-age-icon-node_cpu_seconds_total"]',
+      );
+      expect(hidingClasses(icon.element, wrapper.element)).toEqual(["@md/panelbar:hidden"]);
+    });
+
+    it("cuts a long name in the middle, so names that differ only at the end stay apart (CS11)", () => {
+      const name = "apiserver_request_duration_seconds_count";
+      wrapper = createWrapper({ card: { ...CARD, name } });
+      const title = wrapper.find(`[data-test="metrics-explorer-card-title-${name}"]`);
+      const head = title.find(`[data-test="metrics-explorer-card-title-head-${name}"]`);
+      expect(head.text()).toBe(name.slice(0, -14));
+      expect(title.text()).toBe(name);
+      expect(title.findAll("span.shrink-0").map((s) => s.text())).toContain("_seconds_count");
+      const tip = wrapper
+        .findAllComponents({ name: "OTooltip" })
+        .find((c) => c.props("content") === name);
+      expect(tip).toBeDefined();
+
+      const bucket = "apiserver_request_duration_seconds_bucket";
+      wrapper.unmount();
+      wrapper = createWrapper({ card: { ...CARD, name: bucket } });
+      const tail = wrapper.find(
+        `[data-test="metrics-explorer-card-title-${bucket}"] span.shrink-0`,
+      );
+      expect(tail.text()).toBe("_seconds_bucket");
+    });
+
+    describe("the middle cut's ellipsis (K3)", () => {
+      const name = "apiserver_admission_webhook_request_total";
+      const CHAR_PX = 8;
+      const isHead = (el: Element) =>
+        el.getAttribute("data-test") === `metrics-explorer-card-title-head-${name}`;
+      // jsdom has no layout: the head's text is CHAR_PX a character, its box at most `room` wide.
+      const layout = (room: number) => {
+        const scroll = Object.getOwnPropertyDescriptor(Element.prototype, "scrollWidth")!;
+        const client = Object.getOwnPropertyDescriptor(Element.prototype, "clientWidth")!;
+        const width = (el: Element) => (el.textContent ?? "").length * CHAR_PX;
+        Object.defineProperty(Element.prototype, "scrollWidth", {
+          configurable: true,
+          get() {
+            return isHead(this) ? width(this) : scroll.get!.call(this);
+          },
+        });
+        Object.defineProperty(Element.prototype, "clientWidth", {
+          configurable: true,
+          get() {
+            return isHead(this) ? Math.min(width(this), room) : client.get!.call(this);
+          },
+        });
+        onTestFinished(() => {
+          Object.defineProperty(Element.prototype, "scrollWidth", scroll);
+          Object.defineProperty(Element.prototype, "clientWidth", client);
+        });
+      };
+      const title = () => wrapper.find(`[data-test="metrics-explorer-card-title-${name}"]`);
+      const tooltip = () =>
+        wrapper.findAllComponents({ name: "OTooltip" }).find((c) => c.props("content") === name);
+
+      it.each([200, 203, 207])(
+        "sits right against the tail, with no blank between them, in %ipx",
+        async (room) => {
+          layout(room);
+          wrapper = createWrapper({ card: { ...CARD, name } });
+          await nextTick();
+          const head = title().find(`[data-test="metrics-explorer-card-title-head-${name}"]`);
+          expect(head.text()).toBe("apiserver_admission_webh…");
+          expect(head.classes()).not.toContain("truncate");
+          expect(title().text()).toBe("apiserver_admission_webh…_request_total");
+          expect(tooltip()!.props("disabled")).toBe(false);
+        },
+      );
+
+      it("shows the whole name, with no ellipsis or tooltip, when it fits", async () => {
+        layout(400);
+        wrapper = createWrapper({ card: { ...CARD, name } });
+        await nextTick();
+        expect(title().text()).toBe(name);
+        expect(tooltip()!.props("disabled")).toBe(true);
+      });
+    });
+
+    it("keeps a short name whole", () => {
+      wrapper = createWrapper({});
+      const head = wrapper.find(
+        '[data-test="metrics-explorer-card-title-node_cpu_seconds_total"] [data-test="o-truncated-text"]',
+      );
+      expect(head.text()).toBe("node_cpu_seconds_total");
+    });
+
+    it("drops the Drill down words on a narrow card, keeping its icon, name and tooltip (CS11)", () => {
+      wrapper = createWrapper({});
+      const button = wrapper.find(
+        '[data-test="metrics-explorer-card-details-node_cpu_seconds_total"]',
+      );
+      expect(button.attributes("aria-label")).toBeTruthy();
+      const words = button
+        .findAll("span")
+        .filter((s) => s.text() === "Drill down")
+        .at(-1)!;
+      expect(words.classes()).toContain("@max-md/panelbar:hidden");
     });
 
     it("lets the metric name give way, never the function · unit or the freshness", () => {
@@ -535,6 +638,44 @@ describe("MetricCard (ported to @/lib)", () => {
       expect(wrapper.findComponent({ name: "MetricCardChart" }).exists()).toBe(true);
     });
 
+    it("shows one failure marker on a failed card: the header marker carries the error and copies it, the body badge is gone (N3)", async () => {
+      wrapper = createWrapper({
+        preview: preview({
+          status: "done",
+          results: [{ resultType: "matrix", result: [{ values: [[1, "1"]] }] }],
+          stale: true,
+          failedAt: Date.now(),
+          lastTriggeredAt: Date.now() - 60_000,
+          error: "Search query timed out",
+          errorTraceId: "c411073d",
+        }),
+      });
+      expect(
+        wrapper.find('[data-test="metrics-explorer-card-stale-node_cpu_seconds_total"]').exists(),
+      ).toBe(false);
+      const marker = wrapper.find(
+        '[data-test="metrics-explorer-card-refresh-failed-node_cpu_seconds_total"]',
+      );
+      expect(marker.element.tagName).toBe("BUTTON");
+      const age = wrapper
+        .findAllComponents({ name: "ODataAge" })
+        .find((c) => c.props("short") && !c.props("iconOnly"))!;
+      expect(age.props("detail")).toContain("Search query timed out");
+      expect(age.props("detail")).toContain("Trace ID: c411073d");
+      await marker.trigger("click");
+      expect(copied).toContain("Trace ID: c411073d");
+    });
+
+    it("keeps a sparse answer's words, never an empty chart, while it reloads (CS10)", () => {
+      wrapper = createWrapper({
+        preview: preview({ status: "loading", results: [{ result: [] }], sparse: true }),
+      });
+      expect(
+        wrapper.find('[data-test="metrics-explorer-card-sparse-node_cpu_seconds_total"]').exists(),
+      ).toBe(true);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).exists()).toBe(false);
+    });
+
     it("renders the stale indicator when the last refresh failed", () => {
       wrapper = createWrapper({
         preview: preview({
@@ -723,6 +864,283 @@ describe("MetricCard (ported to @/lib)", () => {
       const chart = wrapper.findComponent({ name: "MetricCardChart" });
       expect(chart.exists()).toBe(true);
       expect(chart.props("injectedExemplars")).toEqual(exemplars);
+    });
+  });
+
+  describe("one body until the first paint, and the chart kept across a window change", () => {
+    const N = "node_cpu_seconds_total";
+    const body = (w: VueWrapper<any>) =>
+      w.find(`[data-test="metrics-explorer-card-skeleton-${N}"]`);
+    const series = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] }];
+
+    afterEach(() => vi.useRealTimers());
+
+    it("shows the same static placeholder idle and loading, named Loading chart", async () => {
+      wrapper = createWrapper();
+      const idle = body(wrapper);
+      expect(idle.attributes("role")).toBe("img");
+      expect(idle.attributes("aria-label")).toBe("Loading chart");
+      const idleHtml = idle.html();
+
+      await wrapper.setProps({ preview: preview({ status: "loading", results: [] }) });
+      expect(body(wrapper).exists()).toBe(true);
+      expect(body(wrapper).html()).toBe(idleHtml);
+      expect(body(wrapper).find(".skeleton-wave").exists()).toBe(false);
+      expect(body(wrapper).find(".animate-pulse").exists()).toBe(false);
+    });
+
+    it("draws the chart at the first paint, with no placeholder left", async () => {
+      wrapper = createWrapper({ preview: preview({ status: "loading", results: [] }) });
+      await wrapper.setProps({ preview: preview({ status: "done", results: series }) });
+      expect(body(wrapper).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).exists()).toBe(true);
+    });
+
+    it("dims the kept chart to 60% 150 ms into a different window's load, never on a same-window refresh", async () => {
+      vi.useFakeTimers();
+      wrapper = createWrapper({
+        preview: preview({ status: "loading", results: series, windowStale: true }),
+      });
+      const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart().attributes("aria-busy")).toBe("true");
+      expect(chart().classes()).not.toContain("opacity-60");
+      vi.advanceTimersByTime(149);
+      await wrapper.vm.$nextTick();
+      expect(chart().classes()).not.toContain("opacity-60");
+      vi.advanceTimersByTime(1);
+      await wrapper.vm.$nextTick();
+      expect(chart().classes()).toContain("opacity-60");
+
+      await wrapper.setProps({ preview: preview({ status: "done", results: series }) });
+      expect(chart().classes()).not.toContain("opacity-60");
+
+      await wrapper.setProps({ preview: preview({ status: "loading", results: series }) });
+      vi.advanceTimersByTime(500);
+      await wrapper.vm.$nextTick();
+      expect(chart().classes()).not.toContain("opacity-60");
+      expect(chart().attributes("aria-busy")).toBeUndefined();
+    });
+  });
+
+  describe("its own progress line, the one a dashboard panel draws", () => {
+    const loadingProgress = (w: VueWrapper<any>) => w.findComponent({ name: "LoadingProgress" });
+
+    it("draws its own line by default", () => {
+      wrapper = createWrapper({ preview: preview({ status: "loading", results: [] }) });
+      expect(loadingProgress(wrapper).exists()).toBe(true);
+      expect(loadingProgress(wrapper).props("loading")).toBe(true);
+    });
+
+    it("keeps it on over a kept chart through a refresh or time change, and off once the answer lands", async () => {
+      const series = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] }];
+      wrapper = createWrapper({ preview: preview({ status: "done", results: series }) });
+      expect(loadingProgress(wrapper).props("loading")).toBe(false);
+      await wrapper.setProps({ preview: preview({ status: "loading", results: series }) });
+      expect(loadingProgress(wrapper).props("loading")).toBe(true);
+      expect(loadingProgress(wrapper).props("indeterminate")).toBe(false);
+      await wrapper.setProps({ preview: preview({ status: "done", results: series }) });
+      expect(loadingProgress(wrapper).props("loading")).toBe(false);
+    });
+  });
+
+  describe("data age and the failed-refresh marker", () => {
+    const N = "node_cpu_seconds_total";
+    const series = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] }];
+
+    it("shows Updated hh:mm in the header slot once the chart has drawn its first frame (M-4)", async () => {
+      wrapper = createWrapper({
+        preview: preview({ status: "done", results: series, lastTriggeredAt: Date.now() }),
+      });
+      const age = () => wrapper.find(`[data-test="metrics-explorer-card-data-age-${N}"]`);
+      // Laid out but invisible (hidden from assistive tech too), so the header does not shift when it shows.
+      expect(age().classes()).toContain("invisible");
+      expect(age().text()).toMatch(/Updated \d{2}:\d{2}/);
+
+      wrapper.findComponent({ name: "MetricCardChart" }).vm.$emit("painted");
+      await wrapper.vm.$nextTick();
+      expect(age().classes()).not.toContain("invisible");
+      expect(age().attributes("data-state")).toBe("age");
+      expect(age().text()).toMatch(/Updated \d{2}:\d{2}/);
+    });
+
+    it("puts the data age before Drill down, as the mockups do (CS12)", async () => {
+      wrapper = createWrapper({
+        preview: preview({ status: "done", results: series, lastTriggeredAt: Date.now() }),
+      });
+      wrapper.findComponent({ name: "MetricCardChart" }).vm.$emit("painted");
+      await wrapper.vm.$nextTick();
+      const html = wrapper.html();
+      expect(html.indexOf(`metrics-explorer-card-data-age-${N}`)).toBeLessThan(
+        html.indexOf(`metrics-explorer-card-details-${N}`),
+      );
+    });
+
+    it("in a narrow card, the failed marker is its icon alone with the sentence in its tooltip (CS11)", () => {
+      wrapper = createWrapper({
+        preview: preview({
+          status: "done",
+          results: series,
+          stale: true,
+          failedAt: Date.now(),
+          lastTriggeredAt: Date.now() - 300_000,
+        }),
+      });
+      const words = wrapper.find(`[data-test="metrics-explorer-card-refresh-failed-${N}"]`);
+      const icon = wrapper.find(`[data-test="metrics-explorer-card-refresh-failed-icon-${N}"]`);
+      expect(words.classes()).toContain("@max-md/panelbar:hidden");
+      expect(icon.classes()).toContain("@md/panelbar:hidden");
+      expect(icon.attributes("data-state")).toBe("failed");
+      expect(icon.findAll('[aria-hidden="true"]').filter((el) => el.text())).toHaveLength(0);
+      expect(icon.find(".sr-only").text()).toMatch(/^Refresh failed at \d{2}:\d{2}/);
+    });
+
+    it("in a narrow card, the age is a clock icon with Updated in its tooltip, so the title keeps its room (CS11)", async () => {
+      wrapper = createWrapper({
+        preview: preview({ status: "done", results: series, lastTriggeredAt: Date.now() }),
+      });
+      wrapper.findComponent({ name: "MetricCardChart" }).vm.$emit("painted");
+      await wrapper.vm.$nextTick();
+      const icon = wrapper.find(`[data-test="metrics-explorer-card-data-age-icon-${N}"]`);
+      expect(icon.attributes("data-state")).toBe("age");
+      expect(icon.classes()).toContain("@md/panelbar:hidden");
+      expect(icon.find(".sr-only").text()).toMatch(/^Updated \d{2}:\d{2}:\d{2}/);
+      expect(wrapper.find(`[data-test="metrics-explorer-card-data-age-${N}"]`).classes()).toContain(
+        "@max-md/panelbar:hidden",
+      );
+    });
+
+    it("says Updated at once when there is no chart to wait for", () => {
+      wrapper = createWrapper({
+        preview: preview({ status: "done", results: [], lastTriggeredAt: Date.now() }),
+      });
+      expect(
+        wrapper.find(`[data-test="metrics-explorer-card-data-age-${N}"]`).attributes("data-state"),
+      ).toBe("age");
+    });
+
+    it("waits for the new chart's first frame again after the chart was swapped out", async () => {
+      wrapper = createWrapper({
+        preview: preview({ status: "done", results: series, lastTriggeredAt: Date.now() }),
+      });
+      wrapper.findComponent({ name: "MetricCardChart" }).vm.$emit("painted");
+      await wrapper.vm.$nextTick();
+      await wrapper.setProps({ preview: preview({ status: "loading", results: [] }) });
+      await wrapper.setProps({
+        preview: preview({ status: "done", results: series, lastTriggeredAt: Date.now() }),
+      });
+      expect(wrapper.find(`[data-test="metrics-explorer-card-data-age-${N}"]`).classes()).toContain(
+        "invisible",
+      );
+    });
+
+    it("swaps the age for a short red marker whose tooltip holds the full sentence", () => {
+      const dataFrom = Date.now() - 300_000;
+      wrapper = createWrapper({
+        preview: preview({
+          status: "done",
+          results: series,
+          stale: true,
+          failedAt: Date.now(),
+          lastTriggeredAt: dataFrom,
+          error: "Forbidden",
+        }),
+      });
+      const marker = wrapper.find(`[data-test="metrics-explorer-card-refresh-failed-${N}"]`);
+      expect(marker.exists()).toBe(true);
+      expect(marker.attributes("data-state")).toBe("failed");
+      expect(marker.text()).toContain("Refresh failed");
+      expect(marker.find(".sr-only").text()).toMatch(
+        /^Refresh failed at \d{2}:\d{2} · showing data from \d{2}:\d{2}$/,
+      );
+      expect(marker.classes()).toContain("shrink-0");
+      expect(marker.attributes("role")).toBeUndefined();
+      expect(wrapper.find(`[data-test="metrics-explorer-card-data-age-${N}"]`).exists()).toBe(
+        false,
+      );
+    });
+
+    it("returns a failed card's kept chart to full opacity: the marker says it is not live", async () => {
+      vi.useFakeTimers();
+      onTestFinished(() => vi.useRealTimers());
+      wrapper = createWrapper({
+        preview: preview({ status: "loading", results: series, windowStale: true }),
+      });
+      const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
+      vi.advanceTimersByTime(200);
+      await wrapper.vm.$nextTick();
+      expect(chart().classes()).toContain("opacity-60");
+
+      await wrapper.setProps({
+        preview: preview({
+          status: "done",
+          results: series,
+          stale: true,
+          failedAt: Date.now(),
+          lastTriggeredAt: Date.now() - 60_000,
+          error: "Forbidden",
+        }),
+      });
+      vi.advanceTimersByTime(500);
+      await wrapper.vm.$nextTick();
+      expect(chart().classes()).not.toContain("opacity-60");
+      expect(chart().attributes("aria-busy")).toBeUndefined();
+      expect(wrapper.find(`[data-test="metrics-explorer-card-refresh-failed-${N}"]`).exists()).toBe(
+        true,
+      );
+    });
+
+    it("never advances the age on a failed run: no marker or age without a time", () => {
+      wrapper = createWrapper({ preview: preview({ status: "error", error: "x" }) });
+      expect(wrapper.find(`[data-test="metrics-explorer-card-data-age-${N}"]`).exists()).toBe(
+        false,
+      );
+      expect(wrapper.find(`[data-test="metrics-explorer-card-refresh-failed-${N}"]`).exists()).toBe(
+        false,
+      );
+    });
+
+    it("holds the age and the failed marker in one slot sized by the marker, so a failure never moves the badges (CR2-3)", () => {
+      const slotOf = (w: any) => {
+        const slot = w.get(`[data-test="metrics-explorer-card-age-slot-${N}"]`);
+        const reserve = slot.get('[data-test="data-age-failed-reserve"]');
+        return { slot, reserve, children: slot.element.children };
+      };
+      const dataFrom = Date.now() - 300_000;
+      wrapper = createWrapper({
+        preview: preview({ status: "done", results: series, lastTriggeredAt: dataFrom }),
+      });
+      const before = slotOf(wrapper);
+      const age = before.slot.get(`[data-test="metrics-explorer-card-data-age-${N}"]`);
+      wrapper = createWrapper({
+        preview: preview({
+          status: "done",
+          results: series,
+          stale: true,
+          failedAt: Date.now(),
+          lastTriggeredAt: dataFrom,
+          error: "Forbidden",
+        }),
+      });
+      const after = slotOf(wrapper);
+      const marker = after.slot.get(`[data-test="metrics-explorer-card-refresh-failed-${N}"]`);
+      for (const { slot, reserve, children } of [before, after]) {
+        expect(slot.classes()).toEqual(
+          expect.arrayContaining(["inline-grid", "shrink-0", "justify-items-start"]),
+        );
+        expect(children).toHaveLength(2);
+        expect(reserve.classes()).toEqual(
+          expect.arrayContaining([
+            "invisible",
+            "ms-1.5",
+            "[grid-area:1/1]",
+            "@max-md/panelbar:hidden",
+          ]),
+        );
+      }
+      expect(before.slot.classes()).toEqual(after.slot.classes());
+      for (const shown of [age, marker]) {
+        expect(shown.classes()).toEqual(expect.arrayContaining(["ms-1.5", "[grid-area:1/1]"]));
+      }
     });
   });
 });

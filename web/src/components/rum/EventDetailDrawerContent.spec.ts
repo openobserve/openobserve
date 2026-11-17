@@ -22,6 +22,9 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // ============================================================================
 // TEST DATA FACTORIES
@@ -819,6 +822,7 @@ describe("EventDetailDrawerContent", () => {
           }),
         );
         expect(windowOpenSpy).toHaveBeenCalled();
+        expect(analytics.track).toHaveBeenCalledWith("rum_event_trace_opened");
       }
 
       windowOpenSpy.mockRestore();

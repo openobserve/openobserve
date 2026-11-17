@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-policies-page"
     :title="t('oncall.policiesTitle')"
-    :subtitle="t('oncall.policiesSubtitle')"
     icon="arrow-upward"
     :back="{
       label: t('oncall.backToTeams'),
@@ -63,10 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:sort-by="sortBy = $event"
       @update:sort-order="sortOrder = $event"
     >
-      <template #subheader>
-        <div class="px-page-edge border-table-row-divider border-b py-1.5">
-          <OStatStrip :items="summaryStats" :loading="loading" />
-        </div>
+      <template v-if="!lgUp" #subheader>
+        <OStatStrip :items="summaryStats" :loading="loading" row />
       </template>
 
       <template #toolbar>
@@ -77,6 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             :placeholder="t('oncall.searchTeams')"
             data-test="oncall-policies-search"
+          />
+          <OStatStrip
+            v-if="lgUp"
+            :items="summaryStats"
+            :loading="loading"
+            inline
+            class="shrink-0"
           />
         </div>
       </template>
@@ -173,6 +177,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
 import { oncallTeamsQuery, teamPolicyQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
 import type { OnCallPolicy, OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
@@ -192,6 +197,7 @@ interface PolicyRow {
 }
 
 const { t } = useI18nTyped();
+const { lgUp } = useBreakpoint();
 const store = useStore();
 const router = useRouter();
 

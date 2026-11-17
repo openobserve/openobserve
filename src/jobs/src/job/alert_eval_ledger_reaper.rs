@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Retention for the alert availability ledger (S-16), mirroring
-//! `alert_states::delete_transitions_before`.
+//! `alert_states::delete_transitions_batch_before_with`.
 //!
 //! Unlike the group reaper next door this is **not** gated to the elected job
 //! cluster. Retention deletes are not replicated — each region reaps the copy

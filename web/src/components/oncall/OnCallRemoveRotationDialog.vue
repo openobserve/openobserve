@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost-primary"
           size="xs"
+          icon-left="arrow-forward"
           data-test="oncall-remove-rotation-open-policy"
           @click="emit('open-policy')"
         >

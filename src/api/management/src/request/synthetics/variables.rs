@@ -80,6 +80,17 @@ struct GetCheck {
     use_self_parent: bool,
 }
 
+// Only documents the resolved-variables answer, whose shape the `envs` query parameter picks.
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum ResolvedVariablesVariants {
+    Flat(Vec<config::meta::synthetics_variables::ResolvedVariableView>),
+    Grouped(config::meta::synthetics_variables::ResolvedVariablesGrouped),
+}
+
+config::any_of_schema!(ResolvedVariablesAnswer, ResolvedVariablesVariants);
+
 #[utoipa::path(
     get,
     path = "/{org_id}/synthetics/variables",
@@ -90,9 +101,13 @@ struct GetCheck {
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::synthetics_variables::SyntheticsVariableView>),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"}))
+    )
 )]
 pub async fn list_synthetics_variables(
     Path(org_id): Path<String>,
@@ -119,10 +134,14 @@ pub async fn list_synthetics_variables(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = Object, description = "Variable definition", content_type = "application/json"),
     responses(
-        (status = 200, description = "Created", content_type = "application/json", body = Object),
+        (status = 200, description = "Created", content_type = "application/json", body = config::meta::synthetics_variables::SyntheticsVariableView),
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
         (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "create"}))
+    )
 )]
 pub async fn create_synthetics_variable(
     Path(org_id): Path<String>,
@@ -155,10 +174,14 @@ pub async fn create_synthetics_variable(
     ),
     request_body(content = Object, description = "Variable definition", content_type = "application/json"),
     responses(
-        (status = 200, description = "Updated",   content_type = "application/json", body = Object),
+        (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics_variables::SyntheticsVariableView),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "The new name is already taken, or checks still reference the old name; re-send with force=true", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "update"}))
+    )
 )]
 pub async fn update_synthetics_variable(
     Path((org_id, id)): Path<(String, String)>,
@@ -186,10 +209,14 @@ pub async fn update_synthetics_variable(
         ("id" = String, Path, description = "Variable ID"),
     ),
     responses(
-        (status = 200, description = "Deleted",   content_type = "application/json", body = Object),
+        (status = 200, description = "Deleted",   content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Checks still reference the variable; re-send with force=true", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "delete"}))
+    )
 )]
 pub async fn delete_synthetics_variable(
     Path((org_id, id)): Path<(String, String)>,
@@ -212,9 +239,13 @@ pub async fn delete_synthetics_variable(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::synthetics_variables::SyntheticsEnvironmentView>),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"}))
+    )
 )]
 pub async fn list_synthetics_environments(
     Path(org_id): Path<String>,
@@ -256,10 +287,14 @@ pub async fn list_synthetics_environments(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = Object, description = "Environment definition", content_type = "application/json"),
     responses(
-        (status = 200, description = "Created", content_type = "application/json", body = Object),
+        (status = 200, description = "Created", content_type = "application/json", body = config::meta::synthetics_variables::SyntheticsEnvironmentView),
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
         (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "create"}))
+    )
 )]
 pub async fn create_synthetics_environment(
     Path(org_id): Path<String>,
@@ -291,10 +326,14 @@ pub async fn create_synthetics_environment(
     ),
     request_body(content = Object, description = "Environment definition", content_type = "application/json"),
     responses(
-        (status = 200, description = "Updated",   content_type = "application/json", body = Object),
+        (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics_variables::SyntheticsEnvironmentView),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "update"}))
+    )
 )]
 pub async fn update_synthetics_environment(
     Path((org_id, env)): Path<(String, String)>,
@@ -320,10 +359,14 @@ pub async fn update_synthetics_environment(
         ("env" = String, Path, description = "Environment name"),
     ),
     responses(
-        (status = 200, description = "Deleted",   content_type = "application/json", body = Object),
+        (status = 200, description = "Deleted",   content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "The environment is in use or still holds variables; see the message", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "delete"}))
+    )
 )]
 pub async fn delete_synthetics_environment(
     Path((org_id, env)): Path<(String, String)>,
@@ -349,9 +392,13 @@ pub async fn delete_synthetics_environment(
         ("env" = String, Path, description = "Environment name"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = Vec<config::meta::synthetics_variables::SyntheticsVariableView>),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"}))
+    )
 )]
 pub async fn list_synthetics_environment_variables(
     Path((org_id, env)): Path<(String, String)>,
@@ -388,10 +435,14 @@ pub async fn list_synthetics_environment_variables(
     ),
     request_body(content = Object, description = "Variable definition", content_type = "application/json"),
     responses(
-        (status = 200, description = "Created",   content_type = "application/json", body = Object),
+        (status = 200, description = "Created",   content_type = "application/json", body = config::meta::synthetics_variables::SyntheticsVariableView),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "create"}))
+    )
 )]
 pub async fn create_synthetics_environment_variable(
     Path((org_id, env)): Path<(String, String)>,
@@ -437,10 +488,14 @@ pub async fn create_synthetics_environment_variable(
     ),
     request_body(content = Object, description = "Variable definition", content_type = "application/json"),
     responses(
-        (status = 200, description = "Updated",   content_type = "application/json", body = Object),
+        (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics_variables::SyntheticsVariableView),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "The new name is already taken, or checks still reference the old name; re-send with force=true", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "update"}))
+    )
 )]
 pub async fn update_synthetics_environment_variable(
     Path((org_id, env, id)): Path<(String, String, String)>,
@@ -481,10 +536,14 @@ pub async fn update_synthetics_environment_variable(
         ("id" = String, Path, description = "Variable ID"),
     ),
     responses(
-        (status = 200, description = "Deleted",   content_type = "application/json", body = Object),
+        (status = 200, description = "Deleted",   content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Checks still reference the variable; re-send with force=true", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "delete"}))
+    )
 )]
 pub async fn delete_synthetics_environment_variable(
     Path((org_id, env, id)): Path<(String, String, String)>,
@@ -608,9 +667,13 @@ fn variables_error(operation: &str, error: anyhow::Error) -> Response {
         ("envs" = Option<String>, Query, description = "Pass `all` for every environment's resolved set, keyed by environment name; omit for the flat first-environment set"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 200, description = "Success",   content_type = "application/json", body = ResolvedVariablesAnswer),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"}))
+    )
 )]
 pub async fn get_synthetic_resolved_variables(
     Path((org_id, id)): Path<(String, String)>,
@@ -665,10 +728,14 @@ pub async fn get_synthetic_resolved_variables(
     ),
     request_body(content = Object, description = "Destination scope", content_type = "application/json"),
     responses(
-        (status = 200, description = "Promoted", content_type = "application/json", body = Object),
+        (status = 200, description = "Promoted", content_type = "application/json", body = config::meta::synthetics_variables::SyntheticsVariableView),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "create"}))
+    )
 )]
 pub async fn promote_synthetic_variable(
     Path((org_id, id, name)): Path<(String, String, String)>,
@@ -725,10 +792,14 @@ pub async fn promote_synthetic_variable(
         ("id" = String, Path, description = "Variable ID"),
     ),
     responses(
-        (status = 200, description = "Promoted", content_type = "application/json", body = Object),
+        (status = 200, description = "Promoted", content_type = "application/json", body = config::meta::synthetics_variables::SyntheticsVariableView),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "create"}))
+    )
 )]
 pub async fn promote_environment_variable(
     Path((org_id, env, id)): Path<(String, String, String)>,
@@ -772,10 +843,14 @@ pub async fn promote_environment_variable(
     ),
     request_body(content = Object, description = "One value per destination environment", content_type = "application/json"),
     responses(
-        (status = 200, description = "Split",   content_type = "application/json", body = Object),
+        (status = 200, description = "Split",   content_type = "application/json", body = Vec<config::meta::synthetics_variables::SyntheticsVariableView>),
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
         (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "create"}))
+    )
 )]
 pub async fn split_synthetics_variable(
     Path((org_id, id)): Path<(String, String)>,
@@ -862,10 +937,14 @@ pub struct DuplicateEnvironmentBody {
     ),
     request_body(content = Object, description = "New environment name", content_type = "application/json"),
     responses(
-        (status = 200, description = "Duplicated", content_type = "application/json", body = Object),
+        (status = 200, description = "Duplicated", content_type = "application/json", body = config::meta::synthetics_variables::SyntheticsEnvironmentView),
         (status = 400, description = "Invalid",    content_type = "application/json", body = Object),
         (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "create"}))
+    )
 )]
 pub async fn duplicate_synthetics_environment(
     Path((org_id, env)): Path<(String, String)>,
@@ -919,10 +998,14 @@ pub async fn duplicate_synthetics_environment(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
-        (status = 200, description = "Counts of what was enqueued, and environments whose batch failed", content_type = "application/json", body = Object),
+        (status = 200, description = "Counts of what was enqueued, and environments whose batch failed", content_type = "application/json", body = openobserve_synthetics::service::ResyncSummary),
         (status = 400, description = "Super cluster is not enabled", content_type = "application/json", body = Object),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "create"}))
+    )
 )]
 pub async fn resync_synthetics_environments(Path(org_id): Path<String>) -> Response {
     match openobserve_synthetics::service::resync_environments(&org_id).await {

@@ -609,7 +609,9 @@ export class SanityPage {
         // Open the per-folder dropdown via its more-icon (scoped to this folder's tab).
         const folderMoreIcon = this.getDashboardFolderMoreIconByName(folderName);
         await folderMoreIcon.click();
-        await this.deleteFolderIcon.click({ force: true });
+        // A forced click can land while the reka menu is still opening and never fires @select.
+        await expect(this.deleteFolderIcon).toBeVisible({ timeout: 10000 });
+        await this.deleteFolderIcon.click();
         // ConfirmDialog renders an ODialog with data-test="confirm-dialog"; its primary
         // footer button surfaces as "o-dialog-primary-btn" inside the open dialog.
         // Use the generic locator to avoid timing issues with the scoped ancestor query.
@@ -727,7 +729,9 @@ export class SanityPage {
         await this.generalSettingsTab.waitFor({ state: 'visible', timeout: 15000 });
         await this.generalSettingsTab.click();
         await this.scrapeIntervalInputField.waitFor({ state: 'visible', timeout: 15000 });
-        await this.scrapeIntervalInputField.fill('16');
+        // Save is enabled only when a value differs from the saved one, so a rerun alternates the interval.
+        const savedInterval = await this.scrapeIntervalInputField.inputValue();
+        await this.scrapeIntervalInputField.fill(savedInterval === '16' ? '17' : '16');
         await this.settingsSaveButton.click();
         // Verify success toast appeared.
         await expect(this.toastSuccess.first()).toBeVisible({ timeout: 15000 });

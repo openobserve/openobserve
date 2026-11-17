@@ -439,6 +439,7 @@ pub async fn handle_mcp_get(
         (status = 200, description = "Success", content_type = "application/json"),
         (status = 404, description = "Not Found - OAuth discovery requires Dex to be enabled", content_type = "application/json"),
     ),
+    security(),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
@@ -470,6 +471,7 @@ pub async fn oauth_authorization_server_metadata() -> Response {
     responses(
         (status = 404, description = "Not Found - OAuth discovery is only available in enterprise edition", content_type = "application/json"),
     ),
+    security(),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
@@ -790,8 +792,8 @@ mod tests {
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
     }
 
-    #[test]
-    fn oss_openapi_initializes_mcp_tools() {
+    #[tokio::test]
+    async fn oss_openapi_initializes_mcp_tools() {
         let api = crate::handler::http::router::openapi::ApiDoc::openapi();
 
         openobserve_mcp::tools::init_mcp_tools(&api).unwrap();
@@ -838,6 +840,53 @@ mod tests {
             "GetDbMonitoringBadges",
         ] {
             assert!(tools.iter().all(|tool| tool.name != name), "{name}");
+        }
+        // Enterprise exposes only UserGet on the user path, so UserUpdate is not a tool there.
+        let user_update_is_tool = !cfg!(feature = "enterprise");
+        assert_eq!(
+            tools.iter().any(|tool| tool.name == "UserUpdate"),
+            user_update_is_tool
+        );
+        let mut body_checks = vec![("CreateAlert", &["name", "folder_id"][..])];
+        if user_update_is_tool {
+            body_checks.push(("UserUpdate", &["first_name", "new_password", "role"][..]));
+        }
+        for (name, fields) in body_checks {
+            let tool = tools
+                .iter()
+                .find(|tool| tool.name == name)
+                .unwrap_or_else(|| panic!("{name} is not an MCP tool"));
+            let body = &tool.input_schema["properties"]["request_body"];
+            for field in fields {
+                assert!(
+                    body["properties"].get(field).is_some(),
+                    "{name} cannot express {field}"
+                );
+            }
+        }
+        if !user_update_is_tool {
+            return;
+        }
+
+        let user_update = openobserve_mcp::tools::get_tool_metadata("UserUpdate").unwrap();
+        for body in [
+            serde_json::json!({"first_name": "name"}),
+            serde_json::json!({"role": "admin"}),
+        ] {
+            let arguments = serde_json::json!({
+                "org_id": "default",
+                "email_id": "user@example.com",
+                "request_body": body,
+            });
+            let result = openobserve_mcp::tools::get_shared_http_client()
+                .execute_tool_call(&user_update, &arguments)
+                .await;
+            if let Err(error) = result {
+                assert!(
+                    !format!("{error:?}").starts_with("Validation"),
+                    "UserUpdate refused {body}: {error}"
+                );
+            }
         }
     }
 

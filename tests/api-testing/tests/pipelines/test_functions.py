@@ -127,6 +127,43 @@ def test_delete_nonexistent_function_returns_404(client: OpenObserveClient):
         f"delete of nonexistent should be 404, got {resp.status_code}: {resp.text}"
 
 
+def _function_bodies(client: OpenObserveClient) -> dict[str, str]:
+    resp = client.get("functions")
+    assert resp.status_code == 200, resp.text
+    return {f["name"]: f.get("function") for f in resp.json()["list"]}
+
+
+def test_update_refuses_a_body_name_that_differs_from_the_url(client: OpenObserveClient):
+    """o2-enterprise#3379: PUT /functions/A must not overwrite B or create a new function via the body name."""
+    fn_a, fn_b, fn_new = unique_name("pytestfn_a"), unique_name("pytestfn_b"), unique_name("pytestfn_new")
+    created = []
+    try:
+        for name in (fn_a, fn_b):
+            resp = client.post("functions", json=_function_payload(name, body=f'.orig = "{name}"\n.'))
+            assert resp.status_code == 200, resp.text
+            created.append(name)
+        a_before, b_before = (_function_bodies(client)[n] for n in (fn_a, fn_b))
+
+        resp = client.put(f"functions/{fn_a}", json=_function_payload(fn_b, body=".overwritten_via_a = 1\n."))
+        assert resp.status_code == 400, resp.text
+        assert "must match the name in the URL" in resp.text, resp.text
+        assert _function_bodies(client)[fn_b] == b_before, "the refused update still rewrote the other function"
+
+        resp = client.put(f"functions/{fn_a}", json=_function_payload(fn_new, body=".created_via_a = 1\n."))
+        if fn_new in _function_bodies(client):
+            created.append(fn_new)
+        assert resp.status_code == 400, resp.text
+        assert fn_new not in created, "the refused update created a function under the body name"
+        assert _function_bodies(client)[fn_a] == a_before, "a refused update still rewrote the URL's function"
+
+        resp = client.put(f"functions/{fn_a}", json=_function_payload(fn_a, body=".same_name = 1\n."))
+        assert resp.status_code == 200, resp.text
+        assert ".same_name = 1" in _function_bodies(client)[fn_a]
+    finally:
+        for name in reversed(created):
+            client.delete(f"functions/{name}")
+
+
 # ----- /functions/test endpoint -----
 
 

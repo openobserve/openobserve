@@ -132,6 +132,7 @@ export class LogsPage {
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
         this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
+        this.streamNameCell = '[data-test^="log-stream-name-cell-"]';
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
@@ -315,8 +316,8 @@ export class LogsPage {
         // the hidden one and fail Playwright's visibility actionability check.
         this.fieldListSearchInput = '[data-test="logs-build-query-page"] [data-test="o-field-list-search-field"]';
         this.fieldListSearchInputWrapper = '[data-test="logs-build-query-page"] [data-test="o-field-list-search"]';
-        // Builder filter conditions — each rendered with data-test="dashboard-add-condition-label-{index}-{label}"
-        this.filterConditionLabelItems = '[data-test^="dashboard-add-condition-label-"]';
+        // Builder filter conditions — each a chip of the shared filter builder, data-test="dashboard-filter-builder-chip-{field}"
+        this.filterConditionLabelItems = '[data-test^="dashboard-filter-builder-chip-"]:has([data-test$="-field"])';
 
         // Chart selection
         this.chartSelectionContainer = '[data-test="dashboard-addpanel-chart-selection-item"]';
@@ -516,6 +517,19 @@ export class LogsPage {
         this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"]`;
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
+        this.queryPlanView = `${this.queryPlanDialog} [data-test="query-plan-view"]`;
+        this.queryPlanTileOperators = `${this.queryPlanDialog} [data-test="query-plan-tile-operators"]`;
+        this.queryPlanOperatorCards = `${this.queryPlanDialog} [data-profile-card]`;
+        this.queryPlanModeAnalyze = `${this.queryPlanDialog} [data-test="query-plan-mode-analyze"]`;
+        this.queryPlanAnalyzeStart = `${this.queryPlanDialog} [data-test="query-plan-analyze-start"]`;
+        this.queryPlanAnalyzeRun = `${this.queryPlanDialog} [data-test="query-plan-analyze-run"]`;
+        // The settled status dot is the only analyze-mode id besides the in-flight elapsed counter.
+        this.queryPlanAnalyzeSettled = `${this.queryPlanDialog} [data-test^="query-plan-mode-analyze-"]:not([data-test$="-elapsed"])`;
+        this.queryPlanModeAnalyzeDone = `${this.queryPlanDialog} [data-test="query-plan-mode-analyze-done"]`;
+        this.queryProfileView = `${this.queryPlanDialog} [data-test="query-profile-view"]`;
+        this.queryProfileSummary = `${this.queryPlanDialog} [data-test="query-profile-summary"]`;
+        this.queryProfileTileRows = `${this.queryPlanDialog} [data-test="query-profile-tile-rows"]`;
+        this.queryProfileTileNodes = `${this.queryPlanDialog} [data-test="query-profile-tile-nodes"]`;
         this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
         // useLogsHighlighter marks FTS matches with .log-highlighted inside the result cell.
         this.highlightedMatch = '[data-test="logs-search-result-logs-table"] .log-highlighted';
@@ -1547,9 +1561,7 @@ export class LogsPage {
 
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
-        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 30000 });
-        await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        await this.getMonacoEditorHelper().fillInputArea(this.page.locator(this.queryEditor), query);
     }
 
     async executeQueryWithKeyboardShortcut() {
@@ -3015,7 +3027,7 @@ export class LogsPage {
 
         if (!set) {
             // Fallback to DOM fill
-            return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
+            return await this.getMonacoEditorHelper().fillInputArea(this.page.locator(this.queryEditor), query);
         }
     }
 
@@ -3610,6 +3622,18 @@ export class LogsPage {
         return await this.page.locator(this.exploreButtonSelector).first().click({ force: true });
     }
 
+    async expectStreamListFilteredBy(keyword) {
+        const matching = `[data-test*="${keyword}" i]`;
+        await expect(this.page.locator(`${this.streamNameCell}${matching}`).first()).toBeVisible();
+        // OTable keeps the previous rows inert during a slow filter fetch, and a click on them is silently dropped.
+        await expect(this.page.locator(`[data-test-stale] ${this.streamNameCell}, ${this.streamNameCell}:not(${matching})`)).toHaveCount(0);
+    }
+
+    async exploreFirstStreamAndExpectLogs() {
+        await this.page.locator(this.exploreButtonSelector).first().click();
+        await expect(this.page).toHaveURL(/\/logs(\?|$)/);
+    }
+
     async waitForSavedViewsButton() {
         return await this.page.waitForSelector(this.savedViewsButton);
     }
@@ -3672,7 +3696,7 @@ export class LogsPage {
     }
 
     async waitForQueryEditorTextbox() {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: "visible" });
+        return await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.queryEditor));
     }
 
     async getQueryEditorText() {
@@ -4266,6 +4290,11 @@ export class LogsPage {
         return await expect(this.page.locator(this.errorMessage)).not.toBeVisible({ timeout });
     }
 
+    /** Stricter than expectSqlErrorStateNotVisible: the error state must not be rendered at all, hidden or not. */
+    async expectNoQueryError(message) {
+        await expect(this.page.locator(this.errorMessage), message).toHaveCount(0);
+    }
+
     /**
      * Assert the error state element, if visible, does NOT contain the given text.
      * Passes trivially when no error element is shown (intended for edge-case queries
@@ -4826,7 +4855,7 @@ export class LogsPage {
     }
 
     async isVrlEditorInputVisible() {
-        return await this.page.locator(this.fnEditor).locator('.inputarea').isVisible().catch(() => false);
+        return await this.page.locator(this.fnEditor).locator('.monaco-editor').first().isVisible().catch(() => false);
     }
 
     async clickPast6DaysButton() {
@@ -4870,7 +4899,7 @@ export class LogsPage {
      */
     async expectVrlEditorReady() {
         await this.page.locator(this.vrlEditor).first().waitFor({ state: 'visible', timeout: 15000 });
-        await this.page.locator(`${this.vrlEditor} .inputarea`).first().waitFor({ state: 'visible', timeout: 15000 });
+        await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.vrlEditor).first(), 15000);
     }
 
     /**
@@ -5034,7 +5063,7 @@ export class LogsPage {
         // initialised (setupEditor() async load completes). This prevents the
         // waitForFunction below from timing out on page reloads where window.monaco
         // is not yet set when domcontentloaded fires.
-        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 20000 });
+        await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.queryEditor), 20000);
         // Assert against Monaco's model value (not DOM view-lines which render
         // line numbers when empty — AGENT_RULES §5).
         await this.page.waitForFunction(
@@ -6160,9 +6189,48 @@ export class LogsPage {
         return buttonCount;
     }
 
+    async waitForSearchStreamQuiet({ quietMs = 1500, timeout = 30000 } = {}) {
+        const isSearch = (request) => request.url().includes('/_search_stream') && request.method() === 'POST';
+        let inFlight = 0;
+        let lastActivity = Date.now();
+        const onStart = (request) => {
+            if (!isSearch(request)) return;
+            inFlight++;
+            lastActivity = Date.now();
+        };
+        const onEnd = (request) => {
+            if (!isSearch(request)) return;
+            inFlight = Math.max(0, inFlight - 1);
+            lastActivity = Date.now();
+        };
+        this.page.on('request', onStart);
+        this.page.on('requestfinished', onEnd);
+        this.page.on('requestfailed', onEnd);
+        try {
+            const deadline = Date.now() + timeout;
+            while (Date.now() < deadline) {
+                if (inFlight === 0 && Date.now() - lastActivity >= quietMs) return true;
+                await this.page.waitForTimeout(100);
+            }
+            return false;
+        } finally {
+            this.page.off('request', onStart);
+            this.page.off('requestfinished', onEnd);
+            this.page.off('requestfailed', onEnd);
+        }
+    }
+
+    // J on a page's last row crosses only once the page-count query has given the pager its next page.
+    async expectResultPageCountAtLeast(pageNumber, timeout = 60000) {
+        await expect(this.page.locator(this.resultPaginationPageBtn(pageNumber)).first()).toBeVisible({ timeout });
+    }
+
     async setupAPICallTracking() {
+        // A search the SQL or histogram toggle set off can land after the tracked shortcut and be counted as its own.
+        await this.waitForRunQueryReady();
+        await this.waitForSearchStreamQuiet();
         const allRequests = [];
-        
+
         const requestHandler = (request) => {
             if (request.url().includes('/_search_stream') && request.method() === 'POST') {
                 let postData = null;
@@ -10501,6 +10569,10 @@ export class LogsPage {
         await this.expectNoToastContaining(this.multiStreamPatternsToastText);
     }
 
+    async isAutoQueryEnabledOnInstance() {
+        return await this.logsQueryPage._isAutoQueryEnabled();
+    }
+
     /**
      * Read `quick_mode_enabled` from the instance /config endpoint.
      * isSelectStarForTable() short-circuits to false when this is off, so the
@@ -11282,7 +11354,7 @@ export class LogsPage {
     /**
      * Check if the filter section has any conditions populated.
      * Looks for filter condition items inside the filter layout.
-     * Filter conditions use data-test="dashboard-add-condition-label-{index}-{label}" pattern.
+     * Filter conditions are chips with data-test="dashboard-filter-builder-chip-{field}".
      * @returns {Promise<number>} Number of filter conditions found
      */
     async getFilterConditionCount() {
@@ -11390,6 +11462,88 @@ export class LogsPage {
     async expectQueryPlanDialogHidden() {
         await expect(this.page.locator(this.queryPlanDialog)).toBeHidden({ timeout: 10000 });
         testLogger.info('Query plan dialog is hidden');
+    }
+
+    /** Click Run and wait for the hits request of `stream`, skipping the histogram call. */
+    async runQueryAndWaitForStreamSearch(stream) {
+        const searched = this.page.waitForResponse(
+            (r) =>
+                r.url().includes('/_search_stream') &&
+                !r.url().includes('is_ui_histogram') &&
+                (r.request().postData() || '').includes(stream),
+            { timeout: 60000 },
+        );
+        await this.clickRunQueryButton();
+        return await searched;
+    }
+
+    /** Open the Explain query dialog from the More options menu. */
+    async openExplainQueryDialog() {
+        await this.clickMoreOptionsButton();
+        await expect(this.page.locator(this.explainQueryMenuBtn)).toBeVisible({ timeout: 10000 });
+        await this.clickExplainQuery();
+        await this.expectQueryPlanDialogVisible();
+    }
+
+    /** Run a SQL query on a stream, optionally wait for result rows, then open the Explain query dialog. */
+    async openExplainForQuery(stream, sql, { expectRows = true } = {}) {
+        await this.openLogsWithSqlQuery(stream, sql);
+        await this.runQueryAndWaitForStreamSearch(stream);
+        if (expectRows) {
+            await this.waitForSearchResultRows(60000);
+        }
+        await this.openExplainQueryDialog();
+    }
+
+    async expectQueryPlanOperatorCardsRendered() {
+        await expect.poll(() => this.page.locator(this.queryPlanOperatorCards).count(), { timeout: 15000 })
+            .toBeGreaterThan(0);
+    }
+
+    async expectQueryPlanOperatorsRendered() {
+        await expect(this.page.locator(this.queryPlanView)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator(this.queryPlanTileOperators)).toBeVisible();
+        await this.expectQueryPlanOperatorCardsRendered();
+        testLogger.info('Query plan rendered operator cards');
+    }
+
+    async switchQueryPlanToAnalyze() {
+        await expect(async () => {
+            // #16511 item 4: the More options tooltip opens on the refocused trigger and covers the toggle until blurred.
+            await this.page.mouse.move(0, 0);
+            await this.page.evaluate(() => document.activeElement?.blur());
+            await this.page.locator(this.queryPlanModeAnalyze).click({ timeout: 2000 });
+            await expect(this.page.locator(this.queryPlanAnalyzeStart)).toBeVisible({ timeout: 2000 });
+        }).toPass({ timeout: 15000 });
+    }
+
+    /** Run EXPLAIN ANALYZE and wait until the mode toggle shows a settled state; returns the HTTP status and that state. */
+    async runQueryPlanAnalyze() {
+        const response = this.page.waitForResponse(
+            (r) => r.url().includes('/_search_stream') && (r.request().postData() || '').includes('EXPLAIN ANALYZE'),
+            { timeout: 60000 },
+        );
+        await this.page.locator(this.queryPlanAnalyzeRun).click();
+        const status = (await response).status();
+        const settled = this.page.locator(this.queryPlanAnalyzeSettled);
+        await expect(settled).toHaveCount(1, { timeout: 60000 });
+        const state = (await settled.getAttribute('data-test')).replace('query-plan-mode-analyze-', '');
+        testLogger.info('EXPLAIN ANALYZE settled', { status, state });
+        return { status, state };
+    }
+
+    async expectQueryProfileRendered() {
+        await expect(this.page.locator(this.queryPlanModeAnalyzeDone)).toBeVisible();
+        await expect(this.page.locator(this.queryProfileView)).toBeVisible();
+        await expect(this.page.locator(this.queryProfileSummary)).toBeVisible();
+        await expect(this.page.locator(this.queryProfileTileRows)).toBeVisible();
+        await expect(this.page.locator(this.queryProfileTileNodes)).toBeVisible();
+        await this.expectQueryPlanOperatorCardsRendered();
+        testLogger.info('Query profile rendered operator cards');
+    }
+
+    async expectAnalyzeNotShownAsSuccess() {
+        await expect(this.page.locator(this.queryPlanModeAnalyzeDone)).toHaveCount(0);
     }
 
     /** The logs table delegates scrolling to an unnamed ancestor, so resolve it at runtime. */

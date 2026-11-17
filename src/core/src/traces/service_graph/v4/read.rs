@@ -107,23 +107,36 @@ const NODE_QUANTILE_SLOTS: [fn(&mut MetricNode) -> &mut Option<u64>; 3] =
 pub struct ReadFilter {
     pub trace_stream: Option<String>,
     pub agent_env: Option<String>,
+    /// The trace streams the caller may read; `None` is every stream, collector series included.
+    pub visible_streams: Option<Vec<String>>,
 }
 
 impl ReadFilter {
+    /// No narrowing below what the caller may see; otherwise the org-scope queries run too.
     pub fn is_empty(&self) -> bool {
         self.trace_stream.is_none() && self.agent_env.is_none()
     }
 
     /// Values PromQL cannot quote are the caller's input error, not a read failure.
     pub fn validate(&self) -> Result<(), String> {
-        self.edge_matcher(true).map(|_| ())
+        self.edge_matcher(true)?;
+        self.org_matcher(true).map(|_| ())
+    }
+
+    /// Collector series carry no `trace_stream`, so only a reader of every stream may fall back.
+    fn reads_every_stream(&self) -> bool {
+        self.trace_stream.is_none() && self.visible_streams.is_none()
     }
 
     fn stream_matcher(&self, v4_only: bool) -> Result<Option<String>, String> {
         match self.trace_stream.as_deref() {
             Some(s) => label_eq(LABEL_TRACE_STREAM, s).map(Some),
-            None => Ok(v4_only.then(|| V4_ONLY.to_string())),
+            None => self.org_matcher(v4_only),
         }
+    }
+
+    fn org_matcher(&self, v4_only: bool) -> Result<Option<String>, String> {
+        visible_matcher(self.visible_streams.as_deref(), v4_only)
     }
 
     fn edge_matcher(&self, v4_only: bool) -> Result<String, String> {
@@ -261,7 +274,7 @@ where
     let plan =
         |v4_only| plan_queries(filter, v4_only, range_ms, start, end).map_err(anyhow::Error::msg);
     let mut results = run_plan(&plan(true)?, &run).await;
-    if filter.trace_stream.is_none() && no_v4_output(&results) {
+    if filter.reads_every_stream() && no_v4_output(&results) {
         results = run_plan(&plan(false)?, &run).await;
     }
     let (results, degraded) = settle_plan(results)?;
@@ -325,7 +338,7 @@ fn plan_queries(
 ) -> Result<Vec<(String, i64)>, String> {
     let e = &filter.edge_matcher(v4_only)?;
     let n = &filter.node_matcher(v4_only)?;
-    let org = if v4_only { V4_ONLY } else { "" };
+    let org = &filter.org_matcher(v4_only)?.unwrap_or_default();
     let by_env = filter.agent_env.is_some();
     let mut plan = Vec::with_capacity(PLAN_LEN_FILTERED);
     plan.push((q_requests(e, by_env, range_ms), end));
@@ -446,6 +459,33 @@ pub(super) fn selector(metric: &str, matcher: &str) -> String {
     } else {
         format!("{metric}{{{matcher}}}")
     }
+}
+
+/// `trace_stream` matcher for a reader limited to `visible`; `None` reads every v4 series.
+pub(super) fn visible_matcher(
+    visible: Option<&[String]>,
+    v4_only: bool,
+) -> Result<Option<String>, String> {
+    match visible {
+        Some(streams) => label_in(LABEL_TRACE_STREAM, streams).map(Some),
+        None => Ok(v4_only.then(|| V4_ONLY.to_string())),
+    }
+}
+
+/// An empty set is refused: `=~""` would match the unlabelled collector series.
+fn label_in(label: &str, values: &[String]) -> Result<String, String> {
+    if values.is_empty() {
+        return Err(format!("no {label} value to match"));
+    }
+    let alternation = values
+        .iter()
+        .map(|v| regex::escape(v))
+        .collect::<Vec<_>>()
+        .join("|");
+    Ok(format!(
+        "{label}=~\"{}\"",
+        escape_label_value(&alternation)?
+    ))
 }
 
 fn edge_by(by_env: bool) -> &'static str {
@@ -802,13 +842,20 @@ mod tests {
         let ok = ReadFilter {
             trace_stream: Some("default".to_string()),
             agent_env: Some("prod\"x".to_string()),
+            visible_streams: None,
         };
         assert!(ok.validate().is_ok());
         let bad = ReadFilter {
             trace_stream: Some("z\u{96}".to_string()),
             agent_env: None,
+            visible_streams: None,
         };
         assert!(bad.validate().is_err());
+        let none_visible = ReadFilter {
+            visible_streams: Some(vec![]),
+            ..Default::default()
+        };
+        assert!(none_visible.validate().is_err());
     }
 
     const M: &str = "trace_stream=\"default\"";
@@ -968,6 +1015,16 @@ mod tests {
         ReadFilter {
             trace_stream: trace_stream.map(str::to_string),
             agent_env: agent_env.map(str::to_string),
+            visible_streams: None,
+        }
+    }
+
+    const VISIBLE: &str = "trace_stream=~\"a|b\"";
+
+    fn visible(trace_stream: Option<&str>) -> ReadFilter {
+        ReadFilter {
+            visible_streams: Some(vec!["a".to_string(), "b".to_string()]),
+            ..filter(trace_stream, None)
         }
     }
 
@@ -1507,6 +1564,30 @@ mod tests {
         })
         .await;
         assert_eq!(processed.len(), 16);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_reads_only_the_visible_streams() {
+        let all = visible(None);
+        assert!(all.is_empty());
+        for v4_only in [true, false] {
+            assert_eq!(all.edge_matcher(v4_only).unwrap(), VISIBLE);
+            assert_eq!(all.node_matcher(v4_only).unwrap(), VISIBLE);
+        }
+        let queries = issued_with(&all, |_| vec![]).await;
+        assert_eq!(queries.len(), PLAN_LEN_UNFILTERED);
+        assert!(queries.iter().all(|q| q.contains(VISIBLE)));
+
+        let one = visible(Some("a"));
+        let queries = issued_with(&one, |_| vec![]).await;
+        assert_eq!(queries.len(), PLAN_LEN_FILTERED);
+        let a = "trace_stream=\"a\"";
+        assert!(queries[..IDX_ORG_INBOUND].iter().all(|q| q.contains(a)));
+        assert!(
+            queries[IDX_ORG_INBOUND..]
+                .iter()
+                .all(|q| q.contains(VISIBLE))
+        );
     }
 
     #[tokio::test]

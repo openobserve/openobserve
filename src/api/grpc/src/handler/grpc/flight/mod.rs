@@ -32,7 +32,7 @@ use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
 use search::{
-    datafusion::distributed_plan::profile,
+    datafusion::distributed::analyze::profile,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 use search_service::{grpc::flight as grpcFlight, work_group::DeferredLock};
@@ -144,7 +144,9 @@ impl FlightService for FlightServiceImpl {
                 log::error!(
                     "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
                 );
-                return Err(Status::internal(e.to_string()));
+                return Err(e
+                    .to_unavailable_status()
+                    .unwrap_or_else(|| Status::internal(e.to_string())));
             }
         };
 

@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import regexPatterns from "@/services/regex_pattern";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -342,5 +345,42 @@ describe("regex_pattern service", () => {
 
       await expect(regexPatterns.delete("test-org", "pat-1")).rejects.toEqual(httpError);
     });
+  });
+});
+
+describe("regex_pattern analytics", () => {
+  let mockHttpInstance: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHttpInstance = {
+      post: vi.fn().mockResolvedValue({ data: {} }),
+      put: vi.fn().mockResolvedValue({ data: {} }),
+      delete: vi.fn().mockResolvedValue({ data: { successful: ["a", "b"], unsuccessful: [] } }),
+    };
+    (http as any).mockReturnValue(mockHttpInstance);
+  });
+
+  it("tracks create, update, delete and test on success", async () => {
+    await regexPatterns.create("o", { name: "n", pattern: "p", description: "" });
+    await regexPatterns.update("o", "id", {});
+    await regexPatterns.delete("o", "id");
+    await regexPatterns.bulkDelete("o", { ids: ["a", "b"] });
+    await regexPatterns.test("o", "p", ["x"], "Redact");
+
+    expect(analytics.track).toHaveBeenCalledWith("regex_pattern_created");
+    expect(analytics.track).toHaveBeenCalledWith("regex_pattern_updated");
+    expect(analytics.track).toHaveBeenCalledWith("regex_pattern_deleted", { count: 1 });
+    expect(analytics.track).toHaveBeenCalledWith("regex_pattern_deleted", { count: 2 });
+    expect(analytics.track).toHaveBeenCalledWith("regex_pattern_tested", { with_policy: true });
+  });
+
+  it("does not track a failed create", async () => {
+    mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+    await expect(
+      regexPatterns.create("o", { name: "n", pattern: "p", description: "" }),
+    ).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

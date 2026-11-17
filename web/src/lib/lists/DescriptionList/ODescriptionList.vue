@@ -4,13 +4,23 @@
 // ODescriptionList — the house label/value detail block. See the .types.ts for
 // why this is a real <dl> and how it differs from OFieldList.
 
-import { computed } from "vue";
-import type { DescriptionListProps, DescriptionListSlots } from "./ODescriptionList.types";
+import { computed, provide } from "vue";
+import {
+  DESCRIPTION_LABEL_WIDTH,
+  type DescriptionListProps,
+  type DescriptionListSlots,
+} from "./ODescriptionList.types";
 
 const props = withDefaults(defineProps<DescriptionListProps>(), {
   columns: 1,
   dense: false,
+  labelWidth: "default",
 });
+
+provide(
+  DESCRIPTION_LABEL_WIDTH,
+  computed(() => props.labelWidth),
+);
 
 defineSlots<DescriptionListSlots>();
 

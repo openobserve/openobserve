@@ -18,7 +18,9 @@
 //! `service_routes()` — auth is enforced by the router's auth middleware,
 //! not inside these handlers.
 
-use axum::{Json, extract::Path, response::Response};
+#[cfg(feature = "enterprise")]
+use axum::Json;
+use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
@@ -59,7 +61,7 @@ pub struct UpdateIntegrationPayload {
     pub destinations: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 pub struct IntegrationResponse {
     pub id: String,
@@ -70,6 +72,7 @@ pub struct IntegrationResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
     pub enabled: bool,
+    #[schema(value_type = Object)]
     pub config: serde_json::Value,
     pub destinations: Vec<String>,
     pub created_by: String,
@@ -109,7 +112,7 @@ impl IntegrationResponse {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 pub struct ListIntegrationsResponse {
     pub integrations: Vec<IntegrationResponse>,
@@ -212,7 +215,7 @@ fn gate_enabled() -> Option<Response> {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = ListIntegrationsResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
@@ -283,8 +286,8 @@ async fn can_write_integrations(org_id: &str, user_id: &str) -> bool {
     ),
     request_body(content = CreateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = IntegrationResponse),
+        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
@@ -339,7 +342,7 @@ pub async fn create_integration(
     ),
     request_body(content = SetEnabledPayload, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -381,8 +384,8 @@ pub async fn set_integration_enabled(
     ),
     request_body(content = UpdateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -464,7 +467,7 @@ pub async fn rotate_integration_token(
         ("integration_id" = String, Path, description = "Integration id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
@@ -558,7 +561,7 @@ pub async fn list_integration_senders(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = ListIntegrationsResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
@@ -583,18 +586,15 @@ pub async fn list_integrations(_path: Path<String>) -> Response {
     ),
     request_body(content = CreateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = IntegrationResponse),
+        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn create_integration(
-    _path: Path<String>,
-    _body: Json<CreateIntegrationPayload>,
-) -> Response {
+pub async fn create_integration(_path: Path<String>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -613,17 +613,14 @@ pub async fn create_integration(
     ),
     request_body(content = SetEnabledPayload, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn set_integration_enabled(
-    _path: Path<(String, String)>,
-    _body: Json<SetEnabledPayload>,
-) -> Response {
+pub async fn set_integration_enabled(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -667,18 +664,15 @@ pub async fn rotate_integration_token(_path: Path<(String, String)>) -> Response
     ),
     request_body(content = UpdateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn update_integration(
-    _path: Path<(String, String)>,
-    _body: Json<UpdateIntegrationPayload>,
-) -> Response {
+pub async fn update_integration(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -721,7 +715,7 @@ pub async fn list_integration_senders(_path: Path<(String, String)>) -> Response
         ("integration_id" = String, Path, description = "Integration id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),

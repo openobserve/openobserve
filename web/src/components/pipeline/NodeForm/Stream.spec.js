@@ -28,10 +28,23 @@ const mockAddNode = vi.fn();
 const mockDeletePipelineNode = vi.fn();
 const mockCheckIfDefaultDestinationNode = vi.fn().mockReturnValue(false);
 
-const { mockToast, mockGetUsedStreamsList } = vi.hoisted(() => ({
-  mockToast: vi.fn(),
-  mockGetUsedStreamsList: vi.fn().mockResolvedValue([]),
-}));
+const { mockToast, mockGetUsedStreamsList, mockGetStreams, defaultStreamsResponse } = vi.hoisted(
+  () => {
+    const defaultStreamsResponse = () => ({
+      list: [
+        { name: "logs_stream_1", stream_type: "logs" },
+        { name: "logs_stream_2", stream_type: "logs" },
+        { name: "metrics_stream", stream_type: "metrics" },
+      ],
+    });
+    return {
+      mockToast: vi.fn(),
+      mockGetUsedStreamsList: vi.fn().mockResolvedValue([]),
+      mockGetStreams: vi.fn(async () => defaultStreamsResponse()),
+      defaultStreamsResponse,
+    };
+  },
+);
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
@@ -43,13 +56,7 @@ vi.mock("@/plugins/pipelines/useDnD", () => ({
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStreams: vi.fn().mockResolvedValue({
-      list: [
-        { name: "logs_stream_1", stream_type: "logs" },
-        { name: "logs_stream_2", stream_type: "logs" },
-        { name: "metrics_stream", stream_type: "metrics" },
-      ],
-    }),
+    getStreams: mockGetStreams,
   }),
 }));
 
@@ -482,6 +489,98 @@ describe("Stream Component", () => {
       // For output node the disable logic isn't applied; isDisable may be undefined
       const stream = wrapper.vm.streams.logs?.find((s) => s.name === "logs_stream_1");
       expect(stream?.isDisable).toBeFalsy();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("getStreamList – stream type changes while a request is pending", () => {
+    function deferStreamRequests() {
+      const pending = {};
+      mockGetStreams.mockImplementation(
+        (type) =>
+          new Promise((resolve) => {
+            pending[type] = () =>
+              resolve({
+                list: [
+                  { name: `${type}_stream_a`, stream_type: type },
+                  { name: `${type}_stream_b`, stream_type: type },
+                ],
+              });
+          }),
+      );
+      return pending;
+    }
+
+    const streamNameOptions = (w) =>
+      w
+        .findAllComponents({ name: "OFormSelect" })
+        .find((c) => c.props("name") === "stream_name")
+        .props("options")
+        .map((o) => o.value);
+
+    afterEach(() => {
+      mockGetStreams.mockImplementation(async () => defaultStreamsResponse());
+    });
+
+    it("keeps the new type's streams when the stale logs response resolves last", async () => {
+      const pending = deferStreamRequests();
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(mockGetStreams).toHaveBeenCalledWith("logs", false);
+
+      setField(wrapper, "stream_type", "traces");
+      await flushPromises();
+      expect(mockGetStreams).toHaveBeenLastCalledWith("traces", false);
+
+      pending.traces();
+      await flushPromises();
+      pending.logs();
+      await flushPromises();
+
+      expect(streamNameOptions(wrapper)).toEqual(["traces_stream_a", "traces_stream_b"]);
+      expect(wrapper.vm.schemaList.map((s) => s.stream_type)).toEqual(["traces", "traces"]);
+      expect(wrapper.vm.streams.logs).toBeUndefined();
+    });
+
+    it("keeps the spinner on until the latest request resolves", async () => {
+      const pending = deferStreamRequests();
+      const wrapper = createWrapper();
+      await flushPromises();
+
+      setField(wrapper, "stream_type", "traces");
+      await flushPromises();
+
+      pending.logs();
+      await flushPromises();
+      expect(wrapper.vm.isFetchingStreams).toBe(true);
+      expect(streamNameOptions(wrapper)).toEqual([]);
+
+      pending.traces();
+      await flushPromises();
+      expect(wrapper.vm.isFetchingStreams).toBe(false);
+      expect(streamNameOptions(wrapper)).toEqual(["traces_stream_a", "traces_stream_b"]);
+    });
+
+    it("stores the list under the requested type, not the node's saved type", async () => {
+      const pending = deferStreamRequests();
+      const wrapper = createWrapper();
+      await flushPromises();
+      pending.logs();
+      await flushPromises();
+
+      setField(wrapper, "stream_type", "metrics");
+      await flushPromises();
+      pending.metrics();
+      await flushPromises();
+
+      expect(wrapper.vm.streams.metrics.map((s) => s.name)).toEqual([
+        "metrics_stream_a",
+        "metrics_stream_b",
+      ]);
+      expect(wrapper.vm.streams.logs.map((s) => s.name)).toEqual([
+        "logs_stream_a",
+        "logs_stream_b",
+      ]);
     });
   });
 

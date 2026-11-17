@@ -26,6 +26,9 @@ import FleetFlowList, { type FlowListItem } from "./FleetFlowList.vue";
 import FleetFlowLegend from "./FleetFlowLegend.vue";
 import { apiCollector, apiRollout } from "./fleet.fixtures";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -222,6 +225,27 @@ describe("FleetFlowOverview map", () => {
     expect(Object.keys(logs)).not.toContain("severity");
   });
 
+  it("lets zoom-out and fit reach a map far taller than the canvas", async () => {
+    await mountOverview();
+    const floor = Number(wrapper.findComponent(VueFlowStub).attributes("min-zoom"));
+    expect(floor).toBeLessThanOrEqual(0.01);
+  });
+
+  it("leaves mouse-wheel zoom on", async () => {
+    await mountOverview();
+    expect(wrapper.findComponent(VueFlowStub).attributes("zoom-on-scroll")).not.toBe("false");
+  });
+
+  it("marks each signal filter with the colour its lines are drawn in", async () => {
+    await mountOverview();
+    const dot = (signal: string) =>
+      wrapper.find(`[data-test="fleet-flow-overview-telemetry-dot-${signal}"]`);
+    expect(dot("logs").classes()).toContain("bg-signal-logs");
+    expect(dot("metrics").classes()).toContain("bg-signal-metrics");
+    expect(dot("traces").classes()).toContain("bg-signal-traces");
+    expect(dot("all").exists()).toBe(false);
+  });
+
   it("branches the failing destination off with a dashed send-failed line and rings it", async () => {
     serve(basePipelines());
     await mountOverview();
@@ -392,6 +416,23 @@ describe("FleetFlowOverview window and states", () => {
       .vm.$emit("update:model-value", "5m");
     await flushPromises();
     expect(fleet.getPipelines).toHaveBeenLastCalledWith("default", "5m");
+    expect(analytics.track).toHaveBeenCalledWith("fleet_flow_window_changed", { window: "5m" });
+  });
+
+  it("tracks a signal filter and a details card opened, but not one closed", async () => {
+    serve(basePipelines());
+    await mountOverview();
+    vi.mocked(analytics.track).mockClear();
+    wrapper
+      .findComponent<any>('[data-test="fleet-flow-overview-telemetry"]')
+      .vm.$emit("update:model-value", "logs");
+    await clickNode(`d:${D1.id}`);
+    await clickNode(`d:${D1.id}`);
+    expect(analytics.track).toHaveBeenCalledWith("fleet_flow_signal_changed", { signal: "logs" });
+    expect(analytics.track).toHaveBeenCalledWith("fleet_flow_detail_opened", { kind: "node" });
+    expect(
+      vi.mocked(analytics.track).mock.calls.filter(([e]) => e === "fleet_flow_detail_opened"),
+    ).toHaveLength(1);
   });
 
   it("shows the loading overlay on the first load", async () => {

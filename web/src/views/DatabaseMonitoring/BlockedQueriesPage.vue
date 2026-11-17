@@ -132,9 +132,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <DbmSubheaderBand data-test="dbm-blocked-summary">
-            <OStatStrip :items="summaryStats" :loading="loading" />
-          </DbmSubheaderBand>
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            row
+            data-test="dbm-blocked-summary"
+          />
 
           <DbmLockCoverageLine
             v-if="samples.length"
@@ -452,7 +455,6 @@ import DateTime from "@/components/DateTime.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
-import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
@@ -473,6 +475,7 @@ import dbMonitoringService, {
   type BlockingChain,
   type BlockingSample,
 } from "@/services/db_monitoring";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
@@ -1039,6 +1042,7 @@ const windowMinutes = computed(() =>
 );
 
 const onRowAction = (id: string, row: BlockedRow) => {
+  analytics.track("dbm_row_action_clicked", { page: "blocked", action: id });
   if (id === "copy") {
     copyToClipboard(row.query ?? "", t);
     return;
@@ -1182,6 +1186,7 @@ const longestWaitBehind = (pid: number | null): number | null => {
 };
 
 const askAiForFix = (row: BlockedRow) => {
+  analytics.track("dbm_ai_fix_requested", { page: "blocked" });
   emit("sendToAiChat", {
     query: buildBlockingFixPrompt({
       query: row.query,

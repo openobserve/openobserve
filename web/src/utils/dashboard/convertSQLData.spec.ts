@@ -1051,6 +1051,32 @@ describe("convertSQLData", () => {
     });
 
     describe("Mark line functionality", () => {
+      it("uses a mark line's own label formatter instead of its raw value", async () => {
+        const result = await convertSQLData(
+          {
+            ...mockPanelSchema,
+            config: {
+              mark_line: [
+                { name: "Limit", type: "yAxis", value: 204800, label_formatter: "{b}:200 GB" },
+                { name: "Plain", type: "yAxis", value: 5 },
+              ],
+            },
+          },
+          [[{ timestamp: "2023-01-01", value: 10 }]],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations,
+        );
+
+        const lines = result.options.series.find((s: any) => s.markLine?.data?.length).markLine
+          .data;
+        expect(lines.map((line: any) => line.label.formatter)).toEqual(["{b}:200 GB", "{b}:{c}"]);
+      });
+
       it("should handle mark lines with xAxis type", async () => {
         const schema = {
           ...mockPanelSchema,

@@ -307,6 +307,45 @@ describe("router/index (factory)", () => {
       expect(openobserveRum.setViewName).toHaveBeenCalledWith("logs");
     });
 
+    it("sends a signed-in user from /signup into the app instead of the login page", async () => {
+      await router.push("/signup?utm_source=blog").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/");
+    });
+
+    it("sends a signed-in user from /login into the app", async () => {
+      await router.push("/login").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/");
+    });
+
+    it("sends a user with a saved session but a fresh store from /signup into the app", async () => {
+      store = buildStore(false);
+      router = createAppRouter(store);
+      await router.push("/signup").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/");
+      expect(store.state.loggedIn).toBe(true);
+    });
+
+    it("keeps an expired saved session on the signup flow instead of sending it into the app", async () => {
+      vi.mocked(getDecodedUserInfo).mockReturnValue(
+        JSON.stringify({ email: "user@example.com", exp: Math.floor(Date.now() / 1000) - 60 }),
+      );
+      store = buildStore(false);
+      router = createAppRouter(store);
+      await router.push("/signup").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/login");
+      expect(router.currentRoute.value.query.mode).toBe("signup");
+    });
+
+    it("sends a saved session that has not expired from /signup into the app", async () => {
+      vi.mocked(getDecodedUserInfo).mockReturnValue(
+        JSON.stringify({ email: "user@example.com", exp: Math.floor(Date.now() / 1000) + 3600 }),
+      );
+      store = buildStore(false);
+      router = createAppRouter(store);
+      await router.push("/signup").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/");
+    });
+
     it("does not set the RUM view name when the navigation is aborted", async () => {
       router.beforeEach(() => false);
       vi.mocked(openobserveRum.setViewName).mockClear();
@@ -336,6 +375,8 @@ describe("router/index (factory)", () => {
       // Asserting the resolved text (not the key) is the point: the guard, not the
       // route table, is what translates — that is what keeps the tab title in the
       // current locale.
+      vi.mocked(getDecodedUserInfo).mockReturnValue(null);
+      router = createAppRouter(buildStore(false));
       await router.push("/login").catch(() => {});
       expect(document.title).toBe("OpenObserve - Login");
     });

@@ -46,55 +46,26 @@ fn scorer_uses_provider(scorer: &table::scorers::Scorer, provider_id: &str) -> b
     scorer.params.get("provider_id").and_then(|v| v.as_str()) == Some(provider_id)
 }
 
+pub const SAVED_KEY_TARGET_CHANGED_MESSAGE: &str =
+    "Enter the API key again for a changed provider type or endpoint";
+
+fn has_api_key(auth_config: &serde_json::Value) -> bool {
+    auth_config
+        .get("api_key")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty())
+}
+
 fn resolve_updated_auth_config(
     requested: &serde_json::Value,
     existing: &serde_json::Value,
 ) -> serde_json::Value {
-    let has_new_api_key = requested
-        .get("api_key")
-        .and_then(|value| value.as_str())
-        .map(str::trim)
-        .is_some_and(|value| !value.is_empty());
-
-    if has_new_api_key {
+    if has_api_key(requested) {
         requested.clone()
     } else {
         existing.clone()
     }
-}
-
-/// Whether a test may reuse `saved`'s stored key for `requested`: only for the same provider
-/// type and the same resolved endpoint, so the key never goes to a caller-chosen host.
-pub fn may_reuse_saved_key(
-    requested: &table::providers::Provider,
-    saved: &table::providers::Provider,
-) -> bool {
-    if !requested
-        .provider_type
-        .trim()
-        .eq_ignore_ascii_case(saved.provider_type.trim())
-    {
-        return false;
-    }
-    let mut requested = requested.clone();
-    let mut saved = saved.clone();
-    requested.provider_type = saved.provider_type.clone();
-    #[cfg(feature = "enterprise")]
-    if normalize_provider_endpoint(&mut requested).is_err()
-        || normalize_provider_endpoint(&mut saved).is_err()
-    {
-        return false;
-    }
-    #[cfg(not(feature = "enterprise"))]
-    for provider in [&mut requested, &mut saved] {
-        provider.endpoint = provider
-            .endpoint
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string);
-    }
-    requested.endpoint == saved.endpoint
 }
 
 #[cfg(feature = "enterprise")]
@@ -127,6 +98,42 @@ fn normalize_provider_endpoint(
         .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
     provider.endpoint = Some(resolved);
     Ok(())
+}
+
+/// The URL a provider calls, with a blank endpoint resolved to the default of its type.
+#[cfg(feature = "enterprise")]
+fn saved_key_target(provider_type: &str, endpoint: Option<&str>) -> Option<String> {
+    let configured = endpoint.map(str::trim).filter(|value| !value.is_empty());
+    o2_enterprise::enterprise::llm_evaluations::providers::resolve_endpoint_for_type(
+        provider_type,
+        configured,
+    )
+    .ok()
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn saved_key_target(_provider_type: &str, endpoint: Option<&str>) -> Option<String> {
+    Some(endpoint.map(str::trim).unwrap_or_default().to_string())
+}
+
+/// Whether `requested` may use `saved`'s key: only for the same provider type and resolved URL.
+pub fn may_reuse_saved_key(
+    requested: &table::providers::Provider,
+    saved: &table::providers::Provider,
+) -> bool {
+    if !has_api_key(&saved.auth_config) {
+        return true;
+    }
+    let provider_type = saved.provider_type.trim();
+    if !requested
+        .provider_type
+        .trim()
+        .eq_ignore_ascii_case(provider_type)
+    {
+        return false;
+    }
+    let requested = saved_key_target(provider_type, requested.endpoint.as_deref());
+    requested.is_some() && requested == saved_key_target(provider_type, saved.endpoint.as_deref())
 }
 
 #[tracing::instrument(skip(provider))]
@@ -174,6 +181,11 @@ pub async fn update_provider(
     let existing = table::providers::get(org_id, provider_id)
         .await?
         .ok_or(ProviderError::NotFound)?;
+    if !has_api_key(&provider.auth_config) && !may_reuse_saved_key(&provider, &existing) {
+        return Err(ProviderError::InvalidConfig(
+            SAVED_KEY_TARGET_CHANGED_MESSAGE.to_string(),
+        ));
+    }
     provider.auth_config =
         resolve_updated_auth_config(&provider.auth_config, &existing.auth_config);
 
@@ -406,9 +418,12 @@ mod tests {
         assert!(!scorer_uses_provider(&scorer, "provider-2"));
     }
 
-    #[test]
-    fn test_saved_key_is_reused_only_for_the_saved_type_and_endpoint() {
-        let provider = |provider_type: &str, endpoint: Option<&str>| table::providers::Provider {
+    fn provider_with(
+        provider_type: &str,
+        endpoint: Option<&str>,
+        auth_config: serde_json::Value,
+    ) -> table::providers::Provider {
+        table::providers::Provider {
             provider_type: provider_type.to_string(),
             endpoint: endpoint.map(str::to_string),
             id: String::new(),
@@ -416,18 +431,30 @@ mod tests {
             name: String::new(),
             default_model: String::new(),
             available_models: vec![],
-            auth_config: serde_json::Value::Null,
+            auth_config,
             rate_limits: None,
             is_default: false,
             created_at: 0,
             updated_at: 0,
+        }
+    }
+
+    #[test]
+    fn test_saved_key_is_reused_only_for_the_saved_type_and_endpoint() {
+        let provider = |provider_type: &str, endpoint: Option<&str>| {
+            provider_with(provider_type, endpoint, serde_json::Value::Null)
         };
-        let saved = provider("openai", Some("https://api.openai.com/v1/chat/completions"));
+        let key = serde_json::json!({"api_key": "sk-saved"});
+        let saved = provider_with(
+            "openai",
+            Some("https://proxy.example/v1/chat/completions"),
+            key.clone(),
+        );
         assert!(may_reuse_saved_key(&saved.clone(), &saved));
         assert!(may_reuse_saved_key(
             &provider(
                 "OpenAI ",
-                Some(" https://api.openai.com/v1/chat/completions ")
+                Some(" https://proxy.example/v1/chat/completions ")
             ),
             &saved
         ));
@@ -442,12 +469,12 @@ mod tests {
         assert!(!may_reuse_saved_key(
             &provider(
                 "anthropic",
-                Some("https://api.openai.com/v1/chat/completions")
+                Some("https://proxy.example/v1/chat/completions")
             ),
             &saved
         ));
 
-        let saved_default = provider("openai", None);
+        let saved_default = provider_with("openai", None, key);
         assert!(may_reuse_saved_key(
             &provider("openai", Some("  ")),
             &saved_default
@@ -456,6 +483,37 @@ mod tests {
             &provider("openai", Some("https://attacker.example")),
             &saved_default
         ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_saved_default_endpoint_matches_the_same_url_typed_by_hand() {
+        let default_url = "https://api.openai.com/v1/chat/completions";
+        let key = serde_json::json!({"api_key": "sk-saved"});
+        let saved_default = provider_with("openai", None, key.clone());
+        let typed = provider_with("openai", Some(default_url), serde_json::Value::Null);
+        assert!(may_reuse_saved_key(&typed, &saved_default));
+
+        let saved_typed = provider_with("openai", Some(default_url), key);
+        let blank = provider_with("openai", None, serde_json::Value::Null);
+        assert!(may_reuse_saved_key(&blank, &saved_typed));
+    }
+
+    #[test]
+    fn test_provider_without_a_saved_key_may_change_its_endpoint() {
+        for auth_config in [
+            serde_json::Value::Null,
+            serde_json::json!({}),
+            serde_json::json!({"api_key": "  "}),
+        ] {
+            let saved = provider_with("ollama", Some("http://old.example:11434"), auth_config);
+            let edited = provider_with(
+                "ollama",
+                Some("http://new.example:11434"),
+                serde_json::Value::Null,
+            );
+            assert!(may_reuse_saved_key(&edited, &saved));
+        }
     }
 
     #[test]

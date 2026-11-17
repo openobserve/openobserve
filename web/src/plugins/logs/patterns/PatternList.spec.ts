@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import PatternList from "./PatternList.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 describe("PatternList", () => {
   let wrapper: any;
@@ -84,6 +87,14 @@ describe("PatternList", () => {
 
   it("should mount PatternList component", () => {
     expect(wrapper.exists()).toBe(true);
+  });
+
+  it("tracks a severity chip change with the number of chips selected", async () => {
+    const group = wrapper.findComponent({ name: "OToggleGroup" });
+    await group.vm.$emit("update:modelValue", ["error"]);
+    expect(analytics.track).toHaveBeenCalledWith("log_patterns_severity_filtered", { count: 1 });
+    // The filter is module-scoped, so clear it before the next test mounts.
+    await group.vm.$emit("update:modelValue", []);
   });
 
   describe("Pattern Display", () => {

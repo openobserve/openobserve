@@ -21,9 +21,12 @@ use config::{
     meta::{
         meta_store::MetaStore,
         search::ScanStats,
-        stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+        stream::{
+            FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamPartitionTimeLevel,
+            StreamStats, StreamType,
+        },
     },
-    utils::time::second_micros,
+    utils::time::{hour_micros, second_micros},
 };
 
 use crate::{
@@ -231,6 +234,14 @@ pub trait FileList: Sync + Send + 'static {
 
     // stream stats table
     async fn get_updated_streams(&self, time_range: (i64, i64)) -> Result<Vec<String>>;
+    /// Records per `(stream, date)` partition of live files, or of dumped ones from the dump
+    /// stats, for the given stream keys only.
+    async fn records_by_date(
+        &self,
+        streams: &[String],
+        date_range: (String, String),
+        dumped: bool,
+    ) -> Result<Vec<(String, String, i64)>>;
     async fn stats_by_date_range(
         &self,
         org_id: &str,
@@ -686,6 +697,35 @@ pub async fn get_updated_streams(time_range: (i64, i64)) -> Result<Vec<String>> 
     CLIENT.get_updated_streams(time_range).await
 }
 
+/// Records per `(stream, date)` of live files, then of dumped ones when dumping is on; a dumped
+/// row, marked `true`, covers its whole day.
+pub async fn records_by_date(
+    streams: &[String],
+    date_range: (String, String),
+) -> Result<Vec<(String, String, i64, bool)>> {
+    let mut out: Vec<(String, String, i64, bool)> = CLIENT
+        .records_by_date(streams, date_range.clone(), false)
+        .await?
+        .into_iter()
+        .map(|(s, d, r)| (s, d, r, false))
+        .collect();
+    if !get_config().compact.file_list_dump_enabled {
+        return Ok(out);
+    }
+    let live: stdHashMap<String, &String> = streams
+        .iter()
+        .filter_map(|s| Some((dump_stream_key(s)?, s)))
+        .collect();
+    let keys: Vec<String> = live.keys().cloned().collect();
+    let days = (day_start_key(&date_range.0), date_range.1);
+    for (key, date, records) in CLIENT.records_by_date(&keys, days, true).await? {
+        if let Some(stream) = live.get(&key) {
+            out.push(((*stream).clone(), date, records, true));
+        }
+    }
+    Ok(out)
+}
+
 #[inline]
 pub async fn stats_by_date_range(
     org_id: &str,
@@ -863,6 +903,22 @@ pub async fn local_cache_gc() -> Result<()> {
     Ok(())
 }
 
+/// `{org}/{type}/{name}` as file list dumps key it, `{org}/file_list/{name}_{type}`.
+fn dump_stream_key(stream: &str) -> Option<String> {
+    let mut parts = stream.splitn(3, '/');
+    let (org, stream_type, name) = (parts.next()?, parts.next()?, parts.next()?);
+    Some(format!(
+        "{org}/{}/{name}_{stream_type}",
+        StreamType::Filelist
+    ))
+}
+
+/// Dumps are partitioned by day at hour `00`, so a range starting mid-day still reads that day.
+fn day_start_key(date: &str) -> String {
+    date.rsplit_once('/')
+        .map_or_else(|| date.to_string(), |(day, _)| format!("{day}/00"))
+}
+
 #[inline]
 fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
     let (start, end) = time_range;
@@ -903,17 +959,31 @@ fn stream_key_length_violation(
     })
 }
 
-/// Daily when the stream is dynamically merged (its files can span a day), else the type's level.
+/// The level bounding `max_ts` of a query ending at `time_end`, see [`day_max_ts_level`].
 pub async fn max_ts_bound_level(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    time_end: i64,
 ) -> PartitionTimeLevel {
     let level = query_retention_level(stream_type);
-    if level == PartitionTimeLevel::Daily || !stream_type.support_dynamic_merge() {
+    if level == PartitionTimeLevel::Daily || !stream_type.support_dynamic_partition() {
         return level;
     }
-    if crate::schema::get_dynamic_merge(org_id, stream_name, stream_type).await {
+    match crate::schema::get_settings(org_id, stream_name, stream_type).await {
+        Some(settings) => day_max_ts_level(&settings.partition_time_level, level, time_end),
+        None => level,
+    }
+}
+
+/// Daily when `time_end` is on or an hour from a daily day; earlier daily files end before it.
+fn day_max_ts_level(
+    history: &StreamPartitionTimeLevel,
+    level: PartitionTimeLevel,
+    time_end: i64,
+) -> PartitionTimeLevel {
+    let daily = Some(PartitionTimeLevel::Daily);
+    if history.level_at(time_end) == daily || history.level_at(time_end + hour_micros(1)) == daily {
         PartitionTimeLevel::Daily
     } else {
         level
@@ -1111,6 +1181,22 @@ mod tests {
     use config::meta::stream::StreamStats;
 
     use super::*;
+
+    #[test]
+    fn a_stream_maps_to_its_dump_key_and_day_start() {
+        for (live, dumped) in [
+            ("org/logs/app_web", Some("org/file_list/app_web_logs")),
+            ("org/traces/default", Some("org/file_list/default_traces")),
+            (
+                "org/enrichment_tables/geo",
+                Some("org/file_list/geo_enrichment_tables"),
+            ),
+            ("org/logs", None),
+        ] {
+            assert_eq!(dump_stream_key(live).as_deref(), dumped);
+        }
+        assert_eq!(day_start_key("2026/01/02/13"), "2026/01/02/00");
+    }
 
     #[test]
     fn test_stream_key_length_boundary() {
@@ -1494,6 +1580,37 @@ mod tests {
         assert_eq!(
             query_retention_level(StreamType::EnrichmentTables),
             PartitionTimeLevel::Hourly
+        );
+    }
+
+    #[test]
+    fn test_day_max_ts_level_follows_the_day_of_the_end() {
+        use PartitionTimeLevel::{Daily, Hourly};
+        use config::{meta::stream::PartitionTimeLevelChange, utils::time::day_micros};
+        const DAY: i64 = 1_790_640_000_000_000; // 2026-09-29T00:00:00Z
+        let change = |since, level| PartitionTimeLevelChange { since, level };
+        // the stream is daily for the one day from DAY
+        let history = StreamPartitionTimeLevel {
+            dynamic: None,
+            changes: vec![change(DAY, Daily), change(DAY + day_micros(1), Hourly)],
+        };
+        for (time_end, expected) in [
+            (DAY - hour_micros(2), Hourly),
+            (DAY - hour_micros(1), Daily), // an hour from the daily day
+            (DAY + hour_micros(5), Daily),
+            (DAY + day_micros(1) - 1, Daily),
+            (DAY + day_micros(1), Hourly), // daily files of the day end before it
+            (DAY + day_micros(3), Hourly),
+        ] {
+            assert_eq!(
+                day_max_ts_level(&history, Hourly, time_end),
+                expected,
+                "{time_end}"
+            );
+        }
+        assert_eq!(
+            day_max_ts_level(&StreamPartitionTimeLevel::default(), Hourly, DAY),
+            Hourly
         );
     }
 

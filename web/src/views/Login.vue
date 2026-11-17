@@ -100,7 +100,7 @@ export default defineComponent({
       name: "",
     });
 
-    // The SSO round trip drops the signup link's query and referrer, so keep them for the Get started pick.
+    // The SSO round trip drops the signup link's query and referrer, so keep them for the onboarding pick.
     const pendingUtmContent = (): string | null => {
       try {
         const uri = window.sessionStorage.getItem("redirectURI");
@@ -209,7 +209,8 @@ export default defineComponent({
             checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true" &&
             checkCallBackValues(router.currentRoute.value.hash, "pending_invites") != "true"
           ) {
-            localStorage.setItem("isFirstTimeLogin", "true");
+            // Holds the new user's email, so another sign-in on this browser never reads it as theirs.
+            localStorage.setItem("isFirstTimeLogin", store.state.userInfo.email);
           }
           //this will identify the user for reo.dev
           identify({

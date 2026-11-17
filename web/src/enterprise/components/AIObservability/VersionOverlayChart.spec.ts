@@ -2,7 +2,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { buildOverlaySchema, buildInjectedRows } from "./VersionOverlayChart.vue";
+import * as echarts from "echarts/core";
+import { LineChart } from "echarts/charts";
+import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
+import { SVGRenderer } from "echarts/renderers";
+import { buildOverlayOptions } from "./VersionOverlayChart.vue";
+
+echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, SVGRenderer]);
 
 vi.mock("vue-i18n", async () => {
   const en: any = (await import("@/locales/languages/en-US.json")).default;
@@ -25,69 +31,119 @@ const seriesB = [
   { x: 1, y: 18 },
 ];
 
-describe("VersionOverlayChart buildOverlaySchema", () => {
-  it("uses a value-type x axis via breakdown line chart in sinceRollout mode", () => {
-    const schema = buildOverlaySchema({
-      mode: "sinceRollout",
-      labelA: "Version A",
-      labelB: "Version B",
-      xAxisLabel: "Hours since rollout",
+describe("VersionOverlayChart elapsed-time coordinates", () => {
+  it("draws a 0.11-day interval eleven times wider than a 0.01-day interval", () => {
+    const chart = echarts.init(null, undefined, {
+      renderer: "svg",
+      ssr: true,
+      width: 1200,
+      height: 300,
     });
-    expect(schema.type).toBe("line");
-    expect(schema.queryType).toBe("sql");
-    expect(schema.queries[0].fields.x[0].label).toBe("Hours since rollout");
-    expect(schema.queries[0].fields.breakdown).toHaveLength(1);
+    try {
+      chart.setOption(
+        buildOverlayOptions(
+          [
+            { x: 1.12, y: 10 },
+            { x: 1.13, y: 12 },
+          ],
+          [
+            { x: 4.02, y: 20 },
+            { x: 4.13, y: 18 },
+          ],
+          "1.0",
+          "2.0",
+          "Days since rollout",
+        ),
+      );
+      const px = (x: number) => chart.convertToPixel({ xAxisIndex: 0 }, x) as number;
+      const short = px(1.13) - px(1.12);
+      const long = px(4.13) - px(4.02);
+      expect(short).toBeGreaterThan(0);
+      expect(long / short).toBeCloseTo(11, 8);
+      // A shared elapsed time has one coordinate, regardless of version.
+      expect(chart.convertToPixel({ seriesIndex: 0 }, [2, 10])[0]).toBeCloseTo(
+        chart.convertToPixel({ seriesIndex: 1 }, [2, 20])[0],
+        8,
+      );
+    } finally {
+      chart.dispose();
+    }
   });
 
-  it("carries the xAxisLabel through for sameWallClock mode too (renderer infers axis type from data)", () => {
-    const schema = buildOverlaySchema({
-      mode: "sameWallClock",
-      labelA: "Version A",
-      labelB: "Version B",
-      xAxisLabel: "Time",
-    });
-    expect(schema.queries[0].fields.x[0].label).toBe("Time");
-  });
-
-  it("keeps exactly one query so the renderer's has-at-least-one-query gate passes", () => {
-    const schema = buildOverlaySchema({
-      mode: "sinceRollout",
-      labelA: "Version A",
-      labelB: "Version B",
-      xAxisLabel: "Hours since rollout",
-    });
-    expect(schema.queries).toHaveLength(1);
-    expect(schema.queries[0].query).toBeTruthy();
-  });
-});
-
-describe("VersionOverlayChart buildInjectedRows", () => {
-  it("flattens both series into one row array, tagged by series label", () => {
-    const rows = buildInjectedRows(seriesA, seriesB, "Version A", "Version B");
-    expect(rows).toHaveLength(4);
-    expect(rows.filter((r) => r.series === "Version A")).toHaveLength(2);
-    expect(rows.filter((r) => r.series === "Version B")).toHaveLength(2);
-  });
-
-  it("maps each point's x/y verbatim", () => {
-    const rows = buildInjectedRows(seriesA, seriesB, "Version A", "Version B");
-    expect(rows[0]).toEqual({ x: 0, y: 10, series: "Version A" });
-    expect(rows[2]).toEqual({ x: 0, y: 20, series: "Version B" });
-  });
-});
-
-describe("VersionOverlayChart mount", () => {
-  it("renders the version-overlay-chart data-test hook via PanelSchemaRenderer", async () => {
-    vi.doMock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
-      default: { name: "PanelSchemaRenderer", template: "<div />" },
-    }));
-    const { default: VersionOverlayChart } = await import("./VersionOverlayChart.vue");
-    const wrapper = mount(VersionOverlayChart, {
-      props: { seriesA, seriesB, mode: "sinceRollout" },
-      global: {
-        stubs: { PanelSchemaRenderer: { template: "<div />" } },
+  it("retains each arm's own x positions, including gaps and a shared origin, without mutating points", () => {
+    const a = [
+      { x: 3, y: 12 },
+      { x: 0, y: 10 },
+    ];
+    const options = buildOverlayOptions(
+      a,
+      [
+        { x: 0, y: 20 },
+        { x: 0.5, y: 18 },
+      ],
+      "1.0",
+      "2.0",
+      "Hours since rollout",
+    );
+    expect(options.series).toMatchObject([
+      {
+        name: "1.0",
+        data: [
+          [0, 10],
+          [3, 12],
+        ],
       },
+      {
+        name: "2.0",
+        data: [
+          [0, 20],
+          [0.5, 18],
+        ],
+      },
+    ]);
+    expect(a).toEqual([
+      { x: 3, y: 12 },
+      { x: 0, y: 10 },
+    ]);
+  });
+});
+
+describe("service-version identity", () => {
+  it("labels the y axis through the caller formatter and draws the deploy marker", async () => {
+    const { default: Chart } = await import("./VersionOverlayChart.vue");
+    const wrapper = mount(Chart, {
+      props: {
+        seriesA,
+        seriesB,
+        mode: "sameWallClock",
+        serviceVersions: true,
+        formatY: (value: number) => `${value} u`,
+        marker: { x: seriesA[0].x, label: "v2" },
+      },
+      global: { stubs: { PanelSchemaRenderer: true } },
     });
-    expect(wrapper.find('[data-test="version-overlay-chart"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain(" u");
+    expect(wrapper.find('[data-test="svcver-overlay-marker"]').text()).toBe("v2");
+    const label = wrapper.findAll("text").find((node) => node.text().endsWith(" u"))!;
+    expect(Number(label.attributes("x"))).toBeGreaterThanOrEqual(48);
+    const grid = wrapper.find("line");
+    expect(Number(grid.attributes("x1"))).toBeGreaterThan(Number(label.attributes("x")));
+  });
+  it("starts a new path segment only at a point flagged as following a gap", async () => {
+    const { default: Chart } = await import("./VersionOverlayChart.vue");
+    const path = (points: { x: number; y: number; gapBefore?: boolean }[]) =>
+      mount(Chart, {
+        props: { seriesA: points, seriesB, mode: "sameWallClock", serviceVersions: true },
+        global: { stubs: { PanelSchemaRenderer: true } },
+      })
+        .get('[data-test="svcver-overlay-line-a"]')
+        .attributes("d")!;
+    const three = [
+      { x: 0, y: 10 },
+      { x: 1, y: 12 },
+      { x: 2, y: 11 },
+    ];
+    expect(path(three).match(/M/g)).toHaveLength(1);
+    expect(path([three[0], { ...three[2], gapBefore: true }]).match(/M/g)).toHaveLength(2);
   });
 });

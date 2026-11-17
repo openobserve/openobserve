@@ -17,6 +17,9 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const mockBack = vi.fn();
 vi.mock("vue-router", () => ({
@@ -316,6 +319,10 @@ describe("ImportSemanticGroups - applyChanges", () => {
     expect(callArgs[0]).toBe("default");
     const groups = callArgs[1];
     expect(groups.some((g: any) => g.id === "add-1")).toBe(true);
+    expect(analytics.track).toHaveBeenCalledWith("semantic_groups_imported", {
+      added: 1,
+      modified: 0,
+    });
   });
 
   it("does nothing when hasSelectedChanges is false", async () => {
@@ -372,6 +379,7 @@ describe("ImportSemanticGroups - applyChanges", () => {
 
     vi.mocked(alertsService.saveSemanticGroups).mockRejectedValueOnce(new Error("boom"));
     await (w.vm as any).applyChanges();
+    expect(analytics.track).not.toHaveBeenCalled();
     await flushPromises();
     expect(spy).not.toHaveBeenCalledWith(scope);
 

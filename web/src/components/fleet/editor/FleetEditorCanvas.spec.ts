@@ -74,6 +74,11 @@ beforeEach(() => {
 });
 
 describe("FleetEditorCanvas", () => {
+  it("zooms out as far as the pipeline overview", () => {
+    const floor = Number(wrapper.findComponent({ name: "VueFlow" }).attributes("min-zoom"));
+    expect(floor).toBe(0.01);
+  });
+
   it("fits the graph below the floating toolbar", async () => {
     const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(56);
     await initialize();

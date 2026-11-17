@@ -210,6 +210,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import { saveProviderMutation } from "@/services/online-evals.service.queries";
+import analytics from "@/services/product_analytics";
 import { useMutation } from "@tanstack/vue-query";
 import {
   DEFAULT_PROVIDER_BASE_URLS,
@@ -337,6 +338,10 @@ async function save(value: ProviderForm) {
     const payload = buildPayload(value);
 
     await saveProvider.mutateAsync(payload);
+    analytics.track(
+      props.mode === "edit" && props.row ? "llm_provider_updated" : "llm_provider_created",
+      { provider_type: payload.providerType },
+    );
     toast({
       variant: "success",
       message: t("onlineEvals.saved", { label: t("onlineEvals.singular.providers") }),
@@ -363,6 +368,7 @@ async function testConnection() {
       props.mode === "edit" ? props.row?.id : undefined,
     );
     testState.value = "passed";
+    analytics.track("llm_provider_tested", { provider_type: value.providerType });
     testMessage.value = raw(message);
   } catch (err: any) {
     testState.value = "failed";

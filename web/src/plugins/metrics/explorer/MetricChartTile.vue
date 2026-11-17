@@ -26,11 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Not part of the select target: the mouseup ending a drag-to-zoom arrives as a click. -->
     <div class="relative min-h-0 flex-1 cursor-default">
-      <OSpinner
-        v-if="refreshing"
-        size="xs"
-        class="absolute top-1 right-1 z-10"
-        :data-test="`${dataTest}-refreshing`"
+      <LoadingProgress
+        :loading="state.status === 'loading' || refreshing"
+        :loading-progress-percentage="0"
       />
       <div
         v-if="state.status === 'error'"
@@ -92,9 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </slot>
 
-      <div v-else class="h-full p-2" :data-test="`${dataTest}-loading`">
-        <OSkeleton class="h-full" animation="wave" />
-      </div>
+      <PanelChartPlaceholder v-else :data-test="`${dataTest}-loading`" />
     </div>
   </div>
 </template>
@@ -106,8 +102,8 @@ import MetricCardChart from "./MetricCardChart.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { parseSearchError } from "@/utils/query/searchError";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
@@ -146,6 +142,14 @@ interface TileState {
   timeRange?: { start_time: number; end_time: number };
 }
 
+export interface TileFailure {
+  error: string;
+  /** What the HTTP layer said, so a parent can name the cause. */
+  cause: { status?: number; code?: string };
+  failedAt: number;
+  keptAt: number | null;
+}
+
 const IDLE: TileState = { status: "idle", results: [], error: "" };
 
 const props = withDefaults(
@@ -170,8 +174,14 @@ const props = withDefaults(
       opts?: { window?: QueryWindow; instantAt?: number },
     ) => Promise<any>;
     dataTest: string;
+    /** The parent reports a failed refresh once, so this tile keeps a drawn chart rather than replacing it with its error. */
+    parentReportsFailures?: boolean;
+    /** Bumped by the parent's one Retry; a tile whose query failed loads again. */
+    retryToken?: number;
   }>(),
   {
+    parentReportsFailures: false,
+    retryToken: 0,
     chartType: "line",
     unit: null,
     bucketUnit: null,
@@ -185,6 +195,10 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   select: [];
+  /** A query for this tile is running, first load or refresh. */
+  busy: [on: boolean];
+  /** The tile's last query failed; `keptAt` is when its still-drawn chart was fetched, if one is kept. */
+  failed: [failure: TileFailure | null];
   /** What the tile holds, so a parent can read the fetched series without querying again. */
   results: [
     state: {
@@ -226,10 +240,25 @@ const bucketO2Unit = computed(() =>
 const visible = ref(false);
 /** Marks a kept chart, which would otherwise give no sign that it is reloading. */
 const refreshing = ref(false);
+watch(
+  () => state.value.status === "loading" || refreshing.value,
+  (on) => emit("busy", on),
+  { immediate: true },
+);
 /** The shown result no longer matches the query and window; reload when next seen. */
 let stale = true;
 /** Bumped per load, so a superseded result never lands. */
 let generation = 0;
+/** When the drawn chart was fetched, for a failure that keeps it. */
+let loadedAt: number | null = null;
+const failure = ref<TileFailure | null>(null);
+watch(failure, (value) => emit("failed", value), { immediate: true });
+watch(
+  () => props.retryToken,
+  () => {
+    if (failure.value) load();
+  },
+);
 let active: AbortController | null = null;
 /** What the last load asked for, so a watcher catching up on it does not ask again. */
 let loadedFor: { key: string; forecastKey: string; timeRange: object; step: number } | null = null;
@@ -286,6 +315,8 @@ const load = async () => {
     const [results, past] = await current;
     if (mine !== generation) return;
     refreshing.value = false;
+    loadedAt = Date.now();
+    failure.value = null;
     const shifted = compare
       ? past.map((result, parentIndex) => ({ result, ...compare, parentIndex }))
       : [];
@@ -307,15 +338,27 @@ const load = async () => {
     if (mine !== generation) return;
     // The other queries of a failed load are not worth finishing.
     cancelActive();
-    refreshing.value = false;
     if (isCancelled(error)) {
+      refreshing.value = false;
       // Not its own doing (that bumps `generation`): a shared query or bulk clear cancelled it.
       stale = true;
       if (visible.value) load();
       else if (state.value.status === "loading") state.value = IDLE;
       return;
     }
-    state.value = { status: "error", results: [], error: parseSearchError(error).message };
+    const message = parseSearchError(error).message;
+    const kept = state.value.status === "done";
+    // Before `busy` ends, so a parent reading failures when its region settles already sees this one.
+    failure.value = {
+      error: message,
+      cause: { status: error?.response?.status ?? error?.status, code: error?.code },
+      failedAt: Date.now(),
+      keptAt: kept ? loadedAt : null,
+    };
+    refreshing.value = false;
+    // The parent says it failed once for every tile; a drawn chart stays as it was (ruling 18).
+    if (props.parentReportsFailures && kept) return;
+    state.value = { status: "error", results: [], error: message };
   }
 };
 
@@ -340,6 +383,7 @@ const invalidate = () => {
   refreshing.value = false;
   stale = true;
   if (!windowOnly || state.value.status !== "done") state.value = IDLE;
+  if (!windowOnly) failure.value = null;
   if (visible.value) load();
 };
 

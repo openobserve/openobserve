@@ -18,6 +18,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import i18n from "@/locales";
 
 // ── Mock data ───────────────────────────────────────────────────────────────
@@ -104,6 +105,8 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 // ── Import component under test (after all mocks) ───────────────────────────
 
 import orgService from "@/services/organizations";
+import { queryClient } from "@/composables/query/queryClient";
+import { fullConfigLoad } from "@/composables/useFullConfigLoad";
 import UsageTab from "./UsageTab.vue";
 
 // ── Mount factory ───────────────────────────────────────────────────────────
@@ -153,6 +156,31 @@ function mountUsageTab() {
 
 describe("UsageTab", () => {
   let wrapper: VueWrapper;
+
+  it("switches to the meta org before Renew license opens the license page", async () => {
+    const { zoConfig, organizations } = store.state;
+    store.state.zoConfig = { ...zoConfig, meta_org: "_meta" };
+    store.state.organizations = [{ id: 7, identifier: "_meta", name: "_meta" }];
+    const dispatch = vi.spyOn(store, "dispatch").mockResolvedValue(undefined);
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    wrapper = mountUsageTab();
+    await flushPromises();
+
+    wrapper.findComponent({ name: "LicensePeriod" }).vm.$emit("renew");
+
+    expect(dispatch).toHaveBeenCalledWith(
+      "setSelectedOrganization",
+      expect.objectContaining({ identifier: "_meta" }),
+    );
+    expect(push).toHaveBeenCalledWith({
+      name: "license",
+      query: { org_identifier: "_meta" },
+    });
+    dispatch.mockRestore();
+    push.mockRestore();
+    store.state.zoConfig = zoConfig;
+    store.state.organizations = organizations;
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -240,6 +268,34 @@ describe("UsageTab", () => {
       expect(panel.exists()).toBe(true);
       expect(panel.text()).toContain("No data ingested yet");
       expect(panel.text()).toContain("This organization hasn't received any data");
+    });
+
+    it("should show the no-data panel when the org's only streams are ones O2 writes itself", async () => {
+      vi.mocked(orgService.get_organization_summary).mockResolvedValueOnce({
+        data: {
+          ...mockEmptySummaryData,
+          streams: { ...mockEmptySummaryData.streams, num_streams: 1, num_user_streams: 0 },
+        },
+      });
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(true);
+    });
+
+    it("should show the summary once the org has a user data stream", async () => {
+      vi.mocked(orgService.get_organization_summary).mockResolvedValueOnce({
+        data: {
+          ...mockEmptySummaryData,
+          streams: { ...mockEmptySummaryData.streams, num_streams: 2, num_user_streams: 1 },
+        },
+      });
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(false);
     });
   });
 
@@ -357,6 +413,34 @@ describe("UsageTab", () => {
 
       expect(orgService.get_organization_summary).toHaveBeenCalledTimes(1);
       expect(orgService.get_organization_summary).toHaveBeenCalledWith("default");
+    });
+
+    it("marks the org's full config loaded after the mount-time config refresh", async () => {
+      fullConfigLoad.loadedOrg = "";
+      const fetchSpy = vi.spyOn(queryClient, "fetchQuery").mockResolvedValue({ version: "v1" });
+      try {
+        wrapper = mountUsageTab();
+        await flushPromises();
+
+        expect(fullConfigLoad.loadedOrg).toBe("default");
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it("leaves the full config unmarked when the mount-time config refresh fails", async () => {
+      fullConfigLoad.loadedOrg = "";
+      const fetchSpy = vi.spyOn(queryClient, "fetchQuery").mockRejectedValue(new Error("down"));
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      try {
+        wrapper = mountUsageTab();
+        await flushPromises();
+
+        expect(fullConfigLoad.loadedOrg).toBe("");
+      } finally {
+        fetchSpy.mockRestore();
+        logSpy.mockRestore();
+      }
     });
 
     it("should show a loading notification while fetching", async () => {
@@ -495,6 +579,23 @@ describe("UsageTab", () => {
 
       const btn = wrapper.findComponent('[data-test="home-usage-tab-view-alerts-btn"]');
       expect(String(btn.props("ariaLabel"))).toContain("Locked: needs");
+    });
+
+    it("opens every alert in every folder from the Alerts view button, as its counts do", async () => {
+      wrapper = mountUsageTab();
+      await flushPromises();
+      const alertLinks = wrapper
+        .findAllComponents('[data-test="usage-tab-router-link"]')
+        .map((l) => l.props("to"))
+        .filter((to: any) => to?.name === "alertList");
+      expect(alertLinks).toEqual([
+        expect.objectContaining({
+          query: expect.objectContaining({
+            state: ALERT_LIST_ALL_STATES,
+            all_folders: ALERT_LIST_ALL_FOLDERS,
+          }),
+        }),
+      ]);
     });
 
     it("renders every signal as a link when none is locked", async () => {

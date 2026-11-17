@@ -17,8 +17,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { AxiosInstance } from "axios";
 
 vi.mock("./http", () => ({ default: vi.fn() }));
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import http from "./http";
+import analytics from "./product_analytics";
 import service, { type PublicLinkConfig } from "./public_dashboards_admin";
 
 const cfg: PublicLinkConfig = {
@@ -102,6 +104,35 @@ describe("public_dashboards_admin service", () => {
       { expected_publisher: "a@b.c" },
       { silentForbidden: true },
     );
+  });
+
+  it("tracks each link write once it succeeds, with the link's shape but not its content", async () => {
+    await service.create("org1", "dash1", cfg);
+    await service.update("org1", "dash1", "l1", { ...cfg, expires_at: 1 });
+    await service.pause("org1", "dash1", "l1");
+    await service.resume("org1", "dash1", "l1");
+    await service.takeOver("org1", "dash1", "l1", "a@b.c");
+    await service.refresh("org1", "dash1", "l1");
+    await service.revoke("org1", "dash1", "l1");
+    expect(analytics.track).toHaveBeenCalledWith("public_dashboard_link_created", {
+      ranges: 1,
+      auto_refresh: true,
+      expires: false,
+    });
+    expect(analytics.track).toHaveBeenCalledWith("public_dashboard_link_updated", {
+      ranges: 1,
+      auto_refresh: true,
+      expires: true,
+    });
+    for (const event of ["paused", "resumed", "taken_over", "refreshed", "revoked"]) {
+      expect(analytics.track).toHaveBeenCalledWith(`public_dashboard_link_${event}`);
+    }
+  });
+
+  it("does not track a write the server refused", async () => {
+    mockHttp.post.mockRejectedValueOnce(new Error("403"));
+    await expect(service.create("org1", "dash1", cfg)).rejects.toThrow();
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   it("reads a batch of link statuses for the org list", async () => {

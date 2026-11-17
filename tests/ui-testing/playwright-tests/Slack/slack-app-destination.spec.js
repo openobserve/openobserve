@@ -391,14 +391,17 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
     expect(me).toHaveProperty('next_shift_at');
     const card = byTest('slack-oncall-unlinked');
     await expect(card).toBeVisible();
-    await expect(card).toContainText(ROOT);
+    // The row names the person by display name; their email keys the row and rides in the tooltip.
+    await expect(card.locator(`[data-test="slack-oncall-unlinked-person-${ROOT}"]`)).toBeVisible();
+    await expect(card.locator(`[data-test="slack-oncall-unlinked-teams-${ROOT}"]`)).toContainText(`pw-payments-${u}`);
     await expect(byTest(`slack-oncall-unlinked-reminder-${ROOT}`)).toContainText('Not sent');
     await shoot(page, 'c4-mk6b-settings');
 
     const dmsBefore = (await api.mockRequests(apiContext, 'chat.postMessage')).length;
     await byTest('slack-oncall-unlinked-remind').click();
     await expect(toast('success')).toBeVisible({ timeout: 20000 });
-    await expect(byTest(`slack-oncall-unlinked-reminder-${ROOT}`)).toContainText('DM sent', { timeout: 20000 });
+    // A sent reminder renders OTimeCell's relative time, so the cell reads "0 seconds ago" or a nearby instant.
+    await expect(byTest(`slack-oncall-unlinked-reminder-${ROOT}`)).toHaveText(/^\s*(\d+ (second|minute)s? ago|in \d+ seconds?)\s*$/, { timeout: 20000 });
     expect((await api.mockRequests(apiContext, 'chat.postMessage')).length).toBeGreaterThan(dmsBefore);
     const again = await api.ok(apiContext, 'post', `/api/${org}/slack/installations/${install.id}/oncall-unlinked/remind`);
     expect(again).toHaveProperty('sent');

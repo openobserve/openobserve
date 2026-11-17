@@ -337,18 +337,18 @@ function sanitizeStaticPart(str: string): string[] {
   return str.split("").map((char) => (/[a-zA-Z0-9]/.test(char) ? char : "_"));
 }
 
+// Bumped per request so only the latest getStreams response writes the options.
+let streamListRequestId = 0;
+
 async function getStreamList() {
-  const streamType = Object.prototype.hasOwnProperty.call(
-    pipelineObj.currentSelectedNodeData.data,
-    "stream_type",
-  )
-    ? pipelineObj.currentSelectedNodeData.data.stream_type
-    : "logs";
+  const requestId = ++streamListRequestId;
+  const streamType = formStreamType.value;
 
   isFetchingStreams.value = true;
 
   try {
-    const res: any = await getStreams(formStreamType.value, false);
+    const res: any = await getStreams(streamType, false);
+    if (requestId !== streamListRequestId) return;
 
     if (
       res.list.length > 0 &&
@@ -370,7 +370,7 @@ async function getStreamList() {
       disabled: stream.isDisable || false,
     }));
   } finally {
-    isFetchingStreams.value = false;
+    if (requestId === streamListRequestId) isFetchingStreams.value = false;
   }
 }
 const updateStreams = () => {

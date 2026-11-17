@@ -399,6 +399,7 @@ async fn search_index_window(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: true,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,
@@ -1504,6 +1505,10 @@ async fn resolve_org_streams(org_id: &str, filter: &[String]) -> Result<(Vec<Str
         (status = 400, description = "Invalid parameters"),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Failure")
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 pub async fn get_trace_time_range(
@@ -1591,7 +1596,9 @@ pub async fn get_trace_time_range(
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Failure")
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
+    )
 )]
 pub async fn get_org_trace_time_range(
     Path(org_id): Path<String>,

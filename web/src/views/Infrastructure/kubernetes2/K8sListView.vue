@@ -291,6 +291,7 @@ const namespaceOf = (row: any): string =>
     :frame="false"
     :show-global-filter="false"
     persist-columns
+    enable-column-resize
     :table-id="tableId"
     :column-visibility="defaultVisibility"
     :forbidden="forbidden"

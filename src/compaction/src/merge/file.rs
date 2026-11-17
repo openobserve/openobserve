@@ -35,8 +35,8 @@ use infra::{
 };
 use metrics_index::MetricsFileLayout;
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::{
-    exec::TableBuilder,
+use search::{
+    datafusion::exec::TableBuilder,
     merge::{self, MergeMode, MergeOutput, MergeResult, MergedFile},
 };
 use tantivy_utils::index_builder::{TantivyIndexOptions, create_tantivy_index};

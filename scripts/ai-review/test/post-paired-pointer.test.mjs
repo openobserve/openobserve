@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ANY_REVIEW_MARKER, isPlaceholderComment, selectOwnReviewComment } from "../src/comments.mjs";
+import { ANY_REVIEW_MARKER, isPlaceholderComment, manualReviews, selectOwnReviewComment } from "../src/comments.mjs";
 
 const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), "../post-paired-pointer.sh");
 const MARKER = "<!-- ai-code-review -->";
@@ -47,6 +47,15 @@ test("the pointer keeps the review count of the comment it replaces", t => {
   runWithFakeGh(t, [[comment(3, BOT, `${MARKER}\nreview\n<!-- o2-review-pass:2 -->`)]]);
   assert.match(t.body, /<!-- o2-paired-pointer -->/);
   assert.match(t.body, /<!-- o2-review-pass:2 -->$/);
+});
+
+test("the pointer keeps the manual review count and its commit, and a comment without one stays without", t => {
+  const manual = `<!-- o2-review-manual:2:${"a".repeat(40)}+${"b".repeat(40)} -->`;
+  runWithFakeGh(t, [[comment(3, BOT, `${MARKER}\nreview\n<!-- o2-review-pass:4 -->\n${manual}`)]]);
+  assert.ok(t.body.endsWith(`\n<!-- o2-review-pass:4 -->\n${manual}`), t.body);
+  assert.deepEqual(manualReviews(t.body), { count: 2, key: `${"a".repeat(40)}+${"b".repeat(40)}` });
+  runWithFakeGh(t, [[comment(3, BOT, `${MARKER}\nreview\n<!-- o2-review-pass:2 -->`)]]);
+  assert.equal(t.body.includes("o2-review-manual"), false);
 });
 
 test("the pointer replaces the same comment the runner and the fallback reader pick, whatever marker it carries", t => {

@@ -18,8 +18,8 @@ use config::{get_config, meta::stream::StreamType};
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 use openobserve_api_management::request::{
-    gen_ai, keys, kv, rum_analytics, service_accounts, service_streams, short_url, status, stream,
-    synthetics,
+    gen_ai, keys, kv, rum_analytics, service_accounts, service_identity, service_streams,
+    service_versions, short_url, status, stream, synthetics,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
@@ -108,6 +108,7 @@ use crate::{
         rum::ingest::data,
         rum::ingest::sessionreplay,
         openobserve_api_management::request::ingest_rejections::recent_rejections,
+        openobserve_api_management::request::security::get_security_access,
         openobserve_api_search::search::search,
         openobserve_api_search::search::search_partition,
         openobserve_api_search::search::query_functions::list,
@@ -158,6 +159,9 @@ use crate::{
         openobserve_api_management::request::dashboards::timed_annotations::delete_annotations,
         openobserve_api_management::request::dashboards::timed_annotations::update_annotations,
         openobserve_api_management::request::dashboards::timed_annotations::delete_annotation_panels,
+        openobserve_api_management::request::sample_data::get,
+        openobserve_api_management::request::sample_data::put,
+        openobserve_api_management::request::sample_data::delete,
         openobserve_api_management::request::alerts::create_alert,
         openobserve_api_management::request::alerts::validate_composite_alert,
         openobserve_api_management::request::alerts::get_composite_references,
@@ -186,6 +190,7 @@ use crate::{
         openobserve_api_management::request::alerts::history::get_alert_history,
         openobserve_api_management::request::alerts::auto_investigate::list_auto_investigate_decisions,
         openobserve_api_management::request::alerts::incidents::list_incidents,
+        openobserve_api_management::request::alerts::incidents::create_incident,
         openobserve_api_management::request::alerts::incidents::get_incident,
         openobserve_api_management::request::alerts::incidents::update_incident,
         openobserve_api_management::request::alerts::incidents::get_incident_stats,
@@ -307,6 +312,23 @@ use crate::{
         openobserve_api_management::request::db_monitoring::handler::get_dbm_instances,
         openobserve_api_management::request::db_monitoring::handler::get_dbm_instance_metrics,
         openobserve_api_management::request::db_monitoring::handler::get_dbm_badges,
+        service_versions::list,
+        service_versions::deploys,
+        service_versions::verdicts,
+        service_versions::services,
+        service_versions::compare,
+        service_versions::delete,
+        service_identity::envs,
+        service_identity::unresolved,
+        service_identity::overrides,
+        service_identity::put_override,
+        service_identity::delete_override,
+        service_identity::list_aliases,
+        service_identity::create_alias,
+        service_identity::update_alias,
+        service_identity::delete_alias,
+        service_identity::bulk_aliases,
+        service_identity::undo_aliases,
         service_streams::list_services,
         service_streams::get_dimension_analytics,
         service_streams::correlate_streams,
@@ -317,6 +339,7 @@ use crate::{
         gen_ai::get_agent_mapping,
         gen_ai::list_scored_agents,
         gen_ai::save_agent_mapping,
+        gen_ai::strip_harness_text,
         openobserve_api_management::request::gen_ai_health::get_data_health,
         openobserve_api_management::request::model_pricing::list_unpriced,
         openobserve_api_management::request::alerts::deduplication::get_semantic_groups,
@@ -549,6 +572,7 @@ use crate::{
         openobserve_api_management::request::status_pages::admin::list_page_notices,
         openobserve_api_management::request::status_pages::admin::list_pages,
         openobserve_api_management::request::status_pages::admin::mark_false_positive,
+        openobserve_api_management::request::status_pages::admin::undo_false_positive,
         openobserve_api_management::request::status_pages::admin::preview,
         openobserve_api_management::request::status_pages::admin::rotate_slug,
         openobserve_api_management::request::status_pages::admin::set_components,
@@ -609,9 +633,16 @@ use crate::{
             config::meta::stream::StreamPartitionType,
             config::meta::stream::StreamStats,
             config::meta::stream::UpdateStreamSettings,
+            config::meta::stream::SecuritySourceSetting,
             config::meta::gen_ai::GenAiAgentMappingConfig,
+            config::meta::gen_ai::HarnessStripRequest,
+            config::meta::gen_ai::HarnessStripResponse,
+            config::meta::gen_ai::HarnessStripped,
             gen_ai::GenAiAgentListItem,
             gen_ai::GenAiAgentListResponse,
+            openobserve_core::sample_data::SampleDataStatus,
+            openobserve_core::sample_data::SampleDataState,
+            openobserve_core::sample_data::PutSampleDataRequest,
             openobserve_api_management::request::gen_ai_health::DataHealthResponse,
             openobserve_api_management::request::gen_ai_health::HealthCheck,
             openobserve_api_management::request::gen_ai_health::ModelUsage,
@@ -860,6 +891,7 @@ use crate::{
             openobserve_api_management::request::query_history::QueryHistoryListResponse,
             openobserve_api_management::request::query_history::QueryHistoryClearResponse,
             meta::user::UpdateUser,
+            meta::user::UpdateUserRole,
             meta::user::UserRoleRequest,
             meta::user::PostUserRequest,
             meta::user::UserOrgRole,
@@ -880,6 +912,7 @@ use crate::{
             meta::organization::OrgRenameBody,
             meta::organization::OrganizationSetting,
             meta::organization::OrganizationSettingResponse,
+            config::meta::stream::DataRetentionDefaults,
             meta::organization::RumIngestionResponse,
             meta::organization::RumIngestionToken,
             openobserve_api_management::request::organization::assume_service_account::AssumeServiceAccountRequest,
@@ -1045,6 +1078,7 @@ use crate::{
         (name = "Product Analytics", description = "RUM Product Analytics named events and saved funnels"),
         (name = "Metrics", description = "Metrics data ingestion operations"),
         (name = "Traces", description = "Traces data ingestion operations"),
+        (name = "Service Versions", description = "Service identity, versions, deploys and verdicts"),
         (name = "Profiles", description = "Profiles query and discovery operations"),
         (name = "Clusters", description = "Super cluster operations"),
         (name = "Short Url", description = "Short Url Service"),
@@ -1059,6 +1093,7 @@ use crate::{
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
+        (name = "Security", description = "Security sources, OCSF packs, detections, cases and investigation (enterprise)"),
         (name = "AWS Marketplace", description = "AWS Marketplace subscription linking (cloud)"),
         (name = "AnnotationQueues", description = "Annotation queues for human review of LLM traces (enterprise)"),
         (name = "Annotations", description = "Annotations on traces and spans (enterprise)"),
@@ -1083,12 +1118,22 @@ use crate::{
         (name = "Reports", description = "Report management"),
         (name = "Resources", description = "Resources available for role permissions"),
         (name = "Roles", description = "Role management"),
+        (name = "Sample Data", description = "Sample data state for the onboarding tour"),
         (name = "ScoreConfigs", description = "Score configurations for LLM evaluation (enterprise)"),
         (name = "Scorers", description = "LLM evaluation scorers (enterprise)"),
         (name = "ServiceAccounts", description = "Service account management"),
         (name = "Sourcemaps", description = "Source map upload and stack trace translation"),
         (name = "Status Pages", description = "Public status pages, notices and custom domains"),
         (name = "Templates", description = "Alert notification templates"),
+        (name = "SLOs", description = "Service level objectives and their alert previews"),
+        (name = "Folders", description = "Folders that group dashboards, alerts and other resources"),
+        (name = "GenAI Settings", description = "Gen-AI agent registry and agent mapping settings"),
+        (name = "Ingestion", description = "Ingestion diagnostics such as recently rejected records"),
+        (name = "Search Jobs", description = "Asynchronous search jobs and their results"),
+        (name = "Rum", description = "Real user monitoring data ingestion"),
+        (name = "Playground", description = "LLM playground runs, scores and shared snapshots (enterprise)"),
+        (name = "Prompts", description = "Versioned LLM prompts and their labels (enterprise)"),
+        (name = "RemoteTasks", description = "Remote tasks, their drafts, secrets and signing keys (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -1100,6 +1145,50 @@ pub struct ApiDoc;
 #[cfg(feature = "enterprise")]
 #[derive(OpenApi)]
 #[openapi(paths(
+    openobserve_api_management::request::security::cases::get_case_settings,
+    openobserve_api_management::request::security::cases::update_case_settings,
+    openobserve_api_management::request::security::cases::lookup_cases,
+    openobserve_api_management::request::security::cases::promote_to_case,
+    openobserve_api_management::request::security::triage::search_cases,
+    openobserve_api_management::request::security::triage::bulk_update,
+    openobserve_api_management::request::security::triage::merge_cases,
+    openobserve_api_management::request::security::tuning::list_exceptions,
+    openobserve_api_management::request::security::tuning::create_exception,
+    openobserve_api_management::request::security::tuning::update_exception,
+    openobserve_api_management::request::security::tuning::delete_exception,
+    openobserve_api_management::request::security::tuning::list_allowlists,
+    openobserve_api_management::request::security::tuning::put_allowlist,
+    openobserve_api_management::request::security::tuning::delete_allowlist,
+    openobserve_api_management::request::security::tuning::list_suppressions,
+    openobserve_api_management::request::security::tuning::create_suppression,
+    openobserve_api_management::request::security::tuning::delete_suppression,
+    openobserve_api_management::request::security::audit::list_security_audit,
+    openobserve_api_management::request::security::investigate::list_entities,
+    openobserve_api_management::request::security::investigate::get_entity_graph,
+    openobserve_api_management::request::security::investigate::get_entity_detail,
+    openobserve_api_management::request::security::investigate::score_users,
+    openobserve_api_management::request::security::investigate::search_events,
+    openobserve_api_management::request::security::intel::sweep,
+    openobserve_api_management::request::security::intel::sightings,
+    openobserve_api_management::request::security::intel::validate,
+    openobserve_api_management::request::security::list_ocsf_packs,
+    openobserve_api_management::request::security::sources::list_sources,
+    openobserve_api_management::request::security::sources::list_source_types,
+    openobserve_api_management::request::security::sources::match_source,
+    openobserve_api_management::request::security::sources::classify_sources,
+    openobserve_api_management::request::security::sources::attach_pack,
+    openobserve_api_management::request::security::sources::detach_pack,
+    openobserve_api_management::request::security::sources::set_inclusion,
+    openobserve_api_management::request::security::sources::set_source_type,
+    openobserve_api_management::request::security::sources::get_source_schema,
+    openobserve_api_management::request::security::sigma::get_catalog,
+    openobserve_api_management::request::security::sigma::compile,
+    openobserve_api_management::request::security::sigma::get_mitre_coverage,
+    openobserve_api_management::request::security::sigma::get_detection_evidence,
+    openobserve_api_management::request::slack::insights::get_insights_settings,
+    openobserve_api_management::request::slack::insights::put_insights_settings,
+    openobserve_api_management::request::security::detections::update_detection,
+    openobserve_api_management::request::security::detections::preview_detection,
     openobserve_api_management::request::prompts::list_prompts,
     openobserve_api_management::request::prompts::create_prompt,
     openobserve_api_management::request::prompts::match_prompts,
@@ -1168,6 +1257,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::alert_calibration::digests::list_runs_for_alert,
     openobserve_api_management::request::alert_calibration::digests::get_run_records,
     openobserve_api_management::request::alert_calibration::digests::count_findings_by_rule,
+    openobserve_api_management::request::alert_calibration::dismissals::list_dismissals,
+    openobserve_api_management::request::alert_calibration::dismissals::dismiss_finding,
+    openobserve_api_management::request::alert_calibration::dismissals::reopen_dismissal,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_deadlocks,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_blocking,
     openobserve_api_management::request::db_monitoring::handler::get_dbm_table_health,
@@ -1181,6 +1273,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::anomaly_detection::detect_anomalies,
     openobserve_api_management::request::anomaly_detection::get_detection_history,
     openobserve_api_management::request::alerts::history::get_all_anomaly_history,
+    openobserve_api_management::request::alerts::history_summary::get_alert_history_summary,
     openobserve_api_management::request::workflows::save_workflow,
     openobserve_api_management::request::workflows::list_workflows,
     openobserve_api_management::request::workflows::move_workflows,
@@ -1193,13 +1286,6 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::enable_workflow,
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
-    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
-    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
-    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
-    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
-    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
-    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
-    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
     crate::handler::http::request::ratelimit::api_modules,
     openobserve_api_management::request::ai::chat::cancel,
     openobserve_api_management::request::ai::chat::chat,
@@ -1390,6 +1476,27 @@ pub struct ApiDoc;
     openobserve_core::traces::agent_signals::api::compare_agent_versions,
     openobserve_core::traces::agent_signals::api::get_agent_signals,
     openobserve_core::traces::service_graph::api::get_edge_history,
+    openobserve_api_management::request::autoobserve::entity_types,
+    openobserve_api_management::request::autoobserve::coverage,
+    openobserve_api_management::request::autoobserve::coverage_history,
+    openobserve_api_management::request::autoobserve::writable_folders,
+    openobserve_api_management::request::autoobserve::stream_volume,
+    openobserve_api_management::request::autoobserve::suggestions,
+    openobserve_api_management::request::autoobserve::decisions::preview_decision,
+    openobserve_api_management::request::autoobserve::decisions::decide,
+    openobserve_api_management::request::autoobserve::decisions::undo_decision,
+    openobserve_api_management::request::autoobserve::decisions::list_decisions,
+    openobserve_api_management::request::autoobserve::list_marks,
+    openobserve_api_management::request::autoobserve::put_mark,
+    openobserve_api_management::request::autoobserve::delete_mark,
+    openobserve_api_management::request::autoobserve::incidents::list_incidents,
+    openobserve_api_management::request::autoobserve::review::get_review,
+    openobserve_api_management::request::autoobserve::review::put_verdict,
+    openobserve_api_management::request::autoobserve::paging::get_paging_settings,
+    openobserve_api_management::request::autoobserve::paging::put_paging_settings,
+))]
+#[openapi(tags(
+    (name = "AutoObserve", description = "Monitoring coverage, suggestions and entity marks from the AutoObserve engine (enterprise)"),
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -1399,6 +1506,20 @@ pub struct ApiDoc;
     openobserve_core::alerts::rca_resume::ResumeStep,
 )))]
 struct EnterpriseExperimentApiDoc;
+
+/// Cloud builds never mount the workflow HTTP-trigger routes, so they stay out of its spec.
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+#[derive(OpenApi)]
+#[openapi(paths(
+    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
+    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
+))]
+struct WorkflowHttpTriggerApiDoc;
 
 #[cfg(feature = "cloud")]
 #[derive(OpenApi)]
@@ -1455,25 +1576,27 @@ impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         #[cfg(feature = "enterprise")]
         {
-            let enterprise = EnterpriseExperimentApiDoc::openapi();
-            openapi.paths.paths.extend(enterprise.paths.paths);
-            if let (Some(components), Some(enterprise_components)) =
-                (openapi.components.as_mut(), enterprise.components)
-            {
-                components.schemas.extend(enterprise_components.schemas);
-                components.responses.extend(enterprise_components.responses);
-            }
+            let mut enterprise = EnterpriseExperimentApiDoc::openapi();
+            openapi
+                .tags
+                .get_or_insert_with(Vec::new)
+                .extend(enterprise.tags.take().unwrap_or_default());
+            overlay_doc(openapi, enterprise);
         }
+        #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+        overlay_doc(openapi, WorkflowHttpTriggerApiDoc::openapi());
         #[cfg(feature = "cloud")]
+        overlay_doc(openapi, CloudQuotaApiDoc::openapi());
+        // The hand-written history params cannot be cfg-gated, and `siem` is enterprise-only.
+        #[cfg(not(feature = "enterprise"))]
+        if let Some(params) = openapi
+            .paths
+            .paths
+            .get_mut("/api/v2/{org_id}/alerts/history")
+            .and_then(|path| path.get.as_mut())
+            .and_then(|op| op.parameters.as_mut())
         {
-            let cloud = CloudQuotaApiDoc::openapi();
-            openapi.paths.paths.extend(cloud.paths.paths);
-            if let (Some(components), Some(cloud_components)) =
-                (openapi.components.as_mut(), cloud.components)
-            {
-                components.schemas.extend(cloud_components.schemas);
-                components.responses.extend(cloud_components.responses);
-            }
+            params.retain(|param| param.name != "siem");
         }
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
@@ -1580,6 +1703,28 @@ pub async fn openapi_info() -> OpenapiInfo {
     tag_operations
 }
 
+#[cfg(any(feature = "enterprise", feature = "cloud"))]
+fn overlay_doc(openapi: &mut utoipa::openapi::OpenApi, extra: utoipa::openapi::OpenApi) {
+    overlay_paths(&mut openapi.paths, extra.paths);
+    if let (Some(components), Some(extra_components)) =
+        (openapi.components.as_mut(), extra.components)
+    {
+        components.schemas.extend(extra_components.schemas);
+        components.responses.extend(extra_components.responses);
+    }
+}
+
+/// Lays `extra` over `paths` per method: its operations win, the base keeps methods `extra` lacks.
+#[cfg(any(feature = "enterprise", feature = "cloud"))]
+fn overlay_paths(paths: &mut utoipa::openapi::Paths, extra: utoipa::openapi::Paths) {
+    for (path, mut item) in extra.paths {
+        if let Some(base) = paths.paths.remove(&path) {
+            item.merge_operations(base);
+        }
+        paths.paths.insert(path, item);
+    }
+}
+
 #[cfg(all(test, feature = "enterprise"))]
 mod experiment_tests {
     use super::*;
@@ -1592,9 +1737,9 @@ mod experiment_tests {
         let anomaly_cases = [
             (anomaly.to_string(), "get"),
             (anomaly.to_string(), "post"),
-            (format!("{anomaly}/{{anomaly_id}}"), "delete"),
-            (format!("{anomaly}/{{anomaly_id}}/train"), "post"),
-            (format!("{anomaly}/{{anomaly_id}}/detect"), "post"),
+            (format!("{anomaly}/{{config_id}}"), "delete"),
+            (format!("{anomaly}/{{config_id}}/train"), "post"),
+            (format!("{anomaly}/{{config_id}}/detect"), "post"),
             (format!("{anomaly}/history"), "get"),
         ];
         for (path, method) in &anomaly_cases {
@@ -1606,13 +1751,13 @@ mod experiment_tests {
             let ext = &paths[path.as_str()]["get"]["x-o2-mcp"];
             assert_eq!(ext["category"], "db_monitoring", "{path}");
         }
-        let delete = &paths[format!("{anomaly}/{{anomaly_id}}").as_str()]["delete"];
+        let delete = &paths[format!("{anomaly}/{{config_id}}").as_str()]["delete"];
         assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
-        let history = &paths[format!("{anomaly}/{{anomaly_id}}/history").as_str()]["get"];
+        let history = &paths[format!("{anomaly}/{{config_id}}/history").as_str()]["get"];
         assert_eq!(history["x-o2-mcp"]["enabled"], false);
         for path in [
             anomaly.to_string(),
-            format!("{anomaly}/{{anomaly_id}}/history"),
+            format!("{anomaly}/{{config_id}}/history"),
         ] {
             let body =
                 &paths[path.as_str()]["get"]["responses"]["200"]["content"]["application/json"];
@@ -1707,22 +1852,16 @@ mod tests {
         ("/api/{org_id}/anomaly_detection", "get"),
         ("/api/{org_id}/anomaly_detection", "post"),
         ("/api/{org_id}/anomaly_detection/history", "get"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "get"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "put"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "delete"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}/train", "post"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "get"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "put"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "delete"),
+        ("/api/{org_id}/anomaly_detection/{config_id}/train", "post"),
         (
-            "/api/{org_id}/anomaly_detection/{anomaly_id}/train",
+            "/api/{org_id}/anomaly_detection/{config_id}/train",
             "delete",
         ),
-        (
-            "/api/{org_id}/anomaly_detection/{anomaly_id}/detect",
-            "post",
-        ),
-        (
-            "/api/{org_id}/anomaly_detection/{anomaly_id}/history",
-            "get",
-        ),
+        ("/api/{org_id}/anomaly_detection/{config_id}/detect", "post"),
+        ("/api/{org_id}/anomaly_detection/{config_id}/history", "get"),
         ("/api/{org_id}/workflows", "get"),
         ("/api/{org_id}/workflows", "post"),
         ("/api/v2/{org_id}/workflows/move", "patch"),
@@ -2023,6 +2162,12 @@ mod tests {
         })
     }
 
+    /// Cloud never mounts the HTTP-trigger routes, so its spec leaves them out.
+    #[cfg(feature = "enterprise")]
+    fn published_in_this_edition(path: &str) -> bool {
+        !(cfg!(feature = "cloud") && path.contains("/http_trigger"))
+    }
+
     #[cfg(feature = "enterprise")]
     fn registered_gated_routes() -> BTreeSet<(String, String)> {
         // The licence-gated search routes are a separate group that service_routes() merges in.
@@ -2063,6 +2208,9 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let mut wrong = Vec::new();
         for (path, method, statuses) in expected {
+            if !published_in_this_edition(path) {
+                continue;
+            }
             let Some(operation) = paths.get(*path).and_then(|item| item.get(*method)) else {
                 wrong.push(format!("{method} {path}: absent from the spec"));
                 continue;
@@ -2137,6 +2285,81 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn a_build_without_enterprise_publishes_no_autoobserve_path_or_tag() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths: Vec<&String> = spec["paths"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|p| p.contains("autoobserve"))
+            .collect();
+        assert!(paths.is_empty(), "{paths:?}");
+        let tags = spec["tags"].to_string();
+        assert!(!tags.contains("AutoObserve"), "{tags}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn autoobserve_paths_are_rate_limited_mcp_tagged_and_delete_has_no_body() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let tags = spec["tags"].as_array().unwrap();
+        assert!(tags.iter().any(|t| t["name"] == "AutoObserve"), "{tags:?}");
+        let paths = &spec["paths"];
+        let mark = "/api/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}";
+        let base = "/api/v2/{org_id}/autoobserve";
+        for (path, method, operation) in [
+            (format!("{base}/entity_types"), "get", "list"),
+            (format!("{base}/coverage"), "get", "get"),
+            (format!("{base}/coverage/history"), "get", "list"),
+            (format!("{base}/suggestions"), "get", "list"),
+            (format!("{base}/streams/volume"), "get", "get"),
+            (format!("{base}/incidents"), "get", "list"),
+            (format!("{base}/marks"), "get", "list"),
+            (mark.to_string(), "put", "update"),
+            (mark.to_string(), "delete", "delete"),
+            (format!("{base}/review"), "get", "list"),
+            (
+                format!("{base}/review/{{decision_kind}}/{{cohort_id}}"),
+                "put",
+                "update",
+            ),
+        ] {
+            let op = &paths[path.as_str()][method];
+            assert_eq!(
+                op["x-o2-ratelimit"]["module"], "AutoObserve",
+                "{method} {path}"
+            );
+            assert_eq!(
+                op["x-o2-ratelimit"]["operation"], operation,
+                "{method} {path}"
+            );
+            assert_eq!(op["x-o2-mcp"]["category"], "autoobserve", "{method} {path}");
+            let responses = &op["responses"];
+            assert_eq!(
+                responses["403"]["description"], "Forbidden",
+                "{method} {path}"
+            );
+            assert!(
+                responses["404"]["description"]
+                    .as_str()
+                    .is_some_and(|d| d.contains("disabled")),
+                "{method} {path}: a switched-off deployment is a 404"
+            );
+        }
+        let delete = &paths[mark]["delete"];
+        assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
+        assert!(delete.get("requestBody").is_none(), "{delete}");
+        let params = delete["parameters"].as_array().unwrap();
+        assert!(
+            params
+                .iter()
+                .any(|p| p["name"] == "group_key" && p["in"] == "query"),
+            "{params:?}"
+        );
+    }
+
     #[test]
     fn slack_paths_are_rate_limited_and_hidden_from_mcp() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
@@ -2167,6 +2390,13 @@ mod tests {
             .iter()
             .map(|(m, p)| (m.to_string(), p.to_string()))
             .collect();
+        #[cfg(feature = "enterprise")]
+        want.extend(["get", "put"].map(|m| {
+            (
+                m.to_string(),
+                "/api/{org_id}/slack/insights-settings".to_string(),
+            )
+        }));
         want.sort();
         assert_eq!(documented, want);
     }
@@ -2243,6 +2473,333 @@ mod tests {
         }
     }
 
+    /// The schema with every object closed, so an undeclared key, a missing required key or a
+    /// wrong type fails.
+    fn closed(mut schema: serde_json::Value) -> serde_json::Value {
+        if let Some(object) = schema.as_object_mut() {
+            let object_type = |kind: &serde_json::Value| {
+                kind == "object"
+                    || kind
+                        .as_array()
+                        .is_some_and(|kinds| kinds.contains(&"object".into()))
+            };
+            let is_object =
+                object.contains_key("properties") || object.get("type").is_some_and(object_type);
+            if is_object && !object.contains_key("additionalProperties") {
+                object.insert("additionalProperties".into(), false.into());
+            }
+            for value in object.values_mut() {
+                *value = closed(value.take());
+            }
+        } else if let Some(items) = schema.as_array_mut() {
+            for value in items {
+                *value = closed(value.take());
+            }
+        }
+        schema
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn compare_payload() -> serde_json::Value {
+        let user = openobserve_api_common::extractors::Headers(openobserve_core::auth::UserEmail {
+            user_id: "reader@example.com".into(),
+        });
+        let request = serde_json::json!({"signals": ["traces", "rum"]});
+        let response = super::service_versions::compare(
+            axum::extract::Path("org".into()),
+            user,
+            axum::Json(request),
+        )
+        .await;
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn compare_payload() -> serde_json::Value {
+        openobserve_core::service_identity::signals::api::representative_compare()
+    }
+
+    #[tokio::test]
+    async fn service_version_paths_document_their_inputs_and_results() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let params = spec["paths"]["/api/{org_id}/service_versions"]["get"]["parameters"].clone();
+        let service = params
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == "service");
+        assert_eq!(service.unwrap()["required"], true, "{params}");
+        let schemas = &spec["components"]["schemas"];
+        assert_eq!(
+            schemas["VersionCompareRequest"]["required"],
+            serde_json::json!(["service", "where", "a", "signals"])
+        );
+        assert_eq!(
+            schemas["VersionCompareArm"]["required"],
+            serde_json::json!(["version"])
+        );
+        for (schema, field, refers_to) in [
+            ("CompareResponse", "arms", "VersionCompareArms"),
+            ("CompareResponse", "live_verdict", "VersionVerdict"),
+            ("VersionCompareArms", "b", "VersionBaselineArmResult"),
+            ("VersionCompareArmResult", "coverage", "ArmCoverage"),
+            ("DeployList", "deploys", "DeployMarker"),
+            ("DeployMarker", "verdict", "VersionVerdict"),
+            ("VerdictList", "verdicts", "VersionVerdict"),
+            ("VersionVerdict", "metrics", "VerdictMetric"),
+            ("CatalogService", "where", "CatalogWhere"),
+            ("CatalogService", "newest_verdict", "VersionVerdict"),
+        ] {
+            let property = schemas[schema]["properties"][field].to_string();
+            let target = format!("#/components/schemas/{refers_to}");
+            assert!(property.contains(&target), "{schema}.{field}: {property}");
+        }
+        for field in [
+            "where_key",
+            "env",
+            "no_env",
+            "current_version",
+            "tracking_started",
+        ] {
+            let catalog = &schemas["CatalogService"]["properties"];
+            assert!(catalog.get(field).is_some(), "CatalogService.{field}");
+        }
+        let versions = serde_json::json!({
+            "$ref": "#/components/schemas/ServiceVersionList",
+            "components": closed(spec["components"].clone()),
+        });
+        let validator = jsonschema::draft202012::new(&versions).unwrap();
+        for count in [0, 3] {
+            let payload = serde_json::json!({"service":"checkout", "aliases_applied":[],
+                "versions":[], "total":0, "purged_versions":count,
+                "tracking":{"epoch":null,"warmup_ends_at":null}});
+            assert!(validator.is_valid(&payload), "{payload}");
+        }
+        // Every key a compare emits must be declared, so the schema cannot drift from its builders.
+        let root = serde_json::json!({
+            "$ref": "#/components/schemas/CompareResponse",
+            "components": closed(spec["components"].clone()),
+        });
+        let payload = compare_payload().await;
+        let errors: Vec<_> = jsonschema::draft202012::new(&root)
+            .unwrap()
+            .iter_errors(&payload)
+            .map(|error| format!("{error} at {}", error.instance_path()))
+            .collect();
+        assert!(errors.is_empty(), "{errors:#?}");
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn siem_filters_are_not_advertised_in_oss() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/v2/{org_id}/alerts/history",
+            "/api/v2/{org_id}/alerts/incidents",
+        ] {
+            let params = spec["paths"][path]["get"]["parameters"].as_array().unwrap();
+            assert!(!params.is_empty(), "{path}");
+            assert!(params.iter().all(|p| p["name"] != "siem"), "{path}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn ocsf_packs_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/ocsf/packs"]["get"];
+        assert_eq!(op["operationId"], "ListOcsfPacks", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/OcsfPacksResponse"
+        );
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "OcsfPacksResponse",
+            "OcsfPack",
+            "OcsfPackManifest",
+            "OcsfPackKind",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_sources_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, id) in [
+            (
+                "/api/{org_id}/security/sources",
+                "get",
+                "ListSecuritySources",
+            ),
+            (
+                "/api/{org_id}/security/sources/types",
+                "get",
+                "ListSecuritySourceTypes",
+            ),
+            (
+                "/api/{org_id}/security/sources/match",
+                "post",
+                "MatchSecuritySource",
+            ),
+            (
+                "/api/{org_id}/security/sources/classify",
+                "post",
+                "ClassifySecuritySources",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/attach",
+                "post",
+                "AttachSecuritySourcePack",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/detach",
+                "post",
+                "DetachSecuritySourcePack",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/source_type",
+                "post",
+                "SetSecuritySourceType",
+            ),
+        ] {
+            assert_eq!(spec["paths"][path][method]["operationId"], id, "{path}");
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "SourceListing",
+            "SourceRow",
+            "SourceType",
+            "MatchResponse",
+            "AttachError",
+            "AttachPlan",
+            "DetachSkip",
+            "SourceTypeRequest",
+            "SecurityTypeOrigin",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn security_access_path_and_schema_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/access"]["get"];
+        assert_eq!(op["operationId"], "GetSecurityAccess", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SecurityAccessResponse"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_investigation_paths_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, id, schema) in [
+            (
+                "/api/{org_id}/security/entities",
+                "ListSecurityEntities",
+                "EntitiesResponse",
+            ),
+            (
+                "/api/{org_id}/security/entities/graph",
+                "GetSecurityEntityGraph",
+                "EntityGraphResponse",
+            ),
+            (
+                "/api/{org_id}/security/entities/detail",
+                "GetSecurityEntityDetail",
+                "EntityDetailResponse",
+            ),
+            (
+                "/api/{org_id}/security/ueba",
+                "ScoreSecurityUsers",
+                "UebaReport",
+            ),
+            (
+                "/api/{org_id}/security/events/search",
+                "SearchSecurityEvents",
+                "EventSearchResponse",
+            ),
+        ] {
+            let op = &spec["paths"][path]["post"];
+            assert_eq!(op["operationId"], id, "{op}");
+            assert_eq!(
+                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                format!("#/components/schemas/{schema}")
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_audit_path_and_schema_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/audit"]["get"];
+        assert_eq!(op["operationId"], "ListSecurityAudit", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SecurityAuditResponse"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_sigma_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, id, schema) in [
+            (
+                "/api/{org_id}/security/sigma/catalog",
+                "get",
+                "GetSigmaCatalog",
+                "SigmaCatalogResponse",
+            ),
+            (
+                "/api/{org_id}/security/sigma/compile",
+                "post",
+                "CompileSigmaRule",
+                "SigmaCompileResponse",
+            ),
+            (
+                "/api/{org_id}/security/mitre/coverage",
+                "get",
+                "GetMitreCoverage",
+                "MitreCoverage",
+            ),
+            (
+                "/api/{org_id}/security/detections/{alert_id}/evidence",
+                "get",
+                "GetDetectionEvidence",
+                "DetectionEvidence",
+            ),
+            (
+                "/api/{org_id}/security/detections/{alert_id}",
+                "put",
+                "UpdateSecurityDetection",
+                "UpdatedDetection",
+            ),
+            (
+                "/api/{org_id}/security/detections/preview",
+                "post",
+                "PreviewSecurityDetection",
+                "DetectionPreviewResponse",
+            ),
+        ] {
+            let op = &spec["paths"][path][method];
+            assert_eq!(op["operationId"], id, "{op}");
+            assert_eq!(
+                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                format!("#/components/schemas/{schema}")
+            );
+        }
+    }
+
     #[test]
     fn unpriced_models_path_and_schemas_are_registered() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
@@ -2295,8 +2852,8 @@ mod tests {
         for (path, method) in [
             ("/api/{org_id}/roles/bulk", "delete"),
             ("/api/{org_id}/groups/bulk", "delete"),
-            ("/api/{org_id}/users/{user_email}/roles", "get"),
-            ("/api/{org_id}/users/{user_email}/groups", "get"),
+            ("/api/{org_id}/users/{user_id}/roles", "get"),
+            ("/api/{org_id}/users/{user_id}/groups", "get"),
         ] {
             let op = &spec["paths"][path][method];
             assert!(op.is_object(), "{method} {path} missing");
@@ -2560,11 +3117,32 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let missing: Vec<_> = GATED_MODULE_ROUTES
             .iter()
+            .filter(|(path, _)| published_in_this_edition(path))
             .filter(|(path, method)| paths.get(*path).and_then(|p| p.get(*method)).is_none())
             .collect();
         assert!(
             missing.is_empty(),
             "absent from the merged spec: {missing:#?}"
+        );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn http_trigger_routes_are_absent_from_the_cloud_spec() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let hidden: Vec<_> = GATED_MODULE_ROUTES
+            .iter()
+            .filter(|(path, _)| !published_in_this_edition(path))
+            .collect();
+        assert_eq!(hidden.len(), 7, "{hidden:#?}");
+        let leaked: Vec<_> = hidden
+            .into_iter()
+            .filter(|(path, method)| paths.get(*path).and_then(|p| p.get(*method)).is_some())
+            .collect();
+        assert!(
+            leaked.is_empty(),
+            "cloud publishes unmounted routes: {leaked:#?}"
         );
     }
 
@@ -2597,6 +3175,9 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let mut invalid = Vec::new();
         for (path, method) in GATED_MODULE_ROUTES {
+            if !published_in_this_edition(path) {
+                continue;
+            }
             let Some(operation) = paths.get(*path).and_then(|p| p.get(*method)) else {
                 invalid.push(format!("{method} {path}: absent from the spec"));
                 continue;
@@ -2624,10 +3205,10 @@ mod tests {
     #[test]
     fn anomaly_detection_documents_the_statuses_its_handlers_return() {
         let base = "/api/{org_id}/anomaly_detection";
-        let by_id = "/api/{org_id}/anomaly_detection/{anomaly_id}";
-        let train = "/api/{org_id}/anomaly_detection/{anomaly_id}/train";
-        let detect = "/api/{org_id}/anomaly_detection/{anomaly_id}/detect";
-        let history = "/api/{org_id}/anomaly_detection/{anomaly_id}/history";
+        let by_id = "/api/{org_id}/anomaly_detection/{config_id}";
+        let train = "/api/{org_id}/anomaly_detection/{config_id}/train";
+        let detect = "/api/{org_id}/anomaly_detection/{config_id}/detect";
+        let history = "/api/{org_id}/anomaly_detection/{config_id}/history";
         let bulk_history = "/api/{org_id}/anomaly_detection/history";
         assert_documented_statuses(&[
             (base, "get", &["200", "403", "500"]),
@@ -2792,6 +3373,9 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let mut wrong = Vec::new();
         for (path, method, operation) in WORKFLOWS_RATELIMIT {
+            if !published_in_this_edition(path) {
+                continue;
+            }
             let Some(op) = paths.get(*path).and_then(|p| p.get(*method)) else {
                 wrong.push(format!("{method} {path}: absent from the spec"));
                 continue;
@@ -2830,7 +3414,15 @@ mod tests {
             let ok = &spec["paths"][path]["get"]["responses"]["200"];
             let schema = &ok["content"]["application/json"]["schema"];
             assert_eq!(schema["type"], "array", "{path}: {ok}");
-            assert_eq!(schema["items"]["type"], "object", "{path}: {ok}");
+            let name = schema["items"]["$ref"]
+                .as_str()
+                .and_then(|r| r.strip_prefix("#/components/schemas/"))
+                .unwrap_or_else(|| panic!("{path}: {ok}"));
+            let item = &spec["components"]["schemas"][name];
+            assert!(
+                item["type"] == "object" || item["allOf"].is_array(),
+                "{path}: {item}"
+            );
         }
     }
 

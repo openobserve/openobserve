@@ -68,14 +68,15 @@ const trackClasses = computed(() => [
 ]);
 
 const fillClasses = computed(() => [
-  "h-full rounded-full transition-[width] duration-300 ease-out",
+  props.indeterminate
+    ? "o-progress-indeterminate absolute inset-y-0 w-[35%] rounded-full"
+    : "h-full rounded-full transition-[width] duration-300 ease-out",
   "flex items-center justify-center overflow-hidden",
   props.color ? "" : variantFillClasses[props.variant ?? "default"],
 ]);
 
 const fillStyle = computed(() => ({
-  marginInlineStart: offset.value,
-  width: percentage.value,
+  ...(props.indeterminate ? {} : { marginInlineStart: offset.value, width: percentage.value }),
   ...(props.color ? { backgroundColor: props.color } : {}),
 }));
 </script>
@@ -84,7 +85,7 @@ const fillStyle = computed(() => ({
   <div
     :class="trackClasses"
     role="progressbar"
-    :aria-valuenow="Math.round(span * 100)"
+    :aria-valuenow="indeterminate ? undefined : Math.round(span * 100)"
     aria-valuemin="0"
     aria-valuemax="100"
   >
@@ -98,3 +99,28 @@ const fillStyle = computed(() => ({
     </div>
   </div>
 </template>
+
+<style scoped>
+/* keep(keyframes): the slide is this component's own, and a template animation utility cannot reach a scoped keyframe */
+.o-progress-indeterminate {
+  animation: slide 1.3s ease-in-out infinite;
+}
+
+@keyframes slide {
+  from {
+    left: -35%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .o-progress-indeterminate {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.4;
+  }
+}
+</style>

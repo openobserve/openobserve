@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { h, nextTick, ref } from "vue";
 import { TooltipProvider } from "reka-ui";
 import OTooltip from "./OTooltip.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 // Reka UI portals content into <body>. Render inline for unit tests.
 vi.mock("reka-ui", async (importOriginal) => {
@@ -111,6 +112,122 @@ describe("OTooltip", () => {
       wrapper.unmount();
     });
 
+    it("closes once the pointer moves off the trigger even when mouseleave never fires", async () => {
+      const wrapper = mount(
+        {
+          render: () =>
+            h("button", { "data-testid": "t" }, [h(OTooltip, { content: "Hello", delay: 10 })]),
+        },
+        { attachTo: document.body },
+      );
+      const trigger = wrapper.find('[data-testid="t"]').element;
+      try {
+        trigger.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+        trigger.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 60));
+        await nextTick();
+        expect(document.body.textContent).toContain("Hello");
+
+        document.body.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 60));
+        await nextTick();
+        expect(document.body.textContent).not.toContain("Hello");
+
+        trigger.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+        document.body.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 60));
+        await nextTick();
+        expect(document.body.textContent).not.toContain("Hello");
+      } finally {
+        wrapper.unmount();
+      }
+    });
+
+    const mountPauseAndMarker = (extra: Record<string, unknown>) =>
+      mount(
+        {
+          render: () =>
+            h("div", [
+              h("button", { "data-testid": "pause" }, [
+                h(OTooltip, { content: "Pause alert", delay: 10, ...extra }),
+              ]),
+              h(
+                OTooltip,
+                { content: "Couldn't pause", delay: 10, ...extra },
+                {
+                  default: () => h("span", { "data-testid": "marker", tabindex: 0 }, "!"),
+                },
+              ),
+            ]),
+        },
+        { attachTo: document.body },
+      );
+
+    it("closes the open exclusive tooltip when another one opens, so only one shows at a time", async () => {
+      const wrapper = mountPauseAndMarker({ exclusive: true });
+
+      const pause = wrapper.find('[data-testid="pause"]').element;
+      pause.dispatchEvent(new FocusEvent("focus"));
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+      expect(document.body.textContent).toContain("Pause alert");
+
+      const marker = wrapper.find('[data-testid="marker"]').element;
+      await hover(marker);
+      await nextTick();
+      expect(marker.getAttribute("data-state")).not.toBe("closed");
+      expect(document.body.textContent).not.toContain("Pause alert");
+
+      pause.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+      expect(document.body.textContent).toContain("Pause alert");
+      expect(marker.getAttribute("data-state")).toBe("closed");
+
+      wrapper.unmount();
+    });
+
+    it("leaves tooltips that don't opt in to exclusive alone when another opens", async () => {
+      const wrapper = mountPauseAndMarker({});
+
+      const pause = wrapper.find('[data-testid="pause"]').element;
+      pause.dispatchEvent(new FocusEvent("focus"));
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+      const marker = wrapper.find('[data-testid="marker"]').element;
+      await hover(marker);
+      await nextTick();
+
+      expect(marker.getAttribute("data-state")).not.toBe("closed");
+      expect(document.body.textContent).toContain("Pause alert");
+
+      wrapper.unmount();
+    });
+
+    it("keeps a caller-controlled bubble (the copy bubble) open while an exclusive tooltip opens", async () => {
+      const anchor = document.createElement("div");
+      document.body.appendChild(anchor);
+      const onUpdate = vi.fn();
+      const bubble = mount(OTooltip, {
+        props: { anchor, open: true, content: "Copied", "onUpdate:open": onUpdate },
+        attachTo: document.body,
+      });
+      const wrapper = mountPauseAndMarker({ exclusive: true });
+      await nextTick();
+      expect(document.body.textContent).toContain("Copied");
+
+      const marker = wrapper.find('[data-testid="marker"]').element;
+      await hover(marker);
+      await nextTick();
+      expect(marker.getAttribute("data-state")).not.toBe("closed");
+      expect(document.body.textContent).toContain("Copied");
+      expect(onUpdate).not.toHaveBeenCalledWith(false);
+
+      wrapper.unmount();
+      bubble.unmount();
+      anchor.remove();
+    });
+
     // A kept-alive page deactivates without unmounting, and a detached trigger
     // never fires `mouseleave` — so a tooltip open at the moment of a tab
     // switch survived it. Observable on RETURN: without the onDeactivated
@@ -179,6 +296,154 @@ describe("OTooltip", () => {
       expect(spy.mock.calls.some(([el]) => el === plain)).toBe(false);
       spy.mockRestore();
     });
+  });
+
+  describe("binding to the enclosing control", () => {
+    // jsdom loads no Tailwind, so the utility OButton's slot wrapper relies on is defined here.
+    let sheet: HTMLStyleElement;
+    beforeEach(() => {
+      sheet = document.createElement("style");
+      sheet.textContent = ".contents { display: contents; }";
+      document.head.appendChild(sheet);
+    });
+    afterEach(() => sheet.remove());
+
+    const hoverAndSettle = async (el: Element) => {
+      el.dispatchEvent(new MouseEvent("mouseenter"));
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+    };
+
+    it("opens when the button itself is hovered, not only its left icon", async () => {
+      const wrapper = mount(
+        {
+          render: () =>
+            h(
+              OButton,
+              { iconLeft: "refresh", "data-testid": "btn" },
+              { default: () => h(OTooltip, { content: "Refresh data", delay: 10 }) },
+            ),
+        },
+        { attachTo: document.body },
+      );
+      const button = wrapper.find('[data-testid="btn"]').element;
+
+      expect(button.getAttribute("data-o-tooltip-trigger")).toBe("");
+      expect(button.querySelector("[data-o-tooltip-trigger]")).toBeNull();
+      await hoverAndSettle(button);
+      expect(document.body.textContent).toContain("Refresh data");
+      wrapper.unmount();
+    });
+
+    const mountInfoButton = (listeners: Record<string, unknown> = {}) =>
+      mount(
+        {
+          render: () =>
+            h(
+              OButton,
+              { iconLeft: "info-outline", "data-testid": "btn", ...listeners },
+              { default: () => h(OTooltip, { content: "About this", delay: 5000 }) },
+            ),
+        },
+        { attachTo: document.body },
+      );
+
+    it("opens on click when the button has no action of its own", async () => {
+      const wrapper = mountInfoButton();
+      const button = wrapper.find('[data-testid="btn"]').element as HTMLElement;
+
+      expect(button.hasAttribute("data-o2-inert")).toBe(true);
+      button.click();
+      await nextTick();
+      await nextTick();
+      expect(document.body.textContent).toContain("About this");
+      wrapper.unmount();
+    });
+
+    it("does not open on click when the button runs an action", async () => {
+      const wrapper = mountInfoButton({ onClick: () => {} });
+      const button = wrapper.find('[data-testid="btn"]').element as HTMLElement;
+
+      expect(button.hasAttribute("data-o2-inert")).toBe(false);
+      button.click();
+      await nextTick();
+      await nextTick();
+      expect(document.body.textContent).not.toContain("About this");
+      wrapper.unmount();
+    });
+
+    it("does not treat a popup trigger as inert", () => {
+      const wrapper = mount(() => h(OButton, { "aria-haspopup": "menu", "data-testid": "btn" }));
+      expect(wrapper.find('[data-testid="btn"]').attributes("data-o2-inert")).toBeUndefined();
+    });
+
+    it("binds to a text-only button that gives it no previous sibling", () => {
+      const wrapper = mount({
+        render: () =>
+          h(
+            OButton,
+            { "data-testid": "btn" },
+            { default: () => ["Save", h(OTooltip, { content: "Save changes" })] },
+          ),
+      });
+      expect(wrapper.find('[data-testid="btn"]').attributes("data-o-tooltip-trigger")).toBe("");
+    });
+
+    it("keeps a bare icon outside any control as its own target", async () => {
+      const wrapper = mount(
+        {
+          render: () =>
+            h("div", { "data-testid": "row" }, [
+              h("span", { "data-testid": "icon" }),
+              h(OTooltip, { content: "About this field", delay: 10 }),
+            ]),
+        },
+        { attachTo: document.body },
+      );
+      const icon = wrapper.find('[data-testid="icon"]').element;
+
+      expect(icon.getAttribute("data-o-tooltip-trigger")).toBe("");
+      expect(
+        wrapper.find('[data-testid="row"]').attributes("data-o-tooltip-trigger"),
+      ).toBeUndefined();
+      await hoverAndSettle(icon);
+      expect(document.body.textContent).toContain("About this field");
+      wrapper.unmount();
+    });
+
+    it("keeps an icon inside a laid-out block of a clickable card as its own target", () => {
+      const wrapper = mount({
+        render: () =>
+          h("div", { role: "button", "data-testid": "card" }, [
+            h("div", { class: "flex" }, [
+              h("span", { "data-testid": "icon" }),
+              h(OTooltip, { content: "Info" }),
+            ]),
+          ]),
+      });
+      expect(wrapper.find('[data-testid="icon"]').attributes("data-o-tooltip-trigger")).toBe("");
+      expect(
+        wrapper.find('[data-testid="card"]').attributes("data-o-tooltip-trigger"),
+      ).toBeUndefined();
+    });
+
+    it("leaves an overflow-only tooltip on the text element it measures", () => {
+      const wrapper = mount({
+        render: () =>
+          h("button", [
+            h("span", { "data-testid": "label" }, "long label"),
+            h(OTooltip, { overflowOnly: true }),
+          ]),
+      });
+      expect(wrapper.find('[data-testid="label"]').attributes("data-o-tooltip-trigger")).toBe(
+        "overflow",
+      );
+    });
+  });
+
+  it("waits 300 ms before opening by default", () => {
+    const wrapper = mount(OTooltip, { props: { content: "Hello" } });
+    expect(wrapper.props("delay")).toBe(300);
   });
 
   describe("trigger naming", () => {

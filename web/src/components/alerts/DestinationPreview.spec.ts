@@ -423,8 +423,26 @@ describe("DestinationPreview", () => {
     expect(wrapper.find('[data-test="raw-preview-note"]').exists()).toBe(false);
   });
 
+  it("shows a picked template's body instead of the mockup, under the channel's title", () => {
+    wrapper = mountComponent({ type: "slack", templateContent: '{"text":"hi"}', showBody: true });
+    expect(wrapper.find('[data-test="slack-preview"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="raw-preview"] code').text()).toBe('{"text":"hi"}');
+    expect(wrapper.find('[data-test="raw-preview-note"]').exists()).toBe(false);
+    expect(wrapper.findComponent(ODialogStub).props("title")).toContain("Slack");
+  });
+
   it("names a custom destination Web Hook in the dialog title", () => {
     wrapper = mountComponent({ type: "custom" });
     expect(wrapper.findComponent(ODialogStub).props("title")).toContain("Web Hook");
+  });
+
+  it("notes a generic sample only when asked", () => {
+    wrapper = mountComponent({ genericSample: true });
+    expect(wrapper.get('[data-test="destination-preview-generic-note"]').text()).toContain(
+      "not your template",
+    );
+    wrapper.unmount();
+    wrapper = mountComponent();
+    expect(wrapper.find('[data-test="destination-preview-generic-note"]').exists()).toBe(false);
   });
 });

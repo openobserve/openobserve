@@ -87,6 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFormSwitch
           name="enabled"
           :label="t('synthetics.locations.enabled')"
+          off-tone="neutral"
+          state-text
           data-test="synthetics-location-enabled-toggle"
         />
       </div>
@@ -105,6 +107,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
+import analytics from "@/services/product_analytics";
 import {
   makeSyntheticsLocationFormSchema,
   type SyntheticsLocationForm,
@@ -243,6 +246,10 @@ export default defineComponent({
               enabled: value.enabled,
             });
         if (response.status == 200) {
+          analytics.track(
+            props.isEdit ? "synthetics_location_updated" : "synthetics_location_created",
+            { provider: value.provider },
+          );
           toast({
             message: props.isEdit
               ? t("synthetics.locations.updateSuccess")

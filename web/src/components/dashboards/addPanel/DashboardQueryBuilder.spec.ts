@@ -148,7 +148,8 @@ vi.mock("@/composables/useNotifications", () => ({
   default: () => mockUseNotifications,
 }));
 
-vi.mock("vuex", () => ({
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => mockStore,
 }));
 

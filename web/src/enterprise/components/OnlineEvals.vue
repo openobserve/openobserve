@@ -34,6 +34,7 @@ the Free Software Foundation, either version 3 of the License, or
       :mode="formPage.mode"
       :row="jobFormRow"
       :scorers="scorers"
+      :focus-budget="route.query.section === 'budget'"
       @saved="handleSaved"
       @persisted="reloadLists()"
       @cancel="closeFormPage"
@@ -69,11 +70,13 @@ the Free Software Foundation, either version 3 of the License, or
 
       <OPageHeader
         v-if="hideTabBar && embeddedHeader && activeTab !== 'quality'"
-        :title="raw(embeddedHeader.title)"
-        :subtitle="raw(embeddedHeader.subtitle)"
-        :icon="embeddedHeader.icon"
+        :title="sectionHeader?.title ?? raw(embeddedHeader.title)"
+        :subtitle="sectionHeader?.subtitle ?? raw(embeddedHeader.subtitle)"
+        :icon="sectionHeader?.icon ?? embeddedHeader.icon"
+        :tabs-below="hasTabs"
         class="border-border-default shrink-0 border-b"
       >
+        <template v-if="hasTabs" #tabs><AiSectionTabs /></template>
         <template v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'" #actions>
           <ODropdown side="bottom" align="end">
             <template #trigger>
@@ -163,10 +166,15 @@ the Free Software Foundation, either version 3 of the License, or
         v-if="activeTab === 'quality'"
         :score-configs="scoreConfigs"
         :configs-loading="isLoading"
+        :configs-forbidden="!!scoreConfigsForbidden"
         :date-window="qualityDateWindow"
         :agent-params="qualityAgentParams"
         :enabled="qualityScopeReady"
+        :agent="qualityOneClickAgent"
+        :agent-stream="qualityAgentStream"
+        :create-forbidden="!!(scorersForbidden || scoreConfigsForbidden || jobsForbidden)"
         @status="(status) => (qualityStatus = status)"
+        @created="reloadLists(true)"
       >
         <template #header-actions>
           <!-- Last-refreshed indicator + labeled primary Refresh button, matching the other AI pages. -->
@@ -290,7 +298,7 @@ the Free Software Foundation, either version 3 of the License, or
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
             @view="(row: EvalJob) => openJobView(row)"
-            @edit="(row: EvalJob) => openEditDialog(row)"
+            @edit="(row: EvalJob, section?: 'budget') => openEditDialog(row, section)"
             @activate="(row: EvalJob) => activateJob(row)"
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
@@ -464,6 +472,8 @@ import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
 import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
 import ImportScorer from "./onlineEvals/ImportScorer.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import AiSectionTabs from "@/enterprise/components/AIObservability/AiSectionTabs.vue";
+import { useAiSectionTabs } from "@/enterprise/components/AIObservability/aiSectionTabs";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -508,6 +518,7 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18nTyped();
+const { hasTabs, header: sectionHeader } = useAiSectionTabs();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const activeTab = ref<ActiveTab>(parseTabFromRoute(route.query.tab));
@@ -730,6 +741,7 @@ const {
   selectedEnv: qualitySelectedEnv,
   selectedAgentName: qualitySelectedAgentName,
   selectedVersion: qualitySelectedVersion,
+  effectiveStream: qualityAgentStream,
 } = useAgentScope({
   filterMode: ref<"stream" | "agent">("agent"),
   activeStream: ref(""),
@@ -742,6 +754,12 @@ const {
   allOption: true,
   t,
 });
+
+const qualityOneClickAgent = computed(() =>
+  qualitySelectedAgentName.value && qualitySelectedAgentName.value !== ALL_AGENTS_VALUE
+    ? qualitySelectedAgentName.value
+    : null,
+);
 
 const qualityAgentParams = computed(() =>
   agentParamsFor(
@@ -923,6 +941,7 @@ function clearRouteAction() {
   delete query.action;
   delete query.id;
   delete query.scorer_type;
+  delete query.section;
   router.replace({ name: route.name as string, query }).catch(() => {});
 }
 
@@ -934,9 +953,9 @@ function openCreateDialog() {
   pushRouteAction({ action: "add", id: undefined });
 }
 
-function openEditDialog(row: AnyRow) {
+function openEditDialog(row: AnyRow, section?: "budget") {
   viewRow.value = null;
-  pushRouteAction({ action: "update", id: rowIdOf(row) });
+  pushRouteAction({ action: "update", id: rowIdOf(row), section });
 }
 
 function closeDialog() {

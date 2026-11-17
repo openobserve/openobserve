@@ -34,7 +34,10 @@ test.describe("Dashboard page shortcuts behind a drawer (#3127)", () => {
       message: "precondition: focus must rest inside the drawer, not in a text field",
     }).toBe(true);
 
+    // Export downloads after an async fetch, so the negative check must outwait it.
+    const noDownload = page.waitForEvent("download", { timeout: 1500 });
     await pm.dashboardShareExport.pressExportShortcut();
+    await expect(noDownload).rejects.toThrow();
     expect(await pm.dashboardShareExport.getExportClickCount()).toBe(0);
 
     await pm.dashboardShareExport.closePublicLinksPanel();

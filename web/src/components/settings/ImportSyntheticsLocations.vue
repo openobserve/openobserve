@@ -144,6 +144,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
+import analytics from "@/services/product_analytics";
 
 interface ImportResult {
   id?: string;
@@ -244,6 +245,8 @@ export default defineComponent({
         }
 
         const successCount = importResults.value.filter((r) => r.ok).length;
+        if (successCount > 0)
+          analytics.track("synthetics_location_imported", { count: successCount });
         if (successCount === parsedLocations.value.length) {
           toast({
             message: t("synthetics.locations.importSuccess", { count: successCount }),

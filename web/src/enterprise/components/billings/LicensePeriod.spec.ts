@@ -14,10 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
+import licenseServer from "@/services/license_server";
+
+vi.mock("@/services/license_server", () => ({
+  default: { get_license: vi.fn() },
+}));
 
 // Mock vue-router
 const mockRouter = { push: vi.fn() };
@@ -64,8 +70,43 @@ const createWrapper = (storeOverride: any) => {
 
 // ─── tests ──────────────────────────────────────────────────────────────────
 
+// A serialized LicenseResponse for an expired 200 GB key, as the backend sends it.
+const licenseResponse = (overrides: Record<string, unknown> = {}) => ({
+  installation_id: "inst_test",
+  license: {
+    license_id: "lic_test",
+    expires_at: 1790000000000000,
+    limits: { Ingestion: { typ: "PerDayCount", value: 200 } },
+  },
+  expired: true,
+  ingestion_used: 40,
+  ingestion_exceeded: 2,
+  decision: {
+    search_allowed: true,
+    blocks: [],
+    exceeded_days: 2,
+    allowed_days: 3,
+    limit_today_gb: 50,
+    used_today_gb: 20,
+    waiver_ids_applied: [],
+  },
+  evaluated_at: 1790000000000000,
+  can_update_license: true,
+  ...overrides,
+});
+
+const expiredOn = () => {
+  const expiry = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  return expiry.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+};
+
 describe("LicensePeriod.vue", () => {
   let wrapper: any;
+
+  beforeEach(() => {
+    queryClient.clear();
+    vi.mocked(licenseServer.get_license).mockResolvedValue({ data: licenseResponse() } as never);
+  });
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
@@ -180,17 +221,16 @@ describe("LicensePeriod.vue", () => {
       expect(msg).toBe("1 day remaining until your license expires");
     });
 
-    it("should return expired message when license already expired", () => {
-      wrapper = createWrapper(makeStore(nowPlusDays(-2)));
-      const msg = wrapper.vm.getLicenseExpiryMessage();
-      expect(msg).toBe("Your license has expired");
+    it("should keep only the date sentence before the license response arrives", () => {
+      wrapper = createWrapper(makeStore(nowPlusDays(-3)));
+      expect(wrapper.vm.getLicenseExpiryMessage()).toBe(
+        `Your license expired on ${expiredOn()}. Your features stay on.`,
+      );
     });
 
-    it("should return expired message when daysUntilExpiry is 0", () => {
-      // 0 days: expiry is exactly now (microseconds), Math.ceil(0) = 0 → expired branch
+    it("should treat an expiry of exactly now as expired", () => {
       wrapper = createWrapper(makeStore(msToMicro(Date.now())));
-      const msg = wrapper.vm.getLicenseExpiryMessage();
-      expect(msg).toBe("Your license has expired");
+      expect(wrapper.vm.getLicenseExpiryMessage()).toContain("Your license expired on");
     });
 
     it("should return correct message for 13 days remaining", () => {
@@ -233,23 +273,95 @@ describe("LicensePeriod.vue", () => {
       expect(span.exists()).toBe(true);
     });
 
-    it("should render the subtitle span when warning is active", () => {
-      wrapper = createWrapper(makeStore(nowPlusDays(5)));
-      const span = wrapper.find('[data-test="license-period-subtitle"]');
-      expect(span.exists()).toBe(true);
-      expect(span.text()).toContain("Please update your license by contacting your administrator.");
-    });
-
     it("should display the expiry message text in the template", () => {
       wrapper = createWrapper(makeStore(nowPlusDays(5)));
       const span = wrapper.find('[data-test="license-period-message"]');
       expect(span.text()).toMatch(/5 days remaining until your license expires/);
     });
+  });
 
-    it("should display expired message in the template", () => {
+  // ── Banner from a serialized LicenseResponse ───────────────────────────
+
+  describe("Expired banner", () => {
+    const message = () => wrapper.find('[data-test="license-period-message"]').text();
+    const renew = () => wrapper.find('[data-test="license-period-renew-btn"]');
+    const askAdmin = () => wrapper.find('[data-test="license-period-ask-admin"]');
+    const mountExpired = async (overrides: Record<string, unknown> = {}) => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue({
+        data: licenseResponse(overrides),
+      } as never);
       wrapper = createWrapper(makeStore(nowPlusDays(-3)));
-      const span = wrapper.find('[data-test="license-period-message"]');
-      expect(span.text()).toBe("Your license has expired");
+      await flushPromises();
+    };
+
+    it("is a warning banner on the kept container id", async () => {
+      await mountExpired();
+      const banner = wrapper.findComponent({ name: "OBanner" });
+      expect(banner.props("variant")).toBe("warning");
+      expect(banner.props("icon")).toBe("warning");
+      expect(wrapper.find('[data-test="license-period-container"]').attributes("role")).toBe(
+        "alert",
+      );
+    });
+
+    it("says the date, the limit and the days from the decision, not the license", async () => {
+      await mountExpired();
+      expect(message()).toBe(
+        `Your license expired on ${expiredOn()}. Your features stay on. The free limit of 50 GB/day now applies: more than 3 days over it in a month pauses search until you renew.`,
+      );
+    });
+
+    it("shows a license's own count when the decision has one", async () => {
+      await mountExpired({ decision: { limit_today_gb: 75, allowed_days: 5 } });
+      expect(message()).toContain("The free limit of 75 GB/day");
+      expect(message()).toContain("more than 5 days");
+    });
+
+    it("drops the limit sentence for an unevaluated decision", async () => {
+      await mountExpired({ evaluated_at: 0 });
+      expect(message()).toBe(`Your license expired on ${expiredOn()}. Your features stay on.`);
+    });
+
+    it("drops the limit sentence for a null limit", async () => {
+      await mountExpired({ decision: { limit_today_gb: null, allowed_days: 3 } });
+      expect(message()).toBe(`Your license expired on ${expiredOn()}. Your features stay on.`);
+    });
+
+    it("gives an admin Renew license, which emits renew, and no ask line", async () => {
+      await mountExpired();
+      expect(askAdmin().exists()).toBe(false);
+      expect(renew().text()).toBe("Renew license");
+      await renew().trigger("click");
+      expect(wrapper.emitted("renew")).toHaveLength(1);
+    });
+
+    it("gives everyone else the ask line and no Renew license", async () => {
+      await mountExpired({ can_update_license: false });
+      expect(renew().exists()).toBe(false);
+      expect(askAdmin().text()).toBe("Ask your license administrator to renew.");
+    });
+
+    it("shows neither the action nor the ask line until the response arrives", async () => {
+      vi.mocked(licenseServer.get_license).mockReturnValue(new Promise(() => {}) as never);
+      wrapper = createWrapper(makeStore(nowPlusDays(-3)));
+      await flushPromises();
+      expect(message()).toContain("Your license expired on");
+      expect(renew().exists()).toBe(false);
+      expect(askAdmin().exists()).toBe(false);
+    });
+
+    it("keeps the countdown text in the warning banner under 14 days", async () => {
+      wrapper = createWrapper(makeStore(nowPlusDays(12)));
+      await flushPromises();
+      expect(message()).toBe("12 days remaining until your license expires");
+      expect(wrapper.findComponent({ name: "OBanner" }).props("variant")).toBe("warning");
+      expect(renew().exists()).toBe(true);
+    });
+
+    it("does not fetch the license when no banner shows", async () => {
+      wrapper = createWrapper(makeStore(nowPlusDays(30)));
+      await flushPromises();
+      expect(licenseServer.get_license).not.toHaveBeenCalled();
     });
   });
 

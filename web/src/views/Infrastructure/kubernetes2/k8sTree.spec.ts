@@ -3,8 +3,6 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTree,
-  clusterCodes,
-  clusterHue,
   clusterSeen,
   clusterStatsOf,
   clusterTone,
@@ -264,48 +262,6 @@ describe("clusterTone", () => {
     expect(clusterTone({ nodes: 6, podsBad: 2 })).toBe("warning");
     expect(clusterTone({ nodes: 6, deploymentsBad: 1 })).toBe("warning");
     expect(clusterTone({ nodes: 6, pods: 40 })).toBe("success");
-  });
-});
-
-describe("clusterHue", () => {
-  it("is stable for a name and stays inside the palette", () => {
-    expect(clusterHue("prod-us-east")).toBe(clusterHue("prod-us-east"));
-    for (const name of ["a", "prod-eu-west", "staging", "x".repeat(50)]) {
-      const hue = clusterHue(name);
-      expect(hue).toBeGreaterThanOrEqual(0);
-      expect(hue).toBeLessThan(4);
-    }
-  });
-
-  it("spreads different names across more than one tint", () => {
-    const hues = new Set(
-      ["prod-us-east", "prod-eu-west", "staging", "dev", "qa", "uat"].map((n) => clusterHue(n)),
-    );
-    expect(hues.size).toBeGreaterThan(1);
-  });
-});
-
-describe("clusterCodes", () => {
-  it("uses the leading letters of the first two segments", () => {
-    expect(clusterCodes(["prod-us-east", "staging"])).toEqual({
-      "prod-us-east": "PU",
-      staging: "ST",
-    });
-  });
-
-  it("never repeats a code, even for clusters that share a prefix", () => {
-    const codes = clusterCodes(["prod-us-east", "prod-us-west", "prod-us-north", "prod-us-south"]);
-    expect(new Set(Object.values(codes)).size).toBe(4);
-  });
-
-  it("falls back to numbered codes once the letters run out", () => {
-    const names = ["prod-a-1", "prod-a-2", "prod-a-3", "prod-a-4", "prod-a-5"];
-    const codes = clusterCodes(names);
-    expect(new Set(Object.values(codes)).size).toBe(names.length);
-  });
-
-  it("handles single-word and odd names", () => {
-    expect(clusterCodes(["x", "ap1cloud"])).toEqual({ x: "X", ap1cloud: "AP" });
   });
 });
 

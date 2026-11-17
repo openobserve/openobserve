@@ -57,6 +57,7 @@ export interface RunResult {
   status: HistoryStatus;
   error?: string;
   warning?: string;
+  noResults?: boolean;
 }
 
 export interface RecentRow {
@@ -142,9 +143,12 @@ export const runResultFromError = (err: RunError): RunResult | null => {
   return { status: "ok", warning: message };
 };
 
-export const resultContext = (result: RunResult): Pick<HistoryContext, "error" | "warning"> => ({
+export const resultContext = (
+  result: RunResult,
+): Pick<HistoryContext, "error" | "warning" | "no_results"> => ({
   ...(result.error !== undefined ? { error: result.error } : {}),
   ...(result.warning !== undefined ? { warning: result.warning } : {}),
+  ...(result.noResults ? { no_results: true } : {}),
 });
 
 const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
@@ -248,20 +252,6 @@ export const groupByDay = (
     group.entries.push(entry);
   }
   return [...groups.values()].sort((a, b) => b.dayMs - a.dayMs);
-};
-
-/** Bounds of a `YYYY-MM-DD` day in `zone`, in microseconds, for the "Ran on" filter. */
-export const dayBoundsUs = (
-  date: string,
-  zone?: string,
-): { ran_from: number; ran_to: number } | null => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const start = DateTime.fromISO(date, zoned(zone)).startOf("day");
-  if (!start.isValid) return null;
-  return {
-    ran_from: start.toMillis() * 1000,
-    ran_to: start.plus({ days: 1 }).toMillis() * 1000 - 1,
-  };
 };
 
 /** Absolute URL of a page route with its query string. */

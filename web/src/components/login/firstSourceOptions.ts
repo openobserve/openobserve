@@ -29,12 +29,13 @@ export type FirstSourceId =
   | "rum"
   | "llm"
   | "agent"
+  | "sample"
   | "unsure";
 
 export interface FirstSourceOption {
   id: FirstSourceId;
   labelKey: I18nKey;
-  /** Guide route name; absent for "Not sure yet", which keeps today's landing. */
+  /** Guide route name; absent for sample data, which loads in the welcome dialog, and for "Not sure yet". */
   route?: string;
   /** Image path under assets/images, for getImageURL. */
   logo?: string;
@@ -53,7 +54,7 @@ export interface FirstSourcePrefill {
   referrer?: string;
 }
 
-/** The 11 Get started choices in the approved order, each with its guide route. */
+/** The first-source choices in the approved order, each with its guide route. */
 export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze([
   {
     id: "kubernetes",
@@ -128,6 +129,12 @@ export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze(
     icon: "auto-awesome",
     signals: [],
     feature: "mcp",
+  },
+  {
+    id: "sample",
+    labelKey: "sampleData.entry.onboardingSource",
+    icon: "science",
+    signals: [],
   },
   {
     id: "unsure",
@@ -209,7 +216,7 @@ export function prefillFirstSource(
   return docsReferrerSource(referrer ?? query?.referrer);
 }
 
-/** Stores the signup link's utm_content and docs referrer for the Get started dialog, never replacing a stored pair with nothing. */
+/** Stores the signup link's utm_content and docs referrer for the onboarding page, never replacing a stored pair with nothing. */
 export function capturePrefill(utmContent: unknown, referrer: string | null | undefined): void {
   const utm = typeof utmContent === "string" ? utmContent : "";
   const docs = docsReferrerSource(referrer) ? (referrer as string) : "";
@@ -220,7 +227,7 @@ export function capturePrefill(utmContent: unknown, referrer: string | null | un
     if (docs) record.referrer = docs;
     window.sessionStorage.setItem(FIRST_SOURCE_PREFILL_KEY, JSON.stringify(record));
   } catch {
-    // Storage can be unavailable (private mode); the dialog then opens without a pick.
+    // Storage can be unavailable (private mode); onboarding then opens without a pick.
   }
 }
 

@@ -46,6 +46,8 @@ use crate::{
 const FN_SUCCESS: &str = "Function saved successfully";
 const FN_NOT_FOUND: &str = "Function not found";
 const FN_ALREADY_EXIST: &str = "Function already exist";
+const FN_NAME_MISMATCH: &str =
+    "Function name in the request body must match the name in the URL; functions cannot be renamed";
 const FN_IN_USE: &str =
     "Function is associated with streams, please remove association from streams before deleting:";
 
@@ -361,6 +363,10 @@ pub async fn update_function_checked(
             "Function body cannot be empty",
         ));
     }
+    // Permission is checked on the URL name, so the write must land on that function.
+    if func.name != fn_name {
+        return Ok(MetaHttpResponse::bad_request(FN_NAME_MISMATCH));
+    }
 
     let existing_fn = match check_existing_fn(org_id, fn_name).await {
         Some(function) => function,
@@ -538,7 +544,7 @@ async fn get_dependencies(
     org_id: &str,
     func_name: &str,
 ) -> Result<Vec<PipelineDependencyItem>, infra::errors::Error> {
-    let mut pipelines = infra::pipeline::list_by_org(org_id).await?;
+    let mut pipelines = infra::pipeline::list_by_org_fully_decoded(org_id).await?;
     pipelines.retain(|pl| pl.contains_function(func_name));
     Ok(pipelines
         .into_iter()
@@ -868,5 +874,34 @@ mod tests {
         );
 
         assert!(delete_function(org, name).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn an_update_naming_another_function_writes_nothing() {
+        let org = "fn_rename_org";
+        infra::db::create_table().await.unwrap();
+        infra::pipeline::init().await.unwrap();
+        stored_vrl_function(org, "fn_a").await;
+        let fn_b = stored_vrl_function(org, "fn_b").await;
+        let fn_b_stored = db::functions::get(org, "fn_b").await.unwrap().function;
+
+        for target in ["fn_b", "fn_new"] {
+            let body = Transform {
+                name: target.to_string(),
+                function: ".overwritten = 1".to_string(),
+                ..fn_b.clone()
+            };
+            let updated = update_function(org, "fn_a", body).await.unwrap();
+            assert_eq!(updated.status(), http::StatusCode::BAD_REQUEST, "{target}");
+        }
+        assert_eq!(
+            db::functions::get(org, "fn_b").await.unwrap().function,
+            fn_b_stored
+        );
+        assert!(db::functions::get(org, "fn_new").await.is_err());
+
+        for name in ["fn_a", "fn_b"] {
+            assert!(delete_function(org, name).await.is_ok());
+        }
     }
 }

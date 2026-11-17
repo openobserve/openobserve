@@ -39,7 +39,7 @@ pub struct RequestDecision {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<infra::table::entity::org_domain_ownership::Model>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
@@ -69,7 +69,7 @@ pub async fn get_linked_domain(Path(org_id): Path<String>) -> Response {
     ),
     request_body(content = CreateDomainRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
@@ -168,7 +168,7 @@ pub async fn link_domain(
     ),
     request_body(content = CreateDomainRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
@@ -244,7 +244,7 @@ pub async fn raise_request(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<infra::table::entity::org_domain_requests::Model>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "list"})),
@@ -281,7 +281,7 @@ pub async fn list_requests(Path(org_id): Path<String>) -> Response {
     ),
     request_body(content = RequestDecision, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})),
@@ -359,7 +359,7 @@ pub async fn approve_request(
     ),
     request_body(content = RequestDecision, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})),
@@ -420,7 +420,7 @@ pub async fn reject_request(
         ("domain" = String, Path, description = "Custom domain id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
@@ -476,7 +476,7 @@ pub async fn delete_linked_domain(
         ("domain" = String, Path, description = "Custom domain id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = infra::table::entity::org_domain_ownership::Model),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})),

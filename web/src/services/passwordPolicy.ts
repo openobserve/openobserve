@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 /** What a password must look like. Mirrors `PasswordComplexity` in the Rust API. */
 export interface PasswordComplexity {
@@ -62,10 +63,17 @@ const passwordPolicy = {
     return http().get<PasswordPolicy>(`/api/${metaOrg}/settings/password_policy`);
   },
   updatePolicy: (metaOrg: string, policy: PasswordPolicy) => {
-    return http().put<SetPasswordPolicyResponse>(
-      `/api/${metaOrg}/settings/password_policy`,
-      policy,
-    );
+    return http()
+      .put<SetPasswordPolicyResponse>(`/api/${metaOrg}/settings/password_policy`, policy)
+      .then((res) => {
+        analytics.track("password_policy_updated", {
+          rotation_enabled: policy.rotation_days > 0,
+          lockout_enabled: policy.lockout.threshold > 0,
+          apply_to_root: policy.apply_to_root,
+          users_flagged: res.data?.users_flagged ?? 0,
+        });
+        return res;
+      });
   },
 };
 

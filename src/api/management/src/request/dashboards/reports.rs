@@ -91,7 +91,7 @@ pub struct TriggerReportResponse {
         }),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Report created", body = ()),
+        (status = StatusCode::CREATED, description = "Report created", body = MetaHttpResponse),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
@@ -153,7 +153,7 @@ pub async fn create_report(
         description = "Report details",
     ),
     responses(
-        (status = StatusCode::OK, description = "Report updated", body = ()),
+        (status = StatusCode::OK, description = "Report updated", body = MetaHttpResponse),
         (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the report", body = ()),
     ),
@@ -352,7 +352,7 @@ pub async fn get_report(Path((org_id, name)): Path<(String, String)>) -> Respons
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = ()),
+        (status = StatusCode::OK, description = "Success", body = MetaHttpResponse),
         (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
@@ -457,7 +457,7 @@ pub async fn delete_report_bulk(
     put,
     path = "/{org_id}/reports/{name}/enable",
     context_path = "/api",
-    tag = "Report",
+    tag = "Reports",
     operation_id = "EnableReport",
     summary = "Enable or disable dashboard report",
     description = "Enables or disables automated execution of a dashboard report. When disabled, scheduled report \
@@ -473,9 +473,13 @@ pub async fn delete_report_bulk(
         ("value" = bool, Query, description = "Enable or disable report"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = std::collections::HashMap<String, bool>),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"}))
     )
 )]
 pub async fn enable_report(
@@ -536,7 +540,8 @@ pub async fn enable_report(
         (status = 500, description = "Send failed; `run` carries the error", content_type = "application/json", body = inline(TriggerReportResponse)),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"}))
     )
 )]
 pub async fn trigger_report(
@@ -582,11 +587,12 @@ pub async fn trigger_report(
     ),
     request_body(content = inline(Report), description = "Report details"),
     responses(
-        (status = StatusCode::OK, description = "Report created", body = ()),
+        (status = StatusCode::OK, description = "Report created", body = MetaHttpResponse),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn create_report_v2(
@@ -640,6 +646,7 @@ pub async fn create_report_v2(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn list_reports_v2(
@@ -733,6 +740,7 @@ pub async fn list_reports_v2(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn get_report_v2(Path((org_id, report_id)): Path<(String, String)>) -> Response {
@@ -775,12 +783,13 @@ pub async fn get_report_v2(Path((org_id, report_id)): Path<(String, String)>) ->
     ),
     request_body(content = inline(Report), description = "Report details"),
     responses(
-        (status = StatusCode::OK, description = "Updated", body = ()),
+        (status = StatusCode::OK, description = "Updated", body = MetaHttpResponse),
         (status = StatusCode::FORBIDDEN, description = "Forbidden", body = ()),
         (status = StatusCode::NOT_FOUND, description = "Not found", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn update_report_v2(
@@ -851,11 +860,12 @@ pub async fn update_report_v2(
         ("report_id" = String, Path, description = "Report ID (KSUID)"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Deleted", body = ()),
+        (status = StatusCode::OK, description = "Deleted", body = MetaHttpResponse),
         (status = StatusCode::NOT_FOUND, description = "Not found", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true}))
     )
 )]
 pub async fn delete_report_v2(Path((org_id, report_id)): Path<(String, String)>) -> Response {
@@ -952,11 +962,12 @@ pub async fn delete_report_bulk_v2(
         ("value" = bool, Query, description = "true to enable, false to disable"),
     ),
     responses(
-        (status = 200, description = "Success", body = Object),
+        (status = 200, description = "Success", body = std::collections::HashMap<String, bool>),
         (status = 404, description = "Not found", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn enable_report_v2(
@@ -1009,7 +1020,8 @@ pub async fn enable_report_v2(
         (status = 500, description = "Send failed; `run` carries the error", body = inline(TriggerReportResponse)),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"}))
     )
 )]
 pub async fn trigger_report_v2(
@@ -1051,12 +1063,13 @@ pub async fn trigger_report_v2(
         description = "Report IDs and destination folder",
     ),
     responses(
-        (status = 200, description = "Success", body = Object),
+        (status = 200, description = "Success", body = MetaHttpResponse),
         (status = 403, description = "Forbidden", body = ()),
         (status = 404, description = "Not found", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn move_reports(

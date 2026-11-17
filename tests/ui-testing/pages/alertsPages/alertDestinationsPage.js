@@ -814,7 +814,12 @@ export class AlertDestinationsPage {
         await this.page.locator(this.importJsonUrlTab).click();
         await this.page.locator(this.destinationImportUrlInputField).click();
         await this.page.locator(this.destinationImportUrlInputField).fill(url);
-        await this.page.waitForTimeout(2000); // Wait for JSON to load
+        // BaseImport fetches the URL only after a debounce, so wait for the editor to fill.
+        await this.page.waitForFunction(() => {
+            const eds = window.monaco?.editor?.getEditors?.() || [];
+            return eds.some(e => e.getDomNode()?.closest('[data-test$="-import-sql-editor"]')
+                && (e.getValue?.() || '').trim().length > 0);
+        }, null, { timeout: 15000, polling: 100 });
         await this.page.locator(this.destinationImportJsonBtn).click();
         await expect(this.page.locator(this.destinationImportNameError)).toBeVisible();
         // Resolve the template via the OSelect search-input convention — the legacy

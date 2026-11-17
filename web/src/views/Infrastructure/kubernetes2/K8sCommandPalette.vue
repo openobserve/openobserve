@@ -24,17 +24,15 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { searchPalette, type PaletteGroup, type PaletteItem } from "./k8sPalette";
 
-// `group` narrows the palette to one group, as the cluster switcher does.
 const props = withDefaults(
   defineProps<{
     open: boolean;
     items: PaletteItem[];
-    group?: PaletteGroup | null;
     loading?: boolean;
     indexFailed?: boolean;
     truncated?: boolean;
   }>(),
-  { group: null, loading: false, indexFailed: false, truncated: false },
+  { loading: false, indexFailed: false, truncated: false },
 );
 const emit = defineEmits<{
   (_e: "update:open", _value: boolean): void;
@@ -55,17 +53,10 @@ const GROUP_LABEL: Record<PaletteGroup, I18nKey> = {
 const query = ref("");
 const active = ref(0);
 
-const SWITCHER_LIMIT = 50;
-
 const LISTBOX_ID = "k8s2-palette-listbox";
 const optionId = (index: number) => `k8s2-palette-option-${index}`;
 
-const ranked = computed(() => {
-  const pool = props.group ? props.items.filter((i) => i.group === props.group) : props.items;
-  return props.group && !query.value.trim()
-    ? { items: pool.slice(0, SWITCHER_LIMIT), total: pool.length }
-    : searchPalette(pool, query.value);
-});
+const ranked = computed(() => searchPalette(props.items, query.value));
 
 const results = computed(() =>
   ranked.value.items.map((item, index, all) => ({
@@ -76,7 +67,6 @@ const results = computed(() =>
 );
 
 const statusKey = computed<I18nKey | null>(() => {
-  if (props.group === "clusters") return null;
   if (props.indexFailed) return "infra.k8s2.paletteIndexFailed";
   if (props.loading) return "infra.k8s2.paletteLoading";
   return props.truncated ? "infra.k8s2.paletteTruncated" : null;

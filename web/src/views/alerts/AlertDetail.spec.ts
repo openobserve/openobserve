@@ -233,6 +233,7 @@ async function mountView({
         AlertGroupChart: true,
         AlertGroupsTable: true,
         AlertConfigSummary: true,
+        AlertCalibrationHeadroomCard: true,
         AnomalyDetectionChart: true,
         AlertHeaderActions: true,
       },
@@ -340,6 +341,15 @@ describe("AlertDetail — History tab", () => {
       wrapper = await mountView({ alert: makeMultiAlert() });
       expect(wrapper.find('[data-otab-name="groups"]').exists()).toBe(true);
       expect(alertsService.list_groups).toHaveBeenCalledWith("default", "alert-1");
+      const table = wrapper.findComponent({ name: "AlertGroupsTable" });
+      expect(table.props("loadError")).toBe(false);
+    });
+
+    it("tells the groups table its load failed, rather than that nothing is tracked", async () => {
+      vi.mocked(alertsService.list_groups).mockRejectedValueOnce(new Error("boom"));
+      wrapper = await mountView({ alert: makeMultiAlert() });
+      const table = wrapper.findComponent({ name: "AlertGroupsTable" });
+      expect(table.props("loadError")).toBe(true);
     });
 
     it("keeps the group column and shows every group's transitions", async () => {
@@ -410,6 +420,39 @@ describe("AlertDetail — History tab", () => {
       expect(wrapper.find('[data-test="alerts-alertdetail-tab-groups-count"]').exists()).toBe(
         false,
       );
+    });
+  });
+
+  describe("load failures", () => {
+    const rejectWith = (status: number) =>
+      Promise.reject(Object.assign(new Error("request failed"), { response: { status } }));
+
+    it("shows not found for a 404", async () => {
+      wrapper = await mountView({ alertRequest: rejectWith(404) });
+      expect(wrapper.find('[data-test="alerts-alertdetail-not-found"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertdetail-edit"]').exists()).toBe(false);
+    });
+
+    it("shows no access for a 403, not not found", async () => {
+      wrapper = await mountView({ alertRequest: rejectWith(403) });
+      expect(wrapper.find('[data-test="alerts-alertdetail-no-access"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertdetail-not-found"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alerts-alertdetail-edit"]').exists()).toBe(false);
+    });
+
+    it("shows could not load with a Retry that loads the alert again for a 500", async () => {
+      wrapper = await mountView({ alertRequest: rejectWith(500) });
+      const failed = wrapper.find('[data-test="alerts-alertdetail-load-error"]');
+      expect(failed.exists()).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertdetail-not-found"]').exists()).toBe(false);
+      vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
+        data: makeSimpleAlert(),
+      } as any);
+      await failed.find("button").trigger("click");
+      await flushPromises();
+      expect(alertsService.get_by_alert_id).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('[data-test="alerts-alertdetail-load-error"]').exists()).toBe(false);
+      expect(alertsService.list_group_transitions).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -564,6 +607,41 @@ describe("AlertDetail — History tab", () => {
   });
 });
 
+describe("AlertDetail — alert calibration headroom", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const configuration = async (alert: Record<string, unknown>) => {
+    wrapper = await mountView({ alert });
+    (wrapper.vm as any).activeTab = "configuration";
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("alert_detail_puts_headroom_last_in_configuration", async () => {
+    const scheduled = await configuration(makeSimpleAlert());
+    const summary = scheduled.find("alert-config-summary-stub");
+    const card = scheduled.find("alert-calibration-headroom-card-stub");
+    expect(card.exists()).toBe(true);
+    expect(scheduled.findComponent({ name: "AlertCalibrationHeadroomCard" }).props("alertId")).toBe(
+      "alert-1",
+    );
+    expect(summary.element.nextElementSibling).toBe(card.element);
+    expect(card.element.nextElementSibling).toBeNull();
+    scheduled.unmount();
+
+    for (const alert of [makeCompositeAlert(), makeAnomalyAlert()]) {
+      const other = await configuration(alert);
+      expect(other.find("alert-calibration-headroom-card-stub").exists()).toBe(false);
+      other.unmount();
+    }
+  });
+});
+
 describe("AlertDetail — anomaly alerts", () => {
   let wrapper: VueWrapper;
 
@@ -658,10 +736,17 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
     wrapper?.unmount();
   });
 
-  it("hands a firing single-row alert to the header actions", async () => {
-    withListRow({ last_outcome: "firing" });
+  it.each([
+    ["a firing run", { last_outcome: "firing", last_outcome_since: 1_700_000_000_000_000 }],
+    [
+      "an errored run during an open firing",
+      { last_outcome: "error", firing_started_at: 1_700_000_000_000_000 },
+    ],
+  ])("hands a single-row alert with %s to the header actions as firing", async (_case, row) => {
+    withListRow(row);
     wrapper = await mountView();
     expect(header().exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-alertdetail-firing-for"]').exists()).toBe(true);
     expect(header().props()).toMatchObject({
       alertId: "alert-1",
       name: "cpu-high",
@@ -865,5 +950,62 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
     withListRow({ last_outcome: "firing" });
     wrapper = await mountView({ alert: makeAnomalyAlert() });
     expect(header().exists()).toBe(false);
+  });
+});
+
+describe("AlertDetail — first paint", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const pendingAlert = () => {
+    let resolveAlert: (value: any) => void = () => {};
+    const alertRequest = new Promise((resolve) => {
+      resolveAlert = resolve;
+    });
+    return { alertRequest, resolveAlert: (alert: any) => resolveAlert({ data: alert }) };
+  };
+  const chart = () => wrapper.findComponent({ name: "AlertGroupChart" });
+  const tabs = () => wrapper.find('[data-test="alerts-alertdetail-tabs"]');
+  const banner = () => wrapper.find('[data-test="alerts-alertdetail-simple-grouped-banner"]');
+  const groupedButSimple = () => ({
+    ...makeSimpleAlert(),
+    query_condition: { aggregation: { group_by: ["host"], multi_alert: false } },
+  });
+
+  it("mounts the evaluation chart with no alert while the GET runs, ahead of the tabs", async () => {
+    const { alertRequest, resolveAlert } = pendingAlert();
+    wrapper = await mountView({ alertRequest });
+
+    expect(chart().exists()).toBe(true);
+    expect(chart().props("alert")).toBeNull();
+    expect(tabs().exists()).toBe(false);
+
+    resolveAlert(makeSimpleAlert());
+    await flushPromises();
+    expect(chart().props("alert")).toMatchObject({ name: "cpu-high" });
+    expect(tabs().exists()).toBe(true);
+  });
+
+  it("drops the held chart when the alert turns out to be an anomaly config", async () => {
+    const { alertRequest, resolveAlert } = pendingAlert();
+    wrapper = await mountView({ alertRequest });
+    expect(chart().exists()).toBe(true);
+
+    resolveAlert(makeAnomalyAlert());
+    await flushPromises();
+    expect(chart().exists()).toBe(false);
+  });
+
+  it("puts the grouped-but-simple banner below the tabs, so the tabs never move when it lands", async () => {
+    wrapper = await mountView({ alert: groupedButSimple() });
+
+    expect(banner().exists()).toBe(true);
+    expect(
+      tabs().element.compareDocumentPosition(banner().element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

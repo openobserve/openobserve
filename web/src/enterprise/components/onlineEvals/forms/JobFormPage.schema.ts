@@ -24,6 +24,7 @@ import {
   TRACE_COMPLETION_WINDOW_DEFAULTS,
   completionWindowLimitsForScope,
 } from "../utils/completionWindow";
+import { DEFAULT_BUDGET_ACTION, DEFAULT_DAILY_BUDGET_USD } from "../utils/evalSpend";
 
 const requiredText = (message: string) =>
   z.string().refine((val) => val.trim().length > 0, { message });
@@ -54,12 +55,12 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
       scorerIds: z.array(z.string()),
       samplingMode: z.string().default("rate"),
       samplingValue: z.string().optional().default(""),
-      // The filter-builder tree (V2 group) is now FORM-OWNED: FilterGroup renders
-      // in form mode (name-prefix="filterGroup"), so its leaf column/operator/value
-      // name-bind straight into the form. No validation — an empty filter is valid
-      // (a job may match all spans); it's transformed into the `filterCondition`
-      // payload at submit.
+      // Not validated: an empty filter is valid, since a job may match every span.
       filterGroup: z.any(),
+      // A job may have no daily judge spend limit.
+      budgetEnabled: z.boolean().default(true),
+      dailyBudgetUsd: z.coerce.number().default(DEFAULT_DAILY_BUDGET_USD),
+      budgetAction: z.enum(["pause", "keep_running"]).default(DEFAULT_BUDGET_ACTION),
     })
     .superRefine((val, ctx) => {
       // Sampling value is required unless the mode is "all" (which ignores it).
@@ -68,6 +69,15 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
           code: z.ZodIssueCode.custom,
           path: ["samplingValue"],
           message: t("onlineEvals.job.validation.samplingValueRequired"),
+        });
+      }
+
+      // The limit is only checked when the job has a budget.
+      if (val.budgetEnabled && !(val.dailyBudgetUsd > 0)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["dailyBudgetUsd"],
+          message: t("evalSpend.budget.validation"),
         });
       }
 

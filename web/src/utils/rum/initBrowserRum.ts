@@ -15,6 +15,7 @@
 
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
+import config from "@/aws-exports";
 import { shouldPropagateTracing } from "./tracingOrigin";
 import { isIgnoredNoise } from "./ignoredNoisePatterns";
 import { scrubAuthParams } from "./scrubAuthParams";
@@ -114,7 +115,8 @@ const startRumSdk = (
     actionNameAttribute: "data-test",
     apiVersion,
     insecureHTTP,
-    defaultPrivacyLevel: "allow",
+    // Cloud console replays can show other organizations' data, so mask all text there.
+    defaultPrivacyLevel: config.isCloud === "true" ? "mask" : "allow",
     // Session renewal drops the forced replay start, so sampling must keep every renewed session recording.
     sessionReplaySampleRate: 100,
     startSessionReplayRecordingManually: true,

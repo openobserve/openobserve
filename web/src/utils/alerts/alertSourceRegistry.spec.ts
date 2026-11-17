@@ -1,5 +1,7 @@
 import i18n from "@/locales";
 import { describe, it, expect, vi, afterEach } from "vitest";
+
+vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 import { ALERT_SOURCES, DEFAULT_ALERT_SOURCE, getAlertSource } from "./alertSourceRegistry";
 
 describe("alertSourceRegistry", () => {
@@ -58,5 +60,26 @@ describe("alertSourceRegistry", () => {
     expect(i18n.global.t(getAlertSource("explorer").toastKey)).toBe(
       "Query imported from the Metrics Explorer",
     );
+  });
+
+  it("registers AutoObserve once, on an enterprise build only", async () => {
+    const config = (await import("@/aws-exports")).default as { isEnterprise: string };
+    const source = getAlertSource("autoobserve");
+    expect(source.id).toBe("autoobserve");
+    expect(source.defaultThreshold).toBe("count");
+    expect(source.showQueryPreview).toBe(true);
+    expect(source.metaSettings).toBe(true);
+    expect(
+      i18n.global.t(source.toastKey, { sourceLabel: "Suggested by AutoObserve for svc-a" }),
+    ).toBe("Suggested by AutoObserve for svc-a. Nothing is saved until you save.");
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    config.isEnterprise = "false";
+    try {
+      expect(getAlertSource("autoobserve")).toEqual(DEFAULT_ALERT_SOURCE);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      config.isEnterprise = "true";
+    }
   });
 });

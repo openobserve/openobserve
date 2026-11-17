@@ -19,14 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="text-text-secondary mx-auto flex max-w-[80ch] flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 text-center text-sm leading-relaxed"
     data-test="autoobserve2-footer"
   >
-    <p class="text-pretty">
-      <OIcon
-        name="verified-user"
-        size="sm"
-        class="text-text-muted me-1 inline-block align-text-bottom"
-      />
-      {{ t("autoobserve2.footer.text") }}
-    </p>
     <div class="flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
       <OButton
         variant="ghost-primary"
@@ -53,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const emit = defineEmits<{ "open-coverage": []; "open-activity": [] }>();
 

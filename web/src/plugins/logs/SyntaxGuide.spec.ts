@@ -411,15 +411,15 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ toolbar: true, label: "Syntax Guide" });
     const button = wrapper.findComponent({ name: "OButton" });
     expect(button.props("variant")).toBe("outline");
-    expect(button.classes()).toContain("h-[2.125rem]!");
+    expect(button.classes()).toContain("h-8.5");
     expect(button.classes()).toContain("text-xs");
   });
 
   // Test 42: non-toolbar variants keep their own height
   it("should not apply the toolbar height to the default or menu-item variants", () => {
     wrapper = createWrapper();
-    expect(wrapper.findComponent({ name: "OButton" }).classes()).not.toContain("h-[2.125rem]!");
+    expect(wrapper.findComponent({ name: "OButton" }).props("size")).not.toBe("sm-toolbar");
     wrapper = createWrapper({ menuItem: true });
-    expect(wrapper.findComponent({ name: "OButton" }).classes()).not.toContain("h-[2.125rem]!");
+    expect(wrapper.findComponent({ name: "OButton" }).props("size")).not.toBe("sm-toolbar");
   });
 });

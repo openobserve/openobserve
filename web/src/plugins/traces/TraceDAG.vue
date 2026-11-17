@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :fit-view-options="{ padding: 0.3, minZoom: 0.3, maxZoom: 0.7 }"
         class="trace-dag-flow bg-surface-panel! h-full w-full"
       >
-        <Background pattern-color="#aaa" :gap="16" />
+        <Background :gap="16" />
         <Controls />
 
         <template #node-custom="{ data }">
@@ -397,7 +397,7 @@ export default defineComponent({
         markerEnd: MarkerType.ArrowClosed,
         style: {
           strokeWidth: 2,
-          stroke: "#94a3b8",
+          stroke: "var(--color-border-strong)",
         },
       }));
     });
@@ -558,6 +558,11 @@ export default defineComponent({
    light/dark on its own, which retires the `.dark`-only twin this replaced. */
 .trace-dag-flow :deep(.vue-flow__background) {
   background-color: var(--color-surface-panel) !important;
+}
+
+/* keep: lib-override:vue-flow — the library sets the dot colour as an SVG attribute, which cannot hold a var(). */
+.trace-dag-flow :deep(.vue-flow__background circle) {
+  fill: var(--color-border-strong);
 }
 
 /* keep: lib-override:vue-flow — the controls stylesheet hard-codes light-only button colours. */

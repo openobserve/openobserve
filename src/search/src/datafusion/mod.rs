@@ -15,19 +15,18 @@
 
 use std::str::FromStr;
 
-pub mod aggregates;
 pub mod context;
-pub mod distributed_plan;
+pub mod datasource;
+pub mod distributed;
 pub mod exec;
-pub mod merge;
+pub mod logical_plan;
+pub mod memory_pool;
 pub mod optimizer;
-pub mod peak_memory_pool;
-pub mod plan;
-pub mod plan_metrics;
+pub mod physical_optimizer;
+pub mod physical_plan;
 pub mod planner;
 pub mod sort_order;
 pub mod storage;
-pub mod table_provider;
 pub mod udaf;
 pub mod udf;
 pub mod vortex;

@@ -8,6 +8,7 @@ const {
   getEditVariableBtn,
   getVariableLoadingIndicator,
   SELECTORS,
+  clickDashboardMenuItem,
 } = require("./dashboard-selectors.js");
 
 export default class DashboardShareExportPage {
@@ -32,14 +33,10 @@ export default class DashboardShareExportPage {
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
     this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
     this.absoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
-    this.settingBtn = page.locator('[data-test="dashboard-setting-btn"]');
     this.settingsTabTab = page.locator('[data-test="dashboard-settings-tab-tab"]');
     this.tabListContainer = page.locator(
       '[data-test="dashboard-tab-list-container"]'
     );
-    // The `x` shortcut clicks this header button, so counting its clicks counts exports.
-    this.exportDashboardSelector = '[data-test="export-dashboard"]';
-    this.publicLinksBtn = page.locator('[data-test="dashboard-publish-public-btn"]');
     this.publicLinksPanelSelector = '[data-test="dashboards-public-links-panel"]';
     this.publicLinksPanel = page.locator(this.publicLinksPanelSelector);
     this.publicLinksPanelCloseBtn = page.locator(
@@ -156,7 +153,7 @@ export default class DashboardShareExportPage {
 
   //Open settings drawer and switch to the Tab section
   async openSettingsTabSection() {
-    await this.settingBtn.click();
+    await clickDashboardMenuItem(this.page, SELECTORS.SETTING_BTN);
     await this.settingsTabTab.waitFor({ state: "visible" });
     await this.settingsTabTab.click();
   }
@@ -200,6 +197,18 @@ export default class DashboardShareExportPage {
     return this.page.locator(SELECTORS.ROLE_OPTION).first();
   }
 
+  async selectFirstVariableValue(variableName, timeout = 30000) {
+    const dropdown = this.getVariableDropdownInner(variableName);
+    await dropdown.waitFor({ state: "visible", timeout });
+    await dropdown.click();
+    // The open list stays empty until the values query returns, which a busy shared org can hold for many seconds.
+    const option = this.page.locator(`[data-test="variable-selector-${variableName}-inner-option"]`).first();
+    await expect(option).toBeVisible({ timeout });
+    const value = (await option.getAttribute("data-test-label")) ?? (await option.textContent());
+    await option.click();
+    return value;
+  }
+
   //Navigate to a URL using a separate playwright page (new tab context)
   async openInNewPage(url) {
     const context = this.page.context();
@@ -216,19 +225,17 @@ export default class DashboardShareExportPage {
     await this.exportBtn.click();
   }
 
-  /** Count clicks on the header Export button; the `x` shortcut clicks it synchronously inside keydown. */
+  /** Count exports: each one clicks a detached `<a download="*.dashboard.json">`. */
   async trackExportClicks() {
-    await this.page.locator(this.exportDashboardSelector).waitFor({ state: "visible" });
-    await this.page.evaluate((selector) => {
+    await this.page.locator(SELECTORS.MORE_OPTIONS_BTN).waitFor({ state: "visible" });
+    await this.page.evaluate(() => {
       window.__e2eExportClicks = 0;
-      document.addEventListener(
-        "click",
-        (event) => {
-          if (event.target?.closest?.(selector)) window.__e2eExportClicks += 1;
-        },
-        true,
-      );
-    }, this.exportDashboardSelector);
+      const click = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        if (this.download?.endsWith(".dashboard.json")) window.__e2eExportClicks += 1;
+        return click.call(this);
+      };
+    });
   }
 
   async getExportClickCount() {
@@ -240,7 +247,11 @@ export default class DashboardShareExportPage {
   }
 
   async openPublicLinksPanel() {
-    await this.publicLinksBtn.click();
+    await clickDashboardMenuItem(
+      this.page,
+      '[data-test="dashboard-publish-public-btn"]',
+      SELECTORS.SHARE_OPTIONS_BTN
+    );
     await expect(this.publicLinksPanel).toBeVisible({ timeout: 15000 });
   }
 

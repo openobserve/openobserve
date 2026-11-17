@@ -716,6 +716,34 @@ describe("routeGuard", () => {
       expect(mockNext).toHaveBeenCalledTimes(1);
     });
 
+    it("redirects to /ingestion when the org's only streams are ones O2 writes itself", async () => {
+      (config as any).isCloud = "false";
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 1, num_user_streams: 0 } },
+      });
+      mockStore = buildNoDataStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
+
+      expect(mockStore._mockDispatch).toHaveBeenCalledWith("setIsDataIngested", false);
+      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
+    });
+
+    it("lets the org through when it has a user data stream", async () => {
+      (config as any).isCloud = "false";
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 2, num_user_streams: 1 } },
+      });
+      mockStore = buildNoDataStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
+
+      expect(mockStore._mockDispatch).toHaveBeenCalledWith("setIsDataIngested", true);
+      expect(mockNext).toHaveBeenCalledWith();
+    });
+
     it("logs warning, dispatches setIsDataIngested(true) and calls next() when API throws", async () => {
       (config as any).isCloud = "false";
       vi.mocked(organizationService.get_organization_summary).mockRejectedValue(

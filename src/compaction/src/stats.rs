@@ -146,6 +146,32 @@ pub async fn update_stats_from_file_list_for_stream(
     date_range: (String, String),
     is_recent: bool,
 ) -> Result<StreamStats, anyhow::Error> {
+    let stats = stats_with_dump(org_id, stream_type, stream_name, date_range).await?;
+    infra_file_list::set_stream_stats(org_id, stream_type, stream_name, &stats, is_recent).await?;
+
+    Ok(stats)
+}
+
+/// Stats of the UTC day starting at `day`, live and dumped files together.
+pub(crate) async fn day_stats(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    day: i64,
+) -> Result<StreamStats, anyhow::Error> {
+    let date_range = (
+        get_ymdh_from_micros(day, HourFormat::Zero),
+        get_ymdh_from_micros(day + day_micros(1), HourFormat::Zero),
+    );
+    stats_with_dump(org_id, stream_type, stream_name, date_range).await
+}
+
+async fn stats_with_dump(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: (String, String),
+) -> Result<StreamStats, anyhow::Error> {
     let mut stats =
         infra_file_list::stats_by_date_range(org_id, stream_type, stream_name, date_range.clone())
             .await?;
@@ -157,13 +183,11 @@ pub async fn update_stats_from_file_list_for_stream(
             org_id,
             stream_type,
             stream_name,
-            date_range.clone(),
+            date_range,
         )
         .await?;
         stats.merge(&dump_stats);
     }
-    infra_file_list::set_stream_stats(org_id, stream_type, stream_name, &stats, is_recent).await?;
-
     Ok(stats)
 }
 

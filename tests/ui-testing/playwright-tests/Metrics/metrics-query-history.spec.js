@@ -50,12 +50,11 @@ test.describe('Metrics editor query history', () => {
     await expect(metrics.historyRow(first)).toHaveCount(1, { timeout: 15000 });
     await expect(metrics.historyRow(second)).toHaveCount(1, { timeout: 15000 });
 
-    // Star one: the toggle flips, and "starred only" keeps it and drops the unstarred one.
+    // Star one: the toggle flips, and the Starred chip keeps it and drops the unstarred one.
     const starred = page.waitForResponse(isHistoryCall('PATCH'));
     await metrics.historyStarButton(first).click();
     expect((await starred).ok()).toBe(true);
     await expect(metrics.historyStarButton(first)).toHaveAttribute('aria-label', 'Unstar');
-    const starredOnlyBox = metrics.historyStarredOnly.locator('[role="checkbox"]');
     // The new filter shows a skeleton until its list answers, and a skeleton has no rows to find.
     const starredList = page.waitForResponse(
       (res) => {
@@ -65,14 +64,14 @@ test.describe('Metrics editor query history', () => {
       { timeout: 30000 },
     );
     await metrics.historyStarredOnly.click();
-    await expect(starredOnlyBox).toHaveAttribute('aria-checked', 'true');
+    await expect(metrics.historyStarredOnly).toHaveAttribute('aria-pressed', 'true');
     const starredRows = await (await starredList).json();
     expect(starredRows.map((row) => row.query)).toContain(first);
     expect(starredRows.map((row) => row.query)).not.toContain(second);
     await expect(metrics.historyRow(first)).toHaveCount(1, { timeout: 15000 });
     await expect(metrics.historyRow(second)).toHaveCount(0);
     await metrics.historyStarredOnly.click();
-    await expect(starredOnlyBox).toHaveAttribute('aria-checked', 'false');
+    await expect(metrics.historyStarredOnly).toHaveAttribute('aria-pressed', 'false');
     await expect(metrics.historyRow(second)).toHaveCount(1, { timeout: 15000 });
 
     // The editor holds the second query; load the starred entry back in place.

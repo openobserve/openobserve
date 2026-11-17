@@ -140,12 +140,6 @@ describe("K8sCommandPalette", () => {
     expect(q('[data-test="k8s2-palette-more"]')).toBeNull();
   });
 
-  it("lists every cluster for an empty query when scoped to the clusters group", async () => {
-    await open({ group: "clusters" });
-    expect(body().querySelectorAll('[role="option"]')).toHaveLength(2);
-    expect(q('[data-test="k8s2-palette-group-goTo"]')).toBeNull();
-  });
-
   it("shows no status line when the index is complete", async () => {
     await open();
     expect(q('[data-test="k8s2-palette-status"]')).toBeNull();
@@ -166,10 +160,5 @@ describe("K8sCommandPalette", () => {
   it("notes a truncated index", async () => {
     await open({ truncated: true });
     expect(q('[data-test="k8s2-palette-status"]')!.textContent).toContain("20,000");
-  });
-
-  it("hides the status line in the cluster switcher", async () => {
-    await open({ loading: true, group: "clusters" });
-    expect(q('[data-test="k8s2-palette-status"]')).toBeNull();
   });
 });

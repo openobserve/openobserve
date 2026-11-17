@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :workflows-lock-message="
           workflowsLicenseLocked ? workflowsLicenseReason : workflowsAccess.message
         "
+        :locked-workflow-names="lockedTargetNames"
         :placeholder="placeholder"
         :error="!!error"
         @update:destinations="emit('update:destinations', $event)"
@@ -70,12 +71,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            swaps the text and nothing below moves. Styled as a field hint. -->
       <p
         v-else-if="showStatus"
-        class="text-input-help-text pt-1 text-xs"
+        class="text-input-help-text flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-1 text-xs"
         :data-test="
           notifiesNobody ? 'alert-settings-destinations-note' : 'alert-settings-destinations-status'
         "
       >
-        {{ statusText }}
+        <span v-if="statusText">{{ statusText }}</span>
+        <template v-for="(lock, index) in statusLocks" :key="lock.feature">
+          <span v-if="index > 0">·</span>
+          <span
+            class="inline-flex items-center gap-1"
+            :data-test="`alert-settings-destinations-lock-${lock.feature}`"
+          >
+            <OIcon name="lock" size="xs" />
+            {{ lock.reason }}
+          </span>
+        </template>
       </p>
     </div>
   </div>
@@ -110,16 +121,22 @@ const props = withDefaults(
     notifiesNobody?: boolean;
     /** Show the one-line status under the field: where the alert sends, or that it sends nowhere. */
     showStatus?: boolean;
+    /** The caller refuses to save without a target, so the empty status says required instead of optional. */
+    targetRequired?: boolean;
     /** Shown in the empty picker. Omit where empty means something else (recovery destinations). */
     placeholder?: I18nText;
     /** Override the tooltip; pass "" for alert families that need none. */
     tooltip?: string;
+    /** The alert's on-call team, set on the Advanced tab; only the status line reads it. */
+    oncallTeam?: string | null;
+    /** Display names by id, from the alert response, of targets the license keeps us from listing. */
+    lockedTargetNames?: Record<string, string>;
     /** False for alert families with no workflow routing (e.g. synthetics
      *  checks): the Workflows group and its fetch are skipped even on
      *  enterprise, so the picker cannot offer options that would not save. */
     supportsWorkflows?: boolean;
   }>(),
-  { supportsWorkflows: true, notifiesNobody: false, showStatus: false },
+  { supportsWorkflows: true, notifiesNobody: false, showStatus: false, targetRequired: false },
 );
 
 const emit = defineEmits<{
@@ -166,6 +183,23 @@ const workflowsLocked = computed(
   () => props.supportsWorkflows && (!workflowsAccess.value.allowed || workflowsLicenseDenied.value),
 );
 
+const { locked: oncallLicenseLocked, lockedReason: oncallLicenseReason } = useLicenseLock("oncall");
+const hasOncallTeam = computed(() => !!props.oncallTeam?.trim());
+const statusLocks = computed(() =>
+  [
+    {
+      feature: "workflows",
+      kept: workflowsLicenseLocked.value && props.workflows.length > 0,
+      reason: workflowsLicenseReason.value,
+    },
+    {
+      feature: "oncall",
+      kept: oncallLicenseLocked.value && hasOncallTeam.value,
+      reason: oncallLicenseReason.value,
+    },
+  ].filter((lock) => lock.kept),
+);
+
 const workflowOptions = ref<{ label: I18nText; value: string }[]>([]);
 const fetchWorkflows = async (force = false) => {
   if (!workflowsEnabled.value) return;
@@ -191,8 +225,13 @@ const fetchWorkflows = async (force = false) => {
 };
 
 // One name reads better than "1 destination"; more than one is a count.
-const statusText = computed<I18nText>(() => {
-  if (props.notifiesNobody) return t("alerts.alertSettings.noDestinationNote");
+const noTargetNote = (): I18nText =>
+  props.targetRequired
+    ? t("alerts.alertSettings.targetRequiredNote")
+    : t("alerts.alertSettings.noDestinationNote");
+
+const statusText = computed<I18nText | null>(() => {
+  if (props.notifiesNobody) return noTargetNote();
   const parts: string[] = [];
   const { destinations } = props;
   if (destinations.length === 1) parts.push(destinations[0]);
@@ -216,8 +255,13 @@ const statusText = computed<I18nText>(() => {
       t("alert_dependencies.countWorkflow", { count: workflows.length }, workflows.length),
     );
   }
-  // A target the picker does not show: the on-call team set on the Advanced tab.
-  if (parts.length === 0) parts.push(t("alerts.alertSettings.oncallTeamTarget"));
+  // A target the picker does not show. `/config` says false while it is locked or switched off.
+  if (parts.length === 0 && hasOncallTeam.value && store.state.zoConfig?.oncall_enabled === true) {
+    parts.push(t("alerts.alertSettings.oncallTeamTarget"));
+  }
+  if (parts.length === 0) {
+    return statusLocks.value.length > 0 ? null : noTargetNote();
+  }
   const targets = new Intl.ListFormat(locale.value, { type: "conjunction" }).format(parts);
   return t("alerts.alertSettings.sendsToStatus", { targets });
 });

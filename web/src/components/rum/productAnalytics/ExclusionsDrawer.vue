@@ -110,70 +110,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :info="t('rum.analytics.exclusions.sessionsCaption')"
         >
           <div class="flex flex-col gap-2">
-            <span v-if="draft.sessions.length" class="flex flex-wrap items-center gap-1.5">
-              <span
-                v-for="(rule, i) in draft.sessions"
-                :key="i"
-                class="flex max-w-full min-w-0 items-center gap-1"
-                :data-test="`rum-analytics-exclusions-rule-${i}`"
-              >
-                <OTag
-                  :label="ruleLabel(rule)"
-                  variant="primary-outline"
-                  size="sm"
-                  clickable
-                  removable
-                  class="max-w-full min-w-0"
-                  :remove-label="t('rum.analytics.exclusions.remove')"
-                  :data-test="`rum-analytics-exclusions-rule-${i}-chip`"
-                  @click="editRule(i)"
-                  @remove="removeRule(i)"
-                >
-                  <OTruncatedText as="span" class="min-w-0">{{ ruleLabel(rule) }}</OTruncatedText>
-                </OTag>
-                <OTag
-                  v-if="!pa.schema.value[rule.field]"
-                  :label="t('rum.analytics.exclusions.fieldMissing')"
-                  variant="warning-soft"
-                  size="sm"
-                  :data-test="`rum-analytics-exclusions-rule-${i}-missing`"
-                />
-              </span>
-            </span>
-            <OPopover
-              :open="ruleOpen"
-              side="bottom"
-              align="start"
-              content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
-              @update:open="setRuleOpen"
-            >
-              <template #trigger>
-                <span class="self-start">
-                  <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-left="add"
-                    :active="ruleOpen"
-                    :disabled="draft.sessions.length >= MAX_SESSION_RULES"
-                    data-test="rum-analytics-exclusions-add-rule"
-                    @click="ruleEditing = null"
-                    >{{ t("rum.analytics.exclusions.addRule") }}</OButton
-                  >
-                </span>
-              </template>
-              <SessionFieldPicker
-                v-if="ruleOpen"
-                :key="ruleEditing ?? '+'"
-                :fields="ruleFields"
-                :values="ruleValues"
-                :initial="editingRule"
-                :lock-field="ruleEditing !== null"
-                :conditions="RULE_CONDITIONS"
-                @load="loadRuleValues"
-                @apply="applyRule"
-                @cancel="setRuleOpen(false)"
+            <FilterBuilder
+              profile="rum-exclusion"
+              :model-value="draft.sessions"
+              :fields="ruleFields"
+              :load-values="loadRuleValues"
+              :placeholder="t('rum.analytics.exclusions.addRule')"
+              data-test="rum-analytics-exclusions-rules"
+              @update:model-value="onRulesChange"
+            />
+            <span v-if="missingRules.length" class="flex flex-wrap items-center gap-1.5">
+              <OTag
+                v-for="{ rule, index } in missingRules"
+                :key="index"
+                :label="
+                  t('rum.analytics.exclusions.fieldMissingOn', {
+                    field: filterFieldLabel(t, rule.field),
+                  })
+                "
+                variant="warning-soft"
+                size="sm"
+                :data-test="`rum-analytics-exclusions-rule-${index}-missing`"
               />
-            </OPopover>
+            </span>
           </div>
         </OFormSection>
 
@@ -318,11 +277,11 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import BuiltinBotsSummary from "@/components/rum/productAnalytics/BuiltinBotsSummary.vue";
 import AppFilterPagePicker from "@/components/rum/productAnalytics/AppFilterPagePicker.vue";
-import SessionFieldPicker from "@/components/rum/productAnalytics/funnelParts/SessionFieldPicker.vue";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import {
-  FILTER_CONDITIONS,
   conditionOf,
   filterFieldLabel,
+  valuesLoader,
   type FilterValuesState,
 } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
@@ -331,22 +290,13 @@ import useExclusionSuggestions from "@/composables/rum/useExclusionSuggestions";
 import useAnalyticsSearch from "@/composables/rum/useAnalyticsSearch";
 import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import type { FilterField } from "@/utils/query/filterBar";
 import { addCommasToNumber } from "@/utils/formatters";
 import { rumPaError } from "@/utils/rum/rumPaApiError";
-import {
-  filterValuesSql,
-  summarySql,
-  type FunnelFilter,
-} from "@/utils/rum/productAnalyticsQueries";
-import type {
-  AppSettings,
-  PageRule,
-  SessionField,
-  SessionRule,
-} from "@/utils/rum/productAnalyticsModel";
+import { filterValuesSql, summarySql } from "@/utils/rum/productAnalyticsQueries";
+import type { AppSettings, PageRule, SessionRule } from "@/utils/rum/productAnalyticsModel";
 import {
   MAX_PAGE_RULES,
-  MAX_RULE_VALUES,
   MAX_SESSION_RULES,
   SESSION_FIELDS,
   appSettingsDefaults,
@@ -356,8 +306,6 @@ import {
 
 const FORM_ID = "rum-analytics-exclusions-form";
 const PREVIEW_DELAY_MS = 400;
-// App rules have no negation on the server, so only the kept conditions are offered.
-const RULE_CONDITIONS = FILTER_CONDITIONS.filter((c) => !c.not);
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ "update:open": [boolean] }>();
@@ -397,15 +345,22 @@ const draft = form.useStore((s: { values: AppSettingsForm }) => s.values);
 
 const valuesPanel = runner.panel<{ v: string; sessions: number }>("rule-values");
 const valuesField = ref<string | null>(null);
-const ruleOpen = ref(false);
-const ruleEditing = ref<number | null>(null);
 const pageOpen = ref(false);
 const pageEditing = ref<number | null>(null);
 
-const ruleFields = computed(() => SESSION_FIELDS.filter((f) => !!pa.schema.value[f]));
+const ruleFields = computed<FilterField[]>(() =>
+  SESSION_FIELDS.filter((f) => !!pa.schema.value[f]).map((name) => ({
+    name,
+    label: filterFieldLabel(t, name),
+    type: "string",
+  })),
+);
 
-const editingRule = computed<FunnelFilter | undefined>(() =>
-  ruleEditing.value === null ? undefined : draft.value.sessions[ruleEditing.value],
+// A saved rule on a field the stream no longer has still applies, so it is kept and flagged.
+const missingRules = computed(() =>
+  draft.value.sessions
+    .map((rule, index) => ({ rule, index }))
+    .filter(({ rule }) => !pa.schema.value[rule.field]),
 );
 
 // Values are listed with every app filter lifted, so a value already hidden can still be picked.
@@ -569,7 +524,6 @@ watch(
 watch(
   () => props.open,
   (open) => {
-    setRuleOpen(false);
     setPageOpen(false);
     if (!open) {
       runner.abortAll();
@@ -592,23 +546,7 @@ const addRule = (rule: SessionRule) => {
   form.pushFieldValue("sessions", { ...rule, values: [...rule.values] });
 };
 
-const setRuleOpen = (v: boolean) => {
-  ruleOpen.value = v;
-  if (!v) ruleEditing.value = null;
-};
-
-const editRule = (i: number) => {
-  setPageOpen(false);
-  ruleEditing.value = i;
-  ruleOpen.value = true;
-};
-
-const removeRule = (i: number) => {
-  setRuleOpen(false);
-  form.removeFieldValue("sessions", i);
-};
-
-const loadRuleValues = (field: string) => {
+const requestRuleValues = (field: string) => {
   valuesField.value = field;
   if (!pa.schema.value[field]) return;
   const key = valuesKey(field);
@@ -621,24 +559,10 @@ const loadRuleValues = (field: string) => {
   );
 };
 
-// An edited `eq` rule stays `eq`, so re-applying it unchanged keeps saved funnels from going stale.
-const applyRule = (f: FunnelFilter) => {
-  const before = editingRule.value;
-  const rule: SessionRule = {
-    field: f.field as SessionField,
-    op: f.op === "in" && before?.op === "eq" ? "eq" : f.op,
-    values: [...new Set(f.values)],
-  };
-  if (!schema.shape.sessions.element.safeParse(rule).success) {
-    toast({
-      variant: "error",
-      message: t("rum.analytics.exclusions.valuesInvalid", { max: MAX_RULE_VALUES }),
-    });
-    return;
-  }
-  if (ruleEditing.value === null) addRule(rule);
-  else form.replaceFieldValue("sessions", ruleEditing.value, rule);
-  setRuleOpen(false);
+const loadRuleValues = valuesLoader(() => ruleValues.value, requestRuleValues);
+
+const onRulesChange = (next: unknown) => {
+  form.setFieldValue("sessions", next as SessionRule[]);
 };
 
 const setPageOpen = (v: boolean) => {
@@ -647,7 +571,6 @@ const setPageOpen = (v: boolean) => {
 };
 
 const editPage = (i: number) => {
-  setRuleOpen(false);
   pageEditing.value = i;
   pageOpen.value = true;
 };

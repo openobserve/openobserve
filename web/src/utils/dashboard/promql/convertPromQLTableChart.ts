@@ -234,9 +234,12 @@ export class TableConverter implements PromQLChartConverter {
 
       processedData.forEach((queryData) => {
         queryData.series.forEach((seriesData) => {
+          // A drilldown reads the clicked row's labels; `id` stays the table's own row key.
+          const { id: _id, ...labels } = seriesData.metric;
           // Create a row for each data point
           seriesData.values.forEach(([timestamp, value]) => {
             rows.push({
+              ...labels,
               timestamp: formatDate(toZonedTime(timestamp * 1000, timezone)),
               value: parseFloat(value),
               __legend__: seriesData.name, // Store legend for filtering

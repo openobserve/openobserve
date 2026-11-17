@@ -63,7 +63,7 @@ test.describe('Legacy ingestion guides use the masked code block', () => {
                 expect(html).not.toContain(basicForm(secret));
             }
 
-            await pm.ingestionConfigPage.clickCodeBlock(slug);
+            await pm.ingestionConfigPage.clickCodeBlockCopyBtn(slug);
             await pm.ingestionConfigPage.expectToastText('Copied');
             const copied = await pm.ingestionConfigPage.readClipboard();
             expect(copied).not.toContain('•');

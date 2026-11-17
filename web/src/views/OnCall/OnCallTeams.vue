@@ -19,20 +19,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-teams-page"
     :title="t('oncall.teamsTitle')"
-    :subtitle="t('oncall.teamsSubtitle')"
     icon="group-work"
   >
+    <template #title-trail>
+      <BetaBadge class="shrink-0" />
+    </template>
     <template #actions>
       <OButton
         v-if="canConfigure"
         variant="primary"
         size="sm"
+        icon-left="add"
         data-test="oncall-teams-add-btn"
         @click="openCreate"
       >
         {{ t("oncall.newTeam") }}
       </OButton>
     </template>
+
+    <!-- With no team the empty state below is already the next step, so the bar would only repeat it. -->
+    <OnCallSetupBanner
+      v-if="teams.length && !notAvailable"
+      class="px-page-edge shrink-0 pt-2"
+      @create-team="openCreate"
+    />
 
     <OTable
       ref="oTableRef"
@@ -46,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       pagination="client"
       show-index
       table-id="oncall-teams-list"
-      :persist-columns="true"
+      :persist-columns="showToolbar"
       :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-teams-table"
@@ -60,7 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:sort-by="sortBy = $event"
       @update:sort-order="sortOrder = $event"
     >
-      <template #toolbar>
+      <!-- Search, columns and refresh have nothing to act on until a team exists. -->
+      <template v-if="showToolbar" #toolbar>
         <div class="flex w-full items-center gap-2 max-md:contents">
           <OSearchInput
             v-model="search"
@@ -72,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <template #toolbar-trailing>
+      <template v-if="showToolbar" #toolbar-trailing>
         <ORefreshButton
           layout="inline"
           variant="outline"
@@ -101,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`oncall-team-default-badge-${row.id}`"
           >
             {{ t("oncall.defaultTeamBadge") }}
+            <OTooltip side="bottom" :content="t('oncall.defaultTeamBadgeTip')" />
           </OTag>
         </span>
       </template>
@@ -122,7 +134,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :data-test="`oncall-teams-primary-gap-${row.id}`"
         />
-        <OUserCell v-else :value="positionsByTeam[row.id]!.first!.user_email" />
+        <OnCallPersonName
+          v-else
+          truncate
+          :email="positionsByTeam[row.id]!.first!.user_email"
+          :data-test="`oncall-teams-primary-${row.id}`"
+        />
       </template>
 
       <template #cell-secondary="{ row }">
@@ -140,7 +157,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="position.rotation_id"
             class="flex flex-wrap items-center gap-1.5"
           >
-            <OUserCell :value="position.user_email" />
+            <OnCallPersonName
+              truncate
+              :email="position.user_email"
+              :data-test="`oncall-teams-secondary-${row.id}-${position.rotation_id}`"
+            />
             <!-- The header already says "secondary". Only a rotation the header
                  does not name has to announce itself. -->
             <OTag
@@ -155,89 +176,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
-      <!-- Delete was the only control here, so the most destructive act was
-           the most discoverable one and editing was a whole-row click nothing
-           announced. Safe actions first, destructive last. -->
+      <!-- The default is set from the Edit drawer, so the row offers no action of its own for it. -->
       <template #cell-actions="{ row }">
-        <OButton
-          v-if="canConfigure && row.id !== defaultTeamId"
-          variant="ghost"
-          size="icon-sm"
-          icon-left="star-outline"
-          class="max-md:hidden"
-          :loading="settingDefaultTeamId === row.id"
-          :aria-label="t('oncall.setDefaultTeam')"
-          :data-test="`oncall-team-set-default-${row.id}`"
-          @click.stop="setDefaultTeam(row)"
-        >
-          <OTooltip side="bottom" :content="t('oncall.setDefaultTeam')" />
-        </OButton>
-        <div v-else-if="canConfigure" class="h-8 w-8 shrink-0 max-md:hidden" />
-        <OButton
-          v-if="canConfigure"
-          variant="ghost"
-          size="icon-sm"
-          icon-left="edit"
-          class="max-md:hidden"
-          :aria-label="t('oncall.editTeam')"
-          :data-test="`oncall-team-edit-${row.id}`"
-          @click.stop="openEdit(row)"
-        >
-          <OTooltip side="bottom" :content="t('oncall.editTeam')" />
-        </OButton>
-        <!-- The server refuses to delete the default team, so its row offers no Delete, as the phone menu already does. -->
-        <OButton
-          v-if="canConfigure && row.id !== defaultTeamId"
-          variant="ghost"
-          size="icon-sm"
-          icon-left="delete-outline"
-          class="max-md:hidden"
-          :aria-label="t('oncall.deleteTeam')"
-          :data-test="`oncall-team-delete-${row.id}`"
-          @click.stop="teamToDelete = row"
-        >
-          <OTooltip side="bottom" :content="t('oncall.deleteTeam')" />
-        </OButton>
-        <ODropdown v-if="canConfigure" side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              icon-left="more-vert"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="md:hidden"
-              :loading="settingDefaultTeamId === row.id"
-              :aria-label="t('oncall.moreActions')"
-              data-test="oncall-teams-row-more-actions"
-              @click.stop
-            />
-          </template>
-          <ODropdownItem
-            v-if="row.id !== defaultTeamId"
-            icon-left="star-outline"
-            class="md:hidden"
-            :data-test="`oncall-team-set-default-${row.id}-menu`"
-            @select="setDefaultTeam(row)"
-          >
-            <span>{{ t("oncall.setDefaultTeam") }}</span>
-          </ODropdownItem>
-          <ODropdownItem
+        <div v-if="canConfigure" class="flex items-center justify-center gap-1">
+          <OButton
+            variant="ghost"
+            size="icon-sm"
             icon-left="edit"
-            class="md:hidden"
-            :data-test="`oncall-team-edit-${row.id}-menu`"
-            @select="openEdit(row)"
+            class="max-md:hidden"
+            :aria-label="t('oncall.editTeam')"
+            :data-test="`oncall-team-edit-${row.id}`"
+            @click.stop="openEdit(row)"
           >
-            <span>{{ t("oncall.editTeam") }}</span>
-          </ODropdownItem>
-          <ODropdownItem
+            <OTooltip side="bottom" :content="t('oncall.editTeam')" />
+          </OButton>
+          <!-- The server refuses to delete the default team, so its Delete stays in its slot and says why it is off. -->
+          <OTooltip
+            v-if="row.id === defaultTeamId"
+            side="bottom"
+            :content="t('oncall.deleteDefaultTeamBlocked')"
+          >
+            <OButton
+              variant="ghost-destructive"
+              size="icon-sm"
+              icon-left="delete-outline"
+              class="max-md:hidden"
+              disabled
+              focusable-unavailable
+              :aria-label="t('oncall.deleteTeam')"
+              :data-test="`oncall-team-delete-${row.id}`"
+              @click.stop
+            >
+              <template #unavailable-reason>{{ t("oncall.deleteDefaultTeamBlocked") }}</template>
+            </OButton>
+          </OTooltip>
+          <OButton
+            v-else
+            variant="ghost-destructive"
+            size="icon-sm"
             icon-left="delete-outline"
-            variant="destructive"
-            class="md:hidden"
-            :data-test="`oncall-team-delete-${row.id}-menu`"
-            @select="teamToDelete = row"
+            class="max-md:hidden"
+            :aria-label="t('oncall.deleteTeam')"
+            :data-test="`oncall-team-delete-${row.id}`"
+            @click.stop="teamToDelete = row"
           >
-            <span>{{ t("oncall.deleteTeam") }}</span>
-          </ODropdownItem>
-        </ODropdown>
+            <OTooltip side="bottom" :content="t('oncall.deleteTeam')" />
+          </OButton>
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                :aria-label="t('oncall.moreActions')"
+                :data-test="`oncall-team-more-${row.id}`"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="edit"
+              class="md:hidden"
+              :data-test="`oncall-team-edit-${row.id}-menu`"
+              @select="openEdit(row)"
+            >
+              <span>{{ t("oncall.editTeam") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="delete-outline"
+              variant="destructive"
+              class="md:hidden"
+              :disabled="row.id === defaultTeamId"
+              :focusable-unavailable="row.id === defaultTeamId"
+              :description="
+                row.id === defaultTeamId ? t('oncall.deleteDefaultTeamBlocked') : undefined
+              "
+              :data-test="`oncall-team-delete-${row.id}-menu`"
+              @select="teamToDelete = row"
+            >
+              <span>{{ t("oncall.deleteTeam") }}</span>
+            </ODropdownItem>
+          </ODropdown>
+        </div>
       </template>
 
       <template #error>
@@ -267,17 +287,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-teams-not-available"
         />
         <OEmptyState
-          v-else-if="!loading"
+          v-else-if="!loading && search"
           size="hero"
           preset="no-oncall-teams"
-          :filtered="!!search"
+          filtered
+          data-test="oncall-teams-empty"
+          @action="onEmptyAction"
+        />
+        <!-- The title and the card already say what to do; the preset's explainer lines are left out. -->
+        <OEmptyState
+          v-else-if="!loading"
+          size="hero"
+          illustration="users"
+          variant="create"
+          :title="t('emptyState.noOncallTeams.title')"
+          :actions="NO_TEAMS_ACTIONS"
           data-test="oncall-teams-empty"
           @action="onEmptyAction"
         />
       </template>
     </OTable>
 
-    <OnCallTeamForm v-model:open="formOpen" :team="editingTeam" @saved="onSaved" />
+    <OnCallTeamForm
+      v-model:open="formOpen"
+      :team="editingTeam"
+      offer-default
+      :is-default="!!editingTeam && editingTeam.id === defaultTeamId"
+      @saved="onSaved"
+    />
 
     <!-- Named in the prompt: deleting the wrong rotation silently stops
          paging, and the team name is the only thing that distinguishes two
@@ -301,34 +338,32 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallSetupBanner from "@/components/oncall/OnCallSetupBanner.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useListViewState } from "@/composables/useListViewState";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
+import { useOnCallDefaultTeam } from "@/composables/useOnCallDefaultTeam";
 import { queryClient } from "@/composables/query/queryClient";
-import oncallService from "@/services/oncall";
-import {
-  deleteTeamMutation,
-  oncallTeamsQuery,
-  setRoutingConfigMutation,
-  whoIsOnCallQuery,
-} from "@/services/oncall.queries";
+import { deleteTeamMutation, oncallTeamsQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
 import { userKeys } from "@/services/users.querykeys";
 import { useMutation } from "@tanstack/vue-query";
 import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
@@ -340,13 +375,14 @@ import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { dropScheduleDrafts, useScheduleDraftTimes } from "@/components/oncall/scheduleDrafts";
+import { serverMessageOf, statusOf } from "@/utils/slackLink";
 
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
-const { confirm } = useConfirmDialog();
+const { nameOf } = useOrgUserNames();
 const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfig();
 
 const teams = ref<OnCallTeam[]>([]);
@@ -375,8 +411,6 @@ const teamToDelete = ref<OnCallTeam | null>(null);
 // Undefined = not fetched yet, so a team in flight reads as loading rather
 // than as an empty rotation.
 const onCallByTeam = ref<Record<string, OnCallPosition[]>>({});
-// Which row's default-team save is in flight, for the same reason.
-const settingDefaultTeamId = ref<string | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? "");
@@ -400,7 +434,7 @@ const teamDraftTimes = computed(() => {
   }
   return times;
 });
-const setRoutingConfigWrite = useMutation(() => setRoutingConfigMutation(orgId.value));
+const { setDefaultTeam } = useOnCallDefaultTeam(orgId);
 
 // Named handler: `@click="fetchTeams"` would hand the MouseEvent to `force`.
 const refreshTeams = () => fetchTeams(true);
@@ -494,10 +528,13 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => {
       header: t("oncall.actions"),
       isAction: true,
       sortable: false,
-      meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+      pinned: "right",
+      meta: { align: "center", actionCount: 2 },
     },
   ];
 });
+
+const showToolbar = computed(() => loading.value || teams.value.length > 0 || !!loadError.value);
 
 const filteredTeams = computed(() => {
   const q = search.value.trim().toLowerCase();
@@ -510,7 +547,10 @@ const filteredTeams = computed(() => {
       // "Which team would page Priya right now" is a question this list can
       // answer in one keystroke; without the holders it costs a drill-in per
       // team, which is the same search done by hand.
-      ...(onCallByTeam.value[team.id] ?? []).map((slot) => slot.user_email),
+      ...(onCallByTeam.value[team.id] ?? []).flatMap((slot) => [
+        slot.user_email,
+        nameOf(slot.user_email),
+      ]),
     ].some((field) => field.toLowerCase().includes(q)),
   );
 });
@@ -560,7 +600,7 @@ async function fetchTeams(force = false) {
     loadError.value = null;
     notAvailable.value = false;
     forbidden.value = false;
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Feature-off (404) and OSS (403 "Not Supported") are the same calm fact,
     // not an error: nothing failed and there is nothing to retry. §G.8.1 —
     // the teams list IS the capability probe.
@@ -576,7 +616,7 @@ async function fetchTeams(force = false) {
     }
     // The state, not a toast: a toast evaporates and leaves "no teams" on
     // screen, which reads as an unconfigured org rather than a failed read.
-    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    loadError.value = serverMessageOf(err) ?? (err instanceof Error ? err.message : "");
   } finally {
     loading.value = false;
   }
@@ -618,14 +658,14 @@ async function deleteTeam() {
     // Unforced: the mutation expired the scope, so this read reaches the server
     // and repaints the rows this page holds in its own ref.
     await fetchTeams();
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.deleteTeamFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.deleteTeamFailed"),
     });
   }
 }
@@ -633,45 +673,6 @@ async function deleteTeam() {
 // Mirrors the routing screen's own check: nominating a team is the one
 // moment "nobody is on call" is still avoidable, so an unstaffed pick warns
 // before it starts silently swallowing unrouted signals.
-async function isTeamUnstaffed(teamId: string): Promise<boolean> {
-  try {
-    const { data } = await oncallService.coverageGaps({ org_identifier: orgId.value, limit: 200 });
-    return data.teams.some((gap) => gap.id === teamId);
-  } catch {
-    return false;
-  }
-}
-
-async function setDefaultTeam(team: OnCallTeam) {
-  if (await isTeamUnstaffed(team.id)) {
-    const proceed = await confirm({
-      title: t("oncall.defaultTeamUnstaffedTitle"),
-      message: t("oncall.defaultTeamUnstaffedMessage", { team: raw(team.name) }),
-      confirmLabel: t("oncall.defaultTeamUnstaffedConfirm"),
-    });
-    if (!proceed) return;
-  }
-
-  settingDefaultTeamId.value = team.id;
-  try {
-    await setRoutingConfigWrite.mutateAsync(team.id);
-    // Unforced: the write expired the entry, so this repaints from one server read.
-    await loadRoutingConfig(orgId.value);
-    toast({ variant: "success", message: t("oncall.defaultTeamSaved") });
-  } catch (err: any) {
-    noteConfigurationDenied(err);
-    toast({
-      variant: "error",
-      message:
-        err?.response?.status === 403
-          ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.defaultTeamSaveFailed"),
-    });
-  } finally {
-    settingDefaultTeamId.value = null;
-  }
-}
-
 function openCreate() {
   editingTeam.value = null;
   formOpen.value = true;
@@ -690,6 +691,10 @@ function openTeam(team: Pick<OnCallTeam, "id">) {
   });
 }
 
+const NO_TEAMS_ACTIONS: EmptyStateAction[] = [
+  { id: "create", icon: "add", titleKey: "emptyState.noOncallTeams.action" },
+];
+
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
     search.value = "";
@@ -699,13 +704,14 @@ function onEmptyAction(id?: string) {
 }
 
 // A created team opens straight away: its members, schedule and ladder are set up there, not on this list.
-function onSaved(teamId: string) {
-  const created = !editingTeam.value;
+async function onSaved(teamId: string, makeDefault = false) {
+  const edited = editingTeam.value;
   formOpen.value = false;
-  if (created && teamId) {
+  if (!edited && teamId) {
     openTeam({ id: teamId });
     return;
   }
+  if (makeDefault && edited) await setDefaultTeam(edited);
   fetchTeams();
 }
 

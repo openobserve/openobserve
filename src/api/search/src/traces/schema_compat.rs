@@ -76,11 +76,16 @@ impl LlmColumns {
     }
 }
 
+/// A stream whose spans never had a parent lacks this column.
+pub(super) const PARENT_SPAN_ID_COLUMN: &str = "reference_parent_span_id";
+
 /// Schema facts for callers that only need the generation and usage layout.
 #[derive(Debug, Clone, Copy, Default)]
 pub(super) struct StreamLlmLayout {
     pub(super) has_gen_ai: bool,
     pub(super) has_operation_name: bool,
+    /// Spans record their parent, so the usage rule can tell top-level agents from nested ones.
+    pub(super) has_parent_span: bool,
 }
 
 /// Decide which schema generation an Arrow schema belongs to.
@@ -117,6 +122,7 @@ pub(super) async fn stream_llm_layout(
         .map(|s| StreamLlmLayout {
             has_gen_ai: has_gen_ai_fields(&s),
             has_operation_name: has_operation_name(&s),
+            has_parent_span: s.field_with_name(PARENT_SPAN_ID_COLUMN).is_ok(),
         })
         .unwrap_or_default()
 }
@@ -172,6 +178,8 @@ pub(super) struct ValidatedLlmSchema {
     pub(super) has_cost_status: bool,
     /// New schema with `gen_ai_operation_name`, so usage totals sum only LLM-call spans.
     pub(super) has_operation_name: bool,
+    /// `reference_parent_span_id` exists, so the usage rule can find top-level agents.
+    pub(super) has_parent_span: bool,
 }
 
 impl ValidatedLlmSchema {
@@ -191,6 +199,15 @@ impl ValidatedLlmSchema {
              array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_usage_cost_status = 'unpriced' \
              AND gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_unpriced_models"
         )
+    }
+
+    /// The generation and usage facts the per-trace usage rule reads.
+    pub(super) fn layout(&self) -> StreamLlmLayout {
+        StreamLlmLayout {
+            has_gen_ai: self.has_gen_ai,
+            has_operation_name: self.has_operation_name,
+            has_parent_span: self.has_parent_span,
+        }
     }
 }
 
@@ -236,12 +253,8 @@ impl ValidatedLlmSchema {
             has_cost_net_cache_impact: false,
             has_cost_status: false,
             has_operation_name: false,
+            has_parent_span: false,
         }
-    }
-
-    /// [`usage_sum_expr`] for this stream's layout.
-    pub(super) fn usage_sum(&self, column: &str) -> String {
-        usage_sum_expr(column, self.has_operation_name)
     }
 }
 
@@ -327,6 +340,7 @@ pub(super) fn validate_llm_schema(
                 .field_with_name(config::meta::model_pricing::COST_STATUS_COLUMN)
                 .is_ok(),
         has_operation_name: has_operation_name(schema),
+        has_parent_span: schema.field_with_name(PARENT_SPAN_ID_COLUMN).is_ok(),
     })
 }
 

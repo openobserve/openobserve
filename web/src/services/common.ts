@@ -6,8 +6,14 @@ const common = {
     const url = `/api/v2/${organization}/folders/${folder_type}`;
     return options ? http().get(url, options) : http().get(url);
   },
-  new_Folder: (organization: string, folder_type: string, data: any) => {
+  new_Folder: (
+    organization: string,
+    folder_type: string,
+    data: any,
+    options?: AxiosRequestConfig,
+  ) => {
     return http().post(`/api/v2/${organization}/folders/${folder_type}`, data, {
+      ...options,
       headers: { "Content-Type": "application/json; charset=UTF-8" },
     });
   },

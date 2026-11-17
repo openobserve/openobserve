@@ -24,6 +24,8 @@ import { describe, expect, it, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 
 import AlertConfigSummary from "@/components/alerts/AlertConfigSummary.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -32,10 +34,19 @@ import router from "@/test/unit/helpers/router";
 const field = (wrapper: any, key: string) =>
   wrapper.find(`[data-test="alerts-alertconfigsummary-${key}"]`);
 
-/** Just the VALUE. Asserting on the block would let the <dt> label's words
- *  satisfy a `toContain`, and a raw JSON dump of the condition would satisfy
- *  every numeric assertion in this file. */
-const value = (wrapper: any, key: string) => field(wrapper, key).find("dd").text().trim();
+/** The read-only input that shows a short value. */
+const input = (wrapper: any, key: string) =>
+  field(wrapper, key).find(`[data-test="alerts-alertconfigsummary-${key}-input-field"]`);
+
+/** Just the VALUE, so neither the label's words nor a raw JSON dump can satisfy an assertion. */
+const value = (wrapper: any, key: string): string => {
+  const code = field(wrapper, key).find(
+    `[data-test="alerts-alertconfigsummary-${key}-code-pre"] code`,
+  );
+  if (code.exists()) return code.text().trim();
+  if (input(wrapper, key).exists()) return (input(wrapper, key).element as HTMLInputElement).value;
+  return field(wrapper, key).findComponent(OTag).text().trim();
+};
 
 const mountSummary = (alert: any, props: Record<string, any> = {}) =>
   mount(AlertConfigSummary, {
@@ -81,6 +92,13 @@ const translated = (key: string, params?: Record<string, any>, plural?: number) 
   return out;
 };
 
+/** An unset value stays empty, so the input's "Not set" placeholder is what reads. */
+const expectNotSet = (wrapper: any, key: string) => {
+  expect(input(wrapper, key).exists(), `${key} is not a read-only input`).toBe(true);
+  expect(value(wrapper, key)).toBe("");
+  expect(input(wrapper, key).attributes("placeholder")).toBe(translated("alerts.configNotSet"));
+};
+
 afterEach(() => {});
 
 describe("AlertConfigSummary — non-SLO alerts (regression)", () => {
@@ -119,9 +137,11 @@ describe("AlertConfigSummary — SLO alerts", () => {
     const wrapper = mountSummary(sloAlert(), { sloName: "checkout-availability" });
 
     expect(value(wrapper, "slo")).toBe("checkout-availability");
-    const link = wrapper.find('[data-test="alerts-alertconfigsummary-slo-link"]');
+    const link = field(wrapper, "slo").find('[data-test="alerts-alertconfigsummary-slo-link"]');
     expect(link.exists()).toBe(true);
     expect(link.attributes("href")).toMatch(/\/slos\/slo-123(\?|$)/);
+    // Icon-only, so its accessible name comes from aria-label.
+    expect(link.attributes("aria-label")).toBe(translated("alerts.openSlo"));
   });
 
   // The name needs a second fetch, which can fail or be skipped when SLOs are
@@ -142,8 +162,8 @@ describe("AlertConfigSummary — SLO alerts", () => {
     expect(field(wrapper, "slo-kind").exists()).toBe(true);
     // …but nothing is asserted that isn't known. "Burn rate" here would be an
     // invention, and the string "undefined" would be worse.
-    expect(value(wrapper, "slo-kind")).toBe("—");
-    expect(value(wrapper, "slo")).toBe("—");
+    expectNotSet(wrapper, "slo-kind");
+    expectNotSet(wrapper, "slo");
     expect(wrapper.find('[data-test="alerts-alertconfigsummary-slo-link"]').exists()).toBe(false);
   });
 
@@ -222,13 +242,13 @@ describe("AlertConfigSummary — SLO alerts", () => {
     expect(value(wrapper, "warning")).toBe(`${translated("slos.alert.budgetConsumed")} >= 10%`);
   });
 
-  it("renders an em dash for an unset warning rather than a dangling operator", () => {
+  it("leaves an unset warning Not set rather than a dangling operator", () => {
     const wrapper = mountSummary(sloAlert({ warning: undefined }));
 
-    // Anchored in the SLO branch — the generic branch also renders a dash here.
+    // Anchored in the SLO branch — the generic branch also leaves it unset here.
     expect(field(wrapper, "slo-kind").exists()).toBe(true);
-    // Exact, not `toContain`: "burn rate > —" contains an em dash too.
-    expect(value(wrapper, "warning")).toBe("—");
+    // Empty, so a dangling "burn rate >" cannot pass.
+    expectNotSet(wrapper, "warning");
   });
 
   // The schedule half is shared and must survive the branch.
@@ -324,6 +344,8 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     // The same badge the alert list renders, so one status cannot read two
     // ways — and so it is localized rather than showing the wire token.
     expect(value(wrapper, "status")).toBe(translated("components.badge.alertStatus.ready"));
+    expect(field(wrapper, "status").findComponent(OTag).exists()).toBe(true);
+    expect(input(wrapper, "status").exists()).toBe(false);
     expect(value(wrapper, "model-version")).toBe("3");
     expect(value(wrapper, "last-trained")).toBe("2026-08-31 00:00:00");
     // A permanent empty row would imply a slot worth watching.
@@ -401,10 +423,10 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     );
   });
 
-  it("dashes the band fields for a config trained before they existed", () => {
+  it("leaves the band fields Not set for a config trained before they existed", () => {
     const wrapper = mountSummary(anomalyConfig());
-    expect(value(wrapper, "band-grouping")).toBe("—");
-    expect(value(wrapper, "training-span")).toBe("—");
+    expectNotSet(wrapper, "band-grouping");
+    expectNotSet(wrapper, "training-span");
   });
 
   it("surfaces the training error when there is one", () => {
@@ -413,6 +435,7 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     );
 
     expect(value(wrapper, "last-error")).toBe("not enough data points");
+    expect(field(wrapper, "last-error").classes()).toContain("col-span-full");
   });
 
   // "waiting" is the status every anomaly config carries until its first model
@@ -433,10 +456,10 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
       }),
     );
 
-    expect(value(wrapper, "last-trained")).toBe("—");
+    expectNotSet(wrapper, "last-trained");
     // `current_model_version` is NOT NULL and created as 0 — a version number
     // on a config that has no model.
-    expect(value(wrapper, "model-version")).toBe("—");
+    expectNotSet(wrapper, "model-version");
   });
 
   // 0 is the stored value for "train once and keep", not "unset".
@@ -444,9 +467,7 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     expect(
       value(mountSummary(anomalyConfig({ retrain_interval_days: 0 })), "retrain-interval"),
     ).toBe(translated("alerts.anomaly.retrainNever"));
-    expect(
-      value(mountSummary(anomalyConfig({ retrain_interval_days: null })), "retrain-interval"),
-    ).toBe("—");
+    expectNotSet(mountSummary(anomalyConfig({ retrain_interval_days: null })), "retrain-interval");
     // "1 days" is the reason this key is pluralized.
     expect(
       value(mountSummary(anomalyConfig({ retrain_interval_days: 1 })), "retrain-interval"),
@@ -482,5 +503,131 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     // The modes are exclusive: the unused one's dash reads as a missing setting.
     expect(field(wrapper, "detection-function").exists()).toBe(false);
     expect(field(wrapper, "filters").exists()).toBe(false);
+  });
+});
+
+describe("AlertConfigSummary — layout", () => {
+  const SQL = "SELECT count(*) AS n FROM default\nWHERE eventName = 'ConsoleLogin'";
+  const CODE = '[data-test$="-code"]';
+  const generic = (queryCondition: Record<string, any>, extra: Record<string, any> = {}) => ({
+    stream_name: "default",
+    stream_type: "logs",
+    trigger_condition: { period: 5, frequency: 5, silence: 10 },
+    query_condition: queryCondition,
+    ...extra,
+  });
+  const builder = (aggregation: Record<string, any>) =>
+    generic({ type: "custom", aggregation: { function: "avg", ...aggregation } });
+  const rowsBeside = (wrapper: any, key: string) => {
+    const el = field(wrapper, key).element as HTMLElement;
+    const rows = [...el.parentElement!.children];
+    return { before: rows.slice(0, rows.indexOf(el)), after: rows.slice(rows.indexOf(el) + 1) };
+  };
+  const position = (wrapper: any, key: string) => {
+    const el = field(wrapper, key).element as HTMLElement;
+    return [...el.parentElement!.children].indexOf(el);
+  };
+  const expectQueryRow = (wrapper: any, key: string, lang: string) => {
+    const block = field(wrapper, key).findComponent(OCodeBlock);
+    expect(block.exists(), `${key} is not a code block`).toBe(true);
+    expect(block.props("lang")).toBe(lang);
+    expect(input(wrapper, key).exists()).toBe(false);
+    expect(field(wrapper, key).classes()).toContain("col-span-full");
+    // After the short fields, so it never splits a row of them.
+    const { before, after } = rowsBeside(wrapper, key);
+    expect(before.some((row) => !row.querySelector(CODE))).toBe(true);
+    expect(after.every((row) => row.querySelector(CODE))).toBe(true);
+  };
+  const expectShortInput = (wrapper: any, key: string) => {
+    expect(input(wrapper, key).exists(), `${key} is not a read-only input`).toBe(true);
+    expect(field(wrapper, key).findComponent(OCodeBlock).exists()).toBe(false);
+    expect(field(wrapper, key).classes()).not.toContain("col-span-full");
+    expect(field(wrapper, key).classes()).not.toContain("sm:col-span-2");
+  };
+
+  it("shows each short value in a read-only input under its own label", () => {
+    const wrapper = mountSummary(generic({ type: "sql", sql: SQL }));
+
+    for (const key of ["stream-type", "stream", "period", "frequency", "silence"]) {
+      expect(input(wrapper, key).attributes("readonly"), `${key} is editable`).toBeDefined();
+    }
+    expect(field(wrapper, "stream").find("label").text()).toBe(translated("alerts.streamName"));
+    expect(value(wrapper, "stream")).toBe("default");
+  });
+
+  it("leaves an unset value empty so the Not set placeholder reads, not a dash", () => {
+    const wrapper = mountSummary(generic({ type: "sql", sql: SQL }, { stream_name: "" }));
+    expectNotSet(wrapper, "stream");
+    expect(value(wrapper, "stream")).not.toBe("—");
+  });
+
+  it("puts the stream type before the stream name", () => {
+    const ordinary = mountSummary(generic({ type: "sql", sql: SQL }));
+    expect(position(ordinary, "stream-type")).toBeLessThan(position(ordinary, "stream"));
+
+    const anomaly = mountSummary(anomalyConfig());
+    expect(position(anomaly, "stream-type")).toBeLessThan(position(anomaly, "stream"));
+  });
+
+  it("gives a value too long for one column two columns, and leaves a short one in one", () => {
+    const long = mountSummary(
+      generic({ type: "sql", sql: SQL }, { stream_name: "k8s_cluster_production_audit_events" }),
+    );
+    expect(field(long, "stream").classes()).toContain("sm:col-span-2");
+
+    const short = mountSummary(generic({ type: "sql", sql: SQL }));
+    expectShortInput(short, "stream");
+  });
+
+  it("renders raw SQL as a full-row code block after the short fields, with no empty Warning", () => {
+    const wrapper = mountSummary(generic({ type: "sql", sql: SQL }));
+    expectQueryRow(wrapper, "condition", "sql");
+    expect(value(wrapper, "condition")).toBe(SQL);
+    expect(field(wrapper, "warning").exists()).toBe(false);
+  });
+
+  it("keeps a builder threshold beside its warning, both short inputs", () => {
+    const wrapper = mountSummary(
+      builder({ having: { column: "latency", operator: ">", value: 500 }, warning_value: 200 }),
+    );
+    expect(value(wrapper, "condition")).toBe("avg(latency) > 500");
+    expect(value(wrapper, "warning")).toBe("avg(latency) > 200");
+    expectShortInput(wrapper, "condition");
+    expectShortInput(wrapper, "warning");
+  });
+
+  it("keeps a builder threshold's unset Warning, which says no warning level is set", () => {
+    const wrapper = mountSummary(
+      builder({ having: { column: "latency", operator: ">", value: 1 } }),
+    );
+    expectNotSet(wrapper, "warning");
+  });
+
+  it("renders a PromQL rule as a full-row code block, and keeps a PromQL threshold beside its warning", () => {
+    const rule = mountSummary(
+      generic({ type: "promql", promql_rule_mode: true, promql: "sum(rate(errors[5m])) > 1" }),
+    );
+    expectQueryRow(rule, "condition", "promql");
+    expect(field(rule, "warning").exists()).toBe(false);
+
+    const threshold = mountSummary(
+      generic({
+        type: "promql",
+        promql_condition: { operator: ">", value: 0.9 },
+        promql_warning_value: 0.5,
+      }),
+    );
+    expectShortInput(threshold, "condition");
+    expect(value(threshold, "warning")).toBe("> 0.5");
+  });
+
+  it("renders an anomaly config's custom SQL and its filters as full-row code blocks", () => {
+    const sql = mountSummary(anomalyConfig({ query_mode: "custom_sql", custom_sql: SQL }));
+    expectQueryRow(sql, "custom-sql", "sql");
+    expect(value(sql, "custom-sql")).toBe(SQL);
+
+    const filters = mountSummary(anomalyConfig());
+    expectQueryRow(filters, "filters", "sql");
+    expectShortInput(filters, "detection-function");
   });
 });

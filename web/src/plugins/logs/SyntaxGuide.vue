@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="toolbar"
           data-cy="syntax-guide-button"
           variant="outline"
-          size="xs"
-          :class="['h-[2.125rem]!', sqlmode ? 'sql-mode' : 'normal-mode']"
+          :size="label ? 'sm-toolbar' : 'icon-toolbar'"
+          :class="sqlmode ? 'sql-mode' : 'normal-mode'"
         >
           <OIcon name="help" size="sm" />
           <span v-if="label">{{ label }}</span>

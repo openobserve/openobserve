@@ -192,6 +192,7 @@ import {
   decideOrgDomainRequestMutation,
   orgDomainRequestsQuery,
 } from "@/services/organizations.queries";
+import analytics from "@/services/product_analytics";
 import OrgDomainRequestDecisionDialog from "./OrgDomainRequestDecisionDialog.vue";
 
 type StatusFilter = "pending" | "all";
@@ -318,6 +319,7 @@ async function submitDecision(reason: string): Promise<boolean> {
   const approve = decisionApprove.value;
   try {
     await decide.mutateAsync({ id: request.id, approve, reason });
+    analytics.track("org_domain_request_decided", { approved: approve });
   } catch (err: any) {
     toast({
       variant: "error",

@@ -1,6 +1,7 @@
 // ingestionTokensPage.js — Page object for IAM > Ingestion Tokens page.
 // PR #11691: Org-level ingestion tokens (prefix o2oi_).
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 export class IngestionTokensPage {
     constructor(page) {
@@ -9,7 +10,6 @@ export class IngestionTokensPage {
         // ============================================================
         // IAM navigation
         // ============================================================
-        this.iamPageMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
         this.ingestionTokensTab = page.locator('[data-test="iam-ingestion-tokens-tab"]');
 
         // ============================================================
@@ -60,7 +60,7 @@ export class IngestionTokensPage {
     // ----- navigation -----
 
     async gotoIamPage() {
-        await this.iamPageMenu.click();
+        await openNavFlyoutChild(this.page, 'iam');
     }
 
     async gotoIngestionTokensTab() {

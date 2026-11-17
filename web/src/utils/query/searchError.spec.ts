@@ -197,13 +197,14 @@ describe("no call site is allowed to defeat the never-empty guarantee", () => {
     return out;
   };
 
+  const EMPTY_FALLBACK = /parseSearchError\(\s*[^,()]+,\s*(""|''|``)\s*\)/;
+
+  // Scanned at collection time so the per-test timeout does not cover reading every source file.
+  const offenders = walk("src")
+    .filter((file) => !file.endsWith(".spec.ts"))
+    .filter((file) => EMPTY_FALLBACK.test(readFileSync(file, "utf-8")));
+
   it("nobody passes an empty fallback", () => {
-    const EMPTY_FALLBACK = /parseSearchError\(\s*[^,()]+,\s*(""|''|``)\s*\)/;
-
-    const offenders = walk("src")
-      .filter((file) => !file.endsWith(".spec.ts"))
-      .filter((file) => EMPTY_FALLBACK.test(readFileSync(file, "utf-8")));
-
     expect(offenders).toEqual([]);
   });
 });

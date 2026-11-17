@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AutoRefreshInterval
             :model-value="selectedRefresh"
             :min-refresh-interval="minRefreshSeconds"
+            hide-relative-note
             class="h-7.5"
             data-test="dashboard-general-setting-default-refresh"
             @update:model-value="
@@ -158,7 +159,7 @@ import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
-  autoRefreshLabel,
+  autoRefreshShortLabel,
   effectiveDefaultRefresh,
   minAutoRefreshSeconds,
 } from "@/utils/dashboard/autoRefresh";
@@ -215,8 +216,8 @@ export default defineComponent({
     const refreshHelpText = computed(() =>
       savedRefresh.value > 0 && savedRefresh.value < minRefreshSeconds.value
         ? t("dashboard.generalSettingsPage.defaultAutoRefreshRaised", {
-            saved: autoRefreshLabel(savedRefresh.value, t),
-            effective: autoRefreshLabel(effectiveRefresh.value, t),
+            saved: autoRefreshShortLabel(savedRefresh.value, t),
+            effective: autoRefreshShortLabel(effectiveRefresh.value, t),
           })
         : t("dashboard.generalSettingsPage.defaultAutoRefreshHelp"),
     );

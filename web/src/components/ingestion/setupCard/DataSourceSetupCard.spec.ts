@@ -20,6 +20,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import { ref } from "vue";
+import { SETUP_CARD_ONBOARDING, type SetupCardPresets } from "./types";
 import i18n from "@/locales";
 import { b64EncodeStandard } from "@/utils/formatters";
 import DataSourceSetupCard from "./DataSourceSetupCard.vue";
@@ -68,7 +69,7 @@ vi.mock("@/composables/useIngestion", () => ({
 const rendererStub = {
   name: "SetupCardRenderer",
   props: ["content", "subs", "tokenState"],
-  emits: ["detected", "step-action"],
+  emits: ["detected", "step-action", "state", "received"],
   template: '<div data-test="renderer-stub" />',
 };
 
@@ -222,6 +223,18 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
       expect(wrapper.emitted("detected")).toEqual([[4]]);
     },
   );
+
+  it("forwards the renderer's state and received emits (onboarding pins them in a bar)", async () => {
+    wrapper = mountCard("linux");
+    const result = { streamName: "system_cpu_time", streamType: "metrics", count: 4 };
+    renderer().vm.$emit("state", "no-requests");
+    renderer().vm.$emit("received", result);
+    await flushPromises();
+    expect(wrapper.emitted("state")).toEqual([["no-requests"]]);
+    expect(wrapper.emitted("received")).toEqual([[result]]);
+    // `detected` stays count-only for the pages that bind it.
+    expect(wrapper.emitted("detected")).toBeUndefined();
+  });
 
   it("toasts hostDashboardImported with the View Hosts action on created", async () => {
     wrapper = mountCard("linux");
@@ -517,5 +530,49 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
     renderer().vm.$emit("step-action", "open-setup-dashboard");
     await flushPromises();
     expect(importSetupDashboard).not.toHaveBeenCalled();
+  });
+});
+
+describe("DataSourceSetupCard — onboarding's tracing answer", () => {
+  const mountK8s = (presets?: SetupCardPresets) => {
+    const store = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        userInfo: { email: "t@e.com" },
+        organizationData: { organizationPasscode: "pc" },
+        theme: "light",
+      },
+    });
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: { template: "<div />" } }],
+    });
+    return mount(DataSourceSetupCard, {
+      props: { slug: "kubernetes" },
+      global: {
+        plugins: [store, router, i18n],
+        stubs: { SetupCardRenderer: rendererStub },
+        provide: presets ? { [SETUP_CARD_ONBOARDING as symbol]: ref(presets) } : {},
+      },
+    });
+  };
+  const instrument = (w: VueWrapper<any>) =>
+    w
+      .findComponent({ name: "SetupCardRenderer" })
+      .props("content")
+      .steps.find((s: { id: string }) => s.id === "instrument");
+
+  it("builds the tracing step from onboarding's answer", () => {
+    const step = instrument(mountK8s({ traces: "library", languages: ["java"] }));
+    expect(step.collapsed).toBeUndefined();
+    expect(step.inputs).toBeUndefined();
+    expect(step.code.raw).toContain("kubectl annotate namespace my-namespace");
+  });
+
+  it("folds the optional step only inside onboarding", () => {
+    expect(instrument(mountK8s({ languages: [] })).collapsed).toBe(true);
+    const step = instrument(mountK8s());
+    expect(step.collapsed).toBe(false);
+    expect(step.inputs).toBeUndefined();
   });
 });

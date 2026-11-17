@@ -43,6 +43,23 @@ pub async fn save(
     pipeline_id: &str,
     needs_validated: bool,
 ) -> Result<(), anyhow::Error> {
+    validate(
+        &mut derived_stream,
+        pipeline_name,
+        pipeline_id,
+        needs_validated,
+    )
+    .await?;
+    upsert_trigger(&derived_stream, pipeline_name, pipeline_id).await
+}
+
+/// Runs a save's checks and fills in the schedule that `upsert_trigger` needs; writes nothing.
+pub async fn validate(
+    derived_stream: &mut DerivedStream,
+    pipeline_name: &str,
+    pipeline_id: &str,
+    needs_validated: bool,
+) -> Result<(), anyhow::Error> {
     // 1. Start validate DerivedStream
     // checks for query type
     match derived_stream.query_condition.query_type {
@@ -130,7 +147,7 @@ pub async fn save(
     }
     // an enable toggle re-saves the stored schedule with `needs_validated` off
     if needs_validated {
-        check_schedule(&derived_stream)?;
+        check_schedule(derived_stream)?;
     }
 
     let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
@@ -155,7 +172,16 @@ pub async fn save(
             ));
         };
     }
+    Ok(())
+}
 
+/// Creates the trigger, or gives an existing one a new next run and keeps its data.
+pub async fn upsert_trigger(
+    derived_stream: &DerivedStream,
+    pipeline_name: &str,
+    pipeline_id: &str,
+) -> Result<(), anyhow::Error> {
+    let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
     let next_run_at = if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
         match derived_stream.trigger_condition.get_next_trigger_time(
             false,

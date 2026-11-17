@@ -131,9 +131,6 @@ describe("Condition Component - OR Operator Tests", () => {
         provide: {
           store: mockStore,
         },
-        stubs: {
-          FilterGroup: true,
-        },
       },
     });
 
@@ -145,12 +142,9 @@ describe("Condition Component - OR Operator Tests", () => {
   });
 
   describe("OR Operator in Condition Node - Basic Functionality", () => {
-    it("should initialize conditions with nested OR group structure", () => {
-      const conditionGroup = wrapper.vm.conditionGroup;
-      expect(conditionGroup).toBeDefined();
-      expect(conditionGroup.filterType).toBe("group");
-      expect(conditionGroup.conditions).toBeDefined();
-      expect(Array.isArray(conditionGroup.conditions)).toBe(true);
+    it("starts a new condition node with no rule and an empty Where row", () => {
+      expect(wrapper.vm.conditionGroup).toBeNull();
+      expect(wrapper.find('[data-test="condition-builder-empty-row"]').exists()).toBe(true);
     });
 
     it("should support OR condition with multiple fields", () => {

@@ -42,7 +42,7 @@ impl VisitorMut for HistogramIntervalVisitor {
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr
-            && func.name.to_string().eq_ignore_ascii_case("histogram")
+            && crate::sql::histogram::is_histogram_function(&func.name)
         {
             self.is_histogram = true;
             if let FunctionArguments::List(list) = &func.args {

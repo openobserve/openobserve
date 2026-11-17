@@ -111,6 +111,14 @@ async fn dashboard_msg(msg: Message) -> infra::errors::Result<()> {
     }
 }
 
+async fn service_identity_msg(msg: Message) -> infra::errors::Result<()> {
+    o2_enterprise::enterprise::super_cluster::queue::service_identity::process(
+        msg,
+        |org, message| async move { db::service_identity_sync::apply_remote(&org, message).await },
+    )
+    .await
+}
+
 /// Creates a super cluster queue for each super cluster topic and begins
 /// polling messages from each queue in a separate thread.
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -132,6 +140,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_enrichment_file_list_delete_msg: enrichment_table::process_file_list_delete,
         on_kv_msg: kv::process,
         on_service_streams_msg: service_streams::process,
+        on_service_identity_msg: service_identity_msg,
         on_rum_analytics_msg: rum_analytics::process,
         on_system_settings_msg: system_settings::process,
     };

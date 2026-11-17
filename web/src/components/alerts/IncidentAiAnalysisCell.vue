@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
     <template v-else>
       <OBadge
-        :variant="BADGE_VARIANT[model.tone]"
+        :variant="RCA_BADGE_VARIANT[model.tone]"
         size="sm"
         clickable
         :aria-describedby="model.detail || model.rerunNote ? detailId : undefined"
@@ -47,6 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="model.spinner" #icon>
           <OSpinner size="xs" data-test="incident-ai-analysis-spinner" />
         </template>
+        <template v-else-if="model.locked" #icon>
+          <OIcon name="lock" size="xs" class="lock-chip" data-test="incident-ai-analysis-lock" />
+        </template>
         {{ model.label }}
       </OBadge>
       <span
@@ -55,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-secondary flex min-w-0 gap-1 truncate text-xs"
         data-test="incident-ai-analysis-detail"
       >
-        <span v-if="model.detail" class="truncate">{{ model.detail }}</span>
+        <OTruncatedText v-if="model.detail">{{ model.detail }}</OTruncatedText>
         <span v-if="model.detail && model.rerunNote" aria-hidden="true">·</span>
         <!-- A newer run did not finish; the result shown is the earlier one. -->
         <span
@@ -88,12 +91,14 @@ import { useStore } from "vuex";
 import { isAxiosError } from "axios";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Incident } from "@/services/incidents";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRcaTrigger } from "@/composables/useRcaTrigger";
-import { rcaCellModel, type RcaCellTone } from "@/utils/incidents/rcaCell";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { RCA_BADGE_VARIANT, rcaCellModel } from "@/utils/incidents/rcaCell";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 
@@ -114,23 +119,16 @@ const emit = defineEmits<{
   failed: [];
 }>();
 
-// Strong warning uses the orange family of the list's P2 row rail.
-const BADGE_VARIANT: Record<RcaCellTone, BadgeVariant> = {
-  muted: "default",
-  warn: "warning",
-  "warn-strong": "orange-outline",
-  ok: "success",
-  err: "error",
-};
-
 const { t } = useI18nTyped();
 const store = useStore();
 const { requestRca } = useRcaTrigger();
 const timezone = useViewerTimezone();
+const aiLock = useLicenseLock("ai_assistant");
 
 const model = computed(() =>
   rcaCellModel(props.incident, {
     rcaEnabled: props.rcaEnabled,
+    lockedReason: aiLock.locked.value ? aiLock.lockedReason.value : undefined,
     now: props.now,
     timezone: timezone.value,
   }),

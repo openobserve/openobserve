@@ -20,6 +20,7 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
 import SyntheticsLocationsList from "./SyntheticsLocationsList.vue";
+import analytics from "@/services/product_analytics";
 
 // ── Hoisted mock references (accessible inside vi.mock factories) ──────────────
 
@@ -34,6 +35,7 @@ const { mockToast, mockConfirm, mockGetLocations, mockUpdateLocation, mockDelete
 
 // ── Mock external modules ──────────────────────────────────────────────────────
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true" },
 }));
@@ -79,7 +81,7 @@ const OPageLayoutStub = {
       :data-icon="icon"
       :data-subtitle="subtitle"
     >
-      <div data-test="page-actions"><slot name="actions" /></div>
+      <div data-test="page-actions"><slot name="actions-overflow" /><slot name="actions" /></div>
       <slot />
     </div>
   `,
@@ -173,9 +175,11 @@ const OEmptyStateStub = {
       data-test="empty-state"
       :data-preset="preset"
       :data-filtered="String(filtered)"
+      :data-actions="(actions || []).map((a) => a.id).join(',')"
+      @click="$emit('action', 'create')"
     />
   `,
-  props: ["size", "preset", "filtered"],
+  props: ["size", "preset", "filtered", "actions"],
   emits: ["action"],
 };
 
@@ -439,7 +443,7 @@ describe("SyntheticsLocationsList", () => {
       expect(emptyState.attributes("data-filtered")).toBe("true");
     });
 
-    it("shows no-data empty state when there are no locations at all", async () => {
+    it("offers to create the first location when there are no locations at all", async () => {
       // Re-mount with no locations
       wrapper.unmount();
       mockGetLocations.mockResolvedValue(mockLocationsResponse([]));
@@ -448,8 +452,9 @@ describe("SyntheticsLocationsList", () => {
 
       const emptyState = wrapper.find('[data-test="empty-state"]');
       expect(emptyState.exists()).toBe(true);
-      expect(emptyState.attributes("data-preset")).toBe("no-data");
-      expect(emptyState.attributes("data-filtered")).toBe("false");
+      expect(emptyState.attributes("data-actions")).toBe("create");
+      await emptyState.trigger("click");
+      expect(wrapper.vm.formDialog.show).toBe(true);
     });
   });
 
@@ -511,6 +516,7 @@ describe("SyntheticsLocationsList", () => {
       await flushPromises();
 
       expect(wrapper.vm.locations[0].enabled).toBe(false);
+      expect(analytics.track).toHaveBeenCalledWith("synthetics_location_disabled", { count: 1 });
     });
 
     it("enables a disabled location", async () => {
@@ -585,6 +591,7 @@ describe("SyntheticsLocationsList", () => {
 
       expect(wrapper.vm.locations[0].enabled).toBe(false);
       expect(wrapper.vm.locations[1].enabled).toBe(false);
+      expect(analytics.track).toHaveBeenCalledWith("synthetics_location_disabled", { count: 2 });
     });
 
     it("shows success toast when all bulk operations succeed", async () => {
@@ -667,6 +674,7 @@ describe("SyntheticsLocationsList", () => {
         confirmVariant: "destructive",
       });
       expect(mockDeleteLocation).toHaveBeenCalledWith("test-org", "loc-1");
+      expect(analytics.track).toHaveBeenCalledWith("synthetics_location_deleted", { count: 1 });
     });
 
     it("removes the location from the local array on successful delete", async () => {
@@ -750,6 +758,7 @@ describe("SyntheticsLocationsList", () => {
       const remainingIds = wrapper.vm.locations.map((l: TestLocation) => l.id);
       expect(remainingIds).toContain("loc-2");
       expect(remainingIds).toContain("loc-3");
+      expect(analytics.track).toHaveBeenCalledWith("synthetics_location_deleted", { count: 1 });
 
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({

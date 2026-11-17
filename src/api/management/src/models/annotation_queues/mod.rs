@@ -127,7 +127,7 @@ pub struct ReviewAnnotationQueueItemRequestBody {
     pub metadata: Option<serde_json::Value>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ListQueueReviewsResponseBody {
     pub list: Vec<QueueReviewSubmission>,

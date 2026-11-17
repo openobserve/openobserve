@@ -78,7 +78,6 @@ def collect(ledger):
             "dir": d,
             "evidence": nonempty(os.path.join(d, "evidence.md")),
             "commit": read(os.path.join(d, "commit")),
-            "backend": read(os.path.join(d, "backend")),
             "verdict": load(os.path.join(d, "verdict.json")),
             "response": merged_response(d),
             "paired": paired(d),
@@ -90,26 +89,20 @@ def collect(ledger):
 def finding_registry(rounds):
     """Latest known state of every finding id: severity from the round that reported it, status from the latest mention."""
     reg = {}
-    alias = {}
     for r in rounds:
         v = r["verdict"]
         if not v:
             continue
         for f in v.get("findings", []):
-            reg[f["id"]] = {"severity": f["severity"], "status": "open", "round": r["n"], "title": f.get("title", ""), "repo": f.get("repo", ""), "aliases": []}
-            if f.get("also_reported_as"):
-                alias[f["also_reported_as"]] = f["id"]
-                reg[f["id"]]["aliases"].append(f["also_reported_as"])
+            reg[f["id"]] = {"severity": f["severity"], "status": "open", "round": r["n"], "title": f.get("title", ""), "repo": f.get("repo", "")}
         for p in v.get("prior_findings", []):
-            fid = alias.get(p["id"], p["id"])
-            if fid in reg:
-                reg[fid]["status"] = p["status"]
+            if p["id"] in reg:
+                reg[p["id"]]["status"] = p["status"]
         resp = r["response"]
         if resp:
             for a in resp.get("responses", []):
-                fid = alias.get(a["id"], a["id"])
-                if fid in reg:
-                    reg[fid]["action"] = a["action"]
+                if a["id"] in reg:
+                    reg[a["id"]]["action"] = a["action"]
     return reg
 
 
@@ -133,7 +126,7 @@ def decide(rounds, reg, cap, head, clean):
     if response is None and not last["verdict"].get("findings") and not open_ids:
         response = {"responses": [], "open_items": []}
     answered = {a["id"] for a in (response or {}).get("responses", [])}
-    unanswered = [i for i in open_ids if i not in answered and not (set(reg[i].get("aliases", [])) & answered)]
+    unanswered = [i for i in open_ids if i not in answered]
     if not response or unanswered:
         if n >= cap and (verdict != "approve" or blocking):
             return "cap", f"round cap {cap} reached with the round-{n} verdict {verdict} and open findings {open_ids}; write the interim report and ask the user before any more coding"
@@ -182,7 +175,7 @@ def main():
     action, why = decide(rounds, reg, args.cap, head, clean)
     state = {
         "ledger": ledger,
-        "rounds": [{k: v for k, v in r.items() if k in ("n", "commit", "backend")} | {"verdict": (r["verdict"] or {}).get("verdict"), "responded": bool(r["response"])} for r in rounds],
+        "rounds": [{k: v for k, v in r.items() if k in ("n", "commit")} | {"verdict": (r["verdict"] or {}).get("verdict"), "responded": bool(r["response"])} for r in rounds],
         "findings": reg,
         "head": head,
         "clean": clean,
@@ -195,7 +188,7 @@ def main():
         return
     print(f"ledger: {ledger}")
     for r in state["rounds"]:
-        print(f"  round {r['n']}: {r['backend'] or '-'} {r['verdict'] or 'no verdict'} commit {(r['commit'] or '-')[:10]} responded={r['responded']}")
+        print(f"  round {r['n']}: {r['verdict'] or 'no verdict'} commit {(r['commit'] or '-')[:10]} responded={r['responded']}")
     open_ids = [i for i, f in reg.items() if f["status"] in ("open", "still_open")]
     print(f"open findings: {open_ids or 'none'}")
     for i in open_ids:

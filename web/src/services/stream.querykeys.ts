@@ -26,6 +26,8 @@ import type { StreamPageParams } from "./stream";
 export const streamKeys = {
   all: (org: string) => orgKey(org, "streams"),
   nameList: (org: string, type: string) => orgKey(org, "streams", "nameList", type),
+  /** The org-data probe's own copy of a name list, so its early read never stands in for a page's list. */
+  hasDataProbe: (org: string, type: string) => orgKey(org, "streams", "hasDataProbe", type),
   /** Every paginated Log Streams page, any type — the scope a delete or forced read drops. */
   pagesAll: (org: string) => orgKey(org, "streams", "page"),
   page: (org: string, type: string, params: StreamPageParams) =>

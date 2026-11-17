@@ -13,566 +13,309 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
-import { createRouter, createMemoryHistory } from "vue-router";
-import { createI18n } from "vue-i18n";
-import { reactive } from "vue";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { createMemoryHistory, createRouter } from "vue-router";
+import { nextTick, reactive } from "vue";
 import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { requestFieldValues } from "@/composables/fieldValueStore";
+import DashboardFiltersOption from "./DashboardFiltersOption.vue";
 
-// ---------------------------------------------------------------------------
-// Reactive mock state — mutated by tests to drive different component states.
-// A getter in the mock factory returns this reactive object so Vue's template
-// and computed properties react to changes.
-// ---------------------------------------------------------------------------
+vi.mock("@/composables/fieldValueStore", () => ({
+  requestFieldValues: vi.fn(async () => ["warn", "error"]),
+}));
 
-let mockPanelData: ReturnType<typeof _createDefaultPanelData>;
-
-function _createDefaultPanelData() {
-  return {
-    data: {
-      queries: [
-        {
-          customQuery: false,
-          fields: {
-            filter: {
-              conditions: [] as Record<string, unknown>[],
-            },
-          },
-        },
-      ],
-      queryType: "logs",
-    },
-    layout: {
-      currentQueryIndex: 0,
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Mocks — hoisted by Vitest
-// ---------------------------------------------------------------------------
+let panelData: any;
 
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
-    // Getter defers evaluation: by the time the component accesses this,
-    // mockPanelData has been initialized as a reactive() object below.
     get dashboardPanelData() {
-      return mockPanelData;
+      return panelData;
     },
-    removeFilterItem: vi.fn(),
-    loadFilterItem: vi.fn(),
-    selectedStreamFieldsBasedOnUserDefinedSchema: {
-      value: [
-        { name: "field1", type: "string" },
-        { name: "field2", type: "number" },
-      ],
-    },
+    getStreamNameFromStreamAlias: (alias: string) =>
+      panelData.data.queries[panelData.layout.currentQueryIndex].joins.find(
+        (join: any) => join.streamAlias === alias,
+      )?.stream,
   })),
 }));
 
-vi.mock("./Group.vue", () => ({
-  default: {
-    name: "Group",
-    template: '<div data-test="dashboard-filter-group-component" />',
-    props: [
-      "group",
-      "groupNestedIndex",
-      "groupIndex",
-      "schemaOptions",
-      "dashboardVariablesFilterItems",
-      "loadFilterItem",
-      "dashboardPanelData",
-    ],
-    emits: ["add-condition", "add-group", "remove-group", "logical-operator-change"],
-  },
-}));
-
-import DashboardFiltersOption from "./DashboardFiltersOption.vue";
-
-// ---------------------------------------------------------------------------
-// Test setup
-// ---------------------------------------------------------------------------
-
-const i18n = createI18n({
-  locale: "en",
-  messages: {
-    en: {
-      panel: {
-        filters: "Filters",
-      },
-    },
-  },
+const leaf = (
+  field: unknown,
+  operator: string | null,
+  value: unknown,
+  logicalOperator = "AND",
+) => ({
+  type: "condition",
+  values: [],
+  column: field,
+  operator,
+  value,
+  logicalOperator,
+  filterType: "condition",
 });
 
-function createTestRouter(query: Record<string, string> = { tab: "tab1" }) {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [{ path: "/", component: { template: "<div />" } }],
-  });
-  router.push({ path: "/", query });
-  return router;
-}
+// Saved the way the old builder and the field list wrote panels: list leaves, $variables, joins, nested groups.
+const savedFilter = () => ({
+  filterType: "group",
+  logicalOperator: "AND",
+  conditions: [
+    {
+      type: "list",
+      values: ["error", "warn"],
+      column: { field: "level", streamAlias: null },
+      operator: null,
+      value: null,
+      logicalOperator: "AND",
+      filterType: "condition",
+    },
+    leaf({ field: "service", streamAlias: "b" }, "=", "$service", "OR"),
+    {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [
+        leaf({ field: "status" }, ">=", "500"),
+        leaf({ field: "message" }, "str_match", "timeout", "OR"),
+        leaf({ field: "host" }, "Is Not Null", ""),
+      ],
+    },
+    {
+      type: "list",
+      values: [],
+      column: { field: "level" },
+      operator: null,
+      value: null,
+      logicalOperator: "AND",
+      filterType: "condition",
+    },
+  ],
+});
 
-const defaultDashboardData = {
+const query = (filter: unknown) => ({
+  customQuery: false,
+  fields: { stream: "app_logs", stream_type: "logs", filter },
+  joins: [{ stream: "other_logs", streamAlias: "b" }],
+});
+
+const makePanelData = () =>
+  reactive({
+    data: { queryType: "sql", queries: [query(savedFilter()), query(null)] },
+    layout: { currentQueryIndex: 0 },
+    meta: {
+      dateTime: { start_time: new Date(1000), end_time: new Date(2000) },
+      streamFields: {
+        groupedFields: [
+          {
+            name: "app_logs",
+            stream_alias: undefined,
+            schema: [
+              { name: "level", type: "Utf8" },
+              { name: "status", type: "Int64" },
+            ],
+          },
+          { name: "other_logs", stream_alias: "b", schema: [{ name: "service", type: "Utf8" }] },
+        ],
+      },
+    },
+  });
+
+const dashboardData = {
   variables: {
     list: [
-      { name: "var1", multiSelect: false },
-      { name: "var2", multiSelect: true },
+      { name: "global_var", multiSelect: false },
+      { name: "multi_var", multiSelect: true },
+      { name: "tab_var", tabs: ["tab1"] },
+      { name: "other_tab_var", tabs: ["tab2"] },
+      { name: "panel_var", panels: ["current_panel"] },
     ],
   },
 };
 
-function mountComponent(
-  overrides: {
-    props?: Record<string, unknown>;
-    provide?: Record<string, unknown>;
-    router?: ReturnType<typeof createTestRouter>;
-  } = {},
-) {
-  const {
-    props = {},
-    provide = { dashboardPanelDataPageKey: "dashboard" },
-    router = createTestRouter(),
-  } = overrides;
+let wrapper: VueWrapper | null = null;
 
-  return mount(DashboardFiltersOption, {
-    props: { dashboardData: defaultDashboardData, ...props },
-    global: {
-      plugins: [store, i18n, router],
-      provide,
-    },
+async function mountOption(props: Record<string, unknown> = { dashboardData }) {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: "/", component: { template: "<div />" } }],
   });
+  await router.push({ path: "/", query: { tab: "tab1" } });
+  wrapper = mount(DashboardFiltersOption, {
+    attachTo: document.body,
+    props,
+    global: { plugins: [i18n, store, router] },
+  });
+  await flushPromises();
+  return wrapper;
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+const builder = () => wrapper!.findComponent(FilterBuilder);
+
+beforeEach(() => {
+  panelData = makePanelData();
+});
+
+afterEach(() => {
+  wrapper?.unmount();
+  wrapper = null;
+  document.body.innerHTML = "";
+  vi.clearAllMocks();
+});
 
 describe("DashboardFiltersOption", () => {
-  let wrapper: VueWrapper<typeof DashboardFiltersOption>;
-
-  beforeEach(() => {
-    // Reset to default reactive state before each test
-    mockPanelData = reactive(_createDefaultPanelData());
-    wrapper = mountComponent();
+  it("edits the current query's filter with the horizontal dashboard-panel builder", async () => {
+    await mountOption();
+    expect(builder().props("profile")).toBe("dashboard-panel");
+    expect(builder().props("dataTest")).toBe("dashboard-filter-builder");
+    expect(builder().props("modelValue")).toEqual(savedFilter());
   });
 
-  afterEach(() => {
-    wrapper?.unmount();
-    vi.clearAllMocks();
+  it("hides the filters for a custom SQL query", async () => {
+    panelData.data.queries[0].customQuery = true;
+    await mountOption();
+    expect(builder().exists()).toBe(false);
   });
 
-  // =========================================================================
-  // Rendering
-  // =========================================================================
-
-  describe("rendering", () => {
-    it("renders the filter section with label when not a custom SQL query", () => {
-      const label = wrapper.find('[data-test="dashboard-filter-layout-label"]');
-      expect(label.exists()).toBe(true);
-      expect(label.text()).toBe("Filters");
-    });
-
-    it("renders the separator between label and filter area", () => {
-      expect(wrapper.find('[data-test="dashboard-filter-layout-separator"]').exists()).toBe(true);
-    });
-
-    it("renders the filter layout container", () => {
-      expect(wrapper.find('[data-test="dashboard-filter-layout"]').exists()).toBe(true);
-    });
-
-    it("hides the filter section when query is custom SQL", async () => {
-      // Mutate the reactive mock — the template will react
-      mockPanelData.data.queries[0].customQuery = true;
-      mockPanelData.data.queryType = "sql";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.find('[data-test="dashboard-filter-layout-label"]').exists()).toBe(false);
-    });
-
-    it("renders the Group component when topLevelGroup exists", () => {
-      expect(wrapper.find('[data-test="dashboard-filter-group-component"]').exists()).toBe(true);
-    });
-
-    it("does not render Group when filter is null", async () => {
-      // Remove the filter to make topLevelGroup undefined
-      delete (mockPanelData.data.queries[0].fields as any).filter;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.find('[data-test="dashboard-filter-group-component"]').exists()).toBe(false);
-    });
-
-    it("passes correct props to Group component", () => {
-      const groupComp = wrapper.findComponent({ name: "Group" });
-      expect(groupComp.exists()).toBe(true);
-      expect(groupComp.props("group")).toBeDefined();
-      expect(groupComp.props("schemaOptions")).toEqual([
-        { label: "field1", value: "field1" },
-        { label: "field2", value: "field2" },
-      ]);
-      expect(groupComp.props("groupNestedIndex")).toBe(0);
-      expect(groupComp.props("groupIndex")).toBe(0);
-    });
-
-    it("passes dashboardVariablesFilterItems result as prop to Group", () => {
-      const groupComp = wrapper.findComponent({ name: "Group" });
-      const items = groupComp.props("dashboardVariablesFilterItems");
-      expect(items).toHaveLength(2);
-      expect(items[0]).toEqual({ label: "var1", value: "$var1" });
-      expect(items[1]).toEqual({ label: "var2", value: "(${var2})" });
-    });
+  it("publishes the number of leaf conditions, nested ones included", async () => {
+    await mountOption();
+    const layout = wrapper!.find('[data-test="dashboard-filter-layout"]');
+    expect(layout.attributes("data-condition-count")).toBe("6");
   });
 
-  // =========================================================================
-  // Computed properties
-  // =========================================================================
-
-  describe("computed properties", () => {
-    describe("topLevelGroup", () => {
-      it("returns the filter from the current query", () => {
-        expect(wrapper.vm.topLevelGroup).toEqual({ conditions: [] });
-      });
-
-      it("falls back to index 0 when currentQueryIndex is null", () => {
-        // Mutate query data first while currentQueryIndex is still 0
-        // so the template can re-render without throwing, then null the
-        // index and read the computed directly without awaiting nextTick
-        // (the v-if template uses queries[currentQueryIndex].customQuery
-        // without a fallback, so re-rendering with null index would throw).
-        mockPanelData.data.queries = [
-          {
-            customQuery: false,
-            fields: {
-              filter: { conditions: [{ filterType: "condition" }] } as any,
-            },
-          },
-        ] as any;
-        mockPanelData.data.queryType = "logs";
-        (mockPanelData.layout as any).currentQueryIndex = null;
-
-        expect(wrapper.vm.topLevelGroup).toEqual({
-          conditions: [{ filterType: "condition" }],
-        });
-      });
-
-      it("returns undefined when the query has no filter field", async () => {
-        delete (mockPanelData.data.queries[0].fields as any).filter;
-        await wrapper.vm.$nextTick();
-
-        expect(wrapper.vm.topLevelGroup).toBeUndefined();
-      });
-    });
-
-    describe("schemaOptions", () => {
-      it("maps stream fields to label/value pairs", () => {
-        expect(wrapper.vm.schemaOptions).toEqual([
-          { label: "field1", value: "field1" },
-          { label: "field2", value: "field2" },
-        ]);
-      });
-    });
+  it("names joined-stream columns alias.field and keeps the column as the payload", async () => {
+    await mountOption();
+    expect(builder().props("fields")).toEqual([
+      { name: "level", type: "string", payload: { field: "level", streamAlias: undefined } },
+      { name: "status", type: "number", payload: { field: "status", streamAlias: undefined } },
+      { name: "b.service", type: "string", payload: { field: "service", streamAlias: "b" } },
+    ]);
   });
 
-  // =========================================================================
-  // Filter operations
-  //
-  // Many of these methods exist as callbacks passed to the Group child
-  // component.  They have no UI triggers inside DashboardFiltersOption itself.
-  // Testing via wrapper.vm is the only way to exercise their logic without
-  // mounting the full (non-stubbed) Group component — allowed per the
-  // exception documented in the project test standards.
-  // =========================================================================
-
-  describe("addFilter", () => {
-    it("adds a condition to the filter when type is 'condition'", () => {
-      wrapper.vm.addFilter("condition");
-
-      const groupComp = wrapper.findComponent({ name: "Group" });
-      const conditions = groupComp.props("group").conditions;
-      expect(conditions).toHaveLength(1);
-      expect(conditions[0].filterType).toBe("condition");
-      expect(conditions[0].logicalOperator).toBe("AND");
-      expect(conditions[0].column.field).toBe("field1");
-      expect(wrapper.vm.showAddMenu).toBe(false);
-    });
-
-    it("adds a group to the filter when type is 'group'", () => {
-      wrapper.vm.addFilter("group");
-
-      const groupComp = wrapper.findComponent({ name: "Group" });
-      const conditions = groupComp.props("group").conditions;
-      expect(conditions).toHaveLength(1);
-      expect(conditions[0].filterType).toBe("group");
-      expect(conditions[0].logicalOperator).toBe("AND");
-      expect(conditions[0].conditions).toHaveLength(1);
-      expect(conditions[0].conditions[0].filterType).toBe("condition");
-    });
-
-    it("does nothing when filter type is unknown", () => {
-      wrapper.vm.addFilter("unknown");
-
-      const groupComp = wrapper.findComponent({ name: "Group" });
-      expect(groupComp.props("group").conditions).toHaveLength(0);
-      expect(wrapper.vm.showAddMenu).toBe(false);
-    });
-
-    it("uses empty string for column field when schema has no options", () => {
-      // Mount with no schema fields
-      const noFieldsData = reactive(_createDefaultPanelData());
-      mockPanelData = noFieldsData;
-
-      // The mock composable has fixed schema fields. To test the fallback
-      // (when firstOption is undefined), we'd need to override the mock.
-      // This is covered by the fact that schemaOptions[0]?.value uses
-      // optional chaining and defaults to "" when no fields exist.
-      //
-      // We verify the existing behavior works with available fields:
-      wrapper.vm.addFilter("condition");
-      const groupComp = wrapper.findComponent({ name: "Group" });
-      expect(groupComp.props("group").conditions[0].column.field).toBe("field1");
-    });
+  it("chips every saved leaf, the joined one by alias", async () => {
+    await mountOption();
+    for (const key of ["level", "b.service", "status", "message", "host"]) {
+      expect(
+        wrapper!.find(`[data-test="dashboard-filter-builder-chip-${key}"]`).exists(),
+        key,
+      ).toBe(true);
+    }
   });
 
-  describe("addConditionToGroup", () => {
-    it("pushes a new condition into the group", () => {
-      const group: { conditions: Record<string, unknown>[] } = { conditions: [] };
-      wrapper.vm.addConditionToGroup(group);
-
-      expect(group.conditions).toHaveLength(1);
-      expect(group.conditions[0].filterType).toBe("condition");
-      expect(group.conditions[0].column.field).toBe("field1");
-      expect(group.conditions[0].logicalOperator).toBe("AND");
-    });
+  it("writes the builder's tree into the current query only", async () => {
+    panelData.layout.currentQueryIndex = 1;
+    await mountOption();
+    const next = { filterType: "group", logicalOperator: "AND", conditions: [] };
+    builder().vm.$emit("update:modelValue", next);
+    await nextTick();
+    expect(panelData.data.queries[1].fields.filter).toEqual(next);
+    expect(panelData.data.queries[0].fields.filter).toEqual(savedFilter());
   });
 
-  describe("addGroupToGroup", () => {
-    it("pushes a nested group into the parent group", () => {
-      const group: { conditions: Record<string, unknown>[] } = { conditions: [] };
-      wrapper.vm.addGroupToGroup(group);
-
-      expect(group.conditions).toHaveLength(1);
-      expect(group.conditions[0].filterType).toBe("group");
-      expect(group.conditions[0].conditions).toHaveLength(1);
-      expect(group.conditions[0].conditions[0].filterType).toBe("condition");
-    });
+  it("follows the query tabs", async () => {
+    await mountOption();
+    panelData.layout.currentQueryIndex = 1;
+    await nextTick();
+    expect(builder().props("modelValue")).toBeNull();
   });
 
-  describe("removeGroup", () => {
-    // Note: The component's removeGroup implementation calls
-    // `currentQuery.fields?.filter?.splice(index, 1)` directly on the
-    // `filter` object (which is `{ conditions: [...] }`, not an array),
-    // so splice is not a function on that object. In practice this
-    // handler is wired to the top-level Group's `remove-group` event,
-    // which Group only emits when `groupNestedIndex !== 0` — so it is
-    // never actually invoked at runtime. The tests below document the
-    // current behaviour.
-    it("throws TypeError when filter exists (splice not a function on object)", () => {
-      (mockPanelData.data.queries[0].fields.filter as any).conditions = [
-        { filterType: "condition", id: "a" },
-        { filterType: "group", id: "b" },
-      ];
-
-      expect(() => wrapper.vm.removeGroup(1)).toThrow(TypeError);
+  it("shows a filter the field list pushes into the saved tree in place", async () => {
+    await mountOption();
+    panelData.data.queries[0].fields.filter.conditions.push({
+      type: "list",
+      values: [],
+      column: { field: "status" },
+      operator: null,
+      value: null,
+      logicalOperator: "AND",
+      filterType: "condition",
     });
-
-    it("does not throw when filter is null", () => {
-      delete (mockPanelData.data.queries[0].fields as any).filter;
-
-      expect(() => wrapper.vm.removeGroup(0)).not.toThrow();
-    });
+    await nextTick();
+    expect((builder().props("modelValue") as any).conditions).toHaveLength(5);
   });
 
-  describe("handleLogicalOperatorChange", () => {
-    beforeEach(() => {
-      (mockPanelData.data.queries[0].fields.filter as any).conditions = [
-        { filterType: "condition", logicalOperator: "AND" },
-        {
-          filterType: "group",
-          logicalOperator: "AND",
-          conditions: [
-            { filterType: "condition", logicalOperator: "AND" },
-            {
-              filterType: "group",
-              logicalOperator: "AND",
-              conditions: [{ filterType: "condition", logicalOperator: "AND" }],
-            },
-          ],
-        },
-      ];
+  it("keeps a filter the field list adds after an edit made in the builder", async () => {
+    await mountOption();
+    await wrapper!.find('[data-test="dashboard-filter-builder-connector-2"]').trigger("click");
+    await flushPromises();
+    panelData.data.queries[0].fields.filter.conditions.push({
+      type: "list",
+      values: [],
+      column: { field: "status" },
+      operator: null,
+      value: null,
+      logicalOperator: "AND",
+      filterType: "condition",
     });
-
-    it("updates logical operator for a condition at the given index", () => {
-      wrapper.vm.handleLogicalOperatorChange(0, "OR");
-
-      const condition = mockPanelData.data.queries[0].fields.filter.conditions[0];
-      expect(condition.logicalOperator).toBe("OR");
-    });
-
-    it("recursively updates all logical operators in a nested group", () => {
-      wrapper.vm.handleLogicalOperatorChange(1, "OR");
-
-      const group = mockPanelData.data.queries[0].fields.filter.conditions[1] as any;
-      expect(group.logicalOperator).toBe("OR");
-      expect(group.conditions[0].logicalOperator).toBe("OR");
-      expect(group.conditions[1].logicalOperator).toBe("OR");
-      expect(group.conditions[1].conditions[0].logicalOperator).toBe("OR");
-    });
-
-    it("does not throw for a non-existent index", () => {
-      expect(() => wrapper.vm.handleLogicalOperatorChange(99, "OR")).not.toThrow();
-    });
-
-    it("updates all condition types including non-group, non-condition types", () => {
-      (mockPanelData.data.queries[0].fields.filter as any).conditions = [
-        {
-          filterType: "group",
-          logicalOperator: "AND",
-          conditions: [{ filterType: "other", logicalOperator: "AND" }],
-        },
-      ];
-
-      wrapper.vm.handleLogicalOperatorChange(0, "OR");
-
-      const group = mockPanelData.data.queries[0].fields.filter.conditions[0] as any;
-      expect(group.conditions[0].logicalOperator).toBe("OR");
-    });
+    await flushPromises();
+    expect(wrapper!.find('[data-test="dashboard-filter-builder-chip-status"]').exists()).toBe(true);
+    await wrapper!.find('[data-test="dashboard-filter-builder-connector-1"]').trigger("click");
+    await flushPromises();
+    const conditions = panelData.data.queries[0].fields.filter.conditions;
+    expect(conditions).toHaveLength(5);
+    expect(conditions[4].column).toEqual({ field: "status" });
   });
 
-  // =========================================================================
-  // dashboardVariablesFilterItems
-  // =========================================================================
-
-  describe("dashboardVariablesFilterItems", () => {
-    it("returns correctly formatted items for single-select variables", () => {
-      const items = wrapper.vm.dashboardVariablesFilterItems(0);
-      expect(items[0]).toEqual({ label: "var1", value: "$var1" });
-    });
-
-    it("returns parenthesized format for multi-select variables", () => {
-      const items = wrapper.vm.dashboardVariablesFilterItems(0);
-      expect(items[1]).toEqual({ label: "var2", value: "(${var2})" });
-    });
-
-    it("returns empty array when dashboardData is null", () => {
-      const wrapper2 = mountComponent({ props: { dashboardData: null } });
-      expect(wrapper2.vm.dashboardVariablesFilterItems(0)).toEqual([]);
-      wrapper2.unmount();
-    });
-
-    it("returns empty array when variables list is empty", () => {
-      const wrapper2 = mountComponent({
-        props: { dashboardData: { variables: { list: [] } } },
-      });
-      expect(wrapper2.vm.dashboardVariablesFilterItems(0)).toEqual([]);
-      wrapper2.unmount();
-    });
-
-    it("returns empty array when dashboardData has no variables property", () => {
-      const wrapper2 = mountComponent({
-        props: { dashboardData: {} },
-      });
-      expect(wrapper2.vm.dashboardVariablesFilterItems(0)).toEqual([]);
-      wrapper2.unmount();
-    });
-
-    it("handles null operator in conditions", () => {
-      (mockPanelData.data.queries[0].fields.filter as any).conditions = [{ operator: null }];
-
-      const items = wrapper.vm.dashboardVariablesFilterItems(0);
-      expect(items).toHaveLength(2);
-      expect(items[0].value).toBe("$var1");
-    });
-
-    it("filters variables by scope — global always shown, tabs scoped to current tab", async () => {
-      const scopedRouter = createTestRouter({ tab: "tab1" });
-      await scopedRouter.isReady();
-      const wrapper2 = mountComponent({
-        props: {
-          dashboardData: {
-            variables: {
-              list: [
-                { name: "globalVar" },
-                { name: "tabVar", tabs: ["tab1"] },
-                { name: "otherTabVar", tabs: ["other"] },
-              ],
-            },
-          },
-        },
-        router: scopedRouter,
-      });
-
-      const items = wrapper2.vm.dashboardVariablesFilterItems(0);
-      expect(items).toHaveLength(2);
-      expect(items.map((i: { label: string }) => i.label)).toEqual(["globalVar", "tabVar"]);
-      wrapper2.unmount();
-    });
-
-    it("filters variables scoped to panels when panelId is in route", async () => {
-      const panelRouter = createTestRouter({ tab: "tab1", panelId: "panel-1" });
-      await panelRouter.isReady();
-      const wrapper2 = mountComponent({
-        props: {
-          dashboardData: {
-            variables: {
-              list: [
-                { name: "globalVar" },
-                { name: "panelVar", panels: ["panel-1"] },
-                { name: "otherPanelVar", panels: ["other"] },
-              ],
-            },
-          },
-        },
-        router: panelRouter,
-      });
-
-      const items = wrapper2.vm.dashboardVariablesFilterItems(0);
-      expect(items).toHaveLength(2);
-      expect(items.map((i: { label: string }) => i.label)).toEqual(["globalVar", "panelVar"]);
-      wrapper2.unmount();
-    });
-
-    it("shows panel-scoped variable for 'current_panel' when no panelId in route", () => {
-      const noPanelRouter = createTestRouter({ tab: "tab1" });
-      const wrapper2 = mountComponent({
-        props: {
-          dashboardData: {
-            variables: {
-              list: [{ name: "newPanelVar", panels: ["current_panel"] }],
-            },
-          },
-        },
-        router: noPanelRouter,
-      });
-
-      const items = wrapper2.vm.dashboardVariablesFilterItems(0);
-      expect(items).toHaveLength(1);
-      expect(items[0].label).toBe("newPanelVar");
-      wrapper2.unmount();
-    });
+  it("toggling the connector before a nested group changes only that group's operator", async () => {
+    await mountOption();
+    await wrapper!.find('[data-test="dashboard-filter-builder-connector-2"]').trigger("click");
+    await flushPromises();
+    const expected = savedFilter();
+    expected.conditions[2].logicalOperator = "OR";
+    expect(JSON.stringify(panelData.data.queries[0].fields.filter)).toBe(JSON.stringify(expected));
   });
 
-  // =========================================================================
-  // Edge cases
-  // =========================================================================
+  it("toggling a connector inside a nested group reaches the SQL", async () => {
+    await mountOption();
+    await wrapper!.find('[data-test="dashboard-filter-builder-connector-2-1"]').trigger("click");
+    await flushPromises();
+    const group = panelData.data.queries[0].fields.filter.conditions[2];
+    expect(group.conditions[1].logicalOperator).toBe("AND");
+    expect(buildCondition(group, { ...panelData, data: { queries: [query(null)] } })).toBe(
+      "(app_logs.status >= 500 AND str_match(app_logs.message, 'timeout') AND app_logs.host IS NOT NULL)",
+    );
+  });
 
-  describe("edge cases", () => {
-    it("handles inject with a custom pageKey", () => {
-      const wrapper2 = mountComponent({
-        provide: { dashboardPanelDataPageKey: "custom-page" },
-      });
-      expect(wrapper2.exists()).toBe(true);
-      wrapper2.unmount();
-    });
+  it("offers global, this tab's and this new panel's variables, multi-selects in parentheses", async () => {
+    await mountOption();
+    expect(builder().props("extraValueSuggestions")!("level")).toEqual([
+      "$global_var",
+      "(${multi_var})",
+      "$tab_var",
+      "$panel_var",
+    ]);
+  });
 
-    it("uses default pageKey when no inject is provided", () => {
-      const wrapper2 = mountComponent({ provide: {} });
-      expect(wrapper2.exists()).toBe(true);
-      wrapper2.unmount();
-    });
+  it("loads values from the column's own stream in the panel's time range", async () => {
+    await mountOption();
+    const values = await builder().props("loadValues")!("b.service", "ser");
+    expect(values).toEqual(["error", "warn"]);
+    expect(requestFieldValues).toHaveBeenCalledWith(
+      { org: expect.any(String), streamType: "logs", streamName: "other_logs" },
+      "service",
+      { timeRange: { startTime: 1000, endTime: 2000 }, keyword: "ser" },
+    );
+  });
 
-    it("accepts and uses dashboardData prop", () => {
-      expect(wrapper.props("dashboardData")).toEqual(defaultDashboardData);
-    });
+  it("an Escape that closes the field list stays inside the builder", async () => {
+    await mountOption();
+    const input = wrapper!.find('[data-test="dashboard-filter-builder-input"]');
+    await input.trigger("click");
+    await flushPromises();
+    const onWindow = vi.fn();
+    window.addEventListener("keydown", onWindow);
+    await input.trigger("keydown", { key: "Escape" });
+    window.removeEventListener("keydown", onWindow);
+    expect(onWindow).not.toHaveBeenCalled();
+  });
+
+  it("loads main-stream values without a keyword before anything is typed", async () => {
+    await mountOption();
+    await builder().props("loadValues")!("level", "");
+    expect(requestFieldValues).toHaveBeenCalledWith(
+      expect.objectContaining({ streamName: "app_logs" }),
+      "level",
+      expect.objectContaining({ keyword: undefined }),
+    );
   });
 });

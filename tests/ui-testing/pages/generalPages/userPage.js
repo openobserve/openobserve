@@ -1,5 +1,6 @@
 // userPage.js
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 
 export class UserPage {
@@ -9,7 +10,6 @@ export class UserPage {
         // ===========================================================
         // IAM navigation
         // ===========================================================
-        this.iamPageMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
         this.iamUsersTab = page.locator('[data-test="iam-users-tab"]');
         this.iamPage = page.locator('[data-test="iam-page"]');
         // Empty-state rendered inside the OTable empty slot.
@@ -94,7 +94,7 @@ export class UserPage {
     }
 
     async gotoIamPage() {
-        await this.iamPageMenu.click();
+        await openNavFlyoutChild(this.page, 'iam');
         await this.iamUsersTab.waitFor({ state: 'visible' });
         await this.iamUsersTab.click();
     }

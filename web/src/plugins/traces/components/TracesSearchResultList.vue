@@ -46,10 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTable
                 class="h-auto!"
                 :wrap="wrap"
-                :columns="searchObj.data.resultGrid.columns"
+                :columns="tableColumns"
                 :data="hits"
                 :loading="loading"
                 :get-row-status-color="traceRowStatusColor"
+                :loading-reset-key="rowsKey"
+                :progress-line="false"
                 :active-row-index="activeRowIndex"
                 sorting="server"
                 :sort-by="props.sortBy"
@@ -365,6 +367,8 @@ interface Props {
   scrollEl?: HTMLElement | null;
   /** Resolves a row to its trace-details URL so the name cell is a real link. */
   rowHref?: (row: any) => string | undefined;
+  /** Adds a read-only Version column from the trace's `o2_service_version`. */
+  versionColumn?: boolean;
 }
 
 const store = useStore();
@@ -387,6 +391,7 @@ const props = withDefaults(defineProps<Props>(), {
   queryWindowUs: undefined,
   scrollEl: null,
   rowHref: undefined,
+  versionColumn: false,
 });
 
 const emit = defineEmits<{
@@ -539,19 +544,59 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
   }
 };
 
-const { searchObj, updatedLocalLogFilterField } = useTraces();
+const { searchObj, updatedLocalLogFilterField, loadLocalLogFilterField } = useTraces();
 const { buildColumns } = useTracesTableColumns();
 
 const timestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
+
+const VERSION_COLUMN_ID = "o2_service_version";
+// The column is local to this table so the shared traces column state never stores it.
+const injectsVersionColumn = computed(
+  () =>
+    props.versionColumn &&
+    !searchObj.data.resultGrid.columns.some(
+      (column: { id: string }) => column.id === VERSION_COLUMN_ID,
+    ),
+);
+const tableColumns = computed(() => {
+  const columns = searchObj.data.resultGrid.columns;
+  if (!injectsVersionColumn.value) return columns;
+  const at = columns.findIndex((column: { id: string }) => column.id === "service_name");
+  const version = {
+    id: VERSION_COLUMN_ID,
+    header: t("serviceVersions.correlation.versionColumn"),
+    size: 140,
+    meta: { sortable: false },
+    accessorFn: (row: Record<string, unknown>) =>
+      typeof row[VERSION_COLUMN_ID] === "string" ? row[VERSION_COLUMN_ID] : "",
+  };
+  return at === -1
+    ? [...columns, version]
+    : [...columns.slice(0, at + 1), version, ...columns.slice(at + 1)];
+});
 
 const sortFieldMap = computed<Record<string, string>>(() => ({
   [timestampCol.value]: "start_time",
   duration: "duration",
 }));
 
+// Rows of another stream or mode must never show under this one's columns, even dimmed.
+const rowsKey = computed(
+  () => `${searchObj.data.stream.selectedStream?.value ?? ""}|${props.searchMode ?? "traces"}`,
+);
+
 onMounted(() => {
   if (!searchObj.data.resultGrid.columns.length) {
-    searchObj.data.resultGrid.columns = buildColumns(false, "traces", DEFAULT_TRACE_COLUMNS.traces);
+    // The cold skeleton shows the current mode's columns, so they do not swap when rows land.
+    const mode = props.searchMode === "spans" ? "spans" : "traces";
+    loadLocalLogFilterField(mode);
+    searchObj.data.resultGrid.columns = buildColumns(
+      false,
+      mode,
+      searchObj.data.stream.selectedFields?.length
+        ? searchObj.data.stream.selectedFields
+        : DEFAULT_TRACE_COLUMNS[mode],
+    );
   }
 });
 
@@ -582,7 +627,10 @@ onMounted(() => {
 const onColumnReorder = (newOrder: string[]) => {
   const mode = props.searchMode ?? "traces";
   searchObj.data.stream.selectedFields = newOrder.filter(
-    (id) => id !== store.state.zoConfig.timestamp_column && !SPAN_DERIVED_COLUMN_IDS.has(id),
+    (id) =>
+      id !== store.state.zoConfig.timestamp_column &&
+      !SPAN_DERIVED_COLUMN_IDS.has(id) &&
+      !(id === VERSION_COLUMN_ID && injectsVersionColumn.value),
   );
   const rank = new Map(newOrder.map((id, index) => [id, index]));
   const ordered = [...searchObj.data.resultGrid.columns].sort(

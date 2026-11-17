@@ -26,6 +26,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import type { FilterField } from "@/utils/query/filterBar";
 
 const props = defineProps<{ check: ProtocolCheck; validationErrors?: Record<string, string> }>();
 const emit = defineEmits<{ "update:check": [value: ProtocolCheck] }>();
@@ -42,17 +44,20 @@ function update(patch: Partial<HttpCheckConfig>) {
 const METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
 const methodOptions = METHODS.map((m) => ({ label: raw(m), value: m }));
 
-const ASSERTION_FIELDS = ["status_code", "body", "response_time_ms"] as const;
-const fieldOptions = computed(() =>
-  ASSERTION_FIELDS.map((f) => ({
-    label: t(`synthetics.protocolConfig.http.fields.${f}`),
-    value: f,
-  })),
-);
-const OPERATORS = ["eq", "ne", "lt", "gt", "contains", "not_contains"] as const;
-const operatorOptions = computed(() =>
-  OPERATORS.map((o) => ({ label: t(`synthetics.protocolConfig.http.operators.${o}`), value: o })),
-);
+// The prober reads these three response fields only.
+const assertionFields = computed<FilterField[]>(() => [
+  {
+    name: "status_code",
+    type: "number",
+    label: t("synthetics.protocolConfig.http.fields.status_code"),
+  },
+  { name: "body", type: "string", label: t("synthetics.protocolConfig.http.fields.body") },
+  {
+    name: "response_time_ms",
+    type: "number",
+    label: t("synthetics.protocolConfig.http.fields.response_time_ms"),
+  },
+]);
 
 const method = computed({
   get: () => cfg.value.method,
@@ -81,19 +86,6 @@ function addHeader() {
 }
 function removeHeader(index: number) {
   update({ headers: cfg.value.headers.filter((_, i) => i !== index) });
-}
-
-function patchAssertion(index: number, patch: Partial<HttpCheckConfig["assertions"][number]>) {
-  const assertions = cfg.value.assertions.map((a, i) => (i === index ? { ...a, ...patch } : a));
-  update({ assertions });
-}
-function addAssertion() {
-  update({
-    assertions: [...cfg.value.assertions, { field: "status_code", operator: "eq", value: "" }],
-  });
-}
-function removeAssertion(index: number) {
-  update({ assertions: cfg.value.assertions.filter((_, i) => i !== index) });
 }
 </script>
 
@@ -196,51 +188,13 @@ function removeAssertion(index: number) {
         <label class="text-text-body mb-1 block text-sm font-medium">{{
           t("synthetics.protocolConfig.http.assertions")
         }}</label>
-        <div v-for="(a, i) in cfg.assertions" :key="i" class="mb-2 flex items-center gap-2">
-          <OSelect
-            :model-value="a.field"
-            :options="fieldOptions"
-            width="sm"
-            :data-test="`synthetics-check-http-assertion-field-${i}`"
-            @update:model-value="(v) => patchAssertion(i, { field: String(v ?? '') })"
-          />
-          <OSelect
-            :model-value="a.operator"
-            :options="operatorOptions"
-            width="xs"
-            :data-test="`synthetics-check-http-assertion-operator-${i}`"
-            @update:model-value="(v) => patchAssertion(i, { operator: String(v ?? 'eq') })"
-          />
-          <div class="min-w-0 flex-1">
-            <OInput
-              :model-value="a.value"
-              :placeholder="t('synthetics.protocolConfig.http.assertionValue')"
-              :data-test="`synthetics-check-http-assertion-value-${i}`"
-              @update:model-value="
-                (v: string | number) =>
-                  patchAssertion(i, { value: typeof v === 'string' ? v : String(v) })
-              "
-            />
-          </div>
-          <OButton
-            variant="ghost"
-            size="icon-sm"
-            :aria-label="t('common.delete')"
-            :data-test="`synthetics-check-http-assertion-remove-${i}`"
-            @click="removeAssertion(i)"
-          >
-            <template #icon-left><OIcon name="close" size="xs" /></template>
-          </OButton>
-        </div>
-        <OButton
-          variant="outline"
-          size="sm"
-          data-test="synthetics-check-http-add-assertion-btn"
-          @click="addAssertion"
-        >
-          <template #icon-left><OIcon name="add" size="xs" /></template>
-          {{ t("synthetics.protocolConfig.http.addAssertion") }}
-        </OButton>
+        <FilterBuilder
+          profile="synthetics"
+          :model-value="cfg.assertions"
+          :fields="assertionFields"
+          data-test="synthetics-check-http-assertions"
+          @update:model-value="(v) => update({ assertions: v as HttpCheckConfig['assertions'] })"
+        />
       </div>
     </div>
   </div>

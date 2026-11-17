@@ -93,6 +93,10 @@ pub(crate) struct StackSet {
         (status = 400, description = "Invalid request"),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Failure")
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Profiles", "operation": "create"}))
     )
 )]
 pub async fn merge_profiles(
@@ -144,6 +148,10 @@ pub async fn merge_profiles(
         (status = 400, description = "Invalid request"),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Failure")
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Profiles", "operation": "list"}))
     )
 )]
 pub async fn merge_profiles_get(

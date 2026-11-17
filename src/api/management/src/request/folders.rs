@@ -610,7 +610,7 @@ pub mod deprecated {
             ("folder_id" = String, Path, description = "Folder ID"),
         ),
         responses(
-            (status = StatusCode::OK, description = "Success", body = ()),
+            (status = StatusCode::OK, description = "Success", body = MetaHttpResponse),
             (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
             (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
         ),

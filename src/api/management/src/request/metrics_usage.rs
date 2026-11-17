@@ -42,7 +42,8 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn get_metric_usage(
@@ -80,7 +81,8 @@ pub async fn get_metric_usage(
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn get_org_metric_usage(

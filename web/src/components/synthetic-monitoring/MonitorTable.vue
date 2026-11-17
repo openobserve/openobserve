@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dot="true"
         size="sm"
       >
-        {{ resolveBadgeLabel("serviceStatus", (row as any).status) }}
+        {{ statusLabel(row as any) }}
       </OBadge>
     </template>
 
@@ -192,16 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Response time -->
     <template #cell-responseTime="{ row }">
       <span
-        v-if="(row as any).responseTime"
+        v-if="(row as any).responseTime != null"
         class="font-mono text-sm font-semibold"
-        :class="
-          parseFloat((row as any).responseTime) < 300
-            ? 'text-status-success-text'
-            : parseFloat((row as any).responseTime) < 1000
-              ? 'text-status-warning-text'
-              : 'text-status-error-text'
-        "
-        >{{ (row as any).responseTime }}</span
+        :class="responseTimeClass(row)"
+        >{{ formatMs((row as any).responseTime) }}</span
       >
       <span v-else class="text-sm">—</span>
     </template>
@@ -246,16 +240,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
         :delay="0"
       >
-        <div class="flex cursor-pointer items-center gap-1">
-          <span class="max-w-[4.375rem] truncate text-xs">{{
-            locationLabel((row as any).locations[0])
-          }}</span>
-          <span
-            v-if="(row as any).locations.length > 1"
-            class="rounded-default bg-surface-subtle shrink-0 px-1 py-0.5 text-xs font-bold whitespace-nowrap"
-            >+{{ (row as any).locations.length - 1 }}</span
-          >
-        </div>
+        <FitItems :items="(row as any).locations" class="cursor-pointer">
+          <template #default="{ item }">
+            <span class="block truncate text-xs">{{ locationLabel(item as string) }}</span>
+          </template>
+          <template #more="{ count }">
+            <span
+              class="rounded-default bg-surface-subtle px-1 py-0.5 text-xs font-bold whitespace-nowrap"
+              >+{{ count }}</span
+            >
+          </template>
+        </FitItems>
       </OTooltip>
       <span v-else class="text-xs">—</span>
     </template>
@@ -292,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else
           :variant="(row as any).enabled ? 'ghost-destructive' : 'ghost'"
-          size="icon-sm"
+          size="icon-xs-sq"
           :icon-left="(row as any).enabled ? 'pause' : 'play-arrow'"
           class="max-md:hidden"
           :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn`"
@@ -309,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Edit -->
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="edit"
           class="max-md:hidden"
           :data-test="`${dataTest}-edit-btn`"
@@ -321,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Duplicate -->
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="content-copy"
           class="max-md:hidden"
           :data-test="`${dataTest}-duplicate-btn`"
@@ -332,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="drive-file-move"
           class="max-md:hidden"
           :data-test="`${dataTest}-move-btn`"
@@ -356,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-else
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               icon-left="more-vert"
               :data-test="`${dataTest}-more-btn`"
               @click.stop
@@ -414,7 +409,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-if="downtimesEnabled">
             <ODropdownSeparator />
+            <RowMuteMenu
+              v-if="(row as any).active_downtime"
+              :downtime="(row as any).active_downtime"
+              :extend-test-prefix="`${dataTest}-${(row as any).id}-extend`"
+              :end-test="`${dataTest}-${(row as any).id}-end-mute`"
+              :muted-by-test="`${dataTest}-${(row as any).id}-muted-by`"
+              @preset="(secs) => rowMuteActions.extendBy((row as any).active_downtime, secs)"
+              @until="rowMuteActions.openExtendUntil((row as any).active_downtime)"
+              @end="rowMuteActions.end((row as any).active_downtime)"
+            />
             <MuteMenuItems
+              v-else
               :data-test-prefix="`${dataTest}-mute`"
               @preset="(secs) => muteRows([row], secs)"
               @until="openMuteDialog([row])"
@@ -540,6 +546,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="muteDialogOpen"
     :selection="muteSelection"
   />
+  <ExtendDowntimeDialog
+    v-if="downtimesEnabled"
+    v-model:open="rowMuteActions.extendUntilOpen.value"
+    :downtime="rowMuteActions.extendUntilRow.value"
+    :submit="rowMuteActions.extendUntil"
+  />
 
   <!-- Spark bar detail tooltip -->
   <Teleport to="body">
@@ -610,14 +622,20 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
+import { utcClock } from "@/utils/synthetics/runClass";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { ForbiddenState } from "@/utils/featureGate";
 import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
 import MuteMenuItems from "@/components/alerts/downtimes/MuteMenuItems.vue";
+import RowMuteMenu from "@/components/alerts/downtimes/RowMuteMenu.vue";
+import ExtendDowntimeDialog from "@/components/alerts/downtimes/ExtendDowntimeDialog.vue";
 import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
+import { useDowntimeRowActions } from "@/composables/downtimes/useDowntimeRowActions";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
+import { formatMs } from "@/utils/formatters";
 
 type Mode = "all" | "browser";
 
@@ -632,22 +650,31 @@ type Mode = "all" | "browser";
 // A DEGRADED monitor keeps a clean row and reads from the amber rail: it is worth
 // noticing, not worth acting on this second, and washing it too would put most of
 // a wobbly estate in colour.
+/** The badge text; Not measured says since when, so a long gap reads as one. */
+const statusLabel = (row: any): I18nText => {
+  if (row?.status === "not_measured" && row?.statusSince) {
+    return t("synthetics.table.notMeasuredSince", { time: utcClock(row.statusSince) });
+  }
+  return resolveBadgeLabel("serviceStatus", row?.status);
+};
+
+const FAILING_STATUSES = new Set(["failed", "error", "misconfigured"]);
+
 const monitorRowClass = (row: any): string => {
   const st = String(row?.status ?? "").toLowerCase();
-  if (st === "failed" || st === "error") return "!bg-status-error-bg";
+  if (FAILING_STATUSES.has(st)) return "!bg-status-error-bg";
   return row?.enabled === false ? "!bg-surface-panel" : "";
 };
 
 const monitorRowStyle = (row: any): Record<string, string> => {
   const status = String(row?.status ?? "").toLowerCase();
-  const color =
-    status === "failed" || status === "error"
-      ? "var(--color-error-500)"
-      : status === "warning"
-        ? "var(--color-warning-500)"
-        : status === "passed"
-          ? "var(--color-success-500)"
-          : "var(--color-grey-400)";
+  const color = FAILING_STATUSES.has(status)
+    ? "var(--color-error-500)"
+    : status === "warning" || status === "partial"
+      ? "var(--color-warning-500)"
+      : status === "passed"
+        ? "var(--color-success-500)"
+        : "var(--color-grey-400)";
   return { boxShadow: `var(--shadow-rail-geom) ${color}` };
 };
 
@@ -698,6 +725,18 @@ function locationLabel(id: string): string {
   return props.locationNames[id] ?? id;
 }
 
+// TanStack's sortUndefined only applies to undefined, so a never-run check has to read as that.
+function responseTimeSortValue(row: any): number | undefined {
+  return row.responseTime ?? undefined;
+}
+
+function responseTimeClass(row: any): string {
+  // A browser value is whole-journey wall-clock time, so latency limits say nothing about it.
+  if (row.type === "BROWSER") return "";
+  if (row.responseTime < 300) return "text-status-success-text";
+  return row.responseTime < 1000 ? "text-status-warning-text" : "text-status-error-text";
+}
+
 const emit = defineEmits<{
   "row-click": [row: any];
   edit: [row: any];
@@ -739,6 +778,9 @@ const { downtimesEnabled, muteDialogOpen, muteSelection, muteRows, openMuteDialo
     () => "synthetics",
     (row) => String(row.id),
   );
+
+// The list is a query, so a write's invalidation and a refused write's refetch both reload it.
+const rowMuteActions = useDowntimeRowActions();
 
 const selectedRows = computed(() =>
   props.data.filter((row: any) => localSelectedIds.value.includes(String(row.id))),
@@ -805,7 +847,8 @@ const HISTORY_COL: OTableColumnDef = {
 const RESPONSE_TIME_COL: OTableColumnDef = {
   id: "responseTime",
   header: t("synthetics.table.response"),
-  accessorKey: "responseTime",
+  accessorFn: responseTimeSortValue,
+  sortUndefined: "last",
   size: COL.responseTime,
   minSize: 72,
   sortable: true,
@@ -815,7 +858,8 @@ const RESPONSE_TIME_COL: OTableColumnDef = {
 const PAGE_LOAD_COL: OTableColumnDef = {
   id: "responseTime",
   header: t("synthetics.table.pageLoad"),
-  accessorKey: "responseTime",
+  accessorFn: responseTimeSortValue,
+  sortUndefined: "last",
   size: COL.responseTime,
   minSize: 80,
   sortable: true,

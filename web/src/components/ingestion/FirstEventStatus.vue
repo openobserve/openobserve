@@ -31,6 +31,11 @@ import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "@/composables/firstEvent/firstEventBudget";
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
+import { FIRST_EVENT_BARS } from "@/composables/firstEvent/firstEventCopied";
+import {
+  FIRST_EVENT_REPORTER,
+  FIRST_EVENT_SUCCESS_BY_HOST,
+} from "@/composables/firstEvent/firstEventReporter";
 import {
   useFirstEventWatch,
   type FirstEventResult,
@@ -38,6 +43,8 @@ import {
   type StreamSignal,
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStillStuck from "./FirstEventStillStuck.vue";
+import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
+import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
 import { FIRST_EVENT_ASK_AI, REJECTION_REASON_KEYS, askAiQuery } from "./firstEventAskAi";
 
 const props = withDefaults(
@@ -94,6 +101,11 @@ const { t, locale } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const askAiFn = inject(FIRST_EVENT_ASK_AI, null);
+const hostAsksHeardFrom = inject(HEARD_FROM_ASKED_BY_HOST, false);
+const hostShowsSuccess = inject(FIRST_EVENT_SUCCESS_BY_HOST, false);
+// Attached in setup, not on mount: a keyed swap then never leaves the host counting zero statuses.
+const reporter = inject(FIRST_EVENT_REPORTER, null);
+const detach = reporter?.attach();
 // getIngestionURL's rule, kept reactive because /config can land after the bar mounts
 const endpoint = computed<string>(
   () => store.state.zoConfig?.ingestion_url || store.state.API_ENDPOINT || "",
@@ -108,6 +120,9 @@ const watcher = useFirstEventWatch(toRef(props, "org"), toRef(props, "signal"), 
 });
 const { state, result, diagnosis, startedAtMs, scope, troubleshooting, targetExists, deciding } =
   watcher;
+const leaveBars = inject(FIRST_EVENT_BARS, null)?.(watcher.start);
+// A status that replaces another starts over, so the host drops the old one's result.
+reporter?.state(state.value);
 
 const CLOCK_TICK_MS = 1000;
 
@@ -120,6 +135,8 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   if (clock) clearInterval(clock);
+  detach?.();
+  leaveBars?.();
 });
 
 const elapsedMs = computed(() => Math.max(0, nowMs.value - (startedAtMs.value ?? nowMs.value)));
@@ -435,6 +452,7 @@ const secondsSinceSignup = (): number => {
 let diagnosisReported = false;
 watch(state, (next, prev) => {
   emit("state", next);
+  reporter?.state(next);
   // Check again (or a copy) after the stop starts a new watch, which reports its own diagnosis
   if (prev === "stopped" && next === "waiting") diagnosisReported = false;
   if (next === "received" && prev !== "received" && result.value) {
@@ -443,6 +461,7 @@ watch(state, (next, prev) => {
       seconds_since_signup: secondsSinceSignup(),
     });
     emit("detected", result.value);
+    reporter?.detected(result.value);
   }
 });
 
@@ -649,7 +668,10 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
       </div>
       <template
         v-if="
-          state === 'waiting' || state === 'stopped' || state === 'idle' || state === 'received'
+          state === 'waiting' ||
+          state === 'stopped' ||
+          state === 'idle' ||
+          (state === 'received' && !hostShowsSuccess)
         "
         #actions
       >
@@ -745,6 +767,11 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
       <strong class="shrink-0">{{ streamText }}</strong>
       <span class="min-w-0 truncate">{{ firstRecordJson }}</span>
     </div>
+
+    <HeardFromPrompt
+      v-if="state === 'received' && kind === 'standard' && !hostAsksHeardFrom"
+      :org="org"
+    />
 
     <div
       v-if="showDiagnosis && diagnosis"

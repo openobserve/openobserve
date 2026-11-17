@@ -286,6 +286,50 @@ export default class DashboardPromQLEditor {
     return labels.length;
   }
 
+  // Re-triggers via Monaco's action because metric keywords land asynchronously and the first trigger can beat them.
+  async triggerAndWaitForSuggestions({ totalTimeoutMs = 30000, perTryTimeoutMs = 5000 } = {}) {
+    const deadline = Date.now() + totalTimeoutMs;
+    let lastCount = 0;
+    let lastError = null;
+    while (Date.now() < deadline) {
+      try {
+        await this.page.evaluate(() => {
+          const m = window.monaco;
+          const editors = m?.editor?.getEditors?.() || [];
+          const editor = editors[editors.length - 1];
+          if (!editor) return;
+          editor.focus();
+          editor.trigger("e2e", "editor.action.triggerSuggest", {});
+        });
+        await this.waitForSuggestionsReady(perTryTimeoutMs);
+        lastCount = await this.getSuggestionCount();
+        if (lastCount > 0) return lastCount;
+      } catch (err) {
+        lastError = err;
+      }
+      await this.dismissSuggestions();
+    }
+    if (lastError) {
+      testLogger.warn(`Suggestions widget not visible: ${lastError.message}`);
+    }
+    return lastCount;
+  }
+
+  // Re-trigger until the list has settled past "...Loading" and the stale pre-debounce list into one holding a seeded entry.
+  async waitForSeededSuggestions(matchesSeed, message) {
+    let labels = [];
+    await expect.poll(async () => {
+      await this.triggerAndWaitForSuggestions({ totalTimeoutMs: 5000, perTryTimeoutMs: 2000 });
+      labels = await this.getSuggestionLabels(1000);
+      return !labels.includes("...Loading") && labels.some(matchesSeed);
+    }, { message, timeout: 30000, intervals: [500, 1000, 2000] }).toBe(true);
+    return labels;
+  }
+
+  isMetricEntry(label) {
+    return /\([A-Za-z]+\)$/.test(label);
+  }
+
   async logSuggestions(prefix, limit = 10) {
     const labels = await this.getSuggestionLabels(limit);
     testLogger.info(`${prefix}: ${labels.join(", ")}`);

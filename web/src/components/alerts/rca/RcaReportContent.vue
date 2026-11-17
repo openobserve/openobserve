@@ -43,7 +43,7 @@ defineProps<{
    selector would not match them. The private --rca-* vocabulary now aliases global
    tokens; entries whose token already flips in dark mode carry no dark override.
    Judgment mappings (near-identical values, flagged for the §7.4 eyeball pass):
-   slate text → neutral text tokens; inline-code pink (rose-700) → status-error-text. */
+   slate text → neutral text tokens; inline code reads as body text, not as an error. */
 :deep(.rca-report-content) {
   --rca-bg-primary: var(--color-blue-50);
   --rca-bg-secondary: var(--color-blue-50);
@@ -57,7 +57,7 @@ defineProps<{
   --rca-text-secondary: var(--color-text-body);
   --rca-text-tertiary: var(--color-text-secondary);
   --rca-text-heading: var(--color-blue-600);
-  --rca-text-code: var(--color-status-error-text);
+  --rca-text-code: var(--color-text-body);
   --rca-text-blockquote: var(--color-blue-800);
   --rca-text-em: var(--color-text-secondary);
   --rca-text-list: var(--color-text-body);

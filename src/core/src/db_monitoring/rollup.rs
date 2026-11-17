@@ -260,7 +260,7 @@ struct RecentIngestedTraceStream {
 // through [`run_dbm_search`], which puts `(start_time, end_time)` on
 // `config::meta::search::Query`, and the planner pushes that down as a physical
 // `_timestamp >= start AND _timestamp < end` FilterExec attached to EACH scan
-// (`search/src/datafusion/table_provider/helpers.rs`) — per table alias, so even
+// (`search/src/datafusion/datasource/helpers.rs`) — per table alias, so even
 // a self-join is bounded on both sides. An inline copy would be a second literal
 // window to keep in sync by hand with nothing checking it: `Sql::time_range` is
 // unconditionally `(query.start_time, query.end_time)` (`search/src/sql/mod.rs`)
@@ -1097,6 +1097,7 @@ pub fn dbm_search_request(
         search_type: None,
         search_event_context: None,
         use_cache,
+        use_index: true,
         clear_cache: false,
         local_mode: Some(false),
         agent_options: None,

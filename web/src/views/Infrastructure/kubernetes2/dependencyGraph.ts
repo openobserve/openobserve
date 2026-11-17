@@ -47,6 +47,9 @@ export interface FlowEnd {
   namespace: string;
   name: string;
   ownerType: string;
+  // A namespace boundary standing for its collapsed workloads, with how many it holds.
+  group?: true;
+  members?: number;
 }
 
 // Hosts draw the same edges between their own ends.

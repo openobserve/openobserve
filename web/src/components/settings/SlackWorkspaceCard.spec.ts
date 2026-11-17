@@ -15,9 +15,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { defineComponent } from "vue";
+import { defineComponent, type Component } from "vue";
 import i18n from "@/locales";
 import slack from "@/services/slack";
+import users from "@/services/users";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import SlackWorkspaceCard from "./SlackWorkspaceCard.vue";
 import {
   OTableStub,
@@ -30,6 +32,7 @@ import {
   ok,
   postCallback,
   selfHostedSettingsExchange,
+  withSlackSaveBar,
 } from "@/test/unit/helpers/slack";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { InstallationView } from "@/types/slack";
@@ -45,6 +48,8 @@ vi.mock("@/services/slack", () => ({
     installExchange: vi.fn(),
   },
 }));
+
+vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
 
 vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
@@ -83,8 +88,12 @@ const NamedConfirmDialogStub = defineComponent({
     </div>`,
 });
 
-const mountCard = (installation: InstallationView = installationView(), isCloud = false) =>
-  mount(SlackWorkspaceCard, {
+const mountCard = (
+  installation: InstallationView = installationView(),
+  isCloud = false,
+  component: Component = SlackWorkspaceCard,
+) =>
+  mount(component as typeof SlackWorkspaceCard, {
     props: { installation, isCloud },
     attachTo: document.body,
     global: {
@@ -127,17 +136,21 @@ afterEach(() => {
 describe("SlackWorkspaceCard (A3)", () => {
   it("AC-12.4 shows the workspace with its slackInstallStatus badge", () => {
     const w = mountCard(installationView({ status: "degraded" }));
-    expect(w.find('[data-test="slack-workspace-name"]').text()).toBe("Acme Corp");
+    expect(w.find('[data-test="slack-workspace-card"] h2').text()).toBe("Acme Corp");
     expect(w.find('[data-test="slack-workspace-status"]').text()).toBe("Degraded");
-    expect(w.find('[data-test="slack-workspace-meta"]').text()).toContain(
-      "Socket Mode · connected by ana@acme.example",
+    expect(w.find('[data-test="slack-workspace-card-description"]').text()).toContain(
+      "Connected by ana@acme.example",
     );
   });
 
   it("shows socket health as of the local health record, and none in HTTP mode", () => {
-    expect(mountCard().find('[data-test="slack-workspace-sockets"]').text()).toContain(
-      "2 of 2 sockets · as of",
+    const w = mountCard();
+    expect(w.find('[data-test="slack-workspace-sockets"]').text()).toContain("Connected to Slack");
+    expect(w.find('[data-test="slack-workspace-sockets"]').text()).not.toContain("Socket Mode");
+    expect(w.find('[data-test="slack-workspace-card-description"]').text()).not.toContain(
+      "Socket Mode",
     );
+    expect(w.find('[data-test="slack-workspace-connection-info"]').exists()).toBe(true);
     expect(
       mountCard(installationView({ mode: "http" }))
         .find('[data-test="slack-workspace-sockets"]')
@@ -254,21 +267,33 @@ describe("SlackWorkspaceCard (A3)", () => {
     },
   );
 
-  it("AC-12.1 help contact loads row 23 and saves it", async () => {
-    const w = mountCard();
+  it("AC-12.1 help contact loads row 23 and is saved by the page's Save", async () => {
+    const w = mountCard(installationView(), false, withSlackSaveBar(SlackWorkspaceCard));
     await flushPromises();
     const input = w.find('[data-test="slack-help-contact"] input');
     expect((input.element as HTMLInputElement).value).toBe("#o2-help");
     await input.setValue("#ops");
-    await w.find('[data-test="slack-help-contact-form"]').trigger("submit");
+    expect(slack.putHelpContact).not.toHaveBeenCalled();
+    expect((w.vm as any).bar.changeCount.value).toBe(1);
+    let answer: (value: unknown) => void = () => {};
+    vi.mocked(slack.putHelpContact).mockReturnValue(new Promise((r) => (answer = r)) as any);
+    const saving = (w.vm as any).bar.save();
     await vi.waitFor(() =>
       expect(slack.putHelpContact).toHaveBeenCalledWith("acme", "inst-1", { help_contact: "#ops" }),
     );
+    // The old value typed back while the request is open: it stays, as the one unsaved change.
+    await input.setValue("#o2-help");
+    vi.mocked(slack.getHelpContact).mockReturnValue(ok({ help_contact: "#ops" }) as any);
+    answer({ data: { help_contact: "#ops" } });
+    await saving;
     await vi.waitFor(() =>
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "success", message: "Help contact saved" }),
       ),
     );
+    await flushPromises();
+    expect((input.element as HTMLInputElement).value).toBe("#o2-help");
+    expect((w.vm as any).bar.changeCount.value).toBe(1);
   });
 
   it("AC-12.2 lists this org and only a count of other connected orgs", () => {
@@ -279,11 +304,79 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(orgs).toContain("3 other orgs");
   });
 
+  it("names this org by its name, not its identifier", () => {
+    const store = makeSlackStore();
+    store.state.selectedOrganization.label = "Acme Inc";
+    const w = mount(SlackWorkspaceCard, {
+      props: { installation: installationView(), isCloud: false },
+      global: {
+        plugins: [i18n, store],
+        config: { errorHandler },
+        stubs: {
+          OTable: OTableStub,
+          ConfirmDialog: NamedConfirmDialogStub,
+          SlackCredentialsDialog: CredentialsStub,
+        },
+      },
+    });
+    expect(w.find('[data-test="slack-connected-orgs"]').text()).toContain("Acme Inc (this org)");
+    expect(w.text()).toContain("Stops Slack for Acme Inc only");
+    w.unmount();
+  });
+
+  it("names who connected the workspace and keeps their email on hover", async () => {
+    vi.mocked(users.orgUsers).mockResolvedValue({
+      data: { data: [{ email: "ana@acme.example", first_name: "Ana", last_name: "Smith" }] },
+    } as any);
+    const w = mountCard();
+    await flushPromises();
+
+    const meta = w.find('[data-test="slack-workspace-card-description"]');
+    expect(meta.text()).toContain("Ana Smith");
+    expect(meta.text()).not.toContain("ana@acme.example");
+    const hover = meta.findAllComponents(OTooltip).map((tip) => String(tip.props("content")));
+    expect(hover.some((content) => content.includes("ana@acme.example"))).toBe(true);
+  });
+
+  it("renders the on-call slot right under the workspace card, above connected orgs", () => {
+    const w = mount(SlackWorkspaceCard, {
+      props: { installation: installationView(), isCloud: false },
+      slots: {
+        oncall: '<div data-test="oncall-slot" />',
+        default: '<div data-test="default-slot" />',
+      },
+      global: {
+        plugins: [i18n, makeSlackStore()],
+        config: { errorHandler },
+        stubs: {
+          OTable: OTableStub,
+          ConfirmDialog: NamedConfirmDialogStub,
+          SlackCredentialsDialog: CredentialsStub,
+        },
+      },
+    });
+    const html = w.html();
+    expect(html.indexOf("oncall-slot")).toBeLessThan(html.indexOf("slack-connected-orgs"));
+    expect(html.indexOf("slack-connected-orgs")).toBeLessThan(html.indexOf("default-slot"));
+    w.unmount();
+  });
+
+  it("gives every card action a leading icon", () => {
+    const w = mountCard();
+    for (const id of [
+      "slack-test-connection",
+      "slack-reinstall",
+      "slack-update-credentials",
+      "slack-disconnect-org",
+      "slack-uninstall",
+    ]) {
+      expect(w.find(`[data-test="${id}"] svg`).exists()).toBe(true);
+    }
+  });
+
   it("AC-7.6 Forget clears only OpenObserve's copy of the refresh token after a confirm", async () => {
     const w = mountCard();
-    expect(w.find('[data-test="slack-refresh-token"]').text()).toContain(
-      "Configuration refresh token kept",
-    );
+    expect(w.find('[data-test="slack-refresh-token"]').text()).toContain("Slack setup token kept");
     await w.find('[data-test="slack-forget-token"]').trigger("click");
     expect(w.find('[data-test-stub="confirm-name"]').text()).toBe("Acme Corp");
     const dialog = w.findComponent(NamedConfirmDialogStub);
@@ -390,6 +483,55 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(cloud.find('[data-test="slack-uninstall"]').exists()).toBe(false);
   });
 
+  it("a_reader_without_manage_slack_gets_disconnect_and_uninstall_off_with_the_reason", async () => {
+    const w = mount(SlackWorkspaceCard, {
+      props: { installation: installationView(), isCloud: false, readOnly: true },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n, makeSlackStore()],
+        config: { errorHandler },
+        stubs: {
+          OTable: OTableStub,
+          ConfirmDialog: NamedConfirmDialogStub,
+          SlackCredentialsDialog: CredentialsStub,
+        },
+      },
+    });
+    expect(w.find('[data-test="slack-disconnect-org"]').attributes("disabled")).toBeDefined();
+    expect(w.find('[data-test="slack-uninstall"]').attributes("disabled")).toBeDefined();
+    expect(w.find('[data-test="slack-danger-locked"]').text()).toContain(
+      "They need the Manage Slack permission.",
+    );
+    await w.find('[data-test="slack-disconnect-org"]').trigger("click");
+    expect(w.emitted("disconnect")).toBeUndefined();
+  });
+
+  it("a_reader_without_manage_slack_gets_every_write_on_the_card_off", async () => {
+    const w = mount(SlackWorkspaceCard, {
+      props: { installation: installationView(), isCloud: false, readOnly: true },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n, makeSlackStore()],
+        config: { errorHandler },
+        stubs: {
+          OTable: OTableStub,
+          ConfirmDialog: NamedConfirmDialogStub,
+          SlackCredentialsDialog: CredentialsStub,
+        },
+      },
+    });
+    await flushPromises();
+    for (const test of [
+      "slack-test-connection",
+      "slack-reinstall",
+      "slack-update-credentials",
+      "slack-forget-token",
+      "slack-help-contact-field",
+    ]) {
+      expect(w.find(`[data-test="${test}"]`).attributes("disabled"), test).toBeDefined();
+    }
+  });
+
   it("a managed workspace shows Managed by your instance admin with the _meta contact", () => {
     const w = mountCard(managedView());
     const banner = w.find('[data-test="slack-managed-banner"]');
@@ -398,8 +540,8 @@ describe("SlackWorkspaceCard (A3)", () => {
       "Credentials, linking and which organizations use Acme Corp are set in _meta.",
     );
     expect(banner.text()).toContain("Questions: #o2-platform");
-    expect(w.find('[data-test="slack-workspace-meta"]').text()).toBe(
-      "Socket Mode · managed by your instance admin",
+    expect(w.find('[data-test="slack-workspace-card-description"]').text()).toBe(
+      "Managed by your instance admin",
     );
     expect(mountCard().find('[data-test="slack-managed-banner"]').exists()).toBe(false);
   });

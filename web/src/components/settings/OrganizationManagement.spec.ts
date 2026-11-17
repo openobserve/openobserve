@@ -29,9 +29,11 @@ import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import enLocaleFull from "@/locales/languages/en-US.json";
 import { nextTick } from "vue";
+import analytics from "@/services/product_analytics";
 
 // ── Mock toast ──
 const mockToastFn = vi.fn().mockReturnValue(vi.fn());
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToastFn(...args),
 }));
@@ -576,6 +578,7 @@ describe("OrganizationManagement.vue", () => {
       };
 
       expect(mockExtendTrialPeriod).toHaveBeenCalledWith("default", expectedPayload);
+      expect(analytics.track).toHaveBeenCalledWith("org_management_trial_extended");
 
       mockDateNow.mockRestore();
     });

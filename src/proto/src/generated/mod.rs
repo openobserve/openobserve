@@ -14,5 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod cluster;
+pub mod datadog_agentpayload;
+pub mod datadog_trace {
+    include!("datadog_trace.rs");
+    pub mod idx {
+        include!("datadog_trace_idx.rs");
+    }
+}
 pub mod prometheus;
 pub mod loki;

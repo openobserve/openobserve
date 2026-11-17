@@ -4,6 +4,16 @@
 // surface loosely on purpose. Type-only; no runtime effect.
 declare module "reodotdev";
 declare module "monaco-editor/esm/vs/editor/editor.all.js";
+declare module "monaco-editor/esm/vs/base/common/errors.js" {
+  export class CancellationError extends Error {}
+}
+declare module "monaco-editor/esm/vs/base/common/async.js" {
+  export class Delayer<T> {
+    constructor(defaultDelay: number);
+    trigger(task: () => T | Promise<T>, delay?: number): Promise<T>;
+    dispose(): void;
+  }
+}
 
 // sortablejs ships no types; declare the minimal surface the app uses
 // (Sortable.create / instance destroy+option / SortableEvent). Type-only.

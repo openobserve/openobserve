@@ -51,7 +51,8 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         (status = 500, description = "The log could not be read", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn list_auto_investigate_decisions(

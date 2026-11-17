@@ -1,12 +1,12 @@
 
 const { expect } = require('@playwright/test');
+const { openNavFlyoutChild } = require('../commonActions.js');
 
 export class CreateOrgPage {
     constructor(page) {
         this.page = page;
 
         // ── IAM navigation ────────────────────────────────────────────────
-        this.iamMenuLink = page.locator('[data-test="menu-link-\\/iam-item"]');
         this.iamOrganizationsTab = page.locator('[data-test="iam-organizations-tab"]');
         this.iamPage = page.locator('[data-test="iam-page"]');
 
@@ -110,7 +110,7 @@ export class CreateOrgPage {
     }
 
     async navigateToOrg() {
-        await this.iamMenuLink.click();
+        await openNavFlyoutChild(this.page, 'iam');
         await this.iamOrganizationsTab.click();
     }
 

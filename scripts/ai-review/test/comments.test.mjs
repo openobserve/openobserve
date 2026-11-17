@@ -6,17 +6,21 @@ import { readFileSync } from "node:fs";
 import {
   ANY_REVIEW_MARKER,
   REVIEW_HEADING,
+  automaticPassCount,
+  bodyAtFailedRun,
   bodyAtPassLimit,
   bodyAtReviewedHead,
   bodyAtUnchangedDiff,
   bodyAtUnreviewedHead,
   claimedReviewBody,
   finishReviewBody,
+  manualReviews,
   parseMaxPasses,
   passLimitNote,
   previousReviewText,
   redactProviderIdentity,
   reviewKey,
+  reviewManualTag,
   reviewPassCount,
   reviewPassTag,
   reviewShaTag,
@@ -28,6 +32,7 @@ import {
   selectOwnReviewComment,
   shouldSkipAsReviewed,
   shouldSkipAsUnchangedDiff,
+  withManualTag,
   withPassLimitNote,
   withPassTag,
   withReviewShaTag,
@@ -712,4 +717,94 @@ test("a model cannot forge the diff fingerprint, and the reviewers never see it"
   const { text } = sanitizeReviewBody(forged, { marker: "<!-- ai-code-review -->", providerId: "p", modelId: "m", env: {} });
   assert.doesNotMatch(text, /o2-review-diff/);
   assert.doesNotMatch(previousReviewText(stampedReview()), /o2-review-diff/);
+});
+
+const byHand = (count, key = SHA_B) => ({ count, key });
+const finishedByHand = (head, passes, maxPasses, manual) => finishReviewBody(sanitize(REVIEW), { key: head, passes, maxPasses, reviewed: true, confidence: HIGH, manual });
+const NOTE_TAIL = "Run the AI Code Review workflow by hand with `ignore_pass_limit` to review it again.";
+
+test("a comment from before the manual counter reads as no manual reviews, and the tag reads back what it writes", () => {
+  for (const body of [undefined, "", finished(SHA_A, 4, 3), `x\n${reviewPassTag(4)}`]) assert.deepEqual(manualReviews(body), { count: 0, key: "" });
+  assert.deepEqual(manualReviews("x\n<!-- o2-review-manual:3 -->"), { count: 3, key: "" });
+  const paired = reviewKey(SHA_A, SHA_B);
+  const twice = withManualTag(withManualTag("x", byHand(1, SHA_A)), byHand(2, paired));
+  assert.deepEqual(manualReviews(twice), { count: 2, key: paired });
+  assert.equal(twice.match(/o2-review-manual/g).length, 1);
+  assert.equal(withManualTag(twice, byHand(0)), "x");
+  assert.equal(withManualTag("x", byHand(0)), "x");
+  assert.equal(reviewManualTag(byHand(1, "")), "<!-- o2-review-manual:1 -->");
+  assert.equal(automaticPassCount(4, 1), 3);
+  assert.equal(automaticPassCount(1, 3), 0);
+});
+
+test("the visible line names manual reviews only when there are some, with and without a cap", () => {
+  assert.equal(reviewedCommitLine(SHA_A, 2, 3), "<sub>Reviewed commit `aaaaaaa` · review 2 of 3</sub>");
+  assert.equal(reviewedCommitLine(SHA_A, 2, 3, 0), "<sub>Reviewed commit `aaaaaaa` · review 2 of 3</sub>");
+  assert.equal(reviewedCommitLine(SHA_A, 2, 0, 0), "<sub>Reviewed commit `aaaaaaa` · review 2</sub>");
+  assert.equal(reviewedCommitLine(SHA_A, 4, 3, 1), "<sub>Reviewed commit `aaaaaaa` · review 4 · 3 of 3 automatic · 1 manual</sub>");
+  assert.equal(reviewedCommitLine(SHA_A, 3, 0, 2), "<sub>Reviewed commit `aaaaaaa` · review 3 · 2 manual</sub>");
+  assert.equal(reviewedCommitLine(reviewKey(SHA_A, SHA_B), 2, 5, 1), "<sub>Reviewed commits `aaaaaaa` and `bbbbbbb` (paired OSS PR) · review 2 · 1 of 5 automatic · 1 manual</sub>");
+  assert.match(finishedByHand(SHA_B, 4, 3, byHand(1)), /<sub>Reviewed commit `bbbbbbb` · review 4 · 3 of 3 automatic · 1 manual<\/sub>/);
+  assert.match(finishedByHand(SHA_B, 3, 0, byHand(2)), /<sub>Reviewed commit `bbbbbbb` · review 3 · 2 manual<\/sub>/);
+  assert.equal(finishedByHand(SHA_A, 2, 3, byHand(0)), finished(SHA_A, 2, 3));
+});
+
+test("the cap counts only automatic reviews, so a manual one neither reaches it nor hides it", () => {
+  const under = finishedByHand(SHA_B, 3, 3, byHand(1));
+  assert.equal(under.includes("automatic reviews"), false);
+  assert.ok(under.endsWith(`${reviewPassTag(3)}\n${reviewManualTag(byHand(1))}`));
+  const at = finishedByHand(SHA_B, 4, 3, byHand(1));
+  assert.ok(at.includes(`> This PR has used its 3 automatic reviews; later pushes are not reviewed. ${NOTE_TAIL} Manual reviews so far: 1 (latest on \`bbbbbbb\`).`));
+  assert.equal(at.match(/automatic reviews/g).length, 1);
+});
+
+test("the limit note adds the manual count to both of its forms", () => {
+  assert.equal(passLimitNote(3), `> [!NOTE]\n> This PR has used its 3 automatic reviews; later pushes are not reviewed. ${NOTE_TAIL}`);
+  assert.equal(passLimitNote(3, "", "", byHand(1)), `> [!NOTE]\n> This PR has used its 3 automatic reviews; later pushes are not reviewed. ${NOTE_TAIL} Manual reviews so far: 1 (latest on \`bbbbbbb\`).`);
+  assert.equal(passLimitNote(3, SHA_A, SHA_C, byHand(2, reviewKey(SHA_A, SHA_B))), `> [!NOTE]\n> This PR has used its 3 automatic reviews. This review covers \`aaaaaaa\`; \`ccccccc\` and later pushes are not reviewed. ${NOTE_TAIL} Manual reviews so far: 2 (latest on \`aaaaaaa+bbbbbbb\`).`);
+  assert.equal(passLimitNote(3, "", "", byHand(2, "")), `> [!NOTE]\n> This PR has used its 3 automatic reviews; later pushes are not reviewed. ${NOTE_TAIL} Manual reviews so far: 2.`);
+  const skipped = bodyAtPassLimit(finishedByHand(SHA_B, 4, 3, byHand(1)), 3, SHA_C);
+  assert.ok(skipped.includes(`> This PR has used its 3 automatic reviews. This review covers \`bbbbbbb\`; \`ccccccc\` and later pushes are not reviewed. ${NOTE_TAIL} Manual reviews so far: 1 (latest on \`bbbbbbb\`).`));
+  assert.equal(skipped.match(/automatic reviews/g).length, 1);
+  assert.equal(bodyAtPassLimit(skipped, 3, SHA_C), skipped);
+});
+
+test("the manual tag survives the claim, every skip and the restore, and only a manual claim moves it", () => {
+  const body = finishedByHand(SHA_A, 2, 3, byHand(1, SHA_A));
+  const kept = byHand(1, SHA_A);
+  const claimed = claimedReviewBody(body, 3, SHA_B);
+  assert.deepEqual(manualReviews(claimed), kept);
+  assert.equal(reviewPassCount(claimed), 3);
+  assert.deepEqual(manualReviews(claimedReviewBody(body, 3, SHA_B, byHand(2))), byHand(2));
+  for (const next of [
+    bodyAtUnreviewedHead(body, SHA_B),
+    bodyAtFailedRun(body, SHA_B),
+    bodyAtPassLimit(body, 3, SHA_B),
+    bodyAtUnchangedDiff(body, SHA_B, 3),
+    bodyAtReviewedHead(claimed, 3),
+    bodyAtReviewedHead(bodyAtPassLimit(claimed, 3, SHA_B), 3),
+  ]) {
+    assert.deepEqual(manualReviews(next), kept, next);
+    assert.equal(next.match(/o2-review-manual/g).length, 1, next);
+  }
+  assert.equal(bodyAtReviewedHead(claimed, 3), withManualTag(withPassTag(body, 3), kept));
+  const placeholder = withManualTag(withPassTag(`<!-- ai-code-review -->\n<!-- o2-paired-pointer -->\n${REVIEW_HEADING}\n\n> [!NOTE]\n> paired`, 2), kept);
+  assert.deepEqual(manualReviews(claimedReviewBody(placeholder, 3, SHA_B)), kept);
+  assert.deepEqual(manualReviews(bodyAtPassLimit(placeholder, 2, SHA_B)), kept);
+});
+
+test("a reviewed head keeps the limit note while automatic reviews fill the cap and drops it once a manual one is counted out", () => {
+  const atCap = withPassLimitNote(withManualTag(withPassTag("## R\n\n> [!TIP]\n> ok\n\n**Merge confidence: 🟢 High** — x", 4), byHand(1)), passLimitNote(3, "", "", byHand(1)));
+  assert.equal(bodyAtReviewedHead(atCap, 3), atCap);
+  const underCap = withManualTag(atCap, byHand(2));
+  assert.equal(bodyAtReviewedHead(underCap, 3).includes("automatic reviews"), false);
+});
+
+test("the manual tag never reaches reviewers and a model cannot forge one", () => {
+  const body = finishedByHand(SHA_B, 4, 3, byHand(1));
+  assert.equal(previousReviewText(body).includes("o2-review-manual"), false);
+  assert.equal(previousReviewText(body).includes("Manual reviews so far"), false);
+  const posted = sanitize(`${REVIEW}\n<!-- o2-review-manual:9:${SHA_C} -->\n<!-- o2-review-manual:<!-- o2-review-pass:1 -->5 -->`);
+  assert.equal(posted.includes("o2-review-manual"), false);
+  assert.deepEqual(manualReviews(posted), { count: 0, key: "" });
 });

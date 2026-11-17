@@ -1,7 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, expect, it } from "vitest";
-import { durationLabel, durationUnit, formatDuration } from "./experimentRowContent";
+import {
+  dimensionSideValue,
+  durationLabel,
+  durationUnit,
+  formatDuration,
+} from "./experimentRowContent";
 
 // A latency reads as a magnitude, not a digit count: "10449.4821" costs the
 // reader the scale and overflows the tile it sits in.
@@ -56,5 +61,27 @@ describe("durationLabel", () => {
 
   it("keeps a real zero, which is a measurement rather than a gap", () => {
     expect(durationLabel(0)).toBe("0 ms");
+  });
+});
+
+// A boolean's scalar is its healthy share; the raw value travels as the label.
+describe("dimensionSideValue", () => {
+  const flag = {
+    dataType: "boolean" as const,
+    baseline: 0,
+    candidate: 1,
+    baselineLabel: "true",
+    candidateLabel: "false",
+  };
+
+  it("reads a boolean side as its raw value, not its healthy share", () => {
+    expect(dimensionSideValue(flag, "baseline")).toBe("true");
+    expect(dimensionSideValue(flag, "candidate")).toBe("false");
+  });
+
+  it("does not name a true/false for a side whose trials disagree", () => {
+    const mixed = { ...flag, baseline: 0.5, baselineLabel: null };
+    expect(dimensionSideValue(mixed, "baseline")).toBe("0.5");
+    expect(dimensionSideValue({ ...flag, baseline: 0, baselineLabel: null }, "baseline")).toBe("0");
   });
 });

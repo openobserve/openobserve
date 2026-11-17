@@ -251,14 +251,32 @@ test.describe('RUM Product Analytics', () => {
     const to = (NOW - 59 * DAY_MS) * 1000;
     await pa.goto('overview', { app: facts.appId, from, to });
     await expect(pa.overviewEmpty).toBeVisible({ timeout: 30000 });
+    await expect(pa.datePicker).not.toContainText(/30 Days/i);
     await pa.widenRangeBtn.click();
     await expect.poll(() => pa.query().get('period')).toBe('30d');
+    // o2-enterprise#2811: the picker's own label must follow the widened range, not only the URL.
+    await expect(pa.datePicker).toContainText(/30 Days/i, { timeout: 30000 });
     await expect(pa.rankedRow('pages', 0, 'key')).toBeVisible({ timeout: 30000 });
 
     await pa.goto('overview', { app: viewsOnlyApp, period: '7d' });
     await expect(pa.clicksNotCaptured).toBeVisible({ timeout: 30000 });
     await expect(pa.clicksSetupLink).toBeVisible();
     expect(await pa.rankedKeys('pages')).toContain('/web/landing');
+  });
+
+  test('Overview KPI cards keep their labels on an 864px-wide window (o2-enterprise#2924 P1-26)', {
+    tag: PA_TAGS('@P2'),
+  }, async ({ page }) => {
+    const pa = new PageManager(page).rumProductAnalyticsPage;
+    await page.setViewportSize({ width: 864, height: 800 });
+    await pa.goto('overview', { app: facts.appId, period: '7d' });
+    await expect(pa.kpiSessions).toContainText(/\d/, { timeout: 30000 });
+    await pa.expectKpiLabelsVisible({
+      sessions: 'Sessions',
+      users: /Identified users|Visitors/,
+      'pages-per-session': 'Pages per session',
+      'identity-coverage': 'Sessions with a user id',
+    });
   });
 
   test('Pages list switches to Entry and Exit pages in one click (AC-42)', {
@@ -1383,13 +1401,21 @@ test.describe('RUM Product Analytics', () => {
       await expect(pa.sessionsRows.first()).toContainText(user);
     });
 
-    // Still broken on main: the Users KPI reads "No user id set" under its loading skeleton until the summary answers.
-    test.fixme('o2-enterprise#2809 (M5, KPIs): KPIs never flash "No user id set" while an app with users loads', {
+    test('o2-enterprise#2809 (M5, KPIs): the Users KPI waits for identity and never flashes "No user id set"', {
       tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       await pa.watchKpiText('No user id set');
-      await pa.goto('overview', { app: facts.appId, period: '7d' });
+      const facets = await pa.holdFacetQueries();
+      try {
+        await pa.goto('overview', { app: facts.appId, period: '7d' });
+        await facets.summaryAnswered;
+        // Identity waits on the held filter queries, so the summary alone must not settle the Users tile.
+        await expect(pa.kpiUsersSkeleton).toBeVisible();
+      } finally {
+        await facets.release();
+      }
+      await expect(pa.kpiUsersSkeleton).toHaveCount(0, { timeout: 30000 });
       await expect(pa.rankedRow('pages', 0, 'key')).toBeVisible({ timeout: 30000 });
       await pa.waitForNetworkQuiet();
       expect(await pa.kpiTextSeen(), 'the KPI strip showed the no-identity placeholder').toBe(false);

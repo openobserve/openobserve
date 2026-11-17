@@ -1,0 +1,219 @@
+{
+  "decide_one": {
+    "family": "suggestion",
+    "id": "s-cluster-d",
+    "action": "dismiss",
+    "reason": "planned_work",
+    "note": "node pool upgrade",
+    "until": 1730916000000000,
+    "request_id": "3f2c9a1e-dialog"
+  },
+  "decide_batch": {
+    "items": [
+      {
+        "family": "alert_finding",
+        "id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "action": "dismiss",
+        "reason": "intended_report",
+        "until_reopened": true,
+        "request_id": "slack-hash-1"
+      }
+    ]
+  },
+  "undo": {
+    "expected_revision": 1,
+    "request_id": "3f2c9a1e-undo"
+  },
+  "preview": {
+    "may": true,
+    "verb": "dismiss",
+    "decision_id": "suggestion:s-cluster-d",
+    "family": "suggestion",
+    "id": "s-cluster-d",
+    "action": "dismiss",
+    "effect": {
+      "scope": "org",
+      "until": 1730916000000000,
+      "comes_back_when": "at_until"
+    },
+    "subject": {
+      "title": "cluster-d k8s_events",
+      "folder": null,
+      "team": null
+    },
+    "revision": 0,
+    "current": null
+  },
+  "preview_locked": {
+    "may": false,
+    "verb": "dismiss",
+    "decision_id": "suggestion:s-cluster-d",
+    "family": "suggestion",
+    "id": "s-cluster-d",
+    "action": "dismiss",
+    "effect": {
+      "scope": "org",
+      "until": 1730916000000000,
+      "comes_back_when": "at_until"
+    },
+    "subject": {
+      "title": "cluster-d k8s_events",
+      "folder": null,
+      "team": null
+    },
+    "revision": 0,
+    "current": null,
+    "locked": {
+      "code": "decision_refused",
+      "reason": "folder",
+      "verb": "dismiss",
+      "message": "You can't dismiss this in folder infra. Ask an admin of this organization.",
+      "folder": "infra",
+      "owners": [],
+      "owners_scope": null,
+      "can_act": [
+        {
+          "email": "ada@demo-org.test"
+        },
+        {
+          "email": "bo@demo-org.test"
+        },
+        {
+          "email": "cy@demo-org.test"
+        }
+      ],
+      "more": 1
+    }
+  },
+  "decided": {
+    "change": "created",
+    "decision": {
+      "decision_id": "suggestion:s-cluster-d",
+      "family": "suggestion",
+      "id": "s-cluster-d",
+      "action": "dismiss",
+      "state": "active",
+      "reason": "planned_work",
+      "note": null,
+      "has_note": false,
+      "actor": "alice@demo-org.test",
+      "source": "slack",
+      "decided_at": 1730908800000000,
+      "until": 1730916000000000,
+      "revision": 1
+    }
+  },
+  "batch": {
+    "results": [
+      {
+        "index": 0,
+        "family": "alert_finding",
+        "id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "status": 200,
+        "result": {
+          "change": "created",
+          "decision": {
+            "decision_id": "alert_finding:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "family": "alert_finding",
+            "id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "action": "dismiss",
+            "state": "active",
+            "reason": "intended_report",
+            "note": null,
+            "has_note": false,
+            "actor": "alice@demo-org.test",
+            "source": "slack",
+            "decided_at": 1730908800000000,
+            "until": null,
+            "revision": 1
+          }
+        }
+      },
+      {
+        "index": 1,
+        "family": "suggestion",
+        "id": "s-blind-alert",
+        "status": 409,
+        "error": {
+          "code": 409,
+          "error": "calibration_owned",
+          "message": "Alert calibration owns this finding, so it is dismissed on the Alert Calibration page."
+        }
+      }
+    ],
+    "written": 1,
+    "unchanged": 0,
+    "failed": 1
+  },
+  "undone": {
+    "change": "undone",
+    "decision": {
+      "decision_id": "suggestion:s-cluster-d",
+      "family": "suggestion",
+      "id": "s-cluster-d",
+      "action": "dismiss",
+      "state": "undone",
+      "reason": null,
+      "note": null,
+      "has_note": false,
+      "actor": "alice@demo-org.test",
+      "source": "slack",
+      "decided_at": 1730908800000000,
+      "until": null,
+      "revision": 2
+    }
+  },
+  "list": {
+    "decisions": [
+      {
+        "decision_id": "suggestion:s-cluster-d",
+        "family": "suggestion",
+        "id": "s-cluster-d",
+        "action": "dismiss",
+        "state": "active",
+        "reason": "planned_work",
+        "note": null,
+        "has_note": false,
+        "actor": "alice@demo-org.test",
+        "source": "slack",
+        "decided_at": 1730908800000000,
+        "until": 1730916000000000,
+        "revision": 1,
+        "subject": {
+          "title": "cluster-d k8s_events",
+          "folder": null,
+          "team": null
+        }
+      }
+    ],
+    "total": 1,
+    "limit": 100,
+    "offset": 0
+  },
+  "refused": {
+    "code": "decision_refused",
+    "reason": "folder",
+    "verb": "dismiss",
+    "message": "You can't dismiss this in folder infra. Ask an admin of this organization.",
+    "folder": "infra",
+    "owners": [],
+    "owners_scope": null,
+    "can_act": [
+      {
+        "email": "ada@demo-org.test"
+      },
+      {
+        "email": "bo@demo-org.test"
+      },
+      {
+        "email": "cy@demo-org.test"
+      }
+    ],
+    "more": 1
+  },
+  "conflict": {
+    "code": 409,
+    "error": "finding_changed",
+    "message": "This finding changed. Refresh and try again."
+  }
+}

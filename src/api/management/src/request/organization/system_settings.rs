@@ -156,7 +156,12 @@ pub async fn get_setting(
     }
 
     match system_settings::get_resolved(Some(&org_id), user_id, &key).await {
-        Ok(setting) => (StatusCode::OK, Json(setting)).into_response(), // Returns setting or null
+        // The cached stand-in for an unsaved row is not a setting, so it reads as null.
+        Ok(setting) => (
+            StatusCode::OK,
+            Json(setting.filter(|s| !system_settings::is_absent_semantic_field_groups(s))),
+        )
+            .into_response(),
         Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
     }
 }
@@ -180,7 +185,7 @@ pub async fn get_setting(
         ("category" = Option<String>, Query, description = "Filter by setting category"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = std::collections::HashMap<String, config::meta::system_settings::SystemSetting>),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(

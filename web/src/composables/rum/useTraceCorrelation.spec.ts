@@ -334,6 +334,32 @@ describe("useTraceCorrelation", () => {
       expect(correlationData.value?.trace_id).toBe("01a034c1aabc72f78880daf6c9755cff");
     });
 
+    it.each([
+      ["found", [createMockBackendSpan()]],
+      ["not found", []],
+    ])("links a trace whose spans were %s to where they live", async (label, spans) => {
+      const traceId = ref("1a034c1aabc72f78880daf6c9755cff");
+      mockResolveTraceLocation.mockResolvedValueOnce({
+        stream: "payments_traces",
+        range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_090_000_000 },
+      });
+      mockSuccessfulSearch([createMockRumEvent()], spans);
+
+      const { fetchCorrelation, traceLocation } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      expect(traceLocation.value).toEqual(
+        label === "found"
+          ? {
+              stream: "payments_traces",
+              traceId: "01a034c1aabc72f78880daf6c9755cff",
+              startTime: 1_700_000_000_000_000 - 60_000_000,
+              endTime: 1_700_000_090_000_000 + 60_000_000,
+            }
+          : null,
+      );
+    });
+
     it("should fetch trace data after RUM data", async () => {
       const traceId = ref("test-trace-123");
 
@@ -391,6 +417,28 @@ describe("useTraceCorrelation", () => {
       await fetchCorrelation();
 
       expect(correlationData.value).not.toBeNull();
+      expect(hasBackendTrace.value).toBe(false);
+      expect(correlationData.value?.backend_spans).toHaveLength(0);
+    });
+
+    it("reports no backend trace, not a failure, when the org has no traces stream", async () => {
+      const traceId = ref("test-trace-123");
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce(createMockSearchResponse([createMockRumEvent()]))
+        .mockRejectedValueOnce({
+          response: {
+            status: 400,
+            data: { code: 20002, message: "Search stream not found: default" },
+          },
+        });
+
+      const { fetchCorrelation, correlationData, error, hasBackendTrace } = useTraceCorrelation(
+        traceId,
+        t,
+      );
+      await fetchCorrelation();
+
+      expect(error.value).toBeNull();
       expect(hasBackendTrace.value).toBe(false);
       expect(correlationData.value?.backend_spans).toHaveLength(0);
     });
@@ -670,6 +718,95 @@ describe("useTraceCorrelation", () => {
 
       await fetchCorrelation();
       expect(hasBackendTrace.value).toBe(true);
+    });
+
+    describe("when the trace changes while a request is in flight", () => {
+      const OLDER = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      const NEWER = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+      // Each trace's span search waits on its own gate, so a test picks which request answers last.
+      function serveTraces(gates: Record<string, Promise<void>>) {
+        const answer = async (params: any) => {
+          const sql = String(params?.query?.query?.sql ?? "");
+          if (params?.page_type !== "traces")
+            return createMockSearchResponse([createMockRumEvent()]);
+          const id = sql.includes(OLDER) ? OLDER : NEWER;
+          await gates[id];
+          return createMockSearchResponse([createMockBackendSpan({ span_id: `span-${id[0]}` })]);
+        };
+        for (let i = 0; i < 4; i++) vi.mocked(searchService.search).mockImplementationOnce(answer);
+      }
+
+      function gate() {
+        let open!: () => void;
+        let fail!: (reason: Error) => void;
+        const held = new Promise<void>((resolve, reject) => {
+          open = resolve;
+          fail = reject;
+        });
+        return { held, open, fail };
+      }
+
+      it("keeps the newer trace when an older request answers last", async () => {
+        const older = gate();
+        serveTraces({ [OLDER]: older.held, [NEWER]: Promise.resolve() });
+        const traceId = ref(OLDER);
+        const { fetchCorrelation, correlationData, traceLocation, isLoading } = useTraceCorrelation(
+          traceId,
+          t,
+        );
+
+        const olderFetch = fetchCorrelation();
+        await vi.waitFor(() => expect(searchService.search).toHaveBeenCalledTimes(2));
+        traceId.value = NEWER;
+        await fetchCorrelation();
+        older.open();
+        await olderFetch;
+
+        expect(correlationData.value?.trace_id).toBe(NEWER);
+        expect(correlationData.value?.backend_spans.map((span) => span.span_id)).toEqual([
+          "span-b",
+        ]);
+        expect(traceLocation.value?.traceId).toBe(NEWER);
+        expect(isLoading.value).toBe(false);
+      });
+
+      it("keeps an older trace's failed span search off the newer trace's card", async () => {
+        const older = gate();
+        serveTraces({ [OLDER]: older.held, [NEWER]: Promise.resolve() });
+        const traceId = ref(OLDER);
+        const { fetchCorrelation, correlationData, error } = useTraceCorrelation(traceId, t);
+
+        const olderFetch = fetchCorrelation();
+        await vi.waitFor(() => expect(searchService.search).toHaveBeenCalledTimes(2));
+        traceId.value = NEWER;
+        await fetchCorrelation();
+        older.fail(new Error("Request failed with status code 500"));
+        await olderFetch;
+
+        expect(error.value).toBeNull();
+        expect(correlationData.value?.trace_id).toBe(NEWER);
+      });
+
+      it("stays loading for the newer trace when an older request answers first", async () => {
+        const newer = gate();
+        serveTraces({ [OLDER]: Promise.resolve(), [NEWER]: newer.held });
+        const traceId = ref(OLDER);
+        const { fetchCorrelation, correlationData, isLoading } = useTraceCorrelation(traceId, t);
+
+        const olderFetch = fetchCorrelation();
+        traceId.value = NEWER;
+        const newerFetch = fetchCorrelation();
+        await olderFetch;
+
+        expect(correlationData.value).toBeNull();
+        expect(isLoading.value).toBe(true);
+
+        newer.open();
+        await newerFetch;
+        expect(correlationData.value?.trace_id).toBe(NEWER);
+        expect(isLoading.value).toBe(false);
+      });
     });
   });
 

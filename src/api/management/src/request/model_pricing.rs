@@ -15,11 +15,14 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+#[cfg(any(feature = "enterprise", test))]
+use axum::http::StatusCode;
+#[cfg(feature = "enterprise")]
+use axum::response::IntoResponse;
 use axum::{
     Json,
     extract::{Path, Query},
-    http::StatusCode,
-    response::{IntoResponse, Response},
+    response::Response,
 };
 use config::meta::model_pricing::{
     BUILT_IN_ORG, META_ORG, MatchKind, ModelPricingDefinition, PricingSource, PricingTierDefinition,
@@ -251,62 +254,69 @@ pub async fn get(
 pub async fn create(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(mut item): Json<ModelPricingDefinition>,
+    #[cfg(feature = "enterprise")] Json(mut item): Json<ModelPricingDefinition>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    if !check_permissions(
-        &org_id,
-        &org_id,
-        &user_email.user_id,
-        "model_pricing",
-        "PUT",
-        None,
-        true,
-        false,
-        false,
-    )
-    .await
+    #[cfg(not(feature = "enterprise"))]
     {
-        return MetaHttpResponse::forbidden("Unauthorized Access");
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not supported in the open source version")
     }
-    // The built-in org is managed exclusively by the background GitHub sync job.
-    if org_id == BUILT_IN_ORG {
-        return MetaHttpResponse::forbidden(
-            "Cannot create entries in the built-in org. Use the refresh endpoint to sync from upstream.",
-        );
-    }
-
-    item.org_id = org_id.clone();
-    item.id = None; // Force new ID generation
-    item.source = if org_id == META_ORG {
-        PricingSource::MetaOrg
-    } else {
-        PricingSource::Org
-    };
-
-    if let Err(e) = validate_definition(&item) {
-        return MetaHttpResponse::bad_request(e);
-    }
-
-    // Reject if a definition with the same name already exists in this org.
-    // The underlying `put()` does upsert-by-name (needed by the sync job),
-    // so user-facing create must enforce uniqueness explicitly.
-    match model_pricing::get_by_name(&org_id, &item.name).await {
-        Ok(Some(_)) => {
-            return MetaHttpResponse::bad_request(format!(
-                "A model pricing definition with name '{}' already exists in this organization",
-                item.name
-            ));
+    #[cfg(feature = "enterprise")]
+    {
+        if !check_permissions(
+            &org_id,
+            &org_id,
+            &user_email.user_id,
+            "model_pricing",
+            "PUT",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
-        Err(e) => {
-            return MetaHttpResponse::internal_error(e);
+        // The built-in org is managed exclusively by the background GitHub sync job.
+        if org_id == BUILT_IN_ORG {
+            return MetaHttpResponse::forbidden(
+                "Cannot create entries in the built-in org. Use the refresh endpoint to sync from upstream.",
+            );
         }
-        Ok(None) => {} // good — name is available
-    }
 
-    match model_pricing::set(item).await {
-        Ok(saved) => (StatusCode::CREATED, Json(saved)).into_response(),
-        Err(e) => map_set_error(e),
+        item.org_id = org_id.clone();
+        item.id = None; // Force new ID generation
+        item.source = if org_id == META_ORG {
+            PricingSource::MetaOrg
+        } else {
+            PricingSource::Org
+        };
+
+        if let Err(e) = validate_definition(&item) {
+            return MetaHttpResponse::bad_request(e);
+        }
+
+        // Reject if a definition with the same name already exists in this org.
+        // The underlying `put()` does upsert-by-name (needed by the sync job),
+        // so user-facing create must enforce uniqueness explicitly.
+        match model_pricing::get_by_name(&org_id, &item.name).await {
+            Ok(Some(_)) => {
+                return MetaHttpResponse::bad_request(format!(
+                    "A model pricing definition with name '{}' already exists in this organization",
+                    item.name
+                ));
+            }
+            Err(e) => {
+                return MetaHttpResponse::internal_error(e);
+            }
+            Ok(None) => {} // good — name is available
+        }
+
+        match model_pricing::set(item).await {
+            Ok(saved) => (StatusCode::CREATED, Json(saved)).into_response(),
+            Err(e) => map_set_error(e),
+        }
     }
 }
 
@@ -339,52 +349,59 @@ pub async fn create(
 pub async fn update(
     Path((org_id, model_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(mut item): Json<ModelPricingDefinition>,
+    #[cfg(feature = "enterprise")] Json(mut item): Json<ModelPricingDefinition>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    if !check_permissions(
-        &org_id,
-        &org_id,
-        &user_email.user_id,
-        "model_pricing",
-        "PUT",
-        None,
-        true,
-        false,
-        false,
-    )
-    .await
+    #[cfg(not(feature = "enterprise"))]
     {
-        return MetaHttpResponse::forbidden("Unauthorized Access");
+        let _ = (org_id, model_id);
+        MetaHttpResponse::forbidden("Not supported in the open source version")
     }
-    // Verify the model exists and belongs to this org
-    match model_pricing::get_by_id(&model_id).await {
-        Ok(Some(existing)) if existing.org_id == org_id => {
-            if existing.source == PricingSource::BuiltIn {
-                return MetaHttpResponse::forbidden(
-                    "Built-in model pricing definitions are read-only. Clone to customize.",
-                );
+    #[cfg(feature = "enterprise")]
+    {
+        if !check_permissions(
+            &org_id,
+            &org_id,
+            &user_email.user_id,
+            "model_pricing",
+            "PUT",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+        // Verify the model exists and belongs to this org
+        match model_pricing::get_by_id(&model_id).await {
+            Ok(Some(existing)) if existing.org_id == org_id => {
+                if existing.source == PricingSource::BuiltIn {
+                    return MetaHttpResponse::forbidden(
+                        "Built-in model pricing definitions are read-only. Clone to customize.",
+                    );
+                }
+                // Preserve the ID, org_id, and source
+                item.id = existing.id;
+                item.org_id = org_id;
+                item.source = existing.source;
             }
-            // Preserve the ID, org_id, and source
-            item.id = existing.id;
-            item.org_id = org_id;
-            item.source = existing.source;
+            Ok(Some(_)) | Ok(None) => {
+                return MetaHttpResponse::not_found("Model pricing definition not found");
+            }
+            Err(e) => {
+                return MetaHttpResponse::internal_error(e);
+            }
         }
-        Ok(Some(_)) | Ok(None) => {
-            return MetaHttpResponse::not_found("Model pricing definition not found");
-        }
-        Err(e) => {
-            return MetaHttpResponse::internal_error(e);
-        }
-    }
 
-    if let Err(e) = validate_definition(&item) {
-        return MetaHttpResponse::bad_request(e);
-    }
+        if let Err(e) = validate_definition(&item) {
+            return MetaHttpResponse::bad_request(e);
+        }
 
-    match model_pricing::set(item).await {
-        Ok(saved) => MetaHttpResponse::json(saved),
-        Err(e) => map_set_error(e),
+        match model_pricing::set(item).await {
+            Ok(saved) => MetaHttpResponse::json(saved),
+            Err(e) => map_set_error(e),
+        }
     }
 }
 
@@ -404,7 +421,7 @@ pub async fn update(
         ("model_id" = String, Path, description = "Model pricing definition ID"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not found"),
     ),
     extensions(
@@ -416,6 +433,7 @@ pub async fn delete(
     Path((org_id, model_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    // Not edition-gated: OSS must still be able to remove prices it can no longer edit.
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &org_id,
@@ -468,7 +486,7 @@ pub struct BuiltInModelPricingEntry {
 }
 
 /// BuiltInModelPricingResponse
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, utoipa::ToSchema)]
 pub struct BuiltInModelPricingResponse {
     pub models: Vec<BuiltInModelPricingEntry>,
     pub source_url: String,
@@ -496,7 +514,7 @@ pub struct BuiltInModelPricingResponse {
         ("metadata_only" = Option<bool>, Query, description = "Return seed/sync metadata without loading the catalogue"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = BuiltInModelPricingResponse),
         (status = 500, description = "Internal server error"),
     ),
     extensions(
@@ -575,6 +593,7 @@ pub async fn get_built_in(
 
 /// Map errors from `model_pricing::set` to appropriate HTTP responses.
 /// Duplicate-name errors are returned as 400 Bad Request; everything else is 500.
+#[cfg(feature = "enterprise")]
 fn map_set_error(e: anyhow::Error) -> Response {
     if let Some(infra::errors::Error::DuplicateName(msg)) = e.downcast_ref::<infra::errors::Error>()
     {
@@ -600,7 +619,7 @@ fn map_set_error(e: anyhow::Error) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = openobserve_builtins::model_pricing::SyncResult),
         (status = 500, description = "Internal server error"),
     ),
     extensions(
@@ -612,6 +631,9 @@ pub async fn refresh_built_in(
     Path(_org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    if !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &_org_id,
@@ -1146,6 +1168,7 @@ pub async fn test_model_match(
     })
 }
 
+#[cfg(any(feature = "enterprise", test))]
 fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     if item.name.trim().is_empty() {
         return Err("Model name is required".to_string());
@@ -1810,5 +1833,26 @@ mod tests {
         let captured = captured_models(&entries, &org_candidate(r"(?i)^gpt-4o"));
         assert!(find(&captured, "gpt-4o").is_some());
         assert!(find(&captured, "gpt-4o-mini").is_none());
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn writes_are_refused_without_enterprise() {
+        let org = || Path("default".to_string());
+        let model = || Path(("default".to_string(), "m".to_string()));
+        for (op, resp) in [
+            ("create", create(org()).await),
+            ("update", update(model()).await),
+            ("refresh_built_in", refresh_built_in(org()).await),
+        ] {
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{op}");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert!(
+                String::from_utf8_lossy(&body).contains("open source version"),
+                "{op}"
+            );
+        }
     }
 }

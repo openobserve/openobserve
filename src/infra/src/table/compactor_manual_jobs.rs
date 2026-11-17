@@ -25,7 +25,7 @@ use crate::{
     errors, orm_err,
 };
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CompactorManualJob {
     pub id: String,
     pub key: String,
@@ -53,7 +53,8 @@ impl TryFrom<CompactorManualJob> for String {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(as = CompactorJobStatus)]
 pub enum Status {
     Pending = 0,
     Running = 1,
@@ -71,7 +72,7 @@ impl From<i64> for Status {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CompactorManualJobResEntry {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub cluster: String,
@@ -81,12 +82,13 @@ pub struct CompactorManualJobResEntry {
     pub job: CompactorManualJob,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct CompactorManualJobStatusRes {
     pub id: String,
     pub status: Status,
     pub metadata: Vec<CompactorManualJobResEntry>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[schema(value_type = Vec<Object>)]
     pub errors: Vec<serde_json::Value>,
 }
 

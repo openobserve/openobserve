@@ -37,19 +37,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
+    v-if="!holder || !hasMembers || !secondary"
     class="border-border-default px-page-edge flex flex-wrap items-center gap-x-8 gap-y-3 border-b py-3"
     data-test="oncall-schedule-answer"
   >
     <!-- Nobody on call at all is the loudest thing this strip can say, and it
          is the one state in which the buttons beside it are beside the point. -->
-    <div v-if="!holder" class="flex min-w-0 flex-col gap-0.5">
-      <OText variant="panel-title" class="text-status-error-text">
-        {{ t("oncall.schedNobodyOnCall") }}
-      </OText>
-      <p class="text-text-secondary text-xs" data-test="oncall-answer-nobody-hint">
-        {{ t("oncall.schedNobodyOnCallHint") }}
-      </p>
-    </div>
+    <OText
+      v-if="!holder"
+      variant="panel-title"
+      class="text-status-error-text min-w-0"
+      data-test="oncall-answer-nobody"
+    >
+      {{ t("oncall.schedNobodyOnCall") }}
+    </OText>
 
     <span class="ms-auto flex flex-wrap items-center gap-2">
       <!-- On a team with nobody in it every one of these opens on an empty
@@ -57,16 +58,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="!hasMembers"
         variant="primary"
-        size="sm-action"
+        size="sm"
+        icon-left="person-add"
         data-test="oncall-answer-add-people"
         @click="emit('add-people')"
       >
         {{ t("oncall.rotationOpenMembers") }}
       </OButton>
+      <!-- Only with exactly one rotation: none has no first to back up, and a second off-hours now is still a secondary. -->
       <OButton
-        v-else-if="!secondary"
+        v-else-if="!secondary && rotationCount === 1"
         variant="outline"
-        size="sm-action"
+        size="sm"
+        icon-left="add"
         data-test="oncall-answer-assign-secondary"
         @click="emit('assign-secondary')"
       >
@@ -99,8 +103,10 @@ const props = withDefaults(
      * the actions of a team that is staffed.
      */
     hasMembers?: boolean;
+    /** How many rotations the team has; the secondary is offered only to a team with one. */
+    rotationCount?: number;
   }>(),
-  { positions: () => [], hasMembers: true },
+  { positions: () => [], hasMembers: true, rotationCount: 1 },
 );
 
 const emit = defineEmits<{

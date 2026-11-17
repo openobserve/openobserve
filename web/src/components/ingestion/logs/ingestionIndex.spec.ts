@@ -116,6 +116,7 @@ describe("IngestLogs Index Component", () => {
         "syslogNg",
         "splunkHec",
         "loongcollector",
+        "datadogAgentLogs",
       ];
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
     });
@@ -313,6 +314,7 @@ describe("IngestLogs Index Component", () => {
         "syslogNg",
         "splunkHec",
         "loongcollector",
+        "datadogAgentLogs",
       ];
 
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);

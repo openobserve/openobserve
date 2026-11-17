@@ -2,13 +2,12 @@
 // This class contains methods to interact with the dashboard settings page in OpenObserve.
 // This includes changing the dashboard name, adding tabs, managing variables, and more.
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getTabSelector } = require('./dashboard-selectors.js');
+const { getTabSelector, SELECTORS, clickDashboardMenuItem } = require('./dashboard-selectors.js');
 const { selectStreamFromDropdown, selectFieldFromDropdown } = require('./dashboard-stream-field-utils.js');
 
 export default class DashboardSetting {
   constructor(page) {
     this.page = page;
-    this.setting = page.locator('[data-test="dashboard-setting-btn"]');
     this.addVariableBtn = page.locator(
       '[data-test="dashboard-add-variable-btn"]'
     );
@@ -82,7 +81,7 @@ export default class DashboardSetting {
   async openSetting() {
     // Idempotent: if the settings ODrawer is already open, do nothing.
     // The settings UI is rendered as an ODrawer with a backdrop overlay; clicking
-    // the dashboard-setting-btn while the drawer is open causes the overlay to
+    // the More button while the drawer is open causes the overlay to
     // intercept the pointer and dismiss the drawer (onInteractOutside), so blindly
     // re-clicking after a save would close the drawer mid-test.
     const generalTab = this.page.locator('[data-test="dashboard-settings-general-tab"]');
@@ -91,11 +90,11 @@ export default class DashboardSetting {
       return;
     }
 
-    await this.page.waitForSelector('[data-test="dashboard-setting-btn"]', {
+    await this.page.waitForSelector(SELECTORS.MORE_OPTIONS_BTN, {
       state: "visible",
       timeout: 15000,
     });
-    await this.setting.click();
+    await clickDashboardMenuItem(this.page, SELECTORS.SETTING_BTN);
     // Wait for settings dialog to open - use more specific selector
     await generalTab.waitFor({ state: "visible", timeout: 10000 });
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -629,7 +628,19 @@ export default class DashboardSetting {
       '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
     );
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    const saved = this.waitForDashboardPut();
     await saveBtn.click();
+    await saved;
+  }
+
+  // Tab rename and delete both persist through PUT /dashboards/<id>; on a slow backend it can take seconds.
+  waitForDashboardPut() {
+    return this.page.waitForResponse(
+      (response) =>
+        response.request().method() === "PUT" &&
+        /\/dashboards\/[^/?]+(\?|$)/.test(response.url()),
+      { timeout: 30000 }
+    );
   }
 
   // Delete tab in edit tab options//
@@ -654,6 +665,8 @@ export default class DashboardSetting {
     await page
       .locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]')
       .waitFor({ state: "visible" });
+    const deleted = this.waitForDashboardPut();
     await page.locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]').click();
+    await deleted;
   }
 }

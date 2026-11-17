@@ -27,6 +27,8 @@ import { clearPanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
 import { editorDraftSessionEnded, resumeEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
+import config from "@/aws-exports";
+import { setDeployTimeZone } from "@/utils/deployTimeZone";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -95,6 +97,9 @@ const organizationObj = {
   }>,
 };
 
+const initialTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+setDeployTimeZone(initialTimezone);
+
 const store = createStore({
   state: {
     API_ENDPOINT: API_ENDPOINT,
@@ -113,9 +118,7 @@ const store = createStore({
     themeOverride: null,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: <{ [key: string]: any }>{},
-    timezone: useLocalTimezone()
-      ? useLocalTimezone()
-      : Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone: initialTimezone,
     savedViewDialog: false,
     refreshIntervalID: 0,
     savedViewFlag: false,
@@ -173,6 +176,8 @@ const store = createStore({
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
     pendingShortURL: null,
+    solutionMode: ((config.isEnterprise == "true" && localStorage.getItem("solutionMode")) ||
+      "observability") as "observability" | "security",
   },
   mutations: {
     login(state, payload) {
@@ -308,6 +313,10 @@ const store = createStore({
     setPrintMode(state, payload) {
       state.printMode = payload;
     },
+    setSolutionMode(state, payload: "observability" | "security") {
+      state.solutionMode = payload;
+      localStorage.setItem("solutionMode", payload);
+    },
     setKioskMode(state, payload) {
       state.kioskMode = payload;
     },
@@ -316,6 +325,7 @@ const store = createStore({
     },
     setTimezone(state, payload) {
       state.timezone = payload;
+      setDeployTimeZone(payload);
     },
     setSavedViewDialog(state, payload) {
       state.savedViewDialog = payload;

@@ -72,6 +72,19 @@ pub(crate) async fn secret_server() -> String {
     format!("http://127.0.0.1:{port}")
 }
 
+/// Base URL of a local server that accepts every connection and never answers.
+pub(crate) async fn hanging_server() -> String {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let mut held = Vec::new();
+        while let Ok((sock, _)) = listener.accept().await {
+            held.push(sock);
+        }
+    });
+    format!("http://127.0.0.1:{port}")
+}
+
 /// Base URL of a local server that answers 200 with a head promising more body than it sends.
 pub(crate) async fn truncated_server() -> String {
     use tokio::io::AsyncWriteExt;

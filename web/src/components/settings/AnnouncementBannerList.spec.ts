@@ -19,7 +19,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import announcements from "@/services/announcements";
 import AnnouncementBannerList from "./AnnouncementBannerList.vue";
+import analytics from "@/services/product_analytics";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/announcements", () => ({
   default: { getActive: vi.fn(), getConfig: vi.fn(), setConfig: vi.fn() },
 }));
@@ -45,11 +47,18 @@ const store = {
 
 // Renders every cell slot per row; the real table virtualizes and lays out nothing in jsdom.
 const OTableStub = {
-  props: ["data", "columns"],
+  props: ["data", "columns", "rowActions"],
   template: `<div data-test="announcement-list-table">
     <div v-for="row in data" :key="row.index">
       <template v-for="col in columns" :key="col.id">
         <slot :name="'cell-' + col.id" :row="row">{{ row[col.accessorKey] }}</slot>
+      </template>
+      <template v-for="action in rowActions" :key="action.id">
+        <button
+          v-if="!action.visible || action.visible(row)"
+          :data-test="action.dataTest(row)"
+          @click="action.onSelect(row)"
+        />
       </template>
     </div>
     <slot v-if="!data.length" name="empty" />
@@ -157,6 +166,7 @@ describe("AnnouncementBannerList", () => {
       ],
       styles: [],
     });
+    expect(analytics.track).toHaveBeenCalledWith("announcement_deleted");
   });
 
   it("opens the editor for a row, a copy, or a new banner", async () => {
@@ -170,6 +180,26 @@ describe("AnnouncementBannerList", () => {
       query: { duplicate: "0" },
     });
     expect(mockPush.mock.calls[1][0].query).not.toHaveProperty("index");
+  });
+
+  it("shows one empty message with no banners, whose action opens the editor", async () => {
+    service.getConfig.mockResolvedValue({ data: { banners: [] } });
+    await mountList();
+
+    expect(document.querySelector('[data-test="announcement-list-live"]')).toBeNull();
+    expect(document.querySelector('[data-test="announcement-list-empty"]')).not.toBeNull();
+    document.querySelector<HTMLElement>('[data-test="o2-empty-state-action-create"]')!.click();
+    expect(mockPush.mock.calls[0][0]).toMatchObject({ name: "announcementBannerEditor" });
+  });
+
+  it("keeps the live strip, saying nothing is live, when no banner is live", async () => {
+    service.getConfig.mockResolvedValue({
+      data: { banners: [{ message: "Later", starts_at: iso(HOUR) }] },
+    });
+    await mountList();
+
+    expect(document.querySelector('[data-test="announcement-list-live-empty"]')).not.toBeNull();
+    expect(document.querySelector('[data-test="announcement-list-empty"]')).toBeNull();
   });
 
   it("marks a promo hidden while a critical banner is live", async () => {
@@ -219,5 +249,6 @@ describe("AnnouncementBannerList", () => {
 
     expect(service.setConfig).not.toHaveBeenCalled();
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

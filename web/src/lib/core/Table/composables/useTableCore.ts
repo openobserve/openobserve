@@ -15,7 +15,7 @@ import {
 import { computed, ref, watch, type Ref } from "vue";
 import { raw } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { TABLE_INDEX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
+import { TABLE_INDEX_COL_SIZE, type OTableColumnDef, type OTableRowAction } from "../OTable.types";
 
 // Register the custom "avg" fn (provided via table options below) so
 // OTableColumnDef.aggregate values type-check against AggregationFnOption.
@@ -58,6 +58,7 @@ export function useTableCore<TData>(
     initialColumnSizes?: Record<string, number> | null;
     /** When true, do not auto-reset page index when data changes */
     keepPageOnDataChange?: boolean;
+    rowActions?: readonly OTableRowAction<TData>[];
   },
   emit?: (event: any, ...args: any[]) => void,
 ) {
@@ -185,6 +186,13 @@ export function useTableCore<TData>(
     return Math.max(content, isMobile.value ? 0 : ACTIONS_HEADER_MIN);
   };
 
+  // Sized by the declared list, not the rows on screen, so loading and loaded widths match.
+  const rowActionBudget = computed<number | undefined>(() =>
+    props.rowActions ? Math.min(3, props.rowActions.length) : undefined,
+  );
+  const actionCountOf = (col: OTableColumnDef<TData>): number | undefined =>
+    rowActionBudget.value ?? col.meta?.actionCount;
+
   // Track column order for drag-reorder
   const columnOrder = ref<string[]>([]) as Ref<string[]>;
   // Set once the user drag-reorders a column. Until then the parent's columns
@@ -272,8 +280,8 @@ export function useTableCore<TData>(
       // width — no flash when data arrives.
       const size = isActionCol
         ? isMobile.value
-          ? actionColumnWidth((col.meta as any)?.actionCount)
-          : Math.max(col.size ?? 0, actionColumnWidth((col.meta as any)?.actionCount))
+          ? actionColumnWidth(actionCountOf(col))
+          : Math.max(col.size ?? 0, actionColumnWidth(actionCountOf(col)))
         : (col.size ?? 150);
       const columnDef: ColumnDef<TData> = {
         id: col.id,
@@ -311,7 +319,9 @@ export function useTableCore<TData>(
         meta: {
           // Action columns (pinned-right icon buttons) center by default — the
           // app-wide convention — unless a column opts into a specific align.
-          align: col.meta?.align ?? (isActionCol ? "center" : "left"),
+          align:
+            col.meta?.align ??
+            (isActionCol ? (props.rowActions && !isMobile.value ? "right" : "center") : "left"),
           headerClass: col.meta?.headerClass ?? "",
           cellClass: col.meta?.cellClass ?? "",
           isAction: col.isAction,
@@ -325,6 +335,7 @@ export function useTableCore<TData>(
           // min+max to the column's CSS size var.
           fixedWidth: rigid,
           ...col.meta,
+          ...(isActionCol && props.rowActions ? { actionCount: actionCountOf(col) } : {}),
         },
         footer: col.footer as any,
         aggregationFn: col.aggregate,

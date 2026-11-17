@@ -198,24 +198,18 @@
           </template>
           <template v-if="muteEnabled">
             <ODropdownSeparator v-if="canAcknowledge(row) || row.ack" />
-            <template v-if="groupMute(row)">
-              <MuteMenuItems
-                labels="extend"
-                until-clear
-                :data-test-prefix="`alerts-alertgroupstable-extend-${row.group_key}`"
-                @preset="(secs) => onExtend(row, { minutes: secs / 60 })"
-                @until-clear="onExtend(row, { untilClear: true })"
-                @until="openExtendUntil(row)"
-              />
-              <ODropdownItem
-                variant="destructive"
-                icon-left="notifications-active"
-                :data-test="`alerts-alertgroupstable-end-mute-${row.group_key}`"
-                @select="onEndMute(row)"
-              >
-                {{ t("alerts.downtimes.mute.endNow") }}
-              </ODropdownItem>
-            </template>
+            <RowMuteMenu
+              v-if="menuMute(row)"
+              :downtime="menuMute(row)!"
+              until-clear
+              :extend-test-prefix="`alerts-alertgroupstable-extend-${row.group_key}`"
+              :end-test="`alerts-alertgroupstable-end-mute-${row.group_key}`"
+              :muted-by-test="`alerts-alertgroupstable-muted-by-${row.group_key}`"
+              @preset="(secs) => onExtend(row, { minutes: secs / 60 })"
+              @until-clear="onExtend(row, { untilClear: true })"
+              @until="openExtendUntil(row)"
+              @end="onEndMute(row)"
+            />
             <MuteMenuItems
               v-else
               labels="group"
@@ -240,7 +234,14 @@
 
     <template #empty>
       <OEmptyState
-        v-if="!loading"
+        v-if="!loading && loadError"
+        size="hero"
+        preset="load-error"
+        data-test="alerts-alertgroupstable-load-error"
+        @action="emit('refresh')"
+      />
+      <OEmptyState
+        v-else-if="!loading"
         size="hero"
         :title="t('alerts.groups.emptyTitle')"
         :description="t('alerts.groups.emptyDescription')"
@@ -256,6 +257,7 @@
     :target="target"
     :downtime="untilGroup ? muteRef(untilGroup) : null"
     @done="emit('changed')"
+    @settled="emit('changed')"
   />
   <QuickMuteDialog
     v-if="muteEnabled"
@@ -273,6 +275,7 @@ import { useStore } from "vuex";
 
 import type { ActiveDowntime } from "@/services/downtimes";
 import { useAlertActions, type AlertMuteRef } from "@/composables/alerts/useAlertActions";
+import type { MuteActionResult } from "@/utils/downtimes/muteResult";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { ackShortName, downtimeForGroup } from "@/utils/alerts/ackState";
 import { isFiringOutcome } from "@/utils/alerts/runOutcome";
@@ -288,6 +291,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
 import MutedChip from "./downtimes/MutedChip.vue";
+import RowMuteMenu from "./downtimes/RowMuteMenu.vue";
 import AlertMuteUntilDialog from "./AlertMuteUntilDialog.vue";
 import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -304,6 +308,7 @@ const props = withDefaults(
   defineProps<{
     groups: AlertGroup[];
     loading?: boolean;
+    loadError?: boolean;
     alertId?: string;
     alertName?: string;
     folderId?: string;
@@ -313,6 +318,7 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
+    loadError: false,
     alertId: "",
     alertName: "",
     folderId: undefined,
@@ -353,16 +359,31 @@ const muteAlertContext = computed<QuickMuteAlertContext>(() => ({
 
 const canAcknowledge = (row: AlertGroup) => isFiringOutcome(row.last_outcome) && !row.ack;
 
+// The alert's chip is one merged mute; a condition-scoped mute is resolved only there.
+const coveringMute = (row: AlertGroup): AlertGroup["downtime"] =>
+  row.downtime ?? downtimeForGroup(props.downtime, row.group_key);
+
 // The table shows the mute per group, so a group mute reads as this group's own countdown.
 const groupMute = (row: AlertGroup): ActiveDowntime | null => {
-  const covering = downtimeForGroup(props.downtime, row.group_key);
+  const covering = coveringMute(row);
   return covering ? { ...covering, alert_groups: null } : null;
 };
 
+// Only the group's own lookup knows whether ending frees this group alone; the alert's does not.
+const menuMute = (row: AlertGroup): ActiveDowntime | null => {
+  const covering = coveringMute(row);
+  return covering ? { ...covering, end_here: !!row.downtime?.end_here } : null;
+};
+
 const muteRef = (row: AlertGroup): AlertMuteRef | null => {
-  const covering = downtimeForGroup(props.downtime, row.group_key);
-  return covering && props.downtime
-    ? { id: covering.id, ends_at: covering.ends_at, version: props.downtime.version }
+  const covering = coveringMute(row);
+  return covering
+    ? {
+        id: covering.id,
+        ends_at: covering.ends_at,
+        version: covering.version,
+        folder_id: covering.folder_id,
+      }
     : null;
 };
 
@@ -406,14 +427,19 @@ const onMute = async (row: AlertGroup, end: AlertMuteEnd) =>
     }),
   );
 
+// Any answer refreshes: a refused End or Extend means the table shows a stale mute.
+const afterMute = (result: MuteActionResult) => {
+  if (result !== "failed") emit("changed");
+};
+
 const onExtend = async (row: AlertGroup, end: AlertMuteEnd) => {
   const downtime = muteRef(row);
-  if (downtime) after(await actions.extend(target.value, downtime, end));
+  if (downtime) afterMute(await actions.extend(target.value, downtime, end));
 };
 
 const onEndMute = async (row: AlertGroup) => {
   const downtime = muteRef(row);
-  if (downtime) after(await actions.endMute(target.value, downtime.id));
+  if (downtime) afterMute(await actions.endMute(target.value, downtime));
 };
 
 const openExtendUntil = (row: AlertGroup) => {

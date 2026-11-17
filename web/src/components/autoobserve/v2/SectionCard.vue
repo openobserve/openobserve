@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </header>
     <slot />
-    <footer v-if="$slots.footer" class="border-border-subtle border-t px-3 py-2 sm:px-4">
+    <footer v-if="$slots.footer" class="border-border-subtle border-t px-5 py-2 sm:px-6">
       <slot name="footer" />
     </footer>
   </section>

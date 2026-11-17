@@ -25,16 +25,16 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use common::utils::sql::escape_like;
 use config::{
     ider,
     meta::{
         folder::DEFAULT_FOLDER,
+        pipeline::components::{Edge, Node},
         search::{Query as SearchQuery, Request as SearchRequest},
         self_reporting::{error::NodeErrors, usage::TRIGGERS_STREAM},
         stream::StreamType,
     },
-    utils::time::now_micros,
+    utils::{sql::quote_like_pattern, time::now_micros},
 };
 use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use infra::table::{
@@ -43,9 +43,9 @@ use infra::table::{
     workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors, WorkflowTriggerEntity},
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
+use openobserve_core::{auth::UserEmail, self_reporting::triggers_schema as trigger_stream};
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -62,6 +62,18 @@ use crate::{
 /// Bounded because a move runs one OpenFGA check per id before authorizing anything.
 const MAX_MOVE_WORKFLOWS: usize = 100;
 
+const HISTORY_COLUMNS: [&str; 9] = [
+    "_timestamp",
+    "org",
+    "key",
+    "start_time",
+    "end_time",
+    "status",
+    "evaluation_took_in_secs",
+    "source_node",
+    "error",
+];
+
 #[derive(Deserialize)]
 pub struct WorkflowTestInput {
     inputs: Vec<serde_json::Value>,
@@ -73,7 +85,7 @@ pub struct WorkflowTestInput {
     suppress_destinations: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct WorkflowTestResult {
     errors: HashMap<String, NodeErrors>,
     inputs: HashMap<String, Vec<Value>>,
@@ -106,13 +118,15 @@ pub struct WorkflowHistoryQuery {
     pub end_time: Option<i64>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 struct WorkflowHistoryRow {
     _timestamp: i64,
     org: String,
     start_time: i64,
     end_time: i64,
+    #[serde(default, deserialize_with = "null_as_default")]
     evaluation_took_in_secs: f64,
+    #[serde(default, deserialize_with = "null_as_default")]
     source_node: String,
     key: String,
     #[serde(default)]
@@ -129,7 +143,7 @@ struct WorkflowHistoryRow {
     http_request: Option<HttpRequestFacts>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 struct HttpRequestFacts {
     credential_prefix: String,
     caller_ip: String,
@@ -140,7 +154,7 @@ struct HttpRequestFacts {
     error: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct WorkflowErrorResponse {
     errors: Option<WorkflowRunErrors>,
     data: Option<InputMap>,
@@ -161,6 +175,30 @@ pub struct WorkflowListItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     folder_name: Option<String>,
     http_endpoint_enabled: bool,
+}
+
+// Doc-only wire shape: flattening Workflow would intersect its non-null `folder_id` with the slug.
+#[derive(Serialize, ToSchema)]
+#[schema(as = WorkflowListItem)]
+#[allow(dead_code)]
+struct WorkflowListItemSchema {
+    associations: Vec<WorkflowAssociation>,
+    id: String,
+    org_id: String,
+    created_at: i64,
+    updated_at: i64,
+    created_by: String,
+    enabled: bool,
+    name: String,
+    description: String,
+    nodes: Vec<Node>,
+    edges: Vec<Edge>,
+    is_draft: bool,
+    /// Owning folder's URL slug; null when the folder no longer resolves.
+    folder_id: Option<String>,
+    /// Display name of the owning folder.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    folder_name: Option<String>,
 }
 
 /// Resolves a folder primary key to its `(slug, display name)`, memoized so a
@@ -235,13 +273,14 @@ fn lookup_error(e: anyhow::Error) -> Response {
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 403, description = "No write access to the destination folder", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn save_workflow(
@@ -339,13 +378,14 @@ pub async fn save_workflow(
         ("search_substring" = Option<String>, Query, description = "Case-insensitive substring the workflow name or description must contain."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<WorkflowListItemSchema>),
         (status = 403, description = "The caller's workflow listing was refused", content_type = "application/json", body = ()),
         (status = 404, description = "The folder does not exist", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn list_workflows(
@@ -498,6 +538,7 @@ pub struct MoveWorkflowsRequestBody {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn move_workflows(
@@ -580,13 +621,14 @@ pub async fn move_workflows(
         ("draft" = Option<bool>, Query, description = "Target the draft instead of the published workflow, defaults to false"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Workflow is still associated with entities", content_type = "application/json", body = ()),
         (status = 404, description = "No published workflow with that id", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true}))
     )
 )]
 pub async fn delete_workflows(
@@ -695,12 +737,13 @@ pub async fn delete_workflows(
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Id mismatch, no such workflow or draft, or an invalid workflow", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn update_workflows(
@@ -838,11 +881,12 @@ pub async fn update_workflows(
     ),
     request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = WorkflowTestResult),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn test_workflow(
@@ -912,6 +956,7 @@ pub async fn test_workflow(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn trigger_workflow(
@@ -963,12 +1008,13 @@ pub async fn trigger_workflow(
         ("run_id" = String, Path, description = "Workflow run id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = WorkflowErrorResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn get_workflow_errors(
@@ -1030,11 +1076,12 @@ pub async fn get_workflow_errors(
     ),
     request_body(content = inline(Object), description = "retry details", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = WorkflowTestResult),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn retry_workflow(
@@ -1070,11 +1117,12 @@ pub async fn retry_workflow(
         ("value" = Option<bool>, Query, description = "true enables and false disables the workflow, defaults to true"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn enable_workflow(
@@ -1114,12 +1162,13 @@ pub async fn enable_workflow(
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds, defaults to now"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<WorkflowHistoryRow>),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn get_workflow_history(
@@ -1178,7 +1227,16 @@ pub async fn get_workflow_history(
         }
     };
 
-    let data_sql = history_sql(&org_id, &workflow_id, start_time, end_time);
+    let schema = match trigger_stream::get(&org_id).await {
+        Ok(schema) => schema,
+        Err(e) => {
+            log::error!("Failed to read the workflow history schema: {e}");
+            return MetaHttpResponse::internal_error(format!(
+                "Failed to read the workflow history schema: {e}"
+            ));
+        }
+    };
+    let data_sql = history_sql(&org_id, &workflow_id, start_time, end_time, &schema);
 
     let data_req = SearchRequest {
         query: SearchQuery {
@@ -1272,13 +1330,14 @@ pub async fn get_workflow_history(
         ("folder" = Option<String>, Query, description = "Folder to publish into. The draft's own folder is used when absent."),
     ),
     responses(
-        (status = 201, description = "Created", content_type = "application/json", body = inline(Object)),
+        (status = 201, description = "Created", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "No draft with that id, or the graph is still invalid", content_type = "application/json", body = ()),
         (status = 403, description = "No write access to the destination folder", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn promote_draft(
@@ -1453,18 +1512,30 @@ fn ledger_history_row(row: ledger_rows::Model) -> WorkflowHistoryRow {
     history
 }
 
-fn history_sql(org_id: &str, workflow_id: &str, start_time: i64, end_time: i64) -> String {
+fn history_sql(
+    org_id: &str,
+    workflow_id: &str,
+    start_time: i64,
+    end_time: i64,
+    schema: &arrow_schema::Schema,
+) -> String {
+    let columns = trigger_stream::present_columns(HISTORY_COLUMNS, schema);
     format!(
-        "SELECT _timestamp, org, key,  \
-         start_time, end_time, \
-         evaluation_took_in_secs, \
-         source_node, error, status \
-         FROM \"{TRIGGERS_STREAM}\" \
+        "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" \
          WHERE module = 'workflow' AND org = '{org_id}' \
-         AND key like '{}/%'\
+         AND key like {} \
          AND _timestamp >= {start_time} AND _timestamp <= {end_time}",
-        escape_like(workflow_id).replace("'", "''")
+        quote_like_pattern("", workflow_id, "/%")
     )
+}
+
+/// A search hit carries a column the stream has but this row left empty as JSON `null`.
+fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 /// Rows written before the stored-status fix say `succeeded` even when the run errored.
@@ -1816,11 +1887,56 @@ mod tests {
 
     #[test]
     fn the_history_query_selects_the_stored_status() {
-        let sql = history_sql("org1", "wf1", 1, 2);
+        let sql = history_sql("org1", "wf1", 1, 2, &arrow_schema::Schema::empty());
         let select = sql.split(" FROM ").next().unwrap();
         assert!(
             select.split(',').any(|column| column.trim() == "status"),
             "the history SELECT must return status, got {select}"
         );
+    }
+
+    #[test]
+    fn the_history_query_selects_only_the_optional_columns_the_stream_has() {
+        use arrow_schema::{DataType, Field, Schema};
+
+        let select = |schema: &Schema| {
+            let sql = history_sql("org1", "wf1", 1, 2, schema);
+            sql.split(" FROM ").next().unwrap().to_string()
+        };
+        let bare = select(&Schema::empty());
+        for missing in ["evaluation_took_in_secs", "source_node", "error"] {
+            assert!(!bare.contains(missing), "{missing} in {bare}");
+        }
+        let with_error = select(&Schema::new(vec![Field::new(
+            "error",
+            DataType::Utf8,
+            true,
+        )]));
+        assert!(with_error.ends_with(", error"), "{with_error}");
+        assert!(!with_error.contains("source_node"), "{with_error}");
+    }
+
+    #[test]
+    fn a_history_row_without_the_optional_columns_still_parses() {
+        let row: WorkflowHistoryRow = serde_json::from_value(serde_json::json!({
+            "_timestamp": 1, "org": "org1", "key": "wf1/run1",
+            "start_time": 1, "end_time": 2, "status": "succeeded"
+        }))
+        .unwrap();
+        assert_eq!(row.source_node, "");
+        assert!(row.evaluation_took_in_secs.abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn a_history_row_with_null_optional_columns_still_parses() {
+        let row: WorkflowHistoryRow = serde_json::from_value(serde_json::json!({
+            "_timestamp": 1, "org": "org1", "key": "wf1/run1",
+            "start_time": 1, "end_time": 2, "status": "succeeded",
+            "evaluation_took_in_secs": null, "source_node": null, "error": null
+        }))
+        .unwrap();
+        assert_eq!(row.source_node, "");
+        assert!(row.evaluation_took_in_secs.abs() < f64::EPSILON);
+        assert_eq!(row.error, None);
     }
 }

@@ -14,11 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { onBeforeUnmount, ref, shallowRef } from "vue";
-import alertCalibration, {
-  errorMessage,
-  isAbort,
-  type DigestRead,
-} from "@/services/alert_calibration";
+import alertCalibration, { isAbort, type DigestRead } from "@/services/alert_calibration";
 import { useOrgId } from "@/composables/query";
 import { SEARCH_SIZE } from "./digests";
 
@@ -53,11 +49,11 @@ export function useDigestSearch() {
   return { search, orgId };
 }
 
-/** One read at a time per view: a newer request supersedes the one in flight. */
+/** One read at a time per view: a newer request supersedes the one in flight; `error` keeps what the read threw, for `readErrorCopy`. */
 export function useLatestRead<T>(read: () => Promise<T>) {
   const data = shallowRef<T | null>(null);
   const loading = ref(false);
-  const error = ref<string | null>(null);
+  const error = shallowRef<unknown>(null);
   let generation = 0;
 
   async function load() {
@@ -69,7 +65,7 @@ export function useLatestRead<T>(read: () => Promise<T>) {
       if (mine === generation) data.value = result;
     } catch (e) {
       if (mine !== generation || isAbort(e)) return;
-      error.value = errorMessage(e) || String(e);
+      error.value = e;
     } finally {
       if (mine === generation) loading.value = false;
     }

@@ -181,17 +181,31 @@ describe("environments round-trip", () => {
 });
 
 describe("template override round-trip", () => {
-  it("sends the override on both payloads and null when cleared", () => {
-    expect(buildCreateBrowserTestPayload(check({ template: "ops-card" })).template).toBe(
-      "ops-card",
-    );
-    expect(buildCreateBrowserTestPayload(check({ template: null })).template).toBeNull();
-    const protocolCheck = {
-      ...check({ template: "ops-card" }),
+  const withDestination = { notifications: { destinations: ["ops-slack"] } };
+  const protocol = (overrides: Partial<BrowserCheck>) =>
+    ({
+      ...check(overrides),
       checkType: "tcp",
       tcp: { port: 443, timeout_ms: 10000, response_contains: "" },
-    } as unknown as ProtocolCheck;
-    expect(buildCreateProtocolCheckPayload(protocolCheck).template).toBe("ops-card");
+    }) as unknown as ProtocolCheck;
+
+  it("sends the override on both payloads and null when cleared", () => {
+    expect(
+      buildCreateBrowserTestPayload(check({ ...withDestination, template: "ops-card" })).template,
+    ).toBe("ops-card");
+    expect(
+      buildCreateBrowserTestPayload(check({ ...withDestination, template: null })).template,
+    ).toBeNull();
+    expect(
+      buildCreateProtocolCheckPayload(protocol({ ...withDestination, template: "ops-card" }))
+        .template,
+    ).toBe("ops-card");
+  });
+
+  // B5: with no destination the picker is hidden, so the stored override is released.
+  it("sends null when no destination shows the picker", () => {
+    expect(buildCreateBrowserTestPayload(check({ template: "ops-card" })).template).toBeNull();
+    expect(buildCreateProtocolCheckPayload(protocol({ template: "ops-card" })).template).toBeNull();
   });
 
   it("reads the override back off the wire", () => {

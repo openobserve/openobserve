@@ -66,6 +66,13 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
       testLogger.info('Copy/paste controls verified');
     });
 
+    test("should close the picker when a relative time is picked", {
+      tag: ['@datetime-picker', '@all', '@P1']
+    }, async () => {
+      await pm.dateTimePickerPage.relativePeriodBtn('15-m').click();
+      await pm.dateTimePickerPage.expectPickerClosed();
+    });
+
     // TC-02
     test("should copy a relative range as an absolute epoch payload", {
       tag: ['@datetime-picker', '@all', '@smoke', '@P0']

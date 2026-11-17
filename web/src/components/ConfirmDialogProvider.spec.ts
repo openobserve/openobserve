@@ -59,6 +59,21 @@ describe("ConfirmDialogProvider", () => {
     expect(wrapper.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("primary");
   });
 
+  it("lists lines under the message, left-aligned", async () => {
+    wrapper = buildWrapper();
+    useConfirmDialog().confirm({
+      title: raw("Title"),
+      message: raw("Intro"),
+      lines: [raw("First"), raw("Second")],
+      linesDataTest: "some-lines",
+    });
+    await flushPromises();
+    const list = wrapper.find('[data-test="some-lines"]');
+    expect(list.findAll("li").map((li) => li.text())).toEqual(["First", "Second"]);
+    expect(wrapper.text()).toContain("Intro");
+    expect(wrapper.find(".text-center").exists()).toBe(false);
+  });
+
   it("resolves true when the named dialog is confirmed", async () => {
     wrapper = buildWrapper();
     const result = useConfirmDialog().confirm({

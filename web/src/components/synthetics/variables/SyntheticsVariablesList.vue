@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #toolbar-trailing>
         <OButton
           variant="outline"
-          size="icon-sm"
+          size="icon-toolbar"
           icon-left="refresh"
           :loading="loading"
           data-test="synthetics-variables-refresh-btn"
@@ -128,14 +128,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :aria-label="t('common.edit')"
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="edit"
           data-test="synthetics-variable-edit-btn"
           @click="openEdit(row)"
         />
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="content-copy"
           data-test="synthetics-variable-duplicate-btn"
           @click="openDuplicate(row)"
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               :aria-label="t('synthetics.promote.toGlobal')"
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               icon-left="drive-file-move"
               :disabled="row.kind === 'secret'"
               data-test="synthetics-variable-promote-btn"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="!environment && environments.length > 0"
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="drive-file-move"
           data-test="synthetics-variable-split-btn"
           @click="openSplit(row)"
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :aria-label="t('common.delete')"
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="delete"
           data-test="synthetics-variable-delete-btn"
           @click="removeVariable(row)"

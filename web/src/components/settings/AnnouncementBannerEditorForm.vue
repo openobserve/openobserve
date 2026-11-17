@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OBanner>
 
-            <OFormSection :title="t('announcements.editor.sections.message')">
+            <OFormSection variant="plain" :title="t('announcements.editor.sections.message')">
               <div class="flex flex-col gap-4">
                 <div class="flex flex-col gap-2" data-test="announcement-editor-message-field">
                   <div
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div class="flex flex-col gap-2" data-test="announcement-editor-links">
-                  <span class="text-text-label text-xs font-medium">
+                  <span class="text-input-label-text text-compact leading-tight font-medium">
                     {{ t("announcements.form.links") }}
                   </span>
                   <div
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </OFormSection>
 
-            <OFormSection :title="t('announcements.editor.sections.style')">
+            <OFormSection variant="plain" :title="t('announcements.editor.sections.style')">
               <div class="flex flex-col gap-4" data-test="announcement-editor-style">
                 <div
                   class="flex flex-wrap gap-2"
@@ -236,6 +236,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSwitch
                     :model-value="values.variant === 'critical'"
                     :label="t('announcements.styles.critical')"
+                    label-position="left"
+                    off-tone="neutral"
+                    state-text
+                    class="w-full justify-between"
                     data-test="announcement-editor-style-critical"
                     @update:model-value="setCritical"
                   />
@@ -266,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormToggleGroup>
 
                   <div class="flex flex-col gap-2">
-                    <span class="text-text-label text-xs font-medium">
+                    <span class="text-input-label-text text-compact leading-tight font-medium">
                       {{ t("announcements.form.icon") }}
                     </span>
                     <div
@@ -296,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div class="flex flex-col gap-2">
-                    <span class="text-text-label text-xs font-medium">
+                    <span class="text-input-label-text text-compact leading-tight font-medium">
                       {{ t("announcements.form.color") }}
                     </span>
                     <AnnouncementColorSwatches
@@ -351,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </OFormSection>
 
-            <OFormSection :title="t('announcements.editor.sections.whoWhen')">
+            <OFormSection variant="plain" :title="t('announcements.editor.sections.whoWhen')">
               <div class="flex flex-col gap-5">
                 <div class="flex flex-col gap-3">
                   <OOptionGroup
@@ -393,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="values.start === 'at'"
                     name="startsAt"
                     type="datetime-local"
-                    field-width="md"
+                    width="md"
                     :aria-label="t('announcements.form.starts')"
                     data-test="announcement-editor-starts-at"
                   />
@@ -426,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                     <OFormInput
                       name="duration"
-                      field-width="xs"
+                      width="xs"
                       :placeholder="t('announcements.form.durationPlaceholder')"
                       :aria-label="t('announcements.form.durationCustom')"
                       data-test="announcement-editor-duration"
@@ -436,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="values.end === 'at'"
                     name="endsAt"
                     type="datetime-local"
-                    field-width="md"
+                    width="md"
                     :aria-label="t('announcements.form.ends')"
                     data-test="announcement-editor-ends-at"
                   />
@@ -452,12 +456,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormSwitch
                     name="dismissible"
                     :label="t('announcements.form.dismissible')"
+                    label-position="left"
+                    off-tone="neutral"
+                    state-text
+                    class="w-full justify-between"
                     data-test="announcement-editor-dismissible"
                   />
                   <OSwitch
                     v-if="!isNew && values.dismissible"
                     v-model="resetDismissals"
                     :label="t('announcements.editor.resetDismissals')"
+                    label-position="left"
+                    off-tone="neutral"
+                    state-text
+                    class="w-full justify-between"
                     data-test="announcement-editor-reset-dismissals"
                   />
                 </div>
@@ -569,6 +581,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OFormColor from "@/lib/forms/Color/OFormColor.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import analytics from "@/services/product_analytics";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OOptionGroup from "@/lib/forms/OptionGroup/OOptionGroup.vue";
@@ -767,6 +780,7 @@ const form = useOForm<BannerForm>({
   defaultValues: { ...props.draft, links: props.draft.links.map((l) => ({ ...l })) } as BannerForm,
   // Passed as the schema itself, never a computed — a ref never resolves in TanStack's validator slot.
   schema: makeBannerSchema(t),
+  validateOn: "leave",
   onSubmit: async (values) => {
     saveError.value = "";
     conflict.value = false;
@@ -786,6 +800,7 @@ const form = useOForm<BannerForm>({
         }
         return { ...latest, banners };
       });
+      analytics.track(index === null ? "announcement_created" : "announcement_updated");
       toast({ variant: "success", message: savedMessage(draft) });
       if (leaveSave) {
         leaveSave.saved = true;
@@ -1040,6 +1055,7 @@ const saveStyle = async () => {
 
   try {
     await update((latest) => ({ ...latest, styles: [...latest.styles, authoredFromStyle(style)] }));
+    analytics.track("announcement_style_saved");
     form.setFieldValue("styleId", style.id);
     styleChoice.value = `${STYLE_CHOICE_PREFIX}${style.id}`;
     saveStyleOpen.value = false;
@@ -1064,6 +1080,7 @@ const deleteStyle = async () => {
       styles: latest.styles.filter((s) => s.id !== style.id),
       banners: latest.banners.map((banner) => withoutStyle(banner, style.id)),
     }));
+    analytics.track("announcement_style_deleted");
     if (original) original = withoutStyle(original, style.id);
     // The banner keeps the look it copied, now as its own custom look.
     form.setFieldValue("styleId", "");

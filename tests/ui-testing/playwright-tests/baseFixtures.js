@@ -15,6 +15,14 @@ export function generateUUID() {
 
 export const test = baseTest.extend({
   context: async ({ context }, use) => {
+    // Logs and traces open the filter builder by default; specs on this fixture drive the code editor.
+    await context.addInitScript(() => {
+      try {
+        for (const key of ['o2.logs.queryInput', 'o2.traces.queryInput']) {
+          if (!localStorage.getItem(key)) localStorage.setItem(key, 'query');
+        }
+      } catch (_) {}
+    });
     if (!coverageEnabled) {
       await use(context);
       return;

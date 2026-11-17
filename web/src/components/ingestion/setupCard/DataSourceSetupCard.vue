@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { useI18nTyped } from "@/types/i18n";
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { isPrimaryCloudWebUrl } from "@/utils/otelCollectorConfig";
@@ -44,7 +44,11 @@ import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue"
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import type { CardSubstitutions, IngestTokenState } from "./types";
+import { SETUP_CARD_ONBOARDING, type CardSubstitutions, type IngestTokenState } from "./types";
+import type {
+  FirstEventResult,
+  FirstEventState,
+} from "@/composables/firstEvent/useFirstEventWatch";
 import { getDataSourceCard } from "./registry";
 import { HOST_AGENT_SLUGS } from "./content/osAgent";
 
@@ -85,13 +89,15 @@ const tokenState = computed<IngestTokenState>(() => {
   return store.state.organizationData?.organizationPasscode ? "ready" : "unavailable";
 });
 
+// Inside onboarding, its tracing answer shapes the card (the Kubernetes tracing step).
+const onboarding = inject(SETUP_CARD_ONBOARDING, null);
 const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
   useLicenseLock("dashboards");
 const { locked: hostsLocked } = useLicenseLock("host_monitoring");
 const DASHBOARD_ACTIONS = new Set(["view-host-dashboard", "open-setup-dashboard"]);
 
 const content = computed(() => {
-  const card = getDataSourceCard(props.slug, subs.value, t);
+  const card = getDataSourceCard(props.slug, subs.value, t, onboarding?.value);
   if (!card || !dashboardsLocked.value) return card;
   return {
     ...card,
@@ -115,9 +121,12 @@ const passcodeForbidden = computed(
   () => !!store.state.organizationData?.organizationPasscodeForbidden,
 );
 
-// Detection is forwarded so an embedding page (Hosts empty state) can react to it.
+// Detection, the bar's state and its first-record result are forwarded so an embedding page
+// (Hosts empty state, onboarding) can react to them.
 const emit = defineEmits<{
   (e: "detected", count: number): void;
+  (e: "state", state: FirstEventState): void;
+  (e: "received", result: FirstEventResult): void;
 }>();
 
 // Host Metrics auto-import (design 4.2) — host-agent slugs only, so the AWS EC2 embed comes free.
@@ -267,6 +276,8 @@ const onStepAction = async (actionId: string) => {
         :token-state="tokenState"
         data-test="data-source-setup-card"
         @detected="onDetected"
+        @state="emit('state', $event)"
+        @received="emit('received', $event)"
         @step-action="onStepAction"
       >
         <template v-if="$slots['hero-under-title']" #hero-under-title>

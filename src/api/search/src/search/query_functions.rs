@@ -45,6 +45,10 @@ pub struct QueryFunctionsResponse {
     responses(
         (status = 200, description = "Success", content_type = "application/json",
          body = QueryFunctionsResponse),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "list"}))
     )
 )]
 pub async fn list(Path(org_id): Path<String>) -> Response {

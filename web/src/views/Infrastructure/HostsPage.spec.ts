@@ -22,6 +22,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { defineComponent, h, ref } from "vue";
 import HostsPage from "./HostsPage.vue";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
 
 // Mock factories only dereference these at mount time, so module-scope reactive state is safe.
 vi.mock("./useHostsList", () => ({
@@ -29,6 +30,8 @@ vi.mock("./useHostsList", () => ({
   utilizationTint: (v: number | null) =>
     v == null ? "" : v >= 90 ? "critical" : v >= 70 ? "warn" : "",
 }));
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/composables/useWorkloadDetection", () => ({
   useWorkloadDetection: () => ({ states: workloadStates, refresh: detectionRefresh }),
@@ -545,6 +548,13 @@ describe("HostsPage", () => {
   });
 
   describe("drawer deep-link", () => {
+    it("tracks a row click opening the drawer, without the host", async () => {
+      wrapper = await mountPage();
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.find('[data-test="hosts-row-web-01"]').trigger("click");
+      expect(analytics.track).toHaveBeenCalledWith("infra_host_detail_opened", { view: "table" });
+    });
+
     it("opens the drawer from ?host= and clears the param on close", async () => {
       wrapper = await mountPage({ host: "web-01" });
       const drawer = wrapper.find('[data-test="host-drawer-stub"]');
@@ -736,12 +746,30 @@ describe("HostsPage", () => {
     it("does NOT fetch on the picker's mount replay (userChangedValue === false)", async () => {
       wrapper = await mountPage();
       hostsListState.refresh.mockClear();
+      vi.mocked(analytics.track).mockClear();
       // DateTime.vue contract: the mount emit is stamped programmatic — "do not fetch".
       wrapper
         .findComponent({ name: "DateTime" })
         .vm.$emit("on:date-change", { startTime: 111, endTime: 222, userChangedValue: false });
       await flushPromises();
       expect(hostsListState.refresh).not.toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "infra_time_range_changed",
+        expect.anything(),
+      );
+    });
+
+    it("tracks a genuine time pick", async () => {
+      wrapper = await mountPage();
+      vi.mocked(analytics.track).mockClear();
+      wrapper
+        .findComponent({ name: "DateTime" })
+        .vm.$emit("on:date-change", { startTime: 1, endTime: 2, valueType: "absolute" });
+      await flushPromises();
+      expect(analytics.track).toHaveBeenCalledWith("infra_time_range_changed", {
+        page: "hosts",
+        type: "absolute",
+      });
     });
 
     it("does NOT fan out on a date change while the org is undetected", async () => {

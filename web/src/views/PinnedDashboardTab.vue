@@ -107,6 +107,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { licenseDeniedFeatures } from "@/utils/featureGate";
@@ -143,6 +144,9 @@ const renderRef = ref<any>(null);
 // ViewDashboard's initial-tab resolution.
 const selectedTabId = ref<string | null>(null);
 provide("selectedTabId", selectedTabId);
+
+const { isAutoRunOn } = useAutoRunToggle();
+provide("dashboardAutoRun", isAutoRunOn);
 
 const LS_TIME_KEY = () => `o2_home_pin_time_${props.dashboardId}`;
 
@@ -213,6 +217,7 @@ const setTime = () => {
 
 const refreshData = () => {
   setTime();
+  renderRef.value?.commitAllVariables();
 };
 
 // A license denial is never "unavailable": that emit deletes the org-wide pin for everyone.

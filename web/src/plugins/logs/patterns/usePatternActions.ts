@@ -29,6 +29,7 @@ import { buildPrefillFromPatterns } from "@/utils/alerts/prefill/fromPatterns";
 import { buildFilterContext, planStreamsFilter } from "@/composables/useLogs/freeTextSearch";
 import { isHeldPlan, renderPlan } from "@/utils/query/freeTextFilter";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
+import analytics from "@/services/product_analytics";
 
 /**
  * The severity chips' state, module-scoped so it is shared between the pattern
@@ -76,6 +77,7 @@ export const usePatternActions = () => {
     navPatterns.value = visiblePatterns ?? patternsState.value.patterns?.patterns ?? [];
     selectedPattern.value = { pattern, index };
     showPatternDetails.value = true;
+    analytics.track("log_patterns_detail_opened");
   };
 
   const navigatePatternDetail = (next: boolean, prev: boolean) => {
@@ -122,6 +124,7 @@ export const usePatternActions = () => {
 
     searchObj.data.stream.addToFilter = filterExpression;
     searchObj.meta.logsVisualizeToggle = "logs";
+    analytics.track("log_patterns_filter_applied", { action, target: "pattern" });
   };
 
   const addWildcardValueToSearch = (value: string, action: "include" | "exclude") => {
@@ -134,6 +137,7 @@ export const usePatternActions = () => {
 
     searchObj.data.stream.addToFilter = filterExpression;
     searchObj.meta.logsVisualizeToggle = "logs";
+    analytics.track("log_patterns_filter_applied", { action, target: "wildcard_value" });
   };
 
   // ── Alert creation from the visible patterns ────────────────────────────

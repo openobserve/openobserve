@@ -35,10 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="w-full">
       <OForm id="add-user-form" :form="form">
         <OTruncatedText as="p" class="mt-2" v-if="!existingUser">
-          {{ t("user.email") }} : <strong>{{ formEmail }}</strong>
+          {{ t("user.email") }}: <strong>{{ formEmail }}</strong>
         </OTruncatedText>
         <OTruncatedText as="p" class="mt-2" v-if="!existingUser && !beingUpdated">
-          {{ t("user.roles") }} : <strong>{{ formRole }}</strong>
+          {{ t("user.role") }}: <strong>{{ formRoleLabel }}</strong>
         </OTruncatedText>
         <OTruncatedText
           as="p"
@@ -618,6 +618,9 @@ export default defineComponent({
     const changePassword = form.useStore((s: any) => s.values.change_password);
     const formEmail = form.useStore((s: any) => s.values.email);
     const formRole = form.useStore((s: any) => s.values.role);
+    const formRoleLabel = computed(
+      () => props.roles.find((r) => r.value === formRole.value)?.label ?? formRole.value,
+    );
     const formCustomRole = form.useStore((s: any) => s.values.custom_role);
     // Read live so the requirement rows tick while typing, the same way the reset dialog does.
     const formPassword = form.useStore((s: any) => s.values.password);
@@ -764,6 +767,7 @@ export default defineComponent({
       changePassword,
       formEmail,
       formRole,
+      formRoleLabel,
       formCustomRole,
       formPassword,
       formNewPassword,

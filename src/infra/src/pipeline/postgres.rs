@@ -277,7 +277,7 @@ UPDATE pipeline
         let query = r#"
 SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 AND stream_name = $4 AND stream_type = $5 ORDER BY kind ASC, id ASC;
         "#;
-        let pipelines = sqlx::query_as::<_, Pipeline>(query)
+        let rows = sqlx::query(query)
             .bind(stream_params.org_id.as_str())
             .bind("realtime")
             .bind(stream_params.org_id.as_str())
@@ -285,24 +285,25 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
             .bind(stream_params.stream_type.as_str())
             .fetch_all(&pool)
             .await?;
-        Ok(pipelines)
+        Ok(super::decode_rows(rows))
     }
 
-    async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline> {
+    async fn get_by_id(&self, pipeline_id: &str) -> Result<super::Decoded> {
         let pool = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline WHERE id = $1;";
-        sqlx::query_as::<_, Pipeline>(query)
+        let row = sqlx::query(query)
             .bind(pipeline_id)
-            .fetch_one(&pool)
+            .fetch_optional(&pool)
             .await
-            .map_err(|_| Error::from(DbError::KeyNotExists(pipeline_id.to_string())))
+            .map_err(|_| Error::from(DbError::KeyNotExists(pipeline_id.to_string())))?;
+        super::decode_row(pipeline_id, row)
     }
 
     async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Vec<Pipeline>> {
         let pool = CLIENT_RO.clone();
         let similar_pipelines = match &pipeline.source {
             PipelineSource::Realtime(stream_params) => {
-                sqlx::query_as::<_, Pipeline>(
+                let rows = sqlx::query(
                     r#"
 SELECT * FROM pipeline
     WHERE source_type = $1 AND stream_org = $2 AND stream_name = $3 AND stream_type = $4
@@ -314,7 +315,8 @@ SELECT * FROM pipeline
                 .bind(stream_params.stream_name.as_str())
                 .bind(stream_params.stream_type.as_str())
                 .fetch_all(&pool)
-                .await?
+                .await?;
+                super::decode_rows(rows)
             }
             PipelineSource::Scheduled(_) => {
                 // only checks for realtime pipelines
@@ -327,27 +329,23 @@ SELECT * FROM pipeline
         Ok(similar_pipelines)
     }
 
-    async fn list(&self) -> Result<Vec<Pipeline>> {
+    async fn list(&self) -> Result<super::DecodedPipelines> {
         let pool = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline ORDER BY id;";
-        match sqlx::query_as::<_, Pipeline>(query).fetch_all(&pool).await {
-            Ok(pipelines) => Ok(pipelines),
+        match sqlx::query(query).fetch_all(&pool).await {
+            Ok(rows) => Ok(super::decode_all_rows(rows)),
             Err(e) => {
                 log::debug!("[POSTGRES] list all pipelines  error: {e}");
-                Ok(vec![]) // Return empty vector instead of error
+                Ok(super::DecodedPipelines::default()) // Return empty vector instead of error
             }
         }
     }
 
-    async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>> {
+    async fn list_by_org(&self, org: &str) -> Result<super::DecodedPipelines> {
         let pool = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline WHERE org = $1 ORDER BY id;";
-        match sqlx::query_as::<_, Pipeline>(query)
-            .bind(org)
-            .fetch_all(&pool)
-            .await
-        {
-            Ok(pipelines) => Ok(pipelines),
+        match sqlx::query(query).bind(org).fetch_all(&pool).await {
+            Ok(rows) => Ok(super::decode_all_rows(rows)),
             Err(e) => {
                 log::error!("[POSTGRES] list pipelines by org error: {e}");
                 Err(e.into())
@@ -370,13 +368,13 @@ SELECT * FROM pipeline
         let query = r#"
 SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
         "#;
-        match sqlx::query_as::<_, Pipeline>(query)
+        match sqlx::query(query)
             .bind(org)
             .bind("realtime")
             .fetch_all(&pool)
             .await
         {
-            Ok(pipelines) => Ok(pipelines),
+            Ok(rows) => Ok(super::decode_rows(rows)),
             Err(e) => {
                 log::debug!("[POSTGRES] list streams with pipelines error: {e}");
                 Ok(vec![])

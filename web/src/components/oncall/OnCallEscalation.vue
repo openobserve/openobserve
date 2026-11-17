@@ -140,7 +140,6 @@ import type {
   DeliveryRecord,
   EscalationProgress,
   OnCallResponseEvent,
-  PolicyFinalAction,
   ResponderRole,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -163,8 +162,6 @@ const props = withDefaults(
      * reading, which is the one that was correct before this prop existed.
      */
     responderRole?: ResponderRole;
-    /** The team's policy `final_action` — what happens when the rungs run out. */
-    finalAction?: PolicyFinalAction | null;
     /** Set to offer the edit affordance; the caller owns where it goes. */
     teamId?: string | null;
   }>(),
@@ -173,7 +170,6 @@ const props = withDefaults(
     deliveries: () => [],
     deliveriesTotal: null,
     responderRole: "owner",
-    finalAction: null,
     teamId: null,
   },
 );
@@ -343,14 +339,9 @@ const stoppedKey = computed<StoppedKey | null>(() => {
 /// because somebody owns it, still climbing, or finished with nobody left.
 const endLabel = computed<I18nText>(() => {
   if (stoppedKey.value) return t(`oncall.ladderStopped_${stoppedKey.value}`);
-  // An exhausted ladder arrives stopped as well, and this card's own wording
-  // for it knows about the liaison seat and the final action; the server's
-  // one-line reason knows neither.
+  // An exhausted ladder arrives stopped too, and only this card knows about the liaison seat.
   if (props.progress.exhausted) {
-    if (isLiaison.value) return t("oncall.ladderLiaisonDone");
-    return props.finalAction === "notify_default_team"
-      ? t("oncall.ladderEndsDefaultTeam")
-      : t("oncall.ladderExhausted");
+    return isLiaison.value ? t("oncall.ladderLiaisonDone") : t("oncall.ladderExhausted");
   }
   if (props.progress.stopped_because) return raw(props.progress.stopped_because);
   const at = props.progress.next_at;

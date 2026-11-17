@@ -1,4 +1,6 @@
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from "vue";
+import { computed, type Ref } from "vue";
+
+import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 
 import type { TranslateFn } from "@/types/i18n";
 
@@ -39,7 +41,7 @@ const SYSTEM_FIELDS = new Set(["_timestamp", "_all", "_stream"]);
 const NUMERIC_TYPES = new Set(["Int64", "Float64", "UInt64", "Int32", "UInt32"]);
 
 /**
- * Builds animated typewriter example queries from real stream field/value data.
+ * Builds typewriter example queries from real stream field/value data.
  * Priority: interesting (key) fields → FTS fields → other fields.
  * Uses correct OpenObserve query syntax:
  *   - FTS fields  → match_all('term'), match_all('term*'), match_all('*term')
@@ -54,30 +56,6 @@ export function useQueryPlaceholder(
   t: TranslateFn,
   options: Options = {},
 ) {
-  const placeholder = ref("");
-
-  const typeSpeed = options.typeSpeedMs ?? 45;
-  const eraseSpeed = options.eraseSpeedMs ?? 22;
-  const holdMs = options.holdMs ?? 2000;
-  const initialDelay = options.initialDelayMs ?? 400;
-
-  let cancelled = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  function clearTimer() {
-    if (timer !== null) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  }
-
-  function delay(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-      clearTimer();
-      timer = setTimeout(resolve, ms);
-    });
-  }
-
   // Build example query strings from available field+value data
   const examples = computed((): string[] => {
     if (noStream.value) return [options.noStreamText ?? t("search.selectStreamFirst")];
@@ -201,44 +179,11 @@ export function useQueryPlaceholder(
     return filtered.slice(0, 9);
   });
 
-  async function loop(): Promise<void> {
-    let i = 0;
-    await delay(initialDelay);
-    while (!cancelled) {
-      const list = examples.value;
-      if (list.length === 0) {
-        await delay(300);
-        continue;
-      }
-      const target = list[i % list.length];
-      for (let c = 1; c <= target.length; c++) {
-        if (cancelled) return;
-        placeholder.value = target.slice(0, c);
-        await delay(typeSpeed);
-      }
-      await delay(holdMs);
-      if (cancelled) return;
-      for (let c = target.length - 1; c >= 0; c--) {
-        if (cancelled) return;
-        placeholder.value = target.slice(0, c);
-        await delay(eraseSpeed);
-      }
-      i++;
-    }
-  }
-
-  onMounted(() => {
-    loop();
-  });
-
-  onBeforeUnmount(() => {
-    cancelled = true;
-    clearTimer();
-  });
-
-  // Reset index on field change so we show fresh examples
-  watch(fields, () => {
-    placeholder.value = "";
+  const { placeholder } = useTypewriterPlaceholder(examples, {
+    typeSpeedMs: options.typeSpeedMs ?? 45,
+    eraseSpeedMs: options.eraseSpeedMs ?? 22,
+    holdMs: options.holdMs ?? 2000,
+    initialDelayMs: options.initialDelayMs ?? 400,
   });
 
   return { placeholder, examples };

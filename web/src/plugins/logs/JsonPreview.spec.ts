@@ -4,6 +4,12 @@ import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
+import {
+  COPY_CONFIRM_MS,
+  copyConfirm,
+  dismissCopyConfirm,
+  trackActivations,
+} from "@/lib/feedback/Toast/copyConfirm";
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can drive primary/secondary actions via emits.
@@ -1302,8 +1308,10 @@ describe("JsonPreview Component", () => {
 });
 
 describe("JsonPreview in-place copy", () => {
+  let stopTracking: () => void;
   const mountInPlace = () =>
     mount(JsonPreview, {
+      attachTo: document.body,
       props: { value: { a: 1 }, mode: "sidebar", copyInPlace: true },
       global: {
         plugins: [i18n],
@@ -1327,58 +1335,101 @@ describe("JsonPreview in-place copy", () => {
         },
       },
     });
+  // jsdom lays nothing out, so the anchor is given a box for the shared bubble to sit on.
+  const laidOut = (el: Element) => {
+    vi.spyOn(el, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
+    return el as HTMLElement;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
     (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    stopTracking = trackActivations();
   });
 
-  it("copies the log itself and shows Copied on the button, with no toast and no emit", async () => {
+  afterEach(() => {
+    dismissCopyConfirm();
+    stopTracking();
+  });
+
+  it("copies the log and confirms it with the shared Copied bubble on the button, with no toast and no emit", async () => {
     const wrapper = mountInPlace();
     const button = wrapper.find('[data-test="logs-json-preview-copy-btn"]');
+    laidOut(button.element);
 
+    await button.trigger("pointerdown");
     await button.trigger("click");
     await flushPromises();
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(JSON.stringify({ a: 1 }));
     expect(wrapper.emitted("copy")).toBeUndefined();
     expect(mockToast).not.toHaveBeenCalled();
-    const visible = button.findAll("span span").filter((el) => !el.classes("invisible"));
-    expect(visible).toHaveLength(1);
-    expect(visible[0].text()).toBe(i18n.global.t("common.copied"));
+    expect(copyConfirm.open).toBe(true);
+    expect(copyConfirm.anchor).toBe(button.element);
+    expect(copyConfirm.message).toBe(i18n.global.t("common.copied"));
+    expect(button.text()).toBe(i18n.global.t("common.copyToClipboard"));
     wrapper.unmount();
   });
 
-  it("shows an error toast and keeps the copy label when the clipboard refuses", async () => {
+  it("shows Couldn't copy red on the button, with no toast, when the clipboard refuses", async () => {
     (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("denied"),
     );
     const wrapper = mountInPlace();
     const button = wrapper.find('[data-test="logs-json-preview-copy-btn"]');
+    laidOut(button.element);
 
+    await button.trigger("pointerdown");
     await button.trigger("click");
     await flushPromises();
 
-    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
-    const visible = button.findAll("span span").filter((el) => !el.classes("invisible"));
-    expect(visible[0].text()).toBe(i18n.global.t("common.copyToClipboard"));
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(copyConfirm.open).toBe(true);
+    expect(copyConfirm.tone).toBe("error");
+    expect(copyConfirm.anchor).toBe(button.element);
+    expect(copyConfirm.message).toBe(i18n.global.t("common.couldntCopy"));
+    expect(button.text()).toBe(i18n.global.t("common.copyToClipboard"));
     wrapper.unmount();
   });
 
-  it("confirms a copied selection inside the menu, then closes it", async () => {
+  it("shows a failed selection copy on its menu item and keeps the menu open", async () => {
+    (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("denied"),
+    );
+    const wrapper = mountInPlace();
+    const item = laidOut(document.createElement("div"));
+    document.body.appendChild(item);
+    (wrapper.vm as any).selectedText = "picked";
+    (wrapper.vm as any).showMenu = true;
+    await (wrapper.vm as any).copySelectedText({ currentTarget: item });
+    await flushPromises();
+
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(copyConfirm.anchor).toBe(item);
+    expect(copyConfirm.tone).toBe("error");
+    expect((wrapper.vm as any).showMenu).toBe(true);
+    item.remove();
+    wrapper.unmount();
+  });
+
+  it("confirms a copied selection on its menu item, then closes the menu", async () => {
     vi.useFakeTimers();
     try {
       const wrapper = mountInPlace();
+      const item = laidOut(document.createElement("div"));
+      document.body.appendChild(item);
       (wrapper.vm as any).selectedText = "picked";
       (wrapper.vm as any).showMenu = true;
-      await (wrapper.vm as any).copySelectedText();
+      await (wrapper.vm as any).copySelectedText({ currentTarget: item });
       await flushPromises();
 
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("picked");
-      expect((wrapper.vm as any).selectionCopied).toBe(true);
+      expect(copyConfirm.anchor).toBe(item);
+      expect(copyConfirm.open).toBe(true);
       expect((wrapper.vm as any).showMenu).toBe(true);
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(COPY_CONFIRM_MS / 2);
       expect((wrapper.vm as any).showMenu).toBe(false);
+      item.remove();
       wrapper.unmount();
     } finally {
       vi.useRealTimers();

@@ -70,20 +70,14 @@ pub fn normalize_ts_order_by(
         .collect()
 }
 
-/// Checks if ORDER BY clause contains any non-timestamp columns.
-///
-/// Returns `true` if at least one ORDER BY field is not the timestamp column.
-///
-/// # Arguments
-/// * `order_by` - List of (field_name, order_direction) tuples
-/// * `ts_column` - The timestamp column name
-pub fn has_non_timestamp_ordering(
+/// Whether the leading ORDER BY key is not the timestamp, so hits are not grouped by time.
+pub fn is_ranked_by_non_timestamp(
     order_by: &[(String, config::meta::sql::OrderBy)],
     ts_column: &str,
 ) -> bool {
     order_by
-        .iter()
-        .any(|(field, _)| !is_timestamp_field(field, ts_column))
+        .first()
+        .is_some_and(|(field, _)| !is_timestamp_field(field, ts_column))
 }
 
 /// Extracts the min and max timestamps from a set of hits.
@@ -190,24 +184,19 @@ mod tests {
     }
 
     #[test]
-    fn test_has_non_timestamp_ordering_all_timestamp() {
-        let order_by = vec![("_timestamp".to_string(), config::meta::sql::OrderBy::Desc)];
-        assert!(!has_non_timestamp_ordering(&order_by, "_timestamp"));
-    }
-
-    #[test]
-    fn test_has_non_timestamp_ordering_has_non_ts() {
-        let order_by = vec![
-            ("_timestamp".to_string(), config::meta::sql::OrderBy::Desc),
-            ("count".to_string(), config::meta::sql::OrderBy::Desc),
+    fn test_is_ranked_by_non_timestamp() {
+        use config::meta::sql::OrderBy::{Asc, Desc};
+        let cases: [(&[(&str, config::meta::sql::OrderBy)], bool); 5] = [
+            (&[], false),
+            (&[("ts", Desc)], false),
+            (&[("\"ts\"", Asc), ("count", Desc)], false),
+            (&[("count", Desc)], true),
+            (&[("count", Desc), ("ts", Asc)], true),
         ];
-        assert!(has_non_timestamp_ordering(&order_by, "_timestamp"));
-    }
-
-    #[test]
-    fn test_has_non_timestamp_ordering_empty() {
-        let order_by: Vec<(String, config::meta::sql::OrderBy)> = vec![];
-        assert!(!has_non_timestamp_ordering(&order_by, "_timestamp"));
+        for (fields, expected) in cases {
+            let order_by: Vec<_> = fields.iter().map(|(f, o)| (f.to_string(), *o)).collect();
+            assert_eq!(is_ranked_by_non_timestamp(&order_by, "ts"), expected);
+        }
     }
 
     #[test]

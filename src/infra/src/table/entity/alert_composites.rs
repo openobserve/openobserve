@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "alert_composites")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
@@ -28,6 +28,7 @@ pub struct Model {
     pub updated_at: Option<i64>,
     pub evaluation_generation: i64,
     pub pending_period_sec: i64,
+    pub incident_title_template: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

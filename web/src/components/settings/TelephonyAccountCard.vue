@@ -15,77 +15,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard variant="outlined" class="max-w-160 gap-4 p-5">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="flex min-w-0 flex-col gap-0.5">
-        <h2 class="text-text-heading m-0 text-lg font-semibold">{{ title }}</h2>
-        <span class="text-text-secondary text-sm" data-test="telephony-card-meta">
-          {{ meta }}
-        </span>
-      </div>
+  <OFormSection variant="plain" class="max-w-5xl" :title="title">
+    <template #actions>
       <OTag
         :variant="TAG_VARIANT[health]"
         size="sm"
         :label="tagLabel"
         data-test="telephony-card-status"
       />
-    </div>
+      <OButton
+        variant="outline"
+        size="sm-action"
+        icon-left="fact-check"
+        :loading="status.isFetching.value"
+        data-test="telephony-card-check"
+        @click="checkAccount"
+      >
+        {{ t("telephony.checkAccount") }}
+      </OButton>
+      <slot name="actions" />
+    </template>
+    <div class="flex flex-col gap-4">
+      <span class="text-text-secondary text-sm" data-test="telephony-card-meta">
+        {{ meta }}
+      </span>
 
-    <OBanner
-      v-if="problem"
-      variant="error-soft"
-      icon="error-outline"
-      data-test="telephony-card-problem"
-    >
-      {{ problem }}
-      <template v-if="updatable" #actions>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          :disabled="readOnly"
-          data-test="telephony-card-problem-update"
-          @click="emit('update')"
+      <OBanner
+        v-if="problem"
+        variant="error-soft"
+        icon="error-outline"
+        data-test="telephony-card-problem"
+      >
+        {{ problem }}
+        <template v-if="updatable" #actions>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="edit"
+            :disabled="readOnly"
+            data-test="telephony-card-problem-update"
+            @click="emit('update')"
+          >
+            {{ t("telephony.update") }}
+          </OButton>
+        </template>
+      </OBanner>
+
+      <OBanner
+        v-if="live?.state === 'unavailable'"
+        variant="warning"
+        dense
+        data-test="telephony-card-unchecked"
+      >
+        {{ t("telephony.uncheckedNow", { provider: PROVIDER }) }}
+      </OBanner>
+
+      <OBanner v-if="ok?.trial" variant="info" icon="info" data-test="telephony-card-trial">
+        {{ t("telephony.trial", { provider: PROVIDER }) }}
+      </OBanner>
+
+      <div class="border-border-default grid grid-cols-1 gap-2 border-t pt-4">
+        <TelephonyPress4Row v-if="callsWork" :available="press4Available" />
+        <span
+          v-if="ok && !ok.can_text"
+          class="text-status-warning-text flex items-center gap-2 text-sm"
+          data-test="telephony-card-cant-text"
         >
-          {{ t("telephony.update") }}
-        </OButton>
-      </template>
-    </OBanner>
+          <OIcon name="warning-amber" size="sm" />
+          {{ t("telephony.cantText") }}
+        </span>
+        <span
+          v-if="ok && !ok.can_call"
+          class="text-status-warning-text flex items-center gap-2 text-sm"
+          data-test="telephony-card-cant-call"
+        >
+          <OIcon name="warning-amber" size="sm" />
+          {{ t("telephony.cantCall") }}
+        </span>
+      </div>
 
-    <OBanner
-      v-if="live?.state === 'unavailable'"
-      variant="warning"
-      dense
-      data-test="telephony-card-unchecked"
-    >
-      {{ t("telephony.uncheckedNow", { provider: PROVIDER }) }}
-    </OBanner>
-
-    <OBanner v-if="ok?.trial" variant="info" icon="info" data-test="telephony-card-trial">
-      {{ t("telephony.trial", { provider: PROVIDER }) }}
-    </OBanner>
-
-    <div class="border-border-default grid grid-cols-1 gap-2 border-t pt-4">
-      <TelephonyPress4Row v-if="callsWork" :available="press4Available" />
-      <span
-        v-if="ok && !ok.can_text"
-        class="text-status-warning-text flex items-center gap-2 text-sm"
-        data-test="telephony-card-cant-text"
-      >
-        <OIcon name="warning-amber" size="sm" />
-        {{ t("telephony.cantText") }}
-      </span>
-      <span
-        v-if="ok && !ok.can_call"
-        class="text-status-warning-text flex items-center gap-2 text-sm"
-        data-test="telephony-card-cant-call"
-      >
-        <OIcon name="warning-amber" size="sm" />
-        {{ t("telephony.cantCall") }}
-      </span>
+      <slot />
     </div>
-
-    <slot />
-  </OCard>
+  </OFormSection>
 </template>
 
 <script setup lang="ts">
@@ -96,9 +107,10 @@ import { useQuery } from "@tanstack/vue-query";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { telephonyStatusQuery } from "@/services/oncall.queries";
 import type { I18nText } from "@/types/i18n";
 import { useI18nTyped } from "@/types/i18n";
@@ -148,6 +160,15 @@ const tagLabel = computed<I18nText>(() => {
   };
   return labels[health.value];
 });
+
+async function checkAccount() {
+  const result = await status.refetch();
+  if (result.data?.state === "ok" && !result.error) {
+    toast({ variant: "success", message: t("telephony.checkOk", { provider: PROVIDER }) });
+  } else {
+    toast({ variant: "warning", message: t("telephony.checkFailed") });
+  }
+}
 
 const problem = computed<I18nText | null>(() => {
   const state = live.value?.state;

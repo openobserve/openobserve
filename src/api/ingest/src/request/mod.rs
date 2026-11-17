@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod clusters;
+pub mod datadog;
 pub mod logs;
 pub mod metrics;
 pub mod profiles;

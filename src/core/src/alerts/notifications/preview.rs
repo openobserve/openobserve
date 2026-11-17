@@ -31,7 +31,7 @@ use super::{
     context::NotificationContext,
     format::ChannelFormat,
     render::{RenderedMessage, markdown::markdown_to_html, render, severity_color},
-    resolve::{empty_variables, resolve_content},
+    resolve::{LinkRole, empty_variables, escaped_body_markdown, resolve_content},
 };
 
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -52,6 +52,7 @@ pub struct PreviewRequest {
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = TemplatePreviewResponse)]
 pub struct PreviewResponse {
     /// The real wire payload (raw tab).
     pub payload: serde_json::Value,
@@ -77,7 +78,16 @@ pub struct PreviewModel {
     pub color: String,
     pub severity: Option<String>,
     pub footer: String,
+    /// The data button label; empty when the server has none for this kind.
+    pub footer_label: String,
+    /// The object button; `null` when the message has no second system button.
+    pub detail: Option<PreviewLink>,
     pub chart_placeholder: bool,
+    /// The sample's result rows, column-ordered, as the real message lists them.
+    pub rows: Vec<Vec<PreviewKv>>,
+    /// Set when the template formats each row; the real message then shows these lines instead
+    /// of `rows`.
+    pub row_lines: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -190,6 +200,10 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         alert_start_time_millis: "1785578400000".into(),
         alert_end_time_millis: "1785579000000".into(),
         alert_url: "https://example.openobserve.ai/alerts/sample".into(),
+        alert_url_label: "View logs".into(),
+        alert_detail_url:
+            "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default".into(),
+        alert_detail_label: "Open alert".into(),
         alert_trigger_time: 1_785_579_000_000_000,
         alert_trigger_time_str: "2026-08-01T10:10:00".into(),
         alert_description: "cpu > 80 for 10m".into(),
@@ -258,16 +272,18 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         }
     };
 
-    let footer = content
-        .links
-        .iter()
-        .find(|(label, _)| label.is_empty())
-        .map(|(_, url)| url.clone())
+    let system = |role: LinkRole| content.links.iter().find(|l| l.role == role);
+    let (footer, footer_label) = system(LinkRole::Primary)
+        .map(|l| (l.url.clone(), l.label.clone()))
         .unwrap_or_default();
+    let detail = system(LinkRole::Detail).map(|l| PreviewLink {
+        label: l.label.clone(),
+        url: l.url.clone(),
+    });
 
     let preview_model = PreviewModel {
         title: content.title.clone(),
-        body_html: markdown_to_html(&content.body_markdown),
+        body_html: markdown_to_html(&escaped_body_markdown(&req.definition, &ctx)),
         fields: content
             .fields
             .iter()
@@ -279,16 +295,31 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         links: content
             .links
             .iter()
-            .filter(|(label, _)| !label.is_empty())
-            .map(|(label, url)| PreviewLink {
-                label: label.clone(),
-                url: url.clone(),
+            .filter(|l| l.role == LinkRole::Authored)
+            .map(|l| PreviewLink {
+                label: l.label.clone(),
+                url: l.url.clone(),
             })
             .collect(),
         color: severity_color(level).to_string(),
         severity: req.severity.clone(),
         footer,
+        footer_label,
+        detail,
         chart_placeholder: req.definition.chart.enabled,
+        rows: content
+            .rows
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|(label, value)| PreviewKv {
+                        label: label.clone(),
+                        value: value.clone(),
+                    })
+                    .collect()
+            })
+            .collect(),
+        row_lines: content.row_lines.clone(),
     };
 
     Ok(PreviewResponse {
@@ -359,6 +390,39 @@ mod tests {
             err.to_string().contains("click"),
             "error should name the offending link, got: {err}"
         );
+    }
+
+    #[test]
+    fn preview_names_the_data_button_and_returns_the_object_button() {
+        let req = |kind| PreviewRequest {
+            definition: sample_spec(),
+            channel: "slack".into(),
+            severity: Some("critical".into()),
+            sample: None,
+            kind,
+        };
+        let alert = preview(&req(NotificationKind::Alert))
+            .unwrap()
+            .preview_model;
+        assert_eq!(alert.footer_label, "View logs");
+        let detail = alert.detail.expect("an alert has an object button");
+        assert_eq!(detail.label, "Open alert");
+        assert!(detail.url.contains("/web/alerts/detail/"));
+        assert!(alert.links.iter().all(|l| l.url != detail.url));
+
+        let incident = preview(&req(NotificationKind::Incident))
+            .unwrap()
+            .preview_model;
+        assert_eq!(incident.footer_label, "Open incident");
+        assert_eq!(incident.detail.unwrap().label, "Open alert");
+
+        let downtime = preview(&req(NotificationKind::Downtime))
+            .unwrap()
+            .preview_model;
+        assert_eq!(downtime.footer_label, "Open downtime");
+        assert!(downtime.detail.is_none());
+        let json = serde_json::to_value(&downtime).unwrap();
+        assert!(json["detail"].is_null(), "{json}");
     }
 
     #[test]
@@ -699,5 +763,100 @@ mod tests {
             at(NotificationKind::Synthetics, Some(AlertLevel::Warning)),
             (Some(AlertLevel::Warning), notice)
         );
+    }
+
+    fn rows_request(format: Option<&str>) -> PreviewRequest {
+        let mut spec = sample_spec();
+        spec.rows = config::meta::alerts::content_spec::RowsSpec {
+            enabled: true,
+            max: 5,
+            columns: Some(vec!["host".into()]),
+            format: format.map(str::to_string),
+        };
+        PreviewRequest {
+            definition: spec,
+            channel: "slack".into(),
+            severity: Some("critical".into()),
+            sample: None,
+            kind: Default::default(),
+        }
+    }
+
+    #[test]
+    fn the_preview_model_lists_the_rows_the_real_message_lists() {
+        let model = preview(&rows_request(None)).unwrap().preview_model;
+        assert_eq!(model.row_lines, None);
+        let rows: Vec<Vec<(String, String)>> = model
+            .rows
+            .iter()
+            .map(|r| {
+                r.iter()
+                    .map(|kv| (kv.label.clone(), kv.value.clone()))
+                    .collect()
+            })
+            .collect();
+        assert_eq!(
+            rows,
+            vec![
+                vec![("host".to_string(), "web-1".to_string())],
+                vec![("host".to_string(), "web-2".to_string())],
+            ]
+        );
+    }
+
+    #[test]
+    fn a_row_format_gives_the_preview_its_lines_not_the_columns() {
+        let model = preview(&rows_request(Some("{host} at {cpu}")))
+            .unwrap()
+            .preview_model;
+        // The format reads `cpu`, which the selected columns leave out: the lines win, as in email.
+        assert_eq!(
+            model.row_lines,
+            Some(vec![
+                "web-1 at 92.5".to_string(),
+                "web-2 at 88.1".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn rows_switched_off_leave_the_preview_without_rows() {
+        let mut req = rows_request(Some("{host}"));
+        req.definition.rows.enabled = false;
+        let model = preview(&req).unwrap().preview_model;
+        assert!(model.rows.is_empty());
+        assert_eq!(model.row_lines, None);
+    }
+
+    #[test]
+    fn plain_text_platform_bodies_are_raw_while_preview_html_stays_escaped() {
+        let definition = ContentSpec {
+            title: "t".into(),
+            body: "- {alert_operator} {alert_threshold}".into(),
+            ..Default::default()
+        };
+        for (channel, pointer) in [
+            ("opsgenie", "/description"),
+            ("pagerduty", "/payload/custom_details/body"),
+            ("servicenow", "/description"),
+        ] {
+            let resp = preview(&PreviewRequest {
+                definition: definition.clone(),
+                channel: channel.into(),
+                severity: Some("critical".into()),
+                sample: None,
+                kind: Default::default(),
+            })
+            .unwrap();
+            assert_eq!(
+                resp.payload.pointer(pointer).and_then(|v| v.as_str()),
+                Some("- >= 80"),
+                "{channel} payload"
+            );
+            assert_eq!(
+                resp.preview_model.body_html, "<ul>\n<li>&gt;= 80</li>\n</ul>\n",
+                "{channel} preview"
+            );
+        }
     }
 }

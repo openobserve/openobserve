@@ -26,26 +26,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <!-- A section whose API needs online evaluations, on a server with them off. -->
-    <OnlineEvalsDisabled v-if="onlineEvalsRouteOff" />
     <!-- Form-style sections (general, org params, license, domain): a section
          header above a centered reading column. -->
-    <div v-else-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
+    <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
       <OPageHeader
         :title="raw(activeSectionItem?.label || '')"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
-        :subtitle="raw(activeSectionItem?.description || '')"
+        :subtitle="raw(pageSubtitles[activeSection] || activeSectionItem?.description || '')"
         :icon="activeSectionItem?.icon as any"
+        content-size="lg"
         class="border-border-default shrink-0 border-b"
-      />
+      >
+        <template v-if="HEADER_ACTION_SECTIONS.has(activeSection)" #actions>
+          <div :id="PAGE_ACTIONS_SLOT_ID" class="flex items-center gap-2"></div>
+        </template>
+      </OPageHeader>
       <ConstrainedPage
-        :size="['password_policy', 'license'].includes(activeSection) ? 'full' : 'lg'"
+        size="lg"
         align="left"
         :padded="false"
-        class="min-h-0 flex-1 px-4 py-3"
+        class="px-page-edge min-h-0 flex-1 py-3"
       >
         <router-view title="" />
       </ConstrainedPage>
+      <!-- Outside the scroller and its reading column, so a page's save bar spans the pane at its bottom. -->
+      <div :id="SAVE_BAR_SLOT_ID" class="shrink-0"></div>
     </div>
     <!-- Table/list sections render their own header (OPageLayout) inside. Do NOT
          pass a `title` attr here: these children are OPageLayout-rooted, so a
@@ -66,16 +71,14 @@ import { type SectionHubGroup, type SectionHubItem } from "@/components/common/S
 import { defineComponent, ref, onBeforeMount, onActivated, onUpdated, computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
-import useTheme from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
 import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { getImageURL } from "@/utils/zincutils";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, menuState } from "@/utils/featureGate";
 import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
-import { useOnlineEvalsRouteOff } from "@/composables/shared/useOnlineEvalsGate";
-import OnlineEvalsDisabled from "@/components/OnlineEvalsDisabled.vue";
+import { PAGE_ACTIONS_SLOT_ID } from "./pageActionsSlot";
+import { SAVE_BAR_SLOT_ID } from "./saveBarSlot";
 
 export default defineComponent({
   name: "AppSettings",
@@ -84,22 +87,18 @@ export default defineComponent({
     ConstrainedPage,
     OPageLayout,
     SectionRail,
-    OnlineEvalsDisabled,
   },
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
-    const { isDark } = useTheme();
     const router: any = useRouter();
     const route = useRoute();
 
     // Maps a route name → the section key used by the hub/switcher.
     const routeToSettingsTab: Record<string, string> = {
       general: "general",
-      organization: "organization",
       organizationSettings: "organization",
       nodes: "nodes",
-      queryManagement: "queryManagement",
       query_management: "queryManagement",
       domainManagement: "domain_management",
       orgDomainMapping: "org_domain_mapping",
@@ -108,19 +107,14 @@ export default defineComponent({
       announcementBannerEditor: "announcements",
       pipelineDestinations: "pipeline_destinations",
       telephonySettings: "telephony",
-      alertTemplates: "templates",
-      modelPricing: "model_pricing",
-      modelPricingEditor: "model_pricing",
-      modelPricingGaps: "model_pricing",
-      llmProviders: "llm_providers",
       storageSettings: "storageSettings",
       cipherKeys: "cipher-keys",
+      aiToolsets: "ai_toolsets",
       license: "license",
       orgnizationManagement: "organization_management",
       regexPatterns: "regex_patterns",
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
-      genAiAgentMapping: "gen_ai_agent_mapping",
       slack: "slack",
     };
 
@@ -139,11 +133,11 @@ export default defineComponent({
       "license",
       "domain_management",
       "password_policy",
-      "alert_calibration",
       "slack",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
-    const onlineEvalsRouteOff = useOnlineEvalsRouteOff();
+    // Pages without a header of their own that put buttons in the shell's header.
+    const HEADER_ACTION_SECTIONS = new Set(["slack"]);
 
     const slackVisible = computed(() => {
       const edition = buildFeatureGateContext(store.state.zoConfig);
@@ -207,25 +201,13 @@ export default defineComponent({
     onActivated(handleSettingsRouting);
     onUpdated(handleSettingsRouting);
 
-    const slackIcon = computed(() =>
-      getImageURL(isDark.value ? "images/common/slack_dark.svg" : "images/common/slack.svg"),
-    );
-
-    const regexIcon = computed(() =>
-      getImageURL(
-        isDark.value
-          ? "images/regex_pattern/regex_icon_dark.svg"
-          : "images/regex_pattern/regex_icon_light.svg",
-      ),
-    );
-
     // Order the section groups appear in (hub + switcher).
     const settingsGroupOrder = [
       "General",
       "Access & Security",
       "Destinations",
       "Integrations",
-      "Data & AI",
+      "Data",
       "Operations",
       "Synthetics",
       "Account",
@@ -244,16 +226,14 @@ export default defineComponent({
       // folds the "Cloud never offers this" distinction into `.visible`, so
       // nothing here re-derives its own `!isCloud` check anymore.
       const cipherKeysAccess = checkFeatureAccess("cipherKeys", featureGateCtx);
+      const aiToolsetsAccess = checkFeatureAccess("aiToolsets", featureGateCtx);
       const regexPatternsAccess = checkFeatureAccess("regexPatterns", featureGateCtx);
       const domainManagementAccess = checkFeatureAccess("domainManagement", featureGateCtx);
       const passwordPolicyAccess = checkFeatureAccess("passwordPolicy", featureGateCtx);
       const pipelineDestinationsAccess = checkFeatureAccess("pipelineDestinations", featureGateCtx);
       const oncallAccess = checkFeatureAccess("oncall", featureGateCtx);
       const storageSettingsAccess = checkFeatureAccess("storageSettings", featureGateCtx);
-      const modelPricingAccess = checkFeatureAccess("modelPricing", featureGateCtx);
       const correlationSettingsAccess = checkFeatureAccess("correlationSettings", featureGateCtx);
-      const llmProvidersAccess = checkFeatureAccess("llmProviders", featureGateCtx);
-      const genAiAgentMappingAccess = checkFeatureAccess("genAiAgentMapping", featureGateCtx);
       const queryManagementAccess = checkFeatureAccess("queryManagement", featureGateCtx);
       const nodesAccess = checkFeatureAccess("nodes", featureGateCtx);
       const licenseAccess = checkFeatureAccess("license", featureGateCtx);
@@ -269,9 +249,10 @@ export default defineComponent({
         z?.service_streams_enabled !== false,
       );
       const queryManagementLicense = featureState(z?.features, "query_management");
+      const aiToolsetsLicense = featureState(z?.features, "ai_toolsets");
+      const aiAssistantLicense = featureState(z?.features, "ai_assistant");
       const byobLicense = featureState(z?.features, "byob");
       const oncallLicense = menuState(z?.features, "oncall", z?.oncall_enabled !== false);
-      const aiObsLicense = menuState(z?.features, "ai_observability", !!z?.online_evals_enabled);
       const alertsLocked = featureState(z?.features, "alerts") === "locked";
 
       const items: (SectionHubItem & { group: string })[] = [
@@ -309,7 +290,7 @@ export default defineComponent({
           key: "regex_patterns",
           label: t("regex_patterns.title"),
           description: t("settings.regexPatternsDesc"),
-          icon: `img:${regexIcon.value}`,
+          icon: "pattern",
           to: { name: "regexPatterns", query: { org_identifier: org } },
           visible: regexPatternsAccess.visible,
           locked: !regexPatternsAccess.allowed,
@@ -396,11 +377,11 @@ export default defineComponent({
         {
           key: "slack",
           label: t("settings.slackApp"),
-          description: t("settings.slackAppDesc"),
-          icon: `img:${slackIcon.value}`,
+          icon: "slack",
           to: { name: "slack", query: { org_identifier: org } },
           visible: slackVisible.value,
           dataTest: "slack-settings-tab",
+          description: t("settings.slackAppDesc"),
           group: "Integrations",
         },
         {
@@ -421,20 +402,7 @@ export default defineComponent({
           lockedMessage: storageSettingsAccess.message,
           licenseLocked: byobLicense === "locked",
           dataTest: "storage-settings-tab",
-          group: "Data & AI",
-        },
-        {
-          key: "model_pricing",
-          label: t("settings.llmModelPricing"),
-          description: t("settings.modelPricingDesc"),
-          icon: "paid",
-          to: { name: "modelPricing", query: { org_identifier: org } },
-          visible: !!z.model_pricing_enabled && modelPricingAccess.visible,
-          locked: !modelPricingAccess.allowed,
-          lockedMessage: modelPricingAccess.message,
-          licenseLocked: featureState(z?.features, "ai_observability") === "locked",
-          dataTest: "model-pricing-tab",
-          group: "Data & AI",
+          group: "Data",
         },
         {
           key: "correlation_settings",
@@ -447,33 +415,23 @@ export default defineComponent({
           lockedMessage: correlationSettingsAccess.message,
           licenseLocked: correlationLicense === "locked" && alertsLocked,
           dataTest: "correlation-settings-tab",
-          group: "Data & AI",
+          group: "Data",
         },
         {
-          key: "llm_providers",
-          label: t("llmProviders.tabLabel"),
-          description: t("settings.llmProvidersDesc"),
+          key: "ai_toolsets",
+          label: t("aiToolset.header"),
+          description: t("settings.aiToolsetsDesc"),
           icon: "smart-toy",
-          to: { name: "llmProviders", query: { org_identifier: org } },
-          visible: aiObsLicense !== "hidden" && llmProvidersAccess.visible,
-          locked: !llmProvidersAccess.allowed,
-          lockedMessage: llmProvidersAccess.message,
-          licenseLocked: aiObsLicense === "locked",
-          dataTest: "llm-providers-tab",
-          group: "Data & AI",
-        },
-        {
-          key: "gen_ai_agent_mapping",
-          label: t("settings.genAiAgentMapping.tabLabel"),
-          description: t("settings.index.genAiAgentMappingDesc"),
-          icon: "smart-toy",
-          to: { name: "genAiAgentMapping", query: { org_identifier: org } },
-          visible: aiObsLicense !== "hidden" && genAiAgentMappingAccess.visible,
-          locked: !genAiAgentMappingAccess.allowed,
-          lockedMessage: genAiAgentMappingAccess.message,
-          licenseLocked: aiObsLicense === "locked",
-          dataTest: "gen-ai-agent-mapping-tab",
-          group: "Data & AI",
+          to: { name: "aiToolsets", query: { org_identifier: org } },
+          visible:
+            aiToolsetsLicense !== "hidden" &&
+            aiAssistantLicense !== "hidden" &&
+            aiToolsetsAccess.visible,
+          locked: !aiToolsetsAccess.allowed,
+          lockedMessage: aiToolsetsAccess.message,
+          licenseLocked: aiToolsetsLicense === "locked" || aiAssistantLicense === "locked",
+          dataTest: "ai-toolsets-tab",
+          group: "Integrations",
         },
         {
           key: "queryManagement",
@@ -545,6 +503,16 @@ export default defineComponent({
       settingsItems.value.find((i) => i.key === activeSection.value),
     );
 
+    // The header describes the page for this organization; the rail keeps its shorter description.
+    const pageSubtitles = computed<Record<string, string>>(() => {
+      const org = store.state.selectedOrganization?.label ?? "";
+      return {
+        general: t("settings.generalSubtitle", { org }),
+        organization: t("settings.orgSubtitle", { org }),
+        password_policy: t("settings.passwordPolicySubtitle"),
+      };
+    });
+
     // Bucket the sections into ordered groups for SectionHub / the breadcrumb switcher.
     const sectionGroups = computed<SectionHubGroup[]>(() => {
       const buckets = new Map<string, SectionHubItem[]>();
@@ -564,7 +532,7 @@ export default defineComponent({
         "Access & Security": t("settings.groupAccessSecurity"),
         Destinations: t("settings.groupDestinations"),
         Integrations: t("settings.groupIntegrations"),
-        "Data & AI": t("settings.groupDataAI"),
+        Data: t("settings.groupData"),
         Operations: t("settings.groupOperations"),
         Synthetics: t("settings.groupSynthetics"),
         Account: t("settings.groupAccount"),
@@ -584,8 +552,11 @@ export default defineComponent({
       isMetaOrg,
       activeSection,
       isConstrainedSection,
-      onlineEvalsRouteOff,
+      SAVE_BAR_SLOT_ID,
+      PAGE_ACTIONS_SLOT_ID,
+      HEADER_ACTION_SECTIONS,
       activeSectionItem,
+      pageSubtitles,
       sectionGroups,
       handleSettingsRouting,
     };

@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Kubernetes setup card: install → optional traces (libraries or eBPF) → optional eBPF network flows → verify.
+// Kubernetes setup card: install → optional tracing (language libraries or eBPF) → optional eBPF
+// network flows → verify. The optional steps are folded. Onboarding asks about tracing on its own
+// step first; its answer (`presets`) then shows only the chosen tracing as a normal step, or none.
 //
 // Step 1 deliberately offers ONLY the two endpoint choices — external (reach
 // OpenObserve over the network) and internal (OpenObserve runs in this same
@@ -33,8 +35,11 @@ import { getImageURL } from "@/utils/zincutils";
 import type {
   CardSubstitutions,
   RichCardContent,
+  RichCardDetect,
+  RichCardStep,
   RichCardStepVariant,
   RichCardStepVariantGroup,
+  SetupCardPresets,
 } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
 
@@ -57,7 +62,7 @@ const INSTALL_SCRIPT =
 // {cluster} is a live step input; {org}/{token} are substituted at build time.
 // `--o2-url` takes a reachable URL, `--internal-endpoint` the in-cluster one —
 // they are separate flags, not two values for the same flag.
-const scriptInstall = (endpointFlag: string) =>
+export const scriptInstall = (endpointFlag: string) =>
   `curl -sSL ${INSTALL_SCRIPT} | bash -s -- \\
   --cluster-name={cluster} \\
   --org-id={org} \\
@@ -106,27 +111,33 @@ const codeFor = (template: string, subs: CardSubstitutions, lang = "bash") => ({
 /**
  * Annotating a namespace makes the operator inject the language's auto-
  * instrumentation into every pod in it — no application code or image change.
+ * One annotate and one restart per language, each in its own namespace.
  */
-const annotate = (key: string) =>
+export const annotate = (langs: { id: string; namespace: string }[]) =>
   `# Every pod in the namespace is instrumented — no code or image change.
-kubectl annotate namespace my-namespace \\
-  instrumentation.opentelemetry.io/inject-${key}="openobserve-collector/openobserve-${key}"
+${langs
+  .map(
+    ({ id, namespace }) => `kubectl annotate namespace ${namespace} \\
+  instrumentation.opentelemetry.io/inject-${id}="openobserve-collector/openobserve-${id}"`,
+  )
+  .join("\n")}
 
 # Restart so running pods pick up the injection
-kubectl rollout restart deployment -n my-namespace`;
+${langs.map(({ namespace }) => `kubectl rollout restart deployment -n ${namespace}`).join("\n")}`;
 
-const LANGUAGES: { id: string; label: string; icon: string }[] = [
+/** The languages the collector's Instrumentation resources cover; onboarding offers the same ones. */
+export const LANGUAGES: { id: string; label: string; icon: string }[] = [
   { id: "java", label: "Java", icon: "images/ingestion/java.svg" },
   { id: "dotnet", label: ".NET", icon: "images/ingestion/dotnet.svg" },
   { id: "nodejs", label: "Node.js", icon: "images/ingestion/nodejs.svg" },
   { id: "python", label: "Python", icon: "images/ingestion/python.svg" },
 ];
 
-const EBPF_DOC_URL =
+export const EBPF_DOC_URL =
   "https://github.com/openobserve/openobserve-helm-chart/blob/main/charts/openobserve-collector/docs/traces.md#ebpf-tracing";
 
 // --reuse-values would keep the old chart's defaults and lose the ebpf ones 0.6.0 adds.
-const EBPF_UPGRADE = `helm repo update openobserve
+export const EBPF_UPGRADE = `helm repo update openobserve
 helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
   --version '>=0.6.0' --reset-then-reuse-values \\
   --set ebpf.enabled=true{flags}`;
@@ -146,9 +157,47 @@ const instrumentVariants = (t: TranslateFn): RichCardStepVariant[] =>
     id: l.id,
     label: raw(l.label),
     icon: getImageURL(l.icon),
-    code: { lang: "bash", raw: annotate(l.id) },
+    code: { lang: "bash", raw: annotate([{ id: l.id, namespace: "my-namespace" }]) },
     note: t("ingestion.setupCard.k8sAnnotatePodNote"),
   }));
+
+const ebpfChoice = (t: TranslateFn): RichCardStepVariant => ({
+  id: "ebpf",
+  labelKey: "ingestion.setupCard.k8sEbpfVariant",
+  code: { lang: "bash", raw: EBPF_UPGRADE },
+  inputs: [
+    {
+      id: "ebpfPorts",
+      helmSet: "ebpf.trace.ports",
+      labelKey: "ingestion.setupCard.tracePortsLabel",
+      // A port matches on every node, so nothing is selected until the user chooses.
+      default: "",
+      placeholder: raw("8080,9000-9100"),
+      helpKey: "ingestion.setupCard.tracePortsHelp",
+    },
+    {
+      id: "ebpfExe",
+      helmSet: "ebpf.trace.exePaths",
+      labelKey: "ingestion.setupCard.traceExeLabel",
+      default: "",
+      placeholder: raw("/app/checkout*"),
+    },
+    {
+      id: "ebpfCmd",
+      helmSet: "ebpf.trace.cmdLines",
+      labelKey: "ingestion.setupCard.traceCmdLabel",
+      default: "",
+      placeholder: raw("*reports.py*"),
+      helpKey: "ingestion.setupCard.traceCmdHelp",
+    },
+  ],
+  // The chart refuses to render with all three lists empty.
+  requireOneOf: {
+    ids: ["ebpfPorts", "ebpfExe", "ebpfCmd"],
+    messageKey: "ingestion.setupCard.traceSelectorRequired",
+  },
+  note: t("ingestion.setupCard.k8sEbpfNote"),
+});
 
 const instrumentChoices = (t: TranslateFn): (RichCardStepVariant | RichCardStepVariantGroup)[] => [
   {
@@ -156,54 +205,85 @@ const instrumentChoices = (t: TranslateFn): (RichCardStepVariant | RichCardStepV
     labelKey: "ingestion.setupCard.k8sLibrariesVariant",
     variants: instrumentVariants(t),
   },
-  {
-    id: "ebpf",
-    labelKey: "ingestion.setupCard.k8sEbpfVariant",
-    code: { lang: "bash", raw: EBPF_UPGRADE },
-    inputs: [
-      {
-        id: "ebpfPorts",
-        helmSet: "ebpf.trace.ports",
-        labelKey: "ingestion.setupCard.tracePortsLabel",
-        // A port matches on every node, so nothing is selected until the user chooses.
-        default: "",
-        placeholder: raw("8080,9000-9100"),
-        helpKey: "ingestion.setupCard.tracePortsHelp",
-      },
-      {
-        id: "ebpfExe",
-        helmSet: "ebpf.trace.exePaths",
-        labelKey: "ingestion.setupCard.traceExeLabel",
-        default: "",
-        placeholder: raw("/app/checkout*"),
-      },
-      {
-        id: "ebpfCmd",
-        helmSet: "ebpf.trace.cmdLines",
-        labelKey: "ingestion.setupCard.traceCmdLabel",
-        default: "",
-        placeholder: raw("*reports.py*"),
-        helpKey: "ingestion.setupCard.traceCmdHelp",
-      },
-    ],
-    // The chart refuses to render with all three lists empty.
-    requireOneOf: {
-      ids: ["ebpfPorts", "ebpfExe", "ebpfCmd"],
-      messageKey: "ingestion.setupCard.traceSelectorRequired",
-    },
-    note: t("ingestion.setupCard.k8sEbpfNote"),
-  },
+  ebpfChoice(t),
 ];
+
+/**
+ * The tracing step: optional and folded, with both ways to trace. Onboarding's answer (`presets`)
+ * replaces it with only the chosen way, as a normal step: the eBPF upgrade, or one annotate line
+ * per language, each with its own namespace field. Skipped, there is no step.
+ */
+const instrumentStep = (t: TranslateFn, presets?: SetupCardPresets): RichCardStep | undefined => {
+  const step: Pick<RichCardStep, "id" | "chip" | "completeOn" | "notProvenByDetect"> = {
+    id: "instrument",
+    chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
+    completeOn: "copy",
+    notProvenByDetect: true,
+  };
+  if (presets?.traces === "off") return undefined;
+  if (presets?.traces === "ebpf") {
+    return {
+      ...step,
+      titleKey: "ingestion.setupCard.k8sTraceAppsTitle",
+      descriptionKey: "ingestion.setupCard.k8sTraceEbpfDesc",
+      variants: [ebpfChoice(t)],
+      variantToggle: false,
+    };
+  }
+  const langs =
+    presets?.traces === "library" ? LANGUAGES.filter((l) => presets.languages.includes(l.id)) : [];
+  // No answer (a guide opened from search) or no known language: the card asks, as it does alone.
+  if (!langs.length) {
+    return {
+      ...step,
+      titleKey: "ingestion.setupCard.autoInstrumentTracesTitle",
+      descriptionKey: "ingestion.setupCard.autoInstrumentTracesDesc",
+      chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
+      collapsed: !!presets,
+      variants: instrumentChoices(t),
+    };
+  }
+  return {
+    ...step,
+    titleKey: "ingestion.setupCard.k8sTraceAppsTitle",
+    descriptionKey: "ingestion.setupCard.k8sTraceLibraryDesc",
+    // Two languages in one namespace trace neither, so each gets its own placeholder.
+    code: {
+      lang: "bash",
+      raw: annotate(
+        langs.map((l) => ({
+          id: l.id,
+          namespace: langs.length > 1 ? `my-${l.id}-namespace` : "my-namespace",
+        })),
+      ),
+    },
+    note: t("ingestion.setupCard.k8sAnnotatePodNote"),
+  };
+};
 
 // ── card ─────────────────────────────────────────────────────────────────────
 
-export default function kubernetesCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
+// `k8s_namespace_name` (the collector's k8s.namespace.name) sets cluster logs apart on `default`.
+export const kubernetesDetect: RichCardDetect = {
+  streamType: "logs",
+  streamName: "default",
+  filter: "k8s_namespace_name IS NOT NULL",
+};
+
+export default function kubernetesCard(
+  subs: CardSubstitutions,
+  t: TranslateFn,
+  presets?: SetupCardPresets,
+): RichCardContent {
   const isCloud = config.isCloud === "true";
+  const instrument = instrumentStep(t, presets);
+  // With tracing skipped in onboarding, the card does not promise traces.
+  const traces = instrument ? [t("common.traces")] : [];
 
   const INSTALLER_NOTE = t("ingestion.setupCard.k8sInstallerNote");
 
   // The manual Helm path sits in a collapsed section below the steps, which is
-  // past the auto-instrument and verify steps — point at it from here, where the
+  // past the verify and optional tracing steps — point at it from here, where the
   // user is actually choosing how to install. `(#advanced)` renders as a jump
   // link that opens that accordion and scrolls to it (see noteMd in
   // SetupCardRenderer), so the user never has to go looking for it.
@@ -241,7 +321,7 @@ export default function kubernetesCard(subs: CardSubstitutions, t: TranslateFn):
       tone: "#326ce5",
       runtime: t("ingestion.setupCard.runtimeCluster"),
       setupTime: t("ingestion.setupCard.setupTime3Min"),
-      metaBadges: [t("common.logs"), t("common.metrics"), t("common.events"), t("common.traces")],
+      metaBadges: [t("common.logs"), t("common.metrics"), t("common.events"), ...traces],
     },
     steps: [
       {
@@ -270,20 +350,16 @@ export default function kubernetesCard(subs: CardSubstitutions, t: TranslateFn):
         note: isCloud ? raw(`${INSTALLER_NOTE} ${ADVANCED_HINT}`) : undefined,
         variants: installVariants,
       },
-      {
-        id: "instrument",
-        titleKey: "ingestion.setupCard.autoInstrumentTracesTitle",
-        descriptionKey: "ingestion.setupCard.autoInstrumentTracesDesc",
-        chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
-        completeOn: "copy",
-        variants: instrumentChoices(t),
-      },
+      // The data check is always last; onboarding folds the optional steps.
+      ...(instrument ? [instrument] : []),
       {
         id: "network",
         titleKey: "ingestion.setupCard.k8sNetworkFlowsTitle",
         descriptionKey: "ingestion.setupCard.k8sNetworkFlowsDesc",
         chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
         completeOn: "copy",
+        collapsed: !!presets,
+        notProvenByDetect: true,
         code: { lang: "bash", raw: EBPF_NETWORK_UPGRADE },
         note: t("ingestion.setupCard.k8sNetworkFlowsNote"),
       },
@@ -299,18 +375,11 @@ export default function kubernetesCard(subs: CardSubstitutions, t: TranslateFn):
           t("ingestion.setupCard.pillKubernetesEvents"),
           t("ingestion.setupCard.pillNodeMetrics"),
           t("ingestion.setupCard.pillPodMetrics"),
-          t("common.traces"),
+          ...traces,
         ],
       },
     ],
-    // Collector logs carry the k8sattributes processor's resource attributes;
-    // `k8s_namespace_name` is the flattened `k8s.namespace.name`, which is what
-    // distinguishes cluster logs from anything else already on `default`.
-    detect: {
-      streamType: "logs",
-      streamName: "default",
-      filter: "k8s_namespace_name IS NOT NULL",
-    },
+    detect: kubernetesDetect,
     extras: {
       // The manual Helm path, kept secondary. Previously six separate copy
       // boxes with a "wait 2 minutes" instruction between them; the explicit

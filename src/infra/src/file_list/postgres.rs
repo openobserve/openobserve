@@ -514,7 +514,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             let (time_start, time_end) = time_range;
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
                 time_end,
-                super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+                super::max_ts_bound_level(org_id, stream_type, stream_name, time_end).await,
             );
             let (date_from, date_to) = derive_date_range(time_start, time_end);
             let sql = r#"
@@ -596,7 +596,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .inc();
         let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
             time_end,
-            super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+            super::max_ts_bound_level(org_id, stream_type, stream_name, time_end).await,
         );
         let (date_from, date_to) = derive_date_range(time_start, time_end);
         let ret = sqlx::query_as::<_, super::FileRecord>(
@@ -755,11 +755,12 @@ SELECT id, account, stream, date, file, records, index_size, mindex_size FROM fi
         };
         log::debug!("file_list day_partitions: {day_partitions:?}");
 
-        let max_ts_level = super::max_ts_bound_level(org_id, stream_type, stream_name).await;
         let mut tasks = Vec::with_capacity(day_partitions.len());
 
         for (time_start, time_end) in day_partitions {
             let stream_key = stream_key.clone();
+            let max_ts_level =
+                super::max_ts_bound_level(org_id, stream_type, stream_name, time_end).await;
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT_RO.clone();
                 DB_QUERY_NUMS
@@ -860,7 +861,7 @@ SELECT id, account, stream, date, file, records, index_size, mindex_size FROM fi
         let cfg = get_config();
         let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
             time_end,
-            super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+            super::max_ts_bound_level(org_id, stream_type, stream_name, time_end).await,
         );
         let (date_from, date_to) = derive_date_range(time_start, time_end);
         let sql = r#"
@@ -1139,6 +1140,47 @@ SELECT date
             .with_label_values(&["get_updated_streams", "file_list"])
             .observe(time);
         Ok(ret)
+    }
+
+    async fn records_by_date(
+        &self,
+        streams: &[String],
+        date_range: (String, String),
+        dumped: bool,
+    ) -> Result<Vec<(String, String, i64)>> {
+        if streams.is_empty() {
+            return Ok(Vec::new());
+        }
+        let (start_date, end_date) = date_range;
+        let from = if dumped {
+            "file_list_dump_stats WHERE"
+        } else {
+            "file_list WHERE deleted = false AND"
+        };
+        let mut qb: QueryBuilder<Postgres> = QueryBuilder::new(format!(
+            "SELECT stream, date, CAST(SUM(records) AS BIGINT) AS records FROM {from} date >= "
+        ));
+        qb.push_bind(start_date);
+        qb.push(" AND date < ");
+        qb.push_bind(end_date);
+        qb.push(" AND stream IN (");
+        let mut keys = qb.separated(", ");
+        for s in streams {
+            keys.push_bind(s.clone());
+        }
+        qb.push(") GROUP BY stream, date");
+        let pool = CLIENT_RO.clone();
+        let rows = qb.build().fetch_all(&pool).await?;
+        Ok(rows
+            .iter()
+            .map(|r| {
+                (
+                    r.try_get::<String, &str>("stream").unwrap_or_default(),
+                    r.try_get::<String, &str>("date").unwrap_or_default(),
+                    r.try_get::<i64, &str>("records").unwrap_or_default(),
+                )
+            })
+            .collect())
     }
 
     async fn stats_by_date_range(

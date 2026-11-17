@@ -99,12 +99,17 @@ fn attribution_event_data(
     email: &str,
     created_at: &str,
 ) -> HashMap<String, json::Value> {
+    // Cloud signup admits only work email domains, so the domain names the company.
+    let company = if attribution.company.trim().is_empty() {
+        email
+            .rsplit_once('@')
+            .map_or(String::new(), |(_, domain)| domain.trim().to_lowercase())
+    } else {
+        attribution.company
+    };
     HashMap::from([
         ("from".to_string(), json::Value::String(attribution.from)),
-        (
-            "company".to_string(),
-            json::Value::String(attribution.company),
-        ),
+        ("company".to_string(), json::Value::String(company)),
         (
             "first_source".to_string(),
             attribution
@@ -148,5 +153,24 @@ mod tests {
         assert_eq!(data["first_source"], json::Value::Null);
         assert_eq!(data["skipped"], json::json!(false));
         assert_eq!(data["from"], json::json!("web"));
+        assert_eq!(data["company"], json::json!("Acme"));
+    }
+
+    #[test]
+    fn test_attribution_company_falls_back_to_email_domain() {
+        let attribution: NewUserAttribution =
+            json::from_str(r#"{"from":"","company":"  "}"#).unwrap();
+        let data = attribution_event_data(attribution, "jane@acme.io", "2026-10-22");
+        assert_eq!(data["company"], json::json!("acme.io"));
+
+        let attribution: NewUserAttribution =
+            json::from_str(r#"{"from":"","company":""}"#).unwrap();
+        let data = attribution_event_data(attribution, " jane@ACME.io ", "2026-10-22");
+        assert_eq!(data["company"], json::json!("acme.io"));
+
+        let attribution: NewUserAttribution =
+            json::from_str(r#"{"from":"","company":""}"#).unwrap();
+        let data = attribution_event_data(attribution, "not-an-email", "2026-10-22");
+        assert_eq!(data["company"], json::json!(""));
     }
 }

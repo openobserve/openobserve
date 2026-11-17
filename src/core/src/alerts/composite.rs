@@ -19,10 +19,10 @@ pub use runtime::{
     CompositeEvaluation, CompositeEvaluator, CompositeStateInput, EvaluatedChild, EvaluationFailure,
 };
 pub use service::{
-    CompositeCreate, CompositeServiceError, StartupPreflightError, clone_composite,
-    create_composite, delete_composite, evaluate_definition, evaluate_expression, get_composite,
-    move_composite, set_composite_enabled, startup_preflight, trigger_composite, update_composite,
-    validate_composite_graph,
+    CompositeCreate, CompositeServiceError, StartupPreflightError, check_move_composite,
+    clone_composite, create_composite, delete_composite, evaluate_definition, evaluate_expression,
+    get_composite, move_composite, set_composite_enabled, startup_preflight, trigger_composite,
+    update_composite, validate_composite_graph,
 };
 
 #[cfg(test)]
@@ -56,6 +56,7 @@ pub fn notification_alert(
         .unwrap_or_default();
     alert.trigger_condition.silence = definition.silence_seconds;
     alert.pending_period_sec = definition.pending_period_sec;
+    alert.incident_title_template = definition.incident_title_template.clone();
     alert.enabled = definition.enabled;
     alert.last_edited_by = definition.last_edited_by.clone();
     alert.updated_at = definition

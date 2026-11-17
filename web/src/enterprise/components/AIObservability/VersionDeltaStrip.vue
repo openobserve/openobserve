@@ -120,15 +120,11 @@ function formatDelta(metric: MetricResult): string {
   return `${sign}${metric.deltaPct.toFixed(1)}%`;
 }
 
-// Color EVERY metric by the DIRECTION of its change (sign of deltaPct): a rise
-// (deltaPct>0) is red, a drop is green. All comparison metrics here read
-// "up = worse" (more latency / cost / errors / volume-churn), so the direction
-// maps straight to good/bad without needing a per-metric CI verdict. The only
-// neutral case is a null delta (no data / no direction to show).
+// Every metric here reads "up = worse", so direction alone decides the colour.
 function deltaColorClass(metric: MetricResult): string {
-  if (metric.deltaPct === null) return "text-text-secondary";
-  if (metric.deltaPct > 0) return "text-error-600"; // rose → worse
-  if (metric.deltaPct < 0) return "text-success-600"; // fell → better
+  const dir = metric.deltaPct ?? metric.b - metric.a;
+  if (dir > 0) return "text-error-600"; // rose → worse
+  if (dir < 0) return "text-success-600"; // fell → better
   return "text-text-secondary";
 }
 

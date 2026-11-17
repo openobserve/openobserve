@@ -214,6 +214,26 @@ describe("useHttpStreaming", () => {
       await streamPromise;
     });
 
+    it("lets a caller skip the result cache without the clear_cache flag", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: vi.fn().mockResolvedValue({ message: "x" }),
+        body: new MockReadableStream() as any,
+      });
+
+      await httpStreaming.fetchQueryDataWithHttpStream(
+        { ...mockData, use_cache: false },
+        mockHandlers,
+      );
+      await flushPromises();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${store.state.API_ENDPOINT}/api/test-org/_search_stream?type=logs&search_type=ui&use_cache=false`,
+        expect.anything(),
+      );
+    });
+
     it("should throw an error when the stream connection fails", async () => {
       vi.spyOn(httpStreaming, "onError");
 
@@ -656,6 +676,40 @@ describe("useHttpStreaming", () => {
       });
     });
   });
+  describe("a search that matches nothing", () => {
+    it("completes once the stream ends, with no hits and no error", async () => {
+      const handlers = { data: vi.fn(), error: vi.fn(), complete: vi.fn(), reset: vi.fn() };
+      vi.stubGlobal("Worker", function () {
+        return mockWorker;
+      });
+      // The worker answers the end of the stream the way streamWorker.js does.
+      vi.mocked(mockWorker.postMessage).mockImplementation((msg: any) => {
+        if (msg.action === "endStream") {
+          mockWorker.onmessage?.({ data: { type: "end", traceId: msg.traceId } });
+        }
+      });
+      mockFetch.mockResolvedValueOnce({ ok: true, body: new MockReadableStream([]) as any });
+      await httpStreaming.fetchQueryDataWithHttpStream(
+        {
+          queryReq: { query: { sql: 'SELECT a FROM "default"', start_time: 1, end_time: 2 } },
+          type: "search",
+          traceId: "trace-empty",
+          org_id: "test-org",
+          searchType: "ui",
+          pageType: "logs",
+        },
+        handlers,
+      );
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(handlers.complete).toHaveBeenCalledTimes(1);
+      expect(handlers.error).not.toHaveBeenCalled();
+      expect(handlers.data).not.toHaveBeenCalled();
+      expect(httpStreaming.traceMap.value["trace-empty"]).toBeUndefined();
+      vi.restoreAllMocks();
+    });
+  });
+
   describe("mid-stream network failure", () => {
     const handlers = { data: vi.fn(), error: vi.fn(), complete: vi.fn(), reset: vi.fn() };
     const request: any = {

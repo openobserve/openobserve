@@ -332,12 +332,17 @@ describe("FleetCollectors", () => {
     expect(bodyText(wrapper)).not.toContain("edge-02");
     wrapper.unmount();
     wrapper = await mountList("/?status=unknown");
-    expect((wrapper.vm as any).statusFilter).toBe("unknown");
+    expect((wrapper.vm as any).statusFilters).toEqual(["unknown"]);
+    wrapper.unmount();
+    wrapper = await mountList("/?status=offline,online");
+    expect((wrapper.vm as any).statusFilters).toEqual(["offline", "online"]);
+    expect(bodyText(wrapper)).toContain("edge-02");
+    expect(bodyText(wrapper)).toContain("prod-web-01");
   });
 
   it.each(["bogus"])("ignores an invalid ?status=%s", async (status) => {
     wrapper = await mountList(`/?status=${status}`);
-    expect((wrapper.vm as any).statusFilter).toBeNull();
+    expect((wrapper.vm as any).statusFilters).toEqual([]);
     expect(bodyText(wrapper)).toContain("prod-web-01");
     expect(bodyText(wrapper)).toContain("edge-02");
   });
@@ -354,7 +359,9 @@ describe("FleetCollectors", () => {
   it("shows the skeleton while the list is loading", async () => {
     vi.mocked(fleet.listCollectors).mockReturnValue(new Promise(() => {}) as any);
     wrapper = await mountList();
-    expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true),
+    );
   });
 
   it("shows the error state when the list fails to load", async () => {

@@ -28,6 +28,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODate from "@/lib/forms/Date/ODate.vue";
+import { useSyntheticPrefillView } from "../prefill/useSyntheticPrefill";
 import OTime from "@/lib/forms/Time/OTime.vue";
 
 const props = defineProps<{
@@ -37,6 +38,8 @@ const props = defineProps<{
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
 const { t } = useI18nTyped();
+const prefill = useSyntheticPrefillView();
+const prefillView = computed(() => prefill?.value ?? null);
 
 function updateSchedule(patch: Partial<BrowserCheckSchedule>) {
   emit("update:check", {
@@ -62,7 +65,10 @@ const frequencyOptions: { label: I18nText; value: FrequencyPreset }[] = [
 function scheduleToPreset(s: BrowserCheckSchedule): FrequencyPreset {
   if (s.type === "cron") return "cron";
   if (s.isCustomFrequency) return "custom";
-  const mins = s.intervalUnit === "hours" ? (s.intervalValue ?? 1) * 60 : (s.intervalValue ?? 5);
+  const unit = s.intervalUnit ?? "minutes";
+  // Every preset is minutes or hours, so a 1-day interval must not read as "1min".
+  if (unit !== "minutes" && unit !== "hours") return "custom";
+  const mins = unit === "hours" ? (s.intervalValue ?? 1) * 60 : (s.intervalValue ?? 5);
   if (mins === 1) return "1min";
   if (mins === 5) return "5min";
   if (mins === 15) return "15min";
@@ -363,6 +369,13 @@ const startTime = computed({
           data-test="synthetics-check-schedule-start-timezone-select"
         />
       </div>
+      <p
+        v-if="prefillView?.runsPerDay"
+        class="text-text-secondary text-xs"
+        data-test="synthetics-prefill-runs-per-day"
+      >
+        {{ prefillView.runsPerDay }}
+      </p>
     </div>
   </div>
 </template>

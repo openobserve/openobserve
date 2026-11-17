@@ -2,10 +2,11 @@
 
 
 const path = require('path');
+const testLogger = require('./test-logger.js');
 const fs = require('fs');
 const { request } = require('@playwright/test');
 const {
-  urls, api, uniq, simpleAlert, multiAlert, createAlert, findAlertId, listAlerts,
+  urls, api, uniq, simpleAlert, multiAlert, createAlert, findAlertId, listAlerts, listAlertsInFolder,
   getAlertGroups, ingest, isFiringOutcome,
 } = require('./alerts-api-helpers.js');
 
@@ -57,7 +58,9 @@ async function waitFiring(page, alert, { timeoutMs = 240_000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     await alert.feed();
-    const item = await listItem(page, alert.name);
+    const item = alert.folder
+      ? (await listAlertsInFolder(page, alert.folder)).find((a) => a.name === alert.name) || null
+      : await listItem(page, alert.name);
     if (item?.firing_started_at && isFiringOutcome(item.last_outcome)) return item;
     if (Date.now() > deadline) throw new Error(`${alert.name} never fired: ${JSON.stringify(item)}`);
     await page.waitForTimeout(5000);
@@ -146,10 +149,34 @@ async function ackAs(page, user, alertId, body) {
   }
 }
 
+// Cleanup never fails the test, so a refused call is logged by path and status to make a leak traceable.
+async function cleanupCall(page, method, p) {
+  const r = await api(page, method, v2(p)).catch((e) => {
+    // The thrown message carries Playwright's call log with the Authorization header, so only its first line is kept.
+    testLogger.warn('alert mute cleanup: request failed', { method, path: p, reason: String(e?.message ?? e).split('\n')[0] });
+    return null;
+  });
+  if (r && !r.ok()) testLogger.warn('alert mute cleanup: non-ok response', { method, path: p, status: r.status() });
+  return r?.ok() ? r : null;
+}
+
 async function endMutes(page, names) {
-  const items = await listAlerts(page);
-  for (const item of items.filter((a) => names.includes(a.name) && a.active_downtime)) {
-    await api(page, 'post', v2(`/alerts/${item.alert_id}/mute/${item.active_downtime.id}/cancel?folder=default`)).catch(() => {});
+  const items = (await listAlerts(page)).filter((a) => names.includes(a.name));
+  for (const item of items.filter((a) => a.active_downtime)) {
+    await cleanupCall(page, 'post', `/alerts/${item.alert_id}/mute/${item.active_downtime.id}/cancel?folder=default`);
+  }
+  const ids = items.map((a) => a.alert_id);
+  const seen = new Set();
+  for (const id of ids) {
+    const r = await cleanupCall(page, 'get', `/downtimes?alert_id=${encodeURIComponent(id)}&page_size=500`);
+    // alert_id also matches rows whose condition covers the alert, so only rows that name one of ours are deleted.
+    const rows = r ? ((await r.json()).items ?? []) : [];
+    // Ended quick mutes are kept, and enough of them push a new row off the Downtimes list's first page.
+    for (const d of rows.filter((x) => (x.targets ?? []).some((t) => (t.ids ?? []).some((i) => ids.includes(i))))) {
+      if (seen.has(d.id)) continue;
+      seen.add(d.id);
+      await cleanupCall(page, 'delete', `/downtimes/${d.id}?folder=${encodeURIComponent(d.folder_id || 'default')}`);
+    }
   }
 }
 

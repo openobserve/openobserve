@@ -29,7 +29,7 @@ import type { I18nKey } from "@/types/i18n";
 import type { IllustrationName } from "./illustrations";
 
 /** Tone of an empty state — drives subtle styling and signals intent. */
-export type EmptyStateVariant = "create" | "no-results" | "error" | "neutral";
+export type EmptyStateVariant = "create" | "no-results" | "error" | "warning" | "neutral";
 
 /** A rich action card (icon + title + description) shown in an empty state. */
 export interface EmptyStateAction {
@@ -520,13 +520,11 @@ export const emptyStatePresets = {
     illustration: "users",
     variant: "create",
     titleKey: "emptyState.noOncallTeams.title",
-    descriptionKey: "emptyState.noOncallTeams.description",
     actions: [
       {
         id: "create",
         icon: "add",
         titleKey: "emptyState.noOncallTeams.action",
-        descriptionKey: "emptyState.noOncallTeams.actionDesc",
       },
     ],
   },
@@ -534,13 +532,11 @@ export const emptyStatePresets = {
     illustration: "users",
     variant: "create",
     titleKey: "emptyState.noOncallMembers.title",
-    descriptionKey: "emptyState.noOncallMembers.description",
     actions: [
       {
         id: "add",
         icon: "add",
         titleKey: "emptyState.noOncallMembers.action",
-        descriptionKey: "emptyState.noOncallMembers.actionDesc",
       },
     ],
   },
@@ -552,19 +548,24 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noOncallResponses.title",
     descriptionKey: "emptyState.noOncallResponses.description",
   },
+  // Nothing waiting for an owner is the good outcome, so no action is offered.
+  "no-oncall-unrouted": {
+    illustration: "check",
+    variant: "neutral",
+    titleKey: "emptyState.noOncallUnrouted.title",
+    descriptionKey: "emptyState.noOncallUnrouted.description",
+  },
   // Ownership is claimed by path, so the prompt is about the path rather than
   // about a list of services somebody has to enumerate.
   "no-oncall-rules": {
     illustration: "connect",
     variant: "create",
     titleKey: "emptyState.noOncallRules.title",
-    descriptionKey: "emptyState.noOncallRules.description",
     actions: [
       {
         id: "create",
         icon: "add",
         titleKey: "emptyState.noOncallRules.action",
-        descriptionKey: "emptyState.noOncallRules.actionDesc",
       },
     ],
   },
@@ -581,30 +582,26 @@ export const emptyStatePresets = {
         id: "add",
         icon: "add",
         titleKey: "emptyState.noTeamRouting.action",
-        descriptionKey: "emptyState.noTeamRouting.actionDesc",
       },
     ],
   },
-  // No lanes on the calendar. A blank rotation and a preset ladder are two
-  // equally valid ways in, so both get a card rather than one being the
-  // button and the other a smaller afterthought beside it.
+  // A template first: with nothing to replace yet it is the shortest road to a working schedule.
   "no-oncall-schedule": {
     illustration: "schedule",
     variant: "create",
     titleKey: "emptyState.noOncallSchedule.title",
-    descriptionKey: "emptyState.noOncallSchedule.description",
     actions: [
-      {
-        id: "add",
-        icon: "add",
-        titleKey: "emptyState.noOncallSchedule.action",
-        descriptionKey: "emptyState.noOncallSchedule.actionDesc",
-      },
       {
         id: "presets",
         icon: "rocket-launch",
         titleKey: "emptyState.noOncallSchedule.presetsAction",
         descriptionKey: "emptyState.noOncallSchedule.presetsActionDesc",
+      },
+      {
+        id: "add",
+        icon: "add",
+        titleKey: "emptyState.noOncallSchedule.action",
+        descriptionKey: "emptyState.noOncallSchedule.actionDesc",
       },
     ],
   },
@@ -794,6 +791,36 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-slack-channel-defaults": {
+    illustration: "board",
+    variant: "neutral",
+    titleKey: "emptyState.noSlackChannelDefaults.title",
+    descriptionKey: "emptyState.noSlackChannelDefaults.description",
+  },
+  "no-slack-linked-people": {
+    illustration: "users",
+    variant: "neutral",
+    titleKey: "emptyState.noSlackLinkedPeople.title",
+  },
+  "slack-not-connected": {
+    illustration: "connect",
+    variant: "neutral",
+    titleKey: "emptyState.slackNotConnected.title",
+  },
+  "no-announcement-banners": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noAnnouncementBanners.title",
+    descriptionKey: "emptyState.noAnnouncementBanners.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noAnnouncementBanners.action",
+        descriptionKey: "emptyState.noAnnouncementBanners.actionDesc",
+      },
+    ],
+  },
   "no-ai-toolsets": {
     illustration: "box",
     variant: "create",
@@ -906,7 +933,6 @@ export const emptyStatePresets = {
     illustration: "connect",
     variant: "create",
     titleKey: "emptyState.noPhoneProvider.title",
-    descriptionKey: "emptyState.noPhoneProvider.description",
     actions: [
       {
         id: "connect",
@@ -1164,6 +1190,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-eval-templates": "emptyState.nouns.evalTemplates",
   "no-enrichment-tables": "emptyState.nouns.enrichmentTables",
   "no-cipher-keys": "emptyState.nouns.cipherKeys",
+  "no-announcement-banners": "emptyState.nouns.announcementBanners",
   "no-ai-toolsets": "emptyState.nouns.aiToolsets",
   "no-llm-providers": "emptyState.nouns.llmProviders",
   "no-source-maps": "emptyState.nouns.sourceMaps",

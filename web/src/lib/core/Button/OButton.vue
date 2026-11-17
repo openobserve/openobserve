@@ -1,10 +1,21 @@
 <script setup lang="ts">
 import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
-import { computed, ref, onMounted, onBeforeUnmount, useAttrs, useId } from "vue";
+import {
+  computed,
+  getCurrentInstance,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  useAttrs,
+  useId,
+} from "vue";
 import { UNNAMED_ICON_ONLY_DELAY_MS, warnIfUnnamedIconOnly } from "./iconOnlyName";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useFeatureLock } from "@/composables/useFeatureLock";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
+import { activates } from "./activation";
 
 defineOptions({ inheritAttrs: false });
 
@@ -16,6 +27,7 @@ const props = withDefaults(defineProps<ButtonProps>(), {
   disabled: false,
   focusableUnavailable: false,
   loading: false,
+  spinner: true,
   active: false,
   block: false,
 });
@@ -28,6 +40,10 @@ const isDisabled = computed(() => props.disabled || locked.value);
 // No native `disabled` reaches an anchor or a slotted child, so a locked one is styled and blocked by hand.
 const lockedLink = computed(() => locked.value && (props.as !== "button" || !!props.asChild));
 const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
+// A busy button stays focusable (no native disabled), so it looks and acts unavailable without losing focus.
+const inactive = computed(() => unavailable.value || props.loading);
+// The button is busy at once; the spinner waits so a fast action never flashes one.
+const showSpinner = useDelayedFlag(() => props.loading && props.spinner, LOADER_DELAY_MS);
 const reasonId = computed(() => props.descriptionId ?? `${id}-reason`);
 const rootRef = ref<{ $el?: Element } | null>(null);
 // Labels that arrive with data are not unnamed, so the dev check waits for them.
@@ -44,6 +60,7 @@ onBeforeUnmount(() => clearTimeout(nameCheckTimer));
 defineSlots<ButtonSlots>();
 
 // Variant class map - every entry is a full token-based class string
+// Inside a hovered table row a neutral ghost hover would match the row fill, so it steps up to the row-action fill.
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary: [
     "bg-button-primary text-button-primary-foreground",
@@ -55,6 +72,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   secondary: [
     "bg-button-secondary text-button-secondary-foreground",
     "enabled:hover:bg-button-secondary-hover",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-secondary-active",
     "focus-visible:ring-3 focus-visible:ring-button-secondary-focus-ring",
     "disabled:bg-button-secondary-disabled disabled:text-text-disabled",
@@ -69,13 +87,15 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ghost: [
     "bg-transparent text-button-ghost-text border-0",
     "enabled:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:text-text-disabled",
   ].join(" "),
   "ghost-primary": [
     "bg-transparent text-button-ghost-primary-text border-0",
-    "enabled:hover:bg-button-ghost-primary-hover-bg",
+    "enabled:hover:text-button-ghost-primary-hover-text enabled:hover:bg-button-ghost-primary-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-primary-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:text-text-disabled",
@@ -83,6 +103,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "ghost-muted": [
     "bg-transparent text-button-ghost-muted-text border-0",
     "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-muted-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-muted-focus-ring",
     "disabled:text-text-disabled",
@@ -90,6 +111,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "ghost-subtle": [
     "bg-transparent text-button-ghost-subtle-text border-0 opacity-60",
     "enabled:hover:opacity-100 enabled:hover:bg-button-ghost-subtle-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-subtle-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-subtle-focus-ring",
     "disabled:text-text-disabled disabled:opacity-30",
@@ -149,6 +171,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "ghost-neutral": [
     "bg-transparent text-inherit border-0",
     "enabled:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
@@ -177,6 +200,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "panel-collapse": [
     "bg-transparent text-button-ghost-muted-text border-0",
     "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-muted-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-muted-focus-ring",
     "disabled:opacity-50",
@@ -193,6 +217,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "sidebar-toggle": [
     "bg-surface-panel text-button-ghost-text border border-border-default",
     "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
@@ -271,10 +296,17 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:opacity-80",
     "disabled:opacity-60",
   ].join(" "),
+  // link: an action that reads as a link inside running copy, at the copy's own size.
+  link: [
+    "bg-transparent border-0 text-text-link underline underline-offset-2",
+    "h-auto! p-0! align-baseline",
+    "enabled:hover:opacity-80",
+    "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
+  ].join(" "),
   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
   // Use for edition/tier badges that must stand out without being a heavy CTA.
   "outline-primary": [
-    "bg-button-ghost-primary-active-bg text-button-ghost-primary-text border border-button-outline-hover-border",
+    "bg-button-ghost-primary-active-bg text-button-ghost-primary-hover-text border border-button-outline-hover-border",
     "enabled:hover:bg-button-ghost-primary-active-bg enabled:hover:border-button-outline-hover-border",
     "enabled:active:bg-button-ghost-primary-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
@@ -285,6 +317,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   dashed: [
     "bg-transparent text-button-ghost-muted-text border border-dashed border-button-outline-border",
     "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover enabled:hover:text-button-ghost-text",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
@@ -302,6 +335,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-text border-0 text-start rounded-default",
     "h-auto! justify-between! gap-3! px-0! py-1.5!",
     "enabled:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:text-text-disabled",
@@ -319,8 +353,18 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
     "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
-    "transition-colors duration-150",
-    "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
+    "transition-colors duration-(--duration-control) ease-(--ease-control)",
+    "enabled:hover:border-accent enabled:hover:text-accent-on-tint enabled:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
+    "disabled:opacity-60",
+  ].join(" "),
+  "section-chip": [
+    "bg-transparent text-text-body border border-border-default whitespace-nowrap",
+    "!rounded-full !h-auto !py-1 !px-3 !text-sm",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "aria-[current=location]:bg-surface-accent-active aria-[current=location]:border-button-outline-hover-border",
+    "aria-[current=location]:text-text-heading aria-[current=location]:font-semibold",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
   // tint-*: soft categorical badge fill for tiles that identify an entity by colour, e.g. a cluster code.
@@ -351,6 +395,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 };
 
 const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
+  "section-chip": "opacity-60",
   primary: "bg-button-primary-disabled text-button-primary-foreground",
   secondary: "bg-button-secondary-disabled text-text-disabled",
   outline: "opacity-50",
@@ -381,6 +426,7 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "preview-action": "opacity-60",
   "webinar-dismiss": "opacity-60",
   "banner-dismiss": "opacity-60",
+  link: "opacity-60",
   "outline-primary": "opacity-50",
   dashed: "opacity-50",
   "pricing-chip": "opacity-60",
@@ -412,20 +458,23 @@ const unavailableClasses = computed(() => {
 });
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
-  xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded-default",
+  xs: "h-7 ps-3 pe-3 max-[85.5rem]:ps-2.5 max-[85.5rem]:pe-2.5 text-xs gap-1.5 rounded-default",
   // 34px control height — the workhorse compact button that pairs with 34px
   // inputs in toolbars/headers. (radius 8 = rounded-default.)
-  sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-default",
-  // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
-  "sm-toolbar": "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
-  "xs-grouped": "h-6.5 ps-2 pe-2 text-xs gap-1.5 rounded-default",
+  sm: "h-[2.125rem] ps-3.5 pe-3.5 max-[85.5rem]:ps-3 max-[85.5rem]:pe-3 text-sm gap-2 rounded-default",
+  // Every toolbar control shares this box so a bar never mixes heights or padding.
+  "sm-toolbar":
+    "h-8.5 ps-3 pe-3 max-[85.5rem]:ps-2.5 max-[85.5rem]:pe-2.5 text-xs gap-1.5 rounded-default",
+  "xs-grouped":
+    "h-6.5 ps-2.5 pe-2.5 max-[85.5rem]:ps-2 max-[85.5rem]:pe-2 text-xs gap-1.5 rounded-default",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
   // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
-  "sm-action": "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
+  "sm-action":
+    "h-[2.125rem] ps-3.5 pe-3.5 max-[85.5rem]:ps-3 max-[85.5rem]:pe-3 min-w-20 text-sm gap-2 rounded-default",
   // h-8.5 sorts before h-9 and up, so a caller's own plain height class still overrides md.
   md: "h-8.5 ps-4 pe-4 text-sm gap-2 rounded-default",
   cta: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
@@ -444,8 +493,8 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "icon-lg": "h-12 w-12 shrink-0 p-0 rounded-default gap-x-0",
   "icon-circle": "size-8 shrink-0 p-0 rounded-full gap-x-0",
   "icon-circle-sm": "size-7 shrink-0 p-0 rounded-full gap-x-0",
-  // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
-  "icon-toolbar": "size-[1.875rem] shrink-0 p-0 rounded-default gap-x-0",
+  // Square twin of sm-toolbar for icon-only toolbar controls.
+  "icon-toolbar": "size-8.5 shrink-0 p-0 rounded-default gap-x-0",
   // 26px rounded-default — compact modern icon button for panel header collapse/expand
   "icon-panel": "size-6.5 shrink-0 p-0 rounded-default gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
@@ -471,15 +520,15 @@ const classes = computed<string[]>(() => [
   // `as="a"` renders a real anchor, which base-elements.css underlines on hover.
   "no-underline hover:no-underline",
   // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
-  "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
+  "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-(--duration-control) ease-(--ease-control)",
   "outline-none",
   // A hugging ring vanishes on accent fills, so the outline sits off a gap; ring-0! mutes the per-variant rings.
   "focus-visible:outline-2! focus-visible:outline-solid! focus-visible:outline-offset-2! focus-visible:outline-focus-ring-accent! focus-visible:ring-0!",
-  unavailable.value || lockedLink.value
+  inactive.value || lockedLink.value
     ? "cursor-not-allowed!"
     : "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
-  unavailable.value || lockedLink.value
+  inactive.value || lockedLink.value
     ? unavailableClasses.value
     : props.active
       ? activeClasses
@@ -488,15 +537,26 @@ const classes = computed<string[]>(() => [
 ]);
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (unavailable.value && (event.key === "Enter" || event.key === " ")) {
+  if (inactive.value && activates(event)) {
     event.preventDefault();
     event.stopImmediatePropagation();
   }
 }
 
+const instance = getCurrentInstance();
+const ACTION_LISTENERS = ["onClick", "onPointerdown", "onMousedown", "onPointerup"];
+
+// A plain button with no listener does nothing on click, so a child tooltip may claim the click to open.
+function isInert(): boolean {
+  if (props.as !== "button" || props.asChild || props.type !== "button") return false;
+  if (attrs["aria-haspopup"] !== undefined || attrs["aria-expanded"] !== undefined) return false;
+  const vnodeProps = instance?.vnode.props ?? {};
+  return !ACTION_LISTENERS.some((name) => vnodeProps[name]);
+}
+
 function handleClick(event: MouseEvent): void {
   if (isDisabled.value || props.loading) {
-    if (unavailable.value || lockedLink.value) {
+    if (inactive.value || lockedLink.value) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -513,15 +573,12 @@ function handleClick(event: MouseEvent): void {
     :as-child="asChild"
     :class="classes"
     :type="as === 'button' ? type : undefined"
-    :disabled="
-      as === 'button'
-        ? (isDisabled && !focusableUnavailable) || (loading && !unavailable)
-        : undefined
-    "
+    :disabled="as === 'button' ? isDisabled && !focusableUnavailable : undefined"
     :aria-disabled="isDisabled || loading || undefined"
     :aria-busy="loading || undefined"
     data-o2-btn
     :data-o2-variant="variant"
+    :data-o2-inert="isInert() || undefined"
     v-bind="$attrs"
     :aria-describedby="unavailable ? reasonId : (attrs['aria-describedby'] as string | undefined)"
     @keydown.capture="handleKeydown"
@@ -529,15 +586,17 @@ function handleClick(event: MouseEvent): void {
   >
     <!-- Loading spinner overlay — centered, absolute, shown only when loading -->
     <span
-      v-if="loading"
+      v-if="loading && showSpinner"
       class="pointer-events-none absolute inset-0 flex items-center justify-center"
       aria-hidden="true"
     >
-      <OIcon name="progress-activity" size="sm" class="animate-spin" />
+      <OIcon name="progress-activity" size="sm" class="o2-motion-keep animate-spin" />
     </span>
 
     <!-- Keep display:contents while loading: a wrapper that later loses its box strands a child-mode OTooltip anchored to it at (0,0) -->
-    <span :class="loading ? 'contents text-transparent [&>*]:opacity-0' : 'contents'">
+    <span
+      :class="loading && showSpinner ? 'contents text-transparent [&>*]:opacity-0' : 'contents'"
+    >
       <slot name="icon-left">
         <OIcon
           v-if="iconLeft"

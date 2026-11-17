@@ -24,7 +24,12 @@ import type {
   NotificationEvent,
   TargetModule,
 } from "@/services/downtimes";
-import { conditionSummary, sortedTargets, type FolderNameFn } from "./targetSummary";
+import {
+  conditionSummary,
+  sortedTargets,
+  type FolderNameFn,
+  type ValueLabelFn,
+} from "./targetSummary";
 import { formatDuration, formatWindowTime } from "./schedule";
 import { NOTIFICATION_EVENTS } from "./downtimeForm";
 
@@ -141,8 +146,9 @@ export function summarySentence(
   t: TranslateFn,
   folderName?: FolderNameFn,
   locale?: string,
+  valueLabel?: ValueLabelFn,
 ): I18nText {
-  const conditionText = conditionSummary(completePairs(request.condition), t);
+  const conditionText = conditionSummary(completePairs(request.condition), t, valueLabel);
   const who = sortedTargets(request.targets)
     .filter((tg) => tg.module !== "slos")
     .map((tg) => targetPhrase(tg, conditionText, t, folderName));

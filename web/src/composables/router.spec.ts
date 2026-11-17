@@ -102,14 +102,22 @@ describe("useOSRoutes", () => {
         "aiRemoteTaskEdit",
         "aiRemoteTaskDetail",
         "aiEvaluations",
+        "llmProviders",
+        "genAiAgentMapping",
       ]),
     );
   });
 
-  it("gates every AI Observability route except LLM Insights/Sessions with a beforeEnter guard", () => {
+  it("gates every AI Observability route except the ones OSS serves with a beforeEnter guard", () => {
     const { homeChildRoutes } = useOSRoutes();
     const aiRoute = homeChildRoutes.find((r: any) => r.path === "ai");
-    const ungated = new Set(["aiObservability", "aiLLMInsights", "aiSessions"]);
+    const ungated = new Set([
+      "aiObservability",
+      "aiLLMInsights",
+      "aiSessions",
+      "aiUsers",
+      "aiBudgets",
+    ]);
     for (const child of aiRoute.children) {
       if (ungated.has(child.name)) continue;
       expect(typeof child.beforeEnter).toBe("function");

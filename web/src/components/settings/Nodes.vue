@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <OPageLayout
-    :title="t('nodes.header')"
+    :title="t('settings.nodes')"
     icon="hub"
     :subtitle="t('settings.nodesPage.subtitle')"
     bleed
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-r4 border-border-default flex h-full flex-col border-e max-md:overflow-y-auto max-md:border-e-0 max-md:border-b"
         >
           <div class="sticky top-0 shrink-0 px-2">
-            <div class="flex items-center justify-between p-2 text-lg">
+            <div class="flex items-center justify-between p-2 text-sm font-medium">
               <span class="flex items-center gap-1">
                 {{ t("nodes.filter_header") }}
                 <OIcon name="filter-list" size="sm" />
@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="flex shrink-0 justify-end border-t px-2 py-2">
-            <OButton variant="primary" size="sm-action" @click="applyFilter()">
+            <OButton variant="primary" size="sm-action" @click="onApplyFilterClick">
               {{ t("nodes.applyFilter") }}
             </OButton>
           </div>
@@ -449,30 +449,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             :loading="loading"
           >
-            <!-- Health strip: node counts by status, doubling as the status facet.
-                 Attention-first — offline, then starting, then online, Total last. -->
-            <template #subheader>
-              <div
-                class="px-page-edge border-table-row-divider border-b py-1.5"
-                data-test="nodes-summary"
-              >
-                <OStatStrip
-                  :items="summaryStats"
-                  :loading="loading"
-                  selectable
-                  :selected-key="statusFilter"
-                  default-key="total"
-                  @select="onStatSelect"
-                />
-              </div>
-            </template>
-
             <template #toolbar>
               <OSearchInput
                 data-test="nodes-search-input"
                 v-model="filterQuery"
-                class="flex-1"
+                class="min-w-0 flex-1 md:min-w-48"
                 :placeholder="t('nodes.search')"
+              />
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :row="false"
+                multiple
+                :selected-keys="statusFilters"
+                default-key="total"
+                class="max-md:order-last"
+                data-test="nodes-summary"
+                @update:selected-keys="onStatKeys"
               />
             </template>
             <template #toolbar-trailing>
@@ -490,10 +484,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 size="hero"
                 preset="no-nodes"
-                :filtered="!!(filterQuery || statusFilter)"
-                :hide-action="!(filterQuery || statusFilter)"
+                :filtered="!!(filterQuery || statusFilters.length)"
+                :hide-action="!(filterQuery || statusFilters.length)"
                 @action="
-                  (id) => id === 'clear-filters' && ((filterQuery = ''), (statusFilter = null))
+                  (id) => id === 'clear-filters' && ((filterQuery = ''), (statusFilters = []))
                 "
               />
             </template>
@@ -568,6 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { nodesQuery } from "@/services/common.queries";
+import analytics from "@/services/product_analytics";
 import { defineComponent, reactive, ref, computed, watch, nextTick } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useStore } from "vuex";
@@ -585,7 +580,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ORange from "@/lib/forms/Range/ORange.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
@@ -599,6 +594,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { matchesAnyKey } from "@/utils/filterKeys";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -698,7 +694,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          minSize: 160,
+          minSize: 240,
           meta: { align: "left", flex: true },
         },
         {
@@ -707,7 +703,8 @@ export default defineComponent({
           accessorKey: "region",
           resizable: true,
           hideable: true,
-          size: 50,
+          size: 72,
+          minSize: 66,
           meta: { align: "left" },
         },
         {
@@ -717,8 +714,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.status,
-          minSize: 96,
+          size: 92,
+          minSize: 80,
           meta: { align: "left" },
         },
         {
@@ -729,7 +726,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.role,
+          size: 100,
+          minSize: 98,
           meta: { align: "left" },
         },
         {
@@ -739,7 +737,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 100,
+          size: 84,
+          minSize: 82,
           meta: { align: "left" },
         },
         {
@@ -749,7 +748,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 200,
+          size: 92,
+          minSize: 80,
           meta: { align: "right" },
         },
         {
@@ -759,7 +759,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 200,
+          size: 96,
+          minSize: 96,
           meta: { align: "right" },
         },
         {
@@ -768,7 +769,8 @@ export default defineComponent({
           accessorKey: "tcp_conns",
           resizable: true,
           hideable: true,
-          size: 150,
+          size: 132,
+          minSize: 130,
           meta: { align: "right" },
         },
       ];
@@ -1064,9 +1066,19 @@ export default defineComponent({
       resultTotal.value = data.length;
     };
 
+    const onApplyFilterClick = () => {
+      applyFilter();
+      analytics.track("nodes_filter_applied", {
+        regions: selectedRegions.value.length,
+        clusters: selectedClusters.value.length,
+        node_types: selectedNodetypes.value.length,
+        statuses: selectedStatuses.value.length,
+      });
+    };
+
     const clearAll = () => {
       filterQuery.value = "";
-      statusFilter.value = null;
+      statusFilters.value = [];
       selectedRegions.value = [];
       selectedClusters.value = [];
       selectedNodetypes.value = [];
@@ -1175,22 +1187,19 @@ export default defineComponent({
     // ── Health facet + summary strip ─────────────────────────────────────────
     // Counts run over the search-filtered rows (not the facet-filtered ones) so
     // the tiles keep their totals while a facet is active.
-    const statusFilter = ref<"offline" | "prepare" | "online" | null>(null);
+    const statusFilters = ref<string[]>([]);
 
-    const displayedRows = computed(() => {
-      const rows = visibleRows.value || [];
-      const f = statusFilter.value;
-      if (!f) return rows;
-      return rows.filter((row: any) => nodeHealth(row) === f);
-    });
+    const displayedRows = computed(() =>
+      (visibleRows.value || []).filter((row: any) =>
+        matchesAnyKey(statusFilters.value, row, (r, key) => nodeHealth(r) === key),
+      ),
+    );
 
-    const onStatSelect = (key: string) => {
-      if (key === "total") {
-        statusFilter.value = null;
-        return;
-      }
-      statusFilter.value =
-        statusFilter.value === key ? null : (key as "offline" | "prepare" | "online");
+    // Only a chip being added is tracked; clearing one is not a filter applied.
+    const onStatKeys = (keys: string[]) => {
+      const added = keys.find((key) => !statusFilters.value.includes(key));
+      statusFilters.value = keys;
+      if (added) analytics.track("nodes_health_filter_applied", { status: added });
     };
 
     const healthCounts = computed(() => {
@@ -1242,7 +1251,7 @@ export default defineComponent({
         },
         {
           key: "total",
-          label: t("nodes.summaryTotal"),
+          label: t("common.all"),
           value: v(c.total),
           icon: "hub",
           tone: "primary",
@@ -1313,9 +1322,9 @@ export default defineComponent({
       nodeRowStyle,
       statusIndicatorClass,
       usageVariant,
-      statusFilter,
+      statusFilters,
       displayedRows,
-      onStatSelect,
+      onStatKeys,
       summaryStats,
       splitterModel,
       isMobile,
@@ -1355,6 +1364,7 @@ export default defineComponent({
       maxClosewait,
       maxWaittime,
       applyFilter,
+      onApplyFilterClick,
       clearAll,
       filterOTableColumns,
       filterQuery,

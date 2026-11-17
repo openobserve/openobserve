@@ -160,6 +160,28 @@ pub async fn remove(org_id: &str, pattern_id: &str) -> Result<(), errors::Error>
     Ok(())
 }
 
+/// Makes every stored public dashboard result of `org` rebuild before it is served again, so
+/// anonymous viewers never keep values that a new or changed redaction pattern now hides.
+/// Callers run it after this node's pattern manager holds the change, and every node's watcher
+/// runs it again, so the last bump follows the last node. A failure is retried, then logged,
+/// never returned, so it never stops a redaction change from reaching the other nodes.
+pub async fn invalidate_public_dashboards(org: &str) {
+    let db = infra::db::get_orm_client_rw().await;
+    for attempt in 1..=3 {
+        let now = config::utils::time::now_micros();
+        match infra::table::public_dashboards::bump_settings_rev(db, org, "re_pattern", now).await {
+            Ok(()) => return,
+            Err(e) if attempt < 3 => {
+                log::warn!("[re_pattern] public dashboards of {org}: bump {attempt} failed: {e}");
+                tokio::time::sleep(std::time::Duration::from_millis(200 * attempt)).await;
+            }
+            Err(e) => {
+                log::error!("[re_pattern] failed to invalidate public dashboards of {org}: {e}")
+            }
+        }
+    }
+}
+
 pub async fn process_association_changes(
     org: &str,
     stream: &str,
@@ -225,6 +247,8 @@ pub async fn process_association_changes(
         .collect();
 
     infra::table::re_pattern_stream_map::batch_process(added, removed).await?;
+    // Before the put, so a coordinator failure still invalidates; the watchers bump again.
+    invalidate_public_dashboards(org).await;
 
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
@@ -319,7 +343,10 @@ pub async fn watch_patterns() -> Result<(), anyhow::Error> {
                 };
                 let mgr = get_pattern_manager().await?;
                 if mgr.check_pattern_exists(&new_pattern.id) {
+                    let org = new_pattern.org.clone();
                     mgr.update_pattern(new_pattern.id, new_pattern.pattern)?;
+                    // Each node bumps once it holds the new regex, so the last bump follows it.
+                    invalidate_public_dashboards(&org).await;
                 } else {
                     mgr.insert_pattern(new_pattern);
                 }
@@ -386,6 +413,7 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
 
                 let mgr = get_pattern_manager().await?;
                 mgr.update_associations(org, stype, stream, updates.remove, updates.add)?;
+                invalidate_public_dashboards(org).await;
             }
             Event::Delete(ev) => {
                 let combo = ev.key.strip_prefix(prefix).unwrap();

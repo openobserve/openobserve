@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use async_nats::{error::Error as NatsError, jetstream};
-use config::utils::json;
+use config::{meta::feature::Feature, utils::json};
 use thiserror::Error as ThisError;
 pub mod grpc;
 
@@ -238,9 +240,11 @@ pub enum TemplateError {
     ConvertingId(String),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(ThisError, Debug, Clone)]
 pub enum ErrorCodes {
     ServerInternalError(String),
+    /// A transient server-side refusal, such as an overloaded node; carries the reason.
+    ServiceUnavailable(String),
     SearchSQLNotValid(String),
     SearchStreamNotFound(String),
     FullTextSearchFieldNotFound,
@@ -254,6 +258,8 @@ pub enum ErrorCodes {
     InvalidParams(String),
     RatelimitExceeded(String),
     SearchHistogramNotAvailable(String),
+    /// The stream holds internal records that only their own API reads; carries the stream.
+    SearchStreamProtected(String),
     /// The o2-ai replica holding a conversation is unreachable; carries the
     /// session id. Recoverable — the UI restores it into a fresh session.
     AiSessionOwnerUnavailable(String),
@@ -262,6 +268,12 @@ pub enum ErrorCodes {
     AiChatSessionBusy(String),
     /// The installed license does not entitle these features; carries the comma-joined keys.
     LicenseFeatureNotEntitled(String),
+}
+
+impl From<config::meta::search::QueryOutOfRange> for Error {
+    fn from(value: config::meta::search::QueryOutOfRange) -> Self {
+        Error::ErrorCode(ErrorCodes::InvalidParams(value.to_string()))
+    }
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -343,8 +355,9 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
             ErrorCodes::SearchTimeout(_) => 408,
             ErrorCodes::AiSessionOwnerUnavailable(_) | ErrorCodes::AiChatSessionBusy(_) => 409,
-            ErrorCodes::LicenseFeatureNotEntitled(_) => 403,
+            ErrorCodes::LicenseFeatureNotEntitled(_) | ErrorCodes::SearchStreamProtected(_) => 403,
             ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
+            ErrorCodes::ServiceUnavailable(_) => 503,
             ErrorCodes::InvalidParams(_)
             | ErrorCodes::SearchSQLExecuteError(_)
             | ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
@@ -360,6 +373,7 @@ impl ErrorCodes {
     pub fn get_code(&self) -> u16 {
         match self {
             ErrorCodes::ServerInternalError(_) => 10001,
+            ErrorCodes::ServiceUnavailable(_) => 10002,
             ErrorCodes::SearchSQLNotValid(_) => 20001,
             ErrorCodes::SearchStreamNotFound(_) => 20002,
             ErrorCodes::FullTextSearchFieldNotFound => 20003,
@@ -373,6 +387,7 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(_) => 20011,
             ErrorCodes::RatelimitExceeded(_) => 20012,
             ErrorCodes::SearchHistogramNotAvailable(_) => 20013,
+            ErrorCodes::SearchStreamProtected(_) => 20014,
             ErrorCodes::AiSessionOwnerUnavailable(_) => 30001,
             ErrorCodes::AiChatSessionBusy(_) => 30002,
             ErrorCodes::LicenseFeatureNotEntitled(_) => 40001,
@@ -382,6 +397,7 @@ impl ErrorCodes {
     pub fn get_message(&self) -> String {
         match self {
             ErrorCodes::ServerInternalError(_) => "Server Internal Error".to_string(),
+            ErrorCodes::ServiceUnavailable(_) => "Service unavailable".to_string(),
             ErrorCodes::SearchSQLNotValid(_) => "Search SQL not valid".to_string(),
             ErrorCodes::SearchStreamNotFound(stream) => {
                 format!("Search stream not found: {stream}")
@@ -405,6 +421,9 @@ impl ErrorCodes {
             ErrorCodes::SearchHistogramNotAvailable(_) => {
                 "Search histogram not available".to_string()
             }
+            ErrorCodes::SearchStreamProtected(stream) => {
+                format!("Stream {stream} holds internal records and cannot be searched")
+            }
             ErrorCodes::AiSessionOwnerUnavailable(_) => {
                 "The replica serving this conversation is unavailable".to_string()
             }
@@ -412,7 +431,14 @@ impl ErrorCodes {
                 "Another turn is already running in this conversation".to_string()
             }
             ErrorCodes::LicenseFeatureNotEntitled(features) => {
-                format!("Features not included in your license: {features}")
+                let names: Vec<&str> = features
+                    .split(", ")
+                    .map(|key| Feature::from_str(key).map_or(key, |f| f.display_name()))
+                    .collect();
+                format!(
+                    "Features not included in your license: {}",
+                    names.join(", ")
+                )
             }
         }
     }
@@ -420,6 +446,7 @@ impl ErrorCodes {
     pub fn get_inner_message(&self) -> String {
         match self {
             ErrorCodes::ServerInternalError(msg) => msg.to_owned(),
+            ErrorCodes::ServiceUnavailable(reason) => reason.to_owned(),
             ErrorCodes::SearchSQLNotValid(sql) => sql.to_owned(),
             ErrorCodes::SearchStreamNotFound(stream) => stream.to_owned(),
             ErrorCodes::FullTextSearchFieldNotFound => "".to_string(),
@@ -433,6 +460,7 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
+            ErrorCodes::SearchStreamProtected(stream) => stream.to_owned(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
             ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
             ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
@@ -442,6 +470,7 @@ impl ErrorCodes {
     pub fn get_error_detail(&self) -> String {
         match self {
             ErrorCodes::ServerInternalError(msg) => msg.to_owned(),
+            ErrorCodes::ServiceUnavailable(reason) => reason.to_owned(),
             ErrorCodes::SearchSQLNotValid(sql) => sql.to_owned(),
             ErrorCodes::SearchStreamNotFound(_) => "".to_string(),
             ErrorCodes::FullTextSearchFieldNotFound => "".to_string(),
@@ -455,6 +484,7 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
+            ErrorCodes::SearchStreamProtected(_) => "".to_string(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
             ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
             ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
@@ -497,6 +527,7 @@ impl ErrorCodes {
         };
         match code {
             10001 => Ok(ErrorCodes::ServerInternalError(message)),
+            10002 => Ok(ErrorCodes::ServiceUnavailable(message)),
             20001 => Ok(ErrorCodes::SearchSQLNotValid(message)),
             20002 => Ok(ErrorCodes::SearchStreamNotFound(message)),
             20003 => Ok(ErrorCodes::FullTextSearchFieldNotFound),
@@ -510,6 +541,7 @@ impl ErrorCodes {
             20011 => Ok(ErrorCodes::InvalidParams(message)),
             20012 => Ok(ErrorCodes::RatelimitExceeded(message)),
             20013 => Ok(ErrorCodes::SearchHistogramNotAvailable(message)),
+            20014 => Ok(ErrorCodes::SearchStreamProtected(message)),
             30001 => Ok(ErrorCodes::AiSessionOwnerUnavailable(message)),
             30002 => Ok(ErrorCodes::AiChatSessionBusy(message)),
             40001 => Ok(ErrorCodes::LicenseFeatureNotEntitled(message)),
@@ -591,10 +623,41 @@ mod tests {
         assert_eq!(err.get_error_detail(), "oncall, workflows");
         assert_eq!(
             err.get_message(),
-            "Features not included in your license: oncall, workflows"
+            "Features not included in your license: On-Call, Workflows"
         );
         match ErrorCodes::from_json(&err.to_json()).unwrap() {
             ErrorCodes::LicenseFeatureNotEntitled(keys) => assert_eq!(keys, "oncall, workflows"),
+            other => panic!("round trip lost the variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_license_feature_not_entitled_keeps_an_unknown_key() {
+        let err = ErrorCodes::LicenseFeatureNotEntitled("rum, not_a_feature".into());
+        assert_eq!(
+            err.get_message(),
+            "Features not included in your license: Real User Monitoring, not_a_feature"
+        );
+        assert_eq!(err.get_error_detail(), "rum, not_a_feature");
+    }
+
+    #[test]
+    fn a_protected_stream_refusal_is_a_403_with_its_own_code() {
+        let err = ErrorCodes::SearchStreamProtected("s".into());
+        assert_eq!(err.http_status(), 403);
+        assert_eq!(
+            Error::ErrorCode(ErrorCodes::SearchStreamProtected("s".into())).http_status(),
+            403
+        );
+        assert_eq!(err.get_code(), 20014);
+        assert_eq!(err.get_inner_message(), "s");
+        assert_eq!(err.get_error_detail(), "");
+        assert_eq!(
+            err.get_message(),
+            "Stream s holds internal records and cannot be searched"
+        );
+        match ErrorCodes::from_json(&err.to_json()).unwrap() {
+            ErrorCodes::SearchStreamProtected(stream) => assert_eq!(stream, "s"),
             other => panic!("round trip lost the variant: {other:?}"),
         }
     }

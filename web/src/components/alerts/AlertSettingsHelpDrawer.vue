@@ -11,11 +11,13 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
   renderTemplate,
+  segmentClass,
   buildPreviewContext,
   type PreviewSegment,
   type AlertFormFacts,
   type ExtraLiveValues,
 } from "@/composables/alerts/useTemplatePreview";
+import { parseContentSpec } from "@/components/alerts/template-content/contentSpec";
 
 const props = withDefaults(
   defineProps<{
@@ -89,25 +91,23 @@ const title = computed(() => {
 
 const ctx = computed(() => buildPreviewContext(props.facts, props.extra));
 
+/** The text to preview: a Content template's stored JSON spec becomes its title and body. */
+function displayBody(tpl: any): string {
+  const text = typeof tpl.body === "string" ? tpl.body : JSON.stringify(tpl.body, null, 2);
+  if (tpl.kind !== "content") return text;
+  const spec = parseContentSpec(text);
+  if (!spec) return text;
+  return [spec.title, spec.body].filter((part) => part?.trim()).join("\n\n");
+}
+
 function bodyOf(name: string): string {
   const tpl = props.templates.find((x: any) => x.name === name);
   if (!tpl) return "";
-  return typeof tpl.body === "string" ? tpl.body : JSON.stringify(tpl.body, null, 2);
+  return displayBody(tpl);
 }
 
 function segmentsFor(name: string): PreviewSegment[] {
   return renderTemplate(bodyOf(name), ctx.value);
-}
-
-// segClass maps a segment kind to its visual style class.
-function segClass(kind: string) {
-  return kind === "live"
-    ? "text-text-heading font-semibold"
-    : kind === "sample"
-      ? "text-text-secondary italic underline decoration-dashed"
-      : kind === "opaque"
-        ? "rounded-default bg-surface-subtle-hover text-text-body px-1"
-        : "text-text-body";
 }
 
 // ── CURRENT snapshot, frozen when the drawer opens ──────────────────
@@ -132,12 +132,7 @@ function destTemplateInfo(destName: string): { name: string; body: string } {
   }
   // full Template object on the destination
   const name = tpl.name ?? "";
-  const body =
-    tpl.body != null
-      ? typeof tpl.body === "string"
-        ? tpl.body
-        : JSON.stringify(tpl.body, null, 2)
-      : bodyOf(name);
+  const body = tpl.body != null ? displayBody(tpl) : bodyOf(name);
   return { name, body };
 }
 
@@ -260,6 +255,9 @@ const builtInVars: { name: string; desc: I18nText }[] = [
     desc: t("alerts.alertSettings.builtInVars.alertEndTimeMillis"),
   },
   { name: "alert_url", desc: t("alerts.alertSettings.builtInVars.alertUrl") },
+  { name: "alert_url_label", desc: t("alerts.alertSettings.builtInVars.alertUrlLabel") },
+  { name: "alert_detail_url", desc: t("alerts.alertSettings.builtInVars.alertDetailUrl") },
+  { name: "alert_detail_label", desc: t("alerts.alertSettings.builtInVars.alertDetailLabel") },
   {
     name: "alert_trigger_time",
     desc: t("alerts.alertSettings.builtInVars.alertTriggerTime"),
@@ -388,7 +386,7 @@ defineExpose({ applyTemplate, previewTemplate });
               data-test="help-preview-box"
               class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
             ><template v-for="(s, i) in currentSegments" :key="i"
-                ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+                ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
               ></pre>
             <p v-else class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
@@ -449,7 +447,7 @@ defineExpose({ applyTemplate, previewTemplate });
                   data-test="help-destination-preview"
                   class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
                 ><template v-for="(s, i) in d.segments" :key="i"
-                    ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+                    ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
                   ></pre>
                 <p v-else class="text-text-secondary m-0 text-xs italic">
                   {{ t("alerts.alertSettings.helpDestinationNoTemplate") }}
@@ -479,7 +477,7 @@ defineExpose({ applyTemplate, previewTemplate });
               data-test="help-preview-box"
               class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
             ><template v-for="(s, i) in previewSegments" :key="i"
-                ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+                ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
               ></pre>
             <p v-else class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
@@ -729,7 +727,7 @@ defineExpose({ applyTemplate, previewTemplate });
             data-test="help-preview-box"
             class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
           ><template v-for="(s, i) in rowSegments" :key="i"
-              ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+              ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
             ></pre>
           <p v-else class="text-text-secondary m-0 italic" data-test="help-row-preview-empty">
             {{ t("alerts.alertSettings.helpRowTemplatePreviewEmpty") }}

@@ -46,6 +46,7 @@ import {
 } from "@/utils/dashboard/convertStateTimelineData";
 import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { boxplotDrilldownSeries, boxplotDrilldownTime } from "@/utils/dashboard/convertBoxplotData";
+import { barGaugeDrilldownSeries } from "@/utils/dashboard/convertBarGaugeData";
 import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
 import {
   filtersSummary,
@@ -199,7 +200,7 @@ export function usePanelDrilldown({
   );
 
   // drilldown
-  const replacePlaceholders = (str: any, obj: any) => {
+  const replacePlaceholders = (str: any, obj: any, missing?: string[]) => {
     str = normalizeVariableSyntax(str);
     // if the str is same as the key, return it's value(it can be an string or array).
     for (const key in obj) {
@@ -222,12 +223,22 @@ export function usePanelDrilldown({
           if (value && part in value) {
             value = value[part];
           } else {
+            missing?.push(key);
             return mustacheKey ? "{{" + key + "}}" : "${" + key + "}";
           }
         }
+        if (value === undefined) missing?.push(key);
         return value;
       },
     );
+  };
+
+  // A placeholder with no value for this click must not become the text the target dashboard filters on.
+  const resolvesToValue = (template: string | undefined, variables: Record<string, unknown>) => {
+    if (!template?.trim()) return false;
+    const missing: string[] = [];
+    const value = replacePlaceholders(template, variables, missing);
+    return !missing.length && value !== undefined;
   };
 
   const replaceDrilldownToLogs = (str: any, obj: any) => {
@@ -303,10 +314,12 @@ export function usePanelDrilldown({
     if (panelSchema.value.type === "boxplot") {
       return boxplotDrilldownSeries(panelData?.value?.options, params);
     }
+    if (panelSchema.value.type === "bar-gauge") return barGaugeDrilldownSeries(params);
     return {
       __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,
       __value: value,
-      __axisValue: params?.value?.[0] ?? params?.name,
+      // A gauge dial named "(empty)" stands in for a blank label; drilldowns filter on the blank.
+      __axisValue: params?.value?.[0] ?? params?.data?.rawName ?? params?.name,
     };
   };
 
@@ -1601,7 +1614,7 @@ export function usePanelDrilldown({
 
           // set variables provided by user
           drilldownData.data.variables.forEach((variable: any) => {
-            if (variable?.name?.trim() && variable?.value?.trim()) {
+            if (variable?.name?.trim() && resolvesToValue(variable?.value, drilldownVariables)) {
               url.searchParams.set(
                 "var-" + replacePlaceholders(variable.name, drilldownVariables),
                 replacePlaceholders(variable.value, drilldownVariables),
@@ -1624,7 +1637,7 @@ export function usePanelDrilldown({
           }
 
           drilldownData.data.variables.forEach((variable: any) => {
-            if (variable?.name?.trim() && variable?.value?.trim()) {
+            if (variable?.name?.trim() && resolvesToValue(variable?.value, drilldownVariables)) {
               oldParams["var-" + replacePlaceholders(variable.name, drilldownVariables)] =
                 replacePlaceholders(variable.value, drilldownVariables);
             }

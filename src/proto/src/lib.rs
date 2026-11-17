@@ -15,7 +15,10 @@
 
 mod generated;
 
-pub use generated::{cluster as cluster_rpc, loki as loki_rpc, prometheus as prometheus_rpc};
+pub use generated::{
+    cluster as cluster_rpc, datadog_agentpayload, datadog_trace, loki as loki_rpc,
+    prometheus as prometheus_rpc,
+};
 
 impl From<Vec<serde_json::Value>> for cluster_rpc::IngestionData {
     fn from(usages: Vec<serde_json::Value>) -> Self {

@@ -74,11 +74,7 @@ export function dimensionLabel(
   return raw(version ? `${dimension.scoreConfigName} · v${version}` : dimension.scoreConfigName);
 }
 
-/**
- * What a side actually reads as. A categorical score is a policy-derived rank on
- * the wire and a boolean is 0/1, so rendering the raw scalar makes `0 → 1` mean
- * three different things with no way to tell them apart.
- */
+/** Categorical scores are ranks and booleans healthy shares on the wire, so the raw scalar is ambiguous. */
 export function dimensionSideValue(
   dimension: Pick<
     ExperimentComparisonDimension,
@@ -90,7 +86,6 @@ export function dimensionSideValue(
   if (label) return raw(label);
   const value = side === "baseline" ? dimension.baseline : dimension.candidate;
   if (value === null || value === undefined) return raw("—");
-  if (dimension.dataType === "boolean") return raw(value ? "true" : "false");
   return raw(formatNumber(value));
 }
 

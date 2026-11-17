@@ -68,7 +68,7 @@ fn otlp_request_type_from_content_type(content_type: &str) -> Option<OtlpRequest
     request_body(description = "ExportProfilesServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "ExportProfilesServiceResponse, encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 200, description = "ExportProfilesServiceResponse, encoded like the request", content((common::meta::otlp::OtlpProtobufBody = "application/x-protobuf"), (common::meta::otlp::OtlpProfilesExportJson = "application/json"))),
         (status = 400, description = "Invalid payload, or a Content-Type other than JSON or protobuf (answered in JSON); google.rpc.Status encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 429, description = "Trial period expired; google.rpc.Status encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 500, description = "Failure; google.rpc.Status encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),

@@ -125,7 +125,7 @@ async fn with_cached<T>(
     Ok(f(rows))
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 pub struct SyntheticsLocationRecord {
     pub id: String,
     pub org_id: Option<String>,

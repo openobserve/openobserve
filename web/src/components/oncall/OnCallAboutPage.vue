@@ -30,15 +30,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <OCardSection role="body" dense>
-      <ODescriptionList dense>
+      <ODescriptionList dense label-width="narrow">
         <!-- The engine records why it picked this team. It was only ever
              readable by scrolling the timeline, which is not where somebody
              asks "why me". The winning rule draws as the same key|value chips
              the routing tab draws it with, not a hand-built equation, so a
              dimension reads the same wherever it appears. -->
         <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBy')">
-          <span class="flex flex-col items-start gap-1">
-            <span data-test="oncall-about-routing-reason">
+          <span class="flex min-w-0 flex-col items-start gap-1">
+            <span class="max-w-full wrap-anywhere" data-test="oncall-about-routing-reason">
               <!-- Unrecognised wording: show the record's team, not the server's prose. -->
               <OTag
                 v-if="fallbackRouted && teamDeleted"
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-for="(note, index) in routingNotes"
               :key="index"
-              class="text-text-secondary text-xs"
+              class="text-text-secondary max-w-full text-xs wrap-anywhere"
               :data-test="`oncall-about-routing-note-${index}`"
             >
               {{ raw(note) }}
@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("oncall.deletedTeam") }}
           </OTag>
+          <OSkeleton v-else-if="!teamName" class="h-4 w-24" data-test="oncall-about-team-pending" />
           <router-link
             v-else
             class="text-accent"
@@ -129,33 +130,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </ODescriptionItem>
 
-        <!-- The ids somebody pastes into a channel, boxed with their own copy
-             control — the same shape the Incident Details card uses, so an id
-             reads and copies the same way on both pages. -->
         <ODescriptionItem v-if="incidentId" :label="t('oncall.incident')">
-          <span
-            class="rounded-default border-border-default bg-surface-panel flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
+          <OSkeleton
+            v-if="incidentLoading"
+            class="h-4 w-40"
+            data-test="oncall-about-incident-pending"
+          />
+          <router-link
+            v-else
+            class="text-accent min-w-0"
+            :to="{
+              name: 'incidentDetail',
+              params: { id: incidentId },
+              query: { org_identifier: orgId },
+            }"
+            data-test="oncall-about-incident-link"
           >
-            <router-link
-              class="text-accent min-w-0 flex-1 font-mono"
-              :to="{
-                name: 'incidentDetail',
-                params: { id: incidentId },
-                query: { org_identifier: orgId },
-              }"
-              data-test="oncall-about-incident-link"
-            >
-              <OTruncatedText class="block">{{ raw(incidentId) }}</OTruncatedText>
-            </router-link>
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              icon-left="content-copy"
-              :aria-label="t('common.copyToClipboard')"
-              data-test="oncall-about-copy-incident"
-              @click="copyIncidentId"
-            />
-          </span>
+            <OTruncatedText class="block">{{ raw(incidentTitle || incidentId) }}</OTruncatedText>
+          </router-link>
         </ODescriptionItem>
 
         <!-- When the subject IS the incident, this row would repeat the
@@ -207,6 +199,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import type { ResolutionCause, SubjectType } from "@/ts/interfaces/oncall";
@@ -229,6 +222,10 @@ const props = withDefaults(
     routingReason?: string | null;
     subjectStream?: string | null;
     incidentId?: string | null;
+    /** The incident's own title; the id stands in only when it could not be read. */
+    incidentTitle?: string | null;
+    /** The title is still on its way, so the row skeletons instead of flashing the id. */
+    incidentLoading?: boolean;
     cause?: ResolutionCause | null;
     causeNote?: string | null;
   }>(),
@@ -237,6 +234,8 @@ const props = withDefaults(
     routingReason: null,
     subjectStream: null,
     incidentId: null,
+    incidentTitle: null,
+    incidentLoading: false,
     cause: null,
     causeNote: null,
   },
@@ -318,9 +317,5 @@ const alertEditRoute = computed<RouteLocationRaw | null>(() =>
 
 async function copySubjectId() {
   await copyToClipboard(props.sourceId, t);
-}
-
-async function copyIncidentId() {
-  if (props.incidentId) await copyToClipboard(props.incidentId, t);
 }
 </script>

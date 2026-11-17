@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock;
+
+use arrow_schema::{DataType, Field};
+
 /// Sentinel column whose presence indicates the new `gen_ai_*` schema.
 pub const GEN_AI_SENTINEL_COLUMN: &str = "gen_ai_usage_input_tokens";
 
@@ -57,6 +61,161 @@ pub const REQUIRED_LLM_FIELDS: &[&str] = &[
 
 /// Optional fields for the legacy (llm_*) schema.
 pub const OPTIONAL_LLM_FIELDS: &[&str] = &["llm_input", "llm_output", "llm_usage_tokens_total"];
+
+/// Gen-AI/LLM columns the product reads; every traces UDS keeps them (issue #16307, item 1).
+pub const GEN_AI_UDS_KEEP_FIELDS: &[&str] = &[
+    crate::meta::model_pricing::COST_STATUS_COLUMN,
+    "gen_ai_operation_name",
+    "gen_ai_response_model",
+    "gen_ai_provider_name",
+    "gen_ai_agent_name",
+    "gen_ai_agent_id",
+    "gen_ai_agent_env",
+    "gen_ai_agent_version",
+    "gen_ai_input_messages",
+    "gen_ai_output_messages",
+    "gen_ai_system_instructions",
+    "gen_ai_tool_name",
+    "gen_ai_tool_input",
+    "gen_ai_tool_output",
+    "user_id",
+    "gen_ai_conversation_id",
+    "gen_ai_request_model",
+    "gen_ai_prompt_name",
+    "gen_ai_prompt_version",
+    "gen_ai_prompt_label",
+    "gen_ai_usage_input_tokens",
+    "gen_ai_usage_output_tokens",
+    "gen_ai_usage_prompt_tokens",
+    "gen_ai_usage_completion_tokens",
+    "gen_ai_usage_total_tokens",
+    "gen_ai_usage_cache_read_input_tokens",
+    "gen_ai_usage_cache_creation_input_tokens",
+    "gen_ai_response_time_to_first_chunk",
+    "gen_ai_usage_cost",
+    "gen_ai_usage_cost_usd",
+    "gen_ai_usage_cost_input",
+    "gen_ai_usage_cost_output",
+    "gen_ai_usage_cost_cache_read_input",
+    "gen_ai_usage_cost_cache_creation_input",
+    "gen_ai_usage_cost_estimated_without_cache",
+    "gen_ai_usage_cost_cache_read_savings",
+    "gen_ai_usage_cost_net_cache_impact",
+    // product reads outside the provisioned canonical set
+    "gen_ai_system",
+    "gen_ai_completion_start_time",
+    "gen_ai_user_id",
+    "gen_ai_model_name",
+    "gen_ai_tool_call_id",
+    "gen_ai_tool_call_arguments",
+    "gen_ai_tool_call_result",
+    "session_id",
+    "llm_session_id",
+    "llm_user_id",
+    // legacy llm_* schema reads
+    "llm_usage_tokens_input",
+    "llm_usage_tokens_output",
+    "llm_usage_cost_total",
+    "llm_model_name",
+    "llm_input",
+    "llm_output",
+    "llm_usage_tokens_total",
+    "llm_request_parameters",
+    "llm_request_type",
+    "llm_agent_id",
+    "llm_tool_call_id",
+    "llm_observation_type",
+    "llm_evaluation_quality_score",
+    "llm_evaluation_relevance",
+    "llm_evaluation_completeness",
+    "llm_evaluation_tool_effectiveness",
+    "llm_evaluation_groundedness",
+    "llm_evaluation_safety",
+    "llm_evaluation_duration_ms",
+    "llm_evaluation_commentary",
+    "llm_evaluator_name",
+    "llm_evaluator_version",
+    "llm_evaluator_type",
+];
+
+/// Arrow columns provisioned on LLM streams, named per OTEL Gen-AI semconv after flattening.
+pub static GEN_AI_SCHEMA_FIELDS: LazyLock<Vec<Field>> = LazyLock::new(|| {
+    vec![
+        Field::new("gen_ai_operation_name", DataType::Utf8, true),
+        Field::new("gen_ai_response_model", DataType::Utf8, true),
+        Field::new("gen_ai_provider_name", DataType::Utf8, true),
+        Field::new("gen_ai_agent_name", DataType::Utf8, true),
+        Field::new("gen_ai_agent_id", DataType::Utf8, true),
+        // Registry write-back columns; provisioned so version-scoped queries never hit "No field
+        // named".
+        Field::new("gen_ai_agent_env", DataType::Utf8, true),
+        Field::new("gen_ai_agent_version", DataType::Utf8, true),
+        Field::new("gen_ai_input_messages", DataType::Utf8, true),
+        Field::new("gen_ai_output_messages", DataType::Utf8, true),
+        Field::new("gen_ai_system_instructions", DataType::Utf8, true),
+        // Session span SQL always selects this, so a chat with no tool call still has the column.
+        Field::new("gen_ai_tool_name", DataType::Utf8, true),
+        Field::new("user_id", DataType::Utf8, true),
+        Field::new("gen_ai_conversation_id", DataType::Utf8, true),
+        Field::new("gen_ai_request_model", DataType::Utf8, true),
+        // Prompt Management attribution; label is only written for label-resolved calls.
+        Field::new("gen_ai_prompt_name", DataType::Utf8, true),
+        Field::new("gen_ai_prompt_version", DataType::Utf8, true),
+        Field::new("gen_ai_prompt_label", DataType::Utf8, true),
+        // Written only for unpriced/approximate spans, so provision it for the readers.
+        Field::new(
+            crate::meta::model_pricing::COST_STATUS_COLUMN,
+            DataType::Utf8,
+            true,
+        ),
+        Field::new("gen_ai_usage_input_tokens", DataType::Int64, true),
+        Field::new("gen_ai_usage_output_tokens", DataType::Int64, true),
+        Field::new("gen_ai_usage_total_tokens", DataType::Int64, true),
+        Field::new(
+            "gen_ai_usage_cache_read_input_tokens",
+            DataType::Int64,
+            true,
+        ),
+        Field::new(
+            "gen_ai_usage_cache_creation_input_tokens",
+            DataType::Int64,
+            true,
+        ),
+        Field::new(
+            "gen_ai_response_time_to_first_chunk",
+            DataType::Float64,
+            true,
+        ),
+        Field::new("gen_ai_usage_cost", DataType::Float64, true),
+        Field::new("gen_ai_usage_cost_input", DataType::Float64, true),
+        Field::new("gen_ai_usage_cost_output", DataType::Float64, true),
+        Field::new(
+            "gen_ai_usage_cost_cache_read_input",
+            DataType::Float64,
+            true,
+        ),
+        Field::new(
+            "gen_ai_usage_cost_cache_creation_input",
+            DataType::Float64,
+            true,
+        ),
+        Field::new(
+            "gen_ai_usage_cost_estimated_without_cache",
+            DataType::Float64,
+            true,
+        ),
+        Field::new(
+            "gen_ai_usage_cost_cache_read_savings",
+            DataType::Float64,
+            true,
+        ),
+        Field::new(
+            "gen_ai_usage_cost_net_cache_impact",
+            DataType::Float64,
+            true,
+        ),
+    ]
+});
 
 /// Derived at ingest, already flattened; a same-named user attribute gets an `attr_` prefix.
 pub const INFER_SERVICE_NAME: &str = "infer_service_name";
@@ -272,6 +431,34 @@ pub mod session {
                 vec!["abc-123", "bad';drop", " exact-with-space "]
             );
             assert!(trace_id_predicate(&trace_ids_from_hits(&hits)).contains("'bad'';drop'"));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn uds_keep_list_covers_provisioned_and_query_columns() {
+        let keep: HashSet<&str> = GEN_AI_UDS_KEEP_FIELDS.iter().copied().collect();
+        for field in GEN_AI_SCHEMA_FIELDS.iter() {
+            assert!(keep.contains(field.name().as_str()), "{}", field.name());
+        }
+        for list in [
+            REQUIRED_GEN_AI_FIELDS,
+            OPTIONAL_GEN_AI_FIELDS,
+            REQUIRED_LLM_FIELDS,
+            OPTIONAL_LLM_FIELDS,
+        ] {
+            for name in list {
+                assert!(keep.contains(name), "{name}");
+            }
+        }
+        for name in ["session_id", "gen_ai_conversation_id", "llm_session_id"] {
+            assert!(keep.contains(name), "{name}");
         }
     }
 }

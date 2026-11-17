@@ -253,6 +253,7 @@ import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vu
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import dateTime from "@/components/DateTimePickerDashboard.vue";
 import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
@@ -310,6 +311,7 @@ function onTabsChange(name: string | number) {
     return;
   }
   currentTab.value = String(name);
+  analytics.track("alert_insights_tab_switched", { tab: currentTab.value });
 }
 const selectedAlertForAction = ref<string | null>(null);
 const dashboardData = ref<any>(null); // Store dashboard config as ref instead of computed
@@ -450,6 +452,11 @@ const goBack = () => {
 };
 
 const updateDateTime = (value: any) => {
+  if (value.userChangedValue) {
+    analytics.track("alert_insights_time_range_changed", {
+      type: value.relativeTimePeriod ? "relative" : "absolute",
+    });
+  }
   timeRange.value = {
     __global: {
       start_time: new Date(value.startTime),
@@ -502,6 +509,7 @@ const onDataZoom = (data: any) => {
     start,
     end,
   });
+  analytics.track("alert_insights_filter_applied", { source: "zoom" });
 
   refreshDashboard();
 };
@@ -583,6 +591,7 @@ const handleContextMenuFilter = (filter: any) => {
   });
 
   contextMenu.show = false;
+  analytics.track("alert_insights_filter_applied", { source: "context_menu" });
   refreshDashboard();
 };
 

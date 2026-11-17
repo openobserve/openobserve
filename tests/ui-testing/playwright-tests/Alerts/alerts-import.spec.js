@@ -138,6 +138,10 @@ test.describe("Alerts Import/Export", () => {
       JSON.stringify(exportedJson).includes(alertName),
       `Exported alerts file should contain alert ${alertName}`
     ).toBe(true);
+    // Destination names are per org, so the export clears them and the import below creates the alert without any.
+    const exportedAlert = [].concat(exportedJson).find((a) => a.name === alertName);
+    expect(exportedAlert.destinations, 'Exported alert should carry no destinations').toEqual([]);
+    expect(exportedAlert.recovery_destinations, 'Exported alert should carry no recovery destinations').toEqual([]);
     testLogger.info('Alert export artifact validated', { alertName, downloadPath });
 
     // Delete the original alert before importing to avoid duplicate ID/name conflicts.

@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect } from "vitest";
-import { tooltipNameTarget } from "./triggerName";
+import { tooltipHoverTarget, tooltipNameTarget } from "./triggerName";
 
 const build = (html: string, selector: string) => {
   const host = document.createElement("div");
@@ -33,5 +33,25 @@ describe("tooltipNameTarget", () => {
     const named = build('<button aria-label="Own"><span id="i"></span></button>', "#i");
     expect(tooltipNameTarget(text)).toBeNull();
     expect(tooltipNameTarget(named)).toBeNull();
+  });
+});
+
+describe("tooltipHoverTarget", () => {
+  it("widens to the control when only boxless wrappers sit in between", () => {
+    const icon = build(
+      '<button id="b"><span style="display: contents"><span id="i"></span></span></button>',
+      "#i",
+    );
+    expect(tooltipHoverTarget(icon).id).toBe("b");
+  });
+
+  it("keeps the trigger when a laid-out block sits between it and the control", () => {
+    const icon = build('<div role="button"><div><span id="i"></span></div></div>', "#i");
+    expect(tooltipHoverTarget(icon).id).toBe("i");
+  });
+
+  it("keeps a trigger that sits in no control", () => {
+    const icon = build('<div><span id="i"></span></div>', "#i");
+    expect(tooltipHoverTarget(icon).id).toBe("i");
   });
 });

@@ -27,13 +27,13 @@ use config::{
         stream::{FileKey, StreamSettings, StreamType},
     },
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::Error,
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
         get_stream_setting_index_fields, get_stream_setting_index_updated_at_for_fields,
-        unwrap_stream_created_at, unwrap_stream_settings,
+        unwrap_stream_settings,
     },
 };
 use itertools::Itertools;
@@ -54,7 +54,6 @@ use crate::{
 pub(super) struct StreamSearchSettings {
     pub(super) settings: Option<StreamSettings>,
     pub(super) stream_type: StreamType,
-    pub(super) created_at: Option<i64>,
     pub(super) fts_fields: Vec<String>,
     pub(super) index_fields: Vec<String>,
     pub(super) bloom_fields: Vec<String>,
@@ -106,7 +105,6 @@ impl StreamSearchSettings {
             .map(|v| (v.key.to_string(), v.value.to_string()))
             .collect();
         Self {
-            created_at: unwrap_stream_created_at(&db_schema),
             settings,
             stream_type: source.stream_type,
             fts_fields,
@@ -124,7 +122,6 @@ impl StreamSearchSettings {
         let index_updated_at = get_stream_setting_index_updated_at_for_fields(
             &self.settings,
             self.stream_type,
-            self.created_at,
             &mode.referenced_fields(),
             distinct_fields_updated_at,
         );
@@ -143,6 +140,24 @@ impl StreamSearchSettings {
 
         index_updated_at
     }
+
+    /// FTS fields whose terms are in `_all` for every row at or after `start_time`.
+    pub(super) fn fts_fields_indexed_since(&self, start_time: i64) -> HashSet<String> {
+        self.fts_fields
+            .iter()
+            .filter(|field| {
+                // a field that is also a secondary index keeps its terms out of `_all`
+                !self.index_fields.contains(*field)
+                    && get_stream_setting_index_updated_at_for_fields(
+                        &self.settings,
+                        self.stream_type,
+                        std::slice::from_ref(*field),
+                        0,
+                    ) <= start_time
+            })
+            .cloned()
+            .collect()
+    }
 }
 
 /// Object-storage files whose aggregate is answered without a storage scan.
@@ -153,7 +168,7 @@ pub(super) struct PrecomputedAggregates {
 }
 
 /// Also returns the files left for the storage scan, `None` when the request has no file ids.
-pub(super) async fn route_files(
+pub(super) async fn split_scan_files(
     query: &Arc<QueryParams>,
     req: &FlightSearchRequest,
     settings: &StreamSearchSettings,
@@ -268,7 +283,7 @@ pub(super) async fn route_files(
     Ok((aggregates, Some(scan_files)))
 }
 
-pub(super) async fn search_tables(
+pub(super) async fn collect_table_providers(
     query: &Arc<QueryParams>,
     ctx: &SessionContext,
     source: &StreamSource,
@@ -288,7 +303,7 @@ pub(super) async fn search_tables(
             source.schema.clone(),
             &files,
             source.sort_order,
-            file_stats_cache.clone(),
+            file_stats_cache,
             index.condition.clone(),
             settings.fts_fields.clone(),
             settings.bloom_fields.clone(),
@@ -344,7 +359,6 @@ pub(super) async fn search_tables(
         source.schema.clone(),
         &settings.search_partition_keys,
         source.sort_order,
-        file_stats_cache,
         index.condition.clone(),
         settings.fts_fields.clone(),
         memtable_ids,

@@ -5,6 +5,7 @@
     :subtitle="subtitle"
     icon="group-work"
     title-overflow="visible"
+    tabs-below
     :back="{
       label: t('oncall.backToTeams'),
       to: { name: 'onCallTeams', query: { org_identifier: orgId } },
@@ -21,30 +22,39 @@
     <!-- Whether a page would reach anybody is the team's headline fact, so it
          rides the title instead of sitting in a card below it. -->
     <template #title-trail>
-      <OTag
-        v-if="loaded"
-        type="oncallCoverage"
-        :value="coverageState"
-        size="sm"
-        data-test="oncall-team-coverage"
-      />
+      <span v-if="loaded" class="inline-flex">
+        <OTag
+          type="oncallCoverage"
+          :value="coverageState"
+          size="sm"
+          data-test="oncall-team-coverage"
+        />
+        <OTooltip v-if="coverageTip" side="bottom" :content="coverageTip" />
+      </span>
     </template>
 
     <template #actions>
       <ORefreshButton
         v-if="loaded"
+        layout="inline"
+        size="header"
+        variant="outline"
         :last-run-at="lastFetchedAt"
         :loading="refreshing"
         data-test="oncall-team-refresh"
         @click="refreshPage"
       />
+    </template>
+
+    <template #actions-overflow>
       <!-- A cover is a shift handed to a person, so it needs a roster to hand
            it to: on a team with nobody in it this would open on an empty
            picker, which is a dead end rather than an action. -->
       <OButton
         v-if="members.length && canConfigure"
         variant="outline"
-        size="sm-action"
+        size="sm"
+        icon-left="person-add"
         data-test="oncall-team-override-btn"
         @click="openTakeOverride"
       >
@@ -53,13 +63,77 @@
       <!-- `loaded` stays true after a refresh finds the team gone, so the failure flags are checked too. -->
       <OButton
         v-if="canConfigure && loaded && !teamNotFound && loadError === null"
-        variant="primary"
-        size="sm-action"
+        variant="outline"
+        size="sm"
+        icon-left="edit"
         data-test="oncall-team-detail-edit-btn"
         @click="openTeamEdit"
       >
         {{ t("oncall.editTeam") }}
       </OButton>
+    </template>
+
+    <!-- Attached to the header, as on the Incident page; only once there is a team to show. -->
+    <template v-if="loaded && !oncallUnavailable && !teamNotFound && !loadError" #header-tabs>
+      <OTabs v-model="activeTab" align="left" class="flex-1" data-test="oncall-team-tabs">
+        <OTab
+          name="overview"
+          :label="t('oncall.teamOverview')"
+          icon="format-list-bulleted"
+          data-test="oncall-team-tab-overview"
+        />
+        <OTab name="schedule" data-test="oncall-team-tab-schedule">
+          <OIcon name="calendar-month" size="sm" class="shrink-0" />
+          <span>{{ t("oncall.schedule") }}</span>
+          <EditorDraftDot
+            v-if="scheduleDraftAt(teamId) !== null"
+            :saved-at="scheduleDraftAt(teamId)"
+            data-test="oncall-team-tab-schedule-draft-dot"
+          />
+        </OTab>
+        <OTab name="policy" data-test="oncall-team-tab-policy">
+          <OIcon name="arrow-upward" size="sm" class="shrink-0" />
+          <span>{{ t("oncall.escalationTab") }}</span>
+          <EditorDraftDot
+            v-if="policyDrafts.ids.has(teamId)"
+            :saved-at="policyDrafts.savedAt(teamId)"
+            data-test="oncall-team-tab-policy-draft-dot"
+          />
+          <!-- An icon, not a count chip: the other tabs' chips are tallies, this is a finding. -->
+          <OIcon
+            v-if="silentPriorities"
+            name="warning-amber"
+            size="sm"
+            class="text-status-warning-text shrink-0"
+            data-test="oncall-team-tab-policy-warning"
+          >
+            <OTooltip
+              :content="
+                t('oncall.tabPrioritiesPageNobody', { count: silentPriorities }, silentPriorities)
+              "
+            />
+          </OIcon>
+        </OTab>
+        <OTab name="ownership" data-test="oncall-team-tab-ownership">
+          <OIcon name="alt-route" size="sm" class="shrink-0" />
+          <span>{{ t("oncall.routing") }}</span>
+          <OTag v-if="ruleCount" type="countChip" value="neutral">
+            {{ ruleCount }}
+          </OTag>
+        </OTab>
+        <OTab name="members" data-test="oncall-team-tab-members">
+          <OIcon name="group-work" size="sm" class="shrink-0" />
+          <span>{{ t("oncall.members") }}</span>
+          <OTag
+            v-if="memberCount"
+            type="countChip"
+            value="neutral"
+            data-test="oncall-team-tab-members-count"
+          >
+            {{ memberCount }}
+          </OTag>
+        </OTab>
+      </OTabs>
     </template>
 
     <!-- A failed load must not fall through to the page below: with nothing
@@ -74,6 +148,12 @@
         data-test="oncall-team-detail-not-available"
       />
     </OContent>
+
+    <LicenseDeniedState
+      v-else-if="licenseDenied"
+      :features="licenseDenied"
+      data-test="oncall-team-detail-license-denied"
+    />
 
     <OContent v-else-if="teamNotFound" y>
       <OEmptyState
@@ -100,15 +180,9 @@
     <OnCallTeamDetailSkeleton v-else-if="!loaded" />
 
     <template v-else>
-      <!-- What needs doing about this team, above the tabs that do it. The
-           dry run of a P1 that used to sit here restated the Escalation tab a
-           click away; what survives is the part that names a problem.
-           No OContent wrapper here: with nothing to show, the component
-           renders nothing, and its own inset only applies when it does. -->
       <OnCallTeamAttention
         :risks="configRisks"
         :timezone="team?.timezone ?? 'UTC'"
-        :viewer-timezone="store.state.timezone"
         :reachability="reachability"
         :overview="overview"
         :checked-at="insightsCheckedAt"
@@ -117,72 +191,8 @@
         @recheck="recheckInsights"
       />
 
-      <!-- What the team HAS been doing, then the chain that decides it: when each
-           person is on, what happens if nobody answers, what reaches the team at
-           all, and finally who the people are. -->
-      <OTabs v-model="activeTab" data-test="oncall-team-tabs">
-        <OTab
-          name="overview"
-          :label="t('oncall.teamOverview')"
-          icon="format-list-bulleted"
-          data-test="oncall-team-tab-overview"
-        />
-        <!-- The default slot drops `label` and `icon`, so these tabs size their icon as the `icon` prop would. -->
-        <OTab name="schedule" data-test="oncall-team-tab-schedule">
-          <OIcon name="calendar-month" size="sm" class="shrink-0" />
-          <span>{{ t("oncall.schedule") }}</span>
-          <EditorDraftDot
-            v-if="scheduleDraftAt(teamId) !== null"
-            :saved-at="scheduleDraftAt(teamId)"
-            data-test="oncall-team-tab-schedule-draft-dot"
-          />
-        </OTab>
-        <OTab name="policy" data-test="oncall-team-tab-policy">
-          <OIcon name="arrow-upward" size="sm" class="shrink-0" />
-          <span>{{ t("oncall.escalationTab") }}</span>
-          <EditorDraftDot
-            v-if="policyDrafts.ids.has(teamId)"
-            :saved-at="policyDrafts.savedAt(teamId)"
-            data-test="oncall-team-tab-policy-draft-dot"
-          />
-          <!-- Warning whether or not the tab is open: a priority that pages
-               nobody is a finding, not a tally of what is on the tab. -->
-          <OTag v-if="silentPriorities" type="countChip" value="warning">
-            {{ silentPriorities }}
-          </OTag>
-        </OTab>
-        <OTab name="ownership" data-test="oncall-team-tab-ownership">
-          <OIcon name="alt-route" size="sm" class="shrink-0" />
-          <span>{{ t("oncall.routing") }}</span>
-          <OTag
-            v-if="ruleCount"
-            type="countChip"
-            :value="activeTab === 'ownership' ? 'primary' : 'neutral'"
-          >
-            {{ ruleCount }}
-          </OTag>
-        </OTab>
-        <OTab name="members" data-test="oncall-team-tab-members">
-          <OIcon name="group-work" size="sm" class="shrink-0" />
-          <span>{{ t("oncall.members") }}</span>
-          <OTag
-            v-if="memberCount"
-            type="countChip"
-            :value="activeTab === 'members' ? 'primary' : 'neutral'"
-          >
-            {{ memberCount }}
-          </OTag>
-        </OTab>
-      </OTabs>
-
-      <!-- `scroll` alone left the escalation policy clipped, and `grow` alone never shrinks below content without `min-h-0`, which is what lets Covers' `sticky bottom-0` below pin itself. -->
       <OTabPanels :key="tabsKey" v-model="activeTab" grow scroll="y" class="min-h-0">
         <OTabPanel name="overview">
-          <!-- Two blocks in one column. The demo read as a wall: five sortable
-               columns of history beside a rail restating reach and readiness that
-               the Escalation and Members tabs already own. What is left is the
-               pair of questions this tab exists for — is anybody there to answer
-               next, and has this team been answering. -->
           <OContent y class="flex flex-col gap-5">
             <!-- Gaps are the only thing worth looking at here, so they are the
                  only bands that get an alarming colour. -->
@@ -197,6 +207,7 @@
                 <OButton
                   variant="ghost-primary"
                   size="xs"
+                  icon-left="calendar-month"
                   class="ms-auto"
                   data-test="oncall-team-open-schedule"
                   @click="activeTab = 'schedule'"
@@ -208,7 +219,6 @@
                 :rotations="schedule?.rotations ?? []"
                 :unreachable="unreachableEmails"
                 :timezone="team?.timezone ?? 'UTC'"
-                :viewer-timezone="store.state.timezone"
                 :days="COVERAGE_DAYS"
               />
             </div>
@@ -216,8 +226,8 @@
             <OnCallRecentPages
               :pages="recentPages"
               :policy="policy"
-              :window-days="ACTIVITY_WINDOW_DAYS"
               :loading="pagesLoading"
+              :window-days="ACTIVITY_WINDOW_DAYS"
               @open="openPage"
               @view-all="openOnCallList"
             />
@@ -237,13 +247,13 @@
             :members="members"
             :rotations="schedule?.rotations ?? []"
             :timezone="team?.timezone ?? 'UTC'"
-            :viewer-timezone="store.state.timezone"
             :on-call-now="onCallNow"
             :reachability="reachability"
             :load="teamLoad"
             :can-configure="canConfigure"
             @changed="onMembersChanged"
             @open-schedule="activeTab = 'schedule'"
+            @license-denied="lockPage"
           />
         </OTabPanel>
 
@@ -258,60 +268,57 @@
           <OnCallScheduleAnswer
             :positions="onCallNow"
             :has-members="hasMembers !== false"
+            :rotation-count="teamRotations.length"
             @assign-secondary="onAssignSecondary"
             @add-people="activeTab = 'members'"
           />
 
           <OContent y class="flex h-full min-h-0 flex-1 flex-col gap-5">
-            <!-- Every act on a rotation arrives here, and every one of them opens
-                 the SAME drawer: a rotation is one form, and which button was
-                 pressed only decides what it opens on. The chart draws every
-                 rotation the team has: the picker that used to scope it to one
-                 hid lanes on exactly the teams whose lanes are worth comparing.
-                 flex-1 so it takes the tab's own floor, which is what lets the
-                 Covers panel below sit pinned at the bottom rather than right
-                 under the calendar. -->
+            <!-- Every act on a rotation opens the SAME drawer: which button was pressed only decides what it opens on. -->
             <OnCallScheduleTimeline
               v-model:window="scheduleWindow"
               :rotations="teamRotations"
               :segments="segments"
               :timezone="team?.timezone ?? 'UTC'"
-              :viewer-timezone="store.state.timezone"
               :loading="segmentsLoading"
               :can-cover="hasMembers !== false && canConfigure"
-              class="min-h-0 flex-1"
+              :absences="teamAbsences"
+              :can-mark-away="canConfigure"
+              :self-email="selfEmail"
+              :swap-rotations="swapRotationIds"
+              :shift-spans="shiftSpans"
+              :policy="policy"
               @fill-gap="onFillGap"
               @add="openScheduleEditor({ mode: 'new' })"
               @edit="openScheduleEditor({ mode: 'edit', id: $event })"
               @assign-people="openScheduleEditor({ mode: 'edit', id: $event })"
               @duplicate="openScheduleEditor({ mode: 'duplicate', id: $event })"
-              @override="openCover"
-              @request-cover="openCover"
+              @override="openCoverFor"
               @delete="rotationToDelete = $event"
-              @presets="presetsOpen = true"
+              @presets="openPresets"
+              @shift-action="onShiftAction"
+              @clear-away="awayToClear = $event"
             />
 
-            <!-- Pinned to the tab's own floor rather than left in flow, since whether anyone is overriding the schedule shouldn't depend on how far the reader scrolled. -->
             <OnCallCoverList
               ref="coverListRef"
-              class="sticky bottom-0 z-1"
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
-              :viewer-timezone="store.state.timezone"
               :window="scheduleWindow"
               :rotations="teamRotations"
               @changed="onCoversChanged"
+              @license-denied="lockPage"
             />
 
-            <!-- Stored rotations always pass validation, so the first is the one the server's preset rewrites. -->
             <OnCallSchedulePresets
               v-model:open="presetsOpen"
               :team-id="teamId"
               :members="members"
               :timezone="team?.timezone ?? 'UTC'"
-              :viewer-timezone="store.state.timezone"
-              :primary-rotation-name="schedule?.rotations?.[0]?.name ?? ''"
+              :rotations="teamRotations"
+              :start-on="presetsStartOn"
               @applied="onScheduleSaved"
+              @license-denied="lockPage"
             />
 
             <!-- Drawer only: the read view stays underneath. Swapping the tab
@@ -321,7 +328,6 @@
               drawer-only
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
-              :viewer-timezone="store.state.timezone"
               :schedule="schedule"
               :members="members"
               :intent="scheduleIntent"
@@ -330,6 +336,7 @@
               @intent-handled="scheduleIntent = null"
               @open-members="activeTab = 'members'"
               @open-policy="openPolicyFromRemove"
+              @license-denied="lockPage"
             />
           </OContent>
         </OTabPanel>
@@ -347,8 +354,8 @@
               :preview="preview"
               :loading="previewLoading"
               :can-configure="canConfigure"
+              :on-call-now="onCallNow"
               @edit="openPolicyEditor"
-              @open-members="activeTab = 'members'"
               @send-test="testPageOpen = true"
             />
 
@@ -365,21 +372,32 @@
               @saved="onPolicySaved"
               @policy-written="fetchAll()"
               @open-members="activeTab = 'members'"
+              @license-denied="lockPage"
             />
           </OContent>
         </OTabPanel>
 
         <OTabPanel name="ownership">
-          <!-- The ladder rides along so the rule editor can say what paging
-               this team would actually run. -->
           <OContent y>
-            <OnCallOwnership :team-id="teamId" :teams="teams" :ladder="overview?.rungs ?? []" />
+            <OnCallOwnership
+              :team-id="teamId"
+              :teams="teams"
+              @rules-loaded="(count: number) => (ruleCount = count)"
+              @license-denied="lockPage"
+            />
           </OContent>
         </OTabPanel>
       </OTabPanels>
     </template>
 
-    <OnCallTeamForm v-model:open="editOpen" :team="team" @saved="onTeamSaved" />
+    <!-- The same drawer as the Teams list's, Default switch included. -->
+    <OnCallTeamForm
+      v-model:open="editOpen"
+      :team="team"
+      offer-default
+      :is-default="!!team && team.id === defaultTeamId"
+      @saved="onTeamSaved"
+    />
 
     <!-- Named in the prompt: a rotation is what puts somebody on call, and two
          rotations in one team routinely differ by one word. -->
@@ -395,14 +413,59 @@
     />
 
     <!-- Named from the loaded preview: the first step can be the whole team, so this is the last look at who gets woken. -->
-    <ConfirmDialog
-      :model-value="testPageOpen"
+    <ODialog
+      :open="!!clearingAway"
+      size="sm"
+      :title="t('oncall.awayClear')"
+      :primary-button-label="t('oncall.awayClearConfirm')"
+      :secondary-button-label="t('oncall.cancel')"
+      data-test="oncall-away-clear-confirm"
+      @update:open="(isOpen: boolean) => !isOpen && (awayToClear = null)"
+      @click:primary="confirmClearAway"
+      @click:secondary="awayToClear = null"
+    >
+      <i18n-t
+        v-if="clearingAway"
+        keypath="oncall.awayClearMessage"
+        tag="p"
+        scope="global"
+        class="text-sm"
+        data-test="oncall-away-clear-message"
+      >
+        <template #name><OnCallPersonName :email="clearingAway.user_email" /></template>
+        <template #range>{{ clearingAwayRange }}</template>
+      </i18n-t>
+    </ODialog>
+
+    <ODialog
+      v-model:open="testPageOpen"
+      size="sm"
       :title="t('oncall.testPageConfirmTitle')"
-      :message="testPageMessage"
-      :ok-label="t('oncall.ladderSendTest')"
-      @update:ok="sendTestPage"
-      @update:cancel="testPageOpen = false"
-    />
+      :primary-button-label="t('oncall.ladderSendTest')"
+      :secondary-button-label="t('oncall.cancel')"
+      data-test="oncall-team-test-page-dialog"
+      @click:primary="sendTestPage"
+      @click:secondary="testPageOpen = false"
+    >
+      <i18n-t
+        :keypath="
+          testPageCopy.channels ? 'oncall.testPageConfirm' : 'oncall.testPageConfirmNoChannel'
+        "
+        tag="p"
+        scope="global"
+        class="text-sm"
+        data-test="oncall-team-test-page-message"
+      >
+        <template #priority>{{ raw(selectedPriority) }}</template>
+        <template #names>
+          <template v-for="(email, index) in testPageCopy.emails" :key="email">
+            <span v-if="index">{{ raw(", ") }}</span>
+            <OnCallPersonName :email="email" data-test="oncall-team-test-page-person" />
+          </template>
+        </template>
+        <template #channels>{{ testPageCopy.channels }}</template>
+      </i18n-t>
+    </ODialog>
 
     <OnCallCoverForm
       v-model:open="coverOpen"
@@ -411,13 +474,27 @@
       :viewer-timezone="store.state.timezone"
       :team-name="team?.name ?? ''"
       :saving="coverSaving"
-      :current-holder="onCallNow[0]?.user_email ?? null"
+      :current-holder="coverHolder"
+      :positions="onCallNow"
       :gap="coverGap"
       :default-user="coverDefaultUser"
-      :shifts="swappableShifts"
+      :shifts="swapShifts"
       :rotations="teamRotations"
+      :default-rotation="coverRotation"
+      :default-mode="coverMode"
+      :swap-from="coverSwapFrom"
+      :resolve-runs="resolveCoverRuns"
       @save="saveCover"
       @swap="saveSwap"
+    />
+
+    <OnCallAwayDialog
+      v-model:open="awayOpen"
+      :email="awayEmail"
+      :timezone="team?.timezone ?? 'UTC'"
+      :from="awayWindow?.from ?? null"
+      :to="awayWindow?.to ?? null"
+      @saved="onAwaySaved"
     />
   </OPageLayout>
 </template>
@@ -433,7 +510,9 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
@@ -446,13 +525,24 @@ import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.v
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
 import OnCallRecentPages from "@/components/oncall/OnCallRecentPages.vue";
 import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
+import OnCallAwayDialog from "@/components/oncall/OnCallAwayDialog.vue";
+import type { ShiftAction } from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallEscalationLadder from "@/components/oncall/OnCallEscalationLadder.vue";
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OnCallRemoveRotationDialog from "@/components/oncall/OnCallRemoveRotationDialog.vue";
 import OnCallTeamDetailSkeleton from "@/views/OnCall/OnCallTeamDetailSkeleton.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import { useOnCallDefaultTeam } from "@/composables/useOnCallDefaultTeam";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
+import { useListViewState } from "@/composables/useListViewState";
+import {
+  segmentSpanKey,
+  shiftAround,
+  shiftLookupWindow,
+  SHIFT_LOOKUP_MICROS,
+  swappableRuns,
+} from "@/components/oncall/resolvedShifts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -460,6 +550,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
@@ -480,6 +571,7 @@ import analytics from "@/services/product_analytics";
 import {
   createOverrideMutation,
   deleteOverrideMutation,
+  deleteUnavailabilityMutation,
   escalationPreviewQuery,
   oncallTeamQuery,
   oncallTeamsQuery,
@@ -495,6 +587,7 @@ import {
   teamReachabilityQuery,
   teamScheduleQuery,
   testPageMutation,
+  unavailabilityQuery,
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
 import type {
@@ -512,16 +605,19 @@ import type {
   TeamReachability,
   ScheduleEditorIntent,
   OwnershipRule,
+  Unavailability,
 } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { MICROS_PER_DAY, MICROS_PER_HOUR } from "@/ts/interfaces/oncall";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import {
   channelList,
-  formatInZone,
+  formatDayRange,
   isOnCallUnavailable,
   upcomingShifts,
   winningRule,
 } from "@/utils/oncall";
+import { serverMessageOf, statusOf } from "@/utils/slackLink";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -555,6 +651,8 @@ const insightsCheckedAt = ref<number | null>(null);
 const teamLoad = ref<TeamLoad | null>(null);
 const segments = ref<ResolvedSegment[]>([]);
 const segmentsLoading = ref(false);
+/// The whole shift behind each band the calendar's edges cut, keyed by `segmentSpanKey`.
+const shiftSpans = ref<Record<string, { from: number; to: number }>>({});
 /// Read or edit, never both — the editor brings its own calendar and table.
 
 /// What the drawer opens on. One click lands on the rotation the user pointed
@@ -589,7 +687,7 @@ const coverOpen = ref(false);
 /// landed on the server and left the list under the calendar unchanged.
 const coverListRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
 
-/// So the attention banner's "Add a member" can focus the picker even when switching to this tab is a no-op.
+/// So the attention banner's "Add members" can focus the picker even when switching to this tab is a no-op.
 const membersRef = ref<{ focusMemberPicker: () => void } | null>(null);
 
 /// Both things a written cover invalidates: the calendar, which the server
@@ -599,6 +697,8 @@ async function refreshCoverage() {
   await Promise.allSettled([fetchSegments(), coverListRef.value?.refresh() ?? Promise.resolve()]);
 }
 const presetsOpen = ref(false);
+/// The rotation id a template replaces; empty adds a new rotation.
+const presetsStartOn = ref("");
 /// The rotation the reader asked to delete, held until they confirm it.
 /// The rotation's **id**. The confirm dialog needs its name, which is looked
 /// up rather than carried: a name is renameable and two rotations may share
@@ -617,6 +717,15 @@ const coverGap = ref<{ from: number; to: number } | null>(null);
 /// Who the cover dialog opens pre-selected on. Empty for every opener that has
 /// no opinion about the person.
 const coverDefaultUser = ref("");
+const coverRotation = ref("");
+const coverMode = ref<"cover" | "swap">("cover");
+const coverSwapFrom = ref<{ rotationId: string; at: number } | null>(null);
+/// Whose shift a cover from a clicked bar relieves; null falls back to whoever is on now.
+const coverHolder = ref<string | null>(null);
+const awayOpen = ref(false);
+const awayEmail = ref("");
+const awayWindow = ref<{ from: number; to: number } | null>(null);
+const selfEmail = computed(() => String(store.state.userInfo?.email ?? ""));
 const editingPolicy = ref(false);
 const selectedPriority = ref("P1");
 /// The ladder chips are labels ("P3"); the policy's rungs are numbered. The
@@ -626,7 +735,8 @@ const preview = ref<EscalationPreview | null>(null);
 const previewLoading = ref(false);
 /// Owned by the timeline, which decides the visible range; the fetch follows it.
 const scheduleWindow = ref({ from: 0, to: 0 });
-const ruleCount = ref(0);
+/// Null until known, so the header never claims "0 routing rules" for a lookup that failed.
+const ruleCount = ref<number | null>(null);
 // Where the team actually is in its setup decides the landing tab. A brand
 // new team opens on Members, because a schedule with nobody in it is not
 // something anybody can act on; once there are people, Schedule leads,
@@ -636,10 +746,12 @@ const loaded = ref(false);
 const lastFetchedAt = ref<number | null>(null);
 const loadError = ref<string | null>(null);
 const oncallUnavailable = ref(false);
+const licenseDenied = ref<string[] | null>(null);
 const teamNotFound = ref(false);
 const editOpen = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+const { defaultTeamId, loadDefaultTeam, setDefaultTeam } = useOnCallDefaultTeam(orgId);
 const teamId = computed(() => String(route.params.teamId ?? ""));
 
 const scheduleDraftAt = useScheduleDraftTimes();
@@ -701,14 +813,14 @@ const hasMembers = computed<boolean | null>(() => (loaded.value ? members.value.
 
 const subtitle = computed(() => {
   if (!team.value) return undefined;
-  const rules = overview.value?.alerts_assigned;
+  const rules = ruleCount.value;
   const base = t(
     "oncall.teamSubtitle",
     { tz: team.value.timezone, count: memberCount.value },
     memberCount.value,
   );
-  if (rules === undefined) return base;
-  return raw(`${base} · ${t("oncall.teamAlertRules", { count: rules }, rules)}`);
+  if (rules === null) return base;
+  return raw(`${base} · ${t("oncall.teamOwnsRules", { count: rules }, rules)}`);
 });
 
 /// Pages this team was woken by, inside the activity window.
@@ -725,7 +837,15 @@ function openPage(row: OnCallResponse) {
   });
 }
 
+// The Pages list keeps its filters in shared view state, not the URL, so the team is set there before the jump.
 function openOnCallList() {
+  const view = useListViewState("oncall-responses", { teamFilter: "all" });
+  Object.assign(view, {
+    teamFilter: teamId.value,
+    mineOnly: false,
+    activeFilter: "all",
+    currentPage: 1,
+  });
   router.push({ name: "onCallResponses", query: { org_identifier: orgId.value } });
 }
 
@@ -767,7 +887,28 @@ async function read<T>(
       refetchType: "none",
     });
   }
-  return queryClient.fetchQuery(options as any) as Promise<T>;
+  try {
+    return (await queryClient.fetchQuery(options as any)) as T;
+  } catch (err) {
+    // Any read can carry it, because the others may be answered from cache; the callers still see the error.
+    const denied = licenseDeniedFeatures(err);
+    if (denied) lockPage(denied);
+    throw err;
+  }
+}
+
+function lockPage(features: string[]) {
+  // The header reads these three, and its team facts and actions must not outlive the body.
+  team.value = null;
+  members.value = [];
+  loaded.value = false;
+  // A lock drawn behind an open form would be out of sight, and saving there can only be refused.
+  editOpen.value = false;
+  coverOpen.value = false;
+  awayOpen.value = false;
+  testPageOpen.value = false;
+  rotationToDelete.value = null;
+  licenseDenied.value = features;
 }
 
 /// Read-modify-write: an editor writes its record back whole, so its draft starts from the server's copy, never this page's cached one.
@@ -778,10 +919,11 @@ async function readForEdit<T>(
   try {
     assign(await read<T>(options, true));
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
+    if (licenseDenied.value) return false;
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.editorReadFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.editorReadFailed"),
     });
     return false;
   }
@@ -797,9 +939,14 @@ const refreshScheduleForEdit = () =>
     });
   });
 
+function loadFailureOf(err: unknown): string {
+  return serverMessageOf(err) ?? (err instanceof Error ? err.message : "");
+}
+
 async function fetchAll(force = false) {
   loadError.value = null;
   teamNotFound.value = false;
+  licenseDenied.value = null;
   const org = orgId.value;
   const id = teamId.value;
 
@@ -814,26 +961,28 @@ async function fetchAll(force = false) {
       read<OnCallPosition[]>(whoIsOnCallQuery(org, id), force),
     ]);
 
+  if (licenseDenied.value) return;
+
   // The org-level list exists in every on-call build regardless of this team id, so only its failure means the feature is unavailable.
   if (teamsSettled.status === "rejected") {
-    const err: any = teamsSettled.reason;
+    const err: unknown = teamsSettled.reason;
     if (isOnCallUnavailable(err)) {
       oncallUnavailable.value = true;
       return;
     }
-    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    loadError.value = loadFailureOf(err);
     return;
   }
 
   if (teamSettled.status === "rejected") {
-    const err: any = teamSettled.reason;
+    const err: unknown = teamSettled.reason;
     // The probe above already confirmed on-call is available, so a 404 on this query alone means the team id was deleted.
-    if (err?.response?.status === 404) {
+    if (statusOf(err) === 404) {
       teamNotFound.value = true;
       dropTeamDrafts();
       return;
     }
-    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    loadError.value = loadFailureOf(err);
     return;
   }
 
@@ -843,12 +992,12 @@ async function fetchAll(force = false) {
     policySettled.status === "rejected" ||
     onCallSettled.status === "rejected"
   ) {
-    const err: any = (
+    const err: unknown = (
       [memberSettled, scheduleSettled, policySettled, onCallSettled].find(
         (settled) => settled.status === "rejected",
       ) as PromiseRejectedResult
     ).reason;
-    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    loadError.value = loadFailureOf(err);
     return;
   }
 
@@ -882,8 +1031,7 @@ async function fetchAll(force = false) {
   ]);
 }
 
-// The count feeds a warning tile, so a failed lookup leaves it at zero-known
-// rather than claiming the team has no routing.
+// Same set the Routing tab lists, so the header, the tab chip and the tab agree.
 async function fetchRuleCount(force = false) {
   try {
     const rules = await read<OwnershipRule[]>(
@@ -892,7 +1040,7 @@ async function fetchRuleCount(force = false) {
     );
     ruleCount.value = rules.length;
   } catch {
-    ruleCount.value = 0;
+    ruleCount.value = null;
   }
 }
 
@@ -930,36 +1078,45 @@ async function fetchPages(force = false) {
   }
 }
 
-/// Priorities whose ladder wakes nobody — the count the escalation tab badges.
+/// Priorities whose ladder wakes nobody; P4–P5 page nobody by default, so only a silent P1–P3 is a finding.
 const silentPriorities = computed(
-  () => (overview.value?.rungs ?? []).filter((rung) => !rung.pages_anyone).length,
+  () =>
+    (overview.value?.rungs ?? []).filter(
+      (rung) => !rung.pages_anyone && Number(rung.priority.slice(1)) < 4,
+    ).length,
 );
 
-/// Rostered and reachable are two questions, and the chip used to answer only
-/// the first — a green `Covered` sat beside a panel reading "no page can be
-/// delivered to anyone", which tells the reader the team is fine at the exact
-/// moment it is not. Reachability is folded in: if everybody holding the pager
-/// right now would fail to receive a page, the team is rostered, not covered.
-///
-/// Silent when reachability did not load — an unanswered question is not a
-/// finding, and inventing one here would be the same lie in the other
-/// direction.
-const coverageState = computed<"covered" | "gap" | "unreachable">(() => {
-  const covered = overview.value?.covered_now ?? onCallNow.value.length > 0;
-  if (!covered) return "gap";
-
+/// Green only when every person on call now would receive a page, so the chip never disagrees with the banner naming one who would not.
+const unreachableHolders = computed(() => {
   const verdicts = reachability.value?.members ?? [];
-  const holders = onCallNow.value
-    .map((position) => position.user_email?.toLowerCase())
-    .filter((email): email is string => !!email);
+  const holders = [
+    ...new Set(
+      onCallNow.value
+        .map((position) => position.user_email?.toLowerCase())
+        .filter((email): email is string => !!email),
+    ),
+  ];
   const known = holders
     .map((email) => verdicts.find((member) => member.user_email.toLowerCase() === email))
     .filter((member) => !!member);
+  return { total: holders.length, unreachable: known.filter((m) => !m.would_a_page_land).length };
+});
 
-  // Only when the server actually judged the people on call, and judged every
-  // one of them unreachable: one reachable holder means a page still lands.
-  if (known.length && known.every((member) => !member.would_a_page_land)) return "unreachable";
-  return "covered";
+const coverageState = computed<"covered" | "gap" | "unreachable" | "allunreachable">(() => {
+  const covered = overview.value?.covered_now ?? onCallNow.value.length > 0;
+  if (!covered) return "gap";
+  const { unreachable, total } = unreachableHolders.value;
+  if (!unreachable) return "covered";
+  // Nobody holding the pager would receive a page, which is the coverage bar's red, not a partial warning.
+  return unreachable === total ? "allunreachable" : "unreachable";
+});
+
+const coverageTip = computed<I18nText | undefined>(() => {
+  if (coverageState.value !== "unreachable" && coverageState.value !== "allunreachable") {
+    return undefined;
+  }
+  const { unreachable, total } = unreachableHolders.value;
+  return t("oncall.coverageCantReachTip", { count: unreachable, total });
 });
 
 /// Who the strip must not count as cover: the server judged a page to them would not land.
@@ -970,7 +1127,7 @@ const unreachableEmails = computed(() =>
 );
 
 /// The server sends a test to the first step only, so the first step's people are who it names.
-const testPageMessage = computed(() => {
+const testPageCopy = computed<{ emails: string[]; channels: I18nText | "" }>(() => {
   const first = [...(preview.value?.rungs ?? [])].sort(
     (a, b) => a.after_micros - b.after_micros,
   )[0];
@@ -979,13 +1136,10 @@ const testPageMessage = computed(() => {
   const sent = (preview.value?.channels ?? []).filter((channel) =>
     people.some((one) => (one.deliverable_channels ?? []).includes(channel)),
   );
-  const params = {
-    priority: raw(selectedPriority.value),
-    names: raw(people.map((one) => one.user_email).join(", ")),
+  return {
+    emails: [...new Set(people.map((one) => one.user_email))],
+    channels: sent.length ? raw(channelList(sent, t)) : "",
   };
-  return sent.length
-    ? t("oncall.testPageConfirm", { ...params, channels: raw(channelList(sent, t)) })
-    : t("oncall.testPageConfirmNoChannel", params);
 });
 
 /// The one honest answer to "would a page actually land": send a real one and
@@ -1015,14 +1169,14 @@ async function sendTestPage() {
         }),
       });
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.testPageFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.testPageFailed"),
     });
   }
 }
@@ -1068,15 +1222,42 @@ async function fetchSegments(force = false) {
         rotation_id: segment.rotation_id || rotations[index].id,
       })),
     );
-  } catch (err: any) {
-    if (readId !== latestSegmentsRead) return;
+    void fetchShiftSpans(segments.value);
+  } catch (err: unknown) {
+    if (readId !== latestSegmentsRead || licenseDenied.value) return;
     segments.value = [];
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.timelineLoadFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.timelineLoadFailed"),
     });
   } finally {
     if (readId === latestSegmentsRead) segmentsLoading.value = false;
+  }
+}
+
+const absences = ref<Unavailability[]>([]);
+
+/// Only this team's people: the endpoint answers org-wide.
+const teamAbsences = computed(() => {
+  const emails = new Set(members.value.map((m) => m.user_email.toLowerCase()));
+  return absences.value.filter((a) => emails.has(a.user_email.toLowerCase()));
+});
+
+let latestAbsencesRead = 0;
+
+/// Silent on failure: an org-wide window read needs the configuration grant, and the lanes stand without it.
+async function fetchAbsences(force = false) {
+  const { from, to } = scheduleWindow.value;
+  if (!from || !to) return;
+  const readId = ++latestAbsencesRead;
+  try {
+    const answer = await read<Unavailability[]>(
+      unavailabilityQuery(orgId.value, undefined, from, to),
+      force,
+    );
+    if (readId === latestAbsencesRead) absences.value = answer;
+  } catch {
+    if (readId === latestAbsencesRead) absences.value = [];
   }
 }
 
@@ -1118,16 +1299,16 @@ async function deleteRotation() {
     toast({ variant: "success", message: t("oncall.laneDeleted", { name: raw(name) }) });
     dropRotationDrafts({ org: orgId.value, teamId: teamId.value, rotationId: id });
     await onScheduleSaved();
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     // The server's own sentence: it refuses a save that would leave two
     // rotations equally in force, and which two is the whole story.
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.laneDeleteFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.laneDeleteFailed"),
     });
   }
 }
@@ -1146,17 +1327,129 @@ function openPolicyFromRemove() {
 
 /// Somebody else covers a window nobody holds: the hole is known, the person
 /// is the open question.
-function onFillGap(gap: ResolvedSegment) {
-  coverGap.value = { from: gap.from, to: gap.to };
-  coverDefaultUser.value = "";
+async function onFillGap(gap: ResolvedSegment) {
+  await openCoverDialog({ gap: fromNow(await realSpan(gap)), rotation: gap.rotation_id });
+}
+
+/// A lane's own "Add a cover": the rotation is decided, the window and person are not.
+function openCoverFor(rotationId: string) {
+  void openCoverDialog({ rotation: rotationId });
+}
+
+async function openCoverDialog(opts: {
+  gap?: { from: number; to: number } | null;
+  user?: string;
+  rotation?: string;
+  mode?: "cover" | "swap";
+  swapFrom?: { rotationId: string; at: number } | null;
+  holder?: string | null;
+}) {
+  swapShifts.value = await loadSwapShifts(opts.swapFrom ?? null);
+  if (licenseDenied.value) return;
+  coverGap.value = opts.gap ?? null;
+  coverDefaultUser.value = opts.user ?? "";
+  coverRotation.value = opts.rotation ?? "";
+  coverMode.value = opts.mode ?? "cover";
+  coverSwapFrom.value = opts.swapFrom ?? null;
+  coverHolder.value = opts.holder ?? null;
   coverOpen.value = true;
 }
 
-/// The plain "arrange a cover" entry: neither end is decided.
-function openCover() {
-  coverGap.value = null;
-  coverDefaultUser.value = "";
-  coverOpen.value = true;
+function resolveCoverRuns(rotationId: string, from: number, to: number) {
+  return read<ResolvedSegment[]>(
+    resolvedScheduleQuery(orgId.value, teamId.value, from, to, rotationId),
+    false,
+  );
+}
+
+let latestSpansRead = 0;
+
+/// Only bands cut by the calendar's edges need a second read, at most two per rotation.
+async function fetchShiftSpans(list: ResolvedSegment[]) {
+  const readId = ++latestSpansRead;
+  const window = scheduleWindow.value;
+  const cut = list.filter((segment) => segment.user_email && shiftLookupWindow(segment, window));
+  const entries = await Promise.all(
+    cut.map(async (segment) => [segmentSpanKey(segment), await realSpan(segment)] as const),
+  );
+  if (readId === latestSpansRead) shiftSpans.value = Object.fromEntries(entries);
+}
+
+/// From now, never from a shift's past: a cover or an absence over hours that are gone pages nobody.
+function fromNow(span: { from: number; to: number }): { from: number; to: number } {
+  return { from: Math.max(span.from, Date.now() * 1000), to: span.to };
+}
+
+/// The whole shift behind a drawn band: the calendar's read stops at its edges, so a band there is cut.
+async function realSpan(segment: ResolvedSegment): Promise<{ from: number; to: number }> {
+  const lookup = shiftLookupWindow(segment, scheduleWindow.value);
+  if (!lookup) return { from: segment.from, to: segment.to };
+  try {
+    const runs = await read<ResolvedSegment[]>(
+      resolvedScheduleQuery(orgId.value, teamId.value, lookup.from, lookup.to, segment.rotation_id),
+      false,
+    );
+    return shiftAround(segment, runs);
+  } catch {
+    return { from: segment.from, to: segment.to };
+  }
+}
+
+async function onShiftAction(action: ShiftAction, segment: ResolvedSegment) {
+  const who = segment.user_email ?? "";
+  const span = await realSpan(segment);
+  if (licenseDenied.value) return;
+  if (action === "away") {
+    awayEmail.value = who;
+    awayWindow.value = fromNow(span);
+    awayOpen.value = true;
+    return;
+  }
+  await openCoverDialog({
+    gap: action === "cover" ? fromNow(span) : null,
+    rotation: segment.rotation_id,
+    mode: action === "swap" ? "swap" : "cover",
+    swapFrom: { rotationId: segment.rotation_id, at: span.from },
+    holder: who || null,
+  });
+}
+
+async function onAwaySaved() {
+  await Promise.allSettled([fetchSegments(), fetchAbsences()]);
+}
+
+const deleteAbsenceWrite = useMutation(() => deleteUnavailabilityMutation(orgId.value));
+
+/// The absence the away lane asked to clear; it applies on every team, so it is confirmed first.
+const awayToClear = ref<string | null>(null);
+const clearingAway = computed(
+  () => teamAbsences.value.find((absence) => absence.id === awayToClear.value) ?? null,
+);
+const clearingAwayRange = computed(() => {
+  const absence = clearingAway.value;
+  if (!absence) return raw("");
+  return raw(formatDayRange(absence.start_at, absence.end_at, team.value?.timezone ?? "UTC"));
+});
+
+/// The Members tab's removal, reached from the away lane.
+async function confirmClearAway() {
+  const absenceId = awayToClear.value;
+  awayToClear.value = null;
+  if (!absenceId) return;
+  try {
+    await deleteAbsenceWrite.mutateAsync(absenceId);
+    toast({ variant: "success", message: t("oncall.awayRemoved") });
+    await onAwaySaved();
+  } catch (err: unknown) {
+    noteConfigurationDenied(err);
+    toast({
+      variant: "error",
+      message:
+        statusOf(err) === 403
+          ? t("oncall.configDenied")
+          : raw(serverMessageOf(err)) || t("oncall.awayRemoveFailed"),
+    });
+  }
 }
 
 /// The header offers to cover a shift, so the reader is the person being
@@ -1167,9 +1460,7 @@ function openCover() {
 /// pre-fill when the reader is not on this team, which is why the picker is
 /// still a picker.
 function openTakeOverride() {
-  coverGap.value = null;
-  coverDefaultUser.value = String(store.state.userInfo?.email ?? "");
-  coverOpen.value = true;
+  void openCoverDialog({ user: selfEmail.value });
 }
 
 /// The weeks a swap can trade: the next few shifts of the rotation actually in
@@ -1219,6 +1510,41 @@ const swappableShifts = computed<UpcomingShift[]>(() => {
   });
 });
 
+const swapRotationIds = computed(() => [
+  ...new Set(swappableShifts.value.map((s) => s.rotationId)),
+]);
+
+/// What the swap picker offers, read from the resolved schedule so active hours and covers are already applied.
+const swapShifts = ref<UpcomingShift[]>([]);
+
+/// From the clicked shift when there is one, otherwise from the current hour, which keeps repeat opens on one cached read.
+async function loadSwapShifts(
+  anchor: { rotationId: string; at: number } | null,
+): Promise<UpcomingShift[]> {
+  const now = Date.now() * 1000;
+  const start = anchor ? anchor.at : Math.floor(now / MICROS_PER_HOUR) * MICROS_PER_HOUR;
+  const rotations = teamRotations.value.filter(
+    (rotation) =>
+      swapRotationIds.value.includes(rotation.id) && (!anchor || rotation.id === anchor.rotationId),
+  );
+  const lanes = await Promise.allSettled(
+    rotations.map(async (rotation) => {
+      const runs = await read<ResolvedSegment[]>(
+        resolvedScheduleQuery(
+          orgId.value,
+          teamId.value,
+          start,
+          start + SHIFT_LOOKUP_MICROS,
+          rotation.id,
+        ),
+        false,
+      );
+      return swappableRuns(runs, rotation, anchor ? start : now, SWAPPABLE_SHIFTS);
+    }),
+  );
+  return lanes.flatMap((lane) => (lane.status === "fulfilled" ? lane.value : []));
+}
+
 /// Two covers, one each way.
 ///
 /// Written in sequence rather than in parallel: if the second is refused — the
@@ -1247,12 +1573,12 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
     coverOpen.value = false;
     toast({ variant: "success", message: t("oncall.swapSaved") });
     await refreshCoverage();
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     const reason =
-      err?.response?.status === 403
+      statusOf(err) === 403
         ? t("oncall.configDenied")
-        : raw(err?.response?.data?.message) || t("oncall.coverSaveFailed");
+        : raw(serverMessageOf(err)) || t("oncall.coverSaveFailed");
     // Nothing was written, so the server's own sentence is the whole story.
     if (!firstId) {
       toast({ variant: "error", message: reason });
@@ -1272,25 +1598,24 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
   }
 }
 
-/// In the TEAM's zone, not the browser's: a cover arranged from another office
-/// is still a night on the team's calendar, and that is the night being agreed.
-function coverSavedMessage(value: { user_email: string; start_at: number; end_at: number }) {
-  const zone = team.value?.timezone ?? "UTC";
-  // Named, always. The reader picked those hours on their OWN clock, and a
-  // confirmation restating them on the team's without saying so is how a cover
-  // reads as five and a half hours wrong to the person who just arranged it.
-  const at = (micros: number) =>
-    formatInZone(micros, zone, {
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZoneName: "short",
-    });
-  return t("oncall.coverSaved", {
-    name: raw(value.user_email),
-    team: raw(team.value?.name ?? ""),
-    range: raw(`${at(value.start_at)} – ${at(value.end_at)}`),
-  });
+/// The dialog's own summary sentence on the team's calendar, so the toast and the form say one thing.
+function coverSavedMessage(value: {
+  user_email: string;
+  start_at: number;
+  end_at: number;
+  rotation_id?: string;
+  covering_for?: string;
+}) {
+  const rotation =
+    teamRotations.value.find((one) => one.id === value.rotation_id)?.name ?? team.value?.name;
+  const params = {
+    name: raw(nameOf(value.user_email)),
+    rotation: raw(rotation ?? ""),
+    when: raw(formatDayRange(value.start_at, value.end_at, team.value?.timezone ?? "UTC")),
+  };
+  return value.covering_for
+    ? t("oncall.coverSummaryFor", { ...params, holder: raw(nameOf(value.covering_for)) })
+    : t("oncall.coverSummaryOn", params);
 }
 
 /// A cover takes a slot for a window; outside it the rotation resolves exactly
@@ -1300,6 +1625,7 @@ async function saveCover(value: {
   start_at: number;
   end_at: number;
   rotation_id?: string;
+  covering_for?: string;
 }) {
   coverSaving.value = true;
   try {
@@ -1311,7 +1637,7 @@ async function saveCover(value: {
     // params at all, so a successful save reported " covers  · ".
     toast({ variant: "success", message: coverSavedMessage(value) });
     await refreshCoverage();
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     // Two of the server's sentences are worth showing verbatim, and both name
     // the thing that is wrong: a 409 says who already covers that window, and
@@ -1320,9 +1646,9 @@ async function saveCover(value: {
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.coverSaveFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.coverSaveFailed"),
     });
   } finally {
     coverSaving.value = false;
@@ -1365,6 +1691,11 @@ async function onPolicySaved() {
   await fetchAll();
 }
 
+function openPresets(rotationId?: string) {
+  presetsStartOn.value = rotationId ?? "";
+  presetsOpen.value = true;
+}
+
 async function onScheduleSaved() {
   await fetchAll();
   await fetchSegments();
@@ -1402,11 +1733,12 @@ async function refreshPage() {
 /// child's `changed` is already covered by that write's own invalidation, so
 /// these two stay unforced and only the reader's own Refresh, Retry and Recheck force.
 const recheckInsights = () => fetchInsights(true);
-const onMembersChanged = () => fetchAll();
+const onMembersChanged = () => Promise.allSettled([fetchAll(), fetchAbsences()]);
 const onCoversChanged = () => fetchSegments();
 
-function onTeamSaved() {
+async function onTeamSaved(_teamId: string, makeDefault = false) {
   editOpen.value = false;
+  if (makeDefault && team.value) await setDefaultTeam(team.value);
   fetchAll();
 }
 
@@ -1435,8 +1767,18 @@ watch(activeTab, (tab) => {
 
 // Wrapped: a watcher hands the callback the new value, which `force` would read
 // as a yes and turn every window move into a forced refetch.
-watch(scheduleWindow, () => fetchSegments(), { deep: true });
+watch(
+  scheduleWindow,
+  () => {
+    fetchSegments();
+    fetchAbsences();
+  },
+  { deep: true },
+);
 watch(selectedPriority, () => fetchPreview());
 
-onMounted(() => fetchAll());
+onMounted(() => {
+  fetchAll();
+  loadDefaultTeam().then((denied) => denied && lockPage(denied));
+});
 </script>

@@ -65,6 +65,14 @@ export class RumIngestionPage {
         await expect(this.contentBlocks.first()).toContainText('npm i @openobserve/browser-rum');
     }
 
+    /** The CDN install and init snippets exactly as the page shows them; call after switchToCdnVariant. */
+    async cdnSnippets() {
+        return {
+            install: await this.contentBlocks.first().innerText(),
+            init: await this.contentBlocks.nth(1).innerText(),
+        };
+    }
+
     /** Negative regression guard: the whole card must not contain `text`. */
     async expectCardDoesNotContain(text) {
         await expect(this.titleText).not.toContainText(text);

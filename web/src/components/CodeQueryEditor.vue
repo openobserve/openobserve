@@ -102,6 +102,11 @@ const importMonaco = async () => {
   await import("monaco-editor/esm/vs/editor/editor.all.js");
   // Monaco caches glyph widths once; a webfont swapping in later leaves carets drawn at stale offsets.
   document.fonts?.addEventListener?.("loadingdone", () => monaco?.editor?.remeasureFonts?.());
+  // The word highlighter drops a cursor-triggered delay promise, which disposing the editor rejects.
+  const { CancellationError } = await import("monaco-editor/esm/vs/base/common/errors.js");
+  window.addEventListener("unhandledrejection", (event) => {
+    if (event.reason instanceof CancellationError) event.preventDefault();
+  });
   monaco = api;
   return api;
 };
@@ -344,6 +349,7 @@ import {
 import {
   buildPromqlValueEntries,
   parsePromqlValueContext,
+  promqlValueFilter,
   resolvePromqlLabelValues,
   type PromqlValueContext,
 } from "@/composables/usePromqlSuggestions";
@@ -434,6 +440,11 @@ export default defineComponent({
       default: false,
     },
     showLineNumbers: {
+      type: Boolean,
+      default: true,
+    },
+    /** Off for whitespace-significant text (Sigma YAML): typed text lands verbatim, so indentation never compounds. */
+    typingAids: {
       type: Boolean,
       default: true,
     },
@@ -1018,6 +1029,20 @@ export default defineComponent({
           enabled: props.stickyScroll,
         },
         ...suggestKeyOptions(suggestMode.value, props.language),
+        ...(props.typingAids
+          ? {}
+          : {
+              autoIndent: "none" as const,
+              formatOnType: false,
+              formatOnPaste: false,
+              autoClosingBrackets: "never" as const,
+              autoClosingQuotes: "never" as const,
+              autoSurround: "never" as const,
+              quickSuggestions: false,
+              wordBasedSuggestions: "off" as const,
+              acceptSuggestionOnEnter: "off" as const,
+              suggestOnTriggerCharacters: false,
+            }),
       });
       handOverWhenPainted(editorElement as HTMLElement);
 
@@ -1636,10 +1661,7 @@ export default defineComponent({
         if (!resolver || typedIsColumn || unknownField) return fields;
 
         const outcome = await awaitValues(config, token, (options) =>
-          resolver(context.field, {
-            ...options,
-            prefix: context.hasOpenQuote ? context.typed : "",
-          }),
+          resolver(context.field, { ...options, prefix: context.typed }),
         );
         if (outcome === null) return null;
         if (outcome === "nolookup") return fields;
@@ -1666,6 +1688,7 @@ export default defineComponent({
           range: caretRange(position, context.typed.length),
           fieldType,
           pattern: context.operator === "like",
+          typed: context.typed,
         });
         return [...values, ...fields, ...capRow(context.field, outcome.length, position)];
       };
@@ -1680,8 +1703,12 @@ export default defineComponent({
       ): Promise<any[] | null> => {
         const org = store.state.selectedOrganization?.identifier;
         if (!org) return [];
+        const typed = promqlValueFilter(context);
         const outcome = await awaitValues(config, token, (options) =>
-          resolvePromqlLabelValues(org, context.metric, context.label, options),
+          resolvePromqlLabelValues(org, context.metric, context.label, {
+            ...options,
+            prefix: typed,
+          }),
         );
         // Another organization's label values must never appear in this one's menu.
         if (outcome === null || store.state.selectedOrganization?.identifier !== org) return null;
@@ -1697,6 +1724,7 @@ export default defineComponent({
           hasOpenQuote: context.hasOpenQuote,
           closingQuoteAhead: lineAfterCaret(model, position).startsWith('"'),
           range: caretRange(position, context.typed.length),
+          typed,
         });
         return [...values, ...capRow(context.label, outcome.length, position)];
       };

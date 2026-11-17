@@ -601,6 +601,7 @@ pub async fn run(stop: crate::StopToken) {
                     .ok()
                     .and_then(|v| v.as_str().map(str::to_owned))
                     .unwrap_or_default(),
+                confirm_of: None,
             })
             .unwrap_or_else(|_| "{}".to_string());
 

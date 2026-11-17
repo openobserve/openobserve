@@ -52,6 +52,7 @@ vi.mock("@/services/rumProductAnalytics", async () => ({
 }));
 const toastSpy = vi.hoisted(() => vi.fn());
 const confirmSpy = vi.hoisted(() => vi.fn(async (_o: Record<string, unknown>) => true));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: () => ({ confirm: confirmSpy }),
 }));
@@ -67,6 +68,7 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
 });
 
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import { resetNamedEvents } from "@/composables/rum/useNamedEvents";
 import { resetFunnelDraft } from "@/composables/rum/useFunnelDraft";
 import useSavedFunnels, { resetSavedFunnels } from "@/composables/rum/useSavedFunnels";
@@ -603,6 +605,23 @@ describe("AnalyticsFunnels", () => {
     expect(useProductAnalytics().state.datetime.relativeTimePeriod).toBe("30d");
   });
 
+  it("an empty step 1 offers no widen action once the range is already 30 days (#3268)", async () => {
+    routes = [[/FROM ps LIMIT 1/, [{ c1: 0, c2: 0, seen1: 0, seen2: 0 }]], ...baseRoutes()];
+    respond();
+    await mountFunnels();
+    useProductAnalytics().setScope({
+      datetime: { valueType: "relative", relativeTimePeriod: "30d", startTime: 0, endTime: 0 },
+    });
+    await setSteps([
+      ["p", "/nowhere"],
+      ["c", "b"],
+    ]);
+    expect(text("rum-analytics-funnel-step1-empty")).toContain("/nowhere");
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-widen-range-btn"]').exists()).toBe(
+      false,
+    );
+  });
+
   it("tags a step never seen in range while the funnel still computes (AC-21)", async () => {
     routes = [[/FROM ps LIMIT 1/, [{ c1: 100, c2: 0, seen1: 150, seen2: 0 }]], ...baseRoutes()];
     respond();
@@ -704,10 +723,12 @@ describe("AnalyticsFunnels", () => {
     const drawer = wrapper!.findComponent({ name: "DropoffDrawer" });
     expect(drawer.props("cohort")).toMatchObject({ stepIndex: 2, side: "dropped" });
     expect(drawer.props("expectedDropped")).toBe(40);
+    expect(analytics.track).toHaveBeenCalledWith("rum_funnel_dropoff_opened", { step: 2 });
     drawer.vm.$emit("paths", drawer.props("cohort"));
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("productAnalyticsPaths");
     expect(useProductAnalytics().paths.value.cohort?.stepIndex).toBe(2);
+    expect(analytics.track).toHaveBeenCalledWith("rum_funnel_cohort_paths_opened");
   });
 
   it("See paths of dropped sessions stores the open saved funnel's name on the cohort", async () => {
@@ -2238,6 +2259,9 @@ describe("AnalyticsFunnels", () => {
       await settle();
       expect(pa.funnel.value.f).toBeUndefined();
       expect(pa.funnel.value.breakdown).toEqual({ f: PAY });
+      expect(analytics.track).toHaveBeenCalledWith("rum_funnel_breakdown_applied", {
+        dim: "attribute",
+      });
     });
 
     it("a built-in filter never runs Why N? on its own and gets no notice", async () => {
@@ -3230,6 +3254,12 @@ describe("AnalyticsFunnels", () => {
       expect(wrapper!.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(false);
       await wrapper!.find('[data-test="rum-analytics-funnel-view-steps"]').trigger("click");
       await settle();
+      expect(vi.mocked(analytics.track).mock.calls).toEqual(
+        expect.arrayContaining([
+          ["rum_funnel_view_changed", { view: "trend" }],
+          ["rum_funnel_view_changed", { view: "steps" }],
+        ]),
+      );
       expect(router.currentRoute.value.query.fv).toBeUndefined();
       expect(trendCalls()).toHaveLength(1);
       expect(funnelSqls()).toHaveLength(stepsRuns);

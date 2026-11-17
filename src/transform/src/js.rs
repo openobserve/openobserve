@@ -19,7 +19,7 @@ use std::{
 };
 
 use config::{meta::function::RESULT_ARRAY, stats::MemorySize, utils::json};
-use rquickjs::{Context, Runtime};
+use rquickjs::{CatchResultExt, CaughtError, Context, Runtime};
 
 thread_local! {
     /// Deadline for the eval running on this thread; the interrupt handler aborts once it passes.
@@ -27,6 +27,9 @@ thread_local! {
 
     /// Recently used contexts on this thread; one per org and function so no two share globals.
     static JS_CONTEXTS: RefCell<Vec<CachedJsContext>> = const { RefCell::new(Vec::new()) };
+
+    /// Runtime reused by Code scorer calls on this thread; each call gets its own context.
+    static SCORE_RUNTIME: RefCell<Option<Runtime>> = const { RefCell::new(None) };
 }
 
 /// Fallback when the configured limit is 0; every eval stays bounded (no unlimited option).
@@ -41,6 +44,9 @@ const JS_MEMORY_LIMIT_BYTES: usize = 10 * 1024 * 1024;
 const JS_CONTEXT_CACHE_BUDGET_BYTES: usize = 32 * 1024 * 1024;
 
 const JS_MAX_STACK_SIZE_BYTES: usize = 512 * 1024;
+
+/// A Code scorer runs once per scored span, so it gets far less time than a transform.
+const SCORE_FN_TIMEOUT: Duration = Duration::from_millis(100);
 
 /// Compiled JS function configuration
 #[derive(Clone, Debug)]
@@ -100,7 +106,54 @@ fn compile_js_function_inner(
     if func.trim().is_empty() {
         return Err(std::io::Error::other("JavaScript function cannot be empty"));
     }
+    check_js_security(func)?;
 
+    // #ResultArray# is invalid JS syntax, so strip it before compiling.
+    let func_for_compilation = strip_result_array_marker(func);
+
+    // Only a leading #ResultArray# marks a ResultArray function, not one in comments.
+    let is_result_array = RESULT_ARRAY.is_match(func);
+    let var_name = if is_result_array { "rows" } else { "row" };
+    let test_value = if is_result_array { "[]" } else { "{}" };
+
+    // Execute against empty input so an obvious infinite loop is rejected at save, not at runtime.
+    let context = new_js_context().map_err(std::io::Error::other)?;
+    context.with(|ctx| {
+        let test_code = format!(
+            r#"
+                (function() {{
+                    const {} = {};
+                    try {{
+                        {}
+                    }} catch(e) {{
+                    }}
+                    return JSON.stringify({{ success: true }});
+                }})();
+                "#,
+            var_name, test_value, func_for_compilation
+        );
+
+        let guard = JsDeadlineGuard::new(timeout);
+        let eval_result = ctx.eval::<String, _>(test_code);
+        if guard.expired() {
+            return Err(std::io::Error::other(
+                "JavaScript function exceeded the execution time limit (possible infinite loop)",
+            ));
+        }
+        // error here would mean there was some syntax error, which should be propagated
+        let _: String = eval_result
+            .map_err(|e| std::io::Error::other(format!("JavaScript syntax error: {}", e)))?;
+
+        let params = vec!["row".to_string()];
+        Ok(JSRuntimeConfig {
+            function: func.to_string(), // Store original with marker
+            params,
+        })
+    })
+}
+
+/// Rejects source that names an API the sandbox must not reach.
+fn check_js_security(func: &str) -> Result<(), std::io::Error> {
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::auth::js_security;
@@ -152,53 +205,7 @@ fn compile_js_function_inner(
             }
         }
     }
-
-    // Strip #ResultArray# marker for compilation validation
-    // The marker is invalid JS syntax (# is not a comment in JS)
-    // We keep it in storage but remove it for compilation check
-    let func_for_compilation = strip_result_array_marker(func);
-
-    // Detect if this is a ResultArray function to use appropriate variable name
-    // #ResultArray# functions use 'rows' (array), regular functions use 'row' (single object)
-    // Only match #ResultArray# at the start of the function (not in comments)
-    let is_result_array = RESULT_ARRAY.is_match(func);
-    let var_name = if is_result_array { "rows" } else { "row" };
-    let test_value = if is_result_array { "[]" } else { "{}" };
-
-    // Execute against empty input so an obvious infinite loop is rejected at save, not at runtime.
-    let context = new_js_context().map_err(std::io::Error::other)?;
-    context.with(|ctx| {
-        let test_code = format!(
-            r#"
-                (function() {{
-                    const {} = {};
-                    try {{
-                        {}
-                    }} catch(e) {{
-                    }}
-                    return JSON.stringify({{ success: true }});
-                }})();
-                "#,
-            var_name, test_value, func_for_compilation
-        );
-
-        let guard = JsDeadlineGuard::new(timeout);
-        let eval_result = ctx.eval::<String, _>(test_code);
-        if guard.expired() {
-            return Err(std::io::Error::other(
-                "JavaScript function exceeded the execution time limit (possible infinite loop)",
-            ));
-        }
-        // error here would mean there was some syntax error, which should be propagated
-        let _: String = eval_result
-            .map_err(|e| std::io::Error::other(format!("JavaScript syntax error: {}", e)))?;
-
-        let params = vec!["row".to_string()];
-        Ok(JSRuntimeConfig {
-            function: func.to_string(), // Store original with marker
-            params,
-        })
-    })
+    Ok(())
 }
 
 /// Strip #ResultArray# and #ResultArray#SkipVRL# markers from JS function
@@ -383,7 +390,99 @@ fn eval_js_fn(
     })
 }
 
-fn new_js_context() -> Result<Context, String> {
+/// Runs a Code scorer in a fresh context per call, so nothing left on built-ins leaks onward.
+pub fn run_score_fn(
+    _org_id: &str,
+    source: &str,
+    args: &[json::Value],
+) -> Result<json::Value, String> {
+    check_js_security(source).map_err(|e| e.to_string())?;
+    let args =
+        serde_json::to_string(args).map_err(|e| format!("Failed to serialize arguments: {e}"))?;
+    let rt = score_runtime()?;
+    let context = Context::full(&rt).map_err(|e| format!("Failed to create JS context: {e}"))?;
+    let result = eval_score_fn(&context, source, &args);
+    drop(context);
+    // A pending job keeps the dropped context alive and a failed call may have filled the heap.
+    if result.is_err() || rt.is_job_pending() {
+        SCORE_RUNTIME.with(|cached| cached.borrow_mut().take());
+    } else {
+        rt.run_gc();
+    }
+    result
+}
+
+fn score_runtime() -> Result<Runtime, String> {
+    SCORE_RUNTIME.with(|cached| {
+        let mut cached = cached.borrow_mut();
+        if let Some(rt) = cached.as_ref() {
+            return Ok(rt.clone());
+        }
+        let rt = new_js_runtime()?;
+        *cached = Some(rt.clone());
+        Ok(rt)
+    })
+}
+
+fn eval_score_fn(context: &Context, source: &str, args: &str) -> Result<json::Value, String> {
+    context.with(|ctx| {
+        ctx.globals()
+            .set("scoreArgs", args)
+            .map_err(|e| format!("Failed to set arguments: {e}"))?;
+        // QuickJS throws bare null on OOM while building the error, so a thrown null means OOM.
+        let code = format!(
+            r#"
+                (function() {{
+                    {source}
+                    if (typeof score !== 'function') {{
+                        throw new TypeError('the code must declare function score(...)');
+                    }}
+                    var value = score.apply(null, JSON.parse(scoreArgs));
+                    if (typeof value === 'number' && !isFinite(value)) {{
+                        return JSON.stringify({{ nonFinite: String(value) }});
+                    }}
+                    return JSON.stringify({{ value: value }});
+                }})();
+            "#
+        );
+        let guard = JsDeadlineGuard::new(SCORE_FN_TIMEOUT);
+        let result = ctx.eval::<String, _>(code).catch(&ctx);
+        if guard.expired() {
+            return Err(format!(
+                "Code scorer exceeded the {} ms time limit",
+                SCORE_FN_TIMEOUT.as_millis()
+            ));
+        }
+        let memory_error = || {
+            format!(
+                "Code scorer exceeded the {} MB memory limit",
+                JS_MEMORY_LIMIT_BYTES / (1024 * 1024)
+            )
+        };
+        let out = result.map_err(|e| match &e {
+            CaughtError::Value(value) if value.is_null() || value.is_undefined() => memory_error(),
+            CaughtError::Exception(exception)
+                if exception
+                    .message()
+                    .is_some_and(|message| message.contains("out of memory")) =>
+            {
+                memory_error()
+            }
+            CaughtError::Error(rquickjs::Error::Allocation) => memory_error(),
+            _ => e.to_string().trim().to_string(),
+        })?;
+        let out: json::Value =
+            serde_json::from_str(&out).map_err(|e| format!("Failed to read the score: {e}"))?;
+        if let Some(number) = out.get("nonFinite").and_then(|v| v.as_str()) {
+            return Err(format!(
+                "score() returned {number}: expected a finite number"
+            ));
+        }
+        Ok(out.get("value").cloned().unwrap_or(json::Value::Null))
+    })
+}
+
+fn new_js_runtime() -> Result<Runtime, String> {
     let rt = Runtime::new().map_err(|e| format!("Failed to create JS runtime: {e}"))?;
     rt.set_memory_limit(JS_MEMORY_LIMIT_BYTES);
     rt.set_max_stack_size(JS_MAX_STACK_SIZE_BYTES);
@@ -391,6 +490,11 @@ fn new_js_context() -> Result<Context, String> {
     rt.set_interrupt_handler(Some(Box::new(|| {
         JS_DEADLINE.with(|d| d.get().is_some_and(|deadline| Instant::now() >= deadline))
     })));
+    Ok(rt)
+}
+
+fn new_js_context() -> Result<Context, String> {
+    let rt = new_js_runtime()?;
     // Context::full still exposes eval and Function; only the source denylist keeps them out.
     Context::full(&rt).map_err(|e| format!("Failed to create JS context: {e}"))
 }
@@ -1182,6 +1286,122 @@ for (var i = 0; i < filtered.length; i++) {
             "org B must not see org A's changes"
         );
         assert_eq!(calls("reuse_a"), json!(2), "org A's context must be reused");
+    }
+
+    #[test]
+    fn test_score_fn_returns_the_function_result() {
+        let is_json = "function score(output) { try { JSON.parse(output); return true; } catch (e) { return false; } }";
+        assert_eq!(
+            run_score_fn("score_org", is_json, &[json!(r#"{"a": 1}"#)]),
+            Ok(json!(true))
+        );
+        assert_eq!(
+            run_score_fn("score_org", is_json, &[json!("Sure! {\"a\": 1}")]),
+            Ok(json!(false))
+        );
+        let ratio = "function score(a, b) { return Number(a) / Number(b); }";
+        assert_eq!(
+            run_score_fn("score_org", ratio, &[json!("3"), json!("4")]),
+            Ok(json!(0.75))
+        );
+        // A declared parameter with no value arrives as null, not as an error.
+        assert_eq!(
+            run_score_fn(
+                "score_org",
+                "function score(x) { return x; }",
+                &[json!(null)]
+            ),
+            Ok(json!(null))
+        );
+    }
+
+    #[test]
+    fn test_score_fn_reports_errors_instead_of_a_score() {
+        let thrown = run_score_fn(
+            "score_org",
+            "function score(o) { throw new Error('bad input'); }",
+            &[json!("x")],
+        )
+        .unwrap_err();
+        assert!(thrown.contains("bad input"), "{thrown}");
+
+        let syntax = run_score_fn("score_org", "function score(o) { return (; }", &[]).unwrap_err();
+        assert!(syntax.contains("unexpected token"), "{syntax}");
+
+        let missing = run_score_fn("score_org", "var x = 1;", &[]).unwrap_err();
+        assert!(missing.contains("function score"), "{missing}");
+
+        let forbidden =
+            run_score_fn("score_org", "function score() { return eval('1'); }", &[]).unwrap_err();
+        assert!(forbidden.contains("forbidden pattern"), "{forbidden}");
+
+        let start = Instant::now();
+        let looped =
+            run_score_fn("score_org", "function score() { while (true) {} }", &[]).unwrap_err();
+        assert!(looped.contains("time limit"), "{looped}");
+        assert!(start.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn test_score_fn_calls_do_not_share_globals() {
+        let counter =
+            "function score(o) { Math.calls = (Math.calls || 0) + 1; return Math.calls; }";
+        for _ in 0..3 {
+            assert_eq!(
+                run_score_fn("score_org", counter, &[json!("x")]),
+                Ok(json!(1))
+            );
+        }
+        // A scorer that fills the heap a little each call never reaches the limit.
+        let hoard = "function score(o) { Math.buf = Math.buf || []; Math.buf.push('x'.repeat(1000000) + Math.buf.length); return Math.buf.length; }";
+        for _ in 0..20 {
+            assert_eq!(
+                run_score_fn("score_org", hoard, &[json!("x")]),
+                Ok(json!(1))
+            );
+        }
+    }
+
+    #[test]
+    fn test_score_fn_names_memory_and_non_finite_failures() {
+        // Large chunks so a slow runner hits the memory limit well before the time limit.
+        let hog = "function score(o) { var a = []; for (var i = 0; i < 100000; i++) a.push(new Array(10000).fill(i)); return a.length > 0; }";
+        let err = run_score_fn("score_org", hog, &[json!("x")]).unwrap_err();
+        assert_eq!(err, "Code scorer exceeded the 10 MB memory limit");
+        let big = run_score_fn(
+            "score_org",
+            "function score(o) { return 'x'.repeat(20 * 1024 * 1024).length; }",
+            &[json!("x")],
+        )
+        .unwrap_err();
+        assert_eq!(big, "Code scorer exceeded the 10 MB memory limit");
+        // The next call runs normally.
+        assert_eq!(
+            run_score_fn(
+                "score_org",
+                "function score(o) { return o; }",
+                &[json!("x")]
+            ),
+            Ok(json!("x"))
+        );
+
+        for (body, shown) in [
+            ("NaN", "NaN"),
+            ("1 / 0", "Infinity"),
+            ("-1 / 0", "-Infinity"),
+        ] {
+            let source = format!("function score(o) {{ return {body}; }}");
+            assert_eq!(
+                run_score_fn("score_org", &source, &[json!("x")]),
+                Err(format!(
+                    "score() returned {shown}: expected a finite number"
+                ))
+            );
+        }
+        assert_eq!(
+            run_score_fn("score_org", "function score(o) { }", &[]),
+            Ok(json!(null))
+        );
     }
 
     #[test]

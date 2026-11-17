@@ -85,7 +85,6 @@
               </span>
             </OButton>
           </OTooltip>
-          <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
           <OTooltip
             v-else
             :content="refreshTooltip"

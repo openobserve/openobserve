@@ -3,6 +3,7 @@
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 /**
  * AlertSaveQueryModePage — the "Choose Query Mode" dialog Save opens when more
@@ -29,9 +30,6 @@ export class AlertSaveQueryModePage {
       nameInput: '[data-test="add-alert-name-input-input"]',
       streamTrigger: '[data-test="add-alert-stream-name-select-dropdown-trigger"]',
       destinationTrigger: '[data-test="alert-destinations-select-trigger"]',
-      addCondition: '[data-test="alert-conditions-add-condition-btn"]',
-      conditionColumn: '[data-test="alert-conditions-select-column-trigger"]',
-      conditionValue: '[data-test="alert-conditions-value-input-field"]',
       threshold: '[data-test="alert-trigger-threshold-input-field"]',
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
       scheduledTab: '[data-test="add-alert-type-tab-false"]',
@@ -100,9 +98,7 @@ export class AlertSaveQueryModePage {
   }
 
   async addBuilderCondition(column, value) {
-    await this.page.locator(this.locators.addCondition).click();
-    await this.#pickFromDropdown(this.locators.conditionColumn, column);
-    await this.page.locator(this.locators.conditionValue).fill(value);
+    await new FilterBuilderDriver(this.page, 'alert-conditions').addCondition(column, '=', value);
   }
 
   /** The name field is an inline edit: open it, then type. Enter submits the form. */
@@ -156,6 +152,15 @@ export class AlertSaveQueryModePage {
     await this.page.locator(this.locators.submit).click();
   }
 
+  /** Clicks Save on an existing alert and resolves with the PUT it sends. */
+  async saveAndWaitForUpdate() {
+    const saved = this.page.waitForResponse(
+      (r) => r.request().method() === 'PUT' && /\/api\/v2\/[^/]+\/alerts\//.test(r.url()),
+    );
+    await this.clickSave();
+    return saved;
+  }
+
   /**
    * Monaco auto-closes quotes, so typing a query key by key turns `FROM "x"`
    * into `FROM "x""` and the parser gives up — which silently kills the stream
@@ -172,7 +177,8 @@ export class AlertSaveQueryModePage {
     const table = (sql.match(/FROM\s+"([^"]+)"/i) || [])[1];
     await expect(async () => {
       await editor.locator('.view-lines').click();
-      await input.fill(sql);
+      // Firefox renders Monaco's textarea 0px wide, so the fill must skip the visibility check.
+      await input.fill(sql, { force: true });
       await expect(editor).toContainText(table, { timeout: 5000 });
     }).toPass({ timeout: 40000 });
     // Click away afterwards: the stream-name sync runs off the committed value,
@@ -282,7 +288,8 @@ export class AlertSaveQueryModePage {
 
   async expectDetailConditionCountOnly() {
     const condition = this.page.locator(this.locators.detailCondition);
-    await expect(condition).toContainText('count >=');
+    // A Builder condition is a read-only input, so its text is the input's value; a query renders as a code block.
+    await expect(condition.locator('[data-test="alerts-alertconfigsummary-condition-input-field"]')).toHaveValue(/count >=/);
     await expect(condition).not.toContainText('SELECT');
   }
 

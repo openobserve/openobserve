@@ -13,11 +13,11 @@
  * parallel mode, so each worker sweeps only its own `_w<index>_` names.
  *
  * TWO SURFACES RENDER THE SAME ALL-DAY WINDOW, AND THEY DO NOT AGREE BY DESIGN.
- * The timeline lane collapses 0 -> 1440 to the word "All day"; the rotation
+ * The timeline lane collapses 0 -> 1440 to the words "all day"; the rotation
  * editor shows the two boundary minutes, `00:00` and `24:00`. The plan's literal
  * `00:00 / 24:00` is the EDITOR's rendering. Both are asserted, because the
  * defect being guarded — 1440 formatted as `00:00` — would show up as
- * `00:00 / 00:00` on the lane and as a zero-length warning in the editor, and
+ * `00:00–00:00` on the lane and as a zero-length warning in the editor, and
  * one surface alone would miss half of it.
  *
  * Deliberately NOT asserted: who is on call right now. Resolution is the
@@ -245,8 +245,8 @@ test.describe('On-call schedules and rotations', {
     const text = ((await cadence.innerText()) ?? '').replace(/\s+/g, ' ');
 
     expect(text, 'a full day and a zero-length window must not read alike')
-      .not.toMatch(/00:00\s*\/\s*00:00/);
-    expect(text, 'the lane collapses 0 -> 1440 to a word').toContain('All day');
+      .not.toMatch(/00:00\s*[–/]\s*00:00/);
+    expect(text, 'the lane collapses 0 -> 1440 to words').toContain('all day');
   });
 
   // ------------------------------------------------- the rotation editor

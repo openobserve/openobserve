@@ -17,16 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPopover v-model:open="open" align="end">
     <template #trigger>
-      <OButton
-        variant="outline"
-        size="icon-toolbar"
-        icon-left="tv"
-        :active="open"
-        :aria-label="t('dashboard.kiosk.tvMode')"
-        data-test="dashboard-kiosk-btn"
-      >
-        <OTooltip v-if="!open" :content="t('dashboard.kiosk.tvMode')" />
-      </OButton>
+      <slot name="trigger" />
     </template>
 
     <div
@@ -123,7 +114,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-const open = ref(false);
+const open = defineModel<boolean>("open", { default: false });
 const refreshSeconds = ref(0);
 const theme = ref<KioskThemeChoice>("current");
 const fit = ref(false);

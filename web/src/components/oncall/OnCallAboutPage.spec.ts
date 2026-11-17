@@ -196,7 +196,7 @@ describe("OnCallAboutPage", () => {
     expect(wrapper.find('[data-test="oncall-about-subject-id"]').exists()).toBe(false);
   });
 
-  it("links an incident once the page has been promoted into one, with its own copy control", () => {
+  it("links an incident once the page has been promoted into one", () => {
     expect(render().find('[data-test="oncall-about-incident-link"]').exists()).toBe(false);
 
     const wrapper = render({ incidentId: "inc_9" });
@@ -206,7 +206,23 @@ describe("OnCallAboutPage", () => {
     // Details card uses — not repeated inside the value.
     expect(link.text()).not.toContain("Incident");
     expect(wrapper.text()).toContain("Incident");
-    expect(wrapper.find('[data-test="oncall-about-copy-incident"]').exists()).toBe(true);
+  });
+
+  it("names the incident by its title once it is known", () => {
+    const link = render({ incidentId: "inc_9", incidentTitle: "Checkout outage" }).find(
+      '[data-test="oncall-about-incident-link"]',
+    );
+    expect(link.text()).toContain("Checkout outage");
+    expect(link.text()).not.toContain("inc_9");
+  });
+
+  /// While the title is on its way the row waits, so a raw id never flashes in first.
+  it("skeletons the incident and team rows while their names load", () => {
+    const wrapper = render({ incidentId: "inc_9", incidentLoading: true, teamName: "" });
+    expect(wrapper.find('[data-test="oncall-about-incident-pending"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-about-incident-link"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-team-pending"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("inc_9");
   });
 
   /// The id is here to be pasted into a channel, so it keeps its copy control

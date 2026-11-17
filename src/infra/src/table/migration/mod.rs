@@ -247,6 +247,7 @@ mod m20261026_000003_create_workflow_http_trigger_requests;
 mod m20261027_000001_alter_query_history;
 mod m20261028_000001_add_group_label_set_to_alert_states;
 mod m20261028_000001_add_llm_dataset_item_write_version;
+mod m20261029_000001_add_budget_to_online_eval_jobs;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
 mod m20261030_000001_add_suppress_repeats_to_alerts;
 mod m20261030_000001_create_org_domain_ownership_table;
@@ -254,6 +255,10 @@ mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261101_000001_create_oncall_slack;
 mod m20261102_000001_add_workflow_run_data_run_id_index;
 mod m20261103_000001_add_status_streaks_to_synthetics;
+mod m20261103_000002_add_run_class_to_synthetics;
+mod m20261103_000003_add_gap_state_to_synthetics;
+mod m20261103_000003_status_page_notice_false_alarm;
+mod m20261111_000001_add_false_alarm_recovery_stamp;
 mod m20261120_000001_add_template_applies_to;
 mod m20261120_000002_rename_reserved_template_collisions;
 mod m20261120_000003_add_anomaly_template;
@@ -263,10 +268,18 @@ mod m20261211_000001_add_templates_to_downtime_notifications;
 mod m20261212_000001_add_templates_to_oncall_response_events;
 mod m20261213_000001_retire_compiled_default_templates;
 mod m20261214_000001_templates_columns_to_text;
+mod m20261215_000001_add_alert_incident_title_template;
+mod m20261216_000001_rename_user_default_folders;
+mod m20261217_000001_add_alert_incidents_unresolved_index;
+mod m20261218_000001_add_security_case_to_alert_incidents;
+mod m20261219_000001_add_historical_to_alert_incidents;
+mod m20261220_000001_create_service_identity_tables;
+mod m20261221_000001_add_last_detection_at_to_alert_incidents;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
 pub(crate) use m20261021_000001_create_public_dashboards::forget_draft_migrations;
+pub(crate) use m20261218_000001_add_security_case_to_alert_incidents::forget_renamed_migrations;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_public_dashboards_schema_for_test(
@@ -367,6 +380,11 @@ pub(crate) async fn create_composite_alert_tables_for_test(
     manager
         .alter_table(update::get_update_stmt_composites())
         .await?;
+    manager
+        .alter_table(
+            m20261215_000001_add_alert_incident_title_template::get_update_stmt_composites(),
+        )
+        .await?;
     Ok(())
 }
 
@@ -387,6 +405,11 @@ pub(crate) fn composite_alert_migration_sql_for_test(
             .to_string(),
         backend
             .build(&update::get_update_stmt_composites())
+            .to_string(),
+        backend
+            .build(
+                &m20261215_000001_add_alert_incident_title_template::get_update_stmt_composites(),
+            )
             .to_string(),
     ];
     sql.extend(
@@ -433,12 +456,62 @@ pub(crate) async fn create_downtime_notifications_for_test(
 }
 
 #[cfg(test)]
+pub(crate) async fn create_alert_incidents_unresolved_index_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261217_000001_add_alert_incidents_unresolved_index::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+#[cfg(test)]
 pub(crate) async fn create_alert_calibration_configs_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
     m20261012_000001_create_alert_calibration_configs::Migration
         .up(&SchemaManager::new(db))
         .await
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_service_identity_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261220_000001_create_service_identity_tables::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// A fresh SQLite database, plus a fresh PostgreSQL schema when `ZO_META_POSTGRES_DSN` is set.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn sqlite_and_postgres_for_test(label: &str) -> Vec<sea_orm::DatabaseConnection> {
+    use sea_orm::{ConnectOptions, ConnectionTrait, Database};
+    use svix_ksuid::{Ksuid, KsuidLike as _};
+
+    let mut sqlite = ConnectOptions::new("sqlite::memory:".to_string());
+    sqlite.max_connections(1).min_connections(1);
+    let mut dbs = vec![Database::connect(sqlite).await.unwrap()];
+    let dsn = std::env::var("ZO_META_POSTGRES_DSN").unwrap_or_default();
+    if dsn.trim().is_empty() {
+        return dbs;
+    }
+    let schema = format!(
+        "{label}_{}",
+        Ksuid::new(None, None).to_string().to_ascii_lowercase()
+    );
+    Database::connect(&dsn)
+        .await
+        .unwrap()
+        .execute_unprepared(&format!(r#"CREATE SCHEMA "{schema}""#))
+        .await
+        .unwrap();
+    let mut options = ConnectOptions::new(dsn);
+    options
+        .max_connections(4)
+        .set_schema_search_path(schema.clone());
+    dbs.push(Database::connect(options).await.unwrap());
+    eprintln!("[{label}] running on postgres schema {schema}");
+    dbs
 }
 
 /// Apply only the RUM Product Analytics tables, idempotently, for tests in any crate.
@@ -828,6 +901,18 @@ impl MigratorTrait for Migrator {
             Box::new(m20261212_000001_add_templates_to_oncall_response_events::Migration),
             Box::new(m20261213_000001_retire_compiled_default_templates::Migration),
             Box::new(m20261214_000001_templates_columns_to_text::Migration),
+            Box::new(m20261215_000001_add_alert_incident_title_template::Migration),
+            Box::new(m20261216_000001_rename_user_default_folders::Migration),
+            Box::new(m20261217_000001_add_alert_incidents_unresolved_index::Migration),
+            Box::new(m20261218_000001_add_security_case_to_alert_incidents::Migration),
+            Box::new(m20261219_000001_add_historical_to_alert_incidents::Migration),
+            Box::new(m20261029_000001_add_budget_to_online_eval_jobs::Migration),
+            Box::new(m20261103_000002_add_run_class_to_synthetics::Migration),
+            Box::new(m20261103_000003_status_page_notice_false_alarm::Migration),
+            Box::new(m20261103_000003_add_gap_state_to_synthetics::Migration),
+            Box::new(m20261111_000001_add_false_alarm_recovery_stamp::Migration),
+            Box::new(m20261220_000001_create_service_identity_tables::Migration),
+            Box::new(m20261221_000001_add_last_detection_at_to_alert_incidents::Migration),
         ]
     }
 }
@@ -946,6 +1031,21 @@ mod tests {
         ),
         (143, "m20261213_000001_retire_compiled_default_templates"),
         (144, "m20261214_000001_templates_columns_to_text"),
+        (145, "m20261215_000001_add_alert_incident_title_template"),
+        (146, "m20261216_000001_rename_user_default_folders"),
+        (147, "m20261217_000001_add_alert_incidents_unresolved_index"),
+        (148, "m20261218_000001_add_security_case_to_alert_incidents"),
+        (149, "m20261219_000001_add_historical_to_alert_incidents"),
+        (150, "m20261029_000001_add_budget_to_online_eval_jobs"),
+        (151, "m20261103_000002_add_run_class_to_synthetics"),
+        (152, "m20261103_000003_status_page_notice_false_alarm"),
+        (153, "m20261103_000003_add_gap_state_to_synthetics"),
+        (154, "m20261111_000001_add_false_alarm_recovery_stamp"),
+        (155, "m20261220_000001_create_service_identity_tables"),
+        (
+            156,
+            "m20261221_000001_add_last_detection_at_to_alert_incidents",
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1055,6 +1155,18 @@ mod tests {
             (
                 "m20251204_000001_create_alert_incidents_table",
                 "m20261009_000002_add_muted_by_downtime_id_to_alert_incidents",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261218_000001_add_security_case_to_alert_incidents",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261219_000001_add_historical_to_alert_incidents",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261221_000001_add_last_detection_at_to_alert_incidents",
             ),
             (
                 "m20260725_000001_create_alert_states_tables",

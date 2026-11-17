@@ -86,6 +86,8 @@ export interface SeriesOverridePreviewSource {
 }
 
 const PREVIEW_DEBOUNCE_MS = 120;
+// Converters lay a panel out by its size, and gauges cannot lay out a detached element's 0 x 0.
+const NAME_PROBE_SIZE = { width: 800, height: 400 };
 const STORED_MATCH = { name: "series", regex: "series_regex" } as const;
 
 let nextDraftId = 0;
@@ -406,7 +408,8 @@ const convertWithOverrides = async (
   );
 };
 
-const readOriginalNames = async (
+/** The legend names of the panel's data before any override, read from a detached conversion. */
+export const readOriginalNames = async (
   source: SeriesOverridePreviewSource,
   chartType: string,
   store: any,
@@ -414,8 +417,12 @@ const readOriginalNames = async (
   if (chartType === "metric" && source.panelSchema?.queryType === "promql") {
     return getPromqlMetricSeriesNames(source, store);
   }
-  const detached = { value: document.createElement("div") };
-  const result = await convertWithOverrides(source, [], store, detached);
+  const probe = document.createElement("div");
+  Object.defineProperties(probe, {
+    offsetWidth: { value: NAME_PROBE_SIZE.width },
+    offsetHeight: { value: NAME_PROBE_SIZE.height },
+  });
+  const result = await convertWithOverrides(source, [], store, { value: probe });
   return getLegendSeriesNames(result?.options, chartType, result?.extras);
 };
 

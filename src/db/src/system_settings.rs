@@ -50,6 +50,12 @@ fn row_cache_key((scope, org_id, user_id, key): &db::SettingRowKey) -> String {
     cache_key(&scope, org_id.as_deref(), user_id.as_deref(), key)
 }
 
+fn has_separate_read_replica(meta_store: &str, dsn: &str, ro_dsn: &str) -> bool {
+    use config::meta::meta_store::MetaStore;
+
+    MetaStore::from(meta_store) == MetaStore::PostgreSQL && !ro_dsn.is_empty() && ro_dsn != dsn
+}
+
 /// Caches the stored row on this node and tells this region's other nodes to reload it.
 async fn cache_and_announce(stored: &SystemSetting) {
     let cache_k = cache_key(
@@ -62,6 +68,7 @@ async fn cache_and_announce(stored: &SystemSetting) {
         .write()
         .await
         .insert(cache_k.clone(), stored.clone());
+    refresh_dependents(stored.org_id.as_deref(), &stored.setting_key).await;
 
     let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
     if let Err(e) = infra::coordinator::emit_put(&event_key).await {
@@ -78,6 +85,7 @@ async fn uncache_and_announce(
 ) {
     let cache_k = cache_key(scope, org_id, user_id, key);
     SYSTEM_SETTINGS.write().await.remove(&cache_k);
+    refresh_dependents(org_id, key).await;
 
     let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
     if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
@@ -398,8 +406,13 @@ pub async fn invalidate_all_cache() {
 pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correlation::FieldAlias> {
     use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
 
-    // Try to get from settings v2 (org level)
-    if let Ok(Some(setting)) = get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await
+    let setting = match get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await {
+        Ok(Some(setting)) => Some(setting),
+        // Empty means "use the defaults" here, and caching it spares every later read two misses.
+        Ok(None) => cache_semantic_field_groups_miss(org_id).await,
+        Err(_) => None,
+    };
+    if let Some(setting) = setting
         && let Ok(groups) = serde_json::from_value::<Vec<FieldAlias>>(setting.setting_value)
         && !groups.is_empty()
     {
@@ -408,6 +421,15 @@ pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correl
 
     // Fall back to enterprise defaults
     get_default_semantic_field_groups()
+}
+
+/// Whether this is the stand-in cached for an org with no saved semantic field groups.
+pub fn is_absent_semantic_field_groups(setting: &SystemSetting) -> bool {
+    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
+
+    setting.setting_key == SEMANTIC_FIELD_GROUPS
+        && setting.created_at == 0
+        && setting.updated_at == 0
 }
 
 /// Get the Gen-AI agent fallback mapping config for an organization.
@@ -426,9 +448,14 @@ pub async fn get_gen_ai_agent_mapping_config(
         get_cached(&SettingScope::Org, Some(org_id), None, GEN_AI_AGENT_MAPPING).await
         && let Ok(config) = serde_json::from_value::<GenAiAgentMappingConfig>(setting.setting_value)
         && let Ok(config) = config.normalize_and_validate()
-        && !config.is_all_empty()
     {
-        return config;
+        if !config.is_all_empty() {
+            return config;
+        }
+        // Only attribution fallbacks saved: keep them on top of the identity defaults.
+        let mut defaults = get_default_gen_ai_agent_mapping_config();
+        defaults.attribution_fields = config.attribution_fields;
+        return defaults;
     }
 
     get_default_gen_ai_agent_mapping_config()
@@ -582,14 +609,27 @@ pub async fn get_service_identity_config(
         system_settings::SettingScope,
     };
 
+    let cfg = config::get_config();
+    // The watcher reloads from a separate read replica, which can lag a save and pin a stale row.
+    let stored = if has_separate_read_replica(
+        &cfg.common.meta_store,
+        &cfg.common.meta_postgres_dsn,
+        &cfg.common.meta_postgres_ro_dsn,
+    ) {
+        db::get(&SettingScope::Org, Some(org_id), None, "service_identity")
+            .await
+            .ok()
+            .flatten()
+    } else {
+        get_cached(&SettingScope::Org, Some(org_id), None, "service_identity").await
+    };
     // Intentionally kept here since there's no way to satisfy non-enterprise path
     // TODO: move the entire module to enterprise so that there's no access restrictions
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
-    let mut config = match db::get(&SettingScope::Org, Some(org_id), None, "service_identity").await
-    {
-        Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
+    let mut config = match stored {
+        Some(s) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
             .unwrap_or_else(|_| ServiceIdentityConfig::new_default()),
-        _ => ServiceIdentityConfig::new_default(),
+        None => ServiceIdentityConfig::new_default(),
     };
 
     // If tracked_alias_ids is empty (old stored config or default), populate from env default
@@ -677,6 +717,15 @@ pub async fn get_service_identity_config(
     config
 }
 
+/// Save an org's identity config in this region only, where its service-stream cleanup runs.
+pub async fn set_service_identity_config(setting: &SystemSetting) -> Result<SystemSetting> {
+    let stored = db::set(setting)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    cache_and_announce(&stored).await;
+    Ok(stored)
+}
+
 /// Get the updated_at timestamp for semantic_field_groups setting
 ///
 /// Returns the timestamp (in microseconds since epoch) when the semantic field groups
@@ -694,6 +743,50 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
         // No org-level setting found - using defaults (return 0 = epoch)
         0
     }
+}
+
+/// Rebuilds what is parsed from a setting once its cached row changed.
+async fn refresh_dependents(org_id: Option<&str>, key: &str) {
+    #[cfg(feature = "enterprise")]
+    if key == config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS
+        && let Some(org_id) = org_id
+    {
+        super::service_identity::refresh_fields(org_id).await;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, key);
+}
+
+/// Caches what an org's semantic-groups miss means and returns it; `None` when left uncached.
+async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting> {
+    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
+
+    let cfg = config::get_config();
+    // A replica can lag a save past its watch event, and a cached miss would outlive that lag.
+    if has_separate_read_replica(
+        &cfg.common.meta_store,
+        &cfg.common.meta_postgres_dsn,
+        &cfg.common.meta_postgres_ro_dsn,
+    ) {
+        return None;
+    }
+    let mut absent = SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
+    // Zero timestamps mark the stand-in, and keep `get_semantic_field_groups_updated_at` at 0.
+    absent.created_at = 0;
+    absent.updated_at = 0;
+    // A row cached since the database miss is newer than the miss, so it must win.
+    let cached = SYSTEM_SETTINGS
+        .write()
+        .await
+        .entry(cache_key(
+            &SettingScope::Org,
+            Some(org_id),
+            None,
+            SEMANTIC_FIELD_GROUPS,
+        ))
+        .or_insert(absent)
+        .clone();
+    Some(cached)
 }
 
 async fn evict_settings(keys: &[String]) -> Result<()> {
@@ -765,6 +858,7 @@ async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>
                             .write()
                             .await
                             .insert(cache_k.to_string(), setting);
+                        refresh_dependents(org_id, key).await;
                         log::debug!("Updated system setting in cache: {}", cache_k);
                     }
                     Ok(None) => {
@@ -784,6 +878,9 @@ async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>
                     }
                 };
                 SYSTEM_SETTINGS.write().await.remove(cache_k);
+                if let [_, org, _, key] = cache_k.split(':').collect::<Vec<_>>()[..] {
+                    refresh_dependents((org != "_").then_some(org), key).await;
+                }
                 log::debug!("Removed system setting from cache: {}", cache_k);
             }
             super::Event::Empty => {}
@@ -848,6 +945,51 @@ mod tests {
             .await
             .unwrap();
         !keys.is_empty()
+    }
+
+    #[tokio::test]
+    async fn a_missing_semantic_field_groups_row_is_cached_until_a_real_one_is_saved() {
+        use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
+
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let org = "b16560-no-semantic-groups";
+        let _ = db::delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
+        SYSTEM_SETTINGS.write().await.remove(&cache_key(
+            &SettingScope::Org,
+            Some(org),
+            None,
+            SEMANTIC_FIELD_GROUPS,
+        ));
+
+        let defaults = get_default_semantic_field_groups();
+        assert_eq!(get_semantic_field_groups(org).await, defaults);
+        let cached = get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+            .await
+            .expect("the miss is cached");
+        assert_eq!(cached.setting_value, json!([]));
+        assert!(is_absent_semantic_field_groups(&cached));
+        assert_eq!(get_semantic_field_groups_updated_at(org).await, 0);
+
+        // Written behind the cache's back: still seeing the defaults proves no database read.
+        let groups = vec![FieldAlias::new("b16560-host", "Host", &["host"])];
+        let row = SystemSetting::new_org(org, SEMANTIC_FIELD_GROUPS, json!(groups));
+        db::set(&row).await.unwrap();
+        assert_eq!(get_semantic_field_groups(org).await, defaults);
+
+        set(&row).await.unwrap();
+        assert_eq!(get_semantic_field_groups(org).await, groups);
+        assert!(get_semantic_field_groups_updated_at(org).await > 0);
+
+        // A miss that lost the race to a save must not replace the saved row.
+        cache_semantic_field_groups_miss(org).await;
+        assert_eq!(get_semantic_field_groups(org).await, groups);
+        let saved = get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+            .await
+            .unwrap();
+        assert!(!is_absent_semantic_field_groups(&saved));
+
+        let _ = delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
     }
 
     #[tokio::test]
@@ -918,6 +1060,54 @@ mod tests {
 
         let user = SystemSetting::new_user(org, "dana@acme.com", key, json!({"mode": "p1"}));
         assert!(apply_replicated_put(&user).await.is_err());
+    }
+
+    #[test]
+    fn only_a_distinct_postgres_read_dsn_is_a_separate_replica() {
+        let (dsn, ro) = ("postgres://primary/o2", "postgres://replica/o2");
+        assert!(!has_separate_read_replica("sqlite", dsn, ro));
+        assert!(!has_separate_read_replica("postgres", dsn, ""));
+        assert!(!has_separate_read_replica("postgres", dsn, dsn));
+        assert!(has_separate_read_replica("postgres", dsn, ro));
+        assert!(has_separate_read_replica("postgresql", dsn, ro));
+    }
+
+    #[tokio::test]
+    async fn the_identity_config_is_read_from_the_cache_its_save_keeps_current() {
+        use config::meta::correlation::{IdentitySet, ServiceIdentityConfig};
+
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let org = "b16575-identity-config";
+        let _ = delete(&SettingScope::Org, Some(org), None, "service_identity").await;
+
+        let saved = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "b16575".to_string(),
+                label: "B16575".to_string(),
+                distinguish_by: vec!["k8s-namespace".to_string()],
+            }],
+            tracked_alias_ids: vec!["k8s-namespace".to_string()],
+            service_optional: false,
+        };
+        let row = SystemSetting::new_org(org, "service_identity", json!(saved));
+
+        // Written behind the cache's back: still seeing the defaults proves no database read.
+        db::set(&row).await.unwrap();
+        assert_ne!(get_service_identity_config(org).await.sets, saved.sets);
+
+        set_service_identity_config(&row).await.unwrap();
+        assert_eq!(get_service_identity_config(org).await.sets, saved.sets);
+        let cache_k = cache_key(&SettingScope::Org, Some(org), None, "service_identity");
+        assert!(
+            announced(&format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{cache_k}")).await,
+            "the other nodes reload the saved config"
+        );
+
+        delete(&SettingScope::Org, Some(org), None, "service_identity")
+            .await
+            .unwrap();
+        assert_ne!(get_service_identity_config(org).await.sets, saved.sets);
     }
 
     #[cfg(feature = "enterprise")]
@@ -1037,6 +1227,75 @@ mod tests {
             get_default_gen_ai_agent_mapping_config()
         );
         SYSTEM_SETTINGS.write().await.remove(&key);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn semantic_group_changes_rebuild_the_cached_identity_fields() {
+        use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
+        use o2_enterprise::enterprise::service_identity::fields::{IdentityFields, Need};
+
+        use super::super::service_identity::get_cached_fields;
+
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let org = "s10-identity-fields";
+        let _ = delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
+        // admin fields follow the standard environment keys, which are always read first (D249)
+        let admin_env =
+            |fields: &Arc<IdentityFields>| fields.fields(Need::Env).last().map(|f| f.flat.clone());
+        let defaults = admin_env(&get_cached_fields(org).await);
+        assert_ne!(defaults.as_deref(), Some("service_app_stage"));
+
+        let groups = vec![FieldAlias::new(
+            "environment",
+            "Environment",
+            &["service_app.stage"],
+        )];
+        set(&SystemSetting::new_org(
+            org,
+            SEMANTIC_FIELD_GROUPS,
+            json!(groups),
+        ))
+        .await
+        .unwrap();
+        let saved = admin_env(&get_cached_fields(org).await);
+        assert_eq!(saved.as_deref(), Some("service_app_stage"));
+
+        // Another node's save arrives as a watch event after the row is in the database.
+        let other = vec![FieldAlias::new(
+            "environment",
+            "Environment",
+            &["service_tier"],
+        )];
+        db::set(&SystemSetting::new_org(
+            org,
+            SEMANTIC_FIELD_GROUPS,
+            json!(other),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(admin_env(&get_cached_fields(org).await), saved);
+        let key = cache_key(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS);
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
+        tx.send(infra::db::Event::Put(infra::db::EventData {
+            key: format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{key}"),
+            value: None,
+            start_dt: None,
+        }))
+        .await
+        .unwrap();
+        drop(tx);
+        watch_events(Arc::new(rx)).await.unwrap();
+        assert_eq!(
+            admin_env(&get_cached_fields(org).await).as_deref(),
+            Some("service_tier")
+        );
+
+        delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+            .await
+            .unwrap();
+        assert_eq!(admin_env(&get_cached_fields(org).await), defaults);
     }
 
     #[test]

@@ -221,7 +221,7 @@ fn shorten_url_stores_a_resolvable_org_scoped_short_url() {
             openobserve_core::short_url::retrieve("acme", short_id)
                 .await
                 .as_deref(),
-            Some(long)
+            Some("/web/logs?org_identifier=acme&sql=c2VsZWN0IDE")
         );
         assert_eq!(
             openobserve_core::short_url::retrieve("other", short_id).await,
@@ -268,6 +268,8 @@ fn audit_publishes_a_slack_record_to_the_meta_audit_stream() {
     run(async {
         PUBLISHED.lock().unwrap().clear();
         (hooks().audit)(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: "alice@acme.com".to_string(),
             org_id: "acme".to_string(),
             _timestamp: 1_760_000_000_000_000,
@@ -336,7 +338,7 @@ fn alert_message_view_reads_a_deleted_alert_as_gone_and_a_malformed_id_as_none()
         );
         assert!(
             gone.open_url
-                .ends_with("alert_id=2i4WBnxsiDiRR1dh7O4qcIfUyBW"),
+                .ends_with("/web/alerts/detail/2i4WBnxsiDiRR1dh7O4qcIfUyBW?org_identifier=acme"),
             "{}",
             gone.open_url
         );

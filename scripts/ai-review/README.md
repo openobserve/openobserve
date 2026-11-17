@@ -133,8 +133,13 @@ reviews again even when its diff is the same.
 There is no cap on reviews per PR unless the variable `AI_REVIEW_MAX_PASSES` is a positive integer;
 unset, empty, `0` or an invalid value means no cap. Reviews are counted either way, in a hidden
 `o2-review-pass` tag written before the reviewers start, so a run stopped by removing the label or
-by a draft conversion still counts. A run in which no reviewer finished gives its pass back. The
-paired pointer and the "key not set" notice keep the tag. When a cap is set and reached, later
+by a draft conversion still counts. A run in which no reviewer finished gives its pass back. A
+hand-started review (`REVIEW_MANUAL_RUN`, `force_full` or `ignore_pass_limit`) is also counted in a
+hidden `o2-review-manual:<count>[:<key>]` tag, and the cap counts only the others. Once one is
+counted, the footer reads `review 4 · 3 of 3 automatic · 1 manual`, the limit note adds the manual
+count and the commit the latest one reviewed, and the trace carries `review.manual_passes` and
+`review.manual_run`. The paired pointer and the "key not set" notice keep both tags.
+When a cap is set and reached, later
 pushes skip before any model call and the limit note on the comment names the commit that was
 reviewed and the one that was not. If the bot's comments cannot be read (no reviewer app token, or
 the list call fails) the run fails instead of reviewing, since neither the reviewed commit nor the

@@ -38,6 +38,7 @@ import {
   scopeUrlQuery,
   readUrlScope,
   explicitScopeMode,
+  agentIdentityKey,
 } from "./useAgentScope";
 
 const t = (k: string) => k;
@@ -759,5 +760,133 @@ describe("useAgentScope — stream options", () => {
     const streamA = scope.streamSelectOptions.value.find((o: any) => o.value === "stream_a");
     expect(streamA?.agentCount).toBe(2);
     expect(scope.selectedStreamCount.value).toBe(2);
+  });
+});
+
+describe("useAgentScope — agent stream (one variant in several streams)", () => {
+  // The registry returns rows newest `last_seen` first, so `stray` precedes `main`.
+  const row = (
+    stream: string,
+    firstSeen: number | null,
+    over: Partial<GenAiAgentListItem> = {},
+  ): GenAiAgentListItem => ({
+    name: "support",
+    id: "support",
+    source_stream: stream,
+    source_stream_type: "traces",
+    env: "prod",
+    version: "v1",
+    first_seen: firstSeen,
+    last_seen: 1_000,
+    ...over,
+  });
+  const MULTI = [row("stray", 900), row("main", 100), row("side", 500)];
+
+  function makeScope(list: GenAiAgentListItem[]) {
+    const agents = ref<GenAiAgentListItem[]>(list);
+    const scope = useAgentScope({
+      filterMode: ref<"stream" | "agent">("agent"),
+      activeStream: ref("main"),
+      orgId: () => "org1",
+      getWindow: () => ({ start: 100, end: 200 }),
+      cascade: true,
+      agents,
+      agentsLoaded: ref(true),
+      t,
+    });
+    return { scope, agents };
+  }
+
+  it("defaults to the stream the agent has lived in longest, not the newest registry row", () => {
+    const { scope } = makeScope(MULTI);
+    expect(scope.agentStreams.value.map((o) => o.value)).toEqual(["main", "side", "stray"]);
+    expect(scope.selectedAgentStream.value).toBe("");
+    expect(scope.effectiveStream.value).toBe("main");
+  });
+
+  it("a row without first_seen is never the default over one with it", () => {
+    const { scope } = makeScope([row("unknown", null), row("main", 100)]);
+    expect(scope.effectiveStream.value).toBe("main");
+  });
+
+  it("reads the picked stream, and its agent identity changes so pages reload", () => {
+    const { scope } = makeScope(MULTI);
+    const before = agentIdentityKey(scope.selectedAgent.value);
+    scope.selectedAgentStream.value = "stray";
+    expect(scope.effectiveStream.value).toBe("stray");
+    expect(scope.selectedAgent.value?.source_stream).toBe("stray");
+    expect(agentIdentityKey(scope.selectedAgent.value)).not.toBe(before);
+  });
+
+  it("offers one stream (no picker) when the variant sends to one stream", () => {
+    const { scope } = makeScope([row("main", 100), row("other", 50, { version: "v2" })]);
+    expect(scope.agentStreams.value.map((o) => o.value)).toEqual(["main"]);
+    expect(scope.effectiveStream.value).toBe("main");
+  });
+
+  it("honours a deep link's stream, and ignores one the agent does not send to", () => {
+    const { scope } = makeScope(MULTI);
+    expect(scope.selectAgentByScope("prod", "support", "v1", "side")).toBe(true);
+    expect(scope.effectiveStream.value).toBe("side");
+    expect(scope.selectAgentByScope("prod", "support", "v1", "gone")).toBe(true);
+    expect(scope.selectedAgentStream.value).toBe("");
+    expect(scope.effectiveStream.value).toBe("main");
+  });
+
+  it("re-resolves the stream on an agent change: a pick the new agent lacks falls back", () => {
+    const { scope } = makeScope([
+      ...MULTI,
+      row("billing_main", 300, { name: "billing", id: "billing" }),
+      row("stray", 400, { name: "billing", id: "billing" }),
+    ]);
+    scope.selectedAgentStream.value = "side";
+    scope.selectedAgentName.value = "billing";
+    expect(scope.selectedAgentStream.value).toBe("");
+    expect(scope.effectiveStream.value).toBe("billing_main");
+    // A pick the new agent also sends to is kept.
+    scope.selectedAgentStream.value = "stray";
+    scope.selectedAgentName.value = "support";
+    expect(scope.selectedAgentStream.value).toBe("stray");
+    expect(scope.effectiveStream.value).toBe("stray");
+  });
+
+  it("drops a pick the reloaded agents list no longer carries", () => {
+    const { scope, agents } = makeScope(MULTI);
+    scope.selectedAgentStream.value = "stray";
+    agents.value = [row("main", 100), row("side", 500)];
+    expect(scope.selectedAgentStream.value).toBe("");
+    expect(scope.effectiveStream.value).toBe("main");
+  });
+});
+
+describe("scopeUrlQuery / readUrlScope — agent stream", () => {
+  const agent = { name: "support", env: "prod", version: "v1" };
+
+  it("writes the agent's picked stream as `stream`, and a reload reads it back for the agent", () => {
+    const query = scopeUrlQuery(
+      {},
+      { mode: "agent", explicit: true, stream: "picker", agent: { ...agent, stream: "side" } },
+    );
+    expect(query).toEqual({
+      type: "agent",
+      agent: "support",
+      env: "prod",
+      version: "v1",
+      stream: "side",
+    });
+    const reloaded = readUrlScope(query as LocationQuery);
+    expect(reloaded.agentStream).toBe("side");
+    // Agent mode's `stream` is not the Stream-mode picker's stream.
+    expect(reloaded.stream).toBe("");
+  });
+
+  it("leaves `stream` out of an agent URL when the default stream was kept", () => {
+    const query = scopeUrlQuery({}, { mode: "agent", explicit: true, stream: "picker", agent });
+    expect(query.stream).toBeUndefined();
+  });
+
+  it("keeps a Stream-mode `stream` for the picker", () => {
+    const reloaded = readUrlScope({ type: "stream", stream: "s1" });
+    expect(reloaded).toMatchObject({ stream: "s1", agentStream: "" });
   });
 });

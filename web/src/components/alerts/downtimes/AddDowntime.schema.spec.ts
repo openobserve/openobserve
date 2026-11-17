@@ -2,7 +2,6 @@
 
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
-import { conditionToBuilder } from "@/utils/downtimes/conditionBridge";
 import { defaultDowntimeValues, type DowntimeFormValues } from "@/utils/downtimes/downtimeForm";
 import { makeAddDowntimeSchema, repeatGapSecs, tabForPath } from "./AddDowntime.schema";
 
@@ -11,15 +10,15 @@ const NOW = Date.parse("2026-09-17T12:20:00Z");
 const valid = (): DowntimeFormValues => ({
   ...defaultDowntimeValues(NOW, "UTC"),
   condition_open: true,
-  condition: conditionToBuilder({
+  condition: {
     type: "group",
     op: "and",
     items: [{ type: "pair", key: "service", operator: "=", value: "payments" }],
-  }),
+  },
 });
 
 const errorsOf = (values: DowntimeFormValues, ctx = {}) => {
-  const result = makeAddDowntimeSchema(gt, ctx).safeParse(values);
+  const result = makeAddDowntimeSchema(gt, { nowMs: () => NOW, ...ctx }).safeParse(values);
   if (result.success) return {};
   return Object.fromEntries(result.error.issues.map((i) => [i.path.join("."), i.message]));
 };
@@ -27,6 +26,70 @@ const errorsOf = (values: DowntimeFormValues, ctx = {}) => {
 describe("AddDowntime schema", () => {
   it("accepts a narrowed one-time downtime", () => {
     expect(errorsOf(valid())).toEqual({});
+  });
+
+  it("refuses to drop the last group limit until Mute all groups clears it", () => {
+    const v = valid();
+    v.targets.alerts.ids_open = true;
+    v.targets.alerts.ids = ["a1", "a2"];
+    v.alert_groups = [{ alert_id: "a1", group_key: "k1" }];
+    expect(errorsOf(v)).toEqual({});
+    v.targets.alerts.ids = ["a2"];
+    expect(errorsOf(v)["targets.alerts.ids"]).toBe(
+      "Removing this alert also removes the group limit. Use Mute all groups to confirm.",
+    );
+    v.alert_groups = null;
+    expect(errorsOf(v)).toEqual({});
+  });
+
+  it("refuses a one-time end at or before now unless an SLO target corrects the past", () => {
+    const v = valid();
+    const end = Date.parse("2026-09-17T14:00:00Z");
+    expect(errorsOf(v, { nowMs: () => end + 1 })["schedule.end_date"]).toBe(
+      "The end time is in the past. Pick an end time after now.",
+    );
+    expect(errorsOf(v, { nowMs: () => end })["schedule.end_date"]).toBe(
+      "The end time is in the past. Pick an end time after now.",
+    );
+    expect(errorsOf(v, { nowMs: () => end - 1 })).toEqual({});
+    v.modules = ["alerts", "slos"];
+    expect(errorsOf(v, { nowMs: () => end + 1 })).toEqual({});
+  });
+
+  it("refuses a weekly schedule with no window between its start and its until day", () => {
+    const v = valid();
+    v.schedule = {
+      ...v.schedule,
+      repeat: "weekly",
+      start_date: "2026-09-21",
+      start_time: "02:00",
+      duration: "1h",
+      weekdays: [7],
+      until_date: "2026-09-25",
+    };
+    expect(errorsOf(v)["schedule.weekdays"]).toBe("This schedule never produces a window.");
+    v.schedule.until_date = "2026-09-27";
+    expect(errorsOf(v)).toEqual({});
+  });
+
+  it("puts the no-window error of a daily schedule on its until day", () => {
+    const v = valid();
+    // Loaded with a start of Thursday 13:00, so the 09:00 window of that Thursday is not one.
+    v.schedule = {
+      ...v.schedule,
+      repeat: "daily",
+      start_date: "2026-09-17",
+      start_time: "09:00",
+      duration: "1h",
+      weekdays: [],
+      until_date: "2026-09-17",
+      starts_at: Date.parse("2026-09-17T13:00:00Z") * 1000,
+      ends_at: null,
+      starts_at_timezone: "UTC",
+    };
+    expect(errorsOf(v)["schedule.until_date"]).toBe("This schedule never produces a window.");
+    v.schedule.until_date = "2026-09-18";
+    expect(errorsOf(v)).toEqual({});
   });
 
   it("needs at least one module", () => {
@@ -66,21 +129,21 @@ describe("AddDowntime schema", () => {
   it("names the condition caps of 32 pairs and depth 3", () => {
     const pair = { type: "pair" as const, key: "service", operator: "=" as const, value: "p" };
     const v = valid();
-    v.condition = conditionToBuilder({
+    v.condition = {
       type: "group",
       op: "and",
       items: Array.from({ length: 33 }, () => pair),
-    });
+    };
     expect(errorsOf(v).condition).toBe("A condition can hold at most 32 pairs.");
   });
 
   it("rejects a condition made only of != rows", () => {
     const v = valid();
-    v.condition = conditionToBuilder({
+    v.condition = {
       type: "group",
       op: "and",
       items: [{ type: "pair", key: "env", operator: "!=", value: "staging" }],
-    });
+    };
     expect(errorsOf(v).condition).toMatch(/^Add at least one = condition/);
   });
 
@@ -89,11 +152,11 @@ describe("AddDowntime schema", () => {
     v.modules = ["synthetics"];
     v.targets.synthetics.tags_open = true;
     v.targets.synthetics.tags = ["team:checkout"];
-    v.condition = conditionToBuilder({
+    v.condition = {
       type: "group",
       op: "and",
       items: [{ type: "pair", key: "env", operator: "!=", value: "staging" }],
-    });
+    };
     expect(errorsOf(v)).toEqual({});
   });
 

@@ -1834,11 +1834,11 @@ async fn process_remote_stream_node(
 
         // Process each batch_key group separately
         for (batch_key, batch_records) in records_by_batch_key {
-            // Create buffer key that includes batch_key for routing
+            // The timer flush routes by this key, so it carries the pipeline's org, not the node's.
             let buffer_key = format!(
                 "{}:{}:{}:{}:{}",
                 metadata.pipeline_id,
-                remote_stream.org_id,
+                metadata.org_id,
                 remote_stream.destination_name,
                 batch_key,
                 "remote"
@@ -3112,7 +3112,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
     let mut buffers = BATCH_BUFFERS.lock().await;
 
     for (batch_key, buffer) in buffers.iter_mut() {
-        // let buffer_key = format!("{}:{}:{}:{}:{}", pipeline_id, remote_stream.org_id,
+        // let buffer_key = format!("{}:{}:{}:{}:{}", pipeline_id, metadata.org_id,
         // remote_stream.destination_name, batch_key, "remote");
         let key = batch_key.clone();
         let key_parts = key.split(":").collect::<Vec<&str>>();
@@ -4312,6 +4312,7 @@ mod tests {
                         operator: config::meta::alerts::Operator::EqualTo,
                         value: json::json!(value),
                         ignore_case: false,
+                        case_insensitive: None,
                     },
                 ),
             }),
@@ -4326,6 +4327,7 @@ mod tests {
                     operator: config::meta::alerts::Operator::EqualTo,
                     value: json::json!("high"),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
             ),
         }
@@ -4671,6 +4673,7 @@ mod tests {
                     operator: config::meta::alerts::Operator::EqualTo,
                     value: json::json!("high"),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
             ),
         };
@@ -5187,6 +5190,7 @@ mod tests {
                         operator: config::meta::alerts::Operator::EqualTo,
                         value: json::json!(value),
                         ignore_case: false,
+                        case_insensitive: None,
                     },
                 ),
             }),
@@ -5211,6 +5215,7 @@ mod tests {
                     operator: config::meta::alerts::Operator::EqualTo,
                     value: json::json!(50),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
             ),
         };
@@ -5292,6 +5297,7 @@ mod tests {
                                 operator: config::meta::alerts::Operator::EqualTo,
                                 value: json::json!("verify"),
                                 ignore_case: false,
+                                case_insensitive: None,
                             },
                         ),
                     }),
@@ -5807,5 +5813,40 @@ mod tests {
                 );
             },
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn remote_records_are_buffered_under_the_pipelines_own_org() {
+        for (pipeline_id, node_org) in [("pipe-remote-blank", ""), ("pipe-remote-other", "org-2")] {
+            let remote = config::meta::stream::RemoteStreamParams {
+                org_id: node_org.into(),
+                destination_name: "dest".into(),
+            };
+            let node = ExecutableNode {
+                id: "remote-1".to_string(),
+                node_data: NodeData::RemoteStream(remote.clone()),
+                children: vec![],
+                is_disabled: false,
+            };
+            let metadata = ProcessMetadata {
+                pipeline_id: pipeline_id.to_string(),
+                ..dummy_metadata(0)
+            };
+            let (input_tx, _, _, channels) = build_test_channels(0, false);
+            send_records(&input_tx, vec![json::json!({"k": "v"})]).await;
+            drop(input_tx);
+
+            process_remote_stream_node(&remote, metadata, &node, channels)
+                .await
+                .unwrap();
+
+            let buffers = BATCH_BUFFERS.lock().await;
+            let keys: Vec<_> = buffers
+                .keys()
+                .filter(|k| k.starts_with(&format!("{pipeline_id}:")))
+                .collect();
+            assert_eq!(keys, [&format!("{pipeline_id}:org-1:dest:default:remote")]);
+        }
     }
 }

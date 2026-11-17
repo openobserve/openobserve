@@ -52,6 +52,7 @@ const emit = defineEmits<{ "update:open": [open: boolean] }>();
 const { t } = useI18nTyped();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
 const team = computed(() => props.installation.team_name);
 
 const disconnect = useMutation(() => disconnectInstallationMutation(org.value));
@@ -184,16 +185,20 @@ const removeSelected = async (): Promise<void> => {
     <div v-if="!result" class="flex flex-col gap-3 text-sm" data-test="slack-dialog-confirm">
       <template v-if="mode === 'disconnect'">
         <i18n-t
-          keypath="slackApp.uninstall.disconnectMessage"
+          keypath="slackApp.uninstall.disconnectMessageShort"
           tag="p"
           class="m-0"
           data-test="slack-dialog-disconnect-message"
         >
           <template #org
-            ><span class="text-text-heading font-semibold break-all">{{ org }}</span></template
+            ><span class="text-text-heading font-semibold break-all">{{ orgName }}</span></template
           >
         </i18n-t>
-        <p class="m-0 font-medium">
+        <p
+          v-if="destinationCount > 0"
+          class="m-0 font-medium"
+          data-test="slack-dialog-disconnect-destinations"
+        >
           {{
             t(
               "slackApp.uninstall.disconnectDestinations",

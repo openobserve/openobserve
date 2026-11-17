@@ -18,7 +18,17 @@ use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 /// Product features as tags; the snake_case name is the gate-definition and license key.
 #[derive(
-    Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, Serialize, EnumIter,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumString,
+    IntoStaticStr,
+    Serialize,
+    EnumIter,
+    utoipa::ToSchema,
 )]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
@@ -54,6 +64,7 @@ pub enum Feature {
     QueryManagement,
     SuperCluster,
     Byob,
+    Security,
 }
 
 impl Feature {
@@ -66,9 +77,46 @@ impl Feature {
     pub fn all() -> impl Iterator<Item = Feature> {
         <Self as IntoEnumIterator>::iter()
     }
+
+    /// Product name; `infra` has no access to the definition, so a parity test pins these to it.
+    pub const fn display_name(self) -> &'static str {
+        match self {
+            Feature::AiObservability => "AI Observability",
+            Feature::AiAssistant => "AI Assistant",
+            Feature::Workflows => "Workflows",
+            Feature::Oncall => "On-Call",
+            Feature::Incidents => "Incidents",
+            Feature::Logs => "Logs",
+            Feature::Metrics => "Metrics",
+            Feature::Traces => "Traces",
+            Feature::Rum => "Real User Monitoring",
+            Feature::ProductAnalytics => "Product Analytics",
+            Feature::Synthetics => "Synthetics",
+            Feature::DbMonitoring => "Database Monitoring",
+            Feature::Correlation => "Correlation",
+            Feature::Dashboards => "Dashboards",
+            Feature::Reports => "Reports",
+            Feature::Alerts => "Alerts",
+            Feature::Pipelines => "Pipelines",
+            Feature::AiToolsets => "AI Toolsets",
+            Feature::Mcp => "MCP Server",
+            Feature::Ratelimit => "Rate Limiting",
+            Feature::AnomalyDetection => "Anomaly Detection",
+            Feature::ContinuousProfiling => "Continuous Profiling",
+            Feature::KubernetesMonitoring => "Kubernetes Monitoring",
+            Feature::HostMonitoring => "Host Monitoring",
+            Feature::Sso => "Single Sign-On",
+            Feature::Rbac => "Role-Based Access Control",
+            Feature::AuditTrail => "Audit Trail",
+            Feature::QueryManagement => "Query Management",
+            Feature::SuperCluster => "Super Cluster",
+            Feature::Byob => "Bring Your Own Bucket",
+            Feature::Security => "Security (SIEM)",
+        }
+    }
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Copy, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum FeatureState {
     Enabled,
@@ -91,6 +139,7 @@ mod tests {
             ("correlation", Feature::Correlation),
             ("rbac", Feature::Rbac),
             ("byob", Feature::Byob),
+            ("security", Feature::Security),
         ] {
             assert_eq!(Feature::from_str(key).unwrap(), f);
             assert_eq!(<&str>::from(f), key);
@@ -105,6 +154,6 @@ mod tests {
     fn indices_are_unique() {
         let indices: HashSet<u64> = Feature::all().map(Feature::index).collect();
         assert_eq!(indices.len(), Feature::all().count());
-        assert_eq!(Feature::all().count(), 30);
+        assert_eq!(Feature::all().count(), 31);
     }
 }

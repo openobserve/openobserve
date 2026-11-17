@@ -52,6 +52,15 @@ fn map_err(ctx: &str, e: anyhow::Error) -> Response {
     MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
 }
 
+/// The OSS refusal of the licensed notice and domain writes, given before the body is read.
+#[cfg(not(feature = "enterprise"))]
+fn licensed_only(ctx: &str) -> Response {
+    map_err(
+        ctx,
+        openobserve_core::status_pages::enterprise_required::<()>().unwrap_err(),
+    )
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/status_pages",
@@ -64,7 +73,7 @@ fn map_err(ctx: &str, e: anyhow::Error) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::PageListResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
@@ -91,7 +100,7 @@ pub async fn list_pages(Path(org_id): Path<String>) -> Response {
     ),
     request_body(content = CreatePageRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::PageAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
@@ -125,7 +134,7 @@ pub async fn create_page(
         ("id" = String, Path, description = "Resource id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::PageAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "get"})),
@@ -154,7 +163,7 @@ pub async fn get_page(Path((org_id, id)): Path<(String, String)>) -> Response {
     ),
     request_body(content = UpdatePageRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::PageAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
@@ -188,7 +197,7 @@ pub async fn update_page(
         ("id" = String, Path, description = "Resource id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "delete"})),
@@ -259,7 +268,7 @@ pub async fn rotate_slug(
     ),
     request_body(content = SetComponentsRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
@@ -316,7 +325,7 @@ pub async fn set_components(
         ("id" = String, Path, description = "Resource id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::PreviewResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "get"})),
@@ -346,7 +355,7 @@ pub async fn preview(Path((org_id, id)): Path<(String, String)>) -> Response {
         ("id" = String, Path, description = "Resource id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::status_pages::NoticeAdminView>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
@@ -377,7 +386,7 @@ pub async fn list_page_notices(Path((org_id, id)): Path<(String, String)>) -> Re
     ),
     request_body(content = CreateNoticeRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::NoticeAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
@@ -387,14 +396,23 @@ pub async fn list_page_notices(Path((org_id, id)): Path<(String, String)>) -> Re
 pub async fn create_notice(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
-    Json(body): Json<CreateNoticeRequest>,
+    #[cfg(feature = "enterprise")] Json(body): Json<CreateNoticeRequest>,
 ) -> Response {
-    match openobserve_core::status_pages::create_notice(&org_id, &id, body, &user.user_id).await {
-        Ok(notice) => {
-            audit(&org_id, &user.user_id, "create_notice", Some(&notice.id)).await;
-            MetaHttpResponse::json(notice)
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, id, user);
+        licensed_only("create_notice")
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        match openobserve_core::status_pages::create_notice(&org_id, &id, body, &user.user_id).await
+        {
+            Ok(notice) => {
+                audit(&org_id, &user.user_id, "create_notice", Some(&notice.id)).await;
+                MetaHttpResponse::json(notice)
+            }
+            Err(e) => map_err("create_notice", e),
         }
-        Err(e) => map_err("create_notice", e),
     }
 }
 
@@ -412,7 +430,7 @@ pub async fn create_notice(
     ),
     request_body(content = UpdateNoticeRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::NoticeAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
@@ -422,14 +440,22 @@ pub async fn create_notice(
 pub async fn update_notice(
     Path((org_id, nid)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
-    Json(body): Json<UpdateNoticeRequest>,
+    #[cfg(feature = "enterprise")] Json(body): Json<UpdateNoticeRequest>,
 ) -> Response {
-    match openobserve_core::status_pages::update_notice(&org_id, &nid, body).await {
-        Ok(notice) => {
-            audit(&org_id, &user.user_id, "update_notice", Some(&nid)).await;
-            MetaHttpResponse::json(notice)
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, nid, user);
+        licensed_only("update_notice")
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        match openobserve_core::status_pages::update_notice(&org_id, &nid, body).await {
+            Ok(notice) => {
+                audit(&org_id, &user.user_id, "update_notice", Some(&nid)).await;
+                MetaHttpResponse::json(notice)
+            }
+            Err(e) => map_err("update_notice", e),
         }
-        Err(e) => map_err("update_notice", e),
     }
 }
 
@@ -446,7 +472,7 @@ pub async fn update_notice(
         ("nid" = String, Path, description = "Notice id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "delete"})),
@@ -480,7 +506,7 @@ pub async fn delete_notice(
         ("nid" = String, Path, description = "Notice id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::status_pages::NoticeUpdateView>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
@@ -508,7 +534,7 @@ pub async fn list_notice_updates(Path((org_id, nid)): Path<(String, String)>) ->
     ),
     request_body(content = NoticeUpdateRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
@@ -518,16 +544,24 @@ pub async fn list_notice_updates(Path((org_id, nid)): Path<(String, String)>) ->
 pub async fn add_notice_update(
     Path((org_id, nid)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
-    Json(body): Json<NoticeUpdateRequest>,
+    #[cfg(feature = "enterprise")] Json(body): Json<NoticeUpdateRequest>,
 ) -> Response {
-    match openobserve_core::status_pages::add_notice_update(&org_id, &nid, body, &user.user_id)
-        .await
+    #[cfg(not(feature = "enterprise"))]
     {
-        Ok(()) => {
-            audit(&org_id, &user.user_id, "notice_update", Some(&nid)).await;
-            MetaHttpResponse::ok("posted")
+        let _ = (org_id, nid, user);
+        licensed_only("add_notice_update")
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        match openobserve_core::status_pages::add_notice_update(&org_id, &nid, body, &user.user_id)
+            .await
+        {
+            Ok(()) => {
+                audit(&org_id, &user.user_id, "notice_update", Some(&nid)).await;
+                MetaHttpResponse::ok("posted")
+            }
+            Err(e) => map_err("add_notice_update", e),
         }
-        Err(e) => map_err("add_notice_update", e),
     }
 }
 
@@ -547,7 +581,7 @@ pub async fn add_notice_update(
     ),
     request_body(content = MarkFalsePositiveRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
@@ -557,21 +591,65 @@ pub async fn add_notice_update(
 pub async fn mark_false_positive(
     Path((org_id, nid)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
-    Json(body): Json<MarkFalsePositiveRequest>,
+    #[cfg(feature = "enterprise")] Json(body): Json<MarkFalsePositiveRequest>,
 ) -> Response {
-    match openobserve_core::status_pages::mark_false_positive(
-        &org_id,
-        &nid,
-        body.snooze_hours,
-        &user.user_id,
-    )
-    .await
+    #[cfg(not(feature = "enterprise"))]
     {
-        Ok(()) => {
-            audit(&org_id, &user.user_id, "mark_false_positive", Some(&nid)).await;
-            MetaHttpResponse::ok("marked")
+        let _ = (org_id, nid, user);
+        licensed_only("mark_false_positive")
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        match openobserve_core::status_pages::mark_false_positive(
+            &org_id,
+            &nid,
+            body.snooze_hours,
+            &body.reason,
+            &user.user_id,
+        )
+        .await
+        {
+            Ok(()) => {
+                audit(&org_id, &user.user_id, "mark_false_positive", Some(&nid)).await;
+                MetaHttpResponse::ok("marked")
+            }
+            Err(e) => map_err("mark_false_positive", e),
         }
-        Err(e) => map_err("mark_false_positive", e),
+    }
+}
+
+/// Undoes a false-alarm mark: the incident returns to the public history and its downtime counts
+/// again.
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "UndoStatusPageNoticeFalsePositive",
+    summary = "Undo a false-alarm mark on a notice",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("nid" = String, Path, description = "Notice id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn undo_false_positive(
+    Path((org_id, nid)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    match openobserve_core::status_pages::undo_false_positive(&org_id, &nid).await {
+        Ok(()) => {
+            audit(&org_id, &user.user_id, "undo_false_positive", Some(&nid)).await;
+            MetaHttpResponse::ok("restored")
+        }
+        Err(e) => map_err("undo_false_positive", e),
     }
 }
 
@@ -588,7 +666,7 @@ pub async fn mark_false_positive(
         ("id" = String, Path, description = "Resource id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<config::meta::status_pages::DomainAdminView>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
@@ -616,7 +694,7 @@ pub async fn list_domains(Path((org_id, id)): Path<(String, String)>) -> Respons
     ),
     request_body(content = CreateDomainRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::CreateDomainResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
@@ -626,14 +704,22 @@ pub async fn list_domains(Path((org_id, id)): Path<(String, String)>) -> Respons
 pub async fn create_domain(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
-    Json(body): Json<CreateDomainRequest>,
+    #[cfg(feature = "enterprise")] Json(body): Json<CreateDomainRequest>,
 ) -> Response {
-    match openobserve_core::status_pages::create_domain(&org_id, &id, body).await {
-        Ok(resp) => {
-            audit(&org_id, &user.user_id, "create_domain", Some(&resp.id)).await;
-            MetaHttpResponse::json(resp)
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, id, user);
+        licensed_only("create_domain")
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        match openobserve_core::status_pages::create_domain(&org_id, &id, body).await {
+            Ok(resp) => {
+                audit(&org_id, &user.user_id, "create_domain", Some(&resp.id)).await;
+                MetaHttpResponse::json(resp)
+            }
+            Err(e) => map_err("create_domain", e),
         }
-        Err(e) => map_err("create_domain", e),
     }
 }
 
@@ -650,7 +736,7 @@ pub async fn create_domain(
         ("did" = String, Path, description = "Custom domain id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "delete"})),
@@ -684,7 +770,7 @@ pub async fn delete_domain(
         ("did" = String, Path, description = "Custom domain id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::DomainAdminView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),

@@ -63,6 +63,16 @@ describe("CompositeStatusTimeline", () => {
     vi.mocked(alertsService.getCompositeTimeline).mockResolvedValue({ data: response });
   });
 
+  it("keeps the loading spinner spinning under reduced motion", async () => {
+    vi.mocked(alertsService.getCompositeTimeline).mockReturnValue(new Promise(() => {}));
+    const wrapper = mountTimeline();
+    await flushPromises();
+
+    const spinner = wrapper.find(".animate-spin");
+    expect(spinner.exists()).toBe(true);
+    expect(spinner.classes()).toContain("o2-motion-keep");
+  });
+
   it("fetches the timeline for the alert and renders a lane per child plus the result", async () => {
     const wrapper = mountTimeline();
     await flushPromises();

@@ -20,10 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="pageState !== 'forbidden' && !errorIsForbidden"
-      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+      class="flex flex-wrap items-center justify-end gap-2"
     >
-      <OverviewStatusLine v-if="showOverviewCards" :status="status" @select="onHeadlineSelect" />
-      <div class="ms-auto flex items-center gap-2">
+      <div class="flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading || overviewState.loading"
@@ -66,17 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
-    <OverviewHeadlineStrip
-      v-if="showOverviewCards"
-      :overview="overview"
-      :pending="overviewPending"
-      :failed="overviewFailed"
-      :forbidden="overviewForbidden"
-      :incidents-state="incidentsTile"
-      :incidents-total="incidentsTotal"
-      @select="onHeadlineSelect"
-    />
-
     <div
       v-if="showOverviewCards"
       class="grid grid-cols-[1.15fr_1fr] gap-3 max-lg:grid-cols-1"
@@ -91,9 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :incidents-total="incidentsTotal"
         :locked-reason="alertsLocked ? alertsLock.lockedReason.value : undefined"
         @retry="() => loadOverview(true)"
-        @open="goToAlertList"
+        @open="() => openAlertList()"
         @create="goToAddAlert"
-        @select="onHeadlineSelect"
+        @select="onAlertsSelect"
+        @ask-ai="onAskAi"
       />
       <OverviewDataHealthCard
         :overview="overview"
@@ -102,6 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :forbidden="overviewForbidden"
         @retry="() => loadOverview(true)"
         @open="onHealthOpen"
+        @view-all="goToPipelines()"
+        @ask-ai="onAskAi"
       />
     </div>
 
@@ -127,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-primary"
           size="sm"
           data-test="overview-incidents-view-all"
-          @click="goToIncidentList"
+          @click="goToAllIncidents"
         >
           {{ t("overview.viewAll") }}
         </OButton>
@@ -158,12 +149,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ inc.title || t("overview.untitledIncident") }}
               <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
                 <ODimensionChip
-                  v-for="[key, val] in sortedDimensions(inc.group_values)"
-                  :key="key"
-                  :dim-key="key"
-                  :key-label="shortDimKey(key)"
-                  :value="val"
-                  :tooltip="true"
+                  v-for="dim in incidentDimensions(inc.group_values)"
+                  :key="dim.key"
+                  :dim-key="dim.key"
+                  :key-label="dim.label"
+                  :value="dim.value"
+                  :tooltip="dim.rawTooltip"
                 />
               </template>
             </div>
@@ -180,6 +171,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="shrink-0 whitespace-nowrap opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
           >
+            <OverviewAskAiButton
+              kind="incident"
+              :item-key="inc.id"
+              :label="inc.title || t('overview.untitledIncident')"
+              @ask="
+                onAskAi({
+                  kind: 'incident',
+                  incident: { ...inc, title: inc.title || t('overview.untitledIncident') },
+                })
+              "
+            />
             <OButton variant="ghost-primary" size="sm" @click="goToIncident(inc)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -642,7 +644,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-primary"
               size="sm"
               data-test="overview-recent-events-view-all"
-              @click="goToAlertList"
+              @click="() => openAlertList()"
             >
               {{ t("overview.viewAll") }}
             </OButton>
@@ -809,6 +811,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { useRouter } from "vue-router";
 import anomalyService from "@/services/anomaly_detection";
 import DateTime from "@/components/DateTime.vue";
@@ -825,37 +828,32 @@ import OverviewSectionError from "./OverviewSectionError.vue";
 import OverviewSectionEmpty from "./OverviewSectionEmpty.vue";
 import HomeNoDataState from "./HomeNoDataState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OverviewHeadlineStrip, {
-  type OverviewTarget,
-  type IncidentsTile,
-} from "./overview/OverviewHeadlineStrip.vue";
-import OverviewAlertsCard from "./overview/OverviewAlertsCard.vue";
+import OverviewAlertsCard, { type AlertsBoxTarget } from "./overview/OverviewAlertsCard.vue";
 import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
 import OverviewTopStreamsCard from "./overview/OverviewTopStreamsCard.vue";
 import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
 import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
-import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
+import OverviewAskAiButton from "./overview/OverviewAskAiButton.vue";
+import { buildOverviewAskAi, type OverviewAskAiTarget } from "./overview/overviewAskAi";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
 import { resolveBrowserTimezone } from "@/utils/timezone";
-import {
-  overviewChecks,
-  overviewStatus,
-  type AttentionCheck,
-  type OverviewDestination,
-  type OverviewSignal,
-} from "./overview/overviewFormat";
+import { type OverviewDestination, type OverviewSignal } from "./overview/overviewFormat";
 import { overviewKeys } from "@/services/overview.querykeys";
-import type { OrgOverview } from "@/ts/interfaces/overview";
+import type { IncidentsTile, OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
-import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
+import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
 import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import analytics from "@/services/product_analytics";
+import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
+import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
+import type { AiChatHandoff } from "@/plugins/traces/utils/traceAiPayload";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -864,6 +862,8 @@ const AlertHistoryDrawer = defineAsyncComponent(
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+
+const emit = defineEmits<{ sendToAiChat: [payload: AiChatHandoff] }>();
 
 // ── Feature flags ────────────────────────────────────────────────────────────
 // Services shares this same gate — it's the service-graph half of the same
@@ -955,6 +955,9 @@ const onDateChange = (value: any) => {
       timeRange: timeRange.value,
     }),
   );
+  if (value.userChangedValue) {
+    analytics.track("home_time_range_changed", { type: dateTimeType.value });
+  }
   loadAll();
 };
 
@@ -1289,25 +1292,6 @@ const incidentsTile = computed<IncidentsTile>(() => {
   return "ok";
 });
 
-// a source not loaded yet is still being checked; one this deployment lacks is left out
-const incidentsCheck = computed<Omit<AttentionCheck, "key" | "monitors"> | undefined>(() => {
-  if (!isIncidentsEnabled.value) return undefined;
-  if (!sectionState.incidents.loaded) return { state: "loading", count: 0 };
-  if (isFailed("incidents")) return { state: "unavailable", count: 0 };
-  return { state: "ok", count: incidentsTotal.value };
-});
-const status = computed(() =>
-  overviewStatus(
-    overviewChecks({
-      overview: overview.value,
-      pending: overviewPending.value,
-      failed: overviewFailed.value,
-      forbidden: overviewForbidden.value,
-      incidents: incidentsCheck.value,
-    }),
-  ),
-);
-
 // only the flag-on page can tell that nothing is watched
 const loadAlertCount = async (force = false) => {
   if (!flagOn.value) return;
@@ -1382,7 +1366,8 @@ const loadUserStreams = async (force = false) => {
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.anomalies = null;
-  if (anomalyLocked.value) {
+  // the OSS build does not register the anomaly routes, and their 401 would end the session
+  if (!anomalyEnabled.value) {
     anomalies.value = [];
     anomalyConfigCount.value = null;
     return;
@@ -1711,13 +1696,23 @@ const formatReqRate = (reqs: number) => {
 };
 
 const sortedDimensions = (dims: Record<string, string>): [string, string][] =>
-  Object.keys(dims)
-    .sort()
-    .map((k) => [k, dims[k]]);
+  chipDimensionKeys(dims).map((k) => [k, dims[k]]);
 
 // Shorten verbose k8s-style keys for display: "k8s-namespace" → "namespace"
 const shortDimKey = (key: string): string =>
   key.replace(/^k8s-/, "").replace(/^kubernetes[_-]/, "");
+
+// A shortened key keeps the full key in its tooltip; a finding's words need none.
+const incidentDimensions = (dims: Record<string, string>) =>
+  sortedDimensions(dims).map(([key, val]) => {
+    const shown = dimensionDisplay(t, dims, key, val);
+    return {
+      key,
+      label: shown.label ?? shortDimKey(key),
+      value: shown.value,
+      rawTooltip: !shown.label,
+    };
+  });
 
 const severityRowClass = (severity: string) =>
   severity === "critical"
@@ -1759,11 +1754,18 @@ const serviceCardClass = (svc: { health: ServiceHealthStatus; latencyFlag: boole
   SERVICE_CARD_BORDER[svc.health === "healthy" && svc.latencyFlag ? "degraded" : svc.health];
 
 // ── Navigation ───────────────────────────────────────────────────────────────
+const trackDrilldown = (target: string, properties?: object) =>
+  analytics.track("home_overview_drilldown_clicked", { target, ...properties });
+
 const goToAlert = (item: any) => {
+  trackDrilldown("alert_history");
   selectedAlertForHistory.value = item.alertConfig ?? { name: item.alertName };
   selectedAlertIdForHistory.value = item.alertId ?? "";
   showAlertHistoryDrawer.value = true;
 };
+
+// Gen-AI node names live in gen_ai_* fields, and their streams may lack infer_service_name (a 400).
+const INFER_NAME_SERVICE_TYPES = new Set(["database", "queue", "rpc", "external"]);
 
 const goToService = (svc: any, e?: MouseEvent) => {
   // Fired from the per-card info-icon button — stop it bubbling to the card
@@ -1771,7 +1773,11 @@ const goToService = (svc: any, e?: MouseEvent) => {
   e?.stopPropagation();
   // the service panel's View traces emits here too, outside this file's lock markup
   if (tracesLock.locked.value) return;
-  let filter = sqlEquals("service_name", svc.label ?? svc.id);
+  trackDrilldown("service_traces");
+  let filter = buildViewTracesFilter({
+    serviceName: svc.label ?? svc.id,
+    serviceType: INFER_NAME_SERVICE_TYPES.has(svc.service_type) ? svc.service_type : undefined,
+  });
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
   const query: Record<string, string> = {
@@ -1796,6 +1802,7 @@ const openServicePanel = (svc: any) => {
   // clicking the card body opens the latency/info side panel.
   selectedService.value = svc;
   servicePanelVisible.value = true;
+  trackDrilldown("service_panel");
 };
 
 const closeServicePanel = () => {
@@ -1804,6 +1811,7 @@ const closeServicePanel = () => {
 };
 
 const goToIncident = (inc: any) => {
+  trackDrilldown("incident");
   router.push({
     name: "incidentDetail",
     params: { id: inc.id },
@@ -1821,55 +1829,96 @@ const showLogsCard = computed(() => router.hasRoute("logs"));
 // events without a stream carry a dash placeholder, which a phone row has no room to repeat
 const hasEventStream = (ev: { service: string }) => ev.service !== "—";
 
-const goToAlertList = () => {
+// The bare "View all" promises every alert behind the org-wide counts, not only what fires.
+const openAlertList = (filter: Record<string, string> = ALERT_LIST_FILTERS.all) => {
   if (alertsLocked.value) return;
-  router.push({ name: "alertList", query: { org_identifier: orgId.value } });
+  trackDrilldown("alerts");
+  router.push({ name: "alertList", query: { org_identifier: orgId.value, ...filter } });
 };
+
+// Each filter yields exactly the rows its count tallies; the counts are org-wide, so the list opens on every folder.
+const all_folders = ALERT_LIST_ALL_FOLDERS;
+const ALERT_LIST_FILTERS = {
+  all: { state: ALERT_LIST_ALL_STATES, all_folders },
+  firing: { state: "firing", all_folders },
+  failing: { state: "error", all_folders },
+  delivery: { state: "notify_failed", all_folders },
+  critical: { state: "firing", level: "critical", all_folders },
+  warning: { state: "firing", level: "warning", all_folders },
+} as const;
 
 const goToAddAlert = () => {
   if (alertsLocked.value) return;
+  trackDrilldown("add_alert");
   router.push({ name: "addAlert", query: { org_identifier: orgId.value } });
 };
 
-const goToPipelines = () => {
-  router.push({ name: "pipelines", query: { org_identifier: orgId.value } });
+const goToPipelines = (state?: "errored") => {
+  trackDrilldown("pipelines");
+  router.push({
+    name: "pipelines",
+    query: { org_identifier: orgId.value, ...(state && { state }) },
+  });
 };
 
 const goToStreams = () => {
+  trackDrilldown("streams");
   router.push({ name: "logstreams", query: { org_identifier: orgId.value } });
 };
 
 const goToIngestion = () => {
+  trackDrilldown("ingestion");
   router.push({ name: "ingestion", query: { org_identifier: orgId.value } });
 };
 
 const onHealthOpen = (destination: OverviewDestination) => {
-  if (destination === "alerts") goToAlertList();
-  else if (destination === "pipelines") goToPipelines();
+  if (destination === "failing" || destination === "delivery")
+    openAlertList(ALERT_LIST_FILTERS[destination]);
+  else if (destination === "pipelines") goToPipelines("errored");
   else goToStreams();
 };
 
 const onSignalOpen = (signal: OverviewSignal) => {
   if (signal in signalLockedReasons.value) return;
+  trackDrilldown("signal", { signal });
   router.push({ name: signal, query: { org_identifier: orgId.value } });
 };
 
-const onHeadlineSelect = (target: OverviewTarget) => {
-  if (target === "firing" || target === "failing" || target === "delivery") goToAlertList();
-  else if (target === "pipelines") goToPipelines();
-  else if (target === "quiet") goToStreams();
-  else if (incidentsLicenseLocked.value) return;
-  else if (incidentsTile.value === "locked") openUpgradeDialog();
-  else if (incidentsTile.value !== "unavailable" && incidentsTile.value !== "forbidden") {
-    goToIncidentList();
-  }
+const onAlertsSelect = (target: AlertsBoxTarget) => {
+  if (target in ALERT_LIST_FILTERS)
+    openAlertList(ALERT_LIST_FILTERS[target as keyof typeof ALERT_LIST_FILTERS]);
+  else goToIncidentList();
+};
+
+const onAskAi = (target: OverviewAskAiTarget) => {
+  emit(
+    "sendToAiChat",
+    buildOverviewAskAi(
+      target,
+      {
+        orgId: orgId.value ?? "",
+        startTime: timeRange.value.startTime,
+        endTime: timeRange.value.endTime,
+        rangeLabel: rangeLabel.value,
+        generatedAt: overview.value?.generated_at,
+      },
+      t,
+    ),
+  );
 };
 
 const goToIncidentList = () => {
+  trackDrilldown("incidents");
   router.push({ name: "incidentList", query: { org_identifier: orgId.value, status: "open" } });
 };
 
+const goToAllIncidents = () => {
+  trackDrilldown("incidents");
+  router.push({ name: "incidentList", query: { org_identifier: orgId.value } });
+};
+
 const goToAnomalies = () => {
+  trackDrilldown("anomalies");
   router.push({
     name: "alertList",
     query: { org_identifier: orgId.value, tab: "anomalyDetection" },
@@ -1878,11 +1927,13 @@ const goToAnomalies = () => {
 
 const goToLogs = () => {
   if (logsLock.locked.value) return;
+  trackDrilldown("logs");
   router.push({ name: "logs", query: { org_identifier: orgId.value } });
 };
 
 const goToServiceGraph = () => {
   if (tracesLock.locked.value) return;
+  trackDrilldown("service_graph");
   const query: Record<string, string> = {
     org_identifier: orgId.value,
     tab: "service-graph",
@@ -1909,11 +1960,27 @@ watch(
   },
 );
 
+// A sample load or removal that ends while Home is open must re-check the org, not wait for a reload
+const sampleSession = useSampleDataSession();
+watch(sampleSession.status, (now, was) => {
+  if (was === "loading" && now !== "idle" && sampleSession.loadingOrg.value === orgId.value)
+    loadAll(true);
+});
+watch(sampleSession.removals, ({ org }) => {
+  if (org === orgId.value) loadAll(true);
+});
+
 // zoConfig loads asynchronously after mount — retry incidents when it becomes available
 watch(isIncidentsEnabled, (enabled) => {
   if (!enabled || incidents.value.length > 0) return;
   // the earlier pass returned early and marked the section loaded, so re-arm its skeleton
   sectionState.incidents.loaded = false;
   void runSection("incidents", (current) => loadIncidents(false, current));
+});
+// a failed config fetch is retried after mount, so the flag can turn on once the first pass has skipped the section
+watch(anomalyEnabled, (enabled) => {
+  if (!enabled) return;
+  sectionState.anomalies.loaded = false;
+  void runSection("anomalies", (current) => loadAnomalies(false, current));
 });
 </script>

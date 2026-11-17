@@ -1284,6 +1284,7 @@ import dbMonitoringService, {
 // hand-built query — the per-fingerprint slow samples — is served by
 // `/samples?fingerprint=`, which builds the predicate server-side.
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { takeDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
 import { useDbmChartTheme } from "@/composables/dbm/useDbmChartTheme";
@@ -1688,6 +1689,7 @@ const activeTab = computed<QueryDetailTab>(() => resolveQueryDetailTab(route.que
 const selectTab = (tab: QueryDetailTab) => {
   if (tab === activeTab.value) return;
   router.replace({ query: { ...route.query, tab } }).catch(() => {});
+  analytics.track("dbm_query_detail_tab_switched", { tab });
 };
 
 const onTabChange = (key: string | number) => {
@@ -3236,7 +3238,13 @@ const onDateChange = (value: DbmDateChange) => {
   // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
   // mount replay would otherwise double every request. See
   // `DbmDateChange.userChangedValue`.
-  if (value?.userChangedValue !== false) load();
+  if (value?.userChangedValue !== false) {
+    load();
+    analytics.track("dbm_time_range_changed", {
+      page: "query_detail",
+      type: value?.relativeTimePeriod ? "relative" : "absolute",
+    });
+  }
 };
 
 // ─── AI ──────────────────────────────────────────────────────────────────────
@@ -3247,6 +3255,7 @@ const onDateChange = (value: DbmDateChange) => {
  * describe it. Sent with `autoSend` so the click is the whole interaction.
  */
 const askAiForFix = () => {
+  analytics.track("dbm_ai_fix_requested", { page: "query_detail" });
   const current = row.value;
   emit("sendToAiChat", {
     query: buildQueryFixPrompt({

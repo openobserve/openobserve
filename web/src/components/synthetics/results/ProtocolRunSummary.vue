@@ -32,6 +32,7 @@ import ProtocolRunSummarySkeleton from "./ProtocolRunSummarySkeleton.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import syntheticsService from "@/services/synthetics";
 import { syntheticsResultsRoute } from "@/utils/synthetics/routes";
+import { formatMs } from "@/utils/formatters";
 import type { HttpAssertion } from "@/types/synthetics";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
@@ -168,10 +169,6 @@ watch(
 // ── Formatting ──────────────────────────────────────────────────────────────
 function fmtTs(ms: number): string {
   return ms ? new Date(ms).toLocaleString() : "—";
-}
-function fmtMs(ms: number | null): string {
-  if (ms == null) return "—";
-  return ms >= 1000 ? (ms / 1000).toFixed(2) + " s" : ms + " ms";
 }
 function fmtBytes(b: number | null): string {
   if (b == null) return "—";
@@ -329,7 +326,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
               <span class="text-text-secondary text-xs">{{
                 t("synthetics.protocolRun.responseTime")
               }}</span>
-              <span class="text-sm font-medium">{{ fmtMs(run.responseTimeMs) }}</span>
+              <span class="text-sm font-medium">{{ formatMs(run.responseTimeMs) }}</span>
             </div>
             <div
               v-if="run.responseBytes != null"
@@ -371,7 +368,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
                 <div class="rounded-default bg-accent h-full" :style="{ width: bar.pct + '%' }" />
               </div>
               <span class="text-text-secondary w-[4.5rem] shrink-0 text-right text-xs">{{
-                fmtMs(bar.ms)
+                formatMs(bar.ms)
               }}</span>
             </div>
             <div class="border-border-default flex items-center gap-2 border-t pt-1">
@@ -380,7 +377,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
               }}</span>
               <div class="flex-1" />
               <span class="text-text-body w-[4.5rem] shrink-0 text-right text-xs font-semibold">{{
-                fmtMs(run.totalMs)
+                formatMs(run.totalMs)
               }}</span>
             </div>
           </div>
@@ -493,7 +490,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
               <span class="font-medium"
                 >{{ run.runtime || "—" }}
                 <span v-if="run.initMs" class="text-text-secondary"
-                  >(+{{ fmtMs(run.initMs) }} {{ t("synthetics.protocolRun.init") }})</span
+                  >(+{{ formatMs(run.initMs) }} {{ t("synthetics.protocolRun.init") }})</span
                 ></span
               >
             </div>

@@ -1,13 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Page Object Model for the Settings > LLM Providers surface (online evals).
-// Covers the ProviderFormPage (create/edit) and the LlmProvidersSettings list.
-//
-// Enterprise/cloud-only: the `llm_providers` route is only pushed when the build
-// is enterprise or cloud (useManagementRoutes.ts), and the settings tab is gated
-// by `(isEnt || isCloud) && online_evals_enabled`. navigateToLlmProviders() probes
-// positively for the page mount and returns a boolean so callers can gate to a
-// clean SKIP on the OSS binary (mirrors navigateToModelPricing).
+// The route is enterprise/cloud-only, so navigateToLlmProviders() returns false on OSS builds for a clean skip.
 
 export class LlmProvidersPage {
     /**
@@ -56,17 +48,12 @@ export class LlmProvidersPage {
 
     // ── Navigation ────────────────────────────────────────────────────────────
 
-    /**
-     * Navigate directly to Settings > LLM Providers and wait for the page mount.
-     * Enterprise/cloud-only: on the OSS binary the route does not exist, so the
-     * mount signal never appears and this returns false for a clean SKIP.
-     * @returns {Promise<boolean>}
-     */
+    /** Opens LLM Providers; returns false on OSS, where the route does not exist. */
     async navigateToLlmProviders() {
         const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const org = process.env.ORGNAME || 'default';
         try {
-            await this.page.goto(`${base}/web/settings/llm_providers?org_identifier=${org}`, {
+            await this.page.goto(`${base}/web/ai/llm-providers?org_identifier=${org}`, {
                 timeout: 60000,
             });
             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});

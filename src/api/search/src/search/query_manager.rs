@@ -95,7 +95,7 @@ pub async fn cancel_query(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::search::QueryStatusResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "list"})),

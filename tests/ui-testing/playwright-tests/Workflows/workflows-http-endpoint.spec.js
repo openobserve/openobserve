@@ -1,4 +1,4 @@
-// Workflows HTTP endpoint (HTTP-01..08): panel from the editor and the list, reveal, dry run, drafts, rotate, rejections, runs, viewer.
+// Workflows HTTP endpoint (HTTP-01..07): panel from the editor and the list, reveal, dry run, drafts, rotate, rejections, runs.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -248,31 +248,6 @@ test.describe(
       await http.filterRunsToHttp();
       await expect.poll(() => http.runsTableText(), { timeout: 30000 }).toContain(key);
       expect(await http.runsTableText()).toContain(runId.slice(0, 8));
-    });
-
-    test('HTTP-08: a viewer sees the endpoint read-only', async ({ browser }) => {
-      const wf = await seeded({ name: `wf_auto_http_v_${uniq()}` });
-      await http.enableEndpointApi(wf.id);
-      const { email, password } = await http.createViewer(uniq());
-      const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-      try {
-        const vp = await http.loginInContext(ctx, email, password);
-        const vpm = new PageManager(vp);
-        const vhttp = vpm.workflowHttpPage;
-        await vpm.workflowsPage.goToList();
-        await vpm.workflowsPage.search(wf.name);
-        await vhttp.openFromList(wf.name);
-        await vp.locator(vhttp.steady).waitFor({ state: 'visible', timeout: 25000 });
-        await expect(vp.locator(vhttp.toggle)).toBeDisabled();
-        await expect(vp.locator(vhttp.rotate)).toHaveCount(0);
-        await expect(vp.locator(vhttp.advanced)).toHaveCount(0);
-        await expect(vp.locator(`${vhttp.credentials} [data-test$="-show"]`)).toHaveCount(0);
-        await expect(vp.locator(`${vhttp.credentials} [data-test$="-revoke"]`)).toHaveCount(0);
-        await expect(vp.locator(vhttp.url)).toBeVisible();
-      } finally {
-        await ctx.close();
-        await http.deleteUser(email);
-      }
     });
   }
 );

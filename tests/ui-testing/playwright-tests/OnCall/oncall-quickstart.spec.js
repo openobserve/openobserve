@@ -19,7 +19,7 @@
  * missing field, and never a silent no-op. That assertion is correct whether or
  * not the fix stays, which is the point of writing it that way.
  *
- * `attemptQuickStartSave()` returns `{disabled, requestSeen, error,
+ * `attemptQuickStartSave()` returns `{disabled, requestSeen, error, blocked,
  * invalidFields}`; `requestSeen` is the half that catches the silent no-op, and
  * neither half alone proves it.
  *
@@ -174,12 +174,17 @@ test.describe('On-call Quick start', {
     await expect(pm.oncallTeamDetailPage.getPresetTab(REGIONS_PRESET),
       'the server catalogue ships follow_the_sun, the shape whose regions carry a required name').toBeVisible({ timeout: 20000 });
     await pm.oncallTeamDetailPage.chooseQuickStartTemplate(REGIONS_PRESET);
+    // Regions open with real default names, so the blank required name is made by clearing one.
+    await expect(pm.oncallTeamDetailPage.getPresetRowNameTrigger('groups-0'),
+      'a region opens with a default name, not an empty field').not.toHaveText('', { timeout: 20000 });
+    await pm.oncallTeamDetailPage.fillQuickStartRegionName('groups-0', '');
 
     const outcome = await pm.oncallTeamDetailPage.attemptQuickStartSave();
     testLogger.info('§11.2 Quick start save outcome', outcome);
 
     const spokeUp = outcome.disabled
       || Boolean(outcome.error)
+      || Boolean(outcome.blocked)
       || outcome.invalidFields > 0
       || outcome.requestSeen;
     expect(
@@ -195,6 +200,7 @@ test.describe('On-call Quick start', {
     ).toBe(false);
 
     expect(outcome.requestSeen, 'unnamed, unstaffed regions are invalid, so nothing may reach the server').toBe(false);
+    expect(outcome.blocked ?? '', 'the footer names the blank region first').toMatch(/a name to save/i);
     const stored = await getTeamSchedule(page, team.id);
     expect(
       (stored?.rotations ?? []).length,
@@ -202,23 +208,7 @@ test.describe('On-call Quick start', {
     ).toBe(0);
   });
 
-  /**
-   * The second limb, pinned precisely.
-   *
-   * With EXACTLY ONE field still blank, `apply()` takes the single-field branch
-   * — the one that names it. Worth its own test because the multi-field branch
-   * says only "fix the highlighted fields", which would pass an assertion about
-   * naming without naming anything.
-   *
-   * REACHING THAT BRANCH MEANS FILLING BOTH REGIONS BAR ONE FIELD. The
-   * catalogue declares `groups` with `min: 2`, so the shape opens at TWO region
-   * rows and each wants a name and a roster: naming only `groups-0` leaves
-   * three fields blank and lands on the summary instead. So this fills
-   * `groups-1` completely, names `groups-0`, and leaves that one roster empty —
-   * the single gap the message then has to name. The catch-all is not in the
-   * count: it is optional and its controls stay off screen until overridden,
-   * and `invalidFields()` skips a row whose controls are not visible.
-   */
+  // One region left unstaffed keeps Save disabled, and the footer says why.
   test('§11.2 a named but unstaffed region gets a message naming the gap', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
@@ -249,14 +239,15 @@ test.describe('On-call Quick start', {
     testLogger.info('§11.2 named-but-unstaffed outcome', outcome);
 
     expect(outcome.requestSeen, 'an unstaffed shape must not reach the server').toBe(false);
+    expect(outcome.disabled, 'Save stays blocked while a region has nobody in it').toBe(true);
     expect(
-      outcome.error ?? '',
-      'the single missing field must be named, not summarised',
-    ).toMatch(/needs someone assigned/i);
+      outcome.blocked ?? '',
+      'the footer says what is blocking Save',
+    ).toMatch(/add people to every shift rule/i);
   });
 
-  // Applying rewrites the primary rotation's shift rules, so the confirm names it; this guard is not §11.2's validation.
-  test('Save on a team that already has rotations asks before replacing the primary rotation\'s rules', {
+  // From a lane's menu the drawer targets that rotation, so the confirm names it; this guard is not §11.2's validation.
+  test('Save on a team that already has rotations asks before replacing the chosen rotation\'s rules', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     // Seed our OWN member — listOrgUsers()[0] may belong to another worker and be
@@ -282,15 +273,20 @@ test.describe('On-call Quick start', {
     ).toBeGreaterThan(0);
 
     await openQuickStartOn(team.id);
+    // Save stays disabled until the form is valid, so the confirm is reached only from a staffed template.
+    await pm.oncallTeamDetailPage.chooseQuickStartTemplate('weekday_weekend');
+    for (const row of ['weekdays', 'weekend']) {
+      await pm.oncallTeamDetailPage.setQuickStartRegionMembers(row, [memberEmail]);
+    }
     await pm.oncallTeamDetailPage.applyQuickStart();
 
+    const confirm = pm.oncallTeamDetailPage.getQuickStartReplaceConfirm();
+    await expect(confirm, 'replacing an existing rotation\'s rules must be confirmed first').toBeVisible({ timeout: 20000 });
     await expect(
-      pm.oncallTeamDetailPage.getConfirmDialog(),
-      'replacing an existing schedule must be confirmed first',
-    ).toBeVisible({ timeout: 20000 });
-    await expect(
-      pm.oncallTeamDetailPage.getConfirmDialog(),
-      'the confirm names the rotation the server rewrites: the first stored one',
+      confirm,
+      'the confirm names the rotation the server rewrites: the first lane\'s, which the menu opened on',
     ).toContainText(stored.rotations[0].name);
+    await expect(confirm.getByRole('button', { name: 'Replace', exact: true }),
+      'the confirm\'s action says what it does').toBeVisible();
   });
 });

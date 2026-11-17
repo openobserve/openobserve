@@ -45,6 +45,7 @@ import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import { useDbmScopeSyncScope } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmTabCountsContext, type DbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
 import type { BadgeCount, DbmTabCountKey } from "@/composables/dbm/useDbmTabCounts";
+import analytics from "@/services/product_analytics";
 import { claimedCount, dbmHttpError } from "@/utils/dbm/format";
 import { forbiddenState, licenseDeniedFeatures, type ForbiddenState } from "@/utils/featureGate";
 
@@ -247,7 +248,13 @@ export function useDbmListPage(options: DbmListPageOptions) {
     // Fetch only on a genuine pick — `onMounted` already loads, and the
     // picker's mount replay would otherwise double every request. See
     // `DbmDateChange.userChangedValue`.
-    if (value?.userChangedValue !== false) void options.load();
+    if (value?.userChangedValue !== false) {
+      void options.load();
+      analytics.track("dbm_time_range_changed", {
+        page: String(route.name ?? ""),
+        type: value?.relativeTimePeriod ? "relative" : "absolute",
+      });
+    }
   };
 
   onMounted(() => {

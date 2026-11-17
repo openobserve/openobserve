@@ -18,7 +18,7 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams }),
 }));
 
-import { useLlmTraceStreams } from "./useLlmTraceStreams";
+import { defaultLlmStream, useLlmTraceStreams } from "./useLlmTraceStreams";
 
 beforeEach(() => {
   getStreams.mockReset();
@@ -79,5 +79,13 @@ describe("useLlmTraceStreams", () => {
     await Promise.all([ensureStreamsLoaded(), ensureStreamsLoaded()]);
 
     expect(getStreams).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("defaultLlmStream", () => {
+  it("opens on the first app stream, never the judge's `_evaluator` while another exists", () => {
+    expect(defaultLlmStream(["_evaluator", "default", "qa"])).toBe("default");
+    expect(defaultLlmStream(["_evaluator"])).toBe("_evaluator");
+    expect(defaultLlmStream([])).toBe("");
   });
 });

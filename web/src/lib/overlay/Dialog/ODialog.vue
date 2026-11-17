@@ -242,11 +242,18 @@ const sizeClasses = computed(() => {
 
 const isFullSize = computed(() => props.size === "full");
 
+const pinnedTop = ref<number | null>(null);
+
 // Inline style for explicit width/maxHeight override
 const contentStyle = computed(() => {
   const style: Record<string, string> = {};
   if (props.width != null) style.width = `${props.width}vw`;
   if (props.maxHeight != null) style.maxHeight = `${props.maxHeight}vh`;
+  if (pinnedTop.value != null && !isFullSize.value) {
+    style.top = `${pinnedTop.value}px`;
+    style.translate = "-50% 0";
+    style.maxHeight = `min(${props.maxHeight ?? 90}vh, calc(95vh - ${pinnedTop.value}px))`;
+  }
   return Object.keys(style).length ? style : undefined;
 });
 
@@ -305,6 +312,16 @@ function handleOpenAutoFocus(event: Event) {
 // single-letter shortcuts. When a mutation batch both removes and adds fields,
 // move focus to the first field of the newly added content — unless the user
 // is still focused in a field that survived the swap.
+// A field portaled out of the body (a popover's search box) still belongs to this dialog's edit.
+function focusStaysInField(body: Element): boolean {
+  const active = document.activeElement;
+  return (
+    active instanceof HTMLElement &&
+    active.matches(AUTOFOCUS_ANY_FIELD) &&
+    (body.contains(active) || !!active.closest("[data-reka-popper-content-wrapper]"))
+  );
+}
+
 watchEffect((cleanup) => {
   if (!shown.value) return;
   const body = bodyRef.value;
@@ -319,16 +336,11 @@ watchEffect((cleanup) => {
     const removedField = records.flatMap((r) => Array.from(r.removedNodes)).some(containsField);
     if (!added.length || !removedField) return;
 
-    const active = document.activeElement;
-    if (
-      active instanceof HTMLElement &&
-      body.contains(active) &&
-      active.matches(AUTOFOCUS_ANY_FIELD)
-    ) {
-      return;
-    }
+    if (focusStaysInField(body)) return;
 
     nextTick(() => {
+      // A field the swap itself focused (a popover's search box) already holds the edit.
+      if (focusStaysInField(body)) return;
       for (const el of added) {
         if (!el.isConnected) continue;
         const field = findAutoFocusTarget(el);
@@ -384,6 +396,41 @@ const {
   detach: detachShadow,
 } = useScrollShadow(bodyRef);
 
+// Pinned from the first interaction so a reveal never moves what was clicked; earlier loads still centre.
+function pinPanelTop() {
+  if (pinnedTop.value != null || isFullSize.value) return;
+  const panel = bodyRef.value?.closest<HTMLElement>("[data-o2-dialog]");
+  if (!panel) return;
+  pinnedTop.value = Math.max(0, (window.innerHeight - panel.getBoundingClientRect().height) / 2);
+}
+
+watchEffect((cleanup) => {
+  if (!shown.value) {
+    pinnedTop.value = null;
+    return;
+  }
+  // Closing or deactivating runs the cleanup, so a repin queued before it never lands on a hidden panel.
+  let live = true;
+  // A new viewport height re-centres a pinned panel once, then holds the new top.
+  const repin = () => {
+    if (pinnedTop.value == null) return;
+    pinnedTop.value = null;
+    nextTick(() => {
+      if (live && shown.value) pinPanelTop();
+    });
+  };
+  window.addEventListener("resize", repin);
+  cleanup(() => {
+    live = false;
+    window.removeEventListener("resize", repin);
+  });
+});
+
+// A fullscreen panel fills the viewport, so a top pinned at its earlier size would be stale when it shrinks back.
+watch(isFullSize, (full) => {
+  if (full) pinnedTop.value = null;
+});
+
 // The body unmounts while a kept-alive host is away, so its listeners follow what is shown.
 watch(shown, (open) => {
   if (open) {
@@ -414,7 +461,7 @@ watch(shown, (open) => {
           'bg-dialog-overlay',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          'data-[state=closed]:duration-90 data-[state=open]:duration-110',
+          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=open]:duration-(--duration-dialog-in)',
         ]"
       />
 
@@ -444,19 +491,18 @@ watch(shown, (open) => {
           'text-dialog-content-text',
           // Focus ring
           'focus-visible:ring-dialog-focus-ring outline-none focus-visible:ring-2',
-          // Animation — single-direction rise: slides up from ~24px below while
-          // fading in, soft ease-out-expo settle (150ms); fades + drops back out
-          // (100ms). No scale, so nothing squishes — it just glides into place.
           'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-6',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-2',
-          'data-[state=open]:duration-150 data-[state=open]:ease-[cubic-bezier(0.16,1,0.3,1)]',
-          'data-[state=closed]:duration-100 data-[state=closed]:ease-in',
+          'data-[state=open]:duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
+          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
         @close-auto-focus="handleCloseAutoFocus"
         @keydown="handleContentKeydown"
+        @pointerdown.capture="pinPanelTop"
+        @keydown.capture="pinPanelTop"
       >
         <!--
           DialogTitle is ALWAYS rendered for accessibility.
@@ -464,12 +510,12 @@ watch(shown, (open) => {
           The visible title in the header is a plain <span> to avoid <h2> browser styles.
         -->
         <DialogTitle class="sr-only absolute">
-          {{ title ?? t("common.dialog") }}
+          {{ title ?? ariaTitle ?? t("common.dialog") }}
         </DialogTitle>
 
         <!-- Required by Reka; hidden from view -->
         <DialogDescription class="sr-only absolute">
-          {{ title ?? t("common.dialog") }}
+          {{ title ?? ariaTitle ?? t("common.dialog") }}
         </DialogDescription>
 
         <!-- ── Header ───────────────────────────────────────── -->

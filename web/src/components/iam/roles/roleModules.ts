@@ -22,6 +22,7 @@ export type ModuleGroupId =
   | "alerting"
   | "pipelines"
   | "monitoring"
+  | "security"
   | "ai"
   | "fleet"
   | "access"
@@ -64,6 +65,7 @@ export const GROUP_ORDER: ModuleGroupId[] = [
   "alerting",
   "pipelines",
   "monitoring",
+  "security",
   "ai",
   "fleet",
   "access",
@@ -77,6 +79,7 @@ export const GROUP_LABEL_KEYS: Record<ModuleGroupId, I18nKey> = {
   alerting: "iam.editRole.moduleGroupAlerting",
   pipelines: "iam.editRole.moduleGroupPipelines",
   monitoring: "iam.editRole.moduleGroupMonitoring",
+  security: "iam.editRole.moduleGroupSecurity",
   ai: "iam.editRole.moduleGroupAi",
   fleet: "iam.editRole.moduleGroupFleet",
   access: "iam.editRole.moduleGroupAccess",
@@ -128,6 +131,7 @@ const GROUP_OF: Record<string, ModuleGroupId> = {
   db_monitoring: "monitoring",
   rumtoken: "monitoring",
   sourcemaps: "monitoring",
+  security: "security",
   provider: "ai",
   score_config: "ai",
   scorer: "ai",
@@ -202,6 +206,7 @@ export const TASK_WORDS: Record<string, string[]> = {
   sourcemaps: ["sourcemap", "javascript", "stack trace"],
   synthetic_folder: ["synthetics", "uptime", "probe", "http test"],
   db_monitoring: ["database", "dbm", "sql", "postgres", "mysql"],
+  security: ["siem", "soc", "detection", "triage", "case", "threat"],
   status_page: ["status page", "uptime"],
   synthetic_environment: ["environment", "location"],
   ai: ["assistant", "chat", "llm"],
@@ -287,6 +292,7 @@ const ICON_OF: Record<string, IconName> = {
   synthetic_environment: "layers",
   status_page: "monitor-heart",
   db_monitoring: "database",
+  security: "verified-user",
   rumtoken: "devices",
   sourcemaps: "code",
   provider: "hub",

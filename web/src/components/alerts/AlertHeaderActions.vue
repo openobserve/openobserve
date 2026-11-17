@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OTooltip v-if="showAcknowledge && acknowledgeHint" :content="acknowledgeHint" />
 
   <template v-if="muteEnabled">
-    <template v-if="downtime">
+    <template v-if="downtime?.end_here">
       <ODropdown align="end">
         <template #trigger>
           <OButton
@@ -61,6 +61,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.downtimes.mute.endMute") }}
       </OButton>
     </template>
+    <OButton
+      v-else-if="downtime"
+      variant="outline"
+      size="sm-action"
+      icon-left="open-in-new"
+      data-test="alerts-alertdetail-muted-by"
+      @click="openDowntime"
+    >
+      {{ t("alerts.downtimes.mute.mutedBy", { name: downtime.name }) }}
+    </OButton>
     <ODropdown v-else align="end">
       <template #trigger>
         <OButton
@@ -114,20 +124,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @muted="emit('changed')"
   />
   <AlertMuteUntilDialog
-    v-if="muteEnabled && downtime"
+    v-if="muteEnabled && downtime?.end_here"
     v-model:open="extendUntilOpen"
     :target="target"
     :downtime="downtime"
     @done="emit('changed')"
+    @settled="emit('changed')"
   />
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
+import { useOrgId } from "@/composables/query";
 import type { ActiveDowntime } from "@/services/downtimes";
 import type { AckView, AlertGroup } from "@/ts/interfaces/alert";
 import { useAlertActions, type AlertMuteRef } from "@/composables/alerts/useAlertActions";
+import { downtimeLink } from "@/utils/downtimes/link";
+import type { MuteActionResult } from "@/utils/downtimes/muteResult";
 import {
   groupOptionOf,
   type AlertMuteEnd,
@@ -153,7 +168,7 @@ const props = withDefaults(
     unackedGroups?: number | null;
     /** The ack in force on a single-row or composite alert. */
     ack?: Pick<AckView, "acked_by" | "acked_at" | "ack_source"> | null;
-    downtime?: (ActiveDowntime & { version?: number }) | null;
+    downtime?: ActiveDowntime | null;
     muteEnabled: boolean;
     /** A multi-alert's firing groups, which Until… offers to scope the mute to. */
     groups?: AlertGroup[];
@@ -165,6 +180,8 @@ const emit = defineEmits<{ changed: [] }>();
 
 const { t } = useI18nTyped();
 const actions = useAlertActions();
+const router = useRouter();
+const orgId = useOrgId();
 
 const muteDialogOpen = ref(false);
 const extendUntilOpen = ref(false);
@@ -197,7 +214,12 @@ const muteAlertContext = computed<QuickMuteAlertContext>(() => ({
 
 const muteRef = (): AlertMuteRef | null =>
   props.downtime
-    ? { id: props.downtime.id, ends_at: props.downtime.ends_at, version: props.downtime.version }
+    ? {
+        id: props.downtime.id,
+        ends_at: props.downtime.ends_at,
+        version: props.downtime.version,
+        folder_id: props.downtime.folder_id,
+      }
     : null;
 
 const after = (ok: boolean) => {
@@ -213,13 +235,22 @@ const onTakeOver = async () => after(await actions.takeOver(target.value, { grou
 
 const onMute = async (end: AlertMuteEnd) => after(await actions.mute(target.value, end));
 
+// Any answer refreshes: a refused End or Extend means the header shows a stale mute.
+const afterMute = (result: MuteActionResult) => {
+  if (result !== "failed") emit("changed");
+};
+
 const onExtend = async (end: AlertMuteEnd) => {
   const downtime = muteRef();
-  if (downtime) after(await actions.extend(target.value, downtime, end));
+  if (downtime) afterMute(await actions.extend(target.value, downtime, end));
 };
 
 const onEndMute = async () => {
   const downtime = muteRef();
-  if (downtime) after(await actions.endMute(target.value, downtime.id));
+  if (downtime) afterMute(await actions.endMute(target.value, downtime));
+};
+
+const openDowntime = () => {
+  if (props.downtime) void router.push(downtimeLink(props.downtime, orgId.value));
 };
 </script>

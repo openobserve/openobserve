@@ -34,7 +34,10 @@
             :data-test="`slos-sloconfigsummary-${field.key}`"
           >
             <dt class="text-text-secondary text-xs">{{ field.label }}</dt>
-            <dd class="text-text-heading text-sm" :class="field.mono ? 'font-mono break-all' : ''">
+            <dd
+              class="text-text-heading text-sm"
+              :class="field.mono ? 'font-mono [overflow-wrap:anywhere] whitespace-pre-wrap' : ''"
+            >
               {{ field.value }}
             </dd>
           </div>

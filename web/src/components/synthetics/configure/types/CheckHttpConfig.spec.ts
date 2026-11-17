@@ -181,14 +181,11 @@ describe("CheckHttpConfig", () => {
       expect(bodyTextarea.exists()).toBe(false);
     });
 
-    it("should render the expected number of assertion rows", () => {
-      // mockHttpConfig has 2 assertions
-      const assertion0 = wrapper.find('[data-test="synthetics-check-http-assertion-field-0"]');
-      const assertion1 = wrapper.find('[data-test="synthetics-check-http-assertion-field-1"]');
-      const assertion2 = wrapper.find('[data-test="synthetics-check-http-assertion-field-2"]');
-      expect(assertion0.exists()).toBe(true);
-      expect(assertion1.exists()).toBe(true);
-      expect(assertion2.exists()).toBe(false);
+    it("should render the assertions in the shared filter builder", () => {
+      const builder = wrapper.findComponent({ name: "FilterBuilder" });
+      expect(builder.exists()).toBe(true);
+      expect(builder.props("profile")).toBe("synthetics");
+      expect(builder.props("modelValue")).toEqual(mockHttpConfig.assertions);
     });
   });
 
@@ -337,73 +334,69 @@ describe("CheckHttpConfig", () => {
 
   // ── Assertions CRUD ───────────────────────────────────────────────────────────
 
-  describe("assertions CRUD", () => {
-    it("should add a new default assertion when add assertion button is clicked", async () => {
-      // Initially 2 assertions (index 0,1 exist; index 2 does not)
-      expect(wrapper.find('[data-test="synthetics-check-http-assertion-field-2"]').exists()).toBe(
-        false,
-      );
-
-      const addBtn = wrapper.find('[data-test="synthetics-check-http-add-assertion-btn"]');
-      await addBtn.trigger("click");
-      await flushPromises();
-
-      const emitted = wrapper.emitted("update:check");
-      expect(emitted).toBeTruthy();
-      const lastEmit = emitted![emitted!.length - 1][0] as ProtocolCheck;
-      expect(lastEmit.http!.assertions).toHaveLength(3);
-      expect(lastEmit.http!.assertions[2]).toEqual({
-        field: "status_code",
-        operator: "eq",
-        value: "",
+  describe("assertions", () => {
+    const real = (assertions: unknown[]) =>
+      mount(CheckHttpConfig, {
+        attachTo: document.body,
+        props: {
+          check: {
+            ...mockProtocolCheckHttp,
+            http: { ...mockHttpConfig, assertions },
+          } as ProtocolCheck,
+        },
       });
-    });
 
-    it("should update assertion field and emit update:check when field select changes", async () => {
-      const fieldSelect = wrapper.find('[data-test="synthetics-check-http-assertion-field-0"]');
-      await fieldSelect.setValue("body");
+    it("should emit update:check with the builder's assertions", async () => {
+      const next = [{ field: "body", operator: "contains", value: "ok" }];
+      wrapper.findComponent({ name: "FilterBuilder" }).vm.$emit("update:modelValue", next);
       await flushPromises();
 
       const emitted = wrapper.emitted("update:check");
       expect(emitted).toBeTruthy();
       const lastEmit = emitted![emitted!.length - 1][0] as ProtocolCheck;
-      expect(lastEmit.http!.assertions[0].field).toBe("body");
+      expect(lastEmit.http!.assertions).toEqual(next);
+      expect(lastEmit.http!.method).toBe(mockHttpConfig.method);
     });
 
-    it("should update assertion operator and emit update:check when operator select changes", async () => {
-      const operatorSelect = wrapper.find(
-        '[data-test="synthetics-check-http-assertion-operator-0"]',
-      );
-      await operatorSelect.setValue("contains");
-      await flushPromises();
-
-      const emitted = wrapper.emitted("update:check");
-      expect(emitted).toBeTruthy();
-      const lastEmit = emitted![emitted!.length - 1][0] as ProtocolCheck;
-      expect(lastEmit.http!.assertions[0].operator).toBe("contains");
+    it("should draw one chip per assertion on the prober's fields", () => {
+      const saved = [
+        { field: "status_code", operator: "eq", value: 200 },
+        { field: "body", operator: "not_contains", value: "error" },
+        { field: "response_time_ms", operator: "lt", value: "800" },
+      ];
+      const http = real(saved);
+      for (const field of ["status_code", "body", "response_time_ms"]) {
+        expect(
+          http.find(`[data-test="synthetics-check-http-assertions-chip-${field}"]`).exists(),
+        ).toBe(true);
+      }
+      http.unmount();
     });
 
-    it("should update assertion value and emit update:check when value input changes", async () => {
-      const valueInput = wrapper.find('[data-test="synthetics-check-http-assertion-value-0"]');
-      await valueInput.setValue("201");
+    it("should write untouched assertions back exactly as loaded when one is removed", async () => {
+      const saved = [
+        { field: "status_code", operator: "eq", value: 200 },
+        { field: "body", operator: "contains", value: "ok", extra: true },
+      ];
+      const http = real(saved);
+      await http
+        .find('[data-test="synthetics-check-http-assertions-chip-status_code-remove"]')
+        .trigger("click");
       await flushPromises();
 
-      const emitted = wrapper.emitted("update:check");
-      expect(emitted).toBeTruthy();
-      const lastEmit = emitted![emitted!.length - 1][0] as ProtocolCheck;
-      expect(lastEmit.http!.assertions[0].value).toBe("201");
+      const emitted = http.emitted("update:check")!;
+      const lastEmit = emitted[emitted.length - 1][0] as ProtocolCheck;
+      expect(lastEmit.http!.assertions).toEqual([saved[1]]);
+      expect(lastEmit.http!.assertions[0]).toBe(saved[1]);
+      http.unmount();
     });
 
-    it("should remove an assertion when remove button is clicked", async () => {
-      const removeBtn = wrapper.find('[data-test="synthetics-check-http-assertion-remove-0"]');
-      expect(removeBtn.exists()).toBe(true);
-      await removeBtn.trigger("click");
-      await flushPromises();
-
-      const emitted = wrapper.emitted("update:check");
-      expect(emitted).toBeTruthy();
-      const lastEmit = emitted![emitted!.length - 1][0] as ProtocolCheck;
-      expect(lastEmit.http!.assertions).toHaveLength(1);
+    it("should keep an assertion with an operator the prober does not list as a locked chip", () => {
+      const http = real(mockHttpConfig.assertions);
+      expect(
+        http.findAll('[data-test="synthetics-check-http-assertions-chip-locked"]').length,
+      ).toBe(2);
+      http.unmount();
     });
   });
 

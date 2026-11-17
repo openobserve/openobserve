@@ -30,12 +30,25 @@ const toggleableColumns = computed(() =>
   props.columns.filter((col) => col.hideable && !col.isAction),
 );
 
+// Only a column the user hid counts: one hidden by design is not "hidden", and one shown past its default is not either.
 const hiddenCount = computed(
-  () => toggleableColumns.value.filter((col) => props.columnVisibility[col.id] === false).length,
+  () =>
+    toggleableColumns.value.filter((col) => !isVisible(col.id) && isVisibleByDefault(col.id))
+      .length,
+);
+
+const atDefault = computed(
+  () =>
+    !props.hasResizedColumns &&
+    toggleableColumns.value.every((col) => isVisible(col.id) === isVisibleByDefault(col.id)),
 );
 
 function isVisible(columnId: string): boolean {
   return props.columnVisibility[columnId] !== false;
+}
+
+function isVisibleByDefault(columnId: string): boolean {
+  return props.defaultColumnVisibility?.[columnId] !== false;
 }
 
 function toggleColumn(columnId: string): void {
@@ -47,11 +60,13 @@ function toggleColumn(columnId: string): void {
 }
 
 function resetToDefault(): void {
+  if (atDefault.value) return;
   const reset: Record<string, boolean> = {};
   for (const col of toggleableColumns.value) {
-    reset[col.id] = props.defaultColumnVisibility?.[col.id] !== false;
+    reset[col.id] = isVisibleByDefault(col.id);
   }
   emit("update:columnVisibility", reset);
+  if (props.hasResizedColumns) emit("reset:columnSizes");
 }
 </script>
 
@@ -61,7 +76,7 @@ function resetToDefault(): void {
       <div class="relative inline-flex">
         <OButton
           variant="outline"
-          size="icon-sm"
+          size="icon-toolbar"
           :aria-label="
             hiddenCount > 0
               ? t('common.manageColumnsHidden', { count: hiddenCount })
@@ -83,7 +98,7 @@ function resetToDefault(): void {
         </OButton>
         <span
           v-if="hiddenCount > 0"
-          class="bg-count-badge-bg text-3xs pointer-events-none absolute -top-1 -right-1 inline-flex h-4 w-4 items-center justify-center rounded-full leading-none font-medium text-white"
+          class="bg-count-badge-bg text-2xs pointer-events-none absolute -top-1 -right-1 inline-flex h-4 w-4 items-center justify-center rounded-full leading-none font-medium text-white"
           data-test="o2-table-column-toggle-hidden-badge"
         >
           {{ hiddenCount }}
@@ -126,20 +141,23 @@ function resetToDefault(): void {
         </li>
       </ul>
 
-      <!-- Reset buttons — same px-3 gap-2 structure as list items for alignment -->
-      <div
-        v-if="hiddenCount > 0 || props.hasResizedColumns"
-        class="border-border-default mt-1 border-t pt-1 pb-1"
-      >
-        <button
-          v-if="hiddenCount > 0"
-          class="rounded-default hover:bg-surface-panel text-text-body flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-sm transition-colors"
-          data-test="o2-table-column-toggle-reset-btn"
-          @click="resetToDefault"
-        >
-          <OIcon name="refresh" size="sm" class="shrink-0" />
-          <span class="select-none">{{ t("components.table.columnToggle.resetToDefault") }}</span>
-        </button>
+      <div class="border-border-default mt-1 border-t pt-1 pb-1">
+        <span class="block">
+          <button
+            class="rounded-default text-text-body enabled:hover:bg-surface-panel flex w-full items-center gap-2 px-3 py-1.5 text-sm transition-colors enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="atDefault"
+            data-test="o2-table-column-toggle-reset-btn"
+            @click="resetToDefault"
+          >
+            <OIcon name="refresh" size="sm" class="shrink-0" />
+            <span class="select-none">{{ t("components.table.columnToggle.resetToDefault") }}</span>
+          </button>
+          <OTooltip
+            v-if="atDefault"
+            :content="t('components.table.columnToggle.alreadyDefault')"
+            side="left"
+          />
+        </span>
         <button
           v-if="props.hasResizedColumns"
           class="rounded-default hover:bg-surface-panel text-text-body flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-sm transition-colors"

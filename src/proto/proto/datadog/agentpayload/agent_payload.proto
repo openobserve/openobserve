@@ -1,0 +1,157 @@
+// Vendored from github.com/DataDog/agent-payload v5.0.215, proto/metrics/agent_payload.proto,
+// with the gogoproto import and options removed for prost.
+//
+// BSD 3-Clause License
+//
+// Copyright (c) 2017, Datadog, Inc.
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// * Redistributions of source code must retain the above copyright notice, this
+//   list of conditions and the following disclaimer.
+//
+// * Redistributions in binary form must reproduce the above copyright notice,
+//   this list of conditions and the following disclaimer in the documentation
+//   and/or other materials provided with the distribution.
+//
+// * Neither the name of the copyright holder nor the names of its
+//   contributors may be used to endorse or promote products derived from
+//   this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+
+package datadog.agentpayload;
+
+
+option go_package = "github.com/DataDog/agent-payload/v5/gogen";
+
+message CommonMetadata {
+	string agent_version = 1;
+	string timezone = 2;
+	double current_epoch = 3;
+	string internal_ip = 4;
+	string public_ip = 5;
+	string api_key = 6;
+}
+
+message Origin {
+    reserved 1,2,3;
+    uint32 origin_product = 4;
+    uint32 origin_category = 5;
+    uint32 origin_service = 6;
+}
+
+// Metadata is used in both the MetricSeries and Sketch messages defined below.
+message Metadata {
+	Origin origin = 1;
+}
+
+message MetricPayload {
+    enum MetricType {
+        UNSPECIFIED = 0;
+        COUNT = 1;
+        RATE = 2;
+        GAUGE = 3;
+    }
+
+    message MetricPoint {
+        // metric value
+        double value = 1;
+        // timestamp for this value in seconds since the UNIX epoch
+        int64 timestamp = 2;
+    }
+
+    message Resource {
+        string type = 1;
+        string name = 2;
+    }
+
+    message MetricSeries {
+        // Resources this series applies to; include at least
+        // { type="host", name=<hostname> }
+        repeated Resource resources = 1;
+        // metric name
+        string metric = 2;
+        // tags for this metric
+        repeated string tags = 3;
+        // data points for this metric
+        repeated MetricPoint points = 4;
+        // type of metric
+        MetricType type = 5;
+        // metric unit name
+        string unit = 6;
+        // source of this metric (check name, etc.)
+        string source_type_name = 7;
+        // interval, in seconds, between samples of this metric
+        int64 interval = 8;
+        // Metrics origin metadata
+        Metadata metadata = 9;
+    }
+    repeated MetricSeries series = 1;
+}
+
+message EventsPayload {
+	message Event {
+		string title = 1;
+		string text = 2;
+		int64 ts = 3;
+		string priority = 4;
+		string host = 5;
+		repeated string tags = 6;
+		string alert_type = 7;
+		string aggregation_key = 8;
+		string source_type_name = 9;
+	}
+	repeated Event events = 1;
+	CommonMetadata metadata = 2;
+}
+
+message SketchPayload {
+	message Sketch {
+		message Distribution {
+			int64 ts = 1;
+			int64 cnt = 2;
+			double min = 3;
+			double max = 4;
+			double avg = 5;
+			double sum = 6;
+			repeated double v = 7;
+			repeated uint32 g = 8;
+			repeated uint32 delta = 9;
+			repeated double buf = 10;
+		}
+		message Dogsketch {
+			int64 ts = 1;
+			int64 cnt = 2;
+			double min = 3;
+			double max = 4;
+			double avg = 5;
+			double sum = 6;
+			repeated sint32 k = 7;
+			repeated uint32 n = 8;
+		}
+		string metric = 1;
+		string host = 2;
+		repeated Distribution distributions = 3;
+		repeated string tags = 4;
+                reserved 5, 6;
+				reserved "distributionsK", "distributionsC";
+		repeated Dogsketch dogsketches = 7;
+		Metadata metadata = 8;
+	}
+	repeated Sketch sketches = 1;
+	CommonMetadata metadata = 2;
+}

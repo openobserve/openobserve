@@ -21,6 +21,7 @@ import { resolvedSchedulePreviewQuery } from "@/services/oncall.queries";
 import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { isShiftRuleValid, zonedMidnight } from "@/utils/oncall";
 
 export const PREVIEW_DAYS = 7;
@@ -127,6 +128,9 @@ export function useRotationPreview(options: {
     currentSegments,
     currentWindowTo,
     error,
+    licenseDenied: computed(
+      () => licenseDeniedFeatures(shown.error.value) ?? licenseDeniedFeatures(current.error.value),
+    ),
     loaded: shown.isSuccess,
   };
 }

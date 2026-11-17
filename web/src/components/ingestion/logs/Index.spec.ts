@@ -135,6 +135,7 @@ describe("IngestLogs Component", () => {
         "syslogNg",
         "splunkHec",
         "loongcollector",
+        "datadogAgentLogs",
       ]);
     });
   });

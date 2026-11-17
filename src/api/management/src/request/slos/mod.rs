@@ -80,6 +80,10 @@ pub struct SloListResponse {
         (status = 200, description = "Success", content_type = "application/json", body = SloListResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "list"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn list_slos(Path(org_id): Path<String>, Query(q): Query<ListQuery>) -> Response {
@@ -111,6 +115,10 @@ pub async fn list_slos(Path(org_id): Path<String>, Query(q): Query<ListQuery>) -
         (status = 200, description = "Success", content_type = "application/json", body = SloListItem),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "get"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn get_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response {
@@ -137,6 +145,10 @@ pub async fn get_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "create"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn create_slo(
@@ -218,6 +230,10 @@ pub async fn create_slo(
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "update"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn update_slo(
@@ -305,6 +321,10 @@ pub async fn update_slo(
         (status = 200, description = "Deleted", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "delete"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn delete_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response {
@@ -346,6 +366,7 @@ pub struct MoveSlosRequestBody {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
@@ -449,6 +470,10 @@ pub struct EnableQuery {
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "update"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn enable_slo(
@@ -493,6 +518,10 @@ pub async fn enable_slo(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "list"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn get_slo_groups(Path((org_id, slo_id)): Path<(String, String)>) -> Response {
@@ -522,6 +551,10 @@ pub async fn get_slo_groups(Path((org_id, slo_id)): Path<(String, String)>) -> R
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "list"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn list_slo_eligible_alerts(
@@ -568,10 +601,14 @@ pub struct AlertSliPreviewQuery {
         ("slice_interval_secs" = i64, Query, description = "Slice width in seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = openobserve_core::slo::service::AlertSliPreview),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "list"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, alert_id = %alert_id))]
 pub async fn preview_alert_sli(

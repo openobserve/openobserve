@@ -1963,3 +1963,14 @@ describe("pure helpers", () => {
     expect(isScopeCovered(consented, null, nowUs)).toBe(false);
   });
 });
+
+describe("userCancelCount", () => {
+  it("counts only user cancels", () => {
+    const h = makeHarness();
+    expect(h.engine.userCancelCount()).toBe(0);
+    h.engine.cancelGeneration(null, { cause: "reset" });
+    expect(h.engine.userCancelCount()).toBe(0);
+    h.engine.cancelGeneration(null, { cause: "user" });
+    expect(h.engine.userCancelCount()).toBe(1);
+  });
+});

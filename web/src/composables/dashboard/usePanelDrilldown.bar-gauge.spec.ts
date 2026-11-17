@@ -48,7 +48,13 @@ const store = {
   },
   dispatch: vi.fn(),
 };
-const drilldown = [{ name: "Logs", type: "byUrl", data: { url: "https://example.com" } }];
+const drilldown = [
+  {
+    name: "Logs",
+    type: "byUrl",
+    data: { url: "https://example.com/?name=${series.__name}&value=${series.__value}" },
+  },
+];
 
 const field = (alias: string, column: string, functionName: string | null = null) => ({
   label: column,
@@ -214,6 +220,18 @@ describe("drilldown on the new chart types", () => {
       expect(popup.style.display).toBe("block");
       expect(api.drilldownArray.value.map((item: any) => item.name)).toEqual(["Logs"]);
       expect(hideChartTooltip).toHaveBeenCalledTimes(1);
+
+      // The bar is drawn at its 0..1 fill; the resolved URL must carry the row's real value.
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      await api.openDrilldown(0);
+      expect(open).toHaveBeenCalledTimes(1);
+      const url = new URL(String(open.mock.calls[0][0]));
+      expect(url.searchParams.get("name")).toBe(params.name);
+      const rowValues = grouped
+        .filter((row) => row.x_axis_1 === params.name)
+        .map((row) => row.y_axis_1);
+      expect(rowValues).toContain(Number(url.searchParams.get("value")));
+      open.mockRestore();
     },
   );
 });

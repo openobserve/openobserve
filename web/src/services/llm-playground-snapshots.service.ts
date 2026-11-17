@@ -14,6 +14,7 @@
  */
 
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
 
 export interface PlaygroundSnapshot {
   id: string;
@@ -48,6 +49,7 @@ const llmPlaygroundSnapshotsService = {
       payload,
       ...(parentSnapshotId ? { parentSnapshotId } : {}),
     });
+    analytics.track("llm_playground_snapshot_shared", { forked: Boolean(parentSnapshotId) });
     return normalize(res.data);
   },
 

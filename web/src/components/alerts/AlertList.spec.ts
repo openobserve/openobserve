@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { foldersQuery } from "@/services/common.queries";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
@@ -32,7 +33,23 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
   return { ...actual, toast: vi.fn((...args: unknown[]) => actual.toast(...args)) };
 });
 
+// Passthrough spy: the real live region still speaks, and specs can count what was said.
+vi.mock("@/lib/feedback/RegionStatus/announcer", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    announcePolite: vi.fn((...args: unknown[]) => actual.announcePolite(...args)),
+  };
+});
+
 // Mock services before importing component (follow reference style)
+// Monaco's real stylesheet makes every jsdom getComputedStyle match hundreds of rules, and a tooltip calls it per mount.
+vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
+  editor: { colorize: vi.fn().mockResolvedValue("") },
+  languages: {},
+}));
+vi.mock("monaco-editor/esm/vs/editor/editor.all.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
 vi.mock("@/services/oncall", () => ({
   default: { listTeams: vi.fn().mockResolvedValue({ data: [{ id: "t1", name: "Payments" }] }) },
 }));
@@ -73,17 +90,23 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
 });
 
 import AlertList from "@/components/alerts/AlertList.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
+import DowntimeService from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
+import { fenceAlertWrite } from "@/services/alerts.readFence";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { setMutationNotifier } from "@/composables/query/queryClient";
+import { announcePolite } from "@/lib/feedback/RegionStatus/announcer";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
   deleteEditorDraft,
   readEditorDraft,
@@ -210,16 +233,18 @@ let alertsDB: AlertV2[] = [];
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
 // Tests that only call vm methods skip the table: its render is the slowest part of a mount.
-async function mountAlertList({ renderTable = true } = {}) {
+async function mountAlertList({ renderTable = true, realFolders = false, keepRoute = false } = {}) {
   const wrapper = mount(AlertList, {
     attachTo: node,
     global: {
       plugins: [i18n, store, router],
       stubs: {
         OTable: !renderTable,
-        FolderList: {
-          template: '<div data-test="stub-folder-list"></div>',
-        },
+        FolderList: realFolders
+          ? false
+          : {
+              template: '<div data-test="stub-folder-list"></div>',
+            },
         MoveAcrossFolders: {
           name: "MoveAcrossFolders",
           props: ["open", "activeFolderId", "moduleId", "anomalyConfigIds", "type"],
@@ -261,7 +286,7 @@ async function mountAlertList({ renderTable = true } = {}) {
   });
   // emulate current route
   wrapper.vm.router.currentRoute.value.name = "alertList";
-  wrapper.vm.router.currentRoute.value.query = {} as any;
+  if (!keepRoute) wrapper.vm.router.currentRoute.value.query = {} as any;
   // Tracked so afterEach can tear it down: every mount here attaches to the one
   // shared `node`, so an un-unmounted tree keeps its watchers and observers
   // alive for the rest of the file and each later test pays for all of them.
@@ -287,7 +312,8 @@ beforeEach(() => {
   // so a leftover action/tab from an earlier test (e.g. "when action=add"
   // pushes {action:"add"}) would asynchronously re-open the add/import dialog
   // and hide the list (and its type filter), breaking every later assertion.
-  router.currentRoute.value.query = {};
+  // Most cases read every row, so they open past the Firing default; its own cases clear this.
+  router.currentRoute.value.query = { state: ALERT_LIST_ALL_STATES };
   router.currentRoute.value.params = {};
   router.currentRoute.value.name = "alertList";
 
@@ -615,6 +641,56 @@ describe("AlertList - data fetching and columns", () => {
     expect(ids).toContain("tags");
   });
 
+  describe("tags cell", () => {
+    const tagged = async (tags: string[]) => {
+      alertsDB = [makeAlert(1, { name: "tagged" })];
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+      wrapper.vm.filteredResults = wrapper.vm.filteredResults.map((row: any) => ({ ...row, tags }));
+      wrapper.vm.activeTab = "all";
+      await flushPromises();
+      return wrapper;
+    };
+
+    let widthSpies: { mockRestore(): void }[] = [];
+    const mockCellWidths = () => {
+      widthSpies = [
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100),
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(60),
+      ];
+    };
+
+    afterEach(() => widthSpies.forEach((spy) => spy.mockRestore()));
+
+    it("collapses what does not fit into +N with the full list in its tooltip", async () => {
+      mockCellWidths();
+      const wrapper = await tagged(["prod", "team:checkout", "tier:1"]);
+      const more = wrapper.find('[data-test="fit-items-more"]');
+      expect(more.text()).toBe("+2");
+      expect(more.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "prod, team:checkout, tier:1",
+      );
+    });
+
+    it("shows every tag with no +N when they fit", async () => {
+      const wrapper = await tagged(["prod", "team:checkout", "tier:1", "eu"]);
+      expect(wrapper.findAll('[data-test="alert-list-tagged-tag"]')).toHaveLength(4);
+      expect(wrapper.find('[data-test="fit-items-more"]').exists()).toBe(false);
+    });
+
+    it("keeps a long tag's text in a truncating span inside a width-capped chip", async () => {
+      const wrapper = await tagged(["a-very-long-tag-name"]);
+      const chip = wrapper.find('[data-test="alert-list-tagged-tag"]');
+      expect(chip.classes()).toContain("max-w-full");
+      expect(chip.find("span.truncate").text()).toBe("a-very-long-tag-name");
+    });
+
+    it("keeps the dash when there are no tags", async () => {
+      const wrapper = await tagged([]);
+      expect(wrapper.find('[data-test="fit-items"]').exists()).toBe(false);
+    });
+  });
+
   it("renders the summary strip with operational counts", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -637,9 +713,13 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.stateCounts.paused).toBe(1);
     expect(wrapper.vm.stateCounts.failed).toBe(1);
 
-    // Summary strip renders (via OTable's #top slot) when rows are present.
-    const summary = wrapper.find('[data-test="alert-list-summary"]');
+    // The chips share the search row, after the search input and before refresh.
+    const toolbar = wrapper.get('[data-test="o2-table-toolbar"]');
+    const summary = toolbar.find('[data-test="alert-list-summary"]');
     expect(summary.exists()).toBe(true);
+    const search = toolbar.get('[data-test="alert-list-search-input"]').element;
+    expect(search.compareDocumentPosition(summary.element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(summary.find('[data-test="o-stat-strip-chips"]').exists()).toBe(true);
     // The KpiCards inside must actually render their content — guards against
     // the components being imported but not registered (renders as empty
     // unknown elements, which the exists() check alone would not catch).
@@ -666,6 +746,23 @@ describe("AlertList - data fetching and columns", () => {
     wrapper.vm.onStatSelect("firing");
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["firing", "notify-failed"]);
+  });
+
+  it("ORs two picked state chips", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "firing", last_outcome: "firing" },
+      { enabled: false, name: "paused" },
+      { enabled: true, name: "normal", last_outcome: "normal" },
+    ];
+    wrapper.vm.onStatSelect("firing");
+    wrapper.vm.onStatSelect("paused");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.stateFilters).toEqual(["firing", "paused"]);
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["firing", "paused"]);
+    wrapper.vm.onStatSelect("total");
+    expect(wrapper.vm.stateFilters).toEqual([]);
   });
 
   it("dynamicQueryModel binds to filterQuery by default and to searchQuery when across-folders toggled", async () => {
@@ -774,6 +871,24 @@ describe("AlertList - row actions", () => {
     expect(updated.enabled).toBe(!initial);
   });
 
+  it("makes the row actions' tooltips exclusive, so one never stays open beside a row error marker", async () => {
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+
+    const rowTips = wrapper
+      .findAllComponents(OTooltip)
+      .filter((tip) =>
+        [
+          i18n.global.t("alerts.pause"),
+          i18n.global.t("alerts.start"),
+          i18n.global.t("alerts.edit"),
+          i18n.global.t("alerts.clone"),
+        ].includes(tip.props("content")),
+      );
+    expect(rowTips.length).toBeGreaterThan(0);
+    expect(rowTips.every((tip) => tip.props("exclusive") === true)).toBe(true);
+  });
+
   it("opens clone dialog and submits successfully", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -799,6 +914,52 @@ describe("AlertList - row actions", () => {
     // DB should have one more item
     expect(alertsDB.length).toBeGreaterThan(6);
   });
+
+  it.each([
+    ["a scheduled clone", "Firing with a search", false, {}],
+    ["an anomaly clone", "Firing with a search", false, { toBeClonedIsAnomaly: true }],
+    ["a composite clone", "Firing with a search", false, { toBeClonedIsComposite: true }],
+    ["a scheduled clone", "All folders", true, {}],
+    ["an editor save", "All folders", true, null],
+  ])(
+    "shows %s after saving, though the list opened on %s",
+    async (_save, _start, allFolders, cloneFlags) => {
+      queryClient.clear();
+      router.currentRoute.value.query = {};
+      alertsDB = [{ ...makeAlert(1), last_outcome: "firing" } as any];
+      // A copy per read, so a cached list keeps the rows it was read with.
+      alertsSvc.listByFolderId.mockImplementation(async () => ({ data: { list: [...alertsDB] } }));
+      const clone = vi
+        .spyOn(alertsSvc, "clone_by_id")
+        .mockImplementation(async (_org: any, _id: any, body: any) => {
+          alertsDB.push(makeAlert(998, { name: body.name }));
+          return { data: { code: 200 } };
+        });
+      const wrapper: any = await mountAlertList({ renderTable: false });
+      await flushPromises();
+      expect(wrapper.vm.stateFilters).toEqual(["firing"]);
+      if (allFolders) {
+        wrapper.vm.searchAcrossFolders = true;
+        await flushPromises();
+      }
+
+      if (cloneFlags) {
+        await wrapper.vm.duplicateAlert(wrapper.vm.displayedAlerts[0]);
+        if (!allFolders) wrapper.vm.filterQuery = "Alert 1";
+        Object.assign(wrapper.vm, cloneFlags, { toBeCloneAlertName: "new clone" });
+        await wrapper.vm.submitForm();
+      } else {
+        alertsDB.push(makeAlert(998, { name: "new clone" }));
+        await wrapper.vm.refreshList("default");
+      }
+      await flushPromises();
+      clone.mockRestore();
+
+      expect(wrapper.vm.filterQuery || "").toBe("");
+      expect(wrapper.vm.searchAcrossFolders).toBe(false);
+      expect(wrapper.vm.displayedAlerts.map((a: any) => a.name)).toContain("new clone");
+    },
+  );
 
   it("names its own list to the table's no-access lock", async () => {
     const wrapper: any = await mountAlertList();
@@ -924,7 +1085,10 @@ describe("AlertList - row actions", () => {
     ).toBeUndefined();
     // No refetch: reloading the folder would blank the table behind its skeleton
     // and a loading toast for a row the server already confirmed gone.
-    expect(alertsSvc.listByFolderId).not.toHaveBeenCalled();
+    const folderReads = (alertsSvc.listByFolderId as any).mock.calls.filter(
+      (call: unknown[]) => call[6] !== undefined,
+    );
+    expect(folderReads).toHaveLength(0);
     // The store cache backs a folder revisit, so the row must leave it too or it
     // reappears the moment the user navigates away and back.
     const cached = store.state.organizationData.allAlertsListByFolderId[wrapper.vm.activeFolderId];
@@ -975,6 +1139,61 @@ describe("AlertList - row actions", () => {
     expect(wrapper.vm.alertsToExport[0]).not.toHaveProperty("id");
   });
 
+  // Destination names are per org: the JSON file drops them, Terraform re-applies them to this org.
+  it.each([
+    [
+      "an alert",
+      { destinations: ["slack"], recovery_destinations: ["pager"] },
+      { destinations: [], recovery_destinations: [] },
+    ],
+    ["an alert without destinations", {}, { destinations: [], recovery_destinations: [] }],
+    [
+      "an anomaly config",
+      { alert_type: "anomaly_detection", alert_destinations: ["slack"] },
+      { alert_destinations: [] },
+    ],
+  ])("exports %s to JSON with its destinations cleared", async (_case, fields, expected) => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    vi.mocked(alertsSvc.export_by_id).mockResolvedValueOnce({
+      data: { name: "exported", ...fields },
+    } as any);
+
+    await wrapper.vm.exportAlert(wrapper.vm.filteredResults[0]);
+    await flushPromises();
+
+    const dialog = wrapper.findComponent({ name: "ExportResourceDialog" });
+    const exported = dialog.props("items")[0];
+    expect(exported).toMatchObject(expected);
+    if (!("destinations" in expected)) {
+      expect(exported).not.toHaveProperty("destinations");
+      expect(exported).not.toHaveProperty("recovery_destinations");
+    }
+  });
+
+  it("keeps the destinations in the Terraform export", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    vi.mocked(alertsSvc.export_by_id).mockResolvedValueOnce({
+      data: {
+        name: "exported",
+        stream_type: "logs",
+        stream_name: "app_logs",
+        query_condition: { type: "sql", sql: "SELECT count(*) FROM app_logs" },
+        trigger_condition: { period: 15, operator: ">=", threshold: 1, frequency: 5 },
+        destinations: ["slack-ops"],
+      },
+    } as any);
+
+    await wrapper.vm.exportAlert(row);
+    await flushPromises();
+
+    const dialog = wrapper.findComponent({ name: "ExportResourceDialog" });
+    expect(dialog.props("terraform").hcl).toContain("slack-ops");
+    expect(dialog.props("items")[0].destinations).toEqual([]);
+  });
+
   it("opens the export dialog with every selected alert", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -987,12 +1206,19 @@ describe("AlertList - row actions", () => {
     ];
     await flushPromises();
     expect(wrapper.vm.selectedAlerts).toHaveLength(2);
+    vi.mocked(alertsSvc.export_by_id).mockResolvedValue({
+      data: { name: "exported", destinations: ["slack"], recovery_destinations: ["pager"] },
+    } as any);
 
     await wrapper.vm.multipleExportAlert();
     await flushPromises();
 
     expect(wrapper.vm.showExportDialog).toBe(true);
     expect(wrapper.vm.alertsToExport).toHaveLength(2);
+    const dialog = wrapper.findComponent({ name: "ExportResourceDialog" });
+    for (const alert of dialog.props("items")) {
+      expect(alert).toMatchObject({ destinations: [], recovery_destinations: [] });
+    }
 
     // The selection clears once the download actually happens.
     expect(wrapper.vm.selectedAlerts.length).toBe(2);
@@ -1000,6 +1226,68 @@ describe("AlertList - row actions", () => {
     await flushPromises();
     expect(wrapper.vm.selectedAlerts.length).toBe(0);
   });
+
+  // Each entry is `folder:alertId`; a move names one source folder, or none when the selection spans several.
+  it.each([
+    [
+      "delete",
+      (vm: any) => vm.bulkDeleteAlerts(),
+      () =>
+        alertsSvc.bulkDelete.mock.calls.flatMap((c: any[]) =>
+          c[1].ids.map((id: string) => `${c[2]}:${id}`),
+        ),
+      ["ops:alert-1", "payments:alert-2"],
+    ],
+    [
+      "pause",
+      (vm: any) => vm.bulkToggleAlerts("pause"),
+      () =>
+        alertsSvc.bulkToggleState.mock.calls.flatMap((c: any[]) =>
+          c[2].ids.map((id: string) => `${c[3]}:${id}`),
+        ),
+      ["ops:alert-1", "payments:alert-2"],
+    ],
+    [
+      "export",
+      (vm: any) => vm.multipleExportAlert(),
+      (wrapper: any) =>
+        wrapper
+          .findComponent({ name: "ExportResourceDialog" })
+          .props("terraform")
+          .hcl.split('resource "openobserve_alert"')
+          .slice(1)
+          .map((block: string) => {
+            const name = /name\s+= "([^"]+)"/.exec(block)?.[1] ?? "";
+            const folder = /folder_id\s+= "([^"]+)"/.exec(block)?.[1];
+            return `${folder}:alert-${name.replace("Alert ", "")}`;
+          }),
+      ["ops:alert-1", "payments:alert-2"],
+    ],
+    [
+      "move",
+      (vm: any) => vm.moveMultipleAlerts(),
+      (wrapper: any) => [wrapper.vm.activeFolderToMove],
+      [""],
+    ],
+  ])(
+    "bulk %s acts on each selected alert in its owning folder",
+    async (_action, run, observe, expected) => {
+      alertsDB = [makeAlert(1, { enabled: true }), makeAlert(2, { enabled: true })];
+      const wrapper: any = await mountAlertList({ renderTable: false });
+      await waitData(wrapper);
+      const [ops, payments] = wrapper.vm.filteredResults;
+      ops.folder_name = { id: "ops", name: "Ops" };
+      payments.folder_name = { id: "payments", name: "Payments" };
+      wrapper.vm.selectedAlertIds = [ops.alert_id, payments.alert_id];
+      await flushPromises();
+      expect(wrapper.vm.selectedAlerts).toHaveLength(2);
+
+      await run(wrapper.vm);
+      await flushPromises();
+
+      expect([...observe(wrapper)].sort()).toEqual(expected);
+    },
+  );
 });
 
 // 5. Router query-driven UI states
@@ -1048,13 +1336,58 @@ describe("AlertList - router query behaviors", () => {
       name: "Alert 1",
       page: "3",
     };
+    wrapper.vm.stateFilters = ["firing"];
+    wrapper.vm.filterQuery = "cpu";
+    await flushPromises();
     const spy = vi.spyOn(router, "push");
     await wrapper.vm.hideForm();
+    await flushPromises();
 
     const pushedQuery = spy.mock.calls[0][0].query;
     expect(pushedQuery.page).toBe("3");
     expect(pushedQuery.action).toBeUndefined();
     expect(pushedQuery.alert_id).toBeUndefined();
+    // Closing the editor, after a save or not, opens the list unfiltered so the alert is in view.
+    expect(pushedQuery.state).toBe(ALERT_LIST_ALL_STATES);
+    expect(wrapper.vm.stateFilters).toEqual([]);
+    // A search left in place would hide an alert saved under another name.
+    expect(wrapper.vm.filterQuery).toBe("");
+  });
+
+  it("a folder read answered after an AutoObserve Apply or Undo does not refill the rows with the old alert (F2)", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const org = store.state.selectedOrganization.identifier;
+    let answerLate: (value: any) => void = () => {};
+    (alertsSvc.listByFolderId as any)
+      .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)))
+      .mockResolvedValue({ data: { list: [{ ...alertsDB[0], name: "After apply" }] } });
+    const read = wrapper.vm.getAlertsFn(store, "default", "", true, "", true);
+    await flushPromises();
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    answerLate({ data: { list: [{ ...alertsDB[0], name: "Before apply" }] } });
+    await read;
+    await flushPromises();
+    const rows = store.state.organizationData.allAlertsListByFolderId.default;
+    expect(rows.map((r: any) => r.name)).toEqual(["After apply"]);
+  });
+
+  it("an editor opened from the list during an AutoObserve Apply gets the applied alert (F2)", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const org = store.state.selectedOrganization.identifier;
+    let answerLate: (value: any) => void = () => {};
+    (alertsSvc.get_by_alert_id as any)
+      .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)))
+      .mockResolvedValue({ data: { ...alertsDB[0], alert_id: "a9", name: "After apply" } });
+    wrapper.vm.router.currentRoute.value.query = { action: "update", alert_id: "a9" };
+    const open = wrapper.vm.handleActionQuery("update");
+    await flushPromises();
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    answerLate({ data: { ...alertsDB[0], alert_id: "a9", name: "Before apply" } });
+    await open;
+    await flushPromises();
+    expect(wrapper.vm.formData?.name).toBe("After apply");
   });
 
   // The editor opens an alert from its detail cache (getAlertById), and a save
@@ -1109,10 +1442,1206 @@ describe("AlertList - pagination restoration", () => {
   });
 });
 
+// Rulings 15, 16: confirmed row writes, in-row failures, off-filter rows and a refresh that keeps the view.
+describe("AlertList - row actions keep the view", () => {
+  const deferred = <T>() => {
+    let resolve!: (v: T) => void;
+    let reject!: (e: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+  const pageIndex = (wrapper: any) => wrapper.vm.oTableRef.table.getState().pagination.pageIndex;
+  const names = (wrapper: any) => wrapper.vm.displayedAlerts.map((r: any) => r.name);
+  const toggleBtn = (wrapper: any, name: string) =>
+    wrapper.find(`[data-test="alert-list-${name}-pause-start-alert"]`);
+  const errorToasts = () =>
+    (toast as any).mock.calls.filter(([opts]: any[]) => opts?.variant === "error");
+
+  // 25 active alerts, five a page, opened on page 2 under the Active tile.
+  const mountOnPageTwo = async (stateFilter: string | null = "active") => {
+    // An earlier test's navigation can still land after beforeEach blanked the query.
+    await flushPromises();
+    router.currentRoute.value.query = { state: stateFilter ?? ALERT_LIST_ALL_STATES };
+    router.currentRoute.value.name = "alertList";
+    (store.state as any).organizationData.allAlertsListByFolderId = {};
+    alertsDB = Array.from({ length: 25 }, (_, i) => makeAlert(i + 1, { enabled: true }));
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 2 });
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+    expect(pageIndex(wrapper)).toBe(1);
+    return wrapper;
+  };
+
+  it("pauses under the Active tile as a confirmed write: busy at once, the row stays tagged, counts move, page and selection kept", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-7"];
+    await flushPromises();
+    const write = deferred<any>();
+    alertsSvc.toggle_state_by_alert_id.mockImplementationOnce(() => write.promise);
+    const before = names(wrapper);
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    const btn = toggleBtn(wrapper, "Alert 6");
+    expect(btn.attributes("aria-busy")).toBe("true");
+    expect(btn.attributes("aria-disabled")).toBe("true");
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect(wrapper.vm.stateCounts.active).toBe(25);
+
+    write.resolve({ data: { enabled: false } });
+    await flushPromises();
+
+    expect(names(wrapper)).toEqual(before);
+    const tag = wrapper.find('[data-test="alert-list-Alert 6-left-filter"]');
+    expect(tag.exists()).toBe(true);
+    expect(tag.text()).toBe("No longer matches filter");
+    expect(wrapper.vm.stateCounts.active).toBe(24);
+    expect(wrapper.vm.stateCounts.paused).toBe(1);
+    expect(pageIndex(wrapper)).toBe(1);
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7"]);
+    expect(toggleBtn(wrapper, "Alert 6").attributes("aria-busy")).toBeUndefined();
+    expect(toggleBtn(wrapper, "Alert 6").attributes("data-row-action")).toBe("resume");
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+  });
+
+  it("announces a row leaving the filter once, politely, with no toast", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const wrapper = await mountOnPageTwo();
+      vi.mocked(announcePolite).mockClear();
+      (toast as any).mockClear();
+
+      await toggleBtn(wrapper, "Alert 6").trigger("click");
+      await flushPromises();
+      vi.advanceTimersByTime(100);
+
+      expect(announcePolite).toHaveBeenCalledTimes(1);
+      expect(announcePolite).toHaveBeenCalledWith("Alert 6 paused. No longer matches filter");
+      expect(document.querySelector('[data-test="region-announcer"]')?.textContent).toBe(
+        "Alert 6 paused. No longer matches filter",
+      );
+      expect(
+        document.querySelector('[data-test="region-announcer"]')?.getAttribute("aria-live"),
+      ).toBe("polite");
+      expect(toast).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("names the resume when a resumed row leaves the Paused tile", async () => {
+    const wrapper = await mountOnPageTwo();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    wrapper.vm.stateFilters = ["paused"];
+    await flushPromises();
+    vi.mocked(announcePolite).mockClear();
+    alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: true } });
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(announcePolite).toHaveBeenCalledTimes(1);
+    expect(announcePolite).toHaveBeenCalledWith("Alert 6 resumed. No longer matches filter");
+  });
+
+  it("says nothing when the toggled row still matches the filter", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    vi.mocked(announcePolite).mockClear();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+    expect(announcePolite).not.toHaveBeenCalled();
+  });
+
+  it("announces a bulk write once, naming one row and counting many", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    vi.mocked(announcePolite).mockClear();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: ["alert-7"], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(announcePolite).toHaveBeenCalledTimes(1);
+    expect(announcePolite).toHaveBeenCalledWith("Alert 6 paused. No longer matches filter");
+
+    wrapper.vm.selectedAlertIds = ["alert-8", "alert-9", "alert-10"];
+    await flushPromises();
+    vi.mocked(announcePolite).mockClear();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-8", "alert-9", "alert-10"], unsuccessful: [], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(announcePolite).toHaveBeenCalledTimes(1);
+    expect(announcePolite).toHaveBeenCalledWith("3 alerts paused. No longer match filter");
+  });
+
+  it("counts a many-row resume the same way", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6", "alert-7"], unsuccessful: [], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    wrapper.vm.stateFilters = ["paused"];
+    await flushPromises();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    vi.mocked(announcePolite).mockClear();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6", "alert-7"], unsuccessful: [], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("resume");
+    await flushPromises();
+    expect(announcePolite).toHaveBeenCalledTimes(1);
+    expect(announcePolite).toHaveBeenCalledWith("2 alerts resumed. No longer match filter");
+  });
+
+  it("says nothing when a bulk write is refused for every row", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    vi.mocked(announcePolite).mockClear();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: [], unsuccessful: ["alert-6", "alert-7"], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(announcePolite).not.toHaveBeenCalled();
+  });
+
+  it("does not announce a row write that settles after the page is left", async () => {
+    const wrapper = await mountOnPageTwo();
+    const write = deferred<any>();
+    alertsSvc.toggle_state_by_alert_id.mockImplementationOnce(() => write.promise);
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    vi.mocked(announcePolite).mockClear();
+
+    wrapper.unmount();
+    write.resolve({ data: { enabled: false } });
+    await flushPromises();
+
+    expect(announcePolite).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-test="region-announcer"]')?.textContent ?? "").toBe("");
+  });
+
+  it.each([
+    ["one row", ["alert-6"]],
+    ["several rows", ["alert-6", "alert-7"]],
+  ])(
+    "does not announce a bulk write of %s that settles after the page is left",
+    async (_c, ids) => {
+      const wrapper = await mountOnPageTwo();
+      wrapper.vm.selectedAlertIds = ids;
+      await flushPromises();
+      const write = deferred<any>();
+      alertsSvc.bulkToggleState.mockImplementationOnce(() => write.promise);
+      const pending = wrapper.vm.bulkToggleAlerts("pause");
+      vi.mocked(announcePolite).mockClear();
+
+      wrapper.unmount();
+      write.resolve({ data: { successful: ids, unsuccessful: [], err: null } });
+      await pending;
+      await flushPromises();
+
+      expect(announcePolite).not.toHaveBeenCalled();
+    },
+  );
+
+  it("drops the off-filter row and its tag on the next filter change", async () => {
+    const wrapper = await mountOnPageTwo();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(names(wrapper)).toContain("Alert 6");
+
+    wrapper.vm.onStatSelect("active");
+    await flushPromises();
+    wrapper.vm.onStatSelect("active");
+    await flushPromises();
+    expect(names(wrapper)).not.toContain("Alert 6");
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(false);
+  });
+
+  it("drops the off-filter row on the next fetch", async () => {
+    const wrapper = await mountOnPageTwo();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(names(wrapper)).toContain("Alert 6");
+
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(names(wrapper)).not.toContain("Alert 6");
+  });
+
+  it("drops the off-filter tag when a second toggle brings the row back into the filter", async () => {
+    const wrapper = await mountOnPageTwo();
+    const tag = () => wrapper.find('[data-test="alert-list-Alert 6-left-filter"]');
+    alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: false } });
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(tag().exists()).toBe(true);
+
+    alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: true } });
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect(tag().exists()).toBe(false);
+  });
+
+  it("leaves a forbidden pause unflipped, with no row message and no toast from the page", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    const central = vi.fn();
+    setMutationNotifier(central);
+    try {
+      alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } });
+      await toggleBtn(wrapper, "Alert 6").trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Couldn't pause");
+      expect(wrapper.vm.rowActionErrors).toBeUndefined();
+      expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+      expect(toggleBtn(wrapper, "Alert 6").exists()).toBe(true);
+      expect(toggleBtn(wrapper, "Alert 6").attributes("aria-busy")).toBeUndefined();
+      expect(errorToasts()).toHaveLength(0);
+      // The shared http interceptor owns 403s, so the central toast stays out of it too.
+      expect(central).not.toHaveBeenCalled();
+    } finally {
+      setMutationNotifier(() => {});
+    }
+  });
+
+  it("sends a failed pause to the central mutation toast with its reason, and nothing to the row", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    const central = vi.fn();
+    setMutationNotifier(central);
+    try {
+      alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({
+        response: { status: 409, data: { message: "Alert is being edited" } },
+      });
+      await toggleBtn(wrapper, "Alert 6").trigger("click");
+      await flushPromises();
+      expect(central).toHaveBeenCalledTimes(1);
+      expect(central).toHaveBeenLastCalledWith("error", "Alert is being edited");
+      expect(wrapper.find('[data-test="alert-list-Alert 6-row-error"]').exists()).toBe(false);
+      expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+
+      alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce(new Error("Network Error"));
+      await toggleBtn(wrapper, "Alert 7").trigger("click");
+      await flushPromises();
+      expect(central).toHaveBeenCalledTimes(2);
+      expect(central).toHaveBeenLastCalledWith("error", "Network Error");
+      expect(wrapper.find('[data-test="alert-list-Alert 7-row-error"]').exists()).toBe(false);
+      expect(errorToasts()).toHaveLength(0);
+    } finally {
+      setMutationNotifier(() => {});
+    }
+  });
+
+  it("toasts a partly refused bulk pause and keeps only the failed rows selected", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7", "alert-8"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: ["alert-7", "alert-8"], err: null },
+    });
+
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+
+    expect(errorToasts()).toEqual([
+      [{ variant: "error", message: "2 of 3 alerts couldn't be paused" }],
+    ]);
+    expect(wrapper.find('[data-test="alert-list-bulk-error"]').exists()).toBe(false);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 7").enabled).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+    expect(pageIndex(wrapper)).toBe(1);
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7", "alert-8"]);
+    expect(wrapper.find('[data-test="o2-table-selected-count"]').exists()).toBe(true);
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+  });
+
+  it("toasts a partly refused bulk resume and keeps only the failed rows selected", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6", "alert-7"], unsuccessful: [] },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: ["alert-7"] },
+    });
+
+    await wrapper.vm.bulkToggleAlerts("resume");
+    await flushPromises();
+
+    expect(errorToasts()).toEqual([
+      [{ variant: "error", message: "1 of 2 alerts couldn't be resumed" }],
+    ]);
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7"]);
+  });
+
+  it.each([
+    ["pause", "Error pausing alerts. Please try again."],
+    ["resume", "Error resuming alerts. Please try again."],
+  ] as const)(
+    "toasts the whole-request failure of a bulk %s and keeps every row selected",
+    async (action, message) => {
+      const wrapper = await mountOnPageTwo(null);
+      const ids = ["alert-6", "alert-7"];
+      wrapper.vm.selectedAlertIds = ids;
+      await flushPromises();
+      if (action === "resume") {
+        alertsSvc.bulkToggleState.mockResolvedValueOnce({
+          data: { successful: ids, unsuccessful: [] },
+        });
+        await wrapper.vm.bulkToggleAlerts("pause");
+        await flushPromises();
+        wrapper.vm.selectedAlertIds = ids;
+        await flushPromises();
+      }
+      const before = wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled;
+      alertsSvc.bulkToggleState.mockRejectedValueOnce({
+        response: { status: 500, data: { message: "boom" } },
+      });
+
+      await wrapper.vm.bulkToggleAlerts(action);
+      await flushPromises();
+
+      expect(errorToasts()).toEqual([[{ variant: "error", message }]]);
+      expect(wrapper.find('[data-test="alert-list-bulk-error"]').exists()).toBe(false);
+      expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(
+        before,
+      );
+      expect(wrapper.vm.selectedAlertIds).toEqual(ids);
+    },
+  );
+
+  it("raises no toast when the whole bulk request is forbidden, and keeps every row selected", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockRejectedValueOnce({ response: { status: 403 } });
+
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+
+    expect(errorToasts()).toHaveLength(0);
+    expect(wrapper.find('[data-test="alert-list-bulk-error"]').exists()).toBe(false);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-6", "alert-7"]);
+  });
+
+  it("shows no toast when the whole bulk pause lands", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-6"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: [] },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(errorToasts()).toHaveLength(0);
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    expect(wrapper.vm.selectedAlertIds).toEqual([]);
+  });
+
+  it("keeps a row paused and tagged when a refresh already in flight answers after the write", async () => {
+    const wrapper = await mountOnPageTwo();
+    const read = deferred<any>();
+    const stale = alertsDB.map((a) => ({ ...a }));
+    alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
+    const refresh = wrapper.vm.refreshAlerts();
+    await flushPromises();
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    read.resolve({ data: { list: stale } });
+    await refresh;
+    await flushPromises();
+
+    expect(names(wrapper)).toContain("Alert 6");
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(names(wrapper)).not.toContain("Alert 6");
+  });
+
+  it("keeps a row paused when an AutoObserve Apply makes a refresh in flight read again and the re-read lags", async () => {
+    const wrapper = await mountOnPageTwo();
+    const org = store.state.selectedOrganization.identifier;
+    const read = deferred<any>();
+    const stale = alertsDB.map((a) => ({ ...a }));
+    alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
+    const refresh = wrapper.vm.refreshAlerts();
+    await flushPromises();
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const lagging = stale.map((a) =>
+      a.name === "Alert 8" ? { ...a, name: "Alert 8 applied" } : a,
+    );
+    alertsSvc.listByFolderId.mockImplementation(async () => ({ data: { list: lagging } }));
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    read.resolve({ data: { list: stale } });
+    await refresh;
+    await flushPromises();
+
+    expect(names(wrapper)).toContain("Alert 8 applied");
+    expect(names(wrapper)).toContain("Alert 6");
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+    expect(errorToasts()).toEqual([]);
+
+    alertsSvc.listByFolderId.mockImplementation(async () => ({ data: { list: alertsDB } }));
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(names(wrapper)).not.toContain("Alert 6");
+  });
+
+  it("tags the current row when a refresh replaced the row objects while the write ran", async () => {
+    const wrapper = await mountOnPageTwo();
+    const write = deferred<any>();
+    alertsSvc.toggle_state_by_alert_id.mockImplementationOnce(() => write.promise);
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const before = wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6");
+
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6")).not.toBe(before);
+
+    write.resolve({ data: { enabled: false } });
+    await flushPromises();
+    expect(names(wrapper)).toContain("Alert 6");
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+  });
+
+  it("tags bulk-paused rows when a refresh replaced the row objects while the write ran", async () => {
+    const wrapper = await mountOnPageTwo();
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    const write = deferred<any>();
+    alertsSvc.bulkToggleState.mockImplementationOnce(() => write.promise);
+    const bulk = wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+
+    const stale = alertsDB.map((a) => ({ ...a }));
+    alertsSvc.listByFolderId.mockImplementationOnce(async () => ({ data: { list: stale } }));
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+
+    write.resolve({ data: { successful: ["alert-6", "alert-7"], unsuccessful: [] } });
+    await bulk;
+    await flushPromises();
+    expect(names(wrapper)).toEqual(expect.arrayContaining(["Alert 6", "Alert 7"]));
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-Alert 7-left-filter"]').exists()).toBe(true);
+  });
+
+  describe.each(["row toggle", "bulk pause"] as const)(
+    "overlapping list reads around a confirmed %s",
+    (path) => {
+      const org = () => store.state.selectedOrganization.identifier;
+      const row6 = (wrapper: any) =>
+        wrapper.vm.filteredResults.find((r: any) => r.alert_id === "alert-6");
+      const cachedRow6 = (alertType = "") =>
+        (queryClient.getQueryData(alertKeys.list(org(), "default", "", alertType)) as any[])?.find(
+          (r: any) => r.alert_id === "alert-6",
+        );
+      // A read before the write answers with Alert 6 still active, plus a row only that answer carries.
+      const staleList = () => [
+        ...alertsDB.map((a) => ({ ...a, enabled: true })),
+        makeAlert(99, { name: "Old Read" }),
+      ];
+      const truthList = () =>
+        alertsDB.map((a) => ({ ...a, enabled: a.alert_id === "alert-6" ? false : a.enabled }));
+      const startWrite = async (wrapper: any) => {
+        const write = deferred<any>();
+        if (path === "row toggle") {
+          alertsSvc.toggle_state_by_alert_id.mockImplementationOnce(() => write.promise);
+          await toggleBtn(wrapper, "Alert 6").trigger("click");
+        } else {
+          wrapper.vm.selectedAlertIds = ["alert-6"];
+          await flushPromises();
+          alertsSvc.bulkToggleState.mockImplementationOnce(() => write.promise);
+          void wrapper.vm.bulkToggleAlerts("pause");
+        }
+        await flushPromises();
+        return async () => {
+          alertsDB = alertsDB.map((a) => (a.alert_id === "alert-6" ? { ...a, enabled: false } : a));
+          write.resolve(
+            path === "row toggle"
+              ? { data: { enabled: false } }
+              : { data: { successful: ["alert-6"], unsuccessful: [] } },
+          );
+          await flushPromises();
+        };
+      };
+      // A is the folder refresh, B a read of another list key (the tab read), so neither joins the other.
+      const startReads = (wrapper: any) => {
+        const a = deferred<any>();
+        alertsSvc.listByFolderId.mockImplementationOnce(() => a.promise);
+        const aDone = wrapper.vm.refreshAlerts();
+        return {
+          a,
+          aDone,
+          startB: () => {
+            const b = deferred<any>();
+            alertsSvc.listByFolderId.mockImplementationOnce(() => b.promise);
+            const bDone = wrapper.vm.getAlertsFn(
+              store,
+              "default",
+              "",
+              true,
+              "scheduled",
+              true,
+              true,
+            );
+            return { b, bDone };
+          },
+        };
+      };
+      const settle = async (read: { promise: Promise<any> }, done: Promise<any>, list: any[]) => {
+        (read as any).resolve({ data: { list } });
+        await done;
+        await flushPromises();
+      };
+
+      it("drops the older read when both answer before the write settles, newer first", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        const { a, aDone, startB } = startReads(wrapper);
+        const { b, bDone } = startB();
+        await settle(
+          b,
+          bDone,
+          staleList().filter((r) => r.alert_id !== "alert-99"),
+        );
+        await settle(a, aDone, staleList());
+        expect(names(wrapper)).not.toContain("Old Read");
+        await settleWrite();
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+      });
+
+      it("keeps the write when the older read answers after it settles and the newer one answered before", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        const { a, aDone, startB } = startReads(wrapper);
+        const { b, bDone } = startB();
+        await settle(
+          b,
+          bDone,
+          staleList().filter((r) => r.alert_id !== "alert-99"),
+        );
+        await settleWrite();
+        await settle(a, aDone, staleList());
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(names(wrapper)).not.toContain("Old Read");
+        expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+        expect(cachedRow6().enabled).toBe(false);
+      });
+
+      it("keeps the write when both answer after it settles, newer first, both begun before it", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        const { a, aDone, startB } = startReads(wrapper);
+        const { b, bDone } = startB();
+        await settleWrite();
+        await settle(
+          b,
+          bDone,
+          staleList().filter((r) => r.alert_id !== "alert-99"),
+        );
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+        await settle(a, aDone, staleList());
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(names(wrapper)).not.toContain("Old Read");
+        expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+        expect(cachedRow6().enabled).toBe(false);
+        expect(cachedRow6("scheduled").enabled).toBe(false);
+      });
+
+      it("never restores the old state when a read begun after the write answers before an older one", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        const { a, aDone, startB } = startReads(wrapper);
+        await settleWrite();
+        const { b, bDone } = startB();
+        await settle(b, bDone, truthList());
+        expect(names(wrapper)).not.toContain("Alert 6");
+        await settle(a, aDone, staleList());
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(names(wrapper)).not.toContain("Alert 6");
+        expect(names(wrapper)).not.toContain("Old Read");
+        expect(cachedRow6().enabled).toBe(false);
+
+        await wrapper.vm.refreshAlerts();
+        await flushPromises();
+        expect(row6(wrapper).enabled).toBe(false);
+      });
+
+      it("never restores the old state when the older read answers first and a read begun after the write is still out", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        const { a, aDone, startB } = startReads(wrapper);
+        await settleWrite();
+        const { b, bDone } = startB();
+        await settle(a, aDone, staleList());
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(names(wrapper)).not.toContain("Old Read");
+        expect(cachedRow6().enabled).toBe(false);
+        await settle(b, bDone, truthList());
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(names(wrapper)).not.toContain("Alert 6");
+      });
+
+      it("keeps the write for a read begun after it that shares the request already in flight", async () => {
+        const wrapper = await mountOnPageTwo();
+        const settleWrite = await startWrite(wrapper);
+        alertsSvc.listByFolderId.mockClear();
+        const a = deferred<any>();
+        alertsSvc.listByFolderId.mockImplementationOnce(() => a.promise);
+        const aDone = wrapper.vm.refreshAlerts();
+        await flushPromises();
+        await settleWrite();
+        const bDone = wrapper.vm.refreshAlerts();
+        await flushPromises();
+        expect(alertsSvc.listByFolderId).toHaveBeenCalledTimes(1);
+        a.resolve({ data: { list: staleList().filter((r) => r.alert_id !== "alert-99") } });
+        await Promise.all([aDone, bDone]);
+        await flushPromises();
+        expect(row6(wrapper).enabled).toBe(false);
+        expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+        expect(cachedRow6().enabled).toBe(false);
+      });
+    },
+  );
+
+  it("drops a cross-folder search answered after a newer folder read, and keeps the write in the search's cache", async () => {
+    const wrapper = await mountOnPageTwo();
+    const write = deferred<any>();
+    alertsSvc.toggle_state_by_alert_id.mockImplementationOnce(() => write.promise);
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const search = deferred<any>();
+    alertsSvc.listByFolderId.mockImplementationOnce(() => search.promise);
+    const searchDone = wrapper.vm.getAlertsFn(store, "default", "Alert", true, "", true, true);
+    await flushPromises();
+    write.resolve({ data: { enabled: false } });
+    await flushPromises();
+
+    const stale = alertsDB.map((a) => ({ ...a, enabled: true }));
+    const truth = alertsDB.map((a) => ({ ...a, enabled: a.alert_id !== "alert-6" }));
+    alertsSvc.listByFolderId.mockImplementationOnce(async () => ({ data: { list: truth } }));
+    await wrapper.vm.getAlertsFn(store, "default", "", true, "", true, true);
+    await flushPromises();
+    search.resolve({ data: { list: stale } });
+    await searchDone;
+    await flushPromises();
+
+    const org = store.state.selectedOrganization.identifier;
+    const searched = queryClient.getQueryData(alertKeys.list(org, "", "Alert", "")) as any[];
+    expect(searched.find((r: any) => r.alert_id === "alert-6").enabled).toBe(false);
+    expect(
+      wrapper.vm.filteredResults.find((r: any) => r.alert_id === "alert-6")?.enabled ?? false,
+    ).toBe(false);
+    expect(errorToasts()).toHaveLength(0);
+  });
+
+  it("carries the write into the folder copy that turning off a cross-folder search restores", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.filteredResults = wrapper.vm.filteredResults.map((r: any) => ({ ...r }));
+    await flushPromises();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const stored = (store.state as any).organizationData.allAlertsListByFolderId.default;
+    expect(stored.find((r: any) => r.alert_id === "alert-6").enabled).toBe(false);
+
+    wrapper.vm.searchAcrossFolders = true;
+    await flushPromises();
+    wrapper.vm.searchAcrossFolders = false;
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.alert_id === "alert-6").enabled).toBe(
+      false,
+    );
+  });
+
+  it("holds the other bulk actions inactive while a bulk pause runs, so Resume can't overlap it", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.filteredResults.find((r: any) => r.alert_id === "alert-7").enabled = false;
+    wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
+    await flushPromises();
+    const write = deferred<any>();
+    alertsSvc.bulkToggleState.mockImplementationOnce(() => write.promise);
+
+    const pause = wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    for (const id of [
+      "alert-list-unpause-alerts-btn",
+      "alert-list-move-across-folders-btn",
+      "alert-list-export-alerts-btn",
+      "alert-list-delete-alerts-btn",
+    ]) {
+      expect(wrapper.find(`[data-test="${id}"]`).attributes("aria-disabled")).toBe("true");
+    }
+    expect(wrapper.find('[data-test="alert-list-pause-alerts-btn"]').attributes("aria-busy")).toBe(
+      "true",
+    );
+    await wrapper.vm.bulkToggleAlerts("resume");
+    expect(alertsSvc.bulkToggleState).toHaveBeenCalledTimes(1);
+
+    write.resolve({ data: { successful: [], unsuccessful: ["alert-6"] } });
+    await pause;
+    await flushPromises();
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-6"]);
+    expect(
+      wrapper.find('[data-test="alert-list-unpause-alerts-btn"]').attributes("aria-disabled"),
+    ).toBeUndefined();
+  });
+
+  it("refreshes over dimmed kept rows and keeps the page and selection", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-7", "alert-9"];
+    await flushPromises();
+    const read = deferred<any>();
+    alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
+
+    const done = wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(wrapper.vm.refreshing).toBe(true);
+    expect(wrapper.find('[data-test="o2-table-body"]').attributes("data-test-stale")).toBe("true");
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7", "alert-9"]);
+
+    read.resolve({ data: { list: alertsDB } });
+    await done;
+    await flushPromises();
+    expect(wrapper.vm.refreshing).toBe(false);
+    expect(pageIndex(wrapper)).toBe(1);
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7", "alert-9"]);
+  });
+
+  it("keeps the refresh button's age while the table keeps rows, and spins only when it does not", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    const refresh = () => wrapper.findComponent({ name: "ORefreshButton" });
+    expect(refresh().props("spinner")).toBe(true);
+    const read = deferred<any>();
+    alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
+
+    const done = wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(wrapper.vm.oTableRef.keepingRows).toBe(true);
+    expect(refresh().props("loading")).toBe(true);
+    expect(refresh().props("spinner")).toBe(false);
+    const button = wrapper.find('[data-test="alert-list-refresh-btn"]');
+    expect(button.attributes("aria-busy")).toBe("true");
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(button.find(".animate-spin").exists()).toBe(false);
+    expect(button.html()).not.toContain("text-transparent");
+    expect(button.text()).toContain("just now");
+
+    read.resolve({ data: { list: alertsDB } });
+    await done;
+    await flushPromises();
+    expect(wrapper.vm.oTableRef.keepingRows).toBe(false);
+    expect(refresh().props("spinner")).toBe(true);
+  });
+
+  it("drops a selected alert that a refresh no longer returns", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.selectedAlertIds = ["alert-7", "alert-9"];
+    await flushPromises();
+    alertsDB = alertsDB.filter((a) => a.alert_id !== "alert-9");
+
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7"]);
+    expect(pageIndex(wrapper)).toBe(1);
+  });
+
+  it("still starts a new tile filter on page 1", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    wrapper.vm.onStatSelect("active");
+    await flushPromises();
+    expect(pageIndex(wrapper)).toBe(0);
+    expect(wrapper.vm.currentPage).toBe(1);
+  });
+});
+
+describe("AlertList - filters from the Overview links", () => {
+  const withQuery = async (query: Record<string, string>) => {
+    router.currentRoute.value.query = query as any;
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    return wrapper;
+  };
+
+  it.each([
+    "active",
+    "paused",
+    "failed",
+    "firing",
+    "acknowledged",
+    "recent",
+    "error",
+    "notify_failed",
+  ])("reads ?state=%s into the state filter", async (state) => {
+    const wrapper = await withQuery({ state });
+    expect(wrapper.vm.stateFilters).toEqual([state]);
+  });
+
+  it("opens on the Firing tile unless ?state picks the tiles, the all-states value meaning none", async () => {
+    expect((await withQuery({})).vm.stateFilters).toEqual(["firing"]);
+    expect((await withQuery({ state: "paused,error" })).vm.stateFilters).toEqual([
+      "paused",
+      "error",
+    ]);
+    expect((await withQuery({ state: ALERT_LIST_ALL_STATES })).vm.stateFilters).toEqual([]);
+    expect((await withQuery({ state: "bogus" })).vm.stateFilters).toEqual([]);
+  });
+
+  it("starts without the saved search when the link carries a state or level", async () => {
+    Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
+    const linked = await withQuery({ state: "firing" });
+    expect(linked.vm.searchQuery).toBe("");
+    expect(linked.vm.filterQuery).toBe("");
+    expect((await withQuery({ level: "critical" })).vm.searchQuery).toBe("");
+    expect((await withQuery({ all_folders: "true" })).vm.searchQuery).toBe("");
+    expect((await withQuery({ state: ALERT_LIST_ALL_STATES })).vm.filterQuery).toBe("");
+  });
+
+  it("clears the level filter with the Total tile", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "critical" });
+    wrapper.vm.onStatSelect("total");
+    expect(wrapper.vm.stateFilters).toEqual([]);
+    expect(wrapper.vm.levelFilter).toBeNull();
+  });
+
+  it("clears the level filter when any state tile is selected or deselected", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "critical" });
+    wrapper.vm.onStatSelect("error");
+    expect(wrapper.vm.levelFilter).toBeNull();
+    const again = await withQuery({ state: "firing", level: "critical" });
+    again.vm.onStatSelect("firing");
+    expect(again.vm.stateFilters).toEqual([]);
+    expect(again.vm.levelFilter).toBeNull();
+    const viaStrip = await withQuery({ state: "firing", level: "critical" });
+    viaStrip.vm.onStateFiltersUpdate(["firing", "error"]);
+    expect(viaStrip.vm.stateFilters).toEqual(["firing", "error"]);
+    expect(viaStrip.vm.levelFilter).toBeNull();
+  });
+
+  it("reads ?level and ignores values other than critical and warning", async () => {
+    expect((await withQuery({ level: "critical" })).vm.levelFilter).toBe("critical");
+    expect((await withQuery({ level: "ok" })).vm.levelFilter).toBeNull();
+  });
+
+  it("shows exactly the firing rows at the linked level", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "critical" });
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "crit", last_outcome: "firing", level: "critical" },
+      { enabled: true, name: "crit-undelivered", last_outcome: "notify_failed", level: "critical" },
+      { enabled: true, name: "warn", last_outcome: "firing", level: "warning" },
+      { enabled: true, name: "crit-ok", last_outcome: "normal", level: "critical" },
+    ];
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual([
+      "crit",
+      "crit-undelivered",
+    ]);
+
+    wrapper.vm.clearLevelFilter();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual([
+      "crit",
+      "crit-undelivered",
+      "warn",
+    ]);
+  });
+
+  it("filters rules whose last evaluation errored and alerts whose delivery failed", async () => {
+    const wrapper = await withQuery({ state: ALERT_LIST_ALL_STATES });
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "errored", last_outcome: "error" },
+      { enabled: true, name: "undelivered", last_outcome: "notify_failed" },
+      { enabled: true, name: "firing", last_outcome: "firing" },
+      // A paused rule freezes its last outcome, so it is never counted as failing.
+      { enabled: false, name: "paused-errored", last_outcome: "error" },
+    ];
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.stateCounts).toMatchObject({ error: 1, notify_failed: 1 });
+    wrapper.vm.onStatSelect("error");
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["errored"]);
+    wrapper.vm.onStatSelect("error");
+    wrapper.vm.onStatSelect("notify_failed");
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["undelivered"]);
+  });
+
+  it.each([
+    ["one open firing", { firing_started_at: 1_800_000_000_000_000 }, 0],
+    [
+      "acked groups still firing",
+      {
+        groups_firing: 2,
+        ack: { acked_by: "a@example.com", acked_at: 1, ack_source: "ui", groups_acked: 1 },
+      },
+      1,
+    ],
+    [
+      "an anomaly's open firing",
+      {
+        alert_type: "anomaly_detection",
+        status: "ready",
+        firing_started_at: 1_800_000_000_000_000,
+      },
+      0,
+    ],
+  ])("shows and counts an errored evaluation during %s as firing", async (_case, live, acked) => {
+    alertsDB = [{ ...makeAlert(91), last_outcome: "error", ...live } as any];
+    const wrapper = await withQuery({});
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-91"]);
+    expect(wrapper.vm.stateCounts).toMatchObject({ firing: 1, acknowledged: acked });
+  });
+
+  it.each([
+    ["with templates", [{ name: "template1" }]],
+    ["with no templates", []],
+  ])(
+    "shows one status error %s when the run state could not be read: in the table while the tiles empty it, else in the footer",
+    async (_case, templates) => {
+      templatesSvc.list.mockResolvedValue({ data: templates } as any);
+      alertsSvc.listByFolderId.mockResolvedValue({
+        data: { list: [makeAlert(93)], status_unavailable: true },
+      });
+      const wrapper = await withQuery({});
+      expect(wrapper.find('[data-test="alert-list-create-template-text"]').exists()).toBe(false);
+      const errorState = wrapper
+        .findAllComponents({ name: "OEmptyState" })
+        .find((c: any) => c.attributes("data-test") === "alert-list-empty-status-error");
+      expect(errorState?.props("variant")).toBe("warning");
+      expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(false);
+      expect(wrapper.vm.summaryStats.find((s: any) => s.key === "firing").value).toBe("—");
+      const calls = alertsSvc.listByFolderId.mock.calls.length;
+      await wrapper.get('[data-test="alert-list-empty-status-retry"]').trigger("click");
+      await flushPromises();
+      expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(calls);
+
+      wrapper.vm.stateFilters = [];
+      await flushPromises();
+      expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
+
+      // A search that empties a folder holding alerts is a filtered list, not a first run.
+      wrapper.vm.filterQuery = "no such alert";
+      await flushPromises();
+      expect(wrapper.vm.displayedAlerts).toHaveLength(0);
+      expect(wrapper.find('[data-test="alert-list-create-template-text"]').exists()).toBe(false);
+    },
+  );
+
+  it("shows the status error, not the quiet state or the old folder's rows, when a new scope fails to load", async () => {
+    alertsDB = [
+      { ...makeAlert(1), last_outcome: "normal" } as any,
+      {
+        ...makeAlert(2, { folder_id: "ops", folder_name: "Ops" }),
+        last_outcome: "firing",
+        firing_started_at: 1_800_000_000_000_000,
+      } as any,
+    ];
+    alertsSvc.listByFolderId.mockImplementation(async (...args: any[]) => ({
+      data: { list: alertsDB.filter((a) => !args[6] || a.folder_id === args[6]) },
+    }));
+    const wrapper = await withQuery({});
+    expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(true);
+
+    alertsSvc.listByFolderId.mockRejectedValueOnce({ response: { status: 500 } });
+    wrapper.vm.searchAcrossFolders = true;
+    await flushPromises();
+    expect(alertsSvc.listByFolderId.mock.lastCall[6]).toBe("");
+    expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-empty-show-all"]').exists()).toBe(true);
+    expect(wrapper.vm.filteredResults).toHaveLength(0);
+    expect(wrapper.vm.summaryStats.find((s: any) => s.key === "firing").value).toBe("—");
+
+    await wrapper.get('[data-test="alert-list-empty-status-retry"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-2"]);
+  });
+
+  it.each([
+    [
+      "edit",
+      async (vm: any, row: any) => {
+        const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+        await vm.editAlert(row);
+        const folder = push.mock.lastCall?.[0] && (push.mock.lastCall[0] as any).query.folder;
+        push.mockRestore();
+        return folder;
+      },
+    ],
+    [
+      "pause",
+      async (vm: any, row: any) => {
+        await vm.toggleAlertState(row);
+        return alertsSvc.toggle_state_by_alert_id.mock.lastCall?.[3];
+      },
+    ],
+    [
+      "delete",
+      async (vm: any, row: any) => {
+        vm.selectedDelete = row;
+        vm.deleteAlertByAlertId();
+        await flushPromises();
+        return alertsSvc.delete_by_alert_id.mock.lastCall?.[2];
+      },
+    ],
+    [
+      "move",
+      async (vm: any, row: any) => {
+        vm.moveAlertToAnotherFolder(row);
+        return vm.activeFolderToMove;
+      },
+    ],
+    [
+      "clone",
+      async (vm: any, row: any) => {
+        await vm.duplicateAlert(row);
+        return vm.folderIdToBeCloned;
+      },
+    ],
+    [
+      "export",
+      async (vm: any, row: any) => {
+        await vm.exportAlert(row);
+        return /folder_id\s*=\s*"production"/.test(vm.alertsTerraform.hcl) ? "production" : "";
+      },
+    ],
+  ])("acts on %s for a row from another folder in its owning folder", async (_action, act) => {
+    alertsDB = [makeAlert(902, { folder_id: "production", folder_name: "Production" } as any)];
+    const wrapper = await withQuery({ state: ALERT_LIST_ALL_STATES, all_folders: "true" });
+    expect(wrapper.vm.activeFolderId).toBe("default");
+    expect(await act(wrapper.vm, wrapper.vm.displayedAlerts[0])).toBe("production");
+  });
+
+  it.each([
+    ["with a state", { state: "firing", all_folders: "true" }],
+    ["alone", { all_folders: "true" }],
+  ])(
+    "applies an all-folders link %s to a mounted list and keeps it through folder-list syncs",
+    async (_case, linkQuery) => {
+      const folders = [
+        { folderId: "default", name: "Default" },
+        { folderId: "production", name: "Production" },
+      ];
+      store.state.organizationData.foldersByType = { alerts: folders } as any;
+      queryClient.setQueryData(
+        foldersQuery(store.state.selectedOrganization.identifier, "alerts").queryKey,
+        folders,
+      );
+      router.currentRoute.value.query = { state: ALERT_LIST_ALL_STATES, folder: "production" };
+      const wrapper: any = await mountAlertList({
+        renderTable: false,
+        realFolders: true,
+        keepRoute: true,
+      });
+      await flushPromises();
+      expect(wrapper.vm.activeFolderId).toBe("production");
+
+      await router.push({ name: "alertList", query: linkQuery });
+      await flushPromises();
+      expect(wrapper.vm.searchAcrossFolders).toBe(true);
+      expect(router.currentRoute.value.query.all_folders).toBeUndefined();
+
+      // A created or renamed folder refreshes the list, which is no folder pick.
+      store.state.organizationData.foldersByType = {
+        alerts: [...folders, { folderId: "new", name: "New" }],
+      } as any;
+      await flushPromises();
+      expect(wrapper.vm.searchAcrossFolders).toBe(true);
+      expect(wrapper.vm.activeFolderId).toBe("production");
+    },
+  );
+
+  it("strips state, level and scope from the URL after reading them, keeping other keys", async () => {
+    const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+    await withQuery({
+      state: "firing",
+      level: "warning",
+      all_folders: "true",
+      org_identifier: "acme",
+    });
+    expect(replace).toHaveBeenCalledWith({ query: { org_identifier: "acme" } });
+    replace.mockRestore();
+  });
+
+  it("does not write the URL when the tile or level chip changes later", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "warning" });
+    const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+    wrapper.vm.onStatSelect("paused");
+    wrapper.vm.clearLevelFilter();
+    await flushPromises();
+    expect(replace).not.toHaveBeenCalled();
+    replace.mockRestore();
+  });
+
+  it("restores the saved search on a later mount without the param", async () => {
+    Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
+    await withQuery({ state: "firing" });
+    const again = await withQuery({});
+    expect(again.vm.searchQuery).toBe("saved");
+    expect(again.vm.filterQuery).toBe("f=1");
+  });
+
+  it("starts a linked filter inside the current folder unless the link asks for every folder", async () => {
+    Object.assign(useListViewState("alerts", {}), { searchAcrossFolders: true });
+    expect((await withQuery({ state: "firing" })).vm.searchAcrossFolders).toBe(false);
+    expect((await withQuery({})).vm.searchAcrossFolders).toBe(true);
+    const everywhere = await withQuery({ state: "firing", all_folders: "true" });
+    expect(everywhere.vm.searchAcrossFolders).toBe(true);
+    expect(alertsSvc.listByFolderId.mock.lastCall[6]).toBe("");
+  });
+
+  it("says what pressing the level chip does", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "critical" });
+    expect(
+      wrapper.get('[data-test="alert-list-level-filter-clear"]').attributes("aria-label"),
+    ).toBe("Remove filter: Firing at critical level");
+  });
+
+  it("offers a way to remove the level filter", async () => {
+    const wrapper = await withQuery({ state: "firing", level: "critical" });
+    expect(wrapper.find('[data-test="alert-list-level-filter"]').text()).toContain("critical");
+    await wrapper.get('[data-test="alert-list-level-filter-clear"]').trigger("click");
+    expect(wrapper.find('[data-test="alert-list-level-filter"]').exists()).toBe(false);
+  });
+});
+
 describe("AlertList - view state restoration", () => {
-  it("restores the stat-tile chip, sort and page size saved before navigating away", async () => {
+  it("restores the sort and page size saved before navigating away, but not the stat tile", async () => {
+    router.currentRoute.value.query = {};
     Object.assign(useListViewState("alerts", {}), {
-      stateFilter: "paused",
+      stateFilter: ["paused"],
       sortBy: "name",
       sortOrder: "desc",
       perPage: 50,
@@ -1120,24 +2649,23 @@ describe("AlertList - view state restoration", () => {
     const wrapper: any = await mountAlertList();
     await flushPromises();
 
-    expect(wrapper.vm.stateFilter).toBe("paused");
+    expect(wrapper.vm.stateFilters).toEqual(["firing"]);
     expect(wrapper.vm.sortBy).toBe("name");
     expect(wrapper.vm.sortOrder).toBe("desc");
     expect(wrapper.vm.pageSize).toBe(50);
   });
 
-  it("saves chip, sort and page size changes for the next visit", async () => {
+  it("saves sort and page size changes for the next visit", async () => {
     const wrapper: any = await mountAlertList();
     await flushPromises();
 
-    wrapper.vm.stateFilter = "active";
+    wrapper.vm.stateFilters = ["active", "paused"];
     wrapper.vm.sortBy = "name";
     wrapper.vm.sortOrder = "asc";
     wrapper.vm.pageSize = 100;
     await flushPromises();
 
     expect(useListViewState("alerts", {})).toMatchObject({
-      stateFilter: "active",
       sortBy: "name",
       sortOrder: "asc",
       perPage: 100,
@@ -1237,7 +2765,8 @@ describe("AlertList - folder and state interactions", () => {
     await wrapper.vm.updateAcrossFolders("default", "default");
     await flushPromises();
 
-    expect(spy).toHaveBeenCalledTimes(2);
+    // The section tabs' Firing badge reads every folder on its own schedule.
+    expect(spy.mock.calls.filter((call) => call[6] === "default")).toHaveLength(2);
     expect(wrapper.vm.selectedAlerts.length).toBe(0);
   });
 });
@@ -1301,6 +2830,19 @@ describe("AlertList - micro validations", () => {
 
   // Note: multipleExportAlert functionality is already tested in "exports multiple selected alerts to JSON" test above
 
+  it("lists every folder, with the Folder column, once the scope is all folders and the search is empty", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    alertsSvc.listByFolderId.mockClear();
+    wrapper.vm.searchAcrossFolders = true;
+    await flushPromises();
+
+    const [, , , , , , folder, term] = alertsSvc.listByFolderId.mock.lastCall;
+    expect(folder).toBe("");
+    expect(term).toBe("");
+    expect(wrapper.vm.columns.map((c: any) => c.id)).toContain("folder_name");
+  }, 10000);
+
   it("toggle searchAcrossFolders rebinds models", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -1353,6 +2895,21 @@ describe("AlertList - micro validations", () => {
     await flushPromises();
     expect(wrapper.vm.alertStateLoadingMap[uuid]).toBe(false);
     expect(before === undefined || before === false).toBe(true);
+  });
+
+  it("toggleAlertState marks the folder-keyed detail entry stale", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    const org = store.state.selectedOrganization.identifier;
+    const key = [...alertKeys.detail(org, row.alert_id), "folder-1"];
+    queryClient.setQueryData(key, { name: row.name });
+
+    await wrapper.vm.toggleAlertState(row);
+    await flushPromises();
+
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: key, exact: true });
   });
 });
 
@@ -1737,7 +3294,11 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     // A failed stream-list load must not skip fetching the alert being
     // cloned — otherwise Save would silently copy whatever alert was
     // cloned previously instead of this one.
-    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(expect.anything(), row.alert_id);
+    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(
+      expect.anything(),
+      row.alert_id,
+      undefined,
+    );
   });
 
   it("clone dialog emits click:primary -> invokes submitForm", async () => {
@@ -2392,6 +3953,59 @@ describe("AlertList - editor drafts", () => {
     expect(readEditorDraft(scope("alert-2"))).not.toBeNull();
   });
 
+  it("drops the deleted alert's folder-keyed detail and refreshes the Firing read", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    const key = [...alertKeys.detail(org, "alert-1"), "folder-1"];
+    const otherKey = alertKeys.detail(org, "alert-2");
+    queryClient.setQueryData(key, { name: "Scheduled Alert A" });
+    queryClient.setQueryData(otherKey, { name: "Scheduled Alert B" });
+    queryClient.setQueryData(alertKeys.firing(org), { list: [] });
+    const { vm } = await mountDraftList();
+
+    await vm.showDeleteDialogFn({
+      row: { alert_id: "alert-1", name: "Scheduled Alert A" },
+    });
+    await vm.deleteAlertByAlertId();
+    await flushPromises();
+
+    expect(queryClient.getQueryData(key)).toBeUndefined();
+    expect(queryClient.getQueryData(otherKey)).toBeDefined();
+    expect(queryClient.getQueryState(alertKeys.firing(org))?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: otherKey, exact: true });
+    queryClient.removeQueries({ queryKey: alertKeys.firing(org), exact: true });
+  });
+
+  it("refreshes the Firing read after a bulk pause", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    queryClient.setQueryData(alertKeys.firing(org), { list: [] });
+    const { wrapper } = await mountDraftList();
+    wrapper.vm.filteredResults[0].selected = true;
+    wrapper.vm.filteredResults[0].enabled = true;
+    await wrapper.vm.$nextTick();
+
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+
+    expect(alertsSvc.bulkToggleState).toHaveBeenCalled();
+    expect(queryClient.getQueryState(alertKeys.firing(org))?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: alertKeys.firing(org), exact: true });
+  });
+
+  it("refreshes the Firing read when a bulk delete answers in an unknown shape", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    queryClient.setQueryData(alertKeys.firing(org), { list: [] });
+    const { wrapper, vm } = await mountDraftList();
+    wrapper.vm.filteredResults[0].selected = true;
+    await wrapper.vm.$nextTick();
+    alertsSvc.bulkDelete.mockResolvedValueOnce({ data: {} });
+
+    await vm.bulkDeleteAlerts();
+    await flushPromises();
+
+    expect(queryClient.getQueryState(alertKeys.firing(org))?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: alertKeys.firing(org), exact: true });
+  });
+
   it("keeps the draft when the delete fails", async () => {
     writeEditorDraft(scope("alert-1"), { data: draftData });
     alertsSvc.delete_by_alert_id.mockRejectedValueOnce({ response: { status: 500 } });
@@ -2530,7 +4144,11 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
   const loadAckRows = async () => {
     alertsDB = [
       { ...makeAlert(1, { name: "acked-firing" }), last_outcome: "firing", ack } as any,
-      { ...makeAlert(2, { name: "plain-firing", enabled: true }), last_outcome: "firing" } as any,
+      {
+        ...makeAlert(2, { name: "plain-firing", enabled: true }),
+        last_outcome: "firing",
+        firing_started_at: 1_800_000_000_000_000,
+      } as any,
       {
         ...makeAlert(3, {
           name: "multi-firing",
@@ -2594,7 +4212,7 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
     expect(wrapper.vm.canAcknowledgeRow(row("resting"))).toBe(false);
   });
 
-  it("acknowledges a single-row alert, or every firing group of a multi-alert", async () => {
+  it("acknowledges the firing a single-row alert shows, or every firing group of a multi-alert", async () => {
     alertsSvc.ackAlert.mockResolvedValue({
       data: { changed: true, acks: [], other_groups_unacked: 0 },
     });
@@ -2603,7 +4221,7 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
     expect(alertsSvc.ackAlert).toHaveBeenLastCalledWith(
       "default",
       "alert-2",
-      { group_key: "" },
+      { group_key: "", firing_started_at: 1_800_000_000_000_000 },
       "default",
     );
     await wrapper.vm.acknowledgeRow(row("multi-firing"));
@@ -2613,6 +4231,24 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
       { all_groups: true },
       "default",
     );
+  });
+
+  it("says the alert fired again and reloads the list when an ack meets a newer firing", async () => {
+    alertsSvc.ackAlert.mockRejectedValue({
+      response: { status: 409, data: { code: "firing_changed", firing_started_at: 7 } },
+    });
+    const { wrapper, row } = await loadAckRows();
+    const reads = alertsSvc.listByFolderId.mock.calls.length;
+    vi.mocked(toast).mockClear();
+    expect(await wrapper.vm.acknowledgeRow(row("plain-firing"))).toBe(false);
+    await flushPromises();
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "error",
+        message: wrapper.vm.t("alerts.ack.errors.firingChanged"),
+      }),
+    );
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(reads);
   });
 
   it("mutes a row through the alert route, Until it clears or for a preset", async () => {
@@ -2684,7 +4320,127 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
       "alert-4",
       "d1",
       "default",
+      2,
     );
+  });
+
+  const anomalyRow = (downtime: Record<string, unknown> = {}) => ({
+    type: "anomaly",
+    alert_id: "an-1",
+    name: "ut-demo-anomaly",
+    folder_name: { id: "default" },
+    active_downtime: {
+      id: "d7",
+      name: "Quick mute · ut-demo-anomaly",
+      ends_at: 4_102_444_800_000_000,
+      version: 5,
+      folder_id: "ops",
+      end_here: true,
+      ...downtime,
+    },
+  });
+
+  it("ends an anomaly row's mute at its version through the downtime route, then refreshes", async () => {
+    const cancel = vi.spyOn(DowntimeService, "cancel").mockResolvedValue({ data: {} } as any);
+    const { wrapper } = await loadAckRows();
+    const loads = alertsSvc.listByFolderId.mock.calls.length;
+    expect(await wrapper.vm.endRowMute(anomalyRow())).toBe("ok");
+    expect(cancel).toHaveBeenLastCalledWith("default", "d7", "ops", 5);
+    expect(alertsSvc.cancelAlertMute).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "an-1",
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(loads);
+    cancel.mockRestore();
+  });
+
+  it("extends an anomaly row's mute by a preset at its version", async () => {
+    const extend = vi
+      .spyOn(DowntimeService, "extend")
+      .mockResolvedValue({ data: { id: "d7", schedule: { ends_at: 1 } } } as any);
+    const { wrapper } = await loadAckRows();
+    expect(await wrapper.vm.extendRow(anomalyRow(), { minutes: 60 })).toBe("ok");
+    expect(extend).toHaveBeenLastCalledWith("default", "d7", { by_secs: 3600, version: 5 }, "ops");
+    extend.mockRestore();
+  });
+
+  it.each([403, 404, 409])("refreshes the list after a %s on End mute", async (status) => {
+    const cancel = vi
+      .spyOn(DowntimeService, "cancel")
+      .mockRejectedValue({ response: { status, data: {} } });
+    const { wrapper } = await loadAckRows();
+    const loads = alertsSvc.listByFolderId.mock.calls.length;
+    expect(await wrapper.vm.endRowMute(anomalyRow())).toBe("conflict");
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(loads);
+    alertsSvc.cancelAlertMute.mockRejectedValue({ response: { status, data: {} } });
+    const before = alertsSvc.listByFolderId.mock.calls.length;
+    expect(await wrapper.vm.endRowMute({ ...anomalyRow(), type: undefined })).toBe("conflict");
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(before);
+    cancel.mockRestore();
+  });
+
+  it("refreshes the list when Extend until cannot read a refused mute, not when no answer came", async () => {
+    const get = vi
+      .spyOn(DowntimeService, "get")
+      .mockRejectedValueOnce({ response: { status: 404, data: {} } })
+      .mockRejectedValueOnce(new Error("Network"));
+    const { wrapper } = await loadAckRows();
+    const loads = alertsSvc.listByFolderId.mock.calls.length;
+    await wrapper.vm.openExtendUntil(anomalyRow());
+    const afterRefusal = alertsSvc.listByFolderId.mock.calls.length;
+    expect(afterRefusal).toBeGreaterThan(loads);
+    await wrapper.vm.openExtendUntil(anomalyRow());
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBe(afterRefusal);
+    get.mockRestore();
+  });
+
+  it("keeps the list as it is when End mute got no answer", async () => {
+    const cancel = vi.spyOn(DowntimeService, "cancel").mockRejectedValue(new Error("Network"));
+    const { wrapper } = await loadAckRows();
+    const loads = alertsSvc.listByFolderId.mock.calls.length;
+    expect(await wrapper.vm.endRowMute(anomalyRow())).toBe("failed");
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBe(loads);
+    cancel.mockRestore();
+  });
+
+  it("ends from the parent row exactly the downtime naming its two groups (D3)", async () => {
+    alertsSvc.cancelAlertMute.mockResolvedValue({ data: {} });
+    const { wrapper, row } = await loadAckRows();
+    const twoGroups = {
+      ...row("muted-firing"),
+      active_downtime: {
+        id: "d1",
+        name: "Quick mute",
+        ends_at: 4_102_444_800_000_000,
+        version: 2,
+        end_here: true,
+        alert_groups: [
+          { alert_id: "alert-4", group_key: "k1" },
+          { alert_id: "alert-4", group_key: "k2" },
+        ],
+      },
+    };
+    expect(await wrapper.vm.endRowMute(twoGroups)).toBe("ok");
+    expect(alertsSvc.cancelAlertMute).toHaveBeenCalledTimes(1);
+    expect(alertsSvc.cancelAlertMute).toHaveBeenLastCalledWith(
+      "default",
+      "alert-4",
+      "d1",
+      "default",
+      2,
+    );
+  });
+
+  it("links the Firing · muted tag to the downtime in its own folder", async () => {
+    const { wrapper } = await loadAckRows();
+    expect(wrapper.vm.downtimeLinkOf(anomalyRow())).toEqual({
+      name: "downtimeDetail",
+      params: { id: "d7" },
+      query: { org_identifier: "default", folder: "ops" },
+    });
   });
 }, 15000);
 
@@ -2827,6 +4583,70 @@ describe("AlertList - first run and the alert library", () => {
     expect(wrapper.vm.filterQuery).toBe("");
   });
 
+  it("names an empty Firing tile by scope, shows all alerts from it, and keeps first run for an empty folder", async () => {
+    router.currentRoute.value.query = {};
+    const wrapper = await mountList();
+    expect(wrapper.vm.stateFilters).toEqual(["firing"]);
+    expect(emptyState(wrapper).attributes("data-test")).toBe("alert-list-empty-no-firing");
+    expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
+    const folderTitle = emptyState(wrapper).props("title");
+    expect(folderTitle).toBeTruthy();
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(false);
+
+    wrapper.vm.searchAcrossFolders = true;
+    await flushPromises();
+    expect(emptyState(wrapper).props("title")).not.toBe(folderTitle);
+
+    await wrapper.get('[data-test="alert-list-empty-show-all"]').trigger("click");
+    expect(wrapper.vm.stateFilters).toEqual([]);
+
+    wrapper.vm.stateFilters = ["firing"];
+    wrapper.vm.allAlerts = [];
+    wrapper.vm.filteredResults = [];
+    await flushPromises();
+    expect(emptyState(wrapper).props("filtered")).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(true);
+  });
+
+  it("scopes the quiet state to the alert type the toggle narrowed the rows to", async () => {
+    router.currentRoute.value.query = {};
+    alertsDB = [
+      { ...makeAlert(1, { is_real_time: false }), last_outcome: "normal" },
+      { ...makeAlert(2, { is_real_time: true }), last_outcome: "firing" },
+    ] as any;
+    alertsSvc.listByFolderId.mockImplementation(async (...args: any[]) => ({
+      data: { list: alertsDB.filter((a: any) => args[8] !== "scheduled" || !a.is_real_time) },
+    }));
+    const wrapper: any = await mountAlertList({ renderTable: false });
+    await flushPromises();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-2"]);
+
+    await wrapper.vm.onAlertTabChange("scheduled");
+    await flushPromises();
+    const type = wrapper.vm.t("alerts.scheduled");
+    expect(wrapper.vm.noFiringCopy).toEqual({
+      title: "alerts.noTypeAlertsFiringThisFolder",
+      description: "alerts.noTypeAlertsFiringThisFolderDescription",
+      params: { type },
+    });
+    wrapper.vm.searchAcrossFolders = true;
+    await flushPromises();
+    expect(wrapper.vm.noFiringCopy).toEqual({
+      title: "alerts.noTypeAlertsFiringAnyFolder",
+      description: "alerts.noTypeAlertsFiringAnyFolderDescription",
+      params: { type },
+    });
+
+    alertsDB[1].last_outcome = "normal";
+    await wrapper.vm.onAlertTabChange("all");
+    await flushPromises();
+    expect(wrapper.vm.noFiringCopy).toEqual({
+      title: "alerts.noAlertsFiringAnyFolder",
+      description: "alerts.noAlertsFiringAnyFolderDescription",
+      params: {},
+    });
+  });
+
   it("hides both library entry points when custom_hide_menus lists alertLibrary", async () => {
     (store.state as any).zoConfig.custom_hide_menus = "billings,alertLibrary";
     const wrapper = await mountEmpty();
@@ -2835,7 +4655,7 @@ describe("AlertList - first run and the alert library", () => {
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(true);
   });
 
-  it("renders the summary strip compact, so its six tiles share one row", async () => {
+  it("passes the compact flag to the summary strip", async () => {
     const wrapper: any = await mountList();
     expect(wrapper.findComponent({ name: "OStatStrip" }).props("compact")).toBe(true);
   });

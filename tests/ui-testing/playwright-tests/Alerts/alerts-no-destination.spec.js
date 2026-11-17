@@ -5,7 +5,7 @@
  *
  * A destination is optional: the form notes that the alert notifies nobody
  * instead of refusing the save, notify-on-recovery cannot be switched on while
- * nothing is notified, and import accepts an absent or empty `destinations`
+ * nothing is notified, and import accepts an absent, empty or null `destinations`
  * while still refusing one that is not a list.
  */
 
@@ -77,7 +77,7 @@ test.describe('Alerts — no destination', {
     await pm.alertNoDestinationPage.expectRecoveryToggleEnabled();
   });
 
-  for (const [shape, destinations] of [['absent', undefined], ['empty', []]]) {
+  for (const [shape, destinations] of [['absent', undefined], ['empty', []], ['null', null]]) {
     test(`import accepts an alert whose destinations are ${shape}`, {
       tag: ['@P1', '@import'],
     }, async () => {
@@ -97,11 +97,11 @@ test.describe('Alerts — no destination', {
   test('import still refuses destinations that are not a list', {
     tag: ['@P2', '@import', '@negative'],
   }, async () => {
-    const name = uniq('auto_nodest_imp_null');
+    const name = uniq('auto_nodest_imp_string');
 
     await pm.alertNoDestinationPage.openImport();
     await pm.alertNoDestinationPage.importAlerts([
-      pm.alertNoDestinationPage.importPayload(name, null),
+      pm.alertNoDestinationPage.importPayload(name, 'ops-slack'),
     ]);
     await pm.alertNoDestinationPage.expectImportRejected('Destinations must be an array.');
     await pm.alertNoDestinationPage.expectAlertNotCreated(name);

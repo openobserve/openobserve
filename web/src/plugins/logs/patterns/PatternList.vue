@@ -209,6 +209,7 @@ import PatternCard from "./PatternCard.vue";
 import { usePatternActions } from "./usePatternActions";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
+import analytics from "@/services/product_analytics";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
@@ -314,7 +315,9 @@ const SEVERITY_LABEL_KEY: Record<PatternSeverityKey, string> = {
 };
 
 const onSeverityFilterChange = (value: unknown) => {
-  setActiveSeverities(Array.isArray(value) ? (value as PatternSeverityKey[]) : []);
+  const next = Array.isArray(value) ? (value as PatternSeverityKey[]) : [];
+  setActiveSeverities(next);
+  analytics.track("log_patterns_severity_filtered", { count: next.length });
 };
 
 // Chip counts come from the extraction sample, which is a clean partition

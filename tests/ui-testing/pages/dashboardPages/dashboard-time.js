@@ -24,7 +24,10 @@ export async function applyPickedDateTime(page) {
     await pickerApply.first().evaluate((el) => el.click());
     return;
   }
-  await page.keyboard.press("Escape");
+  const menu = page.locator("#date-time-menu").first();
+  // An Auto Run picker closes itself on the pick; Escape then would reach the dialog underneath.
+  const closedItself = await menu.waitFor({ state: "hidden", timeout: 1500 }).then(() => true, () => false);
+  if (!closedItself) await page.keyboard.press("Escape");
   await page.locator("#date-time-menu").first().waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
 
   const panelApply = page.locator('[data-test="dashboard-apply"]').first();

@@ -118,6 +118,7 @@ function mountTable(props: Partial<InstanceType<typeof QualityConfigsTable>["$pr
       loading: false,
       forbidden: false,
       loadError: false,
+      agent: null,
       ...props,
     },
     global: {
@@ -232,7 +233,6 @@ describe("QualityConfigsTable", () => {
     expect(tile.classes()).toContain("border-accent");
     expect(rowIds(wrapper)).toEqual(["row-ins"]);
     expect(wrapper.find('[data-test="quality-tile-chip"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="quality-configs-search"]').exists()).toBe(true);
 
     await tile.trigger("click");
     await flushPromises();
@@ -324,6 +324,15 @@ describe("QualityConfigsTable", () => {
     expect(loading.text()).not.toContain("Every config gives a result");
   });
 
+  it("names the filtered agent in the empty state's one-click action and asks the page to open it", () => {
+    const empty = mountTable({ rows: [], agent: "support-bot" });
+    const state = empty.findComponent({ name: "OEmptyState" });
+    const action = state.props("actions").find((a: { id: string }) => a.id === "one-click");
+    expect(action.titleParams).toEqual({ agent: "support-bot" });
+    state.vm.$emit("action", "one-click");
+    expect(empty.emitted("one-click")).toHaveLength(1);
+  });
+
   it("offers Show them only when there is something to show and the tile is not already on", () => {
     const note = '[data-test="quality-tile-attention-note"]';
     expect(mountTable().find(note).text()).toBe("Show them");
@@ -336,8 +345,7 @@ describe("QualityConfigsTable", () => {
   });
 
   it("matches the search on name and description", async () => {
-    const wrapper = mountTable();
-    await wrapper.find('[data-test="quality-configs-search"] input').setValue("instructions");
+    const wrapper = mountTable({ search: "instructions" });
     await flushPromises();
     expect(wrapper.find('[data-test="row-ins"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="row-hal"]').exists()).toBe(false);

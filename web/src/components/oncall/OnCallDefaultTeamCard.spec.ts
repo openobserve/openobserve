@@ -188,4 +188,15 @@ describe("OnCallDefaultTeamCard", () => {
     expect(wrapper.find('[data-test="oncall-default-team-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-default-team-open"]').exists()).toBe(false);
   });
+
+  it("lets the host open the dialog itself when it hides the trigger", async () => {
+    const wrapper = render({ dialog: true, showTrigger: false });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-default-team-open"]').exists()).toBe(false);
+    expect(dialog(wrapper).props("open")).toBe(false);
+
+    (wrapper.vm as unknown as { openDialog: () => void }).openDialog();
+    await flushPromises();
+    expect(dialog(wrapper).props("open")).toBe(true);
+  });
 });

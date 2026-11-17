@@ -2,16 +2,7 @@
 //
 // Schema pieces for QueryConfig.vue.
 //
-// ── The tree shape (from FilterGroup.vue / FilterCondition.vue) ──
-// The alert-conditions tree saved at `query_condition.conditions` is a single
-// ROOT GROUP node whose `conditions[]` mixes two node kinds:
-//   • condition leaf: { filterType: "condition", column, operator, value,
-//     values: [], logicalOperator, id }            (FilterGroup.addCondition)
-//   • nested group:   { filterType: "group", logicalOperator, groupId,
-//     conditions: [...] }                          (FilterGroup.addGroup)
-// FilterGroup.isGroup() additionally recognises a V1-legacy group shape
-// (`items[]` + `groupId`); form mode renders only V2 `conditions[]` children,
-// and the walker below mirrors that exactly.
+// `query_condition.conditions` is the engine V2 root group; a legacy V1 `items[]` group counts as a group too.
 //
 // Validation timing is owned by OForm; this file only describes WHAT is valid.
 // Requiredness is enforced by the `refineConditionsTree` walker — NOT by the
@@ -63,7 +54,6 @@ export const conditionGroupNodeSchema = z.looseObject({
 });
 export type ConditionGroupNode = z.infer<typeof conditionGroupNodeSchema>;
 
-// ── Node-kind detection (mirrors FilterGroup.isGroup exactly) ───────────────
 export function isConditionGroupNode(item: unknown): boolean {
   const node = item as Record<string, unknown> | null | undefined;
   // V2: filterType === "group" with a conditions array.
@@ -203,6 +193,8 @@ export interface QueryConfigMeta {
   selectedFunction: string;
   frequencyMode: "minutes" | "hours" | "cron";
   hasConditions: boolean;
+  /** The condition builder's own verdict, which also covers rules the tree walker cannot see (list sizes). */
+  conditionsValid?: boolean;
   hasGroupBy: boolean;
   aggregationEnabled: boolean;
   /** Org floor for the evaluation frequency, in SECONDS — raw
@@ -339,6 +331,13 @@ export const makeQueryConfigSchema = (t: Translator) =>
           ["query_condition", "conditions"],
           t("alerts.validation.fieldRequired"),
         );
+        if (meta.conditionsValid === false) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "conditions"],
+            message: t("alerts.validation.fieldRequired"),
+          });
+        }
       }
 
       // Everything below is SCHEDULED-only (realtime alerts show filters only —

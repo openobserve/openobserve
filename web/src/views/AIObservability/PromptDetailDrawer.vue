@@ -380,6 +380,7 @@ import {
   deletePromptLabelMutation,
 } from "@/services/llm-prompts.service.queries";
 import { computed, ref, watch } from "vue";
+import analytics from "@/services/product_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -501,6 +502,7 @@ function openCompare() {
   compareBaseId.value = base.id;
   compareHeadId.value = head.id;
   comparing.value = true;
+  analytics.track("llm_prompt_versions_compared");
 }
 function setCompared(side: 0 | 1, versionNumber: number) {
   const picked = versions.value.find((version) => version.version === versionNumber);
@@ -652,6 +654,7 @@ async function moveLabel(name: string, version: number): Promise<boolean> {
       version,
       ifVersion: existing?.version ?? null,
     });
+    analytics.track("llm_prompt_label_moved", { protected: props.protectedLabels.includes(name) });
     await refreshLabels(orgId, entityId);
     toast({
       variant: "success",
@@ -700,6 +703,9 @@ async function deleteLabel(label: PromptLabel) {
     if (!(await askDeleteLabel(label.name, label.version))) return;
     if (props.orgId !== orgId || props.prompt?.entityId !== entityId) return;
     await deleteLabelMutation.mutateAsync({ entityId, name: label.name, ifVersion: label.version });
+    analytics.track("llm_prompt_label_deleted", {
+      protected: props.protectedLabels.includes(label.name),
+    });
     await refreshLabels(orgId, entityId);
     toast({
       variant: "success",

@@ -67,6 +67,7 @@ impl From<AlertError> for Response {
             | AlertError::AlertNameOfgaUnsupported
             | AlertError::AlertNameContainsForwardSlash
             | AlertError::ProtectedStream(_)
+            | AlertError::InvalidCondition(_)
             | AlertError::TemplateNotConfigured { .. }
             | AlertError::AlertTemplateNotForAlert { .. }
             | AlertError::RealtimeMissingCustomQuery
@@ -107,6 +108,7 @@ impl From<AlertError> for Response {
             | AlertError::RecoveryNeedsRoutingKey { .. }
             | AlertError::MultiAlertGroupingError(_)
             | AlertError::GroupByColumnNotFound { .. }
+            | AlertError::FieldNotFound { .. }
             | AlertError::JiraDestinationNotSupported { .. } => MetaHttpResponse::bad_request(value),
             // S-16 PR 4. A conflict, not a bad request: the alert being sent is
             // fine on its own terms — it is the SLOs that already exist and
@@ -136,6 +138,13 @@ impl From<AlertError> for Response {
             AlertError::GetDestinationWithTemplateError(err) => {
                 MetaHttpResponse::internal_error(err)
             }
+            AlertError::FeatureNotLicensed(feature) => (
+                StatusCode::FORBIDDEN,
+                Json(MetaHttpResponse::error_code(
+                    infra::errors::ErrorCodes::LicenseFeatureNotEntitled(feature.clone()),
+                )),
+            )
+                .into_response(),
             AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
             AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
             AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
@@ -273,7 +282,9 @@ impl From<PipelineError> for Response {
         match value {
             PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
             PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
-            PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
+            PipelineError::Modified(_) | PipelineError::RunInProgress(_) => {
+                MetaHttpResponse::conflict(value)
+            }
             PipelineError::Refused(refusal) => refusal.into_response(),
             error => MetaHttpResponse::bad_request(error),
         }

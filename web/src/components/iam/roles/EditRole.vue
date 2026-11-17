@@ -376,9 +376,17 @@ const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEdi
 // Monaco is not an O2 primitive, so the page lock cannot disable it on its own.
 const { locked: pageLocked } = useFeatureLock();
 
+let tabRequested = false;
+
 onBeforeMount(() => {
   permissionsState.permissions = [];
   editingRole.value = router.currentRoute.value.params.role_name as string;
+  const requestedTab = router.currentRoute.value.query.tab;
+  const serviceAccountsOn = store.state.zoConfig?.service_account_enabled;
+  if (requestedTab === "users" || (requestedTab === "serviceAccounts" && serviceAccountsOn)) {
+    activeTab.value = requestedTab;
+    tabRequested = true;
+  }
   getRoleDetails();
 });
 
@@ -614,7 +622,11 @@ const getRoleDetails = () => {
           await seedK8sViewerPreset();
         } else if (preset === "rum_viewer" || preset === "rum_editor") {
           await seedRumPreset(preset);
+        } else if (presets.value.some((item) => item.id === preset)) {
+          // Offered presets only: one needing a module this org lacks would stage tuples FGA rejects.
+          await applyPreset(String(preset));
         }
+        if (preset && router.currentRoute.value.query.created === "1") await savePresetOfNewRole();
       }
     })
     .catch((error) => {
@@ -1009,7 +1021,7 @@ const applyRoleDraft = (data: RoleDraftData) => {
   removedServiceAccounts.value = new Set(
     data.removedServiceAccounts.filter((user) => members.has(user)),
   );
-  if (tabs.value.some((tab) => tab.value === data.tab)) activeTab.value = data.tab;
+  if (!tabRequested && tabs.value.some((tab) => tab.value === data.tab)) activeTab.value = data.tab;
   membersKey.value += 1;
 };
 
@@ -1087,6 +1099,15 @@ const saveRoleAndMark = (): Promise<boolean> =>
     if (saved) roleDraft.markSaved();
     return saved;
   });
+
+// "New role from a preset" is one action, so its staged grants are saved with it; on failure they stay staged for a retry.
+const savePresetOfNewRole = async () => {
+  if (pendingChanges.value.length && !(await saveRoleAndMark())) {
+    toast({ variant: "warning", message: t("iam.editRole.presetSaveFailed") });
+  }
+  const { preset: _preset, created: _created, ...query } = router.currentRoute.value.query;
+  await router.replace({ query });
+};
 
 const toggleHelpSection = async () => {
   isHelpOpen.value = !isHelpOpen.value;

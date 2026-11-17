@@ -19,7 +19,7 @@ use common::meta::organization::BudgetNotificationConfiguration;
 use config::{
     meta::{
         destinations::Email,
-        self_reporting::usage::{DATA_RETENTION_USAGE_STREAM, USAGE_STREAM},
+        self_reporting::usage::{DATA_RETENTION_USAGE_STREAM, USAGE_STREAM, is_user_data_stream},
         user::UserRole,
     },
     utils::{
@@ -236,7 +236,10 @@ async fn report_org_no_ingestion(start_hour: i64, duration: &str) {
     };
     for org in orgs {
         let streams = get_streams(&org.identifier, None, false, None).await;
-        if streams.is_empty() {
+        if !streams
+            .iter()
+            .any(|s| is_user_data_stream(&org.identifier, &s.name, s.stream_type))
+        {
             report_to_segment(
                 "OpenObserve - No ingestion after creation",
                 &org.identifier,

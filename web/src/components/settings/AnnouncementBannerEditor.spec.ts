@@ -21,7 +21,9 @@ import announcements from "@/services/announcements";
 import AnnouncementBannerEditorForm from "./AnnouncementBannerEditorForm.vue";
 import { makeBannerSchema } from "./AnnouncementBannerEditor.schema";
 import { emptyDraft, type BannerDraft, type BannerStyle } from "./announcementDrafts";
+import analytics from "@/services/product_analytics";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/announcements", () => ({
   default: { getActive: vi.fn(), getConfig: vi.fn(), setConfig: vi.fn() },
 }));
@@ -278,6 +280,7 @@ describe("AnnouncementBannerEditorForm", () => {
       { message: "First" },
       { message: "Second, edited", variant: "warning" },
     ]);
+    expect(analytics.track).toHaveBeenCalledWith("announcement_updated");
     expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "announcementBanners" }));
   });
 
@@ -296,6 +299,7 @@ describe("AnnouncementBannerEditorForm", () => {
       id: expect.stringMatching(/^banner-/),
       colors: { light: "#FEF3C7", dark: "#78350F" },
     });
+    expect(analytics.track).toHaveBeenCalledWith("announcement_created");
   });
 
   it("sends a duration as typed, for the server to pin to an absolute end", async () => {
@@ -344,6 +348,7 @@ describe("AnnouncementBannerEditorForm", () => {
     await submit(wrapper);
 
     expect(service.setConfig).not.toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalled();
     expect(document.querySelector('[data-test="announcement-editor-reload"]')).not.toBeNull();
   });
 
@@ -441,6 +446,7 @@ describe("AnnouncementBannerEditorForm", () => {
     expect(savedConfig().styles).toEqual([
       { id: expect.stringMatching(/^style-/), name: "Maintenance", icon: "build" },
     ]);
+    expect(analytics.track).toHaveBeenCalledWith("announcement_style_saved");
   });
 
   it("keeps a critical banner critical when it is restyled", async () => {

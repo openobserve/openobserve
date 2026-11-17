@@ -91,6 +91,7 @@
                    folder type), so this offers the same folders the Alerts
                    page does. -->
               <SelectFolderDropDown
+                :key="folderPickerKey"
                 type="alerts"
                 :active-folder-id="form.folder_id"
                 @folder-selected="onFolderSelected"
@@ -622,6 +623,7 @@ import type { SloEligibleAlert } from "@/ts/interfaces/slo";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { getFoldersListByType } from "@/utils/commons";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -1160,6 +1162,16 @@ const backTarget = computed(() => ({
   query: { ...route.query, org_identifier: org.value, folder: form.folder_id },
 }));
 
+// The picker reads its active folder only on mount, so a folder set later (load, draft) needs a fresh one.
+const folderPickerKey = ref(0);
+
+// The picker only reads the store, which is empty when this page is the first one loaded.
+if (!store.state.organizationData?.foldersByType?.alerts?.length) {
+  getFoldersListByType(store, "alerts").catch((err: unknown) =>
+    console.error("[slos] failed to load alert folders", err),
+  );
+}
+
 function onFolderSelected(folder: any) {
   form.folder_id = folder?.folderId ?? folder?.value ?? form.folder_id;
 }
@@ -1203,6 +1215,7 @@ async function load() {
   });
   if (form.config.stream_type === "metrics") onMetricsLanguageChange(storedLanguage);
   groupByList.value = body.group_by ?? [];
+  folderPickerKey.value++;
   original.value = definitionKey();
 }
 
@@ -1403,6 +1416,7 @@ const sloDraft = useEditorDraft<SloDraftData>({
     onMetricsLanguageChange(data.metricsLanguage);
     Object.assign(form, JSON.parse(JSON.stringify(data.form)));
     groupByList.value = [...data.groupBy];
+    folderPickerKey.value++;
     await loadStreams(form.config.stream_type);
   },
   base: () => (isEdit.value ? serverSlo : undefined),

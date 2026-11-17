@@ -21,6 +21,15 @@
 export const TRACE_TIME_RANGE_MAX_IDS = 100;
 
 /**
+ * At most this many trace ids in one GET whose query string carries them
+ * (`traces/time_range`, the `traces/latest_stream` filter). 40 ids keep the
+ * query string near 1.6 KB, under the 2,048-byte query-string limit that
+ * common WAF rule sets (for example the AWS managed core rule set) enforce in
+ * front of a self-hosted UI; a blocked request never reaches the server.
+ */
+export const TRACE_IDS_PER_GET_REQUEST = 40;
+
+/**
  * `not_found` means the searched window was fully scanned without a hit;
  * `timeout` means the scan gave up, so the key may still exist.
  */

@@ -41,7 +41,7 @@ use {
 
 pub const V2_API_PREFIX: &str = "v2";
 /// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
-pub const V2_ORG_MODULES: [&str; 9] = [
+pub const V2_ORG_MODULES: [&str; 10] = [
     "alerts",
     "folders",
     "reports",
@@ -51,6 +51,7 @@ pub const V2_ORG_MODULES: [&str; 9] = [
     "workflows",
     "alert_calibration",
     "fleets",
+    "autoobserve",
 ];
 pub const SESSION_AUTH_MARKER: &str = "Session::";
 const PASSWORD_HASH_CACHE_CAPACITY: NonZeroUsize = NonZeroUsize::new(10_000).unwrap();
@@ -423,7 +424,12 @@ where
 
         // Resolve permission via the declarative route table.
         // Falls back to the legacy if-else for routes not yet in the table.
-        let resolved = match rp::resolve_permission(
+        let resolve = if query.contains_key("folder") {
+            rp::resolve_permission
+        } else {
+            rp::resolve_permission_without_folder
+        };
+        let resolved = match resolve(
             &path_columns,
             &method,
             &org_id,
@@ -1371,7 +1377,7 @@ mod tests {
             ("POST", "/kv/kv/_search", "kv"),
             ("POST", "/api/kv/_search", "api"),
             ("POST", "/v2/kv/_search", "v2"),
-            ("GET", "/v2/acme/alerts", "acme"),
+            ("GET", "/v2/acme/alerts?folder=default", "acme"),
         ] {
             let (mut parts, ()) = http::Request::builder()
                 .method(method)

@@ -40,7 +40,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-border-default": "#d4d4d4",
   "--color-border-strong": "#a3a3a3",
   "--color-border-subtle": "#ededed",
-  "--color-border-control": "#949494",
+  "--color-border-control": "#8a8a8a",
   "--color-surface-base": "#ffffff",
   "--color-surface-overlay": "#ffffff",
   "--color-map-card-header": "#e5e5e5",
@@ -103,8 +103,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-table-24": "#E8F4FD",
   "--color-chart-gridline": "rgba(0, 10, 23, 0.09)",
   "--color-chart-band": "rgba(115, 115, 115, 0.22)",
-  // --color-chart-crosshair-bg is deliberately absent: it is dark-only, and the empty
-  // string light returns is what makes ECharts use its own auto default (base.css:262).
+  "--color-chart-crosshair-bg": "#525252",
   // Trace span palette (HEX/canvas variant), light values.
   "--color-trace-span-1": "#84CC16",
   "--color-trace-span-2": "#7C3AED",

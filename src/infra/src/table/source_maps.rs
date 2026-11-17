@@ -28,7 +28,7 @@ use crate::{
 // Keeps each IN list under the sqlite and postgres bind-parameter limits.
 const DELETE_ID_BATCH: usize = 1000;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub enum FileType {
     SourceMap,
 }

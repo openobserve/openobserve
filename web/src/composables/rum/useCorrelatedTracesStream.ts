@@ -19,10 +19,12 @@ import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import searchService from "@/services/search";
 import {
+  TRACE_IDS_PER_GET_REQUEST,
   TRACE_TIME_RANGE_MAX_IDS,
   type TraceTimeRange,
 } from "@/ts/interfaces/traces/traceTimeRange.types";
 import { generateTraceContext } from "@/utils/zincutils";
+import { chunkItems, mapWithConcurrency } from "@/utils/rum/batching";
 import { normalizeTraceId, RUM_CORRELATION_TRACES_STREAM } from "@/utils/rum/fields";
 
 /**
@@ -46,11 +48,23 @@ export interface TraceLocation {
 // Ingestion can lag the event-derived window; probes are `limit 1` point lookups, so a wide buffer is free.
 const PROBE_TIME_BUFFER_US = 300_000_000; // ±5 min
 
+// Ids go in the GET query string, so a chunk stays within TRACE_IDS_PER_GET_REQUEST (a WAF
+// blocks longer query strings); a long session makes many chunks, so only this many run at once.
+const TIME_RANGE_IDS_PER_REQUEST = Math.min(TRACE_TIME_RANGE_MAX_IDS, TRACE_IDS_PER_GET_REQUEST);
+const TIME_RANGE_CONCURRENCY = 6;
+// The probe is one POST whose SQL lists every id once per stream, so thousands of unanswered ids
+// go in chunks of this many, PROBE_CONCURRENCY at a time, instead of one huge request.
+const PROBE_IDS_PER_REQUEST = 200;
+const PROBE_CONCURRENCY = 2;
+
 // Deduplicates concurrent resolves of the same id (e.g. the error card and the
 // Traces tab racing on page load). Transient in-progress work, deliberately
 // NOT in the Vuex store: entries delete themselves on settle, so org-switch
 // staleness cannot apply.
-const inFlight = new Map<string, Promise<TraceLocation>>();
+// An entry whose owning instance cancel()led settles to CANCELLED, so a caller that joined it
+// from another instance resolves again on its own instead of taking a silent fallback.
+const CANCELLED = Symbol("cancelled");
+const inFlight = new Map<string, Promise<TraceLocation | typeof CANCELLED>>();
 
 // A 404 means this deployment has no time-range endpoint at all, which no
 // retry can change — latch it off for the session rather than paying a failed
@@ -86,6 +100,10 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   const activeProbeTraceIds = new Set<string>();
+  // A cancelled stream calls no handler, so cancel() settles each in-flight probe itself (as a
+  // failed miss), and bumps the generation so probeInChunks starts no further chunk.
+  const probeSettlers = new Set<() => void>();
+  let cancelGeneration = 0;
 
   const cache = () => store.state.organizationData.correlatedTracesStreams;
 
@@ -114,8 +132,8 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
   };
 
   /**
-   * One `traces/time_range` pass over `traceIds`, chunked at the server's id
-   * cap and issued in parallel. Splits the ids into the ones the index
+   * One `traces/time_range` pass over `traceIds`, in URL-safe chunks of
+   * TIME_RANGE_IDS_PER_REQUEST, TIME_RANGE_CONCURRENCY at a time. Splits the ids into the ones the index
    * resolved and the ones it could not answer for — a scan timeout, missing
    * coverage, or a failed request. An authoritative `not_found` counts as
    * answered, so a trace the org genuinely does not have never reaches the
@@ -127,6 +145,7 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     startTimeUs: number,
     endTimeUs: number,
     narrowTo?: string[],
+    signal?: AbortSignal,
   ): Promise<{ found: Record<string, TraceLocation>; unanswered: string[] }> => {
     const found: Record<string, TraceLocation> = {};
     const unanswered: string[] = [];
@@ -135,50 +154,51 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     const rank = new Map(streams.map((stream, index) => [stream, index]));
     const rankOf = (stream: string) => rank.get(stream) ?? Number.MAX_SAFE_INTEGER;
 
-    const chunks: string[][] = [];
-    for (let index = 0; index < traceIds.length; index += TRACE_TIME_RANGE_MAX_IDS) {
-      chunks.push(traceIds.slice(index, index + TRACE_TIME_RANGE_MAX_IDS));
-    }
+    const chunks = chunkItems(traceIds, TIME_RANGE_IDS_PER_REQUEST);
 
-    await Promise.all(
-      chunks.map(async (chunk) => {
-        try {
-          const response = await searchService.get_trace_time_ranges({
-            org_identifier: store.state.selectedOrganization.identifier,
-            trace_ids: chunk,
-            start_time: startTimeUs,
-            end_time: endTimeUs,
-            // Anchors the server's locate pass, so a typical RUM window is
-            // covered in its first round.
-            hint_ts: startTimeUs,
-            streams: narrowTo,
-          });
-          const data = response?.data;
-          const partialCoverage = Boolean(data?.partial_coverage);
-          const answered = new Set<string>();
-          for (const result of data?.results ?? []) {
-            const id = result?.trace_id;
-            if (!id) continue;
-            if (result.status === "found" && result.stream) {
-              const current = found[id];
-              // The server stops at the first stream that hits, but concurrent
-              // lookups can both report — settle it the way the probe does.
-              if (!current || rankOf(result.stream) < rankOf(current.stream)) {
-                found[id] = { stream: result.stream, range: result.range };
-              }
-              answered.add(id);
-            } else if (result.status === "not_found" && !partialCoverage) {
-              answered.add(id);
+    await mapWithConcurrency(chunks, TIME_RANGE_CONCURRENCY, async (chunk) => {
+      // An aborted resolve starts no further chunk.
+      if (signal?.aborted) {
+        unanswered.push(...chunk);
+        return;
+      }
+      try {
+        const response = await searchService.get_trace_time_ranges({
+          org_identifier: store.state.selectedOrganization.identifier,
+          trace_ids: chunk,
+          start_time: startTimeUs,
+          end_time: endTimeUs,
+          // Anchors the server's locate pass, so a typical RUM window is
+          // covered in its first round.
+          hint_ts: startTimeUs,
+          streams: narrowTo,
+          signal,
+        });
+        const data = response?.data;
+        const partialCoverage = Boolean(data?.partial_coverage);
+        const answered = new Set<string>();
+        for (const result of data?.results ?? []) {
+          const id = result?.trace_id;
+          if (!id) continue;
+          if (result.status === "found" && result.stream) {
+            const current = found[id];
+            // The server stops at the first stream that hits, but concurrent
+            // lookups can both report — settle it the way the probe does.
+            if (!current || rankOf(result.stream) < rankOf(current.stream)) {
+              found[id] = { stream: result.stream, range: result.range };
             }
+            answered.add(id);
+          } else if (result.status === "not_found" && !partialCoverage) {
+            answered.add(id);
           }
-          unanswered.push(...chunk.filter((id) => !answered.has(id)));
-        } catch (err: unknown) {
-          const status = (err as { response?: { status?: number } })?.response?.status;
-          if (status === 404 || status === 405) indexEndpointAvailable = false;
-          unanswered.push(...chunk);
         }
-      }),
-    );
+        unanswered.push(...chunk.filter((id) => !answered.has(id)));
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 404 || status === 405) indexEndpointAvailable = false;
+        unanswered.push(...chunk);
+      }
+    });
 
     return { found, unanswered };
   };
@@ -196,8 +216,9 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     startTimeUs: number,
     endTimeUs: number,
     outcome?: TraceLocationsOutcome,
+    signal?: AbortSignal,
   ): Promise<Record<string, string>> => {
-    if (!streams.length || !traceIds.length) return {};
+    if (!streams.length || !traceIds.length || signal?.aborted) return {};
     const idList = traceIds.map((id) => `'${id}'`).join(",");
     // DISTINCT is load-bearing: the probe scans span rows, and one trace's
     // spans would otherwise consume the whole limit, leaving sibling ids
@@ -212,8 +233,22 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
 
     const probeTraceId = generateTraceContext()?.traceId ?? "";
     if (probeTraceId) activeProbeTraceIds.add(probeTraceId);
+    let settleOnCancel: (() => void) | null = null;
+    // Aborting stops this probe's stream and settles it, like cancel() does for every probe.
+    const onAbort = () => {
+      if (probeTraceId) {
+        cancelStreamQueryBasedOnRequestId({
+          trace_id: probeTraceId,
+          org_id: store.state.selectedOrganization?.identifier,
+        });
+      }
+      settleOnCancel?.();
+    };
     try {
       await new Promise<void>((resolve) => {
+        settleOnCancel = () => resolve();
+        probeSettlers.add(settleOnCancel);
+        signal?.addEventListener("abort", onAbort, { once: true });
         fetchQueryDataWithHttpStream(
           {
             queryReq: {
@@ -281,7 +316,9 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       if (outcome) outcome.failed = true;
       return {};
     } finally {
+      signal?.removeEventListener("abort", onAbort);
       if (probeTraceId) activeProbeTraceIds.delete(probeTraceId);
+      if (settleOnCancel) probeSettlers.delete(settleOnCancel);
     }
 
     // First stream in probe order wins ties (edge case 16).
@@ -296,6 +333,27 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
 
   const record = (traceId: string, stream: string, range?: TraceTimeRange) => {
     store.commit("setCorrelatedTracesStream", { traceId, stream, range });
+  };
+
+  /** probeBatch over `traceIds` in chunks of PROBE_IDS_PER_REQUEST; the answers merge (ids are distinct). */
+  const probeInChunks = async (
+    streams: string[],
+    traceIds: string[],
+    startTimeUs: number,
+    endTimeUs: number,
+    outcome?: TraceLocationsOutcome,
+    signal?: AbortSignal,
+  ): Promise<Record<string, string>> => {
+    const generation = cancelGeneration;
+    const parts = await mapWithConcurrency(
+      chunkItems(traceIds, PROBE_IDS_PER_REQUEST),
+      PROBE_CONCURRENCY,
+      async (chunk) =>
+        signal?.aborted || generation !== cancelGeneration
+          ? {}
+          : probeBatch(streams, chunk, startTimeUs, endTimeUs, outcome, signal),
+    );
+    return Object.assign({}, ...parts);
   };
 
   /**
@@ -313,20 +371,35 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     startTimeUs: number,
     endTimeUs: number,
     outcome?: TraceLocationsOutcome,
+    // Aborting stops the remaining time_range chunks and probes; the answer so far is returned.
+    signal?: AbortSignal,
   ): Promise<Record<string, TraceLocation>> => {
     if (outcome) {
       outcome.failed = false;
       outcome.streams = [];
     }
+    // Once aborted or cancel()led, nothing more is written to the shared cache (it may already belong to
+    // another org or session). Ids an abort left unanswered are not clean misses, so the outcome says it failed.
+    const generation = cancelGeneration;
+    const stopped = () => {
+      const halted = Boolean(signal?.aborted) || generation !== cancelGeneration;
+      if (halted && outcome) outcome.failed = true;
+      return halted;
+    };
     try {
       const result: Record<string, TraceLocation> = {};
       const toResolve: string[] = [];
+      // A Set keeps the dedup linear for a session's thousands of ids.
+      const queued = new Set<string>();
       for (const rawId of traceIds) {
         const canonical = normalizeTraceId(rawId);
         if (!canonical) continue;
         const cached = cache().byTraceId[canonical];
         if (cached) result[canonical] = cached;
-        else if (!toResolve.includes(canonical)) toResolve.push(canonical);
+        else if (!queued.has(canonical)) {
+          queued.add(canonical);
+          toResolve.push(canonical);
+        }
       }
       if (!toResolve.length) return result;
 
@@ -341,8 +414,17 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
         // The stream is already known; the lookup is for the range alone, so
         // an unanswered id still resolves to that stream.
         const ranges = indexEndpointAvailable
-          ? await lookupTraceLocations(allStreams, toResolve, startTimeUs, endTimeUs, allStreams)
+          ? await lookupTraceLocations(
+              allStreams,
+              toResolve,
+              startTimeUs,
+              endTimeUs,
+              allStreams,
+              signal,
+            )
           : { found: {} as Record<string, TraceLocation> };
+        // An aborted lookup left ranges unknown; caching them range-less would outlive the abort.
+        if (stopped()) return result;
         for (const id of toResolve) {
           const location = { stream: allStreams[0], range: ranges.found[id]?.range };
           result[id] = location;
@@ -354,18 +436,34 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       // The index answers first; only what it could not cover is probed.
       let pending = toResolve;
       if (indexEndpointAvailable) {
-        const lookup = await lookupTraceLocations(allStreams, toResolve, startTimeUs, endTimeUs);
+        const lookup = await lookupTraceLocations(
+          allStreams,
+          toResolve,
+          startTimeUs,
+          endTimeUs,
+          undefined,
+          signal,
+        );
+        if (stopped()) return result;
         for (const [id, location] of Object.entries(lookup.found)) {
           result[id] = location;
           record(id, location.stream, location.range);
         }
         pending = lookup.unanswered;
       }
-      if (!pending.length) return result;
+      if (!pending.length || stopped()) return result;
 
       const known: string[] = cache().knownStreams.filter((s: string) => allStreams.includes(s));
       const step1Streams = known.length ? known : allStreams;
-      const step1 = await probeBatch(step1Streams, pending, startTimeUs, endTimeUs, outcome);
+      const step1 = await probeInChunks(
+        step1Streams,
+        pending,
+        startTimeUs,
+        endTimeUs,
+        outcome,
+        signal,
+      );
+      if (stopped()) return result;
       for (const [id, stream] of Object.entries(step1)) {
         result[id] = { stream };
         record(id, stream);
@@ -375,7 +473,15 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       const unresolved = pending.filter((id) => !(id in result));
       const unprobed = allStreams.filter((s) => !step1Streams.includes(s));
       if (unresolved.length && unprobed.length) {
-        const step2 = await probeBatch(unprobed, unresolved, startTimeUs, endTimeUs, outcome);
+        const step2 = await probeInChunks(
+          unprobed,
+          unresolved,
+          startTimeUs,
+          endTimeUs,
+          outcome,
+          signal,
+        );
+        if (stopped()) return result;
         for (const [id, stream] of Object.entries(step2)) {
           result[id] = { stream };
           record(id, stream);
@@ -404,20 +510,31 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     const cached = cache().byTraceId[canonical];
     if (cached) return cached;
 
+    const generation = cancelGeneration;
     const pending = inFlight.get(canonical);
-    if (pending) return pending;
+    if (pending) {
+      const shared = await pending;
+      if (shared !== CANCELLED) return shared;
+      // Retry only if this instance did not cancel meanwhile (it would be a request after unmount).
+      return generation === cancelGeneration
+        ? resolveTraceLocation(traceId, startTimeUs, endTimeUs)
+        : { stream: RUM_CORRELATION_TRACES_STREAM };
+    }
 
     const promise = (async () => {
       const found = await resolveTraceLocationsBulk([canonical], startTimeUs, endTimeUs);
+      if (generation !== cancelGeneration) return CANCELLED;
       return found[canonical] ?? { stream: RUM_CORRELATION_TRACES_STREAM };
     })().finally(() => {
       inFlight.delete(canonical);
     });
     inFlight.set(canonical, promise);
-    return promise;
+    const own = await promise;
+    return own === CANCELLED ? { stream: RUM_CORRELATION_TRACES_STREAM } : own;
   };
 
   const cancel = () => {
+    cancelGeneration += 1;
     activeProbeTraceIds.forEach((traceId) =>
       cancelStreamQueryBasedOnRequestId({
         trace_id: traceId,
@@ -425,6 +542,9 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       }),
     );
     activeProbeTraceIds.clear();
+    const settlers = [...probeSettlers];
+    probeSettlers.clear();
+    settlers.forEach((settle) => settle());
   };
 
   return { resolveTraceLocation, resolveTraceLocationsBulk, fallbackTracesStream, cancel };

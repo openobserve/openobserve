@@ -1,5 +1,5 @@
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { gt, type TranslateFn } from "@/types/i18n";
+import { gt, raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 
 export function parseJson(value: string, label: string) {
   try {
@@ -84,6 +84,23 @@ export function relativeTime(timestampMs: number, t: TranslateFn): string {
   if (hr < 24) return t("refreshButton.hoursAgo", { h: hr });
   const day = Math.floor(hr / 24);
   return t("onlineEvals.quality.overview.relativeTime.daysAgo", { day });
+}
+
+const ERROR_KIND_LABELS: Record<string, I18nKey> = {
+  provider_auth: "onlineEvals.job.errorKinds.providerAuth",
+  rate_limited: "onlineEvals.job.errorKinds.rateLimited",
+  timeout: "onlineEvals.job.errorKinds.timeout",
+  provider_5xx: "onlineEvals.job.errorKinds.provider5xx",
+  parse_error: "onlineEvals.job.errorKinds.parseError",
+  mapping_error: "onlineEvals.job.errorKinds.mappingError",
+  scorer_missing: "onlineEvals.job.errorKinds.scorerMissing",
+  execution_error: "onlineEvals.job.errorKinds.executionError",
+};
+
+/** Known judge error kinds get a translated label; a kind from a newer server shows as-is. */
+export function errorKindLabel(kind: string, t: TranslateFn): I18nText {
+  const key = ERROR_KIND_LABELS[kind];
+  return key ? t(key) : raw(kind);
 }
 
 export function statusClass(status: string) {

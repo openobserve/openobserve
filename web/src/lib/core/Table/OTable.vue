@@ -9,8 +9,10 @@ import {
   onBeforeUnmount,
   onMounted,
   provide,
+  readonly,
   ref,
   shallowRef,
+  useAttrs,
   watch,
   watchEffect,
 } from "vue";
@@ -31,6 +33,7 @@ import {
   TABLE_CELL_CLIP_ATTR,
   OTableCellActionsKey,
   OTableOverflowTooltipKey,
+  OTableStaleKey,
   ROW_RAIL_TONE_CLASS,
   ROW_TONE_CLASS,
   type OTableProps,
@@ -69,7 +72,12 @@ import { TABLE_FORBIDDEN_STATE_KEY } from "./tableForbiddenState";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
 import OTableOverflowTooltip from "./sub-components/OTableOverflowTooltip.vue";
+import OTableRowActions from "./sub-components/OTableRowActions.vue";
+import ONameLinkCell from "./cells/ONameLinkCell.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
+import { injectContextMenuRootContext } from "reka-ui";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { LOADER_DELAY_MS, MIN_SKELETON_MS, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
 
 const { t } = useI18nTyped();
 const { featureNames } = useFeatureNames();
@@ -91,6 +99,8 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   enableRowReorder: false,
   persistColumns: false,
   loading: false,
+  dimOnRefetch: true,
+  progressLine: true,
   streaming: false,
   error: null,
   dense: true,
@@ -170,6 +180,21 @@ const isRowClickable = computed(() => {
 // and renders the (empty) slot instead of falling through to the plain-text {{ displayValue }}.
 const cellSlotColumns = computed(() => props.columns.filter((col) => slots[`cell-${col.id}`]));
 
+// A page's own cell slot wins over `rowActions` and `meta.link`, so a table can move one column at a time.
+const rowActionsColumnId = computed<string | undefined>(() => {
+  if (!props.rowActions) return undefined;
+  const col = props.columns.find((c) => c.isAction === true || c.id === "actions");
+  return col && !slots[`cell-${col.id}`] ? col.id : undefined;
+});
+const linkColumns = computed(() =>
+  props.columns.filter((col) => col.meta?.link && !slots[`cell-${col.id}`]),
+);
+const attrs = useAttrs();
+const nameLinkDataTest = computed(() => `${attrs["data-test"] ?? "o2-table"}-name-link`);
+function linkCellText(col: OTableColumnDef<TData>, value: unknown, row: TData): unknown {
+  return col.meta?.format ? col.meta.format(value, row) : value;
+}
+
 // ── Refs for virtual scroll & keyboard ──────────────────────────
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const columnIds = computed(() => props.columns.map((c) => c.id));
@@ -187,21 +212,17 @@ const SKELETON_ROW_STRATEGY = "fixed" as "fixed" | "pageSize";
 const FIXED_SKELETON_ROWS = 8;
 
 const skeletonRowCount = computed(() => {
+  if (props.skeletonRows && props.skeletonRows > 0) return props.skeletonRows;
   if (SKELETON_ROW_STRATEGY === "pageSize") {
     return props.pageSize ?? FIXED_SKELETON_ROWS;
   }
   return FIXED_SKELETON_ROWS;
 });
 
-// ── Skeleton hold ───────────────────────────────────────────────
-// Show the skeleton for at least 50ms once loading starts, so it doesn't
-// flash-and-disappear on fast responses. If the server is slow, the
-// skeleton stays visible until data actually arrives.
-const MIN_SKELETON_MS = 50;
-// Kept rows stay live until dimmed, so a fast refetch neither flickers nor swallows a click.
-const STALE_DIM_DELAY_MS = 150;
+// ── Skeleton timing and kept rows ───────────────────────────────
+// A skeleton shows only past LOADER_DELAY_MS so fast loads never flash one, then holds MIN_SKELETON_MS so it never blinks.
 const heldLoading = ref(false);
-let loadingStartedAt = 0;
+let skeletonShownAt = 0;
 let releaseTimer: ReturnType<typeof setTimeout> | null = null;
 
 const staleRows = shallowRef<readonly TData[] | null>(null);
@@ -212,11 +233,25 @@ let settledRows: TData[] | null = null;
 let settledTreeMeta: Map<TData, OTableTreeRowMeta | null> | null = null;
 let staleDimTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** A load with no rows to keep: header only until the skeleton is due, never the empty state. */
+const coldLoading = computed(() => heldLoading.value && !staleRows.value);
+const skeletonDue = useDelayedFlag(coldLoading, LOADER_DELAY_MS);
+watch(
+  skeletonDue,
+  (shown) => {
+    if (shown) skeletonShownAt = Date.now();
+  },
+  { flush: "sync" },
+);
+/** A refetch over kept rows that the caller wants marked; live mode opts out with `dimOnRefetch`. */
+const refetchBusy = computed(() => !!staleRows.value && props.dimOnRefetch);
+
 function keepSettledRows(): void {
   if (props.skeletonOnRefetch || !settledRows?.length) return;
   // The very array the table already shows: same row objects for accessors, same identity so paging stays put.
   staleRows.value = settledRows;
   staleTreeMeta.value = settledTreeMeta;
+  if (!props.dimOnRefetch) return;
   staleDimTimer = setTimeout(() => {
     staleDimmed.value = true;
     staleDimTimer = null;
@@ -233,6 +268,22 @@ function dropStaleRows(): void {
   staleTreeMeta.value = null;
 }
 
+function releaseColdLoad(): void {
+  if (!skeletonDue.value) {
+    heldLoading.value = false;
+    return;
+  }
+  const remaining = MIN_SKELETON_MS - (Date.now() - skeletonShownAt);
+  if (remaining <= 0) {
+    heldLoading.value = false;
+    return;
+  }
+  releaseTimer = setTimeout(() => {
+    heldLoading.value = false;
+    releaseTimer = null;
+  }, remaining);
+}
+
 watch(
   () => props.loading,
   (loading) => {
@@ -241,23 +292,13 @@ watch(
         clearTimeout(releaseTimer);
         releaseTimer = null;
       }
-      loadingStartedAt = Date.now();
       if (!heldLoading.value) keepSettledRows();
       heldLoading.value = true;
     } else if (staleRows.value) {
       dropStaleRows();
       heldLoading.value = false;
     } else if (heldLoading.value) {
-      const elapsed = Date.now() - loadingStartedAt;
-      const remaining = MIN_SKELETON_MS - elapsed;
-      if (remaining <= 0) {
-        heldLoading.value = false;
-      } else {
-        releaseTimer = setTimeout(() => {
-          heldLoading.value = false;
-          releaseTimer = null;
-        }, remaining);
-      }
+      releaseColdLoad();
     }
   },
   { immediate: true },
@@ -269,6 +310,14 @@ onBeforeUnmount(() => {
     releaseTimer = null;
   }
   if (staleDimTimer) clearTimeout(staleDimTimer);
+});
+
+provide(OTableStaleKey, readonly(staleDimmed));
+
+// The consumer's row menu acts on the row it opened on, so a slow refetch closes it.
+const rowContextMenu = injectContextMenuRootContext(null);
+watch(staleDimmed, (dimmed) => {
+  if (dimmed && rowContextMenu?.open.value) rowContextMenu.onOpenChange(false);
 });
 
 // ── Internal global filter state (uncontrolled when no parent binds :global-filter) ──
@@ -367,7 +416,9 @@ provide(
 
 // ── Cell hover-actions ──────────────────────────────────────────
 // Only one cell is active at a time, so consumers can mount heavy action menus lazily.
-const activeCellKey = ref<string | null>(null);
+const hoveredCellKey = ref<string | null>(null);
+// Hover actions act on the row under them, so they wait for fresh rows and come back for the cell still hovered.
+const activeCellKey = computed(() => (staleDimmed.value ? null : hoveredCellKey.value));
 let cellActionTimer: ReturnType<typeof setTimeout> | null = null;
 function setActiveCell(key: string | null): void {
   if (cellActionTimer) {
@@ -377,11 +428,11 @@ function setActiveCell(key: string | null): void {
   if (key === null) {
     // Delay the clear so moving the pointer INTO the overlay doesn't flicker it away.
     cellActionTimer = setTimeout(() => {
-      activeCellKey.value = null;
+      hoveredCellKey.value = null;
       cellActionTimer = null;
     }, 120);
   } else {
-    activeCellKey.value = key;
+    hoveredCellKey.value = key;
   }
 }
 onBeforeUnmount(() => {
@@ -594,6 +645,9 @@ const {
     get keepPageOnDataChange() {
       return props.keepPageOnDataChange;
     },
+    get rowActions() {
+      return props.rowActions;
+    },
   },
   emit,
 );
@@ -640,6 +694,35 @@ const pagination = useTablePagination(
   },
   emit,
 );
+
+const livePager = computed(() => ({
+  currentPage: pagination.currentPage.value,
+  totalPages: pagination.totalPages.value,
+  totalCount: pagination.totalCount.value,
+  pageSize: pagination.pageSize.value,
+  showingFrom: pagination.showingFrom.value,
+  showingTo: pagination.showingTo.value,
+  isFirstPage: pagination.isFirstPage.value,
+  isLastPage: pagination.isLastPage.value,
+}));
+// A server page's range arrives with its rows, so kept rows keep the range they settled with, not the one being fetched.
+let settledPager: typeof livePager.value | null = null;
+const keptPager = shallowRef<typeof livePager.value | null>(null);
+watch(
+  [livePager, () => props.loading],
+  ([view, loading]) => {
+    if (!loading) settledPager = pagination.isServerMode.value ? view : null;
+  },
+  { immediate: true },
+);
+watch(
+  staleRows,
+  (rows) => {
+    keptPager.value = rows ? settledPager : null;
+  },
+  { flush: "sync" },
+);
+const pagerView = computed(() => keptPager.value ?? livePager.value);
 
 // Land on row 1 of the new page instead of keeping the previous scroll offset.
 watch(
@@ -961,11 +1044,15 @@ const measuredColumnSizeVars = ref<Record<string, string>>({});
 // vertical scrollbar (clientWidth excludes it) and any sub-pixel rounding, so
 // the table fills with no gap AND no 1-10px overflow scrollbar.
 const measuredFlexFill = ref<Record<string, number>>({});
+// Rendered fixed columns can be wider than their nominal sizes, so only the
+// measurement knows when the minimums no longer fit.
+const measuredFillOverflow = ref(false);
 
 function measureFlexFill() {
   const root = scrollContainerRef.value;
   if (!root || frozen.value || !flexColIds.value.length) {
     if (Object.keys(measuredFlexFill.value).length) measuredFlexFill.value = {};
+    measuredFillOverflow.value = false;
     return;
   }
   const cw = root.clientWidth;
@@ -980,12 +1067,8 @@ function measureFlexFill() {
   // Floor the leftover so the flex column can NEVER be a sub-pixel wider than the
   // exact remaining space — that rounding is what shows as a 1-2px scrollbar.
   const available = Math.max(0, Math.floor(cw - nonFlexSum));
-  const per = Math.max(Math.floor(available / ids.length), 0);
-  const next: Record<string, number> = {};
-  ids.forEach((id, i) => {
-    const w = i === ids.length - 1 ? available - per * (ids.length - 1) : per;
-    next[id] = Math.max(w, colMinSize(id));
-  });
+  const next = splitFill(available, ids);
+  measuredFillOverflow.value = ids.reduce((a, id) => a + next[id], 0) > available + 1;
   const cur = measuredFlexFill.value;
   const changed = Object.keys(cur).length !== ids.length || ids.some((id) => cur[id] !== next[id]);
   if (changed) measuredFlexFill.value = next;
@@ -1087,10 +1170,10 @@ const allowHorizontalScroll = computed(() => {
     if (frozen.value) return realSum() > containerWidth.value + 1;
     // Fill → scroll once the columns can't fit even at their min widths
     // (table-fixed otherwise grows past 100% and the overflow is clipped).
-    return fillMinSum() > containerWidth.value + 1;
+    return measuredFillOverflow.value || fillFloorSum() > containerWidth.value + 1;
   }
   // Past the columns' min widths the table grows anyway, clipping trailing columns out of reach.
-  return fillMinSum() > containerWidth.value + 1;
+  return fillFloorSum() > containerWidth.value + 1;
 });
 
 const SPACER_ID = "__spacer__";
@@ -1175,6 +1258,16 @@ function fillMinSum(): number {
   return nonFlexFixedSum() + flexColIds.value.reduce((a, id) => a + colMinSize(id), 0);
 }
 
+// With row actions an elastic filler counts at its floor: past it the table scrolls instead of crushing it.
+function fillFloorSum(): number {
+  if (!props.rowActions) return fillMinSum();
+  const elastic = table
+    .getVisibleLeafColumns()
+    .filter((c) => (c.columnDef.meta as any)?.autoWidth)
+    .reduce((a, c) => a + colMinSize(c.id), 0);
+  return fillMinSum() + elastic;
+}
+
 // CSS size-var overrides:
 //  • Fill state → each flex column = its (measured) fill width; spacer = 0.
 //  • Frozen state → each flex column = its frozen width; spacer = the leftover.
@@ -1208,19 +1301,29 @@ const dynamicSizeVars = computed<Record<string, string>>(() => {
 // Drives both the fill-state CSS var and the freeze.
 function fillWidths(): Record<string, number> {
   const ids = flexColIds.value;
+  if (!ids.length || containerWidth.value <= 0) return {};
+  return splitFill(containerWidth.value - nonFlexFixedSum(), ids);
+}
+
+// Equal shares, except a column whose minimum is larger keeps it and the rest share what is left,
+// so the widths never add up past `available` while the minimums fit.
+function splitFill(available: number, ids: string[]): Record<string, number> {
   const out: Record<string, number> = {};
-  if (!ids.length || containerWidth.value <= 0) return out;
-  const mins = ids.map(colMinSize);
-  const minTotal = mins.reduce((a, b) => a + b, 0);
-  const available = containerWidth.value - nonFlexFixedSum();
-  if (available <= minTotal) {
-    ids.forEach((id, i) => (out[id] = mins[i]));
-    return out;
+  let open = [...ids];
+  let left = available;
+  for (;;) {
+    const per = Math.floor(left / Math.max(open.length, 1));
+    const held = open.filter((id) => colMinSize(id) > per);
+    if (!held.length) break;
+    for (const id of held) {
+      out[id] = colMinSize(id);
+      left -= out[id];
+    }
+    open = open.filter((id) => !held.includes(id));
   }
-  const extra = available - minTotal;
-  const per = Math.floor(extra / ids.length);
-  ids.forEach((id, i) => {
-    out[id] = mins[i] + (i === ids.length - 1 ? extra - per * (ids.length - 1) : per);
+  const per = open.length ? Math.floor(left / open.length) : 0;
+  open.forEach((id, i) => {
+    out[id] = i === open.length - 1 ? left - per * (open.length - 1) : per;
   });
   return out;
 }
@@ -1276,7 +1379,7 @@ const minTableWidth = computed<string | undefined>(() => {
     return sum > 0 ? `${sum}px` : undefined;
   }
   if (useComputedWidth.value || containerWidth.value <= 0) return undefined;
-  if (fillMinSum() <= containerWidth.value + 1) return undefined;
+  if (fillFloorSum() <= containerWidth.value + 1) return undefined;
   // table-fixed hands a filler column 0px once the fixed columns alone overflow.
   const fillers = cols
     .filter((c) => (c.columnDef.meta as any)?.flex || (c.columnDef.meta as any)?.autoWidth)
@@ -1300,8 +1403,9 @@ function measureElement(el: any) {
 
 // ── Keyboard navigation ─────────────────────────────────────────
 useTableKeyboard(table, scrollContainerRef, {
-  enabled: computed(() => !props.loading),
+  enabled: computed(() => !props.loading || !!staleRows.value),
   onRowSelect: (row: TData) => {
+    if (staleDimmed.value) return;
     selection.toggleRow(row);
   },
   onRowExpand: (row: TData) => {
@@ -1331,14 +1435,43 @@ const showEmpty = computed(
     !props.streaming &&
     !props.error &&
     !showForbidden.value &&
-    // A leading body row is content of its own, so it paints even with no data rows.
+    // A leading or trailing body row is content of its own, so it paints even with no data rows.
     !slots["body-start"] &&
+    !slots["body-end"] &&
     (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
-const showSkeleton = computed(() => heldLoading.value && !staleRows.value);
+const showSkeleton = computed(() => coldLoading.value && skeletonDue.value);
 /** Streaming: data is arriving incrementally. Show pulsing indicator while stream is active and data exists. */
 const showStreaming = computed(() => props.streaming && displayRows.value.length > 0);
+const showProgressLine = useDelayedFlag(
+  () => props.progressLine && (showStreaming.value || refetchBusy.value),
+  LOADER_DELAY_MS,
+);
+// The line hangs under the header, whose height depends on its labels, so it is measured while the line shows.
+const progressLineTop = ref(0);
+let headerObserver: ResizeObserver | null = null;
+function headerSections(): HTMLElement[] {
+  const root = scrollContainerRef.value;
+  return root ? Array.from(root.querySelectorAll<HTMLElement>(":scope > table > thead")) : [];
+}
+function measureProgressLineTop(): void {
+  progressLineTop.value = headerSections().reduce((sum, el) => sum + el.offsetHeight, 0);
+}
+watch(
+  showProgressLine,
+  (shown) => {
+    headerObserver?.disconnect();
+    headerObserver = null;
+    if (!shown) return;
+    measureProgressLineTop();
+    if (typeof ResizeObserver === "undefined") return;
+    headerObserver = new ResizeObserver(measureProgressLineTop);
+    for (const el of headerSections()) headerObserver.observe(el);
+  },
+  { flush: "post" },
+);
+onBeforeUnmount(() => headerObserver?.disconnect());
 
 // ── Scroll event handler ────────────────────────────────────────
 function handleScroll(event: Event) {
@@ -1386,6 +1519,7 @@ defineExpose({
   // Callers that render their own OTableColumnToggle (outside the built-in
   // toolbar / global-filter bar) need this to show "Reset column widths".
   hasResizedColumns: computed(() => props.enableColumnResize && hasResizedColumns.value),
+  keepingRows: computed(() => !!staleRows.value),
   resetColumnSizes: () => {
     table.resetColumnSizing?.();
     frozen.value = false;
@@ -1439,12 +1573,15 @@ defineExpose({
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
         :class="[
-          'px-page-edge flex items-center gap-2 py-2 max-md:flex-wrap max-md:gap-y-2',
+          'px-page-edge flex flex-wrap items-center gap-2 py-2',
           props.toolbarBordered ? 'border-table-row-divider border-b' : '',
         ]"
         data-test="o2-table-toolbar"
       >
-        <slot name="toolbar" />
+        <!-- One wrapping row: a chip strip that does not fit takes a full-width line under everything. -->
+        <div v-if="slots.toolbar" class="contents" data-test="o2-table-toolbar-content">
+          <slot name="toolbar" />
+        </div>
         <!-- Rendered only with content: an empty flex item still costs the toolbar a gap. -->
         <div
           v-if="showColumnToggle || slots['toolbar-trailing']"
@@ -1538,6 +1675,18 @@ defineExpose({
         data-test="o2-table-scroll-container"
         @scroll="handleScroll"
       >
+        <!-- Zero-height and sticky, so the line stays under the header on a tall table without taking a row's space. -->
+        <div
+          v-if="showProgressLine"
+          :class="['start-0 z-20 h-0 w-full', props.stickyHeader ? 'sticky top-0' : 'relative']"
+        >
+          <div
+            data-test="o2-table-streaming-bar"
+            class="bg-table-streaming-bar o2-motion-keep absolute inset-x-0 h-0.5 motion-safe:animate-pulse motion-reduce:animate-[pulse_8s_cubic-bezier(0.4,0,0.6,1)_infinite]"
+            :style="{ top: `${progressLineTop}px` }"
+            :aria-label="refetchBusy ? t('common.loading') : t('common.dataStreamingInProgress')"
+          />
+        </div>
         <table
           :class="[
             // w-full + min-w-max fills a narrow container yet still scrolls when
@@ -1602,7 +1751,7 @@ defineExpose({
           }"
           data-test="o2-table"
           :data-test-loading="heldLoading ? 'true' : 'false'"
-          :aria-busy="showSkeleton || staleDimmed ? 'true' : undefined"
+          :aria-busy="coldLoading || refetchBusy ? 'true' : undefined"
         >
           <!-- ── Header ───────────────────────────────────────── -->
           <OTableHeader
@@ -1666,9 +1815,8 @@ defineExpose({
 
           <!-- ── Body ─────────────────────────────────────────── -->
           <OTableBody
-            v-else-if="!showEmpty && !showError"
-            :class="['transition-opacity', staleDimmed ? 'opacity-60 dark:opacity-40' : '']"
-            :inert="staleDimmed ? true : undefined"
+            v-else-if="!coldLoading && !showEmpty && !showError"
+            :class="['transition-opacity', staleDimmed ? 'opacity-60' : '']"
             :data-test-stale="staleRows ? 'true' : undefined"
             :rows="bodyRows"
             :sections="sectionsEnabled ? rowSections : undefined"
@@ -1711,10 +1859,9 @@ defineExpose({
             :measure-row-element="isVirtual && useDynamicRowHeight ? measureRowElement : undefined"
             :dynamic-row-height="isVirtual && useDynamicRowHeight"
             @toggle-selection="(row: TData) => !staleDimmed && selection.toggleRow(row)"
-            @toggle-expansion="(row: TData) => !staleDimmed && expansion.toggleRow(row)"
+            @toggle-expansion="expansion.toggleRow"
             @row-click="
               (row: TData, evt: MouseEvent) => {
-                if (staleDimmed) return;
                 const canExpand =
                   typeof props.expandOnRowClick === 'function'
                     ? props.expandOnRowClick(row)
@@ -1724,15 +1871,11 @@ defineExpose({
               }
             "
             @row-reorder="(data: TData[]) => !staleDimmed && emit('row-reorder', data)"
-            @row-dblclick="
-              (row: TData, evt: MouseEvent) => !staleDimmed && emit('row-dblclick', row, evt)
-            "
-            @row-auxclick="
-              (row: TData, evt: MouseEvent) => !staleDimmed && emit('row-auxclick', row, evt)
-            "
+            @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+            @row-auxclick="(row: TData, evt: MouseEvent) => emit('row-auxclick', row, evt)"
             @row-mouseenter="(row: TData, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
             @row-mouseleave="(row: TData) => emit('row-mouseleave', row)"
-            @cell-click="(params: any) => !staleDimmed && emit('cell-click', params)"
+            @cell-click="(params: any) => emit('cell-click', params)"
             @cell-contextmenu="(params: any) => !staleDimmed && emit('cell-contextmenu', params)"
           >
             <!-- Pass through named cell slots from parent (only for columns where parent provides a slot) -->
@@ -1749,6 +1892,33 @@ defineExpose({
                 :index="slotProps.index"
               />
             </template>
+            <template v-if="rowActionsColumnId" #[`cell-${rowActionsColumnId}`]="slotProps">
+              <slot
+                v-if="slots['row-actions'] && (props.rowActionsSlot?.(slotProps.row) ?? true)"
+                name="row-actions"
+                :row="slotProps.row"
+                :index="slotProps.index"
+              />
+              <OTableRowActions
+                v-else
+                :actions="props.rowActions ?? []"
+                :row="slotProps.row"
+                :index="slotProps.index"
+                :more-data-test="props.rowActionsMoreDataTest"
+              />
+            </template>
+            <template
+              v-for="col in linkColumns"
+              :key="`link-${col.id}`"
+              #[`cell-${col.id}`]="slotProps"
+            >
+              <ONameLinkCell
+                :to="col.meta?.link?.(slotProps.row)"
+                :data-test="col.meta?.link?.(slotProps.row) ? nameLinkDataTest : undefined"
+              >
+                {{ linkCellText(col, slotProps.value, slotProps.row) }}
+              </ONameLinkCell>
+            </template>
 
             <!-- Expansion slot -->
             <template v-if="slots.expansion" #expansion="expSlotProps">
@@ -1757,6 +1927,10 @@ defineExpose({
 
             <template v-if="slots['body-start']" #body-start>
               <slot name="body-start" />
+            </template>
+
+            <template v-if="slots['body-end']" #body-end>
+              <slot name="body-end" />
             </template>
 
             <!-- Section heading row -->
@@ -1922,24 +2096,17 @@ defineExpose({
           v-if="showError"
           :message="props.error ?? ''"
           @retry="
+            emit('retry');
             emit('pagination-change', {
               page: pagination.currentPage.value,
               size: pagination.pageSize.value,
-            })
+            });
           "
         >
           <template v-if="slots.error" #default="errProps">
             <slot name="error" v-bind="errProps" />
           </template>
         </OTableError>
-
-        <!-- ── Streaming Indicator ─────────────────────────────── -->
-        <div
-          v-if="showStreaming || staleDimmed"
-          data-test="o2-table-streaming-bar"
-          class="bg-table-streaming-bar sticky bottom-0 z-10 h-1 w-full animate-pulse"
-          :aria-label="staleDimmed ? t('common.loading') : t('common.dataStreamingInProgress')"
-        />
       </div>
 
       <!-- A caller-drawn pager replaces the built-in bar and is kept with pagination off, where it may still carry a row count. -->
@@ -1963,19 +2130,22 @@ defineExpose({
       <OTablePagination
         v-else-if="pagination.isEnabled.value"
         position="bottom"
-        :current-page="pagination.currentPage.value"
-        :total-pages="pagination.totalPages.value"
-        :total-count="pagination.totalCount.value"
+        :current-page="pagerView.currentPage"
+        :total-pages="pagerView.totalPages"
+        :total-count="pagerView.totalCount"
         :total-count-exact="props.totalCountExact"
-        :page-size="pagination.pageSize.value"
+        :page-size="pagerView.pageSize"
         :page-size-options="pagination.pageSizeOptions.value"
-        :showing-from="pagination.showingFrom.value"
-        :showing-to="pagination.showingTo.value"
-        :is-first-page="pagination.isFirstPage.value"
-        :is-last-page="pagination.isLastPage.value"
-        :loading="heldLoading"
+        :showing-from="pagerView.showingFrom"
+        :showing-to="pagerView.showingTo"
+        :is-first-page="pagerView.isFirstPage"
+        :is-last-page="pagerView.isLastPage"
+        :loading="coldLoading"
+        :pending="heldLoading"
+        :stale="staleDimmed"
         :selected-count="selection.selectedCount.value"
         :bordered="props.paginationBordered"
+        :range-hidden="showError"
         @update:page-size="pagination.setPageSize"
         @first-page="pagination.firstPage"
         @prev-page="pagination.prevPage"

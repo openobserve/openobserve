@@ -1,33 +1,30 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// AI-page date controller. Extracts the date state + URL-sync logic that was
-// near-identical across SessionsPage / LLMInsightsPage (and similar in
-// AgentGraph / AgentBehaviorPage) into a single composable wrapping the shared
-// `useAiDateRange` singleton.
-//
-// Scope: this composable owns ONLY the date state + URL sync. It does NOT own
-// the child-refresh (`sessionsRef.refresh(...)`) — that lives in
-// `useChildRefresh`. `onDateChange` here updates date state + writes URL only;
-// the page wires the child refresh off the resolved `timeRange`.
-//
-// URL sync boundary: SessionsPage / LLMInsightsPage sync their date to the URL
-// (deep-links reproduce the exact view). AgentGraph / AgentBehaviorPage do NOT
-// — they resolve from shared state on mount but keep no from/to/period URL. Pass
-// `urlSync: false` for those so `readFromUrl` returns false and `writeToUrl`
-// is a no-op, preserving their prior behavior.
+// Resolve at creation, before the picker mounts, or its seed replay writes the previous visit's range.
 
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
 
 import { getConsumableRelativeTime } from "@/utils/date";
+import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
+import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
 
-export function useAiDateController(opts: { defaultRelative?: string; urlSync?: boolean } = {}) {
+function normalizePeriod(raw: string): string | null {
+  const match = raw.match(/^(\d+)([smhdwM])$/);
+  if (match) {
+    const value = Number(match[1]);
+    return value > 0 ? `${value}${match[2]}` : null;
+  }
+  return resolveCalendarPeriod(raw) ? raw : null;
+}
+
+export function useAiDateController(opts: { defaultRelative?: string } = {}) {
   const DEFAULT_RELATIVE = opts.defaultRelative ?? "15m";
-  const urlSync = opts.urlSync ?? true;
 
   const route = useRoute();
   const router = useRouter();
+  const store = useStore();
 
   const { state: dateState } = useAiDateRange();
   const timeRange = ref({ startTime: 0, endTime: 0 });
@@ -45,12 +42,8 @@ export function useAiDateController(opts: { defaultRelative?: string; urlSync?: 
     };
   }
 
-  // URL ↔ shared date sync. URL wins over shared state on mount so deep-links
-  // reproduce the exact saved view, but shared state is the cross-page memory
-  // when no URL hint is present. When `urlSync` is off there is no URL to read.
+  // URL wins on mount so deep-links reproduce the saved view; shared state covers the no-URL case.
   function readFromUrl(): boolean {
-    if (!urlSync) return false;
-
     const fromRaw = route.query.from;
     const toRaw = route.query.to;
     const periodRaw = route.query.period;
@@ -70,36 +63,41 @@ export function useAiDateController(opts: { defaultRelative?: string; urlSync?: 
       }
     }
 
-    if (typeof periodRaw === "string" && periodRaw) {
-      applyRelative(periodRaw);
-      return true;
+    if (typeof periodRaw === "string") {
+      const period = normalizePeriod(periodRaw);
+      if (period) {
+        applyRelative(period);
+        return true;
+      }
     }
 
     return false;
   }
 
+  // An org switch remounts before navigation commits, so the route still names the previous org.
   function writeToUrl() {
-    if (!urlSync) return;
-
-    const next: Record<string, any> = { ...route.query };
-    if (dateState.value.valueType === "relative") {
-      next.period = dateState.value.relativeTimePeriod ?? DEFAULT_RELATIVE;
-      delete next.from;
-      delete next.to;
-    } else {
-      next.from = String(dateState.value.startTime ?? 0);
-      next.to = String(dateState.value.endTime ?? 0);
-      delete next.period;
-    }
-    router.replace({ query: next }).catch(() => {});
+    void replaceRouteQuery(router, route, (next) => {
+      const org = store.state.selectedOrganization?.identifier;
+      if (org && next.org_identifier != null) next.org_identifier = org;
+      if (dateState.value.valueType === "relative") {
+        next.period = dateState.value.relativeTimePeriod ?? DEFAULT_RELATIVE;
+        delete next.from;
+        delete next.to;
+      } else {
+        next.from = String(dateState.value.startTime ?? 0);
+        next.to = String(dateState.value.endTime ?? 0);
+        delete next.period;
+      }
+      return next;
+    });
   }
 
-  // Date-only part of the page's onDateChange: update state + write URL. The
-  // page wires the child refresh off `timeRange` separately (see useChildRefresh).
-  function onDateChange(value: any) {
+  // Returns whether the range changed, so pages skip the picker's mount replay.
+  function onDateChange(value: any): boolean {
+    const before = selectionKey();
     if (value?.valueType === "relative" && value.relativeTimePeriod) {
       applyRelative(value.relativeTimePeriod);
-    } else {
+    } else if (!sameToTheSecond(value)) {
       dateState.value = {
         valueType: "absolute",
         startTime: value.startTime,
@@ -109,10 +107,29 @@ export function useAiDateController(opts: { defaultRelative?: string; urlSync?: 
       timeRange.value = { startTime: value.startTime, endTime: value.endTime };
     }
     writeToUrl();
+    return selectionKey() !== before;
   }
 
-  // Mount precedence: URL > cross-page shared state > default relative.
-  function mountResolve() {
+  // The picker rounds to whole seconds; treat its mount-replay echo as the same selection.
+  function sameToTheSecond(value: { startTime?: unknown; endTime?: unknown }): boolean {
+    const s = dateState.value;
+    return (
+      s.valueType === "absolute" &&
+      Math.abs(Number(value?.startTime) - Number(s.startTime)) < 1_000_000 &&
+      Math.abs(Number(value?.endTime) - Number(s.endTime)) < 1_000_000
+    );
+  }
+
+  // A relative range is the same selection whatever "now" it was anchored to.
+  function selectionKey() {
+    const s = dateState.value;
+    return s.valueType === "relative"
+      ? `relative:${s.relativeTimePeriod}`
+      : `absolute:${s.startTime}-${s.endTime}`;
+  }
+
+  // Precedence: URL > cross-page shared state > default relative.
+  function resolve() {
     if (readFromUrl()) return;
 
     const window = resolveAiDateWindow(dateState.value);
@@ -127,6 +144,8 @@ export function useAiDateController(opts: { defaultRelative?: string; urlSync?: 
     writeToUrl();
   }
 
+  resolve();
+
   return {
     dateState,
     timeRange,
@@ -134,7 +153,6 @@ export function useAiDateController(opts: { defaultRelative?: string; urlSync?: 
     onDateChange,
     readFromUrl,
     writeToUrl,
-    mountResolve,
     DEFAULT_RELATIVE,
   };
 }

@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, KeepAlive, reactive, ref } from "vue";
+import { clearAnnouncements } from "@/lib/feedback/RegionStatus/announcer";
 import SearchResult from "@/plugins/traces/SearchResult.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
@@ -138,6 +139,13 @@ vi.mock("@/composables/useTraces", () => ({
     updatedLocalLogFilterField: vi.fn(),
     patchUrlViewState: mockPatchUrlViewState,
   }),
+}));
+
+vi.mock("./metrics/TracesMetricsDashboard.vue", () => ({
+  default: {
+    name: "TracesMetricsDashboard",
+    template: '<div data-test="red-dashboard-loaded"></div>',
+  },
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
@@ -584,14 +592,15 @@ describe("SearchResult count chip", () => {
     delete (mockSearchObj.data.queryResults as any).countPending;
   });
 
-  it("shows a skeleton instead of a number while the first count runs", async () => {
+  it("shows a static skeleton, not 0 or a spinner, while the first count runs", async () => {
     Object.assign(mockSearchObj.data.queryResults, { total: null, countPending: true });
     wrapper = mount(SearchResult, { global: globalOptions });
     await flushPromises();
 
-    expect(badge().findComponent({ name: "OSkeleton" }).exists()).toBe(true);
-    expect(badge().findComponent({ name: "OSpinner" }).exists()).toBe(false);
+    expect(badge().find('[data-test="traces-count-pending"]').exists()).toBe(false);
+    expect(badge().find('[data-test="traces-count-skeleton"]').exists()).toBe(true);
     expect(badge().attributes("aria-busy")).toBe("true");
+    expect(badge().find(".sr-only").text()).toBe("Loading...");
     expect(badge().text()).not.toMatch(/\d/);
     expect(badge().text()).not.toContain("—");
     expect(badge().text()).toContain("traces with a matching span");
@@ -617,9 +626,6 @@ describe("SearchResult count chip", () => {
 
 describe("SearchResult toolbar controls while a query runs", () => {
   let wrapper: any;
-  const errorChip = () => wrapper.find('[data-test="traces-error-count-badge"]');
-  const pager = () => wrapper.findComponent({ name: "OPagination" });
-  const pageSize = () => wrapper.find('[data-test="traces-search-result-records-per-page"]');
 
   const mountWith = async (results: Record<string, unknown>) => {
     Object.assign(mockSearchObj.data.queryResults, results);
@@ -636,81 +642,6 @@ describe("SearchResult toolbar controls while a query runs", () => {
     delete (mockSearchObj.data.queryResults as any).countPending;
     delete (mockSearchObj.data.queryResults as any).errorCount;
     delete (mockSearchObj.meta.resultGrid as any).showPagination;
-  });
-
-  it("keeps both last counts in a dimmed row with one labelled spinner until the new count lands", async () => {
-    const countChip = () => wrapper.find('[data-test="traces-count-badge"]');
-    const chips = () => wrapper.find('[data-test="traces-count-chips"]');
-    await mountWith({ total: 50, countPending: false, errorCount: 7 });
-    expect(chips().classes()).not.toContain("opacity-60");
-    expect(wrapper.find('[data-test="traces-count-pending"]').exists()).toBe(false);
-
-    Object.assign(mockSearchObj.data.queryResults, { total: null, countPending: true });
-    await flushPromises();
-
-    expect(countChip().text()).toMatch(/^50\s/);
-    expect(countChip().findComponent({ name: "OSkeleton" }).exists()).toBe(false);
-    expect(errorChip().text()).toContain("7");
-    expect(countChip().classes()).toContain("tabular-nums");
-    expect(errorChip().classes()).toContain("tabular-nums");
-    expect(countChip().findComponent({ name: "OSpinner" }).exists()).toBe(false);
-    expect(errorChip().findComponent({ name: "OSpinner" }).exists()).toBe(false);
-    const spinners = chips().findAll('[role="status"]');
-    expect(spinners).toHaveLength(1);
-    expect(spinners[0].attributes("data-test")).toBe("traces-count-pending");
-    expect(spinners[0].attributes("aria-label")).toBe("Updating results");
-    expect(chips().classes()).toEqual(expect.arrayContaining(["opacity-60", "transition-opacity"]));
-    expect(errorChip().attributes("aria-disabled")).toBe("true");
-    expect(errorChip().attributes("disabled")).toBeDefined();
-    expect(errorChip().classes()).toContain("opacity-100!");
-
-    Object.assign(mockSearchObj.data.queryResults, {
-      total: 40,
-      countPending: false,
-      errorCount: 3,
-    });
-    await flushPromises();
-    expect(countChip().text()).toMatch(/^40\s/);
-    expect(errorChip().text()).toContain("3");
-    expect(wrapper.find('[data-test="traces-count-pending"]').exists()).toBe(false);
-    expect(chips().classes()).not.toContain("opacity-60");
-    expect(errorChip().attributes("aria-disabled")).toBeUndefined();
-  });
-
-  it("shows a skeleton, not the old count, when a run over another dataset drops the kept count", async () => {
-    const countChip = () => wrapper.find('[data-test="traces-count-badge"]');
-    await mountWith({ total: 50, countPending: false, errorCount: 7 });
-
-    Object.assign(mockSearchObj.data.queryResults, {
-      total: null,
-      countPending: true,
-      errorCount: undefined,
-    });
-    await flushPromises();
-
-    expect(countChip().findComponent({ name: "OSkeleton" }).exists()).toBe(true);
-    expect(countChip().text()).not.toMatch(/\d/);
-  });
-
-  it("keeps the last page count, disabled, while the new count is pending", async () => {
-    await mountWith({ total: 50, countPending: false });
-    expect(pager().props("max")).toBe(5);
-
-    mockSearchObj.loading = true;
-    Object.assign(mockSearchObj.data.queryResults, { total: null, countPending: true });
-    await flushPromises();
-    expect(pager().props("max")).toBe(5);
-    expect(pager().props("disable")).toBe(true);
-    expect(pageSize().exists()).toBe(true);
-
-    mockSearchObj.loading = false;
-    await flushPromises();
-    expect(pager().props("disable")).toBe(true);
-
-    Object.assign(mockSearchObj.data.queryResults, { total: 20, countPending: false });
-    await flushPromises();
-    expect(pager().props("max")).toBe(2);
-    expect(pager().props("disable")).toBe(false);
   });
 
   it("stops keyboard row navigation crossing pages while the new count is pending", async () => {
@@ -764,5 +695,401 @@ describe("SearchResult in a kept-alive page", () => {
     expect(scroller.scrollTop).toBe(480);
     raf.mockRestore();
     parent.unmount();
+  });
+});
+
+describe("SearchResult announcements from a kept-alive page", () => {
+  afterEach(() => {
+    clearAnnouncements();
+    mockSearchObj.loading = false;
+  });
+
+  it("says nothing when leaving the page ends its search", async () => {
+    const show = ref(true);
+    const Parent = defineComponent({
+      setup: () => () =>
+        h(KeepAlive, null, { default: () => (show.value ? h(SearchResult) : h("div")) }),
+    });
+    mockSearchObj.loading = true;
+    const parent = mount(Parent, { global: globalOptions, attachTo: document.body });
+    await flushPromises();
+
+    show.value = false;
+    await flushPromises();
+    mockSearchObj.loading = false;
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(document.querySelector('[data-test="region-announcer"]')?.textContent ?? "").toBe("");
+    parent.unmount();
+  });
+});
+
+describe("SearchResult header through a re-run (T-3)", () => {
+  let wrapper: any;
+  const badge = () => wrapper.find('[data-test="traces-count-badge"]');
+  const errorChip = () => wrapper.find('[data-test="traces-error-count-badge"]');
+  const pagerGroup = () => wrapper.find('[data-test="traces-search-result-pager-group"]');
+
+  const settle = (total: number, errorCount: number) =>
+    Object.assign(mockSearchObj.data.queryResults, { total, errorCount, countPending: false });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    (mockSearchObj.meta as any).searchMode = "spans";
+    (mockSearchObj.meta.resultGrid as any).showPagination = true;
+    mockSearchObj.meta.resultGrid.rowsPerPage = 10;
+    settle(1284, 38);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.useRealTimers();
+    mockSearchObj.loading = false;
+    (mockSearchObj.meta as any).searchMode = undefined;
+    (mockSearchObj.meta.resultGrid as any).showPagination = false;
+    mockSearchObj.data.stream.selectedStream.value = "default";
+    Object.assign(mockSearchObj.data.queryResults, { total: 2, errorCount: 0 });
+    delete (mockSearchObj.data.queryResults as any).countPending;
+  });
+
+  const startRerun = async () => {
+    mockSearchObj.loading = true;
+    Object.assign(mockSearchObj.data.queryResults, { total: null, countPending: true });
+    await wrapper.vm.$nextTick();
+  };
+
+  it("keeps the count, error chip and pager mounted with the previous values", async () => {
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    await startRerun();
+
+    expect(badge().text()).toBe("1.3K Spans Found");
+    expect(errorChip().exists()).toBe(true);
+    expect(errorChip().text()).toContain("38");
+    expect(pagerGroup().exists()).toBe(true);
+    expect(wrapper.vm.totalPages).toBe(129);
+  });
+
+  it("dims the kept values only after 150 ms, and marks the stale actions aria-disabled", async () => {
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    await startRerun();
+
+    expect(badge().find(".opacity-60").exists()).toBe(false);
+    vi.advanceTimersByTime(149);
+    await wrapper.vm.$nextTick();
+    expect(badge().find(".opacity-60").exists()).toBe(false);
+    vi.advanceTimersByTime(1);
+    await wrapper.vm.$nextTick();
+    expect(badge().find(".opacity-60").exists()).toBe(true);
+    expect(errorChip().classes()).toContain("opacity-60");
+    expect(errorChip().attributes("aria-disabled")).toBe("true");
+    expect(pagerGroup().classes()).toContain("opacity-60");
+    expect(pagerGroup().attributes("aria-disabled")).toBe("true");
+  });
+
+  it("writes the new values once, at full opacity, when the count settles", async () => {
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    await startRerun();
+    vi.advanceTimersByTime(200);
+    mockSearchObj.loading = false;
+    await wrapper.vm.$nextTick();
+    expect(badge().text()).toBe("1.3K Spans Found");
+
+    settle(2500, 41);
+    await wrapper.vm.$nextTick();
+    expect(badge().text()).toBe("2.5K Spans Found");
+    expect(badge().find(".opacity-60").exists()).toBe(false);
+    expect(errorChip().text()).toContain("41");
+  });
+
+  it("shows the skeleton, not the other mode's count, after Spans to Traces", async () => {
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    (mockSearchObj.meta as any).searchMode = "traces";
+    await startRerun();
+
+    expect(badge().find('[data-test="traces-count-skeleton"]').exists()).toBe(true);
+    expect(badge().text()).not.toContain("1.3K");
+    expect(errorChip().exists()).toBe(false);
+  });
+
+  it("shows the skeleton, not the other stream's count, after a stream change", async () => {
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    mockSearchObj.data.stream.selectedStream.value = "checkout";
+    await startRerun();
+
+    expect(badge().find('[data-test="traces-count-skeleton"]').exists()).toBe(true);
+    expect(badge().text()).not.toContain("1.3K");
+    expect(errorChip().exists()).toBe(false);
+  });
+
+  it("wraps the refresh control's data age in its own test id, keeping the control's id", async () => {
+    (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+
+    const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
+    expect(dataAge.exists()).toBe(true);
+    expect(dataAge.find('[data-test="traces-search-result-refresh"]').exists()).toBe(true);
+    expect(dataAge.text()).toContain("Updated");
+  });
+
+  it("keeps the data age readable and the control focusable through a run, with no spinner of its own", async () => {
+    (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
+    wrapper = mount(SearchResult, { global: globalOptions, attachTo: document.body });
+    await flushPromises();
+    const control = () => wrapper.find('[data-test="traces-search-result-refresh"]');
+    (control().element as HTMLElement).focus();
+    await startRerun();
+    vi.advanceTimersByTime(1000);
+    await wrapper.vm.$nextTick();
+
+    expect(control().attributes("aria-busy")).toBe("true");
+    expect(control().attributes("disabled")).toBeUndefined();
+    expect(document.activeElement).toBe(control().element);
+    expect(control().find(".animate-spin").exists()).toBe(false);
+    expect(control().find(".text-transparent").exists()).toBe(false);
+    expect(wrapper.find('[data-test="traces-search-result-data-age"]').text()).toContain("Updated");
+  });
+
+  it("dims the kept values with the auto-run toggle on, as the rows do", async () => {
+    (mockSearchObj.meta as any).liveMode = true;
+    try {
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+      await startRerun();
+      vi.advanceTimersByTime(150);
+      await wrapper.vm.$nextTick();
+
+      expect(badge().find(".opacity-60").exists()).toBe(true);
+      expect(errorChip().classes()).toContain("opacity-60");
+      expect(pagerGroup().classes()).toContain("opacity-60");
+    } finally {
+      (mockSearchObj.meta as any).liveMode = false;
+    }
+  });
+
+  it("moves the data age, failure and pager to a second header row by the results' width, not by state", async () => {
+    (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    const header = wrapper.find('[data-test="traces-section-header"]');
+    const rowBreak = wrapper.find('[data-test="traces-search-result-header-break"]');
+    const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
+
+    expect(header.element.parentElement?.classList).toContain("@container/results");
+    expect(header.classes()).toContain("@max-[58rem]/results:flex-wrap");
+    expect(rowBreak.classes()).toEqual(
+      expect.arrayContaining(["hidden", "basis-full", "@max-[58rem]/results:block"]),
+    );
+    expect(rowBreak.element.nextElementSibling?.classList).toContain(
+      "@max-[58rem]/results:flex-none",
+    );
+    expect(dataAge.classes()).toEqual(
+      expect.arrayContaining(["min-w-0", "@max-[58rem]/results:flex-1"]),
+    );
+
+    (mockSearchObj.meta as any).refreshFailedAt = Date.UTC(2026, 10, 1, 10, 47);
+    await flushPromises();
+    expect(wrapper.find('[data-test="traces-search-result-header-break"]').element).toBe(
+      rowBreak.element,
+    );
+    (mockSearchObj.meta as any).refreshFailedAt = null;
+  });
+
+  it("returns the kept values and actions to full opacity once a refresh fails", async () => {
+    (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    await startRerun();
+    vi.advanceTimersByTime(200);
+    await wrapper.vm.$nextTick();
+    expect(pagerGroup().classes()).toContain("opacity-60");
+
+    (mockSearchObj.meta as any).refreshFailedAt = Date.UTC(2026, 10, 1, 10, 47);
+    settle(1284, 38);
+    mockSearchObj.loading = false;
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="traces-search-result-refresh-failed"]').exists()).toBe(true);
+    expect(badge().find(".opacity-60").exists()).toBe(false);
+    expect(badge().text()).toBe("1.3K Spans Found");
+    expect(errorChip().classes()).not.toContain("opacity-60");
+    expect(errorChip().attributes("aria-disabled")).toBeUndefined();
+    expect(pagerGroup().classes()).not.toContain("opacity-60");
+    expect(pagerGroup().attributes("aria-disabled")).toBeUndefined();
+    await errorChip().trigger("click");
+    expect(wrapper.emitted("error-only-toggled")).toHaveLength(1);
+    (mockSearchObj.meta as any).refreshFailedAt = null;
+  });
+
+  it("refuses the pager, rows-per-page and error chip after the rows land until the count settles", async () => {
+    mockSearchObj.data.resultGrid.currentPage = 0;
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    await startRerun();
+    mockSearchObj.loading = false;
+    await wrapper.vm.$nextTick();
+
+    expect(pagerGroup().attributes("aria-disabled")).toBe("true");
+    expect(errorChip().attributes("aria-disabled")).toBe("true");
+    wrapper.findComponent({ name: "OPagination" }).vm.$emit("update:modelValue", 129);
+    wrapper
+      .find('[data-test="traces-search-result-records-per-page"]')
+      .findComponent({ name: "OSelect" })
+      .vm.$emit("update:modelValue", 100);
+    await errorChip().trigger("click");
+    expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+    expect(mockSearchObj.meta.resultGrid.rowsPerPage).toBe(10);
+    expect(wrapper.emitted("update:scroll")).toBeUndefined();
+    expect(wrapper.emitted("error-only-toggled")).toBeUndefined();
+
+    settle(30, 2);
+    await wrapper.vm.$nextTick();
+    expect(pagerGroup().attributes("aria-disabled")).toBeUndefined();
+    wrapper.findComponent({ name: "OPagination" }).vm.$emit("update:modelValue", 2);
+    expect(mockSearchObj.data.resultGrid.currentPage).toBe(1);
+    expect(wrapper.emitted("update:scroll")).toHaveLength(1);
+    mockSearchObj.data.resultGrid.currentPage = 1;
+  });
+
+  it("marks the stale actions aria-disabled as the run starts, before the dim", async () => {
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    await startRerun();
+
+    expect(pagerGroup().classes()).not.toContain("opacity-60");
+    expect(pagerGroup().attributes("aria-disabled")).toBe("true");
+    expect(errorChip().attributes("aria-disabled")).toBe("true");
+  });
+
+  it("ignores the error chip while the values are stale", async () => {
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    await startRerun();
+    await errorChip().trigger("click");
+    expect(wrapper.emitted("error-only-toggled")).toBeUndefined();
+  });
+
+  it("swaps the data age for the red failed-refresh sentence and keeps the old age", async () => {
+    (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    mockSearchObj.loading = true;
+    await wrapper.vm.$nextTick();
+    (mockSearchObj.meta as any).refreshFailedAt = Date.UTC(2026, 10, 1, 10, 47);
+    mockSearchObj.loading = false;
+    await wrapper.vm.$nextTick();
+
+    const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
+    expect(dataAge.find('[data-test="traces-search-result-refresh-failed"]').text()).toContain(
+      "Refresh failed at",
+    );
+    expect((mockSearchObj.meta as any).lastRunAt).toBe(Date.UTC(2026, 10, 1, 10, 42));
+    (mockSearchObj.meta as any).refreshFailedAt = null;
+  });
+});
+
+describe("SearchResult pending first load (T-1)", () => {
+  let wrapper: any;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    mockSearchObj.searchApplied = true;
+    mockSearchObj.data.stream.selectedStream.value = "default";
+  });
+
+  it("draws the header, a count skeleton and reserved chart placeholders before any stream is known", async () => {
+    mockSearchObj.searchApplied = false;
+    mockSearchObj.data.stream.selectedStream.value = "";
+    wrapper = mount(SearchResult, { global: globalOptions, props: { pending: true } });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="traces-section-header"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="traces-count-skeleton"]').exists()).toBe(true);
+    const placeholder = wrapper.find('[data-test="traces-metrics-placeholder"]');
+    expect(placeholder.exists()).toBe(true);
+    expect(placeholder.classes()).toContain("md:h-40");
+    expect(placeholder.findAll('[role="img"]')).toHaveLength(3);
+    expect(placeholder.find('[role="img"]').attributes("aria-label")).toBe("Loading chart");
+    expect(wrapper.findComponent({ name: "TracesSearchResultList" }).props("loading")).toBe(true);
+    expect(wrapper.find('[data-test="traces-search-loading"]').exists()).toBe(true);
+    const pager = wrapper.find('[data-test="traces-search-result-pager-group"]');
+    expect(pager.exists()).toBe(true);
+    expect(pager.classes()).toContain("opacity-60");
+    expect(pager.attributes("aria-disabled")).toBe("true");
+  });
+
+  it("paints the three panel titles, the rate unit and the Duration panel's Color by chrome at once", async () => {
+    (mockSearchObj.meta as any).searchMode = "spans";
+    mockSearchObj.searchApplied = false;
+    wrapper = mount(SearchResult, { global: globalOptions, props: { pending: true } });
+    await flushPromises();
+
+    const titles = wrapper
+      .find('[data-test="traces-metrics-placeholder"]')
+      .findAll('[data-test="traces-metrics-placeholder-title"]')
+      .map((title: any) =>
+        title
+          .findAll(":scope > span:not([inert])")
+          .map((part: any) => part.text())
+          .join(" "),
+      );
+    expect(titles).toEqual(["Rate spans/s", "Errors", "Duration"]);
+    const colorBy = wrapper.find('[data-test="traces-metrics-placeholder-color-toggle"]');
+    expect(colorBy.exists()).toBe(true);
+    expect(colorBy.text()).toContain("Spans");
+    expect(colorBy.text()).toContain("Errors");
+    expect(colorBy.element.closest("[inert]")).not.toBeNull();
+    expect(wrapper.find('[data-test="traces-latency-heatmap-color-toggle"]').exists()).toBe(false);
+    (mockSearchObj.meta as any).searchMode = undefined;
+  });
+
+  it("draws the chart placeholder while the charts' own chunk loads, so the table never moves up and back", () => {
+    const { TracesMetricsDashboard: _stubbed, ...stubs } = globalOptions.stubs;
+    wrapper = mount(SearchResult, {
+      global: { ...globalOptions, stubs },
+      props: { pending: false },
+    });
+
+    const placeholder = wrapper.find('[data-test="traces-metrics-placeholder"]');
+    expect(placeholder.exists()).toBe(true);
+    expect(placeholder.classes()).toContain("md:h-40");
+    expect(wrapper.find('[data-test="traces-search-loading"]').exists()).toBe(false);
+  });
+});
+
+describe("SearchResult header holds still as the first data lands", () => {
+  let wrapper: any;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("reserves the widest pager from first paint, so the count landing moves nothing to its left", async () => {
+    (mockSearchObj.meta.resultGrid as any).showPagination = true;
+    mockSearchObj.meta.resultGrid.rowsPerPage = 25;
+    Object.assign(mockSearchObj.data.queryResults, { total: 0 });
+    wrapper = mount(SearchResult, { global: globalOptions });
+    const pager = () => wrapper.findComponent({ name: "OPagination" });
+    expect(pager().props("maxPages")).toBe(5);
+    expect(wrapper.find('[data-test="traces-search-result-data-age"]').classes()).toContain(
+      "@min-[58rem]/results:min-w-33",
+    );
+    expect(pager().classes()).toEqual(expect.arrayContaining(["min-w-54", "justify-end"]));
+    Object.assign(mockSearchObj.data.queryResults, { total: 1284 });
+    await flushPromises();
+    expect(pager().classes()).toEqual(expect.arrayContaining(["min-w-54", "justify-end"]));
+  });
+
+  it("draws no results progress line, even through a run", async () => {
+    wrapper = mount(SearchResult, { global: globalOptions, props: { pending: true } });
+    await flushPromises();
+    expect(wrapper.find('[data-test="traces-search-result-progress"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "LoadingProgress" }).exists()).toBe(false);
   });
 });

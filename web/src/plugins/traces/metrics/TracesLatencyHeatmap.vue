@@ -21,28 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <PanelBar class="w-full justify-between gap-2" data-test="traces-latency-heatmap-title">
       <span class="truncate">{{ t("traces.latencyHeatmap.title") }}</span>
-      <OToggleGroup
-        v-model="colorBy"
-        :label="t('traces.latencyHeatmap.colorBy.label')"
-        label-position="left"
-        mobile-dropdown
-        data-test="traces-latency-heatmap-color-toggle"
-      >
-        <OToggleGroupItem
-          value="spans"
-          size="xs"
-          data-test="traces-latency-heatmap-color-toggle-spans"
-        >
-          {{ t("traces.latencyHeatmap.colorBy.spans") }}
-        </OToggleGroupItem>
-        <OToggleGroupItem
-          value="errors"
-          size="xs"
-          data-test="traces-latency-heatmap-color-toggle-errors"
-        >
-          {{ t("traces.latencyHeatmap.colorBy.errors") }}
-        </OToggleGroupItem>
-      </OToggleGroup>
+      <LatencyHeatmapColorToggle v-model="colorBy" />
       <ODropdown side="bottom" align="end">
         <template #trigger>
           <OButton
@@ -71,14 +50,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
       </ODropdown>
     </PanelBar>
-    <div class="relative min-h-0 flex-1">
-      <div
+    <div
+      class="relative min-h-0 flex-1"
+      :aria-busy="refetching ? 'true' : undefined"
+      data-test="traces-latency-heatmap-body"
+    >
+      <LoadingProgress
+        :loading="status === 'loading' || refetching"
+        :loading-progress-percentage="0"
+      />
+      <PanelChartPlaceholder
         v-if="status === 'loading'"
-        class="flex h-full items-center justify-center"
         data-test="traces-latency-heatmap-loading"
-      >
-        <OSpinner size="sm" />
-      </div>
+      />
       <div
         v-else-if="status === 'error' || status === 'unavailable'"
         class="text-status-error-text flex h-full items-center justify-center px-2 text-center text-sm"
@@ -102,9 +86,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- ChartRenderer escape hatch (ui-architect "Charts / graphs", fixed-grid case): empty cells kept and index → bucket box mapping, which the heatmap converter cannot do -->
       <ChartRenderer
         v-else-if="status === 'ready'"
-        :data="{ options }"
+        :data="chartData"
         data-test="traces-latency-heatmap-chart"
         @updated:dataZoom="onDataZoom"
+        @painted="chartPainted = true"
       />
       <!-- Drawn over the canvas, not as a markArea: the chart resets its option after every zoom brush. -->
       <!-- The box passes pointer events through so a new brush can start inside it. -->
@@ -195,6 +180,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </ODropdown>
       </div>
+      <!-- The canvas is blank until its first frame, so the loading block stays over it until then. -->
+      <PanelChartPlaceholder
+        v-if="status === 'ready' && !chartPainted"
+        class="absolute inset-0"
+        data-test="traces-latency-heatmap-first-frame"
+      />
     </div>
   </div>
 </template>
@@ -207,15 +198,17 @@ import useTheme from "@/composables/useTheme";
 import { useAiIcon } from "@/composables/useAiIcon";
 import searchService from "@/services/search";
 import PanelBar from "@/components/common/PanelBar.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import LatencyHeatmapColorToggle, {
+  type LatencyHeatmapColorBy,
+} from "./LatencyHeatmapColorToggle.vue";
 import { chartColor, chartTextColor, chartAxisLine, dataZoomBrushStyle } from "@/utils/chartTheme";
 import { heatmapLargeGridDefaults } from "@/utils/dashboard/heatmapDefaults";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -252,10 +245,14 @@ export interface LatencyHeatmapRequest {
   endTime: number;
 }
 
+// Another stream's grid is never kept under this one, even dimmed.
 const props = defineProps<{
   request: LatencyHeatmapRequest | null;
   selection?: LatencyHeatmapSelection | null;
   aiEnabled?: boolean;
+  stream?: string;
+  /** What the request draws from; a failed refresh keeps the grid only when it was drawn from the same source. */
+  source?: string;
 }>();
 
 const emit = defineEmits<{
@@ -266,6 +263,7 @@ const emit = defineEmits<{
   (e: "ask-ai", payload: LatencyHeatmapAskAi): void;
   (e: "create-alert"): void;
   (e: "add-to-dashboard"): void;
+  (e: "refresh-failed"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -280,7 +278,7 @@ const DAY_US = 24 * 3600 * 1_000_000;
 
 const status = ref<"idle" | "loading" | "ready" | "empty" | "unavailable" | "error">("idle");
 const grid = shallowRef<LatencyHeatmapGrid | null>(null);
-const colorBy = ref<"spans" | "errors">("spans");
+const colorBy = ref<LatencyHeatmapColorBy>("spans");
 // The box the user drew, kept in grid cells; it shows only while the parent holds its selection.
 const drawn = shallowRef<{ selection: LatencyHeatmapSelection; cells: HeatmapCellRange } | null>(
   null,
@@ -288,25 +286,42 @@ const drawn = shallowRef<{ selection: LatencyHeatmapSelection; cells: HeatmapCel
 const popoverOpen = ref(false);
 // Once filtered, the box stands for the staged filter, so only Clear or a reload may erase it.
 const filtered = ref(false);
+// Kept apart from status so a re-run keeps the drawn grid instead of the loading block.
+const refetching = ref(false);
+const chartPainted = ref(false);
+watch(status, (now) => {
+  if (now !== "ready") chartPainted.value = false;
+});
 
 let controller: AbortController | null = null;
+let shownStream: string | undefined;
+let drawnSource: string | undefined;
 
 const isCanceled = (e: any) => e?.name === "CanceledError" || e?.code === "ERR_CANCELED";
 
 async function load(request: LatencyHeatmapRequest | null) {
   controller?.abort();
   controller = null;
-  grid.value = null;
+  refetching.value = false;
   drawn.value = null;
   popoverOpen.value = false;
   filtered.value = false;
   if (!request) {
+    grid.value = null;
     status.value = "idle";
     return;
   }
   const mine = new AbortController();
   controller = mine;
-  status.value = "loading";
+  const requestSource = props.source;
+  const sameStream = props.stream === shownStream;
+  shownStream = props.stream;
+  if (sameStream && (status.value === "ready" || status.value === "empty")) {
+    refetching.value = true;
+  } else {
+    grid.value = null;
+    status.value = "loading";
+  }
   try {
     // Not a TanStack query: search reads are excluded from client caching (ui-architect data-fetching); the server cache still applies.
     const res: any = await searchService.search({
@@ -330,18 +345,30 @@ async function load(request: LatencyHeatmapRequest | null) {
       console.warn("Latency heatmap reached its row limit; the grid may be truncated");
     }
     if (!hits.length) {
+      grid.value = null;
       status.value = "empty";
+      drawnSource = requestSource;
       return;
     }
     if (!intervalSec) {
+      grid.value = null;
       status.value = "unavailable";
       return;
     }
     grid.value = buildHeatmapGrid(hits, intervalSec, request.startTime, request.endTime);
     status.value = grid.value ? "ready" : "empty";
+    drawnSource = requestSource;
   } catch (e: any) {
     if (isCanceled(e) || controller !== mine) return;
+    // A failed refresh keeps what was drawn at full opacity; the results header reports the failure (ruling 18).
+    if (refetching.value && requestSource === drawnSource) {
+      emit("refresh-failed");
+      return;
+    }
+    grid.value = null;
     status.value = "error";
+  } finally {
+    if (controller === mine) refetching.value = false;
   }
 }
 
@@ -524,6 +551,9 @@ const shownBox = computed<{
     }),
   };
 });
+
+// One object per grid, so ChartRenderer's first-frame check is not reset by an unrelated re-render.
+const chartData = computed(() => ({ options: options.value }));
 
 const onDataZoom = (box: HeatmapBox) => {
   if (!grid.value) return;

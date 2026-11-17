@@ -222,17 +222,64 @@ describe("copyToClipboard in-place confirmation", () => {
     expect(toast).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the error toast and shows no confirmation when the copy fails", async () => {
-    vi.stubGlobal("navigator", { ...navigator, clipboard: undefined });
-    Object.defineProperty(document, "execCommand", { value: () => false, configurable: true });
-    press(addButton());
+  describe("when the copy fails", () => {
+    beforeEach(() => {
+      vi.stubGlobal("navigator", { ...navigator, clipboard: undefined });
+      Object.defineProperty(document, "execCommand", { value: () => false, configurable: true });
+    });
 
-    expect(await copyToClipboard("x", t, { errorMessage: raw("Link not copied") })).toBe(false);
-    expect(copyConfirm.open).toBe(false);
-    expect(toast).toHaveBeenCalledWith({
-      variant: "error",
-      message: "Link not copied",
-      timeout: 2000,
+    it("shows the failure red on the control instead of a toast", async () => {
+      const button = addButton();
+      press(button);
+
+      expect(await copyToClipboard("x", t, { errorMessage: raw("Link not copied") })).toBe(false);
+      expect(copyConfirm.open).toBe(true);
+      expect(copyConfirm.anchor).toBe(button);
+      expect(copyConfirm.tone).toBe("error");
+      expect(copyConfirm.message).toBe("Link not copied");
+      expect(toast).not.toHaveBeenCalled();
+    });
+
+    it("says Couldn't copy on the control when the caller has no message", async () => {
+      press(addButton());
+      await copyToClipboard("x", t);
+      expect(copyConfirm.message).toBe("common.couldntCopy");
+      expect(copyConfirm.tone).toBe("error");
+    });
+
+    it("toasts the error when no control was activated", async () => {
+      expect(await copyToClipboard("x", t, { errorMessage: raw("Link not copied") })).toBe(false);
+      expect(copyConfirm.open).toBe(false);
+      expect(toast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "Link not copied",
+        timeout: 2000,
+      });
+    });
+
+    it("toasts the error when the control leaves before the failure is seen", async () => {
+      vi.useFakeTimers();
+      const button = addButton();
+      press(button);
+      await copyToClipboard("x", t);
+
+      button.remove();
+      vi.advanceTimersByTime(250);
+      expect(copyConfirm.open).toBe(false);
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    it("turns the next successful copy back to the success tone", async () => {
+      press(addButton());
+      await copyToClipboard("x", t);
+      vi.stubGlobal("navigator", {
+        ...navigator,
+        clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+      });
+      press(addButton());
+      await copyToClipboard("x", t);
+      expect(copyConfirm.tone).toBe("success");
+      expect(copyConfirm.message).toBe("common.copied");
     });
   });
 

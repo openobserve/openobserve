@@ -3,6 +3,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import OTime from "./OTime.vue";
+import ODate from "../Date/ODate.vue";
 
 describe("OTime", () => {
   let wrapper: VueWrapper;
@@ -22,6 +23,16 @@ describe("OTime", () => {
       props: { label: "Meeting time" },
     });
     expect(wrapper.text()).toContain("Meeting time");
+  });
+
+  it.each([true, false])("labels_itself_like_the_date_field_when_disabled_is_%s", (disabled) => {
+    wrapper = mount(OTime, { attachTo: document.body, props: { label: "End time", disabled } });
+    const date = mount(ODate, { attachTo: document.body, props: { label: "End date", disabled } });
+    expect(wrapper.find("label").classes().sort()).toEqual(date.find("label").classes().sort());
+    expect(wrapper.find("label").classes().includes("text-input-label-text-disabled")).toBe(
+      disabled,
+    );
+    date.unmount();
   });
 
   it("should render label slot content", () => {
@@ -189,16 +200,89 @@ describe("OTime", () => {
       expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["07:05"]);
     });
 
-    it("reverts an unparseable or out-of-range entry without emitting", async () => {
+    it.each([
+      ["0930", "09:30"],
+      ["930", "09:30"],
+      ["7:5", "07:05"],
+      ["23:59", "23:59"],
+    ])("reads a typed %s as %s", async (typed, value) => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, modelValue: "" },
+      });
+      const input = wrapper.find('input[type="text"]');
+      (input.element as HTMLInputElement).value = typed;
+      await input.trigger("change");
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([value]);
+      expect((input.element as HTMLInputElement).value).toBe(value);
+    });
+
+    it.each(["25:99", "ab:cd", "29:77", "12345"])(
+      "keeps an unreadable %s on screen, says why and marks the input invalid, without emitting (T4-14)",
+      async (typed) => {
+        wrapper = mount(OTime, {
+          attachTo: document.body,
+          props: { format24: true, modelValue: "09:00" },
+        });
+        const input = wrapper.find('input[type="text"]');
+        (input.element as HTMLInputElement).value = typed;
+        await input.trigger("change");
+        expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+        expect((input.element as HTMLInputElement).value).toBe(typed);
+        const alert = wrapper.get('[role="alert"]');
+        expect(alert.text()).toBe("Enter a time as HH:MM.");
+        expect(input.attributes("aria-invalid")).toBe("true");
+        expect(input.attributes("aria-describedby")).toBe(alert.attributes("id"));
+        (input.element as HTMLInputElement).value = "10:15";
+        await input.trigger("change");
+        expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+        expect(input.attributes("aria-invalid")).toBeUndefined();
+        expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["10:15"]);
+      },
+    );
+
+    it("tells the caller while a typed entry is unreadable (V-N3)", async () => {
       wrapper = mount(OTime, {
         attachTo: document.body,
         props: { format24: true, modelValue: "09:00" },
       });
       const input = wrapper.find('input[type="text"]');
-      (input.element as HTMLInputElement).value = "25:99";
+      (input.element as HTMLInputElement).value = "99:99";
       await input.trigger("change");
-      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+      expect(wrapper.emitted("invalid")?.at(-1)).toEqual([true]);
+      (input.element as HTMLInputElement).value = "10:15";
+      await input.trigger("change");
+      expect(wrapper.emitted("invalid")?.at(-1)).toEqual([false]);
+      (input.element as HTMLInputElement).value = "ab";
+      await input.trigger("change");
+      await wrapper.setProps({ modelValue: "11:00" });
+      expect(wrapper.emitted("invalid")?.at(-1)).toEqual([false]);
+    });
+
+    it("clears an unreadable entry when the same time as before is typed back", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, modelValue: "09:00" },
+      });
+      const input = wrapper.find('input[type="text"]');
+      (input.element as HTMLInputElement).value = "ab";
+      await input.trigger("change");
+      (input.element as HTMLInputElement).value = "9:00";
+      await input.trigger("change");
       expect((input.element as HTMLInputElement).value).toBe("09:00");
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    });
+
+    it("links a caller's error message to the input", () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, errorMessage: "Choose a digest time as HH:MM." },
+      });
+      const input = wrapper.find('input[type="text"]');
+      expect(input.attributes("aria-invalid")).toBe("true");
+      expect(input.attributes("aria-describedby")).toBe(
+        wrapper.get('[role="alert"]').attributes("id"),
+      );
     });
 
     it("hides the AM/PM toggle in the popup", async () => {

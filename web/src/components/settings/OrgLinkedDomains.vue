@@ -194,6 +194,7 @@ import {
   updateOrgSettingsMutation,
   verifyOrgDomainMutation,
 } from "@/services/organizations.queries";
+import analytics from "@/services/product_analytics";
 import OrgDomainDetailsDialog from "./OrgDomainDetailsDialog.vue";
 import OrgLinkDomainDialog from "./OrgLinkDomainDialog.vue";
 import type { LinkMethod } from "./OrgDomainMapping.schema";
@@ -403,6 +404,7 @@ async function submitLink(domain: string, method: LinkMethod): Promise<boolean> 
       });
       return false;
     }
+    analytics.track("org_domain_link_requested");
     toast({ variant: "success", message: t("settings.orgDomainMapping.requestSent") });
     return true;
   }
@@ -422,6 +424,7 @@ async function submitLink(domain: string, method: LinkMethod): Promise<boolean> 
     });
     return false;
   }
+  analytics.track("org_domain_linked");
   openOnArrival.value = domain;
   openArrivedRecord();
   toast({ variant: "success", message: t("settings.orgDomainMapping.linked") });
@@ -434,6 +437,9 @@ async function verify(domain: string) {
   verifyingDomain.value = domain;
   try {
     const res = await verifyDomain.mutateAsync(domain);
+    analytics.track("org_domain_verify_checked", {
+      verified: res?.data?.verification_state === 1,
+    });
     if (res?.data?.verification_state === 1) {
       toast({ variant: "success", message: t("settings.orgDomainMapping.verified") });
     } else {
@@ -491,6 +497,7 @@ async function remove(row: LinkedDomainRow) {
     });
     return;
   }
+  analytics.track("org_domain_unlinked", { with_mappings: mappedCount > 0 });
   toast({ variant: "success", message: t("settings.orgDomainMapping.removed") });
 }
 

@@ -323,7 +323,7 @@ describe("SyntheticMonitoring", () => {
       useListViewState("synthetics", {
         folder: "",
         activeTab: "all",
-        statusFilter: "all",
+        statusFilter: [] as string[] | string,
         typeFilter: "all",
         locationFilter: "all",
         search: "",
@@ -353,6 +353,16 @@ describe("SyntheticMonitoring", () => {
       expect(mt.props("pageSize")).toBe(50);
       expect(mt.props("sortBy")).toBe("name");
       expect(mt.props("sortOrder")).toBe("desc");
+    });
+
+    it("restores a legacy single status and saves picked statuses as a list", async () => {
+      Object.assign(seed(), { statusFilter: "failed" });
+      wrapper = mountPage();
+      const vm = wrapper.vm as any;
+      expect(vm.statusFilters).toEqual(["failed"]);
+      vm.statusFilters = ["failed", "warning"];
+      await nextTick();
+      expect(seed().statusFilter).toEqual(["failed", "warning"]);
     });
 
     it("restores the type tab and drops the stored page when the folder differs", () => {
@@ -1122,6 +1132,48 @@ describe("SyntheticMonitoring", () => {
       await flushPromises();
 
       expect(mockServiceRun).toHaveBeenCalledWith("default", "mon-9", {}, "f_ksuid_prod");
+    });
+  });
+
+  describe("run class", () => {
+    const table = () => wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+    const base = {
+      type: "http",
+      frequency: { type: "minutes", interval: 5 },
+      last_response_ms: null,
+      last_check_at: null,
+      enabled: true,
+      folder_id: "default",
+    };
+
+    it("badges the run class and falls back to last_check_status without one", async () => {
+      mockServiceList.mockResolvedValue({
+        data: {
+          monitors: [
+            {
+              ...base,
+              id: "a",
+              name: "a",
+              status: "error",
+              last_run_class: 4,
+              last_run_class_at: 7,
+            },
+            { ...base, id: "b", name: "b", status: "failed", last_run_class: 2 },
+            { ...base, id: "c", name: "c", status: "error", last_run_class: 0 },
+            { ...base, id: "d", name: "d", status: "passed" },
+          ],
+        },
+      });
+      wrapper = mountPage();
+      await flushPromises();
+
+      const rows = table().props("data") as { id: string; status: string; statusSince: number }[];
+      const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+      expect(byId.a.status).toBe("not_measured");
+      expect(byId.a.statusSince).toBe(7);
+      expect(byId.b.status).toBe("partial");
+      expect(byId.c.status).toBe("error");
+      expect(byId.d.status).toBe("passed");
     });
   });
 

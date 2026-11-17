@@ -31,7 +31,7 @@ pub struct SearchInspectorEvent {
 }
 
 #[cfg(feature = "enterprise")]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SearchInspector {
     pub sql: String,
     pub start_time: String,
@@ -43,7 +43,7 @@ pub struct SearchInspector {
     pub events: Vec<SearchInspectorFields>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SearchInspectorFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
@@ -64,6 +64,7 @@ pub struct SearchInspectorFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sql: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Vec<String>>)]
     pub time_range: Option<(String, String)>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scan_size: Option<usize>,
@@ -76,6 +77,8 @@ pub struct SearchInspectorFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cluster: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    // A self-referencing schema would abort MCP tool loading.
+    #[schema(value_type = Option<Vec<Object>>)]
     pub events: Option<Vec<SearchInspectorFields>>,
 }
 

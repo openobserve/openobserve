@@ -13,8 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref, watch, type Ref } from "vue";
+import { computed, type Ref } from "vue";
 import type { HistogramTitleParts } from "@/composables/useLogs/searchState";
+import {
+  resolveSettled,
+  useSettledValue,
+  type SettledInput,
+  type SettledState,
+} from "@/composables/useSettledValue";
 
 export interface SummaryInput {
   loading: boolean;
@@ -37,6 +43,11 @@ export interface SettledSummary {
   pageCount: number | null;
 }
 
+interface SummaryValue {
+  parts: HistogramTitleParts | null;
+  pageCount: number;
+}
+
 export interface HistogramViewInput {
   showHistogram: boolean;
   hasChart: boolean;
@@ -56,10 +67,16 @@ export interface HistogramView {
 
 export const EMPTY_SETTLED: SettledSummary = { parts: null, pageCount: null };
 
-const settledView = (parts: HistogramTitleParts | null, pageCount: number): SummaryView => ({
-  parts,
-  updating: false,
-  pageCount,
+const summarySettledInput = (input: SummaryInput): SettledInput<SummaryValue> => ({
+  value: { parts: input.failed ? null : input.parts, pageCount: input.pageCount },
+  // Rows can land before the count's parts, so the chips wait for the parts instead of blanking.
+  busy: input.loading || input.loadingHistogram || (!input.failed && !input.parts && input.hasHits),
+});
+
+const summaryView = (state: SettledState<SummaryValue>): SummaryView => ({
+  parts: state.value?.parts ?? null,
+  updating: state.stale || state.loading,
+  pageCount: state.value?.pageCount ?? 1,
 });
 
 /** Decides what the status bar shows: values change only when a run settles, never per partition. */
@@ -67,24 +84,15 @@ export const resolveSummary = (
   input: SummaryInput,
   settled: SettledSummary,
 ): { view: SummaryView; settled: SettledSummary } => {
-  const busy = input.loading || input.loadingHistogram;
-  if (!busy && (input.failed || (!input.parts && !input.hasHits))) {
-    return {
-      view: settledView(null, input.pageCount),
-      settled: { parts: null, pageCount: input.pageCount },
-    };
-  }
-  if (!busy && input.parts) {
-    return {
-      view: settledView(input.parts, input.pageCount),
-      settled: { parts: input.parts, pageCount: input.pageCount },
-    };
-  }
-  const pageCount = settled.pageCount ?? 1;
-  if (settled.parts) {
-    return { view: { parts: settled.parts, updating: true, pageCount }, settled };
-  }
-  return { view: { parts: null, updating: true, pageCount }, settled };
+  const snapshot =
+    settled.pageCount === null
+      ? null
+      : { key: undefined, value: { parts: settled.parts, pageCount: settled.pageCount } };
+  const next = resolveSettled(summarySettledInput(input), snapshot);
+  return {
+    view: summaryView(next.state),
+    settled: next.snapshot ? next.snapshot.value : EMPTY_SETTLED,
+  };
 };
 
 /** Picks one histogram state per run so partitions never repaint the chart or flash "No data". */
@@ -101,17 +109,7 @@ export const resolveHistogramView = (input: HistogramViewInput): HistogramView =
 };
 
 /** Holds the last settled status-bar values and exposes what to render for the live inputs. */
-export const useSettledSummary = (read: () => SummaryInput): Ref<SummaryView> => {
-  let settled: SettledSummary = EMPTY_SETTLED;
-  const view = ref<SummaryView>(settledView(null, 1));
-  watch(
-    read,
-    (input) => {
-      const next = resolveSummary(input, settled);
-      settled = next.settled;
-      view.value = next.view;
-    },
-    { immediate: true },
-  );
-  return view;
+export const useSettledSummary = (read: () => SummaryInput): Readonly<Ref<SummaryView>> => {
+  const { state } = useSettledValue(() => summarySettledInput(read()));
+  return computed(() => summaryView(state.value));
 };

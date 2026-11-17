@@ -16,7 +16,7 @@
 
 import { expect } from '@playwright/test';
 import fs from 'fs';
-import { CommonActions } from '../commonActions';
+import { CommonActions, showAllAlertStates } from '../commonActions';
 import { AlertCreationWizard } from './alertCreationWizard.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
 import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
@@ -90,15 +90,17 @@ export class AlertsPage {
             queryTabsContainer: '[data-test="step2-query-tabs"]',
             viewEditorButton: '[data-test="step2-view-editor-btn"]',
             conditionsTabsContainer: '[data-test="scheduled-alert-tabs"]',
-            conditionColumnSelect: '[data-test="alert-conditions-select-column"]',
-            operatorSelect: '[data-test="alert-conditions-operator-select"]',
-            conditionValueInput: '[data-test="alert-conditions-value-input"]',
-            addConditionButton: '[data-test="alert-conditions-add-condition-btn"]',
-            addFirstConditionButton: '[data-test="alert-conditions-add-btn"]',
-            addConditionGroupButton: '[data-test="alert-conditions-add-condition-group-btn"]',
-            deleteConditionButton: '[data-test="alert-conditions-delete-condition-btn"]',
-            columnInput: '[data-test="alert-conditions-select-column"]',
-            valueInput: '[data-test="alert-conditions-value-input"]',
+            // The shared condition builder (FilterBuilder, prefix "alert-conditions"): one chip per
+            // condition with -field / -operator / -value / -remove parts; the picker adds new ones.
+            conditionColumnSelect: '[data-test^="alert-conditions-chip-"][data-test$="-field"]',
+            operatorSelect: '[data-test^="alert-conditions-chip-"][data-test$="-operator"]',
+            conditionValueInput: '[data-test^="alert-conditions-chip-"][data-test$="-value"]',
+            addConditionButton: '[data-test="alert-conditions-add-condition"]',
+            addFirstConditionButton: '[data-test="alert-conditions-empty-row"]',
+            addConditionGroupButton: '[data-test="alert-conditions-add-group"]',
+            deleteConditionButton: '[data-test^="alert-conditions-chip-"][data-test$="-remove"]',
+            columnInput: '[data-test^="alert-conditions-chip-"][data-test$="-field"]',
+            valueInput: '[data-test^="alert-conditions-chip-"][data-test$="-value"]',
             stepQueryConfig: '.step-query-config',
 
             // Step 3: Compare with Past (Scheduled only)
@@ -265,7 +267,7 @@ export class AlertsPage {
             tracesTab: '[data-test="incident-traces-tab"]',
 
             // Incident detail — Service Graph content
-            serviceGraphContainer: '.incident-service-graph',
+            serviceGraphContainer: '[data-test="incident-unfold-graph"], [data-test="incident-unfold-empty"]',
 
             // Telemetry tab state selectors
             loadingSpinner: '[data-test="incident-telemetry-loading-indicator"]',
@@ -795,6 +797,38 @@ export class AlertsPage {
         return this.management.openCloneDialog(alertName);
     }
 
+    rowLastOutcome(alertName) {
+        return this.management.rowLastOutcome(alertName);
+    }
+
+    async openAlertListAndSearch(search, org) {
+        return this.management.openAlertListAndSearch(search, org);
+    }
+
+    async expectRowsFiring(org, search, names) {
+        return this.management.expectRowsFiring(org, search, names);
+    }
+
+    async holdAlertDetailLoad(alertId) {
+        return this.management.holdAlertDetailLoad(alertId);
+    }
+
+    waitForAlertDetailLoad(alertId) {
+        return this.management.waitForAlertDetailLoad(alertId);
+    }
+
+    alertDetailUrl(alertId) {
+        return this.management.alertDetailUrl(alertId);
+    }
+
+    async saveCloneDialog() {
+        return this.management.saveCloneDialog();
+    }
+
+    async settlePendingUiTasks() {
+        return this.management.settlePendingUiTasks();
+    }
+
     cloneSaveButton() {
         return this.management.cloneSaveButton();
     }
@@ -1275,6 +1309,11 @@ export class AlertsPage {
             .filter({ hasText: label })
             .first()
             .click();
+        // Focus returns to the trigger as the select closes, so an Enter pressed before that would reopen it.
+        await expect(
+            this.page.locator(`${this.locators.prioritySelect} [data-test$="-trigger"]`).first()
+        ).toHaveAttribute('aria-expanded', 'false', { timeout: 5000 });
+        await expect(this.page.locator('[data-test="alert-priority-select-popover"]')).toHaveCount(0, { timeout: 5000 });
         testLogger.info('Selected alert priority', { label });
     }
 
@@ -2130,6 +2169,7 @@ export class AlertsPage {
     async waitForAlertListPageReady() {
         await this.page.locator(this.locators.alertListPage).waitFor({ state: 'visible', timeout: 30000 });
         await this.page.waitForTimeout(2000);
+        await showAllAlertStates(this.page);
     }
 
     /**
@@ -2746,6 +2786,7 @@ export class AlertsPage {
         overview:         'incident-overview-tab',
         activity:         'incident-activity-tab',
         incidentAnalysis: 'incident-analysis-tab',
+        report:           'incident-report-tab',
         serviceGraph:     'incident-alert-graph-tab',
         alertTriggers:    'incident-alert-triggers-tab',
         logs:             'incident-logs-tab',
@@ -2755,7 +2796,7 @@ export class AlertsPage {
 
     /**
      * Click a tab on the incident detail page by its data-test attribute.
-     * @param {string} tabName - One of: overview, activity, incidentAnalysis, serviceGraph, alertTriggers, logs, metrics, traces
+     * @param {string} tabName - One of: overview, activity, incidentAnalysis, report, serviceGraph, alertTriggers, logs, metrics, traces
      */
     async clickIncidentDetailTab(tabName) {
         testLogger.info(`Clicking incident detail tab: ${tabName}`);
@@ -2773,8 +2814,8 @@ export class AlertsPage {
     /**
      * Verify the service graph tab content rendered.
      * Tabs are v-if gated (no tab-panel wrapper). The serviceGraph tab
-     * renders IncidentServiceGraph inside an absolute-positioned div.
-     * Checks for the .incident-service-graph container OR the detail page
+     * renders IncidentUnfoldGraph inside an absolute-positioned div.
+     * Checks for the unfold graph or its empty state OR the detail page
      * still being visible (confirming no crash).
      */
     async expectServiceGraphTabContentVisible() {
@@ -4859,6 +4900,7 @@ export class AlertsPage {
         const tabQuery = tab ? `&tab=${tab}` : '';
         await this.page.goto(`/web/alerts?org_identifier=${org}&folder=${folderId}${tabQuery}`);
         await expect(this.page.locator('[data-test="alert-list-table"]')).toBeVisible({ timeout: 30000 });
+        await showAllAlertStates(this.page);
     }
 
     _alertRowByName(name) {
@@ -4896,7 +4938,7 @@ export class AlertsPage {
     }
 
     async expectLastOutcome(name, text) {
-        await expect(this.page.locator(`[data-test="alert-list-${name}-last-outcome"]`)).toHaveText(text, { timeout: 20000 });
+        await expect(this.rowLastOutcome(name)).toHaveText(text, { timeout: 20000 });
     }
 
     /** Throws when no element renders exactly the full name, since measuring the whole cell could report "not clipped" by accident. */

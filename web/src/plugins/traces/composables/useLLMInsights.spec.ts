@@ -39,12 +39,20 @@ vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: vi.fn((s: string) => `b64(${s})`),
 }));
 
+// The stream stores span parents, so usage reads top-level agents via the agent-parent join.
+const mockHasParentSpan = vi.fn(async (_org: string, _stream: string) => true);
+vi.mock("../llmStreamColumns", () => ({
+  streamHasParentSpan: (org: string, stream: string) => mockHasParentSpan(org, stream),
+}));
+
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { flushPromises } from "@vue/test-utils";
 import { isRef } from "vue";
 import { useLLMInsights } from "./useLLMInsights";
-import { llmCallUsageSum } from "../config/llmInsightsPanels";
+import { traceUsageSum } from "../llmAttribution";
+import { agentParentsJoin } from "../config/llmInsightsPanels";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -58,6 +66,14 @@ beforeEach(() => {
  */
 function driveKpiHits(callbacks: any, row: Record<string, number>) {
   callbacks.data(null, { content: { results: { hits: [row] } } });
+}
+
+/** Fails a query like useStreamingSearch: `handlers.error(payload, serverBody)`. */
+function failQuery(callbacks: any, body: Record<string, unknown>) {
+  callbacks.error(
+    { queryReq: { query: {} } },
+    { content: { ...body, trace_id: "t" }, type: "error" },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -153,22 +169,38 @@ describe("useLLMInsights — fetchAll early returns", () => {
 // fetchAll — happy path
 // ---------------------------------------------------------------------------
 
-describe("useLLMInsights — fetchAll fires 2 parallel queries", () => {
-  it("kicks off histogram summary + P95 in parallel", () => {
+describe("useLLMInsights — fetchAll fires 3 parallel queries", () => {
+  it("kicks off histogram, whole-window counts + P95 in parallel", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
-    // histogram (summary + sparklines), whole-window P95 = 2 calls
-    expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2);
+    await flushPromises();
+    // histogram (sparklines), whole-window trace/error counts, P95 = 3 calls
+    expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(3);
+  });
+
+  // Distinct counts aren't additive across buckets, so tiles use a whole-window per-trace query.
+  it("counts traces and errored traces over the whole window, per trace", async () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("default", 100, 200);
+    await flushPromises();
+
+    const sql: string = mockFetchQueryDataWithHttpStream.mock.calls[1][0].queryReq.query.sql;
+    expect(sql).toContain("COUNT(*) as trace_count");
+    expect(sql).toContain("SUM(errored) as error_count");
+    expect(sql).toContain("max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as errored");
+    expect(sql).toContain("GROUP BY trace_id");
+    expect(sql).not.toContain("histogram(");
   });
 
   // The histogram interval is intentionally NOT passed — the backend
   // picks an appropriate bucket width for the query window. We assert
   // `histogram(_timestamp)` with no second argument.
-  it("does not pass an explicit interval to histogram()", () => {
+  it("does not pass an explicit interval to histogram()", async () => {
     const { fetchAll } = useLLMInsights();
     const start = 1_000_000;
     const end = start + 12 * 60 * 60 * 1_000_000;
     fetchAll("default", start, end);
+    await flushPromises();
 
     const calls = mockFetchQueryDataWithHttpStream.mock.calls;
     const sparklineCall = calls.find(([p]: any) => p.queryReq.query.sql.includes("GROUP BY ts"));
@@ -179,58 +211,120 @@ describe("useLLMInsights — fetchAll fires 2 parallel queries", () => {
     expect(sql).not.toMatch(/histogram\(_timestamp,/);
   });
 
-  // An agent span repeats its children's usage; the KPI totals must sum only
-  // LLM-call spans (same rule as the backend's trace/session totals).
-  it("sums tokens and cost only over LLM-call spans", () => {
+  // One shared per-trace rule (LLM-call usage, else top-level agents') in stream and agent mode.
+  it("totals each trace's usage with the shared rule in stream and agent mode", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
-
-    const calls = mockFetchQueryDataWithHttpStream.mock.calls;
-    const sql: string = calls.find(([p]) => p.queryReq.query.sql.includes("GROUP BY ts"))![0]
-      .queryReq.query.sql;
-    expect(sql).not.toMatch(/SUM\(\s*gen_ai_usage_/i);
-    expect(sql).toContain(
-      `COALESCE(${llmCallUsageSum("gen_ai_usage_total_tokens")}, 0) as total_tokens`,
-    );
-    expect(sql).toContain(`COALESCE(${llmCallUsageSum("gen_ai_usage_cost")}, 0) as total_cost`);
-  });
-
-  // Many SDKs tag only the agent span with the agent's identity, so an
-  // agent-scoped bucket may match no LLM-call span; it then sums what matched.
-  it("agent-scoped totals fall back to the matched spans when no LLM call matched", () => {
-    const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200, {
       name: "support-agent",
       source_stream: "default",
       source_stream_type: "traces",
     });
+    await flushPromises();
 
-    const sql: string = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]) =>
-      p.queryReq.query.sql.includes("GROUP BY ts"),
-    )![0].queryReq.query.sql;
-    for (const [column, alias] of [
-      ["gen_ai_usage_total_tokens", "total_tokens"],
-      ["gen_ai_usage_cost", "total_cost"],
-    ]) {
-      expect(sql).toContain(
-        `COALESCE(NULLIF(${llmCallUsageSum(column)}, 0), SUM(${column}), 0) as ${alias}`,
-      );
+    const totalsSqls = mockFetchQueryDataWithHttpStream.mock.calls
+      .map(([p]: any) => p.queryReq.query.sql as string)
+      .filter((sql) => sql.includes("GROUP BY trace_id"));
+    expect(totalsSqls).toHaveLength(2);
+    expect(totalsSqls[1]).toContain("support-agent");
+    for (const sql of totalsSqls) {
+      expect(sql).toContain(`${traceUsageSum("gen_ai_usage_total_tokens")} as tokens`);
+      expect(sql).toContain(`${traceUsageSum("gen_ai_usage_cost")} as cost`);
+      expect(sql).toContain("SUM(tokens) as total_tokens");
+      expect(sql).toContain("SUM(cost) as total_cost");
+      expect(sql).not.toMatch(/SUM\(\s*gen_ai_usage_/i);
+      // Top-level agents come from the agent-parent join.
+      expect(sql).toContain(`FROM "default"${agentParentsJoin("default", true)}`);
+    }
+  });
+
+  it("joins no parents on a stream without the parent column", async () => {
+    mockHasParentSpan.mockResolvedValueOnce(false);
+    const { fetchAll } = useLLMInsights();
+    fetchAll("flat", 100, 200);
+    await flushPromises();
+    expect(mockHasParentSpan).toHaveBeenCalledWith("test-org", "flat");
+    const usageSqls = mockFetchQueryDataWithHttpStream.mock.calls
+      .map(([p]: [{ queryReq: { query: { sql: string } } }]) => p.queryReq.query.sql)
+      .filter((sql) => sql.includes("gen_ai_usage_cost"));
+    expect(usageSqls).toHaveLength(2);
+    for (const sql of usageSqls) {
+      expect(sql).toContain(`FROM "flat"${agentParentsJoin("flat", false)}`);
+      expect(sql).not.toContain("reference_parent_span_id");
     }
   });
 });
 
+describe("useLLMInsights — a superseded fetchAll never lands", () => {
+  it("drops a slower earlier call's results and returns only the latest call's snapshot", async () => {
+    const { fetchAll, kpi } = useLLMInsights();
+    const first = fetchAll("stream_a", 100, 200);
+    const second = fetchAll("stream_b", 100, 200);
+    await flushPromises();
+    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
+
+    // The newer call (calls 3..5) finishes first.
+    cbs[3].complete();
+    driveKpiHits(cbs[4], { trace_count: 2, error_count: 0, total_tokens: 20, total_cost: 2 });
+    cbs[4].complete();
+    driveKpiHits(cbs[5], { p95_duration: 222 });
+    cbs[5].complete();
+    const latest = await second;
+
+    // The older call (calls 0..2) lands late.
+    cbs[0].complete();
+    driveKpiHits(cbs[1], { trace_count: 9, error_count: 9, total_tokens: 90, total_cost: 9 });
+    cbs[1].complete();
+    driveKpiHits(cbs[2], { p95_duration: 999 });
+    cbs[2].complete();
+    expect(await first).toBeNull();
+
+    expect(kpi.value.totalCost).toBe(2);
+    expect(kpi.value.p95DurationMicros).toBe(222);
+    expect(latest?.kpi.totalCost).toBe(2);
+    expect(latest?.kpi.p95DurationMicros).toBe(222);
+  });
+
+  // A cache restore must not be overwritten by the previous stream's in-flight load.
+  it("a cache restore supersedes an in-flight load and ends its loading flags", async () => {
+    const { fetchAll, restore, kpi, sparklines, loading, p95Loading } = useLLMInsights();
+    const inFlight = fetchAll("stream_a", 100, 200);
+    expect(loading.value).toBe(true);
+    const cached = {
+      kpi: { ...kpi.value, traceCount: 5, totalCost: 5, p95DurationMicros: 555 },
+      sparklines: { ...sparklines.value, cost: [1] },
+    };
+    restore(cached);
+    expect(loading.value).toBe(false);
+    expect(p95Loading.value).toBe(false);
+    await flushPromises();
+
+    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
+    cbs[0].complete();
+    driveKpiHits(cbs[1], { trace_count: 9, error_count: 9, total_tokens: 90, total_cost: 9 });
+    cbs[1].complete();
+    driveKpiHits(cbs[2], { p95_duration: 999 });
+    cbs[2].complete();
+    expect(await inFlight).toBeNull();
+
+    expect(kpi.value.totalCost).toBe(5);
+    expect(kpi.value.p95DurationMicros).toBe(555);
+    expect(sparklines.value.cost).toEqual([1]);
+    expect(loading.value).toBe(false);
+  });
+});
+
 describe("useLLMInsights — fetchAll resolves and populates KPI on success", () => {
-  // The additive KPI totals (requests/traces/errors/tokens/cost) are
-  // SUMMED across the histogram buckets; P95 comes from its own
-  // whole-window query. call 0 = histogram, call 1 = P95.
-  it("sums histogram buckets for totals and takes P95 from its own query", async () => {
+  // call 0 = histogram (requests summed), call 1 = per-trace totals, call 2 = P95.
+  it("sums histogram buckets for requests and takes the other totals and P95 from their own queries", async () => {
     const { fetchAll, kpi, hasLoadedOnce, error } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     // The mock keeps every fetch's callbacks; complete each in turn.
     const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
 
-    // Histogram — two buckets that sum to the whole-window totals.
+    // Histogram — two buckets; a trace crossing the boundary is in both.
     allCallbacks[0].data(null, {
       content: {
         results: {
@@ -259,18 +353,27 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
     });
     allCallbacks[0].complete();
 
-    // P95 — the one whole-window aggregate.
-    driveKpiHits(allCallbacks[1], { p95_duration: 9_000 });
+    // Whole-window per-trace totals — counts fewer than the per-bucket sum (25 / 3).
+    driveKpiHits(allCallbacks[1], {
+      trace_count: 22,
+      error_count: 2,
+      total_tokens: 48_000,
+      total_cost: 1.2,
+    });
     allCallbacks[1].complete();
+
+    // P95 — the one whole-window aggregate.
+    driveKpiHits(allCallbacks[2], { p95_duration: 9_000 });
+    allCallbacks[2].complete();
 
     await promise;
 
     expect(kpi.value).toEqual({
       requestCount: 100,
-      traceCount: 25,
-      errorCount: 3,
-      totalTokens: 50_000,
-      totalCost: 1.23,
+      traceCount: 22,
+      errorCount: 2,
+      totalTokens: 48_000,
+      totalCost: 1.2,
       p95DurationMicros: 9_000,
     });
     expect(hasLoadedOnce.value).toBe(true);
@@ -285,6 +388,7 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
 
     expect(loading.value).toBe(true);
     expect(p95Loading.value).toBe(true);
+    await flushPromises();
 
     const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
 
@@ -307,18 +411,19 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
       },
     });
     allCallbacks[0].complete();
+    allCallbacks[1].complete();
     // Flush the summary promise chain (executeQuery → .then → .finally).
     await new Promise((r) => setTimeout(r));
 
     expect(loading.value).toBe(false);
     expect(hasLoadedOnce.value).toBe(true);
-    expect(kpi.value.totalCost).toBe(0.5);
+    expect(kpi.value.requestCount).toBe(5);
     // P95 hasn't resolved yet → its loader is still up.
     expect(p95Loading.value).toBe(true);
 
     // Now P95 resolves.
-    driveKpiHits(allCallbacks[1], { p95_duration: 7_000 });
-    allCallbacks[1].complete();
+    driveKpiHits(allCallbacks[2], { p95_duration: 7_000 });
+    allCallbacks[2].complete();
     await promise;
 
     expect(p95Loading.value).toBe(false);
@@ -329,6 +434,7 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
   it("degrades P95 to 0 and leaves the strip intact when the P95 query fails", async () => {
     const { fetchAll, kpi, error, p95Loading, hasLoadedOnce } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
 
@@ -351,11 +457,12 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
       },
     });
     allCallbacks[0].complete();
+    allCallbacks[1].complete();
     // P95 fails.
-    allCallbacks[1].error({ message: "boom" });
+    failQuery(allCallbacks[2], { message: "boom" });
     await promise;
 
-    expect(kpi.value.totalCost).toBe(0.5);
+    expect(kpi.value.requestCount).toBe(5);
     expect(kpi.value.p95DurationMicros).toBe(0);
     expect(p95Loading.value).toBe(false);
     expect(hasLoadedOnce.value).toBe(true);
@@ -368,17 +475,21 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
   it("coerces missing / NaN numeric fields to 0", async () => {
     const { fetchAll, kpi } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
     // Histogram bucket with garbage.
     driveKpiHits(allCallbacks[0], { request_count: "not-a-number" } as any);
     allCallbacks[0].complete();
-    // P95 with garbage.
-    driveKpiHits(allCallbacks[1], { p95_duration: "nope" } as any);
+    // Counts and P95 with garbage.
+    driveKpiHits(allCallbacks[1], { trace_count: "nope" } as any);
     allCallbacks[1].complete();
+    driveKpiHits(allCallbacks[2], { p95_duration: "nope" } as any);
+    allCallbacks[2].complete();
 
     await promise;
     expect(kpi.value.requestCount).toBe(0);
+    expect(kpi.value.traceCount).toBe(0);
     expect(kpi.value.totalCost).toBe(0);
     expect(kpi.value.p95DurationMicros).toBe(0);
   });
@@ -389,19 +500,18 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
 // ---------------------------------------------------------------------------
 
 describe("useLLMInsights — fetchAll error path", () => {
-  // A failure on ANY of the two queries should populate `error.value`
-  // and the dashboard renders its error state. We catch internally so
-  // callers don't need a try/catch.
-  it("captures error message and clears loading on rejection", async () => {
+  it("captures the server error message and clears loading on rejection", async () => {
     const { fetchAll, error, loading } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
-    allCallbacks[0].error({ message: "schema error" });
+    failQuery(allCallbacks[0], { code: 400, message: "Search field not found: no_such_col" });
     allCallbacks[1].complete();
+    allCallbacks[2].complete();
 
     await promise;
-    expect(error.value).toBe("schema error");
+    expect(error.value).toBe("Search field not found: no_such_col");
     expect(loading.value).toBe(false);
   });
 
@@ -410,10 +520,12 @@ describe("useLLMInsights — fetchAll error path", () => {
   it("falls back to generic message when error response has no text", async () => {
     const { fetchAll, error } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
-    allCallbacks[0].error({});
+    failQuery(allCallbacks[0], {});
     allCallbacks[1].complete();
+    allCallbacks[2].complete();
 
     await promise;
     // message picked up by executeQuery's "Failed to fetch query data"
@@ -427,10 +539,12 @@ describe("useLLMInsights — fetchAll error path", () => {
   it("does not set hasLoadedOnce on failure", async () => {
     const { fetchAll, hasLoadedOnce } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
-    allCallbacks[0].error({ message: "x" });
+    failQuery(allCallbacks[0], { message: "x" });
     allCallbacks[1].complete();
+    allCallbacks[2].complete();
 
     await promise;
     expect(hasLoadedOnce.value).toBe(false);
@@ -449,6 +563,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
   it("populates 5 series from a single bucket row", async () => {
     const { fetchAll, sparklines } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
     // Sparkline row (histogram = call 0)
@@ -470,8 +585,9 @@ describe("useLLMInsights — sparklines accumulation", () => {
       },
     });
     allCallbacks[0].complete();
-    // P95 = call 1
+    // Counts = call 1, P95 = call 2
     allCallbacks[1].complete();
+    allCallbacks[2].complete();
 
     await promise;
     expect(sparklines.value.cost).toEqual([0.12]);
@@ -489,6 +605,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
   it("preserves bucket ordering across multiple rows", async () => {
     const { fetchAll, sparklines } = useLLMInsights();
     const promise = fetchAll("default", 1, 20_000_000);
+    await flushPromises();
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].data(null, {
@@ -519,6 +636,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
     });
     cbs[0].complete();
     cbs[1].complete();
+    cbs[2].complete();
 
     await promise;
     expect(sparklines.value.tokens).toEqual([100, 200]);
@@ -532,6 +650,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
   it("emits errorRate=0 for buckets with zero requests", async () => {
     const { fetchAll, sparklines } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].data(null, {
@@ -554,6 +673,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
     });
     cbs[0].complete();
     cbs[1].complete();
+    cbs[2].complete();
 
     await promise;
     expect(sparklines.value.errorRate).toEqual([0]);
@@ -575,6 +695,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
   it("sparkline errorRate never exceeds 100 even when error_count equals trace_count", async () => {
     const { fetchAll, sparklines } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].data(null, {
@@ -597,6 +718,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     });
     cbs[0].complete();
     cbs[1].complete();
+    cbs[2].complete();
 
     await promise;
     expect(sparklines.value.errorRate[0]).toBe(100);
@@ -605,6 +727,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
   it("sparkline errorRate is 0 when there are no error traces", async () => {
     const { fetchAll, sparklines } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].data(null, {
@@ -626,14 +749,16 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     });
     cbs[0].complete();
     cbs[1].complete();
+    cbs[2].complete();
 
     await promise;
     expect(sparklines.value.errorRate[0]).toBe(0);
   });
 
-  it("KPI SQL uses approx_distinct(trace_id) FILTER for error_count (not COUNT(*))", () => {
+  it("KPI SQL uses approx_distinct(trace_id) FILTER for error_count (not COUNT(*))", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
+    await flushPromises();
 
     const kpiCall = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
       p.queryReq.query.sql.includes("approx_percentile_cont(duration, 0.95)"),
@@ -649,9 +774,10 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     );
   });
 
-  it("sparkline SQL uses approx_distinct(trace_id) FILTER for error_count", () => {
+  it("sparkline SQL uses approx_distinct(trace_id) FILTER for error_count", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
+    await flushPromises();
 
     const sparkCall = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
       p.queryReq.query.sql.includes("GROUP BY ts"),
@@ -664,9 +790,10 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     );
   });
 
-  it("whole-window P95 SQL is a lean, LLM-scoped query (no histogram)", () => {
+  it("whole-window P95 SQL is a lean, LLM-scoped query (no histogram)", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
+    await flushPromises();
 
     // The P95 card comes from its own whole-window query — the one that
     // has approx_percentile but is NOT the bucketed histogram.
@@ -688,9 +815,10 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     expect(sql).not.toContain("gen_ai_usage_cost");
   });
 
-  it("sparkline SQL scopes p95 latency to LLM calls via per-aggregate FILTER", () => {
+  it("sparkline SQL scopes p95 latency to LLM calls via per-aggregate FILTER", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
+    await flushPromises();
 
     const sparkCall = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
       p.queryReq.query.sql.includes("GROUP BY ts"),
@@ -715,17 +843,16 @@ describe("useLLMInsights — cancelAll", () => {
     expect(mockCancelStreamQuery).not.toHaveBeenCalled();
   });
 
-  // After kicking off fetchAll, both trace IDs are active. cancelAll
-  // should cancel them all and pass the org ID for routing.
-  it("cancels every in-flight trace ID with the current org ID", () => {
+  it("cancels every in-flight trace ID with the current org ID", async () => {
     const { fetchAll, cancelAll } = useLLMInsights();
     fetchAll("default", 100, 200);
+    await flushPromises();
 
     cancelAll();
-    expect(mockCancelStreamQuery).toHaveBeenCalledTimes(2);
-    // Verify both trace IDs were passed (order doesn't matter).
+    expect(mockCancelStreamQuery).toHaveBeenCalledTimes(3);
+    // Verify every trace ID was passed (order doesn't matter).
     const traceIds = mockCancelStreamQuery.mock.calls.map((c) => (c[0] as any).trace_id);
-    expect(traceIds).toEqual(expect.arrayContaining(["trace-1", "trace-2"]));
+    expect(traceIds).toEqual(expect.arrayContaining(["trace-1", "trace-2", "trace-3"]));
     // Every cancel includes the org id from the (mocked) store.
     for (const [arg] of mockCancelStreamQuery.mock.calls) {
       expect((arg as any).org_id).toBe("test-org");
@@ -733,13 +860,15 @@ describe("useLLMInsights — cancelAll", () => {
   });
 
   // Once a query completes, its trace ID is removed from the active list.
-  it("does not cancel queries that already completed", () => {
+  it("does not cancel queries that already completed", async () => {
     const { fetchAll, cancelAll } = useLLMInsights();
     fetchAll("default", 100, 200);
+    await flushPromises();
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].complete();
     cbs[1].complete();
+    cbs[2].complete();
 
     cancelAll();
     expect(mockCancelStreamQuery).not.toHaveBeenCalled();
@@ -750,10 +879,12 @@ describe("useLLMInsights — cancelAll", () => {
   it("does not cancel queries that already errored", async () => {
     const { fetchAll, cancelAll } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
+    await flushPromises();
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
-    cbs[0].error({ message: "x" });
+    failQuery(cbs[0], { message: "x" });
     cbs[1].complete();
+    cbs[2].complete();
     await promise;
 
     cancelAll();
@@ -769,9 +900,10 @@ describe("useLLMInsights — SQL surface", () => {
   // Pin the column names the queries reference. A future schema rename
   // (e.g. dropping `gen_ai_*`) needs to update these together with the
   // backend, and the test failure here will point that out immediately.
-  it("KPI query references the OTEL gen_ai_* fields", () => {
+  it("KPI query references the OTEL gen_ai_* fields", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
+    await flushPromises();
 
     const kpiCall = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
       p.queryReq.query.sql.includes("approx_percentile_cont(duration, 0.95)"),
@@ -793,9 +925,10 @@ describe("useLLMInsights — SQL surface", () => {
   // Sparkline query bins by `histogram(_timestamp)` (no explicit interval —
   // the backend picks the bucket width) and groups+orders by ts. Without
   // ORDER BY, the chart x-axis is arbitrary.
-  it("sparkline query buckets by histogram(_timestamp) with no interval and orders by ts", () => {
+  it("sparkline query buckets by histogram(_timestamp) with no interval and orders by ts", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
+    await flushPromises();
 
     const sparkCall = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
       p.queryReq.query.sql.includes("GROUP BY ts"),
@@ -810,9 +943,10 @@ describe("useLLMInsights — SQL surface", () => {
 
   // Both queries quote the stream name — important for streams whose
   // names contain hyphens, dots, or other identifier-unsafe chars.
-  it("quotes the stream name in both KPI and sparkline queries", () => {
+  it("quotes the stream name in both KPI and sparkline queries", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("my-stream.test", 100, 200);
+    await flushPromises();
 
     const sqls = mockFetchQueryDataWithHttpStream.mock.calls.map(
       ([p]: any) => p.queryReq.query.sql,
@@ -822,7 +956,7 @@ describe("useLLMInsights — SQL surface", () => {
     }
   });
 
-  it("agent-scoped KPI and sparkline queries use direct canonical agent predicates", () => {
+  it("agent-scoped KPI and sparkline queries use direct canonical agent predicates", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("agent-stream", 100, 200, {
       name: "support-agent",
@@ -830,11 +964,12 @@ describe("useLLMInsights — SQL surface", () => {
       source_stream: "agent-stream",
       source_stream_type: "traces",
     });
+    await flushPromises();
 
     const sqls = mockFetchQueryDataWithHttpStream.mock.calls.map(
       ([p]: any) => p.queryReq.query.sql,
     );
-    expect(sqls).toHaveLength(2);
+    expect(sqls).toHaveLength(3);
     for (const sql of sqls) {
       expect(sql).toContain(`gen_ai_agent_id = 'agent-123'`);
       expect(sql).not.toContain("trace_id IN (SELECT trace_id");

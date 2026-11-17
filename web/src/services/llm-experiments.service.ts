@@ -204,6 +204,8 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   taskOutcomes?: ExperimentTaskOutcomes | null;
   scoreOutcomes?: ExperimentScoreOutcomes | null;
   scoreSummaries?: ExperimentScoreSummary[];
+  /** Dimensions the customer's own code reported, one per Score Config and client key. */
+  clientScoreSummaries?: ExperimentClientScoreSummary[];
   aggregateSummary?: ExperimentAggregateSummary | null;
 }
 
@@ -312,6 +314,8 @@ export interface ExperimentResults {
   scoreOutcomes?: ExperimentScoreOutcomes;
   skipSummary?: ExperimentSkipSummary;
   scoreSummaries?: ExperimentScoreSummary[];
+  /** Run-level aggregates of the Scores the customer's own code reported. */
+  clientScoreSummaries?: ExperimentClientScoreSummary[];
   aggregateSummary?: ExperimentAggregateSummary;
   rowDispersions?: ExperimentRowDispersion[];
   dispersionSummary?: ExperimentDispersionSummary;
@@ -463,7 +467,7 @@ export interface ExperimentComparisonDimension {
   normalized: boolean;
   baselineSampleCount: number;
   candidateSampleCount: number;
-  /** The side's own category name, when it has one unambiguous label. */
+  /** The side's own category or boolean value, when it has one unambiguous value. */
   baselineLabel: string | null;
   candidateLabel: string | null;
   /** Normalized trial spread per side; only where a side ran more than one trial. */
@@ -727,6 +731,11 @@ function normalizeExperiment(input: any): LlmExperiment {
     scoreSummaries: hasSummaryField(input, "scoreSummaries", "score_summaries")
       ? value<any[]>(input, "scoreSummaries", "score_summaries", []).map(normalizeScoreSummary)
       : undefined,
+    clientScoreSummaries: hasSummaryField(input, "clientScoreSummaries", "client_score_summaries")
+      ? value<unknown[]>(input, "clientScoreSummaries", "client_score_summaries", []).map(
+          normalizeClientScoreSummary,
+        )
+      : undefined,
     aggregateSummary: hasSummaryField(input, "aggregateSummary", "aggregate_summary")
       ? normalizeAggregateSummary(value<any>(input, "aggregateSummary", "aggregate_summary", {}))
       : undefined,
@@ -868,6 +877,12 @@ function normalizeResults(input: any, experimentSummary: any = {}): ExperimentRe
       "score_summaries",
       value<any[]>(input, "scoreSummaries", "score_summaries", []),
     ).map(normalizeScoreSummary),
+    clientScoreSummaries: value<unknown[]>(
+      experimentSummary,
+      "clientScoreSummaries",
+      "client_score_summaries",
+      value<unknown[]>(input, "clientScoreSummaries", "client_score_summaries", []),
+    ).map(normalizeClientScoreSummary),
     aggregateSummary: normalizeAggregateSummary(aggregateSummary),
   };
 }

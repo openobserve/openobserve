@@ -88,6 +88,20 @@ FROM timed_out_jobs
 WHERE jobs.id = timed_out_jobs.id;
 "#;
 
+const WATCH_TIMEOUT_MODULE_QUERY: &str = r#"
+WITH timed_out_jobs AS (
+    SELECT id
+    FROM scheduled_jobs
+    WHERE status = $2 AND end_time <= $3 AND module = $4
+    ORDER BY id
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE scheduled_jobs AS jobs
+SET status = $1, retries = jobs.retries + 1
+FROM timed_out_jobs
+WHERE jobs.id = timed_out_jobs.id;
+"#;
+
 const KEEP_ALIVE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
 SET end_time = CASE WHEN module = $1 THEN $2 ELSE $3 END
 WHERE id = $4 AND claim_epoch = $5 AND status = $6;"#;
@@ -117,6 +131,11 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     armed_for    BIGINT
 );"#;
 
+/// Moves only a Waiting row: `$5` is Waiting, so a running job keeps its key until it ends.
+const RENAME_KEY_QUERY: &str = r#"UPDATE scheduled_jobs SET module_key = $1
+    WHERE org = $2 AND module = $3 AND module_key = $4 AND status = $5
+    RETURNING *;"#;
+
 /// SY-2.2 arm: insert at `$5`; a Waiting row moves no later, a Completed one waits again, and a
 /// row a pass holds only notes the earliest asked-for time. `$4` Waiting, `$6` Processing.
 const ARM_SLACK_SYNC_QUERY: &str = r#"INSERT INTO scheduled_jobs
@@ -140,6 +159,24 @@ const FINISH_SLACK_SYNC_QUERY: &str = r#"UPDATE scheduled_jobs SET
     data = $5,
     armed_for = NULL
 WHERE id = $6 AND claim_epoch = $7 AND status = $8;"#;
+
+/// [`super::Scheduler::rename_key`] on `pool`.
+async fn rename_key_in(
+    pool: &Pool<Postgres>,
+    org: &str,
+    module: TriggerModule,
+    key: &str,
+    new_key: &str,
+) -> Result<Option<Trigger>> {
+    Ok(sqlx::query_as::<_, Trigger>(RENAME_KEY_QUERY)
+        .bind(new_key)
+        .bind(org)
+        .bind(module)
+        .bind(key)
+        .bind(TriggerStatus::Waiting)
+        .fetch_optional(pool)
+        .await?)
+}
 
 /// [`super::Scheduler::arm_slack_sync`] on `pool`.
 async fn arm_slack_sync_in(
@@ -744,6 +781,19 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(result.rows_affected() == 1)
     }
 
+    async fn rename_key(
+        &self,
+        org: &str,
+        module: TriggerModule,
+        key: &str,
+        new_key: &str,
+    ) -> Result<Option<Trigger>> {
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
+        rename_key_in(&CLIENT_RW.clone(), org, module, key, new_key).await
+    }
+
     async fn arm_slack_sync(&self, org: &str, response_id: &str, t: i64) -> Result<()> {
         arm_slack_sync_in(&CLIENT_RW.clone(), org, response_id, t).await
     }
@@ -814,6 +864,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         } else {
             PULL_QUERY
         };
+        let (skip_realtime, skip_silenced) = super::pull_skip_binds(module.as_ref());
 
         let mut tx = pool.begin().await?;
 
@@ -852,8 +903,8 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .bind(alert_max_time)
             .bind(TriggerStatus::Waiting)
             .bind(now)
-            .bind(true)
-            .bind(false);
+            .bind(skip_realtime)
+            .bind(skip_silenced);
         if let Some(m) = module {
             q = q.bind(m);
         }
@@ -1026,6 +1077,21 @@ AND EXISTS (SELECT 1 FROM organizations WHERE identifier = $1 AND status = 'acti
         Ok(())
     }
 
+    async fn watch_timeout_module(&self, module: TriggerModule) -> Result<()> {
+        let pool = CLIENT_RW.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
+        sqlx::query(WATCH_TIMEOUT_MODULE_QUERY)
+            .bind(TriggerStatus::Waiting)
+            .bind(TriggerStatus::Processing)
+            .bind(now_micros())
+            .bind(module)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
     async fn len(&self) -> usize {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -1080,6 +1146,7 @@ mod tests {
     use super::{
         ARM_SLACK_SYNC_QUERY, CREATE_TABLE_QUERY, FINISH_SLACK_SYNC_QUERY, SlackSyncFinish,
         Trigger, TriggerModule, TriggerStatus, arm_slack_sync_in, finish_slack_sync_in,
+        rename_key_in,
     };
     use crate::scheduler::slack_sync_tests::{self as cases, KEY, ORG, SyncDb};
 
@@ -1102,6 +1169,32 @@ mod tests {
     }
 
     impl SyncDb for PostgresDb {
+        async fn rename(&self, module: TriggerModule, key: &str, new_key: &str) -> bool {
+            rename_key_in(&self.0, ORG, module, key, new_key)
+                .await
+                .unwrap()
+                .is_some()
+        }
+
+        async fn row_at(&self, module: TriggerModule, key: &str) -> Option<Trigger> {
+            sqlx::query_as::<_, Trigger>(
+                "SELECT * FROM scheduled_jobs WHERE module_key = $1 AND module = $2",
+            )
+            .bind(key)
+            .bind(module)
+            .fetch_optional(&self.0)
+            .await
+            .unwrap()
+        }
+
+        async fn set_data(&self, data: &str) {
+            sqlx::query("UPDATE scheduled_jobs SET data = $1")
+                .bind(data)
+                .execute(&self.0)
+                .await
+                .unwrap();
+        }
+
         async fn fresh() -> Option<Self> {
             // The postgres CI job sets this; elsewhere the case is skipped, saying so.
             let Some(url) = std::env::var("ZO_META_POSTGRES_DSN")
@@ -1201,6 +1294,11 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_rename_moves_only_a_waiting_row() {
+        cases::a_rename_moves_only_a_waiting_row::<PostgresDb>().await;
+    }
+
+    #[tokio::test]
     async fn an_arm_follows_sy2_on_every_row_state() {
         cases::an_arm_follows_sy2_on_every_row_state::<PostgresDb>().await;
     }
@@ -1236,7 +1334,7 @@ mod tests {
     }
     use super::{
         COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, PULL_QUERY_BY_MODULE,
-        PostgresScheduler, WATCH_TIMEOUT_QUERY,
+        PostgresScheduler, WATCH_TIMEOUT_MODULE_QUERY, WATCH_TIMEOUT_QUERY,
     };
 
     #[test]
@@ -1257,6 +1355,13 @@ mod tests {
         assert!(PULL_QUERY_BY_MODULE.contains("FOR UPDATE SKIP LOCKED"));
         assert!(WATCH_TIMEOUT_QUERY.contains("ORDER BY id"));
         assert!(WATCH_TIMEOUT_QUERY.contains("FOR UPDATE SKIP LOCKED"));
+    }
+
+    #[test]
+    fn a_module_timeout_watch_locks_like_the_global_one_and_keeps_to_its_module() {
+        assert!(WATCH_TIMEOUT_MODULE_QUERY.contains("AND module = $4"));
+        assert!(WATCH_TIMEOUT_MODULE_QUERY.contains("ORDER BY id"));
+        assert!(WATCH_TIMEOUT_MODULE_QUERY.contains("FOR UPDATE SKIP LOCKED"));
     }
 
     #[test]

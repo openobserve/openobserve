@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OBanner
     v-if="lastRun?.status === 'error'"
-    variant="warning"
+    variant="error"
     data-test="alert-calibration-last-run-failed"
   >
     {{
@@ -28,11 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }}
   </OBanner>
   <OText v-else-if="!onlyFailure" variant="meta" as="p" data-test="alert-calibration-last-run">
-    {{
-      lastRun
-        ? t("alertCalibration.lastRun.succeeded", { time: formatAgo(lastRun.finished_at) })
-        : t("alertCalibration.lastRun.none")
-    }}
+    {{ statusLine }}
   </OText>
 </template>
 
@@ -57,4 +53,11 @@ const lastRun = computed(() => statusQuery.data.value?.last_run ?? null);
 
 const formatAgo = (micros: number) =>
   raw(formatDistanceToNowStrict(micros / 1000, { addSuffix: true }));
+
+const statusLine = computed(() => {
+  const run = lastRun.value;
+  if (!run) return t("alertCalibration.lastRun.none");
+  if (run.deferred) return t("alertCalibration.lastRun.deferred");
+  return t("alertCalibration.lastRun.succeeded", { time: formatAgo(run.finished_at) });
+});
 </script>

@@ -40,6 +40,7 @@ const {
   createTeam,
   listTeams,
   addTeamMembers,
+  removeTeamMember,
   setTeamSchedule,
   rotation,
   createOwnershipRule,
@@ -58,7 +59,6 @@ const {
   waitForMail,
   requireMailSink,
   extractLinks,
-  deleteDestination,
   deleteAlertById,
 } = require('../utils/oncall-seed-ext.js');
 const { withFreshOrg } = require('../utils/first-event-helpers.js');
@@ -145,10 +145,13 @@ test.describe('On-call onboarding', {
     }
 
     await pm.oncallTeamDetailPage.applyQuickStart();
-    await expect(pm.oncallTeamDetailPage.getConfirmDialog(),
+    await expect(pm.oncallTeamDetailPage.getQuickStartReplaceConfirm(),
       'rewriting a stored rotation is confirmed first, naming it').toContainText(primary.name, { timeout: 20000 });
     const write = await pm.oncallTeamDetailPage.confirmQuickStartReplace();
     expect(write.status(), `the preset write must be accepted: ${await write.text().catch(() => '')}`).toBe(200);
+    const sent = write.request().postDataJSON();
+    expect(sent.rotation_id, 'a replace names the rotation it rewrites').toBe(primary.id);
+    expect(sent.new_rotation_name, 'a replace adds no rotation').toBeUndefined();
 
     await expect.poll(
       async () => (await getTeamSchedule(page, team.id)).rotations.find((r) => r.id === primary.id)?.source ?? 'gone',
@@ -178,7 +181,7 @@ test.describe('On-call onboarding', {
       'only the primary rotation is rewritten; every other rotation is left as it was').toEqual(others.map(shape));
   });
 
-  // Staged in an org of its own: in the shared org other workers' setup completes all four steps, so the checklist is never drawn there.
+  // Staged in an org of its own: in the shared org other workers' setup completes every step, so the checklist is never drawn there.
   test('TS-22.02 checklist state is derived from live configuration, including its absence', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
@@ -216,7 +219,7 @@ test.describe('On-call onboarding', {
 
         await reload();
         await expect(checklist, 'an org with nothing configured must be shown the checklist').toBeVisible({ timeout: 30000 });
-        await expectSteps({ team: false, rotation: false, routing: false, destinations: false }, 'an empty org');
+        await expectSteps({ team: false, rotation: false, policy: false, routing: false }, 'an empty org');
         await expect(list.getSetupCollapse(),
           'with no pages the checklist is the whole screen, so it offers nothing to hide it behind').toHaveCount(0);
 
@@ -232,10 +235,9 @@ test.describe('On-call onboarding', {
         const [member] = await createOrgUsers(page, prefix, 1);
         const staffed = await createTeam(page, { name: `${prefix}_staffed` });
         await addTeamMembers(page, staffed.id, [member]);
-        const destination = await seedNotificationDestination(page, prefix);
         await reload();
-        await expectSteps({ team: true, rotation: true, routing: false, destinations: true },
-          'a staffed team and a destination, but nothing routed');
+        await expectSteps({ team: true, rotation: true, policy: true, routing: false },
+          'a staffed team with its default ladder, but nothing routed');
 
         const stream = `${prefix}_stream`.toLowerCase();
         await seedOnCallStream(page, stream);
@@ -244,21 +246,20 @@ test.describe('On-call onboarding', {
         });
         alertId = fired.alert.id;
 
-        // A page bound straight to a team completes routing without a rule, so all four steps are done.
+        // A page bound straight to a team completes routing without a rule, so every step the server can answer is done.
         await list.goto(stagedOrg);
         await expect(list.getRowByIndex(0), 'the fired page must be on the list').toBeVisible({ timeout: 30000 });
         await list.waitForSetupContext();
         await expect(checklist, 'a fully configured org must draw no checklist').toHaveCount(0);
         await expect(list.getSetupBanner(), 'and no setup banner either').toHaveCount(0);
 
-        const deleted = await deleteDestination(page, destination, stagedOrg);
-        expect(deleted.ok(), `deleting the destination must succeed: ${deleted.status()}`).toBe(true);
+        await removeTeamMember(page, staffed.id, member);
         await list.goto(stagedOrg);
         await expect(list.getSetupBanner(),
-          'the only destination is gone, so the setup is unfinished again and must say so over the live list')
+          'the only on-call person left the team, so the setup is unfinished again and must say so over the live list')
           .toBeVisible({ timeout: 30000 });
         await list.expandSetupChecklist();
-        await expectSteps({ team: true, rotation: true, routing: true, destinations: false }, 'the destination was deleted');
+        await expectSteps({ team: true, rotation: false, policy: true, routing: true }, 'the only member was removed');
 
         await list.getSetupCollapse().click();
         await expect(checklist, '"Hide for now" folds the checklist back into its banner').toHaveCount(0);

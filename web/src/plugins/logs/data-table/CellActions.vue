@@ -12,14 +12,10 @@
         size="icon-xs-circle"
         data-test="logs-cell-actions-copy-btn"
         @click.prevent.stop="copyLogToClipboard(cellValue)"
-        :title="copied ? t('common.copied') : t('logs.cellActions.copy')"
-        :aria-label="copied ? t('common.copied') : t('logs.cellActions.copy')"
+        :title="t('logs.cellActions.copy')"
+        :aria-label="t('logs.cellActions.copy')"
       >
-        <OIcon
-          :name="copied ? 'check' : 'content-copy'"
-          size="xs"
-          :class="copied ? 'text-status-success-text' : ''"
-        />
+        <OIcon name="content-copy" size="xs" />
       </OButton>
     </span>
     <span v-if="isStreamField && !hideSearchTermActions" class="me-1">
@@ -70,7 +66,7 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useCopyFeedback } from "@/composables/useCopyFeedback";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const props = defineProps({
   column: {
@@ -114,12 +110,9 @@ const { t } = useI18nTyped();
 
 const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
 
-const { copy, isCopied } = useCopyFeedback();
-const copied = computed(() => props.copyInPlace && isCopied());
-
 const copyLogToClipboard = (value: any) => {
   if (props.copyInPlace) {
-    copy(JSON.stringify(value));
+    copyToClipboard(JSON.stringify(value), t);
     return;
   }
   emit("copy", value);

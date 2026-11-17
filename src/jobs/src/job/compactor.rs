@@ -91,6 +91,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     });
 
+    // the run itself does its work once per UTC day
+    spawn_pausable_job!("run_classifier", 3600, {
+        log::debug!("[COMPACTOR::JOB] Running stream classifier");
+        if let Err(e) = compaction::classifier::run().await {
+            log::error!("[COMPACTOR::JOB] run stream classifier error: {e}");
+        }
+    });
+
     spawn_pausable_job!(
         "run_generate_retention_job",
         get_config().compact.data_retention_interval + 3,

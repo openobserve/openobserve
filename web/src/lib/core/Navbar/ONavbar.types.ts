@@ -180,6 +180,8 @@ export interface NavbarProps {
    * column permanently there would eat a quarter of a 390px viewport.
    */
   overlay?: boolean;
+  /** Render `linksList` as given, without the observability flyout groups (Infra, Data, Reliability). */
+  flat?: boolean;
   /** Draws placeholder tiles in place of the menu while its entries are not known yet. */
   loading?: boolean;
 }

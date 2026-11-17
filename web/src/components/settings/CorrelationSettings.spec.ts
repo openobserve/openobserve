@@ -25,10 +25,13 @@ import { onBeforeRouteLeave } from "vue-router";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 
+const identitySave = vi.hoisted(() => vi.fn());
+
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("@/services/service_streams", () => ({
@@ -46,9 +49,22 @@ vi.mock("@/components/settings/DiscoveredServices.vue", () => ({
   },
 }));
 
+vi.mock("@/aws-exports", async (original) => ({
+  default: { ...(await original<{ default: object }>()).default, isEnterprise: "true" },
+}));
+
+vi.mock("@/components/settings/ServiceEnvVersionSettings.vue", () => ({
+  default: {
+    name: "ServiceEnvVersionSettings",
+    template: '<div data-test="env-version-settings" />',
+  },
+}));
+
 vi.mock("@/components/settings/ServiceIdentitySetup.vue", () => ({
   default: {
     name: "ServiceIdentitySetup",
+    data: () => ({ isDirty: false, saving: false }),
+    methods: { saveConfig: () => identitySave(), discardChanges: () => {} },
     template: '<div data-test="service-identity-setup" />',
     props: ["orgIdentifier", "semanticGroups"],
     emits: ["navigate-to-aliases", "navigate-to-services"],
@@ -146,6 +162,25 @@ describe("CorrelationSettings", () => {
       expect(wrapper.find('[data-name="discovery"]').attributes("data-suffix")).toBe("lock");
       expect(wrapper.find('[data-name="field-aliases"]').attributes("data-suffix")).toBeUndefined();
       expect(serviceStreamsService.getSemanticGroups).toHaveBeenCalled();
+    });
+
+    it("locks the env-versions tab with the correlation denial when correlation is locked", async () => {
+      wrapper = mountComponent(storeWith({ correlation: "locked" }));
+      (wrapper.vm as any).activeTab = "env-versions";
+      await flushPromises();
+
+      expect(wrapper.find('[data-name="env-versions"]').attributes("data-suffix")).toBe("lock");
+      expect(wrapper.find('[data-test="svcver-env-versions-license-denied"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="env-version-settings"]').exists()).toBe(false);
+    });
+
+    it("shows env-versions settings when correlation is enabled", async () => {
+      wrapper = mountComponent(storeWith({ correlation: "enabled" }));
+      (wrapper.vm as any).activeTab = "env-versions";
+      await flushPromises();
+
+      expect(wrapper.find('[data-name="env-versions"]').attributes("data-suffix")).toBeUndefined();
+      expect(wrapper.find('[data-test="env-version-settings"]').exists()).toBe(true);
     });
 
     it("locks field aliases and skips semantic groups when alerts is locked", async () => {
@@ -293,6 +328,51 @@ describe("CorrelationSettings", () => {
 
       expect(spy).not.toHaveBeenCalledWith(scope);
       spy.mockRestore();
+    });
+  });
+
+  // Before, leaving the Field Mappings tab asked to discard; one page bar now keeps both tabs' drafts.
+  describe("page save bar", () => {
+    it("keeps unsaved field mappings across a tab switch and saves them from the bar", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      expect(wrapper.find('[data-test="correlation-settings-save-bar"]').exists()).toBe(false);
+
+      const draft = [{ display: "Host", group: "", fields: ["host"] }];
+      vm.draftSemanticGroups = draft;
+      await vm.onTabChange("services");
+      expect(vm.draftSemanticGroups).toEqual(draft);
+      expect(vm.changeCount).toBe(1);
+
+      await wrapper.find('[data-test="correlation-semanticfieldgroup-save-btn"]').trigger("click");
+      await flushPromises();
+      expect(serviceStreamsService.updateSemanticGroups).toHaveBeenCalledWith("test-org", draft);
+      expect(vm.changeCount).toBe(0);
+    });
+  });
+
+  describe("page save bar with both tabs changed", () => {
+    it("sends the field mappings Save was clicked on and keeps a later edit unsaved", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      let finishIdentity: (saved: boolean) => void = () => {};
+      identitySave.mockReturnValue(new Promise<boolean>((resolve) => (finishIdentity = resolve)));
+      wrapper.findComponent({ name: "ServiceIdentitySetup" }).vm.isDirty = true;
+      const clicked = [{ display: "Host", group: "", fields: ["host"] }];
+      vm.draftSemanticGroups = clicked;
+      await flushPromises();
+      expect(vm.changeCount).toBe(2);
+
+      const saved = vm.savePage();
+      vm.draftSemanticGroups = [{ display: "Host", group: "", fields: ["host", "hostname"] }];
+      finishIdentity(true);
+      await saved;
+      await flushPromises();
+
+      expect(serviceStreamsService.updateSemanticGroups).toHaveBeenCalledWith("test-org", clicked);
+      expect(vm.isFieldAliasesDirty).toBe(true);
     });
   });
 

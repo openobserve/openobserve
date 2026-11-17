@@ -145,7 +145,7 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+      - uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2.90.2
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -214,7 +214,7 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+      - uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2.90.2
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -378,6 +378,9 @@ jobs:
 
       - name: Merge shard coverage and check thresholds
         working-directory: web
+        env:
+          # Merging the shard reports outgrows the default ~2GB heap and dies with exit 134.
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: ./coverage.sh merge
 
   ui_code_quality:
@@ -431,9 +434,9 @@ jobs:
       - name: Type-check (any error fails)
         working-directory: web
         env:
-          # vue-tsc peaks around 3GB on this project; the runner's default heap
-          # ceiling is ~4GB, which OOMs (exit 134) instead of reporting errors.
-          NODE_OPTIONS: "--max-old-space-size=8192"
+          # vue-tsc now peaks near 9GB of heap on this project; a lower ceiling
+          # OOMs (exit 134) instead of reporting errors.
+          NODE_OPTIONS: "--max-old-space-size=12288"
         run: npm run type-check:app
 
   unit_tests_summary:

@@ -84,8 +84,9 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useI18nTyped } from "@/types/i18n";
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import PrettyStackTrace from "./PrettyStackTrace.vue";
+import analytics from "@/services/product_analytics";
 
 const { t } = useI18nTyped();
 
@@ -101,4 +102,6 @@ defineProps({
 });
 
 const activeTab = ref("raw");
+
+watch(activeTab, (view) => analytics.track("rum_error_stack_view_changed", { view }));
 </script>

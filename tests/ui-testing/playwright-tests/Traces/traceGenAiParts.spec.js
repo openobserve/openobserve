@@ -41,8 +41,8 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.searchUntilTraceResultVisible();
     await pm.tracesPage.clickFirstTraceResult();
-    const clicked = await pm.tracesPage.clickTraceTreeSpanByOperationName(spanName);
-    expect(clicked).toBeTruthy();
+    // An LLM trace with message content opens on the Thread tab; the span tree is on the waterfall.
+    await pm.tracesPage.selectWaterfallSpan(spanName);
     await pm.tracesPage.expectPreviewTabVisible();
   }
 

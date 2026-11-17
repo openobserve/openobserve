@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Condition node body — a thin wrapper over the shared ConditionBuilder (same
-  FilterGroup body the pipeline condition form uses). A workflow has no upstream
+  Condition node body — a thin wrapper over the shared ConditionBuilder (the same
+  builder the pipeline condition form uses). A workflow has no upstream
   stream node, so the fields are the CURRENT trigger's payload fields (resolved
   from the trigger registry by kind — alert vs incident); the guidelines below
   carry the workflow filter wording.
@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="builder"
       :fields="fields"
       :initial-conditions="savedConditions"
+      profile="workflow"
       normalize-column-names
       optional
     >

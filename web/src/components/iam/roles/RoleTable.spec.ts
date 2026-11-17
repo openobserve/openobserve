@@ -1,0 +1,107 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+import router from "@/test/unit/helpers/router";
+import RoleTable from "@/components/iam/roles/RoleTable.vue";
+
+const mountTable = (data: any[], extra: Record<string, unknown> = {}) =>
+  mount(RoleTable, {
+    props: { data, loading: false, ...extra },
+    global: { plugins: [i18n, store, router] },
+    attachTo: document.body,
+  });
+
+describe("RoleTable member count columns", () => {
+  beforeEach(() => {
+    store.state.zoConfig = { ...store.state.zoConfig, service_account_enabled: true };
+  });
+
+  it("opens the Users tab when the users count is clicked", async () => {
+    const wrapper = mountTable([{ role_name: "ops", user_count: 3, service_account_count: 2 }]);
+    await flushPromises();
+    await wrapper.find('[data-test="iam-roles-ops-users-link"]').trigger("click");
+    expect(wrapper.emitted("edit")?.[0]).toEqual([
+      expect.objectContaining({ role_name: "ops" }),
+      "users",
+    ]);
+    wrapper.unmount();
+  });
+
+  it("opens the Service Accounts tab when the service accounts count is clicked", async () => {
+    const wrapper = mountTable([{ role_name: "ops", user_count: 3, service_account_count: 2 }]);
+    await flushPromises();
+    const link = wrapper.find('[data-test="iam-roles-ops-service-accounts-link"]');
+    expect(link.text()).toBe("2");
+    await link.trigger("click");
+    expect(wrapper.emitted("edit")?.[0]).toEqual([
+      expect.objectContaining({ role_name: "ops" }),
+      "serviceAccounts",
+    ]);
+    wrapper.unmount();
+  });
+
+  it("renders a zero count with the muted variant and a non-zero count with the primary one", async () => {
+    const wrapper = mountTable([{ role_name: "bots", user_count: 0, service_account_count: 2 }]);
+    await flushPromises();
+    const variant = (id: string) =>
+      wrapper.find(`[data-test="iam-roles-bots-${id}-link"]`).attributes("data-o2-variant");
+    expect(variant("users")).toBe("ghost-muted");
+    expect(variant("service-accounts")).toBe("ghost-primary");
+    wrapper.unmount();
+  });
+
+  it("labels each count button with its role and column", async () => {
+    const wrapper = mountTable([{ role_name: "ops", user_count: 3, service_account_count: 2 }]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="iam-roles-ops-users-link"]').attributes("aria-label")).toBe(
+      "ops: 3 Users",
+    );
+    wrapper.unmount();
+  });
+
+  it("keeps both count columns and marks an unknown count as loading, then as unavailable", async () => {
+    const wrapper = mount(RoleTable, {
+      props: {
+        data: [{ role_name: "ops", user_count: 3, service_account_count: null }],
+        loading: false,
+        countsLoading: true,
+      },
+      global: { plugins: [i18n, store, router] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const pending = '[data-test="iam-roles-ops-service-accounts-loading"]';
+    expect(wrapper.find(pending).exists()).toBe(true);
+    expect(wrapper.find('[data-test="iam-roles-ops-users-link"]').exists()).toBe(true);
+
+    await wrapper.setProps({ countsLoading: false });
+    expect(wrapper.find(pending).exists()).toBe(false);
+    expect(wrapper.find('[data-test="iam-roles-ops-service-accounts-link"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain(i18n.global.t("iam.serviceAccounts"));
+    wrapper.unmount();
+  });
+
+  it("has no Service accounts column while service accounts are turned off", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, service_account_enabled: false };
+    const wrapper = mountTable([{ role_name: "ops", user_count: 3, service_account_count: null }]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="iam-roles-ops-users-link"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain(i18n.global.t("iam.serviceAccounts"));
+    wrapper.unmount();
+  });
+
+  it("has no count columns when the build cannot load member counts", async () => {
+    const wrapper = mountTable(
+      [{ role_name: "ops", user_count: null, service_account_count: null }],
+      {
+        countsUnavailable: true,
+      },
+    );
+    await flushPromises();
+    expect(wrapper.find('[data-test="iam-roles-ops-users-link"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain(i18n.global.t("iam.roleUsers"));
+    expect(wrapper.text()).not.toContain(i18n.global.t("iam.serviceAccounts"));
+    wrapper.unmount();
+  });
+});

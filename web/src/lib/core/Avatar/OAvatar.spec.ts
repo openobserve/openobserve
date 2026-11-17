@@ -33,9 +33,31 @@ describe("OAvatar", () => {
     expect(tone("ana@o2.ai")).not.toBe(tone("bob@o2.ai"));
   });
 
-  it("carries the full identity for hover and screen readers", () => {
+  // An OTooltip, not a native title: two tooltips would stack on hover.
+  it("carries the identity for screen readers without a native title", () => {
     const wrapper = mount(OAvatar, { props: { value: "ana@o2.ai" } });
-    expect(wrapper.attributes("title")).toBe("ana@o2.ai");
+    expect(wrapper.attributes("title")).toBeUndefined();
     expect(wrapper.attributes("aria-label")).toBe("ana@o2.ai");
+  });
+
+  // Two people can share a name, so the address always rides along.
+  it("names the person and their address in its tooltip", () => {
+    const wrapper = mount(OAvatar, {
+      props: { value: "ana@o2.ai", name: "Ana Sharma" },
+      global: {
+        stubs: { OTooltip: { template: "<span data-test='tip'><slot name='content' /></span>" } },
+      },
+    });
+    expect(wrapper.find('[data-test="tip"]').text()).toContain("Ana Sharma");
+    expect(wrapper.find('[data-test="tip"]').text()).toContain("ana@o2.ai");
+    expect(wrapper.text().startsWith("AS")).toBe(true);
+  });
+
+  it("can leave the tooltip to an enclosing one", () => {
+    const wrapper = mount(OAvatar, {
+      props: { value: "ana@o2.ai", tooltip: false },
+      global: { stubs: { OTooltip: { template: "<span data-test='tip' />" } } },
+    });
+    expect(wrapper.find('[data-test="tip"]').exists()).toBe(false);
   });
 });

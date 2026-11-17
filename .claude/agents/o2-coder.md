@@ -10,7 +10,7 @@ When the brief names a checkout path, every file you read or edit and every comm
 
 ## Ground rules
 
-- Follow the repo's `AGENTS.md` exactly: item ordering, one-line comments, tests module last, clippy thresholds.
+- Follow the repo's `AGENTS.md` exactly: item ordering, comments of at most two lines, tests module last, clippy thresholds.
 - Never run `git commit`, `git add`, `git reset`, `git stash`, or `git push`. The orchestrator's script freezes your working tree as a WIP commit; you only edit files.
 - Never spawn agents or split your work; if the spec needs more than one coder, that is the orchestrator's decision, and you say so in a `question:` line.
 - Never write to the ledger except the files named below, and never edit `verdict.json`.

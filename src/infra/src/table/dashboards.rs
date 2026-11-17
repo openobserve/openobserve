@@ -725,6 +725,26 @@ mod tests {
     }
 
     #[test]
+    fn an_annotation_source_with_a_newer_operator_still_loads() {
+        let data = serde_json::json!({"annotationSources": [{
+            "id": "s1", "name": "Deploys", "mode": "builder", "streamType": "logs",
+            "stream": "k8s_events", "title": "deploy",
+            "filters": {"filterType": "group", "logicalOperator": "AND", "conditions": [
+                {"filterType": "condition", "column": "event", "operator": "in",
+                 "value": "deploy,rollback", "case_insensitive": true,
+                 "logicalOperator": "AND"}]}
+        }]});
+        let dashboard = Dashboard::try_from(make_model(8, data)).unwrap();
+        let sources = dashboard.v8.unwrap().annotation_sources.unwrap();
+        let config::meta::dashboards::v8::AnnotationConditionItem::Condition(leaf) =
+            &sources[0].filters.conditions[0]
+        else {
+            panic!("expected a leaf condition");
+        };
+        assert_eq!(leaf.operator, "in");
+    }
+
+    #[test]
     fn convert_skipping_invalid_drops_only_the_bad_row() {
         let folder = folders::Model {
             id: "folder-1".to_string(),

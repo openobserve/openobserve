@@ -24,15 +24,17 @@ import {
   splitOnAnd,
 } from "./sqlFilterBuilder";
 
-// Values here are arbitrary log/trace field data. The backend's PostgreSqlDialect
-// parser (sqlparser-rs) does not support backslash string-literal escapes, so only
-// an embedded single quote needs escaping (by doubling) — every other character
-// listed is safe once wrapped in quotes.
+// Values here are arbitrary log/trace field data.
 const SPECIAL_CHAR_CASES: Array<[label: string, input: string]> = [
   ["embedded single quote", "notificationHandling's"],
   ["multiple embedded quotes", "it's a 'test'"],
   ["backslash", "C:\\Users\\test"],
+  ["trailing backslash", "ends\\"],
   ["backslash immediately before a quote", "path\\'s end"],
+  ["a quote-closing payload", "nobody\\' OR 1=1 --"],
+  ["two adjacent quotes", "a''b"],
+  ["only quotes", "'''"],
+  ["backslashes and quotes mixed", "\\\\''\\'"],
   ["double quote", 'He said "hi"'],
   ["percent and underscore", "100%_done"],
   ["semicolon", "a;DROP TABLE x"],
@@ -42,6 +44,67 @@ const SPECIAL_CHAR_CASES: Array<[label: string, input: string]> = [
   ["parens and comparison operators", "a(b)=c<d>e"],
   ["empty string", ""],
 ];
+
+// Models the backend: sqlparser-rs parses a literal, re-serialises it with `EscapeQuotedString`, then reparses.
+
+/** Parses `'a'`, or `('a' || 'b' …)`, into its piece values; throws on anything else. */
+const parseLiteralChain = (sql: string): string[] => {
+  let text = sql;
+  if (text.startsWith("(") && text.endsWith(")")) text = text.slice(1, -1);
+  const pieces: string[] = [];
+  let i = 0;
+  for (;;) {
+    if (text[i] !== "'") throw new Error(`expected a literal at ${i} in ${sql}`);
+    let value = "";
+    i++;
+    for (;;) {
+      if (i >= text.length) throw new Error(`unterminated literal in ${sql}`);
+      if (text[i] === "'") {
+        if (text[i + 1] === "'") {
+          value += "'";
+          i += 2;
+          continue;
+        }
+        i++;
+        break;
+      }
+      value += text[i++];
+    }
+    pieces.push(value);
+    if (i === text.length) return pieces;
+    if (!text.startsWith(" || ", i)) throw new Error(`SQL continues after a literal: ${sql}`);
+    i += 4;
+  }
+};
+
+/** sqlparser-rs `EscapeQuotedString` for `'`. */
+const sqlparserDisplay = (value: string): string => {
+  let out = "";
+  let previous = "";
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    if (ch === "'" && previous !== "\\") {
+      if (value[i + 1] === "'") {
+        out += "''";
+        i++;
+        previous = "'";
+        continue;
+      }
+      out += "''";
+    } else {
+      out += ch;
+    }
+    previous = ch;
+  }
+  return out;
+};
+
+const afterReserialising = (literal: string): string => {
+  const pieces = parseLiteralChain(literal);
+  const shown = pieces.map((piece) => `'${sqlparserDisplay(piece)}'`);
+  const again = shown.length > 1 ? `(${shown.join(" || ")})` : shown[0];
+  return parseLiteralChain(again).join("");
+};
 
 describe("sqlLiteral", () => {
   it("doubles an embedded single quote", () => {
@@ -57,14 +120,17 @@ describe("sqlLiteral", () => {
     expect(sqlLiteral(42)).toBe("'42'");
   });
 
+  it("keeps a backslash as an ordinary character", () => {
+    expect(sqlLiteral("C:\\Users")).toBe("'C:\\Users'");
+  });
+
+  it("the model reproduces the bug a plain doubled literal has", () => {
+    expect(() => afterReserialising("'a\\''b'")).toThrow();
+  });
+
   for (const [label, input] of SPECIAL_CHAR_CASES) {
-    it(`safely wraps a value containing ${label}`, () => {
-      const literal = sqlLiteral(input);
-      expect(literal.startsWith("'")).toBe(true);
-      expect(literal.endsWith("'")).toBe(true);
-      // Every unescaped quote in the literal body must be part of a doubled pair.
-      const body = literal.slice(1, -1);
-      expect(body.replace(/''/g, "")).not.toContain("'");
+    it(`a value containing ${label} survives the backend's re-serialisation`, () => {
+      expect(afterReserialising(sqlLiteral(input))).toBe(input);
     });
   }
 });

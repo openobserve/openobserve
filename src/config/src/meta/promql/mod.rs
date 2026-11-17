@@ -70,6 +70,7 @@ where
 
 pub mod grpc;
 pub mod index;
+pub mod response_schema;
 pub mod value;
 
 pub use index::MetricsBlockScan;
@@ -314,7 +315,7 @@ pub struct RequestMetadata {
 // key - metric name
 pub type ResponseMetadata = HashMap<String, Vec<MetadataObject>>;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct MetadataObject {
     #[serde(rename = "type")]
     typ: String, // counter, gauge, histogram, summary
@@ -459,7 +460,7 @@ pub struct QueryResult {
     pub result: value::Value,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(tag = "status", rename_all = "lowercase")]
 pub enum ApiFuncResponse<T: Serialize> {
     Success {
@@ -510,7 +511,7 @@ impl<T: Serialize> ApiFuncResponse<T> {
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/5c5fa5c319fca713506fa144ec6768fddf00d466/web/api/v1/api.go#L73-L82
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiErrorType {
     Timeout,

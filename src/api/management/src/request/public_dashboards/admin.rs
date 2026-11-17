@@ -33,6 +33,13 @@ use crate::service::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use crate::service::auth::check_permissions;
 
+// Only documents the `{"list": [...]}` body `list_body` builds with `json!`.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct PublicLinkList {
+    list: Vec<PublicLinkView>,
+}
+
 pub(super) fn map_err(ctx: &str, e: anyhow::Error) -> Response {
     if let Some(invalid) = e.downcast_ref::<Invalid>() {
         return MetaHttpResponse::bad_request(&invalid.0);
@@ -242,7 +249,7 @@ fn list_body(list: Vec<PublicLinkView>) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PublicLinkList),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
@@ -273,7 +280,7 @@ pub async fn list_org(Path(org_id): Path<String>, Headers(user): Headers<UserEma
         ("dashboard_id" = String, Path, description = "Dashboard id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PublicLinkList),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
@@ -308,7 +315,7 @@ pub async fn list(
     ),
     request_body(content = PublicDashboardConfig, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PublicLinkView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
@@ -361,7 +368,7 @@ pub async fn create(
         ("link_id" = String, Path, description = "Link id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PublicLinkView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
@@ -397,7 +404,7 @@ pub async fn get(
     ),
     request_body(content = PublicDashboardConfig, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PublicLinkView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
@@ -443,7 +450,7 @@ pub async fn update(
         ("link_id" = String, Path, description = "Link id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PublicLinkView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
@@ -485,7 +492,7 @@ pub async fn pause(
         ("link_id" = String, Path, description = "Link id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PublicLinkView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
@@ -528,7 +535,7 @@ pub async fn resume(
     ),
     request_body(content = TakeOverRequest, description = "Request body", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PublicLinkView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
@@ -577,7 +584,7 @@ pub async fn take_over(
         ("link_id" = String, Path, description = "Link id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PublicLinkView),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),

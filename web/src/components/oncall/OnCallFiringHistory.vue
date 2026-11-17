@@ -21,21 +21,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   that needs its threshold tuned.
 -->
 <template>
-  <OCard variant="glass" data-test="oncall-firing-history">
-    <OCardSection role="header" dense>
-      <OText variant="card-title">{{ t("oncall.firingHistory") }}</OText>
-    </OCardSection>
-
-    <OCardSection role="body" dense>
-      <p class="text-text-secondary mb-3 text-xs">{{ t("oncall.firingHistoryHint") }}</p>
-
+  <section class="table-last-row-flush flex flex-col gap-2" data-test="oncall-firing-history">
+    <OText variant="card-title" as="h3">{{ t("oncall.firingHistory") }}</OText>
+    <div>
+      <OEmptyState
+        v-if="!loading && !firings.length"
+        size="inline"
+        variant="no-results"
+        :title="t('oncall.firingHistoryNone')"
+        hide-action
+        data-test="oncall-firing-history-empty"
+      />
       <OTable
+        v-else
         :data="firings"
         :columns="columns"
         row-key="id"
         :frame="false"
         :loading="loading"
-        pagination="client"
+        :pagination="firings.length ? 'client' : 'none'"
         :show-global-filter="false"
         table-id="oncall-firing-history"
         data-test="oncall-firing-history-table"
@@ -62,28 +66,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTag>
           <span v-else class="text-text-secondary text-sm">{{ ABSENT }}</span>
         </template>
-
-        <!-- A subject firing for the first time is the normal case, not an
-             error, so it says so rather than showing an empty frame. -->
-        <template #empty>
-          <OEmptyState
-            size="inline"
-            preset="no-data"
-            :description="t('oncall.firingHistoryEmpty')"
-            data-test="oncall-firing-history-empty"
-          />
-        </template>
       </OTable>
-    </OCardSection>
-  </OCard>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";

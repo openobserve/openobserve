@@ -16,12 +16,16 @@
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { nextTick } from "vue";
+import axios from "axios";
 import BaseImport from "@/components/common/BaseImport.vue";
 import i18n from "@/locales";
 
 // ─── Mock heavy dependencies ──────────────────────────────────────────────────
 
 vi.mock("axios");
+
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mockToast }));
 
 vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vue-i18n")>();
@@ -300,6 +304,172 @@ describe("BaseImport.vue", () => {
       const fakeFiles = [{ name: "file.json" }];
       (wrapper.vm as any).updateFiles(fakeFiles);
       expect((wrapper.vm as any).jsonFiles).toEqual(fakeFiles);
+    });
+  });
+
+  describe("URL import fetch", () => {
+    const jsonResponse = (data: unknown) => ({
+      data,
+      headers: { "content-type": "application/json" },
+    });
+
+    const deferredGet = () => {
+      const calls: {
+        url: string;
+        signal: AbortSignal;
+        resolve: (v: unknown) => void;
+      }[] = [];
+      vi.mocked(axios.get).mockImplementation(
+        (url: string, config?: any) =>
+          new Promise((resolve, reject) => {
+            const signal: AbortSignal = config.signal;
+            signal.addEventListener("abort", () => reject(new Error("canceled")));
+            calls.push({ url, signal, resolve });
+          }) as any,
+      );
+      return calls;
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("fetches the URL after the debounce delay and loads the JSON", async () => {
+      vi.useFakeTimers();
+      vi.mocked(axios.get).mockResolvedValue(jsonResponse([{ a: 1 }]) as any);
+      wrapper = createWrapper({ defaultActiveTab: "import_json_url" });
+      (wrapper.vm as any).updateUrl("https://example.com/a.json");
+      await nextTick();
+      expect(axios.get).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(axios.get).toHaveBeenCalledTimes(1);
+      expect((wrapper.vm as any).jsonArrayOfObj).toEqual([{ a: 1 }]);
+      expect(wrapper.emitted("update:jsonArray")!.at(-1)).toEqual([[{ a: 1 }]]);
+    });
+
+    it("issues one GET for the final URL when the URL changes rapidly", async () => {
+      vi.useFakeTimers();
+      vi.mocked(axios.get).mockResolvedValue(jsonResponse({ ok: true }) as any);
+      wrapper = createWrapper({ defaultActiveTab: "import_json_url" });
+      const full = "https://example.com/final.json";
+      for (let i = 1; i <= full.length; i++) {
+        (wrapper.vm as any).updateUrl(full.slice(0, i));
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(50);
+      }
+      await vi.advanceTimersByTimeAsync(300);
+      expect(axios.get).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(axios.get).mock.calls[0][0]).toBe(full);
+    });
+
+    it("aborts the earlier request so its late response is not applied", async () => {
+      vi.useFakeTimers();
+      const calls = deferredGet();
+      wrapper = createWrapper({ defaultActiveTab: "import_json_url" });
+      (wrapper.vm as any).updateUrl("https://example.com/old.json");
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(300);
+      (wrapper.vm as any).updateUrl("https://example.com/new.json");
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(calls).toHaveLength(2);
+      expect(calls[0].signal.aborted).toBe(true);
+      calls[1].resolve(jsonResponse({ file: "new" }));
+      calls[0].resolve(jsonResponse({ file: "old" }));
+      await vi.advanceTimersByTimeAsync(0);
+      expect((wrapper.vm as any).jsonArrayOfObj).toEqual([{ file: "new" }]);
+    });
+
+    it("shows no error toast for an aborted request", async () => {
+      vi.useFakeTimers();
+      const calls = deferredGet();
+      wrapper = createWrapper({ defaultActiveTab: "import_json_url" });
+      (wrapper.vm as any).updateUrl("https://example.com/slow.json");
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(300);
+      (wrapper.vm as any).updateUrl("");
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(calls[0].signal.aborted).toBe(true);
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("aborts an in-flight request as soon as the URL changes", async () => {
+      vi.useFakeTimers();
+      const calls = deferredGet();
+      wrapper = createWrapper({ defaultActiveTab: "import_json_url" });
+      (wrapper.vm as any).updateUrl("https://example.com/a.json");
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(300);
+      (wrapper.vm as any).updateUrl("https://example.com/a.json2");
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].signal.aborted).toBe(true);
+      expect((wrapper.vm as any).jsonArrayOfObj).toEqual([]);
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("ignores a response that resolves after its request was aborted", async () => {
+      vi.useFakeTimers();
+      let resolveGet: (v: unknown) => void = () => {};
+      vi.mocked(axios.get).mockImplementation(
+        () => new Promise((resolve) => (resolveGet = resolve)) as any,
+      );
+      wrapper = createWrapper({ defaultActiveTab: "import_json_url" });
+      (wrapper.vm as any).updateUrl("https://example.com/a.json");
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(300);
+      (wrapper.vm as any).updateUrl("");
+      await nextTick();
+      resolveGet(jsonResponse({ file: "stale" }));
+      await vi.advanceTimersByTimeAsync(0);
+      expect((wrapper.vm as any).jsonArrayOfObj).toEqual([]);
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("shows an error toast when a current request fails", async () => {
+      vi.useFakeTimers();
+      vi.mocked(axios.get).mockRejectedValue(new Error("network"));
+      wrapper = createWrapper({ defaultActiveTab: "import_json_url" });
+      (wrapper.vm as any).updateUrl("https://example.com/missing.json");
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "toastMessages.common.errorFetchingData",
+          variant: "error",
+        }),
+      );
+    });
+
+    it("shows an error toast for a non-JSON content type", async () => {
+      vi.useFakeTimers();
+      vi.mocked(axios.get).mockResolvedValue({
+        data: "<html/>",
+        headers: { "content-type": "text/html" },
+      } as any);
+      wrapper = createWrapper({ defaultActiveTab: "import_json_url" });
+      (wrapper.vm as any).updateUrl("https://example.com/page.html");
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "toastMessages.common.invalidJsonFormatInTheUrl",
+        }),
+      );
+      expect((wrapper.vm as any).jsonArrayOfObj).toEqual([]);
+    });
+
+    it("does not fetch a URL that was cleared before the delay elapsed", async () => {
+      vi.useFakeTimers();
+      wrapper = createWrapper({ defaultActiveTab: "import_json_url" });
+      (wrapper.vm as any).updateUrl("https://example.com/a.json");
+      await nextTick();
+      (wrapper.vm as any).updateUrl("");
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(axios.get).not.toHaveBeenCalled();
     });
   });
 

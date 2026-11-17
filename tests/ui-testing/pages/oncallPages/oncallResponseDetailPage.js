@@ -56,9 +56,7 @@ export class OnCallResponseDetailPage {
       subtitle: '[data-test="oncall-response-subtitle"]',
       teamLink: '[data-test="oncall-response-team-link"]',
       originLink: '[data-test="oncall-response-origin-link"]',
-      firing: '[data-test="oncall-response-firing"]',
       opened: '[data-test="oncall-response-opened"]',
-      elapsed: '[data-test="oncall-response-elapsed"]',
       stats: '[data-test="oncall-response-stats"]',
       liaisonTag: '[data-test="oncall-response-liaison-tag"]',
       liaisonBanner: '[data-test="oncall-response-liaison-banner"]',
@@ -69,6 +67,9 @@ export class OnCallResponseDetailPage {
       snoozeButton: '[data-test="oncall-response-snooze-btn"]',
       escalateButton: '[data-test="oncall-response-escalate-btn"]',
       handoffButton: '[data-test="oncall-response-handoff-btn"]',
+      // Below a 96rem viewport the secondary verbs fold into this ⋯ menu, each item suffixed `-menu`.
+      moreButton: '[data-test="oncall-response-more-btn"]',
+      handoffMenuItem: '[data-test="oncall-response-handoff-btn-menu"]',
       promoteButton: '[data-test="oncall-response-promote-btn"]',
       resolveButton: '[data-test="oncall-response-resolve-btn"]',
       confirmRecoveryButton: '[data-test="oncall-response-confirm-recovery-btn"]',
@@ -79,25 +80,35 @@ export class OnCallResponseDetailPage {
       tabActivity: '[data-test="oncall-response-tab-activity"]',
       tabDeliveries: '[data-test="oncall-response-tab-deliveries"]',
       tabCauses: '[data-test="oncall-response-tab-causes"]',
-      // THE PANELS HAVE NO `data-test`, AND CANNOT HAVE ONE.
-      //
-      // OnCallResponseDetail.vue does write `data-test="oncall-response-activity"`
-      // (and -deliveries, -causes) onto each `OTabPanel`, but OTabPanel's template
-      // root is a `v-if`/`v-else` pair of `<template>` blocks, which compiles to a
-      // FRAGMENT — and Vue disables attribute fallthrough on a fragment root, so
-      // the attribute is dropped before it reaches the DOM. Verified on :5090: the
-      // active panel renders as `<div role="tabpanel" id="tab-panel-activity"
-      // class="o-tab-panel p-0">` with `data-test` null.
-      //
-      // So the panel is addressed by the id OTabPanel itself builds — which is the
-      // same handle OTab publishes as `aria-controls`, i.e. the component's own
-      // contract rather than a coincidence of markup.
+      // Each panel's hook sits on a div inside OTabPanel, whose fragment root drops attributes.
+      activityPanel: '[data-test="oncall-response-activity"]',
+      activityPending: '[data-test="oncall-response-activity-pending"]',
+      deliveriesPanel: '[data-test="oncall-response-deliveries"]',
+      causesPanel: '[data-test="oncall-response-causes"]',
+      reportPanel: '[data-test="oncall-response-report"]',
+      teamPending: '[data-test="oncall-response-team-pending"]',
+      incidentPending: '[data-test="oncall-about-incident-pending"]',
       activityToggleAll: '[data-test="oncall-response-activity-toggle-all"]',
 
       // The delivery ledger (OnCallDeliveryLedger), rendered inside the tab.
       ledger: '[data-test="oncall-delivery-ledger"]',
       ledgerEmpty: '[data-test="oncall-deliveries-empty"]',
       ledgerTruncated: '[data-test="oncall-deliveries-truncated"]',
+      ackedBy: '[data-test="oncall-who-is-on-acked-by"]',
+      personTooltip: '[data-test="oncall-person-name-tooltip"]',
+      deliveryRows: '[data-test^="oncall-delivery-row-"]:not([data-test^="oncall-delivery-row-template-"])',
+      deliveryStatus: '[data-test="oncall-delivery-status"]',
+      deliveryChannel: '[data-test="oncall-delivery-channel"]',
+      refresh: '[data-test="oncall-response-refresh"]',
+
+      whoIsOn: '[data-test="oncall-who-is-on"]',
+      unackButton: '[data-test="oncall-response-unack-btn"]',
+      alertAckChip: '[data-test="alerts-alertdetail-ack-chip"]',
+
+      // The link's landing page is server-rendered HTML, so it has no data-test.
+      ackLinkHeading: 'h1',
+      ackLinkSubmit: 'form button[type="submit"]',
+      ackLinkIntoApp: 'a[href*="/web/oncall/responses/"]',
 
       // Resolve.
       resolveDialog: '[data-test="oncall-resolve-dialog"]',
@@ -127,8 +138,9 @@ export class OnCallResponseDetailPage {
   }
 
   // Built rather than stored — these carry a duration or a ledger run/index.
-  snoozeOption(minutes) { return `[data-test="oncall-response-snooze-${minutes}"]`; }
+  snoozeOption(minutes, inMenu = false) { return `[data-test="oncall-response-snooze-${minutes}${inMenu ? '-menu' : ''}"]`; }
   deliveryRow(run, index) { return `[data-test="oncall-delivery-row-${run}-${index}"]`; }
+  deliveryRecipient(email) { return `[data-test^="oncall-delivery-recipient-"][data-test-email="${email}"]`; }
 
   /** On the Causes tab: what this rule turned out to be on a previous page. */
   priorCause(cause) { return `[data-test="oncall-prior-cause-${cause}"]`; }
@@ -181,24 +193,37 @@ export class OnCallResponseDetailPage {
     }
   }
 
-  /** Opens the ODropdown and picks a duration. The items do not exist until it opens. */
+  /**
+   * Open whichever surface carries the secondary verbs: the inline button on a wide header, else the ⋯ menu.
+   * @returns {Promise<boolean>} true when the verbs are in the ⋯ menu.
+   */
+  async _openVerbSurface(inlineSelector) {
+    const inline = this.page.locator(inlineSelector);
+    const more = this.page.locator(this.locators.moreButton);
+    await expect(inline.or(more).first()).toBeVisible({ timeout: 45000 });
+    const inMenu = !(await inline.isVisible());
+    await (inMenu ? more : inline).click();
+    return inMenu;
+  }
+
+  /** Opens the snooze menu and picks a duration. The items do not exist until it opens. */
   async snoozeFor(minutes) {
-    await this.page.locator(this.locators.snoozeButton).click();
-    const option = this.page.locator(this.snoozeOption(minutes));
+    const inMenu = await this._openVerbSurface(this.locators.snoozeButton);
+    const option = this.page.locator(this.snoozeOption(minutes, inMenu));
     await expect(option).toBeVisible({ timeout: 20000 });
     await option.click();
   }
 
   /** The offered durations, read off the open menu rather than assumed. */
   async readSnoozeOptions() {
-    await this.page.locator(this.locators.snoozeButton).click();
-    const items = this.page.locator('[data-test^="oncall-response-snooze-"]');
+    await this._openVerbSurface(this.locators.snoozeButton);
+    const items = this.page.locator('[data-test^="oncall-response-snooze-"]:not([data-test="oncall-response-snooze-btn"])');
     await expect(items.first()).toBeVisible({ timeout: 20000 });
     const count = await items.count();
     const minutes = [];
     for (let i = 0; i < count; i++) {
       const attr = await items.nth(i).getAttribute('data-test');
-      const m = /oncall-response-snooze-(\d+)$/.exec(attr ?? '');
+      const m = /^oncall-response-snooze-(\d+)(?:-menu)?$/.exec(attr ?? '');
       if (m) minutes.push(Number(m[1]));
     }
     await this.page.keyboard.press('Escape');
@@ -257,7 +282,9 @@ export class OnCallResponseDetailPage {
   }
 
   async openHandoffDrawer() {
-    await this.page.locator(this.locators.handoffButton).click();
+    if (await this._openVerbSurface(this.locators.handoffButton)) {
+      await this.page.locator(this.locators.handoffMenuItem).click();
+    }
     await expect(this.page.locator(this.locators.handoffDrawer)).toBeVisible({ timeout: 20000 });
   }
 
@@ -380,7 +407,7 @@ export class OnCallResponseDetailPage {
   /** Block until the ledger has actually drawn its rows, or report that it drew none. */
   async waitForDeliveryRows({ timeout = 60000 } = {}) {
     await expect
-      .poll(async () => await this.page.locator('[data-test^="oncall-delivery-row-"]').count(), {
+      .poll(async () => await this.page.locator(this.locators.deliveryRows).count(), {
         timeout,
         intervals: [500],
         message: 'the delivery ledger never drew a row — its fetch may still be in flight',
@@ -398,7 +425,7 @@ export class OnCallResponseDetailPage {
    * so a single-run ledger has rows and no header at all.
    */
   async readDeliveryRuns() {
-    const rows = this.page.locator('[data-test^="oncall-delivery-row-"]');
+    const rows = this.page.locator(this.locators.deliveryRows);
     const count = await rows.count();
     const runs = new Set();
     for (let i = 0; i < count; i++) {
@@ -415,6 +442,80 @@ export class OnCallResponseDetailPage {
 
 
 
+
+  /** Rows arrive out of order because sends run concurrently. */
+  ledgerRow(email, channelLabel) {
+    return this.page.locator(this.locators.deliveryRows)
+      .filter({ has: this.page.locator(this.deliveryRecipient(email)) })
+      .filter({
+        has: this.page.locator(this.locators.deliveryChannel, { hasText: new RegExp(`^\\s*${channelLabel}\\s*$`) }),
+      });
+  }
+
+  /** The record only reads its ledger on load, so a row still being sent needs a refresh to appear. */
+  async expectDelivery(email, channelLabel, status, { timeout = 120000 } = {}) {
+    const row = this.ledgerRow(email, channelLabel);
+    await expect(async () => {
+      await this.page.locator(this.locators.refresh).click();
+      await expect(row, `exactly one ${channelLabel} row for ${email}`).toHaveCount(1, { timeout: 3000 });
+      await expect(row.locator(this.locators.deliveryStatus)).toHaveText(status, { timeout: 3000 });
+    }).toPass({ timeout, intervals: [2000] });
+  }
+
+  /** One row per (step, person, channel), so the number of rows for a person is the number of channels sent. */
+  async expectDeliveryRowCount(email, expected) {
+    const rows = this.page.locator(this.locators.deliveryRows)
+      .filter({ has: this.page.locator(this.deliveryRecipient(email)) });
+    await expect(rows, `the ledger rows for ${email}`).toHaveCount(expected, { timeout: 30000 });
+  }
+
+  /** The row draws a display name, so who it names is read from its tooltip. */
+  async expectAcknowledgedBy(email) {
+    await expect(this.page.locator(this.locators.whoIsOn)).toContainText('Acknowledged by', { timeout: 30000 });
+    await this.page.locator(this.locators.ackedBy).hover({ timeout: 30000 });
+    await expect(this.page.locator(this.locators.personTooltip).first()).toContainText(email, { timeout: 15000 });
+    await this.page.mouse.move(0, 0);
+    await expect(this.page.locator(this.locators.unackButton)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.locators.ackButton), 'an acknowledged page offers no Acknowledge')
+      .toHaveCount(0);
+  }
+
+  async gotoAlertDetail(orgId, alertId) {
+    await this.page.goto(`/web/alerts/detail/${alertId}?org_identifier=${orgId}`);
+    await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  async expectAlertChipNames(email) {
+    await expect(this.page.locator(this.locators.alertAckChip))
+      .toContainText(`Acknowledged by ${email}`, { timeout: 30000 });
+  }
+
+  async openAckLink(link) {
+    await this.page.goto(link);
+    await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  async submitAckLink() {
+    const button = this.page.locator(this.locators.ackLinkSubmit);
+    await expect(button, 'an unacknowledged page must offer Acknowledge').toBeVisible({ timeout: 30000 });
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (res) => res.request().method() === 'POST' && new URL(res.url()).pathname.endsWith('/oncall/ack'),
+        { timeout: 30000 },
+      ),
+      button.click(),
+    ]);
+    return response.status();
+  }
+
+  async expectAckLinkHeading(words) {
+    await expect(this.page.locator(this.locators.ackLinkHeading)).toContainText(words, { timeout: 30000 });
+  }
+
+  async followAckLinkIntoApp() {
+    await this.page.locator(this.locators.ackLinkIntoApp).click();
+    await this.expectDetailVisible();
+  }
 
   async expectTeamLinkNames(teamName) {
     await expect(this.page.locator(this.locators.teamLink)).toContainText(teamName, { timeout: 30000 });

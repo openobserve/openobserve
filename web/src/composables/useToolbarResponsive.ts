@@ -11,7 +11,12 @@
 
 import { ref, computed, onMounted, onUnmounted } from "vue";
 
-export function useToolbarResponsive() {
+export interface ToolbarResponsiveOptions {
+  /** Keep the last real widths while the bar is detached (a kept-alive page in the cache), so it returns at its old stage. */
+  keepWidthWhenDetached?: boolean;
+}
+
+export function useToolbarResponsive(options: ToolbarResponsiveOptions = {}) {
   const toolbarLeftRef = ref<HTMLElement | null>(null);
   const toolbarRightRef = ref<HTMLElement | null>(null);
   const toolbarBarWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200);
@@ -26,19 +31,28 @@ export function useToolbarResponsive() {
     Math.max(0, toolbarBarWidth.value - toolbarRightWidth.value - 14),
   );
 
+  // A detached element measures 0; that is not a width the bar must fit.
+  const keepsWidth = (el: HTMLElement, width: number) =>
+    !!options.keepWidthWhenDetached && width === 0 && !el.isConnected;
+
   onMounted(() => {
     const barEl = toolbarLeftRef.value?.parentElement;
     if (barEl) {
       toolbarBarWidth.value = barEl.getBoundingClientRect().width;
       leftObserver = new ResizeObserver((entries) => {
-        toolbarBarWidth.value = entries[0]?.contentRect.width ?? 0;
+        const width = entries[0]?.contentRect.width ?? 0;
+        if (keepsWidth(barEl, width)) return;
+        toolbarBarWidth.value = width;
       });
       leftObserver.observe(barEl);
     }
     if (toolbarRightRef.value) {
       toolbarRightWidth.value = toolbarRightRef.value.getBoundingClientRect().width;
+      const rightEl = toolbarRightRef.value;
       rightObserver = new ResizeObserver((entries) => {
-        toolbarRightWidth.value = entries[0]?.contentRect.width ?? 0;
+        const width = entries[0]?.contentRect.width ?? 0;
+        if (keepsWidth(rightEl, width)) return;
+        toolbarRightWidth.value = width;
       });
       rightObserver.observe(toolbarRightRef.value);
     }

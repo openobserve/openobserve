@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 import type { StoredTurn } from "@/components/O2AIChat.history";
 
 export type ShareMode = "snapshot" | "live";
@@ -94,7 +95,16 @@ const knownParams = (known?: SharedChatKnown) =>
 
 const aiChatShare = {
   create: (org: string, sessionId: string, body: CreateShareRequest) =>
-    http().post<ShareView>(`/api/${enc(org)}/ai/chats/${enc(sessionId)}/shares`, body),
+    http()
+      .post<ShareView>(`/api/${enc(org)}/ai/chats/${enc(sessionId)}/shares`, body)
+      .then((res) => {
+        analytics.track("shared_chat_created", {
+          mode: body.mode,
+          visibility: body.visibility,
+          redact_tools: body.redact_tools,
+        });
+        return res;
+      }),
 
   listForChat: (org: string, sessionId: string) =>
     http().get<{ shares: ShareView[] }>(`/api/${enc(org)}/ai/chats/${enc(sessionId)}/shares`),
@@ -106,10 +116,25 @@ const aiChatShare = {
     http().get<{ shares: ShareView[] }>(`/api/${enc(org)}/ai/shares`, { params: { all: true } }),
 
   update: (org: string, shareId: string, body: UpdateShareRequest) =>
-    http().patch<ShareView>(`/api/${enc(org)}/ai/shares/${enc(shareId)}`, body),
+    http()
+      .patch<ShareView>(`/api/${enc(org)}/ai/shares/${enc(shareId)}`, body)
+      .then((res) => {
+        analytics.track("shared_chat_updated", {
+          mode: body.mode,
+          refresh_snapshot: !!body.refresh_snapshot,
+          expiry_changed: body.expires_in_secs !== undefined,
+          redact_tools: body.redact_tools,
+        });
+        return res;
+      }),
 
   revoke: (org: string, shareId: string) =>
-    http().delete<{ revoked: boolean }>(`/api/${enc(org)}/ai/shares/${enc(shareId)}`),
+    http()
+      .delete<{ revoked: boolean }>(`/api/${enc(org)}/ai/shares/${enc(shareId)}`)
+      .then((res) => {
+        analytics.track("shared_chat_revoked");
+        return res;
+      }),
 
   getShared: (org: string, token: string, known?: SharedChatKnown) =>
     http().get<SharedChat>(`/api/${enc(org)}/ai/shared/${enc(token)}`, {
@@ -118,11 +143,16 @@ const aiChatShare = {
 
   // The server only accepts a JSON body here, which a cross-site form post cannot send.
   fork: (org: string, token: string) =>
-    http().post<ForkResult>(
-      `/api/${enc(org)}/ai/shared/${enc(token)}/fork`,
-      {},
-      { headers: { "Content-Type": "application/json" } },
-    ),
+    http()
+      .post<ForkResult>(
+        `/api/${enc(org)}/ai/shared/${enc(token)}/fork`,
+        {},
+        { headers: { "Content-Type": "application/json" } },
+      )
+      .then((res) => {
+        analytics.track("shared_chat_forked");
+        return res;
+      }),
 
   getPublic: (token: string, known?: SharedChatKnown) =>
     http().get<SharedChat>(`/api/public/ai_chats/${enc(token)}`, { params: knownParams(known) }),

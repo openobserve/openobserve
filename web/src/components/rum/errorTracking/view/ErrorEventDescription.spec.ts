@@ -195,21 +195,70 @@ describe("ErrorEventDescription Component", () => {
     expect(wrapper.text()).toContain("Submit Button : #submit-btn");
   });
 
-  it("shows action with undefined target text and selector as 'undefined : undefined'", async () => {
-    // Arrange
+  it.each(["_o2_", "_oo_"])("reads SDK action targets under %s", async (prefix) => {
     await wrapper.setProps({
       column: {
         type: "action",
-        _oo_action_target_text: undefined,
-        _oo_action_target_selector: undefined,
+        action_target_name: "Masked Element",
+        [`${prefix}action_target`]: JSON.stringify({ selector: "#header>svg", width: 16 }),
       },
     });
 
-    // Assert
-    expect(wrapper.find('[data-test="error-event-description-default"]').text()).toBe(
-      "undefined : undefined",
-    );
+    expect(wrapper.text()).toBe("Masked Element : #header>svg");
   });
+
+  it("reads an object target without stringifying it", async () => {
+    await wrapper.setProps({
+      column: {
+        type: "action",
+        action_target_name: "Submit",
+        _o2_action_target: { selector: "#submit" },
+      },
+    });
+
+    expect(wrapper.text()).toBe("Submit : #submit");
+  });
+
+  it("prefers the SDK name while retaining a legacy selector", async () => {
+    await wrapper.setProps({
+      column: {
+        type: "action",
+        action_target_name: "Masked Element",
+        _o2_action_target_text: "Legacy text",
+        _o2_action_target_selector: "#submit",
+      },
+    });
+
+    expect(wrapper.text()).toBe("Masked Element : #submit");
+  });
+
+  it.each([
+    [{ action_target_name: "Submit" }, "Submit"],
+    [{ _o2_action_target_selector: "#submit" }, "#submit"],
+    [{ _o2_action_target_text: "Legacy text" }, "Legacy text"],
+    [{ action_target_name: " ", _o2_action_target_text: "Legacy text" }, "Legacy text"],
+    [{}, "—"],
+    [{ action_target_name: null, _o2_action_target_selector: null }, "—"],
+    [{ action_target_name: 42, _o2_action_target_selector: {} }, "—"],
+  ])(
+    "renders available action details without missing-value artifacts: %j",
+    async (fields, text) => {
+      await wrapper.setProps({ column: { type: "action", ...fields } });
+
+      expect(wrapper.text()).toBe(text);
+    },
+  );
+
+  it.each(["{bad json", "null", "[]", "42", '{"selector":{}}', { selector: null }])(
+    "keeps the action name when the target is invalid: %j",
+    async (target) => {
+      await wrapper.setProps({
+        column: { type: "action", action_target_name: "Submit", _o2_action_target: target },
+      });
+
+      expect(wrapper.text()).toBe("Submit");
+    },
+  );
 
   it("shows empty text for unknown type", async () => {
     // Arrange

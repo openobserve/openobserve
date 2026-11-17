@@ -201,6 +201,10 @@ async fn configured_signing_task(
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "update"}))
+    )
 )]
 pub async fn replace_remote_task_auth_secret(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -239,10 +243,14 @@ pub async fn replace_remote_task_auth_secret(
         ("entity_id" = String, Path, description = "Remote task head id"),
     ),
     responses(
-        (status = 200, description = "Success", body = ()),
+        (status = 200, description = "Success", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "delete"}))
+    )
 )]
 pub async fn revoke_remote_task_auth_secret(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -278,6 +286,10 @@ pub async fn revoke_remote_task_auth_secret(
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "update"}))
+    )
 )]
 pub async fn replace_remote_task_header_secret(
     Path((org_id, entity_id, header_name)): Path<(String, String, String)>,
@@ -316,10 +328,14 @@ pub async fn replace_remote_task_header_secret(
         ("header_name" = String, Path, description = "Configured custom header name"),
     ),
     responses(
-        (status = 200, description = "Success", body = ()),
+        (status = 200, description = "Success", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "delete"}))
+    )
 )]
 pub async fn revoke_remote_task_header_secret(
     Path((org_id, entity_id, header_name)): Path<(String, String, String)>,
@@ -353,6 +369,10 @@ pub async fn revoke_remote_task_header_secret(
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "list"}))
+    )
 )]
 pub async fn get_remote_task_signing_status(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -397,6 +417,10 @@ pub async fn get_remote_task_signing_status(
         (status = 404, description = "Not Found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "create"}))
+    )
 )]
 pub async fn rotate_remote_task_signing_secret(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -445,6 +469,10 @@ pub async fn rotate_remote_task_signing_secret(
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "create"}))
+    )
 )]
 pub async fn test_remote_task_signing_candidate(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -507,6 +535,10 @@ pub async fn test_remote_task_signing_candidate(
         (status = 404, description = "Not Found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "create"}))
+    )
 )]
 pub async fn activate_remote_task_signing_candidate(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -544,9 +576,13 @@ pub async fn activate_remote_task_signing_candidate(
         ("entity_id" = String, Path, description = "Remote task head id"),
     ),
     responses(
-        (status = 200, description = "Success", body = ()),
+        (status = 200, description = "Success", body = MetaHttpResponse),
         (status = 404, description = "Not Found", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "create"}))
+    )
 )]
 pub async fn end_remote_task_signing_grace(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -576,10 +612,14 @@ pub async fn end_remote_task_signing_grace(
         ("entity_id" = String, Path, description = "Remote task head id"),
     ),
     responses(
-        (status = 200, description = "Success", body = ()),
+        (status = 200, description = "Success", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "delete"}))
+    )
 )]
 pub async fn revoke_remote_task_signing_secret(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -610,6 +650,7 @@ pub async fn revoke_remote_task_signing_secret(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn list_remote_tasks(
@@ -683,6 +724,7 @@ pub async fn list_remote_tasks(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn create_remote_task(
@@ -720,7 +762,8 @@ pub async fn create_remote_task(
         (status = 400, description = "Bad Request", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "test"})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn test_remote_task(
@@ -777,6 +820,7 @@ pub async fn test_remote_task(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn get_remote_task(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
@@ -808,6 +852,7 @@ pub async fn get_remote_task(Path((org_id, entity_id)): Path<(String, String)>) 
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn list_remote_task_versions(
@@ -844,7 +889,8 @@ pub async fn list_remote_task_versions(
         (status = 404, description = "Not Found", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "stats"})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn get_remote_task_stats(
@@ -880,6 +926,7 @@ pub async fn get_remote_task_stats(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn save_remote_task_draft(
@@ -925,6 +972,7 @@ pub async fn save_remote_task_draft(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn get_remote_task_draft(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
@@ -953,10 +1001,11 @@ pub async fn get_remote_task_draft(Path((org_id, entity_id)): Path<(String, Stri
         ("entity_id" = String, Path, description = "Remote task head id"),
     ),
     responses(
-        (status = 200, description = "Success", body = ()),
+        (status = 200, description = "Success", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true}))
     ),
 )]
 pub async fn discard_remote_task_draft(
@@ -995,6 +1044,7 @@ pub async fn discard_remote_task_draft(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn publish_remote_task(
@@ -1043,11 +1093,12 @@ pub async fn publish_remote_task(
         ("entity_id" = String, Path, description = "Remote task head id"),
     ),
     responses(
-        (status = 200, description = "Success", body = ()),
+        (status = 200, description = "Success", body = MetaHttpResponse),
         (status = 404, description = "Not Found", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true}))
     ),
 )]
 pub async fn delete_remote_task(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
@@ -1084,7 +1135,8 @@ pub async fn delete_remote_task(Path((org_id, entity_id)): Path<(String, String)
         (status = 409, description = "Conflict", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "test_run"})),
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     ),
 )]
 pub async fn test_run_remote_task(

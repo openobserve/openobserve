@@ -7,7 +7,10 @@ import destinationService from "@/services/alert_destination";
 import alertsService from "@/services/alerts";
 import templateService from "@/services/alert_templates";
 import { queryClient } from "@/composables/query/queryClient";
+import { fenceAlertWrite } from "@/services/alerts.readFence";
+import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
   readEditorDraft,
   writeEditorDraft,
@@ -198,67 +201,38 @@ describe("AddAlertView.vue", () => {
     expect(wrapper.vm.destinations).toEqual([]);
   });
 
-  it("should navigate to alert list on handleUpdateList", async () => {
-    vi.mocked(destinationService.list).mockResolvedValue({
-      data: [{ id: 1, name: "Destination 1" }],
-    } as any);
+  it.each(["update:list", "cancel:hideform"])(
+    "opens the unfiltered alert list on %s, so the alert is in view",
+    async (event) => {
+      vi.mocked(destinationService.list).mockResolvedValue({
+        data: [{ id: 1, name: "Destination 1" }],
+      } as any);
 
-    const pushSpy = vi.spyOn(router, "push");
+      const pushSpy = vi.spyOn(router, "push");
 
-    const wrapper = mount(AddAlertView, {
-      global: {
-        plugins: [store, router],
-        stubs: {
-          AddAlert: {
-            name: "AddAlert",
-            template: '<div class="add-alert-stub" @update:list="$emit(\'update:list\')"></div>',
-          },
+      const wrapper = mount(AddAlertView, {
+        global: {
+          plugins: [store, router],
+          stubs: { AddAlert: { name: "AddAlert", template: '<div class="add-alert-stub"></div>' } },
         },
-      },
-    });
+      });
 
-    await flushPromises();
+      await flushPromises();
 
-    wrapper.findComponent({ name: "AddAlert" }).vm.$emit("update:list");
-    await flushPromises();
+      wrapper.findComponent({ name: "AddAlert" }).vm.$emit(event);
+      await flushPromises();
 
-    expect(pushSpy).toHaveBeenCalledWith({
-      name: "alertList",
-      query: {
-        org_identifier: "test-org",
-        folder: "default",
-        tab: "all",
-      },
-    });
-  });
-
-  it("should navigate back on handleCancel", async () => {
-    vi.mocked(destinationService.list).mockResolvedValue({
-      data: [{ id: 1, name: "Destination 1" }],
-    } as any);
-
-    const backSpy = vi.spyOn(router, "back");
-
-    const wrapper = mount(AddAlertView, {
-      global: {
-        plugins: [store, router],
-        stubs: {
-          AddAlert: {
-            name: "AddAlert",
-            template:
-              '<div class="add-alert-stub" @cancel:hideform="$emit(\'cancel:hideform\')"></div>',
-          },
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "alertList",
+        query: {
+          org_identifier: "test-org",
+          folder: "default",
+          tab: "all",
+          state: ALERT_LIST_ALL_STATES,
         },
-      },
-    });
-
-    await flushPromises();
-
-    wrapper.findComponent({ name: "AddAlert" }).vm.$emit("cancel:hideform");
-    await flushPromises();
-
-    expect(backSpy).toHaveBeenCalled();
-  });
+      });
+    },
+  );
 
   it("should refresh destinations when event is emitted", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
@@ -347,7 +321,7 @@ describe("AddAlertView.vue", () => {
 
       const wrapper = await mountEditing();
 
-      expect(alertsService.get_by_alert_id).toHaveBeenCalledWith("test-org", "alert-1");
+      expect(alertsService.get_by_alert_id).toHaveBeenCalledWith("test-org", "alert-1", undefined);
 
       const form = wrapper.findComponent(AddAlertStub);
       expect(form.props("isUpdated")).toBe(true);
@@ -393,6 +367,44 @@ describe("AddAlertView.vue", () => {
       resolveAlert({ data: { name: "my-alert" } });
       await flushPromises();
       expect(wrapper.find(".add-alert-stub").exists()).toBe(true);
+    });
+
+    it("an alert read answered after an AutoObserve Apply or Undo is read again, so the form gets the new values (F2)", async () => {
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
+      let answerLate: (value: any) => void = () => {};
+      vi.mocked(alertsService.get_by_alert_id)
+        .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)) as any)
+        .mockResolvedValue({
+          data: { name: "my-alert", trigger_condition: { period: 15 } },
+        } as any);
+      await router.push({ name: "editAlert", params: { alert_id: "alert-1" } });
+      const wrapper = mount(AddAlertView, {
+        global: { plugins: [store, router], stubs: { AddAlert: AddAlertStub } },
+      });
+      await flushPromises();
+      await fenceAlertWrite(queryClient, "test-org", async () => "undone");
+      answerLate({ data: { name: "my-alert", trigger_condition: { period: 5 } } });
+      await flushPromises();
+      const seeded = wrapper.findComponent(AddAlertStub).props("modelValue") as any;
+      expect(seeded.trigger_condition.period).toBe(15);
+      expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    it("an alert that keeps changing while it loads shows the load failure, never an older copy (F2)", async () => {
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
+      const key = alertKeys.detail("test-org", "alert-1");
+      queryClient.setQueryData(key, { name: "my-alert", version: 0 });
+      await queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
+      let version = 0;
+      vi.mocked(alertsService.get_by_alert_id).mockImplementation((() => {
+        version += 1;
+        void fenceAlertWrite(queryClient, "test-org", async () => "applied");
+        return Promise.resolve({ data: { name: "my-alert", version } });
+      }) as any);
+      const wrapper = await mountEditing();
+      await flushPromises();
+      expect(wrapper.find(".add-alert-stub").exists()).toBe(false);
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("sends the user back to the list when the alert cannot be loaded", async () => {

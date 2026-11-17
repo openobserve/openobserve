@@ -15,7 +15,12 @@
 
 import { describe, expect, it } from "vitest";
 import { marked } from "marked";
-import { renderRcaReport, stripVerdictFence } from "./rcaReportMarkdown";
+import {
+  rcaRenumberCitations,
+  rcaReportExecutiveFirst,
+  renderRcaReport,
+  stripVerdictFence,
+} from "./rcaReportMarkdown";
 
 const toDom = (html: string): HTMLElement => {
   const host = document.createElement("div");
@@ -32,6 +37,64 @@ const VERDICT_REPORT = [
   '{"action": "suppress", "confidence": "high"}',
   "```",
 ].join("\n");
+
+// The analysis writes the Executive Summary last.
+const AGENT_ORDER = [
+  "# Incident Analysis Report",
+  "",
+  "## Subject Summary",
+  "Rejected flows [e2].",
+  "",
+  "## Timeline",
+  "```",
+  "## Executive Summary inside a fence stays put",
+  "```",
+  "",
+  "## Executive Summary",
+  "**Impact**: none [e8].",
+].join("\n");
+
+describe("rcaReportExecutiveFirst", () => {
+  it("moves the Executive Summary to the top, after the title; the rest keeps its order", () => {
+    const lines = rcaReportExecutiveFirst(AGENT_ORDER).split("\n");
+    const headings = lines.filter((line) => line.startsWith("#"));
+    expect(headings).toEqual([
+      "# Incident Analysis Report",
+      "## Executive Summary",
+      "## Subject Summary",
+      "## Timeline",
+      "## Executive Summary inside a fence stays put",
+    ]);
+    expect(lines[lines.indexOf("## Executive Summary") + 1]).toBe("**Impact**: none [e8].");
+  });
+
+  it("leaves a report without an Executive Summary unchanged", () => {
+    const md = "# T\n\n## A\ntext\n## B\nmore";
+    expect(rcaReportExecutiveFirst(md)).toBe(md);
+  });
+});
+
+describe("rcaRenumberCitations", () => {
+  it("renumbers cited ids to the page's evidence numbers and marks the rest not verified", () => {
+    const code =
+      "`m[e2]` ``SELECT `f[e2]` FROM t`` then\n```sql\nSELECT 1 WHERE message = '[e2]'\n```";
+    const out = rcaRenumberCitations(
+      `Seen [e2] and [e7], cited [e8]. ${code}`,
+      new Map([
+        ["e2", 1],
+        ["e7", 6],
+      ]),
+      (id) => `${id}, not verified`,
+    );
+    expect(out).toBe(`Seen [1] and [6], cited [e8, not verified]. ${code}`);
+  });
+
+  it("drops the raw ids while no numbers are known, outside code", () => {
+    expect(
+      rcaRenumberCitations("See [e2] in `m [e2]` and ``a `f[e2]` b``.", null, (id) => id),
+    ).toBe("See in `m [e2]` and ``a `f[e2]` b``.");
+  });
+});
 
 describe("rcaReportMarkdown", () => {
   it("renders inline code verbatim, including angle brackets", () => {

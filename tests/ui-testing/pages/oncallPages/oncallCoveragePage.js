@@ -64,6 +64,7 @@ export class OnCallCoveragePage {
       rotation: '[data-test="oncall-cover-rotation"]',
       window: '[data-test="oncall-cover-window"]',
       summary: '[data-test="oncall-cover-summary"]',
+      holder: '[data-test="oncall-cover-holder"]',
       swapA: '[data-test="oncall-swap-a"]',
       swapB: '[data-test="oncall-swap-b"]',
       swapSummary: '[data-test="oncall-swap-summary"]',
@@ -72,7 +73,7 @@ export class OnCallCoveragePage {
       // the cover list
       coverList: '[data-test="oncall-cover-list"]',
       coverTable: '[data-test="oncall-cover-table"]',
-      coverEmpty: '[data-test="oncall-cover-empty"]',
+      coverListZone: '[data-test="oncall-cover-list-zone"]',
       coverRemoveDialog: '[data-test="oncall-cover-remove-dialog"]',
 
       // the schedule bar and its plain-words answer
@@ -80,13 +81,12 @@ export class OnCallCoveragePage {
       timelineChart: '[data-test="oncall-timeline-chart"]',
       timelineEmpty: '[data-test="oncall-timeline-empty"]',
       scheduleAnswer: '[data-test="oncall-schedule-answer"]',
-      answerNobody: '[data-test="oncall-answer-nobody-hint"]',
+      answerNobody: '[data-test="oncall-answer-nobody"]',
 
       // absences, which live on the members tab
       membersTable: '[data-test="oncall-members-table"]',
       awayDialog: '[data-test="oncall-members-away-dialog"]',
-      awayFromDate: '[data-test="oncall-members-away-from-date"]',
-      awayToDate: '[data-test="oncall-members-away-to-date"]',
+      awayWindow: '[data-test="oncall-members-away-window"]',
       awayReason: '[data-test="oncall-members-away-reason"]',
       awaySave: '[data-test="oncall-members-away-save"]',
 
@@ -100,7 +100,9 @@ export class OnCallCoveragePage {
   coverRemove(coverId) { return `[data-test="oncall-cover-remove-${coverId}"]`; }
   laneHeader(rotationId) { return `[data-test="oncall-lane-header-${rotationId}"]`; }
   markAway(memberRowId) { return `[data-test="oncall-members-mark-away-${memberRowId}"]`; }
+  clearAway(memberRowId) { return `[data-test="oncall-members-clear-away-${memberRowId}"]`; }
   awayTag(memberRowId) { return `[data-test="oncall-members-away-${memberRowId}"]`; }
+  awayPreset(key) { return `[data-test="oncall-members-away-preset-${key}"]`; }
 
   /**
    * The attention row for a rotation handing a shift to somebody away.

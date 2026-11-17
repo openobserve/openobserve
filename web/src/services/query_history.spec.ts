@@ -19,8 +19,10 @@ import { queryClient } from "@/composables/query/queryClient";
 import http from "@/services/http";
 import { recordQueryHistoryMutation } from "@/services/query_history.queries";
 import { queryHistoryKeys } from "@/services/query_history.querykeys";
+import analytics from "@/services/product_analytics";
 
 vi.mock("@/services/http", () => ({ default: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 describe("query_history service", () => {
   let api: any;
@@ -33,6 +35,7 @@ describe("query_history service", () => {
       delete: vi.fn().mockResolvedValue({ data: {} }),
     };
     (http as any).mockReturnValue(api);
+    vi.mocked(analytics.track).mockClear();
   });
 
   it("records a run with its source, key, streams and status", async () => {
@@ -128,5 +131,27 @@ describe("query_history service", () => {
     expect(api.patch).toHaveBeenCalledWith("/api/o1/query_history/id%201", { starred: true });
     await queryHistory.remove("o1", "id 1");
     expect(api.delete).toHaveBeenCalledWith("/api/o1/query_history/id%201");
+  });
+
+  it("tracks star, delete and clear once each resolves", async () => {
+    await queryHistory.star("o1", "a", false);
+    expect(analytics.track).toHaveBeenCalledWith("search_history_entry_starred", {
+      starred: false,
+    });
+    await queryHistory.remove("o1", "a");
+    expect(analytics.track).toHaveBeenCalledWith("search_history_entry_deleted");
+    api.delete.mockResolvedValueOnce({ data: { deleted: 4 } });
+    await queryHistory.clear("o1", { source: "logs,traces", include_starred: true });
+    expect(analytics.track).toHaveBeenCalledWith("search_history_cleared", {
+      count: 4,
+      include_starred: true,
+      all_sources: true,
+    });
+  });
+
+  it("does not track a delete the server refuses", async () => {
+    api.delete.mockRejectedValueOnce(new Error("nope"));
+    await expect(queryHistory.remove("o1", "a")).rejects.toThrow("nope");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

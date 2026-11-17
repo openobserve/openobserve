@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-muted"
           size="icon-circle-sm"
           @click="scrollToTop"
+          :aria-label="scrollTopTooltip"
           :data-test="dataTestScrollTop"
           ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip :content="scrollTopTooltip"
         /></OButton>
@@ -51,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-muted"
           size="icon-circle-sm"
           @click="scrollToBottom"
+          :aria-label="scrollBottomTooltip"
           :data-test="dataTestScrollBottom"
           ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip :content="scrollBottomTooltip"
         /></OButton>
@@ -106,7 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ isAiLabelledOf(event) ? aiSreBadgeText : getEventBadgeText(event) }}
                         <OTooltip
                           v-if="getTooltip && getTooltip(event)"
-                          :delay="300"
                           side="bottom"
                           align="start"
                           :max-width="'24rem'"
@@ -114,11 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </span>
 
-                      <span
-                        class="text-sm"
-                        :class="'text-text-body'"
-                        v-html="getInlineHtml(event)"
-                      ></span>
+                      <slot name="inline-text" :event="event" :html="getInlineHtml(event)">
+                        <span
+                          class="text-sm"
+                          :class="'text-text-body'"
+                          v-html="getInlineHtml(event)"
+                        ></span>
+                      </slot>
 
                       <span
                         v-if="getEventLayout(event) === 'after'"
@@ -185,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Comment Input -->
-    <div class="pt-2">
+    <div class="pt-2" :class="composerClass">
       <div class="flex gap-3">
         <div class="flex-shrink-0 pt-1">
           <div
@@ -212,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="!commentText.trim() || submitting"
               :loading="submitting"
               @click="onSubmit"
+              :aria-label="sendTooltip"
               :data-test="dataTestCommentSend"
               ><OIcon name="send" size="sm" /><OTooltip :content="sendTooltip"
             /></OButton>
@@ -276,6 +280,8 @@ interface Props {
   dataTestScrollBottom: string;
   dataTestCommentInput: string;
   dataTestCommentSend: string;
+  /** Extra classes on the note box, e.g. to keep it stuck to a scrolling page's foot. */
+  composerClass?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -286,6 +292,7 @@ const props = withDefaults(defineProps<Props>(), {
   isAiLabelled: undefined,
   aiSreBadgeText: () => raw(""),
   getTooltip: undefined,
+  composerClass: "",
 });
 
 const emit = defineEmits<{

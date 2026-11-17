@@ -22,6 +22,8 @@ import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStre
 import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import { normalizeTraceId, rumFieldEqualsAnySql, traceIdLookupVariants } from "@/utils/rum/fields";
 
+const SEARCH_STREAM_NOT_FOUND = 20002;
+
 export interface TraceCorrelationData {
   trace_id: string;
   session_id: string | null;
@@ -34,6 +36,8 @@ export interface TraceCorrelationData {
     network_latency_ms: number;
     backend_duration_ms: number;
   } | null;
+  /** Where the found spans live, so the trace can be opened; null when none were found. */
+  trace_location?: TraceLocationLink | null;
 }
 
 export interface CorrelationTimeRange {
@@ -41,6 +45,11 @@ export interface CorrelationTimeRange {
   startTime: number;
   /** µs */
   endTime: number;
+}
+
+export interface TraceLocationLink extends CorrelationTimeRange {
+  stream: string;
+  traceId: string;
 }
 
 export default function useTraceCorrelation(
@@ -54,6 +63,8 @@ export default function useTraceCorrelation(
   const correlationData = ref<TraceCorrelationData | null>(null);
   const isLoading = ref(false);
   const error = ref<Error | null>(null);
+  // A kept-alive viewer can ask for another trace before the last answer lands, so only the newest request writes.
+  let latestRequest = 0;
 
   // Callers correlating a specific event (e.g. an error) pass its time
   // range; without one we fall back to the trailing hour.
@@ -80,8 +91,11 @@ export default function useTraceCorrelation(
    * Uses existing searchService.search with _rumdata stream
    */
   const fetchCorrelation = async () => {
+    const request = ++latestRequest;
+    const isLatest = () => request === latestRequest;
     if (!traceId.value) {
       correlationData.value = null;
+      isLoading.value = false;
       return;
     }
 
@@ -107,7 +121,7 @@ export default function useTraceCorrelation(
         idVariants.length ? idVariants : [sanitized],
       );
       if (!traceIdPredicate) {
-        correlationData.value = null;
+        if (isLatest()) correlationData.value = null;
         return;
       }
 
@@ -169,8 +183,13 @@ export default function useTraceCorrelation(
         backendSpans = traceResponse.data.hits || [];
         hasTrace = backendSpans.length > 0;
       } catch (traceError) {
-        error.value =
-          traceError instanceof Error ? traceError : new Error("Backend trace query failed");
+        const code = (traceError as { response?: { data?: { code?: number } } })?.response?.data
+          ?.code;
+        // An org without a traces stream has no backend trace to show, which is not a failure.
+        if (code !== SEARCH_STREAM_NOT_FOUND && isLatest()) {
+          error.value =
+            traceError instanceof Error ? traceError : new Error("Backend trace query failed");
+        }
       }
 
       // Calculate performance breakdown
@@ -197,6 +216,7 @@ export default function useTraceCorrelation(
         }
       }
 
+      if (!isLatest()) return;
       correlationData.value = {
         trace_id: canonicalTraceId,
         session_id: rumEvents[0]?.session_id || null,
@@ -204,17 +224,22 @@ export default function useTraceCorrelation(
         backend_spans: backendSpans,
         has_backend_trace: hasTrace,
         performance_breakdown: performanceBreakdown,
+        trace_location: hasTrace
+          ? { stream: tracesStream, traceId: canonicalTraceId, ...traceWindow }
+          : null,
       };
     } catch (e) {
-      error.value = e as Error;
       console.error("Failed to fetch trace correlation:", e);
+      if (!isLatest()) return;
+      error.value = e as Error;
       correlationData.value = null;
     } finally {
-      isLoading.value = false;
+      if (isLatest()) isLoading.value = false;
     }
   };
 
   const reset = () => {
+    latestRequest += 1;
     correlationData.value = null;
     isLoading.value = false;
     error.value = null;
@@ -227,6 +252,7 @@ export default function useTraceCorrelation(
     hasBackendTrace,
     backendSpanCount,
     performanceData,
+    traceLocation: computed(() => correlationData.value?.trace_location ?? null),
     fetchCorrelation,
     reset,
     cancelTracesStream,

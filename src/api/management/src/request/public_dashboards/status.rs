@@ -32,6 +32,13 @@ pub struct BatchParams {
     ids: Option<String>,
 }
 
+// Only documents the `{"list": [...]}` body `batch` builds with `json!`.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct LinkStatusList {
+    list: Vec<config::meta::public_dashboards::LinkStatusReport>,
+}
+
 /// GET /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/status, with sources.
 #[utoipa::path(
     get,
@@ -47,7 +54,7 @@ pub struct BatchParams {
         ("link_id" = String, Path, description = "Link id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::public_dashboards::LinkStatusReport),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
@@ -92,7 +99,7 @@ pub async fn link(
         ("ids" = Option<String>, Query, description = "Comma-separated link ids"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = LinkStatusList),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),

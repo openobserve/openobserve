@@ -27,8 +27,10 @@ vi.mock("@/services/settings", async (importOriginal) => {
   });
 });
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import settings from "@/services/settings";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { queryClient } from "@/composables/query/queryClient";
@@ -84,6 +86,7 @@ describe("useHomeDashboard", () => {
     expect(homeDashboard.value).toEqual(D); // optimistic — set before await resolves
     await p;
     expect(settings.setOrgSetting).toHaveBeenCalledWith("org1", "home_dashboard", D, "ui");
+    expect(analytics.track).toHaveBeenCalledWith("home_dashboard_pinned");
   });
 
   it("setHomeDashboard reverts the ref and toasts on failure", async () => {
@@ -94,6 +97,7 @@ describe("useHomeDashboard", () => {
     await setHomeDashboard("org1", D);
     expect(homeDashboard.value).toEqual(prev); // reverted
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   it("setHomeDashboard shows a permission message on 403", async () => {

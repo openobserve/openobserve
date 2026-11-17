@@ -484,3 +484,16 @@ describe("getTruncatedConditions", () => {
     expect(getTruncatedConditions(node)).toBe(full.substring(0, 20) + "...");
   });
 });
+
+describe("buildConditionPreview list values", () => {
+  it("lists each IN value instead of one quoted string", () => {
+    const node = { column: "service", operator: "in", value: ["cart", "checkout"] };
+    expect(buildConditionPreview(node)).toBe("service in ('cart', 'checkout')");
+  });
+
+  it("keeps a scalar value as before", () => {
+    expect(buildConditionPreview({ column: "a", operator: "=", value: "cart,checkout" })).toBe(
+      "a = 'cart,checkout'",
+    );
+  });
+});

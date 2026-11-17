@@ -39,6 +39,7 @@ import fleet, {
   type FleetPage,
 } from "./fleet";
 import { fleetKeys } from "./fleet.querykeys";
+import analytics from "./product_analytics";
 import searchService from "./search";
 import {
   collectorTileQueries,
@@ -316,6 +317,11 @@ export const createFleetTokenMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (body: FleetCreateTokenRequest): Promise<FleetCreatedToken> =>
       (await fleet.createToken(org, body)).data,
+    onSuccess: (_data, body) =>
+      analytics.track("fleet_token_created", {
+        expires: body.expires_in_days != null,
+        limited_uses: body.max_uses != null,
+      }),
     // The response carries the plaintext, so the cache must drop it as soon as nothing observes it.
     gcTime: 0,
     meta: { invalidates: [fleetKeys.tokens(org), fleetKeys.audit(org)], silentError: true },
@@ -324,6 +330,7 @@ export const createFleetTokenMutation = (org: string) =>
 export const revokeFleetTokenMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (id: string): Promise<FleetToken> => (await fleet.revokeToken(org, id)).data,
+    onSuccess: () => analytics.track("fleet_token_revoked"),
     // Revoking closes every connection that used the token, so collectors, details and the summary change too.
     meta: { invalidates: [fleetKeys.all(org)], silentError: true },
   });
@@ -344,6 +351,7 @@ export const deleteCollectorsMutation = (org: string) =>
       for (const id of succeeded) {
         queryClient.removeQueries({ queryKey: fleetKeys.collector(org, id) });
       }
+      analytics.track("fleet_collector_deleted", { count: succeeded.length });
     },
     meta: { invalidates: collectorWrites(org), silentError: true },
   });
@@ -352,6 +360,9 @@ export const restartCollectorsMutation = (org: string) =>
   mutationOptions({
     mutationFn: (ids: string[]): Promise<BulkResult> =>
       settleAll(ids, (id) => fleet.restartCollector(org, id)),
+    onSuccess: ({ succeeded }) => {
+      analytics.track("fleet_collector_restarted", { count: succeeded.length });
+    },
     meta: { invalidates: [fleetKeys.audit(org)], silentError: true },
   });
 
@@ -359,6 +370,7 @@ export const redeliverCollectorMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (id: string) => (await fleet.redeliverCollector(org, id)).data,
     onSuccess: (_data, id) => {
+      analytics.track("fleet_collector_redelivered");
       queryClient.invalidateQueries({ queryKey: fleetKeys.collector(org, id) });
     },
     meta: { invalidates: collectorWrites(org), silentError: true },
@@ -369,6 +381,7 @@ export const renameCollectorMutation = (org: string) =>
     mutationFn: async (vars: { id: string; name: string }) =>
       (await fleet.renameCollector(org, vars.id, vars.name)).data,
     onSuccess: (_data, vars) => {
+      analytics.track("fleet_collector_renamed");
       queryClient.invalidateQueries({ queryKey: fleetKeys.collector(org, vars.id) });
     },
     meta: { invalidates: [fleetKeys.collectors(org), fleetKeys.audit(org)], silentError: true },
@@ -377,6 +390,7 @@ export const renameCollectorMutation = (org: string) =>
 export const createFleetMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (name: string): Promise<Fleet> => (await fleet.createFleet(org, name)).data,
+    onSuccess: () => analytics.track("fleet_created"),
     meta: { invalidates: [fleetKeys.fleets(org), fleetKeys.audit(org)], silentError: true },
   });
 
@@ -384,6 +398,7 @@ export const renameFleetMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (vars: { id: string; name: string }): Promise<Fleet> =>
       (await fleet.renameFleet(org, vars.id, vars.name)).data,
+    onSuccess: () => analytics.track("fleet_renamed"),
     // Collectors, tokens and rollouts carry the fleet's name.
     meta: { invalidates: [fleetKeys.all(org)], silentError: true },
   });
@@ -391,6 +406,7 @@ export const renameFleetMutation = (org: string) =>
 export const deleteFleetMutation = (org: string) =>
   mutationOptions({
     mutationFn: (id: string) => fleet.deleteFleet(org, id),
+    onSuccess: () => analytics.track("fleet_deleted"),
     meta: { invalidates: [fleetKeys.all(org)], silentError: true },
   });
 
@@ -399,6 +415,7 @@ export const updateFleetSettingsOfMutation = (org: string) =>
     mutationFn: async (vars: { id: string; body: FleetSettings }): Promise<FleetSettings> =>
       (await fleet.updateFleetSettings(org, vars.id, vars.body)).data,
     onSuccess: (data, vars) => {
+      analytics.track("fleet_settings_updated");
       queryClient.setQueryData(fleetKeys.fleetSettings(org, vars.id), data);
     },
     meta: { invalidates: [fleetKeys.fleets(org), fleetKeys.audit(org)], silentError: true },
@@ -411,6 +428,7 @@ export const createFleetConfigMutation = (org: string) =>
       description: string;
       yaml: string;
     }): Promise<FleetConfigDetail> => (await fleet.createConfig(org, body)).data,
+    onSuccess: () => analytics.track("fleet_config_created"),
     meta: { invalidates: [fleetKeys.configs(org), fleetKeys.audit(org)], silentError: true },
   });
 
@@ -419,6 +437,7 @@ export const saveFleetConfigDraftMutation = (org: string) =>
     mutationFn: async (vars: { id: string; yaml: string }) =>
       (await fleet.saveConfigDraft(org, vars.id, { yaml: vars.yaml })).data,
     onSuccess: (_data, vars) => {
+      analytics.track("fleet_config_draft_saved");
       queryClient.invalidateQueries({ queryKey: fleetKeys.config(org, vars.id) });
     },
     meta: { silentError: true },
@@ -433,7 +452,10 @@ export const publishFleetConfigVersionMutation = (org: string) =>
     }): Promise<FleetPublished> =>
       (await fleet.publishConfigVersion(org, vars.id, { yaml: vars.yaml, message: vars.message }))
         .data,
-    onSuccess: (_data, vars) => {
+    onSuccess: (data, vars) => {
+      analytics.track("fleet_config_published", {
+        warnings: Object.values(data.warnings ?? {}).reduce((n, list) => n + list.length, 0),
+      });
       queryClient.invalidateQueries({ queryKey: fleetKeys.config(org, vars.id) });
     },
     meta: { invalidates: [fleetKeys.configs(org), fleetKeys.audit(org)], silentError: true },
@@ -444,6 +466,7 @@ export const deleteFleetConfigMutation = (org: string) =>
     mutationFn: (id: string) => fleet.deleteConfig(org, id),
     // Removed even while observed, or a re-created id would show the deleted config's YAML.
     onSuccess: (_data, id) => {
+      analytics.track("fleet_config_deleted");
       queryClient.removeQueries({ queryKey: fleetKeys.config(org, id) });
       queryClient.removeQueries({ queryKey: fleetKeys.configVersions(org, id) });
     },
@@ -464,6 +487,13 @@ export const setFleetDesiredMutation = (org: string) =>
       fleet: string;
       body: FleetSetDesiredRequest;
     }): Promise<FleetRollout> => (await fleet.setDesired(org, vars.fleet, vars.body)).data,
+    onSuccess: (_data, vars) =>
+      analytics.track("fleet_rollout_started", {
+        start: vars.body.start.kind,
+        batching: vars.body.batching.kind,
+        verify: vars.body.verify,
+        auto_rollback: vars.body.auto_rollback,
+      }),
     meta: { invalidates: [fleetKeys.all(org)], silentError: true },
   });
 
@@ -480,6 +510,7 @@ export const rolloutExitMutation = (org: string) =>
       if (vars.exit === "rollback") return (await fleet.rollbackRollout(org, vars.id)).data;
       return (await fleet.skipRollout(org, vars.id, vars.collectorIds ?? [])).data;
     },
+    onSuccess: (_data, vars) => analytics.track("fleet_rollout_exit_taken", { exit: vars.exit }),
     meta: { invalidates: [fleetKeys.all(org)], silentError: true },
   });
 
@@ -488,5 +519,6 @@ export const updateFleetSettingsMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (body: FleetOrgSettings): Promise<FleetOrgSettings> =>
       (await fleet.updateSettings(org, body)).data,
+    onSuccess: () => analytics.track("fleet_org_settings_updated"),
     meta: { invalidates: [fleetKeys.all(org)], silentError: true },
   });

@@ -38,6 +38,12 @@ export interface MetricsCorrelationConfig {
   availableDimensions?: Record<string, string>; // Actual field names (for source stream queries)
   metricSchemas?: Record<string, any>; // Cached metric schemas with metrics_meta
   semanticGroups?: FieldAlias[]; // For resolving semantic IDs to raw field names in subject filters
+  /** What titles and descriptions call the service; queries keep `serviceName`, the key. */
+  displayServiceName?: string;
+}
+
+function shownName(config: MetricsCorrelationConfig): string {
+  return config.displayServiceName || config.serviceName;
 }
 
 /**
@@ -64,9 +70,9 @@ export function useMetricsCorrelationDashboard(t: TranslateFn) {
     const dashboard = {
       version: 5,
       dashboardId: ``,
-      title: t("correlation.correlatedStreamsFor", { service: config.serviceName }),
+      title: t("correlation.correlatedStreamsFor", { service: shownName(config) }),
       description: t("correlation.metricsDashboardDescription", {
-        service: config.serviceName,
+        service: shownName(config),
       }),
       role: "",
       owner: "",
@@ -173,7 +179,7 @@ export function useMetricsCorrelationDashboard(t: TranslateFn) {
         return !skip;
       })
       .map(([field, value]) => {
-        return buildSqlCondition(field, value);
+        return buildSqlCondition(field, value, stream.filter_spellings?.[field]);
       })
       .join(" AND ");
 
@@ -333,6 +339,7 @@ ORDER BY x_axis_1`;
     // Determine stream and filters based on available data
     let streamName: string;
     let filters: Record<string, string>;
+    let spellings: Record<string, string[]> = {};
 
     if (config.sourceType === "logs" && config.sourceStream) {
       // When viewing from logs page, prefer source stream
@@ -344,11 +351,13 @@ ORDER BY x_axis_1`;
       // "No field named X" or a silently-wrong predicate.
       const matchingStream = streams?.find((s) => s.stream_name === config.sourceStream);
       filters = matchingStream?.filters ?? {};
+      spellings = matchingStream?.filter_spellings ?? {};
     } else if (streams && streams.length > 0) {
       // Use first correlated log stream from API response
       const primaryStream = streams[0];
       streamName = primaryStream.stream_name;
       filters = primaryStream.filters ?? {};
+      spellings = primaryStream.filter_spellings ?? {};
     } else {
       // No logs available
       return null;
@@ -362,7 +371,7 @@ ORDER BY x_axis_1`;
         return typeof value === "string" && !field.startsWith("_") && value !== SELECT_ALL_VALUE;
       })
       .map(([field, value]) => {
-        return buildSqlCondition(field, value);
+        return buildSqlCondition(field, value, spellings[field]);
       })
       .join(" AND ");
 
@@ -374,7 +383,7 @@ ORDER BY x_axis_1`;
       id: "logs_table_panel",
       type: "table",
       title: t("correlation.logsPanelTitle", { stream: streamName }),
-      description: t("correlation.logsPanelDescription", { service: config.serviceName }),
+      description: t("correlation.logsPanelDescription", { service: shownName(config) }),
       config: {
         wrap_table_cells: false,
         table_dynamic_columns: true,
@@ -441,8 +450,8 @@ ORDER BY x_axis_1`;
     const dashboard = {
       version: 5,
       dashboardId: ``,
-      title: t("correlation.correlatedStreamsFor", { service: config.serviceName }),
-      description: t("correlation.logsDashboardDescription", { service: config.serviceName }),
+      title: t("correlation.correlatedStreamsFor", { service: shownName(config) }),
+      description: t("correlation.logsDashboardDescription", { service: shownName(config) }),
       role: "",
       owner: "",
       created: new Date().toISOString(),

@@ -961,7 +961,7 @@ pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
 /// operand at all** — `WHERE (<markers>) LIMIT 1`.
 ///
 /// `is_expr_valid_for_index`, in
-/// `search/src/datafusion/optimizer/physical_optimizer/index.rs`, recurses
+/// `search/src/datafusion/physical_optimizer/index_optimizer/index.rs`, recurses
 /// `Operator::And | Operator::Or` with `&&`. For an OR that means EVERY operand
 /// must independently name an indexed column: one un-indexed marker rejects the
 /// **entire** condition, no `IndexCondition` is built, and the read falls back

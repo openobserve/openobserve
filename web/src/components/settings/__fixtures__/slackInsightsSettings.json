@@ -1,0 +1,55 @@
+{
+  "contract": "GET|PUT /api/{org}/slack/insights-settings, slack-insights-feed spec Contract and its 2026-11-09 S7 Decision",
+  "adminOneChannel": {
+    "channel": {
+      "installation_id": "inst-1",
+      "channel_id": "C100",
+      "channel_name": "ops-insights"
+    },
+    "digest_time": "09:00",
+    "digest_time_zone": "America/New_York",
+    "post_trial_findings": false,
+    "allow_changes_from_slack": false,
+    "revision": 7,
+    "last_digest": {
+      "time_us": 1794232800000000,
+      "counts": { "needs_attention": 2, "suggestions": 30, "calibration_runs": 1 },
+      "link": "https://demo-workspace.slack.com/archives/C100/p1794232800000100"
+    },
+    "can_edit": true
+  },
+  "noChannel": {
+    "channel": null,
+    "digest_time": "09:00",
+    "digest_time_zone": null,
+    "post_trial_findings": false,
+    "revision": 0
+  },
+  "member": {
+    "channel": {
+      "installation_id": "inst-1",
+      "channel_id": "C100",
+      "channel_name": "ops-insights"
+    },
+    "digest_time": "09:00",
+    "digest_time_zone": "America/New_York",
+    "post_trial_findings": false,
+    "allow_changes_from_slack": false,
+    "revision": 7,
+    "last_digest": {
+      "time_us": 1794232800000000,
+      "counts": { "needs_attention": 2, "suggestions": 30, "calibration_runs": 1 },
+      "link": "https://demo-workspace.slack.com/archives/C100/p1794232800000100"
+    },
+    "can_edit": false
+  },
+  "staleRevision": {
+    "status": 409,
+    "body": { "code": "revision_mismatch", "message": "Someone else changed these settings." }
+  },
+  "notInChannel": {
+    "status": 400,
+    "body": { "code": "not_in_channel", "message": "OpenObserve isn't in #ops-insights." }
+  },
+  "switchedOff": { "status": 404, "body": { "message": "Not found" } }
+}

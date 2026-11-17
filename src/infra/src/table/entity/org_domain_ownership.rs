@@ -2,7 +2,16 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    DeriveEntityModel,
+    serde::Serialize,
+    serde::Deserialize,
+    utoipa::ToSchema,
+)]
+#[schema(as = OrgDomainOwnership)]
 #[sea_orm(table_name = "org_domain_ownership")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]

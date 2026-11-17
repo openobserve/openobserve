@@ -32,12 +32,14 @@ const mockStore = {
 };
 
 vi.mock("vuex", () => ({ useStore: () => mockStore }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // The composable runs outside a component, where the global i18n plugin isn't installed.
 vi.mock("@/types/i18n", () => ({ useI18nTyped: () => ({ t: (key: string) => key }) }));
 
 import { createRole, getAllRolePermissions, getResources, updateRole } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
+import analytics from "@/services/product_analytics";
 import { MCP_READONLY_ROLE, useMcpCredential } from "./useMcpCredential";
 
 const created = () => ({
@@ -328,6 +330,18 @@ describe("useMcpCredential", () => {
 
       expect(service_accounts.create).toHaveBeenCalledTimes(1);
       expect(second).toBe(first);
+    });
+
+    it("tracks only a credential it actually minted", async () => {
+      const { generate } = useOrg("org-track");
+
+      await generate();
+      await generate();
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("mcp_credential_generated", {
+        scope: "readonly",
+      });
     });
 
     it("hands a remount the credential it can no longer be shown", async () => {

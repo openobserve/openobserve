@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import type { VueWrapper } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgUsersQuery } from "@/services/users.queries";
+import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { formatInZone } from "@/utils/oncall";
 import type {
@@ -263,7 +266,7 @@ describe("OnCallTeamAttention", () => {
       render(risks([risk({ kind: "single_member_rotation", severity: "medium" })])),
     );
     expect(wrapper.find('[data-test="oncall-attention-cta-single_member_rotation"]').text()).toBe(
-      "Add a member",
+      "Add members",
     );
   });
 
@@ -438,5 +441,41 @@ describe("OnCallTeamAttention", () => {
   it("says nothing about freshness before the first check lands", async () => {
     const wrapper = await open(render(risks([risk()])));
     expect(wrapper.find('[data-test="oncall-attention-checked"]').exists()).toBe(false);
+  });
+
+  /// A finding names a person, so the strip reads their display name and keeps the email on hover.
+  it("names people in a finding by display name, mounting the real name component", async () => {
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "bob@oncall.test", first_name: "Bob", last_name: "OnCall" },
+    ]);
+    const wrapper = mount(OnCallTeamAttention, {
+      props: {
+        risks: risks([
+          risk({
+            kind: "unreachable_on_rung",
+            severity: "high",
+            message: "bob@oncall.test is on the P1 ladder and no page can reach them",
+            user_email: "bob@oncall.test",
+          }),
+        ]),
+      },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+
+    const worst = wrapper.find('[data-test="oncall-attention-worst"]');
+    expect(worst.text()).toContain("Bob OnCall is on the P1 ladder");
+    expect(worst.text()).not.toContain("@");
+    expect(worst.findComponent({ name: "OnCallPersonName" }).props("email")).toBe(
+      "bob@oncall.test",
+    );
+    queryClient.clear();
+  });
+
+  it("states its heading in sentence case, never shouted", () => {
+    const wrapper = render(risks([risk()]));
+    const heading = wrapper.find('[data-test="oncall-attention-worst"]').element
+      .previousElementSibling;
+    expect(heading?.className).not.toContain("uppercase");
   });
 });

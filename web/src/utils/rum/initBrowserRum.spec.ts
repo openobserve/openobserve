@@ -25,6 +25,16 @@ vi.mock("@openobserve/browser-rum", () => ({
 }));
 vi.mock("@openobserve/browser-logs", () => ({ openobserveLogs: { init: logsInit } }));
 
+const cloudFlag = vi.hoisted(() => ({ isCloud: "false" }));
+
+vi.mock("@/aws-exports", () => ({
+  default: {
+    get isCloud() {
+      return cloudFlag.isCloud;
+    },
+  },
+}));
+
 const EXT = "chrome-extension://abcdefghijklmnop";
 
 const RUM: BrowserRumConfig = {
@@ -53,12 +63,30 @@ const errorEvent = (stack: string) => ({
 });
 
 beforeEach(() => {
+  cloudFlag.isCloud = "false";
   vi.resetModules();
   rumInit.mockReset();
   logsInit.mockReset();
 });
 
 describe("initBrowserRum", () => {
+  it("masks all replay text on cloud", async () => {
+    cloudFlag.isCloud = "true";
+    const initBrowserRum = await loadHelper();
+
+    initBrowserRum(RUM, "http://localhost:5080");
+
+    expect(rumInit.mock.calls[0][0].defaultPrivacyLevel).toBe("mask");
+  });
+
+  it("keeps replay unmasked outside cloud", async () => {
+    const initBrowserRum = await loadHelper();
+
+    initBrowserRum(RUM, "http://localhost:5080");
+
+    expect(rumInit.mock.calls[0][0].defaultPrivacyLevel).toBe("allow");
+  });
+
   it("initialises the RUM and logs SDKs from the full config's rum block", async () => {
     const initBrowserRum = await loadHelper();
 

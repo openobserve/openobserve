@@ -41,6 +41,7 @@ pub async fn prepare(
     user_id: &str,
     query: &HashMap<String, String>,
     mode: TraceListMode,
+    trace_id: &str,
 ) -> Result<TraceListPlan, Response> {
     let mut options =
         TraceListOptions::parse(query, mode).map_err(MetaHttpResponse::bad_request)?;
@@ -69,13 +70,20 @@ pub async fn prepare(
     if mode == TraceListMode::Complete {
         validate_filter(&options.filter).map_err(MetaHttpResponse::bad_request)?;
     }
-    Ok(TraceListPlan {
+    let plan = TraceListPlan {
         options,
         sort,
         llm_schema,
         columns: TraceColumns::from_schema(schema.as_ref()),
         mode,
-    })
+    };
+    let sql = plan.request(stream_name).query.sql;
+    if let Some(response) =
+        crate::traces::check_sql_permissions(org_id, user_id, &sql, trace_id).await
+    {
+        return Err(response);
+    }
+    Ok(plan)
 }
 
 pub async fn run(ctx: &TraceSearchContext, plan: &TraceListPlan) -> Result<TraceListResult, Error> {

@@ -50,6 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </FeatureLockExempt>
         </template>
       </OPageHeader>
+      <RumVersionStrip
+        v-if="showTabs && versionsEnabled"
+        :app="stripApp"
+        :no-version-hint="onPerformance"
+      />
       <router-view v-slot="{ Component }">
         <!--
           ONE keep-alive, always rendered. It must NOT sit inside a v-if on
@@ -77,7 +82,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { overviewStateOnly } from "@/utils/rum/performanceOverview";
-import { computed, nextTick, onActivated, onMounted, ref, watch, onUpdated } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onActivated,
+  onMounted,
+  ref,
+  watch,
+  onUpdated,
+} from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useSession from "@/composables/useSessionReplay";
@@ -93,6 +107,12 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import RumNoDataState from "@/components/rum/RumNoDataState.vue";
+import config from "@/aws-exports";
+import { drawerQuery, rumTabApps } from "@/enterprise/components/ServiceVersions/rumStrip";
+
+const RumVersionStrip = defineAsyncComponent(
+  () => import("@/enterprise/components/ServiceVersions/RumVersionStrip.vue"),
+);
 
 /**
  * COMPONENT names (not route names) that <keep-alive> retains — the RUM views whose
@@ -152,6 +172,18 @@ const showTabs = computed(() => {
     "SourceMaps",
   ];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
+});
+
+const versionsEnabled = config.isEnterprise === "true" || config.isCloud === "true";
+const onPerformance = computed(() => {
+  const name = router.currentRoute.value.name?.toString() || "";
+  return name.startsWith("rumPerformance") || name === "RumPerformance";
+});
+// Sessions and Source Maps have no app picker, so the strip falls back to the newest-deployed app.
+const stripApp = computed(() => {
+  if (router.currentRoute.value.name === "ErrorTracking") return rumTabApps.errors || undefined;
+  if (onPerformance.value) return rumTabApps.performance || undefined;
+  return undefined;
 });
 
 const { t } = useI18nTyped();
@@ -289,6 +321,7 @@ const changeTab = (tab: string | number) => {
         ...getQueryParams(performanceState.data.datetime, ""),
         ...overviewStateOnly(router.currentRoute.value.query),
         org_identifier: store.state.selectedOrganization.identifier,
+        ...drawerQuery(router.currentRoute.value.query),
       },
     });
     return;
@@ -297,7 +330,10 @@ const changeTab = (tab: string | number) => {
   if (tab === "error_tracking") {
     router.push({
       name: "ErrorTracking",
-      query: getQueryParams(performanceState.data.datetime, errorTrackingState.data.editorValue),
+      query: {
+        ...getQueryParams(performanceState.data.datetime, errorTrackingState.data.editorValue),
+        ...drawerQuery(router.currentRoute.value.query),
+      },
     });
     return;
   }
@@ -305,7 +341,10 @@ const changeTab = (tab: string | number) => {
   if (tab === "sessions") {
     router.push({
       name: "Sessions",
-      query: getQueryParams(performanceState.data.datetime, sessionState.data.editorValue),
+      query: {
+        ...getQueryParams(performanceState.data.datetime, sessionState.data.editorValue),
+        ...drawerQuery(router.currentRoute.value.query),
+      },
     });
     return;
   }

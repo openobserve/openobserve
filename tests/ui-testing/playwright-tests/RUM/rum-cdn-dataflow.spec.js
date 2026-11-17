@@ -51,6 +51,8 @@ const {
   attachBeaconCounter,
   attachCdnAssetTracker,
   isRumSdkReady,
+  annotateCdnOutage,
+  skipOnCdnOutage,
 } = require('../utils/rum-traffic.js');
 
 const ORG = process.env.ORGNAME || 'default';
@@ -159,7 +161,7 @@ test.describe('RUM CDN Data Flow', () => {
         failures: cdn.failures,
       });
       await app.close();
-      test.skip(true, 'CDN SDK bundle did not initialise this run (external dependency)');
+      skipOnCdnOutage(test.info(), true, 'CDN SDK bundle did not initialise this run (external dependency)');
     }
 
     // The recorder chunk is what makes session replay record (the fixture
@@ -180,6 +182,7 @@ test.describe('RUM CDN Data Flow', () => {
       testLogger.warn('CDN recorder chunk unavailable — session replay assertions will be skipped', {
         failures: cdn.failures,
       });
+      annotateCdnOutage(test.info(), 'CDN recorder chunk unavailable this run (external dependency)');
     }
 
     // Deterministic signal generation + flush (shared with the NPM path).
@@ -188,6 +191,12 @@ test.describe('RUM CDN Data Flow', () => {
     await expect
       .poll(() => beacons.rum + beacons.logs, { timeout: 20000, intervals: [1000, 2000, 3000] })
       .toBeGreaterThan(0);
+    // The recorder uploads a segment only every few seconds, so closing the app before the first one loses the recording.
+    if (replayCapable) {
+      await expect
+        .poll(() => beacons.replay, { timeout: 30000, intervals: [1000, 2000, 3000] })
+        .toBeGreaterThan(0);
+    }
 
     // Hold the app open until rows are actually queryable in BOTH streams —
     // the SDK (still live on the fixture pages) retries aborted batches.
@@ -241,7 +250,7 @@ test.describe('RUM CDN Data Flow', () => {
   test('_rumdata stream receives events for this run', {
     tag: ['@rum', '@rumCdnDataflow', '@dataflow', '@P0'],
   }, async ({ page }) => {
-    test.skip(!sdkReady, 'CDN SDK bundle did not initialise this run (external dependency)');
+    skipOnCdnOutage(test.info(), !sdkReady, 'CDN SDK bundle did not initialise this run (external dependency)');
     const hits = await waitForStreamRows(page, {
       sql: `SELECT * FROM "_rumdata" WHERE service = '${SERVICE}'`,
       minRows: 1,
@@ -254,7 +263,7 @@ test.describe('RUM CDN Data Flow', () => {
   test('_rumlog stream receives forwarded logs for this run', {
     tag: ['@rum', '@rumCdnDataflow', '@dataflow', '@P1'],
   }, async ({ page }) => {
-    test.skip(!sdkReady, 'CDN SDK bundle did not initialise this run (external dependency)');
+    skipOnCdnOutage(test.info(), !sdkReady, 'CDN SDK bundle did not initialise this run (external dependency)');
     const hits = await waitForStreamRows(page, {
       sql: `SELECT * FROM "_rumlog" WHERE service = '${SERVICE}'`,
       minRows: 1,
@@ -270,7 +279,7 @@ test.describe('RUM CDN Data Flow', () => {
     // Replay recording needs the CDN's lazy recorder chunk; when the live CDN
     // failed to serve it this run, there is nothing OpenObserve could have
     // recorded — skip (with the warning already logged) instead of failing.
-    test.skip(!replayCapable, 'CDN recorder chunk unavailable this run (external dependency)');
+    skipOnCdnOutage(test.info(), !replayCapable, 'CDN recorder chunk unavailable this run (external dependency)');
 
     // sessionId was captured from this run's _rumdata rows in Layer 0.
     // _sessionreplay has no service column, so the session id is the only
@@ -293,7 +302,7 @@ test.describe('RUM CDN Data Flow', () => {
   test('RUM Error Tracking page renders ingested errors', {
     tag: ['@rum', '@rumCdnDataflow', '@dataflow', '@ui', '@P1'],
   }, async ({ page }) => {
-    test.skip(!sdkReady, 'CDN SDK bundle did not initialise this run (external dependency)');
+    skipOnCdnOutage(test.info(), !sdkReady, 'CDN SDK bundle did not initialise this run (external dependency)');
     const pm = new PageManager(page);
 
     await pm.rumPage.gotoErrorsList();

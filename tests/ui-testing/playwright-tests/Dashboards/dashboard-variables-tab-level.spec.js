@@ -110,7 +110,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Switch to Tab1 and verify variable is visible
     await scopedVars.getTabLocator("Tab1").click();
@@ -184,7 +184,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Go to Tab1 and set value
     await scopedVars.getTabLocator("Tab1").click();
@@ -321,7 +321,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Initially on default tab - variable should not load yet
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -393,7 +393,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Set value on Tab1
     await scopedVars.getTabLocator("Tab1").click();
@@ -526,7 +526,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Change global variable value
     await scopedVars.getTabLocator("Tab1").click();
@@ -603,7 +603,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Stay on default tab and set value
     await scopedVars.waitForTabContentLoaded();

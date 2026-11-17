@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 /** One pricing tier in its wire shape: per-token prices keyed by usage type. */
 export interface PricingTier {
@@ -88,13 +89,28 @@ const modelPricing = {
     return http().get(`/api/${org_identifier}/llm/models/${model_id}`);
   },
   create: (org_identifier: string, data: any) => {
-    return http().post(`/api/${org_identifier}/llm/models`, data);
+    return http()
+      .post(`/api/${org_identifier}/llm/models`, data)
+      .then((res) => {
+        analytics.track("model_pricing_created");
+        return res;
+      });
   },
   update: (org_identifier: string, model_id: string, data: any) => {
-    return http().put(`/api/${org_identifier}/llm/models/${model_id}`, data);
+    return http()
+      .put(`/api/${org_identifier}/llm/models/${model_id}`, data)
+      .then((res) => {
+        analytics.track("model_pricing_updated");
+        return res;
+      });
   },
   delete: (org_identifier: string, model_id: string) => {
-    return http().delete(`/api/${org_identifier}/llm/models/${model_id}`);
+    return http()
+      .delete(`/api/${org_identifier}/llm/models/${model_id}`)
+      .then((res) => {
+        analytics.track("model_pricing_deleted");
+        return res;
+      });
   },
   getBuiltIn: (org_identifier: string, search?: string, metadataOnly = false) => {
     const params = new URLSearchParams();
@@ -113,7 +129,12 @@ const modelPricing = {
     });
   },
   refreshBuiltIn: (org_identifier: string) => {
-    return http().post(`/api/${org_identifier}/llm/models/refresh-built-in`, {});
+    return http()
+      .post(`/api/${org_identifier}/llm/models/refresh-built-in`, {})
+      .then((res) => {
+        analytics.track("model_pricing_built_in_refreshed");
+        return res;
+      });
   },
   /** Test which rule prices `model_name`. With `match_pattern`, the response's
    *  `captured_models` lists the known models that pattern would price if saved;

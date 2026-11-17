@@ -10,6 +10,7 @@ import { b64DecodeUnicode, b64EncodeStandard, b64DecodeStandard } from "@/utils/
 import { useLocalUserInfo } from "@/utils/storage";
 import { getUUID, getUUIDv7 } from "@/utils/uuid";
 import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
+import { summaryHasUserData } from "@/utils/internalStreams";
 
 export const trialPeriodAllowedPath = ["iam", "users", "organizations", "invitations"];
 
@@ -157,7 +158,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
       // Shares the Usage tab's cached summary — this runs on every guarded
       // navigation, so an uncached read here re-requested on each one.
       const data: any = await queryClient.fetchQuery(orgSummaryQuery(orgIdentifier));
-      if (!data?.streams?.num_streams) {
+      if (!summaryHasUserData(data)) {
         store.dispatch("setIsDataIngested", false);
         next({ path: "/ingestion" });
       } else {

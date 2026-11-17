@@ -22,25 +22,33 @@ import config from "@/aws-exports";
 import { addCommasToNumber } from "@/utils/zincutils";
 import analytics from "@/services/product_analytics";
 import {
-  connectDataPopupSettled,
   connectDataPromptSessionKey,
   getCommunitySlackUrl,
   markSlackInviteDismissed,
+  markSlackInviteOffered,
   markSlackInviteResolved,
   shouldShowStandaloneSlackInvite,
 } from "@/utils/slackCommunityInvite";
+import { isFirstLoginOf } from "@/components/onboarding/onboardingFlow";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 
 const { t } = useI18nTyped();
 const store = useStore();
+const session = useSampleDataSession();
 
-// Day-2 follow-up for a user who didn't act on ConnectDataSourcePopup's embedded offer — clock is shared via utils/slackCommunityInvite.ts.
+// Day-2 follow-up; its clock starts in either first-run flow or in any later cloud session — shared via utils/slackCommunityInvite.ts.
 const isOpen = ref(false);
 
 const userEmail = store.state.userInfo?.email ?? "anonymous";
+
+// a welcome that opens over the invite wins this visit; closing without a dismissal keeps the invite due
+watch(session.welcomeOpen, (open) => {
+  if (open) isOpen.value = false;
+});
 
 const slackUrl = computed(() => getCommunitySlackUrl(store.state.zoConfig?.custom_slack_url));
 
@@ -57,35 +65,44 @@ const track = (event: string, properties: Record<string, any> = {}) => {
   }
 };
 
-const maybeShowStandaloneInvite = () => {
-  // ConnectDataSourcePopup gets first refusal on this session — if it claimed the
-  // session (shown, or about to be), the two popups must not stack.
-  if (sessionStorage.getItem(connectDataPromptSessionKey(userEmail)) === "true") return;
-  if (shouldShowStandaloneSlackInvite(userEmail)) {
-    isOpen.value = true;
-    track("community_slack_prompt_shown");
-  }
-};
-
 onMounted(() => {
   // Cloud-only: bail out entirely on Enterprise / open source so nothing is
   // captured or shown there.
   if (config.isCloud !== "true") return;
 
-  // Never compete with ConnectDataSourcePopup/GetStarted during the user's
+  // Never compete with onboarding or the welcome dialog during the user's
   // first-login session — the day-2 clock only starts once that session ends.
-  if (localStorage.getItem("isFirstTimeLogin") === "true") return;
+  if (isFirstLoginOf(store.state.userInfo?.email)) return;
 
-  if (connectDataPopupSettled.value) {
-    maybeShowStandaloneInvite();
+  const due = shouldShowStandaloneSlackInvite(userEmail);
+  // every cloud session starts the clock, so users onboarding never reaches (invited, a new browser) get the invite too
+  markSlackInviteOffered(userEmail);
+  if (!due) return;
+
+  const show = () => {
+    // the onboarding page claims its session, and the welcome or this org's tour wins this visit; the invite stays due for a later one
+    if (sessionStorage.getItem(connectDataPromptSessionKey(userEmail)) === "true") return;
+    if (session.welcomeOpen.value) return;
+    if (session.tour.value?.org === store.state.selectedOrganization?.identifier) return;
+    isOpen.value = true;
+    track("community_slack_prompt_shown");
+  };
+  // the welcome mounts first, so its stream check for this org has started by now
+  const settled = () =>
+    !!store.state.selectedOrganization?.identifier && session.welcomeDeciding.value === 0;
+  if (settled()) {
+    show();
     return;
   }
-  // ConnectDataSourcePopup is still deciding whether it opens this session — wait for it.
-  const stopWaiting = watch(connectDataPopupSettled, (settled) => {
-    if (!settled) return;
-    stopWaiting();
-    maybeShowStandaloneInvite();
-  });
+  const stop = watch(
+    settled,
+    (done) => {
+      if (!done) return;
+      stop();
+      show();
+    },
+    { flush: "post" },
+  );
 });
 
 // Real member count, sourced from the backend `/config` response

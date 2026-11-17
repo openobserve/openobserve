@@ -119,6 +119,7 @@
                 name-prefix="filterGroup"
                 :target-scope="formValues.targetScope"
                 :stream-fields="streamFields"
+                :stream="formValues.stream"
                 data-test="job-form-filter-builder"
               />
             </div>
@@ -200,6 +201,17 @@
             </div>
           </section>
 
+          <JobCostSection
+            ref="costSection"
+            :estimate="spend.estimate.value"
+            :loading="spend.loading.value"
+            :rate="samplingRate"
+            :scope="formValues.targetScope"
+            :budget-enabled="formValues.budgetEnabled"
+            :has-judges="judgeIds.length > 0"
+            :org-id="orgId"
+          />
+
           <!-- Trace/session completion -->
           <section
             v-if="formValues.targetScope !== 'span'"
@@ -247,6 +259,7 @@
                 :group="endSignalGroup"
                 purpose="endSignal"
                 :stream-fields="streamFields"
+                :stream="formValues.stream"
                 data-test="job-form-end-signal-builder"
                 @update:group="endSignalGroup = $event"
               />
@@ -262,6 +275,9 @@
           :stream="formValues.stream"
           :filter-where="filterWhere"
           :filter-ready="filterReady"
+          :stream-fields="streamFieldNames"
+          :daily-cost="spend.estimate.value.perDayUsd"
+          :cost-loading="spend.loading.value"
         />
       </div>
 
@@ -334,7 +350,12 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
-import { type EvalJob, type Scorer, type SpanSelector } from "@/services/online-evals.service";
+import type {
+  EvalJob,
+  EvalTargetScope,
+  Scorer,
+  SpanSelector,
+} from "@/services/online-evals.service";
 import { saveEvalJobMutation, setJobActiveMutation } from "@/services/online-evals.service.queries";
 import { useMutation } from "@tanstack/vue-query";
 import {
@@ -379,6 +400,9 @@ import JobScorerPicker from "./job/JobScorerPicker.vue";
 import JobFilterBuilder from "./job/JobFilterBuilder.vue";
 import JobInputMapping from "./job/JobInputMapping.vue";
 import JobPreviewPanel from "./job/JobPreviewPanel.vue";
+import JobCostSection from "./job/JobCostSection.vue";
+import { useJobSpendEstimate } from "../composables/useJobSpendEstimate";
+import { DEFAULT_BUDGET_ACTION, DEFAULT_DAILY_BUDGET_USD } from "../utils/evalSpend";
 import { makeJobFormSchema, type JobForm } from "./JobFormPage.schema";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
@@ -389,6 +413,8 @@ const props = defineProps<{
   mode: "create" | "edit";
   row: EvalJob | null;
   scorers: Scorer[];
+  /** Opened from a budget-paused job's Edit budget: the form starts at the cost section. */
+  focusBudget?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -421,10 +447,6 @@ const form = useOForm<JobForm>({
 });
 const formValues = form.useStore((s: any) => s.values as JobForm);
 
-// The filter-builder tree is FORM-OWNED now: a reactive READ-VIEW of the
-// form's `filterGroup` field (JobFilterBuilder renders FilterGroup in form mode
-// and writes structural changes straight to the form). Single source of truth,
-// no mirror ref. Drives the preview computeds below and the save payload.
 const filterGroup = form.useStore((s: any) => s.values.filterGroup ?? createEmptyJobFilterGroup());
 // The completion end-signal and mapping/selectors are composite working state
 // built into the payload at submit.
@@ -537,6 +559,35 @@ const selectedScorers = computed(() =>
     .filter((scorer): scorer is Scorer => Boolean(scorer)),
 );
 
+// Only LLM judges cost money.
+const judgeIds = computed(() =>
+  selectedScorers.value
+    .filter(
+      (scorer) => (valueOf(scorer, "scorerType", "scorer_type") ?? "llm_judge") === "llm_judge",
+    )
+    .map(entityId),
+);
+const samplingRate = computed(() =>
+  formValues.value.samplingMode === "all"
+    ? 1
+    : (samplingRatePercent(formValues.value.samplingValue) ?? 0) / 100,
+);
+const streamFields = ref<Array<{ label: I18nText; value: string; type: string }>>([]);
+const streamFieldsLoaded = ref(false);
+// Null while the selected stream's schema is still loading.
+const streamFieldNames = computed(() =>
+  streamFieldsLoaded.value ? streamFields.value.map((field) => field.value) : null,
+);
+const spend = useJobSpendEstimate({
+  stream: computed(() => formValues.value.stream),
+  where: filterWhere,
+  ready: filterReady,
+  scope: computed(() => formValues.value.targetScope as EvalTargetScope),
+  fields: streamFieldNames,
+  judgeIds,
+  rate: samplingRate,
+});
+
 const { getStreams, getStream } = useStreams(t);
 const traceStreams = ref<string[]>([]);
 const RESERVED_EVAL_SOURCE_STREAMS = new Set([
@@ -548,7 +599,6 @@ const RESERVED_EVAL_SOURCE_STREAMS = new Set([
   "errors",
   "data_retention_usage",
 ]);
-const streamFields = ref<Array<{ label: I18nText; value: string; type: string }>>([]);
 
 const streamOptions = computed(() => {
   const opts = traceStreams.value.map((name) => ({ label: raw(name), value: name }));
@@ -584,16 +634,16 @@ async function loadTraceStreams() {
 }
 
 async function loadStreamFields() {
-  if (!formValues.value.stream) {
+  const name = formValues.value.stream;
+  streamFieldsLoaded.value = false;
+  if (!name || typeof getStream !== "function") {
     streamFields.value = [];
-    return;
-  }
-  if (typeof getStream !== "function") {
-    streamFields.value = [];
+    streamFieldsLoaded.value = true;
     return;
   }
   try {
-    const stream: any = await getStream(formValues.value.stream, "traces", true);
+    const stream: any = await getStream(name, "traces", true);
+    if (name !== formValues.value.stream) return;
     streamFields.value = (stream?.schema || [])
       .map((field: any) => {
         const name = typeof field === "string" ? field : field?.name;
@@ -610,14 +660,22 @@ async function loadStreamFields() {
         ): field is { label: I18nText; value: string; type: string } => field !== null,
       );
   } catch {
+    if (name !== formValues.value.stream) return;
     streamFields.value = [];
   }
+  streamFieldsLoaded.value = true;
 }
+
+const costSection = ref<{ $el?: HTMLElement } | null>(null);
 
 onMounted(async () => {
   void loadTraceStreams();
   void loadStreamFields();
   await jobDraft.start();
+  if (props.focusBudget) {
+    await nextTick();
+    costSection.value?.$el?.scrollIntoView?.({ block: "start" });
+  }
 });
 
 const samplingModeOptions = computed(() => [
@@ -674,6 +732,9 @@ function initForm(row: EvalJob | null): JobForm {
       samplingMode: "rate",
       samplingValue: "0.1",
       filterGroup: initFilterGroup(row),
+      budgetEnabled: true,
+      dailyBudgetUsd: DEFAULT_DAILY_BUDGET_USD,
+      budgetAction: DEFAULT_BUDGET_ACTION,
     };
   }
   const targetScope = targetScopeOf(row);
@@ -692,6 +753,9 @@ function initForm(row: EvalJob | null): JobForm {
     samplingMode: samplingModeOf(row),
     samplingValue: samplingRateForForm(valueOf(row, "samplingValue", "sampling_value")),
     filterGroup: initFilterGroup(row),
+    budgetEnabled: row.budget != null,
+    dailyBudgetUsd: row.budget?.dailyUsd ?? DEFAULT_DAILY_BUDGET_USD,
+    budgetAction: row.budget?.onReach ?? DEFAULT_BUDGET_ACTION,
   };
 }
 
@@ -772,7 +836,14 @@ const RUN_STATE_KEYS = new Set([
 
 function jobDefinition(row: EvalJob | null) {
   if (!row) return null;
-  return Object.fromEntries(Object.entries(row).filter(([key]) => !RUN_STATE_KEYS.has(key)));
+  const definition: Record<string, unknown> = Object.fromEntries(
+    Object.entries(row).filter(([key]) => !RUN_STATE_KEYS.has(key)),
+  );
+  // The server writes the budget's pause state (pausedAt, pausedSpendUsd, liftedUntil) itself.
+  if (row.budget) {
+    definition.budget = { dailyUsd: row.budget.dailyUsd, onReach: row.budget.onReach };
+  }
+  return definition;
 }
 
 const jobDraft = useEditorDraft<JobDraft>({
@@ -897,6 +968,10 @@ async function onSubmit(value: JobForm) {
         value.samplingMode === "all"
           ? null
           : parseSamplingRate(value.samplingValue ?? "", t("onlineEvals.job.samplingValueLabel")),
+      // Inputs hand numbers over as text; the schema checked they parse. `null` removes it.
+      budget: value.budgetEnabled
+        ? { dailyUsd: Number(value.dailyBudgetUsd), onReach: value.budgetAction }
+        : null,
     };
 
     if (props.mode === "edit" && props.row) {

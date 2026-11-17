@@ -81,6 +81,37 @@ describe("FeatureComparisonTable", () => {
     expect(wrapper.text()).toContain("You're currently using OpenObserve Open Source Edition");
   });
 
+  it.each([
+    [
+      "one locked state gives the partial sentence",
+      { workflows: "locked", oncall: "enabled", legacy: "hidden" },
+      "You're using OpenObserve Enterprise Edition. Some features are not in your license; see the list above.",
+    ],
+    [
+      "no locked state gives the full sentence",
+      { workflows: "enabled", legacy: "hidden" },
+      "You're using OpenObserve Enterprise Edition with access to all advanced features listed below.",
+    ],
+    [
+      "no feature map gives the full sentence",
+      undefined,
+      "You're using OpenObserve Enterprise Edition with access to all advanced features listed below.",
+    ],
+  ])("on enterprise, %s", (_name, features, expected) => {
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [
+          i18n,
+          createStore({
+            state: { theme: "light", zoConfig: { build_type: "enterprise", features } },
+          }),
+        ],
+      },
+    });
+
+    expect(wrapper.find('[data-test="feature-comparison-ent-msg"]').text()).toBe(expected);
+  });
+
   it("should display enterprise message when build type is enterprise", () => {
     const enterpriseStore = createStore({
       state: {

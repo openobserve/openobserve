@@ -5,6 +5,7 @@ const { SlackWorkspaceCardPage, SlackCredentialsDialogPage, SlackOrgDialogPage }
 const { SlackLinkPages, LinkedAccountsDialogPage } = require('./slackLinkPages.js');
 const { SlackDestinationFormPage } = require('./slackDestinationFormPage.js');
 const { SlackOrgAccessPage } = require('./slackOrgAccessPage.js');
+const { SlackInsightsPage } = require('./slackInsightsPage.js');
 
 class SlackPages {
   constructor(page) {
@@ -17,6 +18,7 @@ class SlackPages {
     this.linkedAccounts = new LinkedAccountsDialogPage(page);
     this.destinationForm = new SlackDestinationFormPage(page);
     this.orgAccess = new SlackOrgAccessPage(page);
+    this.insights = new SlackInsightsPage(page);
   }
 }
 

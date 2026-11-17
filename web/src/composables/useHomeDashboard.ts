@@ -19,6 +19,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
@@ -102,6 +103,7 @@ export function useHomeDashboard(t: TranslateFn) {
     try {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
       queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), d);
+      analytics.track("home_dashboard_pinned");
     } catch (e: any) {
       homeDashboard.value = prev; // revert
       toast({

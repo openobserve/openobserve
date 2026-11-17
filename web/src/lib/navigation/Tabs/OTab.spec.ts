@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, provide, computed } from "vue";
 import { TabsRoot, TabsList } from "reka-ui";
@@ -235,13 +235,13 @@ describe("OTab", () => {
 
   // --- Transition & focus outline ---
 
-  it("puts the hover-in and hover-out motion tokens on the colour transition", () => {
+  it("puts the shared control motion tokens on the colour transition", () => {
     const classes = mountTab().find('[role="tab"]').classes();
     expect(classes).toContain(
       "transition-[color,background-color,border-color,text-decoration-color,fill,stroke]",
     );
-    expect(classes).toContain("duration-(--duration-hover-out)");
-    expect(classes).toContain("hover:duration-(--duration-hover-in)");
+    expect(classes).toContain("duration-(--duration-control)");
+    expect(classes).toContain("ease-(--ease-control)");
     expect(classes).not.toContain("transition-colors");
   });
 
@@ -263,9 +263,9 @@ describe("OTab", () => {
     expect(classes).not.toContain("focus-visible:outline-offset-2");
   });
 
-  it("uses a positive focus outline offset on a vertical tab", () => {
+  it("keeps the focus outline inside the rail inset on a vertical tab", () => {
     const classes = mountTab({ isVertical: true }).find('[role="tab"]').classes();
-    expect(classes).toContain("focus-visible:outline-offset-2");
+    expect(classes).toContain("focus-visible:outline-offset-0");
     expect(classes).not.toContain("focus-visible:-outline-offset-2");
   });
 
@@ -299,6 +299,14 @@ describe("OTab", () => {
     it("should not be draggable until the grip is pressed", () => {
       const wrapper = mountTab({ reorderable: true });
       expect(wrapper.find('[role="tab"]').attributes("draggable")).toBeUndefined();
+    });
+
+    it("should keep a grip press from reaching the trigger, which selects on press", async () => {
+      const wrapper = mountTab({ reorderable: true });
+      const pressed = vi.fn();
+      wrapper.find('[role="tab"]').element.addEventListener("mousedown", pressed);
+      await wrapper.find("[data-otab-grip]").trigger("mousedown");
+      expect(pressed).not.toHaveBeenCalled();
     });
 
     it("should arm dragging on grip mousedown and disarm on mouseup", async () => {

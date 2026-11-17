@@ -1,7 +1,7 @@
 <template>
   <!-- Page gutter is owned by the Settings shell's ConstrainedPage. -->
   <div>
-    <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
+    <LicensePeriod @renew="redirectToGetLicense()"></LicensePeriod>
 
     <div v-if="loading" class="flex flex-col items-center justify-center p-3">
       <OSpinner size="md" />
@@ -10,34 +10,30 @@
     <div v-else class="grid grid-cols-1 items-start gap-4 pb-4">
       <div class="col-span-1 min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
-          <OCard class="border-card-glass-border mb-4 border border-solid">
-            <OCardSection role="body">
-              <div class="text-xl font-semibold">{{ t("about.no_license_found") }}</div>
-              <div class="mt-2 text-sm">
+          <OFormSection variant="plain" class="mb-4" :title="t('about.no_license_found')">
+            <div class="pb-2">
+              <div class="text-sm">
                 {{ t("about.installation_id") }}:
                 <strong>{{ licenseData.installation_id || raw("N/A") }}</strong>
               </div>
               <div
-                class="mt-3 text-sm"
+                class="mt-2 text-sm"
                 v-html="DOMPurify.sanitize(t('about.contact_admin_license'))"
               ></div>
               <OButton
                 data-test="no-license-get-license-btn"
-                variant="primary"
+                variant="outline"
                 size="sm-action"
-                class="ms-2 mt-2"
-                @click="redirectToGetLicense"
+                class="mt-3"
+                @click="redirectToGetLicense()"
               >
                 {{ t("about.get_license") }}
               </OButton>
-            </OCardSection>
-          </OCard>
+            </div>
+          </OFormSection>
 
-          <OCard class="border-card-glass-border border border-solid">
-            <OCardSection role="body">
-              <div class="mb-3 text-base font-medium">
-                {{ t("about.enter_license_key") }}
-              </div>
+          <OFormSection variant="plain" :title="t('about.enter_license_key')">
+            <div class="pt-2 pb-2">
               <OForm ref="noLicenseForm" :form="noLicenseDraft" v-slot="{ isSubmitting }">
                 <OFormTextarea
                   data-test="no-license-key-input"
@@ -47,14 +43,13 @@
                   :placeholder="t('about.paste_license_placeholder')"
                   class="min-h-50"
                 />
-                <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
-                  <div
-                    class="bg-banner-success-bg border-banner-success-border rounded-default flex items-center border border-solid px-4 py-3 backdrop-blur-md transition-all duration-200 dark:shadow-md"
-                  >
-                    <OIcon name="check-circle" class="text-status-positive me-2" size="md" />
-                    <span class="text-sm">{{ t("about.license_auto_filled") }}</span>
-                  </div>
-                </div>
+                <OBanner
+                  v-if="isLicenseKeyAutoFilled"
+                  variant="success"
+                  icon="check-circle"
+                  class="mt-2 mb-3"
+                  :content="t('about.license_auto_filled')"
+                />
                 <LicenseKeyCheck :result="result" :refusal="refusal" />
                 <OBanner
                   v-if="checkError"
@@ -76,7 +71,7 @@
                 >
                 <OButton
                   data-test="no-license-update-btn"
-                  variant="primary"
+                  :variant="noLicenseKey.trim() ? 'primary' : 'outline'"
                   size="sm-action"
                   class="mt-2"
                   type="submit"
@@ -86,8 +81,8 @@
                   {{ t("about.update_license") }}
                 </OButton>
               </OForm>
-            </OCardSection>
-          </OCard>
+            </div>
+          </OFormSection>
         </div>
 
         <div v-else>
@@ -114,178 +109,105 @@
             @add-license-key="showUpdateFormAndFocus"
             @refreshed="reloadLicenseData"
           />
-          <OCard class="border-card-glass-border border border-solid">
-            <OCardSection role="body">
-              <div class="mb-3 text-xl font-semibold">{{ t("about.license_info") }}</div>
-              <!-- fixed layout so the label column keeps its width when the features cell grows or shrinks -->
-              <table
-                class="border-table-header-border w-full table-fixed border-collapse border border-solid wrap-break-word"
+          <OFormSection variant="plain" class="mb-4" :title="t('about.license_info')">
+            <template v-if="licenseData.can_update_license" #actions>
+              <OButton
+                variant="outline"
+                size="sm-action"
+                @click="redirectToGetLicense()"
+                data-test="request-new-license-btn"
               >
-                <tbody>
-                  <tr class="border-table-row-divider border-b border-solid">
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-                    >
-                      {{ t("about.installation_id") }}
-                    </td>
-                    <td class="px-3 py-2 leading-[1.2] break-all">
-                      {{ licenseData.installation_id }}
-                    </td>
-                  </tr>
-                  <tr class="border-table-row-divider border-b border-solid">
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-                    >
-                      {{ t("about.license_id") }}
-                    </td>
-                    <td class="px-3 py-2 leading-[1.2] break-all">
-                      {{ licenseData.license.license_id }}
-                    </td>
-                  </tr>
-                  <tr class="border-table-row-divider border-b border-solid">
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-                    >
-                      {{ t("about.status_lbl") }}
-                    </td>
-                    <td class="px-3 py-2 leading-[1.2]">
-                      <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
-                        {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
-                      </OBadge>
-                    </td>
-                  </tr>
-                  <tr
-                    class="border-table-row-divider border-b border-solid"
-                    data-test="settings-license-features"
-                  >
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 align-top leading-[1.2] font-bold"
-                    >
-                      {{ t("about.features") }}
-                    </td>
-                    <td class="px-3 py-2 text-sm">
-                      <LicenseFeatures
-                        :license="licenseData.license"
-                        @request-access="redirectToGetLicense"
-                      />
-                    </td>
-                  </tr>
-                  <tr class="border-table-row-divider border-b border-solid">
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-                    >
-                      {{ t("about.create_at_lbl") }}
-                    </td>
-                    <td class="px-3 py-2 leading-[1.2]">
-                      {{ formatDate(licenseData.license.created_at) }}
-                    </td>
-                  </tr>
-                  <tr class="border-table-row-divider border-b border-solid">
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-                    >
-                      {{ t("about.expires_at_lbl") }}
-                    </td>
-                    <td class="px-3 py-2 leading-[1.2]">
-                      {{ formatDate(licenseData.license.expires_at) }}
-                    </td>
-                  </tr>
-                  <tr class="border-table-row-divider border-b border-solid">
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-                    >
-                      {{ t("about.company") }}
-                    </td>
-                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.company }}</td>
-                  </tr>
-                  <tr v-if="licenseData.key" class="border-table-row-divider border-b border-solid">
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-                    >
-                      {{ t("about.license_key") }}
-                    </td>
-                    <td class="px-3 py-2 leading-[1.2]">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <span class="min-w-0 break-all">{{ getMaskedLicenseKey() }}</span>
-                        <OButton
-                          :aria-label="t('common.reveal')"
-                          variant="ghost"
-                          size="icon"
-                          class="shrink-0"
-                          data-test="show-license-key-btn"
-                          @click="showLicenseKeyModal = true"
-                        >
-                          <OIcon name="visibility" size="xs" />
-                        </OButton>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr
-                    v-if="licenseData.license.contact_name"
-                    class="border-table-row-divider border-b border-solid"
-                  >
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-                    >
-                      {{ t("about.contact_name") }}
-                    </td>
-                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.contact_name }}</td>
-                  </tr>
-                  <tr
-                    v-if="licenseData.license.contact_email"
-                    class="border-table-row-divider border-b border-solid"
-                  >
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-                    >
-                      {{ t("about.contact_email") }}
-                    </td>
-                    <td class="px-3 py-2 leading-[1.2] break-all">
-                      {{ licenseData.license.contact_email }}
-                    </td>
-                  </tr>
-                  <tr v-if="licenseData.license.environment_type">
-                    <td
-                      class="border-table-row-divider w-2/5 border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-                    >
-                      {{ t("about.environment_type") }}
-                    </td>
-                    <td class="px-3 py-2 leading-[1.2]">
-                      {{ licenseData.license.environment_type }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <div class="mt-3 flex gap-3">
+                {{ t("about.request_new_license") }}
+              </OButton>
+              <OButton
+                v-if="!licenseData.refresh && licenseData.can_update_license === true"
+                data-test="refresh-license-limits-btn"
+                variant="outline"
+                size="sm-action"
+                :loading="refreshingLimits"
+                @click="refreshLimitsOnOldNode"
+              >
+                {{ t("about.refresh_license_limits") }}
+              </OButton>
+              <OButton
+                data-test="add-license-key-btn"
+                :variant="showUpdateForm ? 'outline' : 'primary'"
+                size="sm-action"
+                @click="showUpdateFormAndFocus"
+              >
+                {{ t("about.add_new_license_key") }}
+              </OButton>
+            </template>
+            <OSettingRow control-at="end" :label="t('about.installation_id')">
+              <span class="text-sm break-all">{{ licenseData.installation_id }}</span>
+            </OSettingRow>
+            <OSettingRow control-at="end" :label="t('about.license_id')">
+              <span class="text-sm break-all">{{ licenseData.license.license_id }}</span>
+            </OSettingRow>
+            <OSettingRow control-at="end" :label="t('about.status_lbl')">
+              <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
+                {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
+              </OBadge>
+            </OSettingRow>
+            <OSettingRow control-at="end" :label="t('about.create_at_lbl')">
+              <span class="text-sm">{{ formatDate(licenseData.license.created_at) }}</span>
+            </OSettingRow>
+            <OSettingRow control-at="end" :label="t('about.expires_at_lbl')">
+              <span class="text-sm">{{ formatDate(licenseData.license.expires_at) }}</span>
+            </OSettingRow>
+            <OSettingRow control-at="end" :label="t('about.company')">
+              <span class="text-sm wrap-break-word">{{ licenseData.license.company }}</span>
+            </OSettingRow>
+            <OSettingRow v-if="licenseData.key" control-at="end" :label="t('about.license_key')">
+              <div class="flex min-w-0 flex-wrap items-center gap-2">
+                <span class="min-w-0 text-sm break-all">{{ getMaskedLicenseKey() }}</span>
                 <OButton
-                  variant="primary"
-                  size="sm-action"
-                  @click="redirectToGetLicense"
-                  data-test="request-new-license-btn"
+                  :aria-label="t('common.reveal')"
+                  variant="ghost"
+                  size="icon"
+                  class="shrink-0"
+                  data-test="show-license-key-btn"
+                  @click="showLicenseKeyModal = true"
                 >
-                  {{ t("about.request_new_license") }}
-                </OButton>
-                <OButton
-                  data-test="add-license-key-btn"
-                  variant="primary"
-                  size="sm-action"
-                  @click="showUpdateFormAndFocus"
-                >
-                  {{ t("about.add_new_license_key") }}
-                </OButton>
-                <OButton
-                  v-if="!licenseData.refresh && licenseData.can_update_license === true"
-                  data-test="refresh-license-limits-btn"
-                  variant="outline"
-                  size="sm-action"
-                  :loading="refreshingLimits"
-                  @click="refreshLimitsOnOldNode"
-                >
-                  {{ t("about.refresh_license_limits") }}
+                  <OIcon name="visibility" size="xs" />
                 </OButton>
               </div>
-            </OCardSection>
-          </OCard>
+            </OSettingRow>
+            <OSettingRow
+              v-if="licenseData.license.contact_name"
+              control-at="end"
+              :label="t('about.contact_name')"
+            >
+              <span class="text-sm wrap-break-word">{{ licenseData.license.contact_name }}</span>
+            </OSettingRow>
+            <OSettingRow
+              v-if="licenseData.license.contact_email"
+              control-at="end"
+              :label="t('about.contact_email')"
+            >
+              <span class="text-sm break-all">{{ licenseData.license.contact_email }}</span>
+            </OSettingRow>
+            <OSettingRow
+              v-if="licenseData.license.environment_type"
+              control-at="end"
+              :label="t('about.environment_type')"
+            >
+              <span class="text-sm capitalize">{{ licenseData.license.environment_type }}</span>
+            </OSettingRow>
+          </OFormSection>
+
+          <OFormSection
+            variant="plain"
+            class="text-sm"
+            :title="t('about.features')"
+            data-test="settings-license-features"
+          >
+            <LicenseFeatures
+              :license="licenseData.license"
+              :evaluated-at="licenseData.evaluated_at"
+              @request-access="redirectToGetLicense()"
+            />
+          </OFormSection>
 
           <LicenseWaiversCard
             :waivers="licenseData.waivers"
@@ -293,11 +215,13 @@
             @boundary="refetchAtBoundary"
           />
 
-          <OCard v-show="showUpdateForm" class="border-card-glass-border mt-4 border border-solid">
-            <OCardSection role="body">
-              <div class="mb-2 text-base font-medium">
-                {{ t("about.update_license_key") }}
-              </div>
+          <OFormSection
+            v-show="showUpdateForm"
+            variant="plain"
+            class="mt-4"
+            :title="t('about.update_license_key')"
+          >
+            <div class="pt-2 pb-2">
               <OForm ref="updateLicenseForm" :form="updateLicenseDraft" v-slot="{ isSubmitting }">
                 <OFormTextarea
                   data-test="update-license-key-input"
@@ -307,14 +231,13 @@
                   :placeholder="t('about.paste_new_license_placeholder')"
                   class="min-h-37.5"
                 />
-                <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
-                  <div
-                    class="bg-banner-success-bg border-banner-success-border rounded-default flex items-center border border-solid px-4 py-3 backdrop-blur-md transition-all duration-200 dark:shadow-md"
-                  >
-                    <OIcon name="check-circle" class="text-status-positive me-2" size="md" />
-                    <span class="text-sm">{{ t("about.license_auto_filled") }}</span>
-                  </div>
-                </div>
+                <OBanner
+                  v-if="isLicenseKeyAutoFilled"
+                  variant="success"
+                  icon="check-circle"
+                  class="mt-2 mb-3"
+                  :content="t('about.license_auto_filled')"
+                />
                 <LicenseKeyCheck :result="result" :refusal="refusal" />
                 <OBanner
                   v-if="checkError"
@@ -349,7 +272,7 @@
                   >
                   <OButton
                     data-test="confirm-update-license-btn"
-                    variant="primary"
+                    :variant="updateLicenseKey.trim() ? 'primary' : 'outline'"
                     size="sm-action"
                     type="submit"
                     :loading="isSubmitting"
@@ -359,174 +282,149 @@
                   </OButton>
                 </div>
               </OForm>
-            </OCardSection>
-          </OCard>
+            </div>
+          </OFormSection>
         </div>
       </div>
 
       <div class="col-span-1 self-start">
-        <OCard
-          class="futuristic-card border-card-glass-border border border-solid dark:border-[rgba(99,102,241,0.25)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)]"
-        >
-          <OCardSection class="p-3">
-            <div>
-              <div
-                class="dark:bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]"
-              ></div>
-              <div class="relative z-10 text-xl font-semibold">
-                {{ t("about.usage_information") }}
+        <OFormSection variant="plain" :title="t('about.usage_information')">
+          <div class="flex flex-col gap-3 pt-2 pb-2">
+            <div class="text-sm" data-test="license-usage-summary">
+              <!-- Line 1: License Info -->
+              <div class="mb-2 flex items-center gap-2">
+                <OIcon name="info" size="sm" class="flex-shrink-0" />
+                <span v-if="isIngestionUnlimited">
+                  {{ t("about.license_allows_unlimited_ingestion") }}
+                </span>
+                <span
+                  v-else-if="!licenseData.license"
+                  v-html="
+                    DOMPurify.sanitize(
+                      t('about.no_license_ingestion_limit', { limit: ingestionLimitText }),
+                    )
+                  "
+                ></span>
+                <span
+                  v-else
+                  v-html="
+                    DOMPurify.sanitize(
+                      t('about.license_allows_ingestion', { limit: ingestionLimitText }),
+                    )
+                  "
+                ></span>
               </div>
-            </div>
 
-            <div class="mt-3 flex flex-col gap-2">
-              <!-- Summary Message -->
-              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling the backdrop blur radius with text makes the frosting bloom -->
-              <div
-                class="ingestion-summary-compact rounded-default relative overflow-hidden border border-solid border-[rgba(99,102,241,0.2)] px-3.5 py-3 [backdrop-filter:blur(10px)] dark:border-[rgba(99,102,241,0.3)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)]"
-              >
-                <!-- eslint-enable local/no-hardcoded-px -->
-                <div class="summary-text-compact text-compact text-sm leading-[1.6] text-inherit">
-                  <!-- Line 1: License Info -->
-                  <div class="mb-2 flex items-center gap-2">
-                    <OIcon name="info" size="sm" class="flex-shrink-0" />
-                    <span v-if="isIngestionUnlimited">
-                      {{ t("about.license_allows_unlimited_ingestion") }}
-                    </span>
+              <!-- Line 2: Exceeded Status -->
+              <div v-if="!isIngestionUnlimited" class="flex items-center gap-2">
+                <OIcon
+                  v-if="licenseData?.ingestion_exceeded && pausedOverLimit"
+                  name="warning"
+                  size="sm"
+                  class="text-status-error-text flex-shrink-0"
+                />
+                <OIcon
+                  v-else-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0"
+                  name="warning"
+                  size="sm"
+                  class="text-status-warning-text flex-shrink-0"
+                />
+                <OIcon
+                  v-else
+                  name="check-circle"
+                  size="sm"
+                  class="text-status-positive flex-shrink-0"
+                />
+                <span>
+                  <span
+                    v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0"
+                  >
                     <span
-                      v-else
                       v-html="
                         DOMPurify.sanitize(
-                          t('about.license_allows_ingestion', {
-                            limit:
-                              !licenseData?.expired &&
-                              licenseData?.license?.limits?.Ingestion?.value
-                                ? licenseData?.license?.limits?.Ingestion?.value
-                                : '50',
-                          }),
+                          t(
+                            'about.limit_exceeded_days',
+                            {
+                              colorClass:
+                                licenseData?.ingestion_exceeded > 30
+                                  ? 'text-status-error-text'
+                                  : 'text-status-warning-text',
+                              days: licenseData?.ingestion_exceeded,
+                            },
+                            licenseData?.ingestion_exceeded,
+                          ),
                         )
                       "
-                    ></span>
-                  </div>
-
-                  <!-- Line 2: Exceeded Status -->
-                  <div v-if="!isIngestionUnlimited" class="flex items-center gap-2">
-                    <OIcon
-                      v-if="licenseData?.ingestion_exceeded && pausedOverLimit"
-                      name="warning"
-                      size="sm"
-                      class="text-status-error-text flex-shrink-0"
-                    />
-                    <OIcon
-                      v-else-if="
-                        licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0
+                    ></span
+                    ><span
+                      v-if="pausedOverLimit"
+                      class="inline-flex items-center font-semibold text-inherit"
+                      v-html="
+                        DOMPurify.sanitize(
+                          t(
+                            'about.limit_exceeded_warning',
+                            { max: limitBreachAllowedCount },
+                            limitBreachAllowedCount,
+                          ),
+                        )
                       "
-                      name="check-circle"
-                      size="sm"
-                      class="text-status-warning-text flex-shrink-0"
-                    />
-                    <OIcon
+                    ></span
+                    ><span
                       v-else
-                      name="check-circle"
-                      size="sm"
-                      class="text-status-positive flex-shrink-0"
-                    />
-                    <span>
-                      <span
-                        v-if="
-                          licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0
-                        "
-                      >
-                        <span
-                          v-html="
-                            DOMPurify.sanitize(
-                              t(
-                                'about.limit_exceeded_days',
-                                {
-                                  colorClass:
-                                    licenseData?.ingestion_exceeded > 30
-                                      ? 'text-status-error-text'
-                                      : 'text-status-warning-text',
-                                  days: licenseData?.ingestion_exceeded,
-                                },
-                                licenseData?.ingestion_exceeded,
+                      class="ms-1 text-xs italic opacity-80"
+                      v-html="
+                        DOMPurify.sanitize(
+                          t(
+                            'about.limit_exceeded_info',
+                            {
+                              remaining: Math.max(
+                                0,
+                                limitBreachAllowedCount - licenseData?.ingestion_exceeded,
                               ),
-                            )
-                          "
-                        ></span
-                        ><span
-                          v-if="pausedOverLimit"
-                          class="inline-flex items-center font-semibold text-inherit"
-                          v-html="
-                            DOMPurify.sanitize(
-                              t(
-                                'about.limit_exceeded_warning',
-                                { max: limitBreachAllowedCount },
-                                limitBreachAllowedCount,
-                              ),
-                            )
-                          "
-                        ></span
-                        ><span
-                          v-else
-                          class="ms-1 text-xs italic opacity-80"
-                          v-html="
-                            DOMPurify.sanitize(
-                              t(
-                                'about.limit_exceeded_info',
-                                {
-                                  remaining: Math.max(
-                                    0,
-                                    limitBreachAllowedCount - licenseData?.ingestion_exceeded,
-                                  ),
-                                  max: limitBreachAllowedCount,
-                                },
-                                Math.max(
-                                  0,
-                                  limitBreachAllowedCount - licenseData?.ingestion_exceeded,
-                                ),
-                              ),
-                            )
-                          "
-                        ></span
-                        >.
-                      </span>
-                      <span v-else>
-                        {{
-                          t("about.no_limit_exceedances", {
-                            max: limitBreachAllowedCount,
-                          })
-                        }}
-                      </span>
-                    </span>
-                  </div>
-                </div>
+                              max: limitBreachAllowedCount,
+                            },
+                            Math.max(0, limitBreachAllowedCount - licenseData?.ingestion_exceeded),
+                          ),
+                        )
+                      "
+                    ></span
+                    >.
+                  </span>
+                  <span v-else>
+                    {{
+                      t("about.no_limit_exceedances", {
+                        max: limitBreachAllowedCount,
+                      })
+                    }}
+                  </span>
+                </span>
               </div>
+            </div>
 
-              <!-- Chart -->
-              <div v-if="usageDashboardData">
-                <div class="chart-wrapper relative">
-                  <div class="usage-chart-container mx-auto w-full overflow-visible p-0">
-                    <RenderDashboardCharts
-                      :key="dashboardRenderKey"
-                      :dashboardData="usageDashboardData"
-                      :currentTimeObj="currentTimeObj"
-                      :viewOnly="true"
-                      :allowAlertCreation="false"
-                      searchType="dashboards"
-                    />
-                  </div>
-                  <div
-                    v-if="isIngestionUnlimited"
-                    class="text-text-secondary mt-1 text-center text-xs"
-                    style="font-size: var(--text-3xs)"
-                  >
-                    {{ t("about.usage_shows_zero_unlimited") }}
-                  </div>
+            <!-- Chart -->
+            <div v-if="usageDashboardData">
+              <div class="chart-wrapper relative">
+                <div class="usage-chart-container mx-auto w-full overflow-visible p-0">
+                  <RenderDashboardCharts
+                    :key="dashboardRenderKey"
+                    :dashboardData="usageDashboardData"
+                    :currentTimeObj="currentTimeObj"
+                    :viewOnly="true"
+                    :allowAlertCreation="false"
+                    searchType="dashboards"
+                  />
+                </div>
+                <div
+                  v-if="isIngestionUnlimited"
+                  class="text-text-secondary mt-1 text-center text-xs"
+                  style="font-size: var(--text-3xs)"
+                >
+                  {{ t("about.usage_shows_zero_unlimited") }}
                 </div>
               </div>
             </div>
-          </OCardSection>
-        </OCard>
+          </div>
+        </OFormSection>
       </div>
     </div>
 
@@ -603,13 +501,22 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
 import { refreshMessage } from "@/utils/licenseRefresh";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import { makeLicenseSchema, type LicenseForm } from "./License.schema";
+import {
+  FREE_LIMIT_GB,
+  licenseKeyLosses,
+  licenseRequestUrl,
+  type LicenseKeyLosses,
+} from "@/utils/featureGate";
+import { b64DecodeUnicode } from "@/utils/formatters";
+import { formatLicenseDay } from "@/utils/licenseWaivers";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -634,12 +541,13 @@ export default defineComponent({
     OTextarea,
     OForm,
     OFormTextarea,
-    OCard,
-    OCardSection,
+    OFormSection,
+    OSettingRow,
   },
   setup() {
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     const { confirm } = useConfirmDialog();
+    const { featureNames } = useFeatureNames();
     const loading = ref(false);
     const licenseData = ref<any>({});
     const licenseKey = ref("");
@@ -672,11 +580,13 @@ export default defineComponent({
     const noLicenseDraft = useOForm<LicenseForm>({
       defaultValues: { licenseKey: "" },
       schema: licenseSchema,
+      validateOn: "leave",
       onSubmit: (value) => updateLicense(value),
     });
     const updateLicenseDraft = useOForm<LicenseForm>({
       defaultValues: { licenseKey: "" },
       schema: licenseSchema,
+      validateOn: "leave",
       onSubmit: (value) => updateLicense(value),
     });
     const noLicenseKey = noLicenseDraft.useStore((state) => state.values.licenseKey);
@@ -816,6 +726,46 @@ export default defineComponent({
       if (data) licenseData.value = data as typeof licenseData.value;
     };
 
+    // The payload is unverified, so a key that cannot be read skips the dialog and the server answers it.
+    const pastedKeyLosses = (key: string) => {
+      try {
+        return licenseKeyLosses(
+          licenseData.value.license,
+          JSON.parse(b64DecodeUnicode(key.split(".")[1]) || ""),
+          store.state.zoConfig.features ?? {},
+          Date.now() * 1000,
+        );
+      } catch {
+        return null;
+      }
+    };
+
+    const limitLabel = (gb: number | null) =>
+      gb === null ? t("about.license_status_unlimited") : t("about.license_limit_per_day", { gb });
+
+    const lossLines = ({ expiredAt, lost, limit, expiry }: LicenseKeyLosses) => {
+      const day = (us: number) => formatLicenseDay(us, locale.value);
+      const lines = [];
+      if (expiredAt) lines.push(t("about.license_downgrade_expired", { date: day(expiredAt) }));
+      if (lost.length) {
+        lines.push(t("about.license_downgrade_lose", { names: featureNames(lost) }));
+      }
+      if (limit) {
+        lines.push(
+          t("about.license_downgrade_limit", {
+            old: limitLabel(limit.from),
+            new: limitLabel(limit.to),
+          }),
+        );
+      }
+      if (expiry) {
+        lines.push(
+          t("about.license_downgrade_expiry", { old: day(expiry.from), new: day(expiry.to) }),
+        );
+      }
+      return lines;
+    };
+
     const updateLicense = async (value?: LicenseForm) => {
       if (checking.value || updating.value) return;
       clearKeyCheck();
@@ -823,6 +773,22 @@ export default defineComponent({
       updating.value = true;
       const key = (value?.licenseKey ?? licenseKey.value ?? "").trim();
       try {
+        const losses = pastedKeyLosses(key);
+        if (
+          losses &&
+          !(await confirm({
+            title: t("about.license_downgrade_title"),
+            message: t("about.license_downgrade_intro"),
+            lines: lossLines(losses),
+            linesDataTest: "license-key-losses",
+            confirmLabel: t("about.yes_update_license"),
+            cancelLabel: t("about.no_keep_current"),
+            confirmVariant: "destructive",
+            focusCancel: true,
+          }))
+        ) {
+          return;
+        }
         await updateMutation.mutateAsync(key);
         toast({
           variant: "success",
@@ -903,11 +869,12 @@ export default defineComponent({
     };
 
     const redirectToGetLicense = () => {
-      const baseUrl = window.location.origin;
-      const installationId = licenseData.value.installation_id || "";
-      const serverUrl = String(store.state.zoConfig.license_server_url ?? "").replace(/\/+$/, "");
-      const licenseUrl = `${serverUrl}/user/request-license?base_url=${encodeURIComponent(baseUrl)}&license_id=${encodeURIComponent(installationId)}`;
-      window.open(licenseUrl, "_blank");
+      const url = licenseRequestUrl(
+        store.state.zoConfig,
+        licenseData.value,
+        window.location.origin,
+      );
+      window.open(url, "_blank");
     };
 
     const checkAndAutoFillLicenseFromUrl = async () => {
@@ -947,12 +914,24 @@ export default defineComponent({
       }
     };
 
-    const formatDate = (timestamp: number) => {
-      return new Date(timestamp / 1000).toLocaleString();
-    };
+    const formatDate = (timestamp: number) =>
+      t("about.online_refreshed_at", {
+        date: new Intl.DateTimeFormat(locale.value, {
+          timeZone: "UTC",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        }).format(new Date(timestamp / 1000)),
+      });
 
     const isIngestionUnlimited = computed(() => {
-      return licenseData.value.license?.limits?.Ingestion?.typ === "Unlimited";
+      return (
+        licenseData.value.license?.limits?.Ingestion?.typ === "Unlimited" &&
+        !licenseData.value.expired
+      );
     });
 
     // For license version >= 2, use limit_breach_allowed_count from the license data.
@@ -991,29 +970,6 @@ export default defineComponent({
       return "red";
     };
 
-    const showLicenseExpiryWarning = computed(() => {
-      if (!store.state.zoConfig.license_expiry) return false;
-      const now = Date.now();
-      const expiryDate = store.state.zoConfig.license_expiry;
-      const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-      return daysUntilExpiry < 14;
-    });
-
-    const getLicenseExpiryMessage = () => {
-      if (!store.state.zoConfig.license_expiry) return "";
-      const now = Date.now();
-      const expiryDate = store.state.zoConfig.license_expiry;
-      const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-
-      if (daysUntilExpiry > 1) {
-        return t("settings.licensePage.daysRemaining", { days: daysUntilExpiry });
-      } else if (daysUntilExpiry === 1) {
-        return t("settings.licensePage.oneDayRemaining");
-      } else {
-        return t("settings.licensePage.licenseExpired");
-      }
-    };
-
     // Current time object for dashboard (calendar start date to current date)
     // Similar to TelemetryCorrelationDashboard, we pass microsecond timestamps to Date constructor
     const currentTimeObj = computed(() => {
@@ -1037,8 +993,13 @@ export default defineComponent({
       if (isIngestionUnlimited.value) {
         return null; // No limit for unlimited plans
       }
-      return licenseData.value?.license?.limits?.Ingestion?.value || 100;
+      const licensed = licenseData.value?.license?.limits?.Ingestion?.value;
+      return (!licenseData.value?.expired && licensed) || FREE_LIMIT_GB;
     });
+
+    const ingestionLimitText = computed(() =>
+      ingestionLimitGB.value == null ? "" : ingestionLimitGB.value.toLocaleString(locale.value),
+    );
 
     // Generate usage dashboard data
     const generateUsageDashboard = () => {
@@ -1051,7 +1012,9 @@ export default defineComponent({
         thresholds.push({
           type: "yAxis",
           name: t("settings.limitExceeded"),
-          value: ingestionLimit,
+          // sum(size) is MB, and the megabytes unit counts 1024 MB to the GB.
+          value: ingestionLimit * 1024,
+          label_formatter: `{b}:${ingestionLimit} GB`,
           color: "#FF0000", // Red
           lineStyle: "solid",
           width: 2,
@@ -1069,8 +1032,8 @@ export default defineComponent({
       const dashboard = {
         version: 8,
         dashboardId: "",
-        title: "Ingestion Usage",
-        description: "Daily ingestion usage with threshold limits",
+        title: t("about.usage_chart_title"),
+        description: "",
         role: "",
         owner: "",
         created: new Date().toISOString(),
@@ -1082,7 +1045,7 @@ export default defineComponent({
               {
                 id: "Panel_ID_License_Usage",
                 type: "bar",
-                title: "",
+                title: t("about.usage_chart_title"),
                 description: "",
                 config: {
                   show_legends: false,
@@ -1231,6 +1194,9 @@ export default defineComponent({
       dashboardRenderKey.value++;
     };
 
+    // The first build runs before the license loads, so the line has to follow the loaded limit.
+    watch(ingestionLimitGB, generateUsageDashboard);
+
     onMounted(() => {
       loadLicenseData();
       generateUsageDashboard();
@@ -1260,6 +1226,8 @@ export default defineComponent({
       updating,
       noLicenseDraft,
       updateLicenseDraft,
+      noLicenseKey,
+      updateLicenseKey,
       // Form wiring (Options-API: schema/defaults MUST be returned so :schema
       // resolves and validation runs).
       licenseSchema,
@@ -1270,8 +1238,6 @@ export default defineComponent({
       isIngestionUnlimited,
       ingestionUsagePercent,
       getIngestionUsageColor,
-      showLicenseExpiryWarning,
-      getLicenseExpiryMessage,
       showUpdateFormAndFocus,
       maskKey,
       getMaskedLicenseKey,
@@ -1283,6 +1249,7 @@ export default defineComponent({
       dashboardRenderKey,
       currentTimeObj,
       ingestionLimitGB,
+      ingestionLimitText,
       generateUsageDashboard,
       limitBreachAllowedCount,
       pausedOverLimit,
@@ -1296,38 +1263,5 @@ export default defineComponent({
 /* keep(lib-override:gridstack): zero the gridstack item border inside the usage chart */
 .usage-chart-container :deep(.grid-stack-item-content) {
   border: 0 !important;
-}
-
-/* keep(brand): gradient accent bar on the ingestion summary (generated ::before) */
-.ingestion-summary-compact::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0.1875rem;
-  height: 100%;
-  background: linear-gradient(
-    180deg,
-    var(--color-theme-menu-color) 0%,
-    var(--color-theme-menu-color) 100%
-  );
-  opacity: 0.6;
-}
-
-.dark .ingestion-summary-compact::before {
-  opacity: 0.8;
-}
-
-/* keep(generated-content): gradient text on the v-html <strong> in the summary */
-.ingestion-summary-compact .summary-text-compact :deep(strong) {
-  font-weight: 700;
-  background: linear-gradient(
-    135deg,
-    var(--color-theme-menu-color) 0%,
-    var(--color-theme-menu-color) 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 </style>

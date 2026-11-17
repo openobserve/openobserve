@@ -478,6 +478,7 @@ import {
   validateFleetConfigMutation,
 } from "@/services/fleet.queries";
 import type { FleetConfigIssues, FleetConfigReferences } from "@/services/fleet";
+import analytics from "@/services/product_analytics";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -740,6 +741,7 @@ function redo() {
 
 function setMode(next: "visual" | "yaml") {
   if (next === "visual" && !graph.value) return;
+  if (mode.value !== next) analytics.track("fleet_config_editor_mode_changed", { mode: next });
   mode.value = next;
 }
 

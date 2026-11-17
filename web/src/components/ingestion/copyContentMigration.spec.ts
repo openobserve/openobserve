@@ -107,7 +107,10 @@ const makeStore = (overrides: Record<string, unknown> = {}) =>
 const makeRouter = () =>
   createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: "/:any(.*)*", name: "curl", component: { template: "<div />" } }],
+    routes: [
+      { path: "/iam/tokens", name: "ingestionTokens", component: { template: "<div />" } },
+      { path: "/:any(.*)*", name: "curl", component: { template: "<div />" } },
+    ],
   });
 
 const sources = import.meta.glob(["./**/*.vue", "./**/*.ts", "!./**/*.spec.ts"], {
@@ -116,10 +119,11 @@ const sources = import.meta.glob(["./**/*.vue", "./**/*.ts", "!./**/*.spec.ts"],
   eager: true,
 }) as Record<string, string>;
 
-// These render the block only in a fallback branch the default mount does not reach.
+// These render the block only in a branch the default mount does not reach (DatadogAgent needs an org token).
 const FALLBACK_ONLY = new Set([
   "./setupCard/DataSourceSetupCard.vue",
   "./ai/AIIntegrationDetail.vue",
+  "./logs/DatadogAgent.vue",
 ]);
 
 beforeEach(() => {
@@ -147,8 +151,8 @@ describe("CopyContent migration", () => {
   });
 
   it("migrates every page that rendered CopyContent", () => {
-    // 57 importers at this branch's base, AzureConfig, AIIntegrationDetail and DataSourceSetupCard's fallback among them, minus SplunkHec (plain OCodeBlock).
-    expect(migratedPages.length).toBe(56);
+    // 57 importers at this branch's base, AzureConfig, AIIntegrationDetail and DataSourceSetupCard's fallback among them, minus SplunkHec (plain OCodeBlock), plus DatadogAgent.
+    expect(migratedPages.length).toBe(57);
     expect(sources["./logs/SplunkHec.vue"]).toContain("<OCodeBlock");
   });
 

@@ -21,8 +21,11 @@ import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import i18n from "@/locales";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
-import { toZonedInputValue } from "@/utils/oncall";
+import { formatDayRange, formatShiftRange, toZonedInputValue } from "@/utils/oncall";
 import type { UpcomingShift } from "./OnCallCoverForm.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgUsersQuery } from "@/services/users.queries";
+import store from "@/test/unit/helpers/store";
 
 /// Tomorrow, not a frozen instant in 2023. Every fixture below is a window
 /// somebody could actually be asked to cover, and a schema that refuses hours
@@ -68,6 +71,10 @@ function useStubbedField(name: string) {
   };
 }
 
+/// What the closed When field reads, as the picker is told to print it.
+const fieldText = (wrapper: { findComponent: (s: { name: string }) => any }) =>
+  String(wrapper.findComponent({ name: "OFormDateTimeRange" }).attributes("trigger-text") ?? "");
+
 const stubs = {
   // Renders the body and exposes the primary click, which is what drives a
   // swap — the cover half submits through OForm instead.
@@ -80,6 +87,7 @@ const stubs = {
     emits: ["click:primary", "click:secondary", "update:open"],
     template: `<div v-if="open">
       <slot />
+      <slot name="footer-left" />
       <button
         data-test="dialog-primary"
         :disabled="primaryButtonDisabled"
@@ -113,11 +121,21 @@ const stubs = {
     name: "OFormDateTimeRange",
     props: ["name"],
     template: `<span :data-test-field="name" :data-test-type="value?.type">
+      <slot name="label-append" />
+      <slot name="above" />
       <button data-test="window-pick" @click="set(PICKED)">{{ error }}</button>
       <button data-test="window-clear" @click="set(undefined)"></button>
+      <button data-test="window-round" @click="round()"></button>
     </span>`,
     setup(props: { name: string }) {
-      return { ...useStubbedField(props.name), PICKED };
+      const field = useStubbedField(props.name);
+      // What the real picker does to a range it is handed: it keeps whole minutes only.
+      const toMinute = (micros: number) => Math.floor(micros / 60_000_000) * 60_000_000;
+      const round = () => {
+        const range = field.value.value as { from: number; to: number };
+        field.set({ from: toMinute(range.from), to: toMinute(range.to) });
+      };
+      return { ...field, PICKED, round };
     },
   },
   OButton: {
@@ -229,27 +247,44 @@ describe("OnCallCoverForm — which clock the times are on", () => {
     expect(wrapper.findComponent({ name: "OFormDateTimeRange" }).attributes("label")).toBe("When");
   });
 
-  it("names the clock the reader picked on", async () => {
+  // The closed field states the whole window with times, so nobody opens it just to read it.
+  it("shows the window with its times on the team's clock, naming the zone for a reader elsewhere", async () => {
     const wrapper = renderCover({ viewerTimezone: IST });
     await flushPromises();
 
-    // Whatever ICU calls it — "GMT+5:30" — the point is that SOMETHING names
-    // the offset, since the bare numbers cannot.
-    expect(summaryOf(wrapper)).toContain("GMT+5:30");
+    expect(fieldText(wrapper)).toContain("→");
+    expect(fieldText(wrapper)).toMatch(/\d{2}:\d{2}/);
+    expect(fieldText(wrapper).match(/UTC/g)).toHaveLength(1);
+    expect(fieldText(wrapper)).toMatch(/ UTC$/);
   });
 
-  it("also says what the window is on the team's clock", async () => {
-    const wrapper = renderCover({ viewerTimezone: IST });
+  /// The picker opens on the team's clock, so its zone and the closed field agree.
+  it("opens the picker on the team's zone, without the copy and paste row", () => {
+    const wrapper = renderCover({ timezone: IST, viewerTimezone: "UTC" });
+    const picker = wrapper.findComponent({ name: "OFormDateTimeRange" });
+
+    expect(picker.attributes("picker-timezone")).toBe(IST);
+    expect(picker.attributes()).toHaveProperty("hide-clipboard");
+  });
+
+  /// Another zone picked in the picker leaves the field on team time, and the tooltip restates the picked one.
+  it("keeps the field on team time when another zone is picked, and names the picked range", async () => {
+    const wrapper = renderCover({ timezone: IST, viewerTimezone: IST });
+    await flushPromises();
+    expect(fieldText(wrapper)).not.toContain("GMT");
+
+    wrapper.findComponent({ name: "OFormDateTimeRange" }).vm.$emit("on:timezone-change", "UTC");
     await flushPromises();
 
-    const teamLine = wrapper.find('[data-test="oncall-cover-summary-team-zone"]');
-    expect(teamLine.exists()).toBe(true);
-    expect(teamLine.text()).toContain("UTC");
+    expect(fieldText(wrapper)).toMatch(/ GMT\+5:30$/);
+    const info = wrapper.findComponent({ name: "OnCallZoneInfo" });
+    expect(info.props("pickedTimezone")).toBe("UTC");
+    expect(info.props("timezone")).toBe(IST);
   });
 
   // C8: a cover looks ahead, so the calendar runs from today to the 730-day limit, on the picker's clock.
   it("offers today up to 730 days ahead, and says a refusal under the picker", () => {
-    const wrapper = renderCover({ viewerTimezone: IST });
+    const wrapper = renderCover({ timezone: IST, viewerTimezone: "UTC" });
     const day = (micros: number) => toZonedInputValue(micros, IST).slice(0, 10).replace(/-/g, "/");
     const now = Date.now() * 1000;
 
@@ -259,15 +294,46 @@ describe("OnCallCoverForm — which clock the times are on", () => {
     expect(picker.attributes()).toHaveProperty("show-error");
   });
 
-  /// One clock, said once. A reader on the team's own timezone has nothing to
-  /// reconcile, and repeating the same range twice reads as two windows.
-  it("says it once when the reader is already on the team's clock", async () => {
+  /// One clock, said once: the summary names who covers, never the window again.
+  it("says the window once, in the field, when the reader is on the team's clock", async () => {
     const wrapper = renderCover({ viewerTimezone: "UTC" });
     await flushPromises();
 
+    expect(fieldText(wrapper)).not.toContain("UTC");
+    expect(summaryOf(wrapper)).toContain("ana@o2.ai covers Platform, ");
+    expect(summaryOf(wrapper)).not.toMatch(/\d{2}:\d{2}/);
     expect(wrapper.find('[data-test="oncall-cover-summary-team-zone"]').exists()).toBe(false);
-    expect(summaryOf(wrapper)).toContain("UTC");
   });
+
+  /// The presets set the same field, so the one whose range it still holds is lit until the reader picks by hand.
+  it("lights the quick range the window matches, and unlights it on a hand-pick", async () => {
+    const wrapper = renderCover();
+    const tonight = () => wrapper.findComponent('[data-test="oncall-cover-preset-tonight"]');
+    await wrapper.find('[data-test="oncall-cover-preset-tonight"]').trigger("click");
+    await flushPromises();
+    expect(tonight().attributes("aria-pressed")).toBe("true");
+
+    await wrapper.find('[data-test="window-pick"]').trigger("click");
+    await flushPromises();
+    expect(tonight().attributes("aria-pressed")).toBe("false");
+  });
+
+  /// "Rest of today" and "Next 7 days" start at now, which the picker reads back to the minute.
+  it.each(["rest-of-day", "tonight", "tomorrow", "next-7-days"])(
+    "keeps %s lit after the picker rounds its range to the minute",
+    async (key) => {
+      const wrapper = renderCover();
+      const button = () => wrapper.findComponent(`[data-test="oncall-cover-preset-${key}"]`);
+      await wrapper.find(`[data-test="oncall-cover-preset-${key}"]`).trigger("click");
+      await wrapper.find('[data-test="window-round"]').trigger("click");
+      await flushPromises();
+      expect(button().attributes("aria-pressed")).toBe("true");
+      const lit = wrapper
+        .findAll('[data-test^="oncall-cover-preset-"]')
+        .filter((one) => one.attributes("aria-pressed") === "true");
+      expect(lit).toHaveLength(1);
+    },
+  );
 });
 
 /// The header's *Cover a shift* opens this dialog on the reader — the answer
@@ -312,6 +378,25 @@ describe("OnCallCoverForm — a pre-selected person", () => {
 });
 
 describe("OnCallCoverForm — swapping", () => {
+  /// Opened as a cover from a shift bar, the Swap tab still knows which shift was clicked.
+  it("keeps the clicked shift when switching from cover to swap", async () => {
+    const wrapper = mount(OnCallCoverForm, {
+      props: {
+        open: false,
+        members: [],
+        timezone: "UTC",
+        shifts: SHIFTS,
+        swapFrom: { rotationId: "rot_primary", at: FROM + MICROS_PER_WEEK },
+      },
+      global: { plugins: [i18n], stubs },
+    });
+    await wrapper.setProps({ open: true });
+    await intoSwapMode(wrapper);
+
+    const first = wrapper.findAllComponents({ name: "OSelect" })[0];
+    expect(first.props("modelValue")).toBe(first.props("options")[1].value);
+  });
+
   /// F6: two people trading weeks is ONE errand. Expressed as two covers it is
   /// two dialogs, two date ranges, and a chance to get the second one backwards.
   it("writes one cover each way, each naming the other person", async () => {
@@ -319,7 +404,7 @@ describe("OnCallCoverForm — swapping", () => {
     await intoSwapMode(wrapper);
 
     await pick(wrapper, 0, 0); // ana's first week
-    await pick(wrapper, 1, 1); // bo's week
+    await pick(wrapper, 1, 0); // bo's week
     await wrapper.find('[data-test="dialog-primary"]').trigger("click");
 
     const swap = wrapper.emitted("swap")?.[0]?.[0] as any;
@@ -350,7 +435,7 @@ describe("OnCallCoverForm — swapping", () => {
     ]);
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 0);
-    await pick(wrapper, 1, 1);
+    await pick(wrapper, 1, 0);
     await wrapper.find('[data-test="dialog-primary"]').trigger("click");
 
     const swap = wrapper.emitted("swap")?.[0]?.[0] as any;
@@ -360,6 +445,16 @@ describe("OnCallCoverForm — swapping", () => {
 
   /// Slots do not compete — both are on call at the same instant — so trading
   /// across them staffs one pool twice instead of exchanging anything.
+  it("labels each shift with its start and end time, not only the dates", async () => {
+    const wrapper = render();
+    await intoSwapMode(wrapper);
+    const labels = wrapper
+      .findAll("select")[0]
+      .findAll("option")
+      .map((o) => o.text());
+    expect(labels[0]).toMatch(/\d{2}:\d{2}.* – .*\d{2}:\d{2}/);
+  });
+
   it("refuses a swap across two rotations", async () => {
     const wrapper = render([
       { ...shift("ana@o2.ai", 0), rotationId: "rot_primary", rotationName: "Primary" },
@@ -367,7 +462,7 @@ describe("OnCallCoverForm — swapping", () => {
     ]);
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 0);
-    await pick(wrapper, 1, 1);
+    await pick(wrapper, 1, 0);
 
     expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain("same rotation");
     expect(wrapper.find('[data-test="oncall-swap-summary"]').exists()).toBe(false);
@@ -379,11 +474,13 @@ describe("OnCallCoverForm — swapping", () => {
     const wrapper = render();
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 0);
-    await pick(wrapper, 1, 1);
+    await pick(wrapper, 1, 0);
 
-    const text = wrapper.find('[data-test="oncall-swap-summary"]').text();
-    expect(text).toContain("bo@o2.ai takes ana@o2.ai's shift");
-    expect(text).toContain("ana@o2.ai takes bo@o2.ai's");
+    // U19: both ranges, with their times when a handover is mid-day, and nothing about reordering.
+    const range = (one: UpcomingShift) => formatShiftRange(one.startMicros, one.endMicros, "UTC");
+    expect(wrapper.find('[data-test="oncall-swap-summary"]').text()).toBe(
+      `bo@o2.ai takes ${range(SHIFTS[0])}; ana@o2.ai takes ${range(SHIFTS[1])}.`,
+    );
   });
 
   /// Two shifts of the same person writes two covers that change nothing —
@@ -392,7 +489,7 @@ describe("OnCallCoverForm — swapping", () => {
     const wrapper = render();
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 0); // ana
-    await pick(wrapper, 1, 2); // ana again
+    await pick(wrapper, 1, 1); // ana again
 
     expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain("changes nothing");
     expect(wrapper.find('[data-test="oncall-swap-summary"]').exists()).toBe(false);
@@ -401,17 +498,17 @@ describe("OnCallCoverForm — swapping", () => {
     expect(wrapper.emitted("swap")).toBeFalsy();
   });
 
-  it("refuses a shift swapped with itself", async () => {
+  it("does not offer the picked shift as its own partner", async () => {
     const wrapper = render();
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 1);
-    await pick(wrapper, 1, 1);
 
-    expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain(
-      "cannot swap with itself",
-    );
-    await wrapper.find('[data-test="dialog-primary"]').trigger("click");
-    expect(wrapper.emitted("swap")).toBeFalsy();
+    const partners = wrapper
+      .findAll("select")[1]
+      .findAll("option")
+      .map((o) => o.element.value);
+    expect(partners).toHaveLength(SHIFTS.length - 1);
+    expect(partners).not.toContain(wrapper.findAll("select")[0].element.value);
   });
 
   /// The dialog had NO footer at all: it passed `primary-label` and
@@ -497,6 +594,16 @@ describe("OnCallCoverForm — taking a cover", () => {
       { user_email: string; start_at: number; end_at: number; rotation_id?: string } | undefined;
   }
 
+  // Save stays enabled; submitting with nobody picked names the missing field instead.
+  it("refuses a cover with nobody covering, saying so on the person field", async () => {
+    const empty = renderCover({ gap: GAP, defaultUser: "" });
+    await flushPromises();
+    expect(empty.find('[data-test="dialog-primary"]').attributes("disabled")).toBeUndefined();
+
+    expect(await save(empty)).toBeUndefined();
+    expect(empty.find('[data-test-field="user_email"]').text()).toBe("Choose who is covering");
+  });
+
   it("emits the window as the start_at / end_at pair the API takes", async () => {
     const saved = await save(renderCover({ gap: GAP }));
 
@@ -520,10 +627,56 @@ describe("OnCallCoverForm — taking a cover", () => {
     });
     await flushPromises();
 
-    const summary = wrapper.find('[data-test="oncall-cover-summary"]').text();
-    expect(summary).toContain("bo@o2.ai");
-    expect(summary).toContain("Platform");
-    expect(summary).not.toContain("ana@o2.ai");
+    expect(wrapper.find('[data-test="oncall-cover-summary"]').text()).toContain(
+      "bo@o2.ai covers ana@o2.ai on Platform, ",
+    );
+  });
+
+  // Names are what a person recognises; the email tells two namesakes apart, so it is the row's second line and the name's tooltip.
+  it("lists and names people by display name, keeping the email beside it", async () => {
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "ana@o2.ai", first_name: "Ana" },
+      { email: "bo@o2.ai", first_name: "Bo", last_name: "Lin" },
+    ]);
+    const wrapper = mount(OnCallCoverForm, {
+      props: {
+        open: true,
+        members: MEMBERS,
+        timezone: "UTC",
+        shifts: [],
+        gap: GAP,
+        currentHolder: "ana@o2.ai",
+        defaultUser: "bo@o2.ai",
+        teamName: "Platform",
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ...stubs,
+          OFormSelect: {
+            name: "OFormSelect",
+            props: ["name"],
+            inheritAttrs: false,
+            template: "<div />",
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    const who = wrapper
+      .findAllComponents({ name: "OFormSelect" })
+      .find((one) => one.props("name") === "user_email")!;
+    // `options` reaches OSelect through attribute fall-through; OFormSelect declares only `name`.
+    expect(who.vm.$attrs.options).toEqual([
+      expect.objectContaining({ label: "Ana", value: "ana@o2.ai", subLabel: "ana@o2.ai" }),
+      expect.objectContaining({ label: "Bo Lin", value: "bo@o2.ai", subLabel: "bo@o2.ai" }),
+    ]);
+    expect(wrapper.find('[data-test="oncall-cover-currently"]').exists()).toBe(false);
+    const summary = wrapper.find('[data-test="oncall-cover-summary"]');
+    expect(summary.text()).toContain("Bo Lin covers Ana on Platform");
+    expect(summary.findComponent({ name: "OnCallPersonName" }).props("email")).toBe("bo@o2.ai");
+    queryClient.removeQueries({ queryKey: orgUsersQuery("default").queryKey });
   });
 
   /// No person picked yet is the same half-answered state as a half-picked
@@ -617,19 +770,16 @@ describe("OnCallCoverForm — taking a cover", () => {
   /// The summary read a ref that only the presets and the gap prop ever wrote,
   /// so a range picked by hand left it showing the previous window — the one
   /// element whose whole job is "what this will actually do".
-  it("summarises the window the reader picked, not the one a preset last set", async () => {
+  it("states the window the reader picked, not the one a preset last set", async () => {
     const wrapper = renderCover();
     await flushPromises();
-    // Not "absent then present": the dialog now opens on a window, so what
-    // proves the summary is reading the FIELD is that it follows a hand-pick
-    // away from that opening one.
-    const opening = wrapper.find('[data-test="oncall-cover-summary"]').text();
+    // The dialog opens on a window, so what proves the field label reads the FIELD is that it follows a hand-pick.
+    const opening = fieldText(wrapper);
 
     await wrapper.find('[data-test="window-pick"]').trigger("click");
     await flushPromises();
 
-    const picked = wrapper.find('[data-test="oncall-cover-summary"]').text();
-    expect(picked).not.toBe(opening);
+    expect(fieldText(wrapper)).not.toBe(opening);
     expect(await save(wrapper)).toMatchObject({ start_at: PICKED.from, end_at: PICKED.to });
   });
 
@@ -670,6 +820,147 @@ describe("OnCallCoverForm — taking a cover", () => {
 
   /// Reopening on a different gap must not inherit the last one's window or
   /// its complaints.
+  it("puts a space between the summary's two sentences", async () => {
+    const wrapper = renderCover({ gap: GAP, teamName: "Platform" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-cover-summary"]').element.textContent).toMatch(
+      /\.\s+After that the normal rota continues\.$/,
+    );
+  });
+
+  describe("whose shift it is", () => {
+    const ROTATIONS = [
+      { id: "rot_p", name: "Primary", shift_rules: [] },
+      { id: "rot_s", name: "Secondary", shift_rules: [] },
+    ];
+    const POSITIONS = [
+      { rotation_id: "rot_p", rotation_name: "Primary", rule: "Base", user_email: "ana@o2.ai" },
+      { rotation_id: "rot_s", rotation_name: "Secondary", rule: "Base", user_email: "bo@o2.ai" },
+    ];
+    const holderLine = (wrapper: ReturnType<typeof renderCover>) =>
+      wrapper.find('[data-test="oncall-cover-holder"]');
+
+    it("names the clicked shift's person and sends them as covering_for", async () => {
+      const wrapper = renderCover({
+        gap: GAP,
+        rotations: ROTATIONS,
+        positions: POSITIONS,
+        defaultRotation: "rot_s",
+        currentHolder: "raj@o2.ai",
+        defaultUser: "ana@o2.ai",
+      });
+      await flushPromises();
+      expect(holderLine(wrapper).text()).toBe("On call: raj@o2.ai");
+
+      const saved = (await save(wrapper)) as Record<string, unknown>;
+      expect(saved).toMatchObject({ rotation_id: "rot_s", covering_for: "raj@o2.ai" });
+    });
+
+    // U19: the summary names who covers whom, on which rotation, over which days.
+    it("says who covers whom on which rotation, and that the rota then carries on", async () => {
+      const wrapper = renderCover({
+        gap: GAP,
+        rotations: ROTATIONS,
+        positions: POSITIONS,
+        defaultRotation: "rot_s",
+        currentHolder: "raj@o2.ai",
+        defaultUser: "ana@o2.ai",
+      });
+      await flushPromises();
+      const words = (text: string) => text.replace(/\s+/g, " ");
+      expect(words(wrapper.find('[data-test="oncall-cover-summary"]').text())).toBe(
+        words(
+          `ana@o2.ai covers raj@o2.ai on Secondary, ${formatDayRange(GAP.from, GAP.to, "UTC")}. After that the normal rota continues.`,
+        ),
+      );
+    });
+
+    it("names the picked rotation's holder now, without claiming whose hours they are", async () => {
+      const wrapper = renderCover({
+        gap: GAP,
+        rotations: ROTATIONS,
+        positions: POSITIONS,
+        defaultRotation: "rot_s",
+      });
+      await flushPromises();
+      expect(holderLine(wrapper).text()).toBe("On call: bo@o2.ai");
+      expect(((await save(wrapper)) as Record<string, unknown>).covering_for).toBeUndefined();
+    });
+
+    it("sends no covering_for when the holder covers their own shift", async () => {
+      const wrapper = renderCover({ gap: GAP, currentHolder: "ana@o2.ai" });
+      await flushPromises();
+      expect(((await save(wrapper)) as Record<string, unknown>).covering_for).toBeUndefined();
+    });
+
+    describe("following the picked window", () => {
+      const run = (user_email: string | null, from: number, to: number) => ({
+        rotation_id: "rot_s",
+        from,
+        to,
+        user_email,
+      });
+      const calls: Array<[string, number, number]> = [];
+      /// The clicked shift is raj's; the hand-picked hour is bo's.
+      const resolveRuns = async (rotationId: string, from: number, to: number) => {
+        calls.push([rotationId, from, to]);
+        if (to === PICKED.to) return [run("bo@o2.ai", from - MICROS_PER_HOUR, to)];
+        return [run("raj@o2.ai", from, to)];
+      };
+      const open = (props: Record<string, unknown> = {}) =>
+        renderCover({
+          gap: GAP,
+          rotations: ROTATIONS,
+          positions: POSITIONS,
+          defaultRotation: "rot_s",
+          currentHolder: "raj@o2.ai",
+          resolveRuns,
+          ...props,
+        });
+
+      it("names and relieves whoever holds the window after it changes", async () => {
+        calls.length = 0;
+        const wrapper = open();
+        await flushPromises();
+        expect(holderLine(wrapper).text()).toBe("On call: raj@o2.ai");
+
+        await wrapper.find('[data-test="window-pick"]').trigger("click");
+        await flushPromises();
+        expect(holderLine(wrapper).text()).toBe("On call: bo@o2.ai");
+        expect(calls.at(-1)).toEqual(["rot_s", PICKED.from, PICKED.to]);
+        expect(await save(wrapper)).toMatchObject({ covering_for: "bo@o2.ai" });
+      });
+
+      it("names every holder of a window several share, and relieves nobody", async () => {
+        const split = async (_rotation: string, from: number, to: number) => [
+          run("raj@o2.ai", from, from + MICROS_PER_HOUR),
+          run("bo@o2.ai", from + MICROS_PER_HOUR, to),
+        ];
+        const wrapper = open({ resolveRuns: split });
+        await flushPromises();
+        expect(holderLine(wrapper).text()).toBe("On call: raj@o2.ai, bo@o2.ai");
+        expect(((await save(wrapper)) as Record<string, unknown>).covering_for).toBeUndefined();
+      });
+
+      it("relieves nobody when part of the window has no holder", async () => {
+        const holed = async (_rotation: string, from: number, to: number) => [
+          run("raj@o2.ai", from, from + MICROS_PER_HOUR),
+          run(null, from + MICROS_PER_HOUR, to),
+        ];
+        const wrapper = open({ resolveRuns: holed });
+        await flushPromises();
+        expect(holderLine(wrapper).text()).toBe("On call: raj@o2.ai");
+        expect(((await save(wrapper)) as Record<string, unknown>).covering_for).toBeUndefined();
+      });
+    });
+
+    it("shows no holder line when nobody is known to be on call", async () => {
+      const wrapper = renderCover({ gap: GAP });
+      await flushPromises();
+      expect(holderLine(wrapper).exists()).toBe(false);
+    });
+  });
+
   it("re-seeds from the gap it was reopened on", async () => {
     const wrapper = renderCover({ gap: GAP });
     expect(await save(wrapper)).toMatchObject({ start_at: GAP.from });

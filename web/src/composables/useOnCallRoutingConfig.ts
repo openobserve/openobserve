@@ -18,32 +18,15 @@ import { readonly, ref } from "vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { routingConfigQuery } from "@/services/oncall.queries";
 import type { RoutingConfig } from "@/ts/interfaces/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 
-/**
- * The org's catch-all team, read once and shared.
- *
- * Three components asked for it independently — the card that SETS it, the
- * ownership table that shows it as the last row, and the policy editor, which
- * warns when a ladder ends in `notify_default_team` and nobody is nominated.
- * Two of them render on the Routing screen at the same time, so the same tiny
- * request went out twice and the two copies could disagree the moment one was
- * written: nominating a catch-all left the warning in the drawer still saying
- * there was none, because nothing told it.
- *
- * Sharing is now the query cache's job — org-rooted keys, one in-flight request
- * per key, and a purge on org switch, all of which this file used to hand-roll.
- * The refs below only mirror the entry for templates that read it synchronously.
- *
- * @example
- * const { config, load, refresh } = useOnCallRoutingConfig();
- * onMounted(() => load(orgId.value));      // cache-first
- * await refresh(orgId.value);              // after a write
- */
+/** One shared read of the org's catch-all team, so every screen that shows it sees the same value. */
 const config = ref<RoutingConfig | null>(null);
 /** True while a read is in flight, so a caller can tell "unset" from "not loaded yet". */
 const loading = ref(false);
 
-async function read(orgId: string, force: boolean): Promise<void> {
+/** Resolves to the missing features when the license refused the read, so the page can lock. */
+async function read(orgId: string, force: boolean): Promise<string[] | null> {
   const options = routingConfigQuery(orgId);
   loading.value = true;
   try {
@@ -55,10 +38,12 @@ async function read(orgId: string, force: boolean): Promise<void> {
       });
     }
     config.value = await queryClient.fetchQuery(options);
-  } catch {
+    return null;
+  } catch (err) {
     // Unset is the honest reading of "could not load": neither state claims a
     // catch-all exists, and a failed read must not make one appear or vanish.
     config.value = null;
+    return licenseDeniedFeatures(err);
   } finally {
     loading.value = false;
   }
@@ -66,12 +51,12 @@ async function read(orgId: string, force: boolean): Promise<void> {
 
 export function useOnCallRoutingConfig() {
   /** Cache-first: inside the tier this resolves without a request. */
-  function load(orgId: string): Promise<void> {
+  function load(orgId: string): Promise<string[] | null> {
     return read(orgId, false);
   }
 
   /** Re-reads unconditionally. Call after writing the config. */
-  function refresh(orgId: string): Promise<void> {
+  function refresh(orgId: string): Promise<string[] | null> {
     return read(orgId, true);
   }
 

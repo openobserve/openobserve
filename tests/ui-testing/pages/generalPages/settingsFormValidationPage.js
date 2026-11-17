@@ -146,6 +146,12 @@ export class SettingsFormValidationPage {
         await input.fill(value);
     }
 
+    async getTraceIdValue() {
+        const input = this.page.locator(this.traceIdInputField);
+        await input.waitFor({ state: 'visible' });
+        return input.inputValue();
+    }
+
     async fillSpanIdField(value) {
         const input = this.page.locator(this.spanIdInputField);
         await input.waitFor({ state: 'visible' });
@@ -357,19 +363,12 @@ export class SettingsFormValidationPage {
 
     // ── ModelPricingEditor helpers ────────────────────────────────────────────
 
-    /**
-     * Navigate to Settings and open the Model Pricing section.
-     * LLM Model Pricing is an ENTERPRISE/CLOUD-only feature — the tab/route only
-     * mounts on the enterprise (or cloud) build. Probe positively for the
-     * model-pricing tab and return a boolean so callers can gate the suite to a
-     * clean SKIP on the OSS binary (mirrors navigateToDomainManagement).
-     */
+    /** Enterprise/cloud-only route; returns a boolean so OSS runs can skip cleanly. */
     async navigateToModelPricing() {
-        await this.navigateToSettings(this.page);
+        const org = process.env.ORGNAME || 'default';
+        const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        await this.page.goto(`${base}/web/ai/model-pricing?org_identifier=${org}`);
         try {
-            const modelPricingTab = this.page.locator('[data-test="model-pricing-tab"]');
-            await modelPricingTab.waitFor({ state: 'visible', timeout: 10000 });
-            await modelPricingTab.click();
             const addBtn = this.page.locator('[data-test="model-pricing-add-btn"]');
             await addBtn.waitFor({ state: 'visible', timeout: 10000 });
             await addBtn.click();

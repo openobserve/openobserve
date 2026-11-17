@@ -21,10 +21,12 @@ import {
   applySchedulePresetMutation,
   confirmCodeMutation,
   contactQuery,
+  createTeamMutation,
   createOverrideMutation,
   createOwnershipRuleMutation,
   deleteOverrideMutation,
   deleteOwnershipRuleMutation,
+  deleteTeamMutation,
   deleteTelephonyMutation,
   oncallTeamsQuery,
   pagedResponsesQuery,
@@ -43,6 +45,7 @@ import {
   updateTeamMutation,
 } from "./oncall.queries";
 import { oncallKeys } from "./oncall.querykeys";
+import { configKeys } from "./config.querykeys";
 import oncallService from "./oncall";
 
 vi.mock("./oncall", () => ({
@@ -280,5 +283,13 @@ describe("the team's Slack channel", () => {
     });
     expect(mutation.meta?.invalidates).toBeUndefined();
     expect(mutation.meta?.silentError).toBe(true);
+  });
+});
+
+describe("an org's first or last team", () => {
+  it("refreshes the org config, whose incidents_page_oncall says whether an incident pages anyone (C21)", () => {
+    for (const mutation of [createTeamMutation(ORG), deleteTeamMutation(ORG)]) {
+      expect(mutation.meta?.invalidates).toContainEqual(configKeys.full(ORG));
+    }
   });
 });

@@ -22,6 +22,7 @@ class FleetInstallPage {
     this.waiting = '[data-test="fleet-install-dialog-waiting"]';
     this.tokenFormName = '[data-test="fleet-token-form-name-field"]';
     this.tokenFormSubmit = '[data-test="fleet-token-form-submit"]';
+    this.tokenFormMaxUses = '[data-test="fleet-token-form-max-field"]';
     this.command = '[data-test="fleet-install-command"]';
     this.commandCode = '[data-test="fleet-install-command-code-pre"] code';
     this.revealBtn = '[data-test="fleet-install-command-code-reveal-btn"]';
@@ -236,6 +237,12 @@ class FleetInstallPage {
 
   async expectNoTokenState() {
     await expect(this.page.locator(this.noToken)).toBeVisible({ timeout: PAGE_TIMEOUT_MS });
+  }
+
+  async expectInlineMaxUses(value) {
+    await expect(this.page.locator(this.noToken).locator(this.tokenFormMaxUses)).toHaveValue(value, {
+      timeout: PAGE_TIMEOUT_MS,
+    });
   }
 
   // The dialog must read GET /fleet/collectors again once a token exists, or it never notices the collector.

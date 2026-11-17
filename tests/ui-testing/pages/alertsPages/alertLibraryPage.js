@@ -60,6 +60,14 @@ export class AlertLibraryPage {
       cancel: '[data-test="alert-library-install-cancel"]',
       // alert editor (the Customize hand-off target)
       editorAlertName: '[data-test="add-alert-name-input-value"]',
+      // Rendered only when the manifest ships anomaly alerts.
+      alertType: '[data-test="alert-library-alert-type"]',
+      cardAnomalyTag: '[data-test="alert-library-card-anomaly"]',
+      cardEnterpriseTag: '[data-test="alert-library-card-enterprise"]',
+      upgradeDialog: '[data-test="enterprise-upgrade-dialog"]',
+      selectAllCheckbox: '[data-test="alert-library-select-all-in-view"] [role="checkbox"]',
+      drawerAnomalyNote: '[data-test="alert-library-drawer-anomaly-note"]',
+      drawerDetection: '[data-test="alert-library-drawer-detection"]',
     };
   }
 
@@ -132,6 +140,13 @@ export class AlertLibraryPage {
   cardCustomize(id) { return this.page.locator(`[data-test="alert-library-card-customize-${id}"]`); }
   needsDataChip(id) {
     return this.card(id).locator('[data-test="alert-library-card-needs-data"]');
+  }
+  cardAnomaly(id) { return this.card(id).locator(this.l.cardAnomalyTag); }
+  cardEnterprise(id) { return this.card(id).locator(this.l.cardEnterpriseTag); }
+
+  // ── alert-type facet (anomaly) ────────────────────────────────────────────
+  async pickAlertType(id) {
+    await this.page.locator(`[data-test="alert-library-alert-type-${id}"]`).click();
   }
 
   async firstCardId() {
@@ -262,6 +277,14 @@ export class AlertLibraryPage {
   async expectCardAbsent(id) { await expect(this.card(id)).toHaveCount(0); }
   async expectCardNeedsData(id) { await expect(this.needsDataChip(id)).toBeVisible(); }
   async expectCardReady(id) { await expect(this.needsDataChip(id)).toHaveCount(0); }
+  async expectCardAnomalyTag(id) { await expect(this.cardAnomaly(id)).toBeVisible(); }
+  async expectCardEnterpriseTag(id) { await expect(this.cardEnterprise(id)).toBeVisible(); }
+  async expectNoEnterpriseTag(id) { await expect(this.cardEnterprise(id)).toHaveCount(0); }
+  async expectCardNotSelected(id) { await expect(this.card(id)).toHaveAttribute('data-selected', 'false'); }
+  async expectNoAnomalyCard() { await expect(this.page.locator(this.l.cardAnomalyTag)).toHaveCount(0); }
+  async expectAlertTypeToggleVisible() { await expect(this.page.locator(this.l.alertType)).toBeVisible(); }
+  async expectAlertTypeToggleAbsent() { await expect(this.page.locator(this.l.alertType)).toHaveCount(0); }
+  async expectSelectAllDisabled() { await expect(this.page.locator(this.l.selectAllCheckbox)).toBeDisabled(); }
   async expectDrawerPreviewVisible() { await expect(this.page.locator(this.l.drawerPreview)).toBeVisible(); }
   async expectDrawerNeedsData() { await expect(this.page.locator(this.l.drawerNeedsData)).toBeVisible(); }
   async expectDrawerAvailability() { await expect(this.page.locator(this.l.drawerAvailability)).toBeVisible(); }
@@ -269,6 +292,35 @@ export class AlertLibraryPage {
   async closeDrawer() {
     await this.page.keyboard.press('Escape');
     await expect(this.page.locator(this.l.drawer)).toBeHidden();
+  }
+
+  // ── locked-card upgrade dialog ────────────────────────────────────────────
+  async clickCardTitle(id) {
+    await this.cardTitle(id).click();
+  }
+
+  async expectUpgradeDialogVisible() {
+    await expect(this.page.locator(this.l.upgradeDialog)).toBeVisible({ timeout: 15000 });
+  }
+
+  async closeUpgradeDialog() {
+    await this.page.keyboard.press('Escape');
+    await expect(this.page.locator(this.l.upgradeDialog)).toBeHidden({ timeout: 10000 });
+  }
+
+  async expectDrawerClosed() {
+    await expect(this.page.locator(this.l.drawer)).toBeHidden();
+  }
+
+  async expectDrawerAnomalyNote() { await expect(this.page.locator(this.l.drawerAnomalyNote)).toBeVisible(); }
+  async expectDrawerDetection() { await expect(this.page.locator(this.l.drawerDetection)).toBeVisible(); }
+
+  // The unauthenticated /config is what the store's zoConfig.build_type is loaded from.
+  async detectBuildType() {
+    const base = (process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
+    const response = await this.page.request.get(`${base}/config`);
+    expect(response.ok(), `GET /config returned ${response.status()}`).toBeTruthy();
+    return (await response.json()).build_type;
   }
 
   async expectEditorAlertName(name) {

@@ -78,6 +78,14 @@ function storedConditionsGroup(stored: any): any {
   return detectConditionsVersion(stored) === 1 ? convertV1BEToV2(stored) : stored;
 }
 
+/** True when the critical condition is a whole query (raw SQL, a PromQL rule, anomaly SQL or filters) rather than a threshold. */
+export function alertConditionIsQuery(alert: any): boolean {
+  if (alert?.alert_type === "anomaly_detection") return true;
+  const qc = queryConditionOf(alert);
+  if (qc?.type === "promql") return !!qc.promql_rule_mode;
+  return !qc?.aggregation && qc?.type !== "custom" && !isBlank(qc?.sql);
+}
+
 /** The warning condition, or `—` when the alert has only a critical one. */
 export function alertWarningConditionText(alert: any): string {
   const qc = queryConditionOf(alert);

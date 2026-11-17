@@ -624,4 +624,12 @@ mod tests {
             );
         }
     }
+
+    // Other tests read these symbolically, so only literals catch a changed value.
+    #[test]
+    fn test_the_code_limits_keep_their_spec_values() {
+        assert_eq!(CODE_TTL_MICROS, 600_000_000, "a code lives 10 minutes");
+        assert_eq!(CODE_MAX_ATTEMPTS, 5, "a code takes 5 tries");
+        assert_eq!(SEND_GAP_MICROS, 60_000_000, "codes are 60 s apart");
+    }
 }

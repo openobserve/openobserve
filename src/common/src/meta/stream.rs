@@ -48,6 +48,9 @@ pub struct Stream {
     /// True for streams OpenObserve writes itself; omitted when false.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub is_internal: bool,
+    /// Days the stream keeps data with no value of its own, 0 for forever; set by the schema read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inherited_retention_days: Option<i64>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -176,6 +179,7 @@ mod tests {
             pattern_associations: vec![],
             is_derived: None,
             is_internal: false,
+            inherited_retention_days: None,
         };
 
         let list_stream = ListStream {
@@ -258,6 +262,7 @@ mod tests {
             pattern_associations: vec![],
             is_derived: None,
             is_internal: false,
+            inherited_retention_days: None,
         };
 
         assert!(stream.uds_schema.len() == 1);

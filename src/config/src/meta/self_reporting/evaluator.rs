@@ -42,6 +42,9 @@ pub const SPAN_NAME_EVALUATION: &str = "online_eval.evaluate";
 /// Standard span name for a Remote-Scorer evaluation.
 pub const SPAN_NAME_REMOTE_SCORER: &str = "remote_scorer.evaluate";
 
+/// Standard span name for a Code-Scorer evaluation.
+pub const SPAN_NAME_CODE_SCORER: &str = "code_scorer.evaluate";
+
 /// Standard span name when scorer type cannot be resolved.
 pub const SPAN_NAME_UNKNOWN_SCORER: &str = "unknown_scorer.evaluate";
 
@@ -140,6 +143,7 @@ mod tests {
         assert_ne!(SPAN_NAME_LLM_JUDGE, SPAN_NAME_REMOTE_SCORER);
         assert_ne!(SPAN_NAME_LLM_JUDGE, SPAN_NAME_UNKNOWN_SCORER);
         assert_ne!(SPAN_NAME_REMOTE_SCORER, SPAN_NAME_UNKNOWN_SCORER);
+        assert_ne!(SPAN_NAME_CODE_SCORER, SPAN_NAME_REMOTE_SCORER);
         assert_ne!(SPAN_NAME_SPAN_SKIPPED, SPAN_NAME_LLM_JUDGE);
     }
 

@@ -77,10 +77,11 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
  *
  * Three shapes (see `RailEntry`):
  *   • plain link    — most items (Home, Logs, Metrics, Traces, Actions,
- *     Billings, AI, IAM, Management).
+ *     Billings, AI).
  *   • link + subnav — a tile that navigates to a main page on click AND surfaces
  *     a section nav on hover. Produced by NAV_GROUPS (Reliability → /alerts,
- *     Data → /streams, Dashboards → /dashboards, Infra → /infra/databases) and
+ *     Data → /streams, Dashboards → /dashboards, Infra → /infra/databases,
+ *     Settings → /settings) and
  *     by any NAV_SUBNAV entry.
  *   • pure group    — a flyout with no page of its own (click toggles it).
  *     Supported by the renderer but not emitted by any current entry.
@@ -197,18 +198,21 @@ export const NAV_GROUPS: NavGroupDef[] = [
         categoryKey: "menu.alerts",
         feature: "alerts",
       },
-      // ── Reliability's other concerns ────────────────────────────────────
-      // Deliberately OUTSIDE the Alerts header: an SLO is what an SLO alert
-      // burns against and an incident is what an alert escalates into — the
-      // same workflow, but not alerting configuration, so filing them under
-      // "Alerts" would misfile them. Every child carries `requires` so hiding
-      // any of them (`custom_hide_menus`, or Incidents being enterprise-gated)
-      // shrinks the group, and dropping to a single survivor collapses it back
-      // to a plain link rather than leaving a one-item flyout.
+      // Gated on incidentList, not alertList: external alerts only matter where Incidents is enabled.
+      {
+        titleKey: "alert_sources.header",
+        icon: "webhook",
+        name: "alertSources",
+        requires: "incidentList",
+        categoryKey: "menu.alerts",
+        feature: "incidents",
+      },
+      // Response, not Alerts: these are what alerts burn against or escalate into; each `requires` so hiding one shrinks the group.
       {
         titleKey: "menu.slos",
         icon: "target",
         name: "sloList",
+        categoryKey: "menu.response",
         requires: "sloList",
         feature: "anomaly_detection",
       },
@@ -216,6 +220,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         titleKey: "menu.incidents",
         icon: "notifications-active",
         name: "incidentList",
+        categoryKey: "menu.response",
         requires: "incidentList",
         gate: "incidents",
         feature: "incidents",
@@ -224,6 +229,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         titleKey: "menu.downtimes",
         icon: "notifications-paused",
         name: "downtimes",
+        categoryKey: "menu.response",
         requires: "downtimes",
         gate: "downtimes",
         feature: "alerts",
@@ -234,6 +240,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         titleKey: "menu.alertCalibration",
         icon: "tune",
         name: "alertCalibration",
+        categoryKey: "menu.response",
         requires: "alertList",
         gate: "alertCalibration",
         feature: "alerts",
@@ -258,6 +265,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         categoryKey: "menu.onCall",
         gate: "oncall",
         feature: "oncall",
+        beta: true,
       },
       {
         titleKey: "oncall.teams",
@@ -266,6 +274,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         categoryKey: "menu.onCall",
         gate: "oncall",
         feature: "oncall",
+        beta: true,
       },
       {
         titleKey: "oncall.routingNav",
@@ -274,6 +283,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         categoryKey: "menu.onCall",
         gate: "oncall",
         feature: "oncall",
+        beta: true,
       },
       // Same icon as the page's own header, so the menu and the page read as one place.
       {
@@ -282,17 +292,8 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallMine",
         categoryKey: "menu.onCall",
         gate: "oncall",
-      },
-      // Where external alerts (Grafana, Alertmanager, etc.) feed Incidents.
-      // Gated on incidentList, not alertList: this only makes sense where
-      // Incidents is enabled, matching the enterprise/cloud + incidents_enabled
-      // visibility check it already carried as a Settings tab.
-      {
-        titleKey: "alert_sources.header",
-        icon: "webhook",
-        name: "alertSources",
-        requires: "incidentList",
-        feature: "incidents",
+        feature: "oncall",
+        beta: true,
       },
     ],
   },
@@ -486,13 +487,26 @@ export const NAV_GROUPS: NavGroupDef[] = [
       },
     ],
   },
+  {
+    key: "settings",
+    titleKey: "menu.settings",
+    icon: "settings",
+    parentLink: "/settings",
+    absorbs: ["iam", "settings"],
+    // Cloud inserts Billing between IAM and Settings; anchoring after it keeps Settings the last tile.
+    placeAfter: "billings",
+    children: [
+      { titleKey: "menu.allSettings", icon: "settings", name: "settings", requires: "settings" },
+      { titleKey: "menu.iam", icon: "manage-accounts", name: "iam", requires: "iam" },
+    ],
+  },
 ];
 
 /**
  * Top-level links that ALSO reveal their own in-page section nav on hover,
  * keyed by the top-level item's `name`.
  *
- * AI / IAM / Management are intentionally plain links (no rail submenu) — their
+ * AI is intentionally a plain link (no rail submenu) — its
  * in-page SectionRail is the place to switch sections. Re-add an entry here
  * (mirroring the page's SectionRail) to restore a hover flyout.
  *

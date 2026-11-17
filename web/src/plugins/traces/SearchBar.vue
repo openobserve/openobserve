@@ -21,11 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         ref="toolbarLeftRef"
-        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 max-lg:w-full max-lg:flex-none max-lg:flex-wrap max-lg:gap-y-1"
+        class="flex min-w-0 flex-1 flex-row items-center gap-2 max-lg:w-full max-lg:flex-none max-lg:flex-wrap max-lg:gap-y-1"
       >
         <!-- Clips its overflow so More, a shrink-0 sibling, is never clipped. -->
         <div
-          class="flex min-w-0 flex-initial flex-row items-center gap-1.5 overflow-hidden max-lg:flex-wrap max-lg:gap-y-1 max-lg:overflow-visible"
+          class="flex min-w-0 flex-initial flex-row items-center gap-2 overflow-hidden max-lg:flex-wrap max-lg:gap-y-1 max-lg:overflow-visible"
         >
           <!-- Unified View Toggle: Service Graph / Traces / Spans -->
           <OToggleGroup
@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="xs"
             :disabled="searchObj.loading"
+            focusable-unavailable
             @click="$emit('drill-down')"
           >
             <template #icon-left>
@@ -92,6 +93,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
             <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
           </OButton>
+          <span
+            v-else-if="drillDownSlot"
+            class="invisible inline-flex"
+            aria-hidden="true"
+            inert
+            data-test="insights-button-placeholder"
+          >
+            <OButton variant="outline" size="xs" tabindex="-1">
+              <template #icon-left>
+                <OIcon name="timeline" size="sm" class="shrink-0" />
+              </template>
+              <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
+            </OButton>
+          </span>
 
           <!-- Show search controls only when not on Service Graph or Services Catalog -->
           <template
@@ -104,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!toolbarMoveResetToMenu"
               data-test="traces-search-bar-reset-filters-btn"
               variant="outline"
-              size="xs"
+              size="sm-toolbar"
               @click="resetFilters"
             >
               <template #icon-left>
@@ -117,9 +132,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="showPinnedMetrics"
             data-test="traces-search-bar-metrics-pinned-btn"
-            size="xs"
+            size="sm-toolbar"
             variant="outline"
-            class="gap-1.5"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <OSwitch v-model="searchObj.meta.showHistogram" size="md" @click.stop />
@@ -130,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButtonGroup
             v-if="showPinnedSavedViews"
             data-test="traces-search-bar-saved-views"
-            class="border-button-outline-border shrink-0 border p-0"
+            class="border-button-outline-border h-8.5 shrink-0 border p-0"
           >
             <ODropdown
               :open="savedViewsDropdownOpen"
@@ -143,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="traces-search-bar-saved-views-btn"
                   variant="ghost"
                   size="xs-grouped"
+                  class="h-full!"
                 >
                   <OIcon name="saved-search" size="sm" />
                   <OIcon name="arrow-drop-down" size="sm" />
@@ -167,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-search-bar-saved-views-create-btn"
               variant="ghost"
               size="icon-panel"
+              class="h-full!"
               @click="openSaveViewDialog"
             >
               <OIcon name="save" size="sm" />
@@ -185,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="traces-search-bar-more-menu-btn"
               variant="outline"
-              size="xs"
+              size="sm-toolbar"
               icon-left="more-horiz"
               class="shrink-0 max-lg:ms-auto"
             >
@@ -295,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.meta.searchMode !== 'service-graph' &&
             searchObj.meta.searchMode !== 'services-catalog'
           "
-          class="flex items-center gap-1.5 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
+          class="flex items-center gap-2 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
           <OPageHeaderStatus />
           <DateTime
@@ -312,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             calendar-presets
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8 max-lg:me-auto max-md:[&_.date-time-label]:hidden"
+            class="h-8.5! max-lg:me-auto max-md:[&_.date-time-label]:hidden"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -321,13 +337,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @view-all="openRecentSearches"
           />
           <div>
-            <div class="flex items-center">
+            <div ref="runControlRef" class="flex items-center">
               <OButton
                 v-if="config.isEnterprise == 'true' && isLoading"
                 variant="ghost"
+                aria-busy="true"
                 data-test="traces-search-bar-cancel-btn"
+                size="sm-toolbar"
                 :title="t('search.cancel')"
-                class="bg-cancel-query-bg! text-button-primary-foreground! h-[1.875rem]! w-[5.875rem]! ![border-radius:0.375rem_0_0_0.375rem] p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
                 @click="cancelQueryData"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -338,11 +356,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 :data-run-pending="showRunQueryPending ? 'true' : undefined"
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
+                size="sm-toolbar"
                 :title="t('search.runQuery')"
-                class="h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
+                class="min-w-[5.875rem] [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
                 :class="[
                   store.state.zoConfig.auto_query_enabled
-                    ? '![border-radius:0.375rem_0_0_0.375rem]'
+                    ? 'rounded-s-default! rounded-e-none!'
                     : 'rounded-default',
                   showRunQueryPending
                     ? ''
@@ -368,13 +387,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 {{ t("search.runQuery") }}
               </OButton>
-              <OSeparator v-if="!showRunQueryPending" class="h-[1.875rem]! w-px" vertical />
+              <OSeparator
+                v-if="!showRunQueryPending && store.state.zoConfig.auto_query_enabled"
+                class="h-8.5! w-px"
+                vertical
+              />
               <ODropdown v-if="store.state.zoConfig.auto_query_enabled" side="bottom" align="end">
                 <template #trigger>
                   <OButton
                     :aria-label="t('common.moreOptions')"
                     :variant="showRunQueryPending && !isLoading ? 'pending' : 'ghost'"
-                    size="icon-xs"
+                    size="icon-toolbar"
                     :disabled="isLoading"
                     :class="[
                       config.isEnterprise == 'true' && isLoading
@@ -382,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : showRunQueryPending
                           ? 'border-s-0'
                           : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
-                      '![border-radius:0_0.375rem_0.375rem_0]',
+                      'rounded-e-default! rounded-s-none!',
                     ]"
                   >
                     <OIcon name="arrow-drop-down" size="sm" />
@@ -422,7 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
             variant="outline"
-            size="icon-toolbar"
+            size="icon-md"
             shortcut-id="tracesCopyUrl"
           />
           <ODropdown side="bottom" align="end">
@@ -521,14 +544,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="service-graph-date-time-picker"
               calendar-presets
-              class="h-8!"
+              class="h-8.5!"
               @on:date-change="updateDateTime"
             />
             <OButton
               data-test="service-graph-refresh-btn"
               variant="outline"
-              size="icon-toolbar"
-              class="min-w-[1.875rem]!"
+              size="icon-md"
               @click="$emit('service-graph-refresh')"
             >
               <OIcon name="refresh" size="sm" />
@@ -553,7 +575,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.meta.serviceGraphLayoutType"
               :options="serviceGraphLayoutOptions"
               :searchable="false"
-              class="h-8! min-h-8! w-[7.5rem] max-lg:w-24!"
+              class="h-[2.125rem]! min-h-[2.125rem]! w-[7.5rem] max-lg:w-24!"
               :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
               @update:model-value="onServiceGraphLayoutChange"
             />
@@ -576,7 +598,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
               calendar-presets
-              class="me-1.5 h-8!"
+              class="h-8.5!"
               @on:date-change="updateDateTime"
             />
           </div>
@@ -597,7 +619,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="relative flex h-full w-full flex-col overflow-hidden"
         @keydown.capture="onRecentEditorKeydown"
       >
+        <OButton
+          v-if="!searchObj.meta.sqlMode && !nlpMode"
+          :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
+          data-test="traces-search-bar-filter-builder-toggle"
+          :aria-pressed="filterBuilderOn"
+          variant="ghost"
+          size="icon-xs-sq"
+          class="absolute! top-0.75 z-51"
+          :style="{ right: filterBuilderToggleRight }"
+          @click="toggleFilterBuilder"
+        >
+          <OTooltip
+            :content="filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')"
+          />
+        </OButton>
+        <div
+          v-if="showFilterBuilder"
+          class="h-full overflow-y-auto py-0.75 ps-1.5"
+          :class="isAiEnabled ? 'pe-18' : 'pe-10'"
+          @pointerdown.self.prevent="activateFilterBuilder"
+        >
+          <SqlFilterBuilder
+            ref="filterBuilderRef"
+            :query="searchObj.data.editorValue"
+            :fields="filterBuilderFields"
+            :load-values="loadFilterBuilderValues"
+            :fields-loading="searchObj.loadingStream"
+            :extra-suggestions="recentFilterSection"
+            data-test="traces-search-bar-filter-builder"
+            @update:query="(sql: string) => onFilterBuilderQuery(sql) && searchData()"
+            @submit="searchData"
+            @exit="toggleFilterBuilder"
+            @focus="onFilterBuilderFocus"
+            @extra-select="pickRecentFilterRow"
+          />
+        </div>
+        <OButton
+          v-if="showFilterBuilder && isAiEnabled"
+          data-test="traces-search-bar-filter-builder-ai-btn"
+          variant="ghost"
+          size="icon-toolbar"
+          class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 right-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+          @click="openAiFromBuilder"
+        >
+          <img
+            :src="aiIcon"
+            :alt="t('search.aiModeIconAlt')"
+            class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
+          />
+          <OTooltip :content="t('nlMode.toggle')" />
+        </OButton>
         <UnifiedQueryEditor
+          v-show="!showFilterBuilder"
           ref="queryEditorRef"
           editor-id="traces-query-editor"
           data-test-prefix="traces-search-bar"
@@ -630,10 +704,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @example="applyRecentExample"
           @dismiss="dismissRecentFocus"
         />
+        <!-- Until the stream loads, a query from the link or a saved view may still arrive, so nothing types first. -->
         <div
           v-if="
             searchObj.data.editorValue === '' &&
             searchObj.meta.queryEditorPlaceholderFlag &&
+            !showFilterBuilder &&
+            !searchObj.loadingStream &&
             !recentFocusOpen &&
             !nlpMode
           "
@@ -742,6 +819,10 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { downloadFile } from "@/utils/dom";
 import { toCsv } from "@/utils/csv";
 import { useMutation, useQuery } from "@tanstack/vue-query";
+import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
+import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
+import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
+import { toFilterFields } from "@/utils/query/filterBar";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import savedViewsService from "@/services/saved_views";
@@ -752,6 +833,7 @@ import {
   useRecentSearches,
   useRecentSearchesList,
 } from "@/composables/queryHistory/useRecentSearches";
+import { useRecentFilterSuggestions } from "@/composables/queryHistory/useRecentFilterSuggestions";
 import {
   recentQueryList,
   recentsOpenAfterEdit,
@@ -759,6 +841,8 @@ import {
 } from "@/utils/queryHistory/recentSearches";
 import { TRACES_EXAMPLE_QUERIES } from "@/utils/queryHistory/traces";
 import type { HistoryStatus } from "@/services/query_history";
+import { useTheme } from "@/composables/useTheme";
+import { getImageURL } from "@/utils/zincutils";
 import {
   savedViewsQuery,
   createSavedViewMutation,
@@ -789,6 +873,7 @@ export default defineComponent({
     OSelect,
     OTooltip,
     UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
+    SqlFilterBuilder,
     SyntaxGuide,
     RecentSearchesButton,
     RecentSearchesDrawer,
@@ -798,6 +883,7 @@ export default defineComponent({
   },
   emits: [
     "searchdata",
+    "filterBuilderGrowth",
     "cancel-query",
     "update:searchMode",
     "error-only-toggled",
@@ -931,6 +1017,22 @@ export default defineComponent({
       setEditorValue(query);
       focusEditor();
     };
+    const { section: recentFilterSection, pick: pickRecentFilterRow } = useRecentFilterSuggestions(
+      "traces",
+      {
+        active: recentListActive,
+        examples: recentExamples,
+        run: (entry, when) => emit("recent-restore", entry, when, true),
+        load: (entry, when) => emit("recent-restore", entry, when, false),
+        viewAll: openRecentSearches,
+        example: applyRecentExample,
+      },
+    );
+
+    const onFilterBuilderFocus = () => {
+      if (recentSearchesEnabled.value) recentListActive.value = true;
+    };
+
     const onQueryEditorBlur = async () => {
       searchObj.meta.queryEditorPlaceholderFlag = true;
       await _sqlOnBlur();
@@ -951,6 +1053,41 @@ export default defineComponent({
       updateStreamKeywords,
       resolveFieldValues,
     } = useSqlSuggestions();
+
+    const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
+      useFilterBuilderPreference("o2.traces.queryInput");
+    const filterBuilderRef = ref<InstanceType<typeof SqlFilterBuilder> | null>(null);
+    // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
+    const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
+    // The pane is taller than the bar, so a press on its blank part must still start a filter.
+    const activateFilterBuilder = () => filterBuilderRef.value?.activate();
+    watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
+      immediate: true,
+    });
+    const showFilterBuilder = computed(
+      () => filterBuilderOn.value && !searchObj.meta.sqlMode && !nlpMode.value,
+    );
+    // The AI button holds the corner slot in both modes: QueryEditor's own, or the builder's copy.
+    const filterBuilderToggleRight = computed(() => (isAiEnabled.value ? "2.375rem" : "0.25rem"));
+    const { isDark } = useTheme();
+    const aiIcon = computed(() =>
+      getImageURL(
+        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
+      ),
+    );
+    const openAiFromBuilder = () =>
+      (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
+    const filterBuilderFields = computed(() =>
+      toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
+    );
+    const loadFilterBuilderValues = (field: string, search: string) =>
+      resolveFieldValues(field, { prefix: search });
+    // Returns whether the change should search now, the same rule a field-list click follows.
+    const onFilterBuilderQuery = (sql: string): boolean => {
+      searchObj.data.editorValue = sql;
+      (queryEditorRef.value as { setValue?: (v: string) => void } | null)?.setValue?.(sql);
+      return Boolean(store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode);
+    };
 
     onActivated(async () => {
       await nextTick();
@@ -1341,7 +1478,10 @@ export default defineComponent({
     const _traceStreamFields = computed(() => searchObj.data.stream.selectedStreamFields ?? []);
     const _traceFieldValues = computed(() => props.fieldValues ?? {});
     const _traceSqlMode = computed(() => false);
-    const _traceNoStream = computed(() => !searchObj.data.stream.selectedStream?.value);
+    // The typewriter keeps typing while hidden, so "Select a stream first" must not start before the stream list could pick one.
+    const _traceNoStream = computed(
+      () => !searchObj.loadingStream && !searchObj.data.stream.selectedStream?.value,
+    );
     const { placeholder: traceEditorPlaceholder } = useQueryPlaceholder(
       _traceStreamFields,
       _traceFieldValues,
@@ -1526,7 +1666,22 @@ export default defineComponent({
     };
 
     // Responsive toolbar — shared composable tracks available left-section width
-    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
+    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive({
+      keepWidthWhenDetached: true,
+    });
+
+    // Run and Cancel swap elements, so focus follows the swap instead of dropping to the page.
+    const runControlRef = ref<HTMLElement | null>(null);
+    watch(
+      () => props.isLoading,
+      async () => {
+        const control = runControlRef.value;
+        if (!control || !control.contains(document.activeElement)) return;
+        await nextTick();
+        control.querySelector<HTMLElement>("button")?.focus();
+      },
+      { flush: "pre" },
+    );
     const { lgUp } = useBreakpoint();
     const { isPinned, togglePin } = useToolbarPins("traces");
 
@@ -1554,6 +1709,11 @@ export default defineComponent({
         !searchObj.data.errorMsg?.trim()?.length &&
         !!searchObj.searchApplied,
     );
+    const drillDownSlot = computed(
+      () =>
+        isSearchMode.value &&
+        (searchObj.loadingStream || searchObj.data.stream.streamLists.length > 0),
+    );
     const serviceGraphAccess = useLockedAffordance("enterprise");
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
@@ -1570,7 +1730,7 @@ export default defineComponent({
       tracesToolbarLayout({
         available: availableLeftWidth.value,
         serviceGraph: serviceGraphAccess.value.visible,
-        drillDown: showDrillDown.value,
+        drillDown: drillDownSlot.value,
         reset: isSearchMode.value,
         pinnedWidth: pinnedGroupWidth.value,
       }),
@@ -1611,6 +1771,9 @@ export default defineComponent({
       recentFocusRef,
       recentDrawerRef,
       recentFocusOpen,
+      recentFilterSection,
+      pickRecentFilterRow,
+      onFilterBuilderFocus,
       showRunQueryPending,
       recentQueries,
       recentExamples,
@@ -1637,6 +1800,17 @@ export default defineComponent({
       autoCompleteKeywords,
       effectiveKeywords,
       resolveFieldValues,
+      filterBuilderOn,
+      toggleFilterBuilder,
+      showFilterBuilder,
+      filterBuilderToggleRight,
+      aiIcon,
+      openAiFromBuilder,
+      filterBuilderFields,
+      filterBuilderRef,
+      activateFilterBuilder,
+      loadFilterBuilderValues,
+      onFilterBuilderQuery,
       effectiveSuggestions,
       updateTimezone,
       dateTimeRef,
@@ -1655,10 +1829,12 @@ export default defineComponent({
       traceEditorPlaceholder,
       toolbarLeftRef,
       toolbarRightRef,
+      runControlRef,
       shouldHideToolbarButtonText,
       toolbarToggleIconOnly,
       toolbarMoveResetToMenu,
       showDrillDown,
+      drillDownSlot,
       isSearchMode,
       isPinned,
       togglePin,

@@ -614,6 +614,7 @@ pub(crate) mod tests {
                     schema.create_table_from_entity(oncall_responses::Entity),
                     schema.create_table_from_entity(ai_chat_sessions::Entity),
                     schema.create_table_from_entity(ai_chat_turns::Entity),
+                    schema.create_table_from_entity(infra::table::entity::alert_states::Entity),
                 ] {
                     conn.execute(backend.build(table.if_not_exists()))
                         .await
@@ -632,6 +633,12 @@ pub(crate) mod tests {
             })
             .await;
         LOCK.lock().await
+    }
+
+    /// Turn RCA off for a test of the RCA-off guard; RCA is on by default.
+    pub(crate) fn rca_off() {
+        unsafe { std::env::set_var("O2_INCIDENTS_RCA_ENABLED", "false") };
+        o2_enterprise::enterprise::common::config::refresh_config().unwrap();
     }
 
     /// A fresh org with one open incident that was never analyzed.
@@ -672,6 +679,9 @@ pub(crate) mod tests {
             rca_confidence: None,
             rca_summary: None,
             rca_off_reason: None,
+            security_case: false,
+            historical: false,
+            last_detection_at: None,
         }
         .into();
         alert_incidents::Entity::insert(row.reset_all())

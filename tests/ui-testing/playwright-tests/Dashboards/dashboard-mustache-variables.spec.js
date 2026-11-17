@@ -124,7 +124,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -197,7 +197,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -270,7 +270,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -391,7 +391,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -470,7 +470,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable and select a value
         await pm.dashboardSetting.openSetting();
@@ -587,7 +587,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -662,7 +662,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -737,7 +737,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -814,7 +814,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();
@@ -897,7 +897,7 @@ test.describe(
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await pm.dashboardVariables.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardVariables.getMoreOptionsBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
         // Add a variable
         await pm.dashboardSetting.openSetting();

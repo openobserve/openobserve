@@ -300,6 +300,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import analytics from "@/services/product_analytics";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
   llmPromptsQuery,
@@ -669,6 +670,7 @@ async function movePrompt() {
       input: { folderId: moveDestination.value },
     });
     if (requestedOrg !== orgId.value) return;
+    analytics.track("llm_prompt_moved");
     replacePrompt(updated);
     moveOpen.value = false;
     toast({
@@ -698,6 +700,7 @@ async function archive(prompt: Prompt) {
   if (requestedOrg !== orgId.value) return;
   try {
     const updated = await archiveMutation.mutateAsync(prompt.entityId);
+    analytics.track("llm_prompt_archived");
     // An archived prompt takes no new versions, so its version draft can never be saved.
     deleteEditorDraftsFor({ kind: "prompt", org: requestedOrg, entityId: prompt.entityId });
     if (requestedOrg !== orgId.value) return;

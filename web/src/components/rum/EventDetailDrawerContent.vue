@@ -543,6 +543,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import analytics from "@/services/product_analytics";
 
 const props = defineProps({
   open: {
@@ -953,6 +954,7 @@ const navigateToSpecificTrace = async (traceId: string) => {
     });
     if (win) win.location.href = route.href;
     else window.open(route.href, "_blank");
+    analytics.track("rum_event_trace_opened");
   } finally {
     isResolvingTraceNav.value = false;
   }

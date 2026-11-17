@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { applyPromqlPrefill, defaultAlertValue, formForecastOf } from "@/composables/useAlertForm";
+import {
+  applyMetaSettings,
+  applyPromqlPrefill,
+  defaultAlertValue,
+  formForecastOf,
+} from "@/composables/useAlertForm";
 import { getAlertPayload } from "@/utils/alerts/alertPayload";
 import {
   buildForecastAlertPromql,
@@ -43,6 +48,31 @@ const promqlPrefill = (overrides: Partial<AlertPrefill> = {}): AlertPrefill => (
   promql: "avg(up)",
   warnings: [],
   ...overrides,
+});
+
+describe("applyMetaSettings", () => {
+  it("copies the description and the named destinations once each", () => {
+    const data = applyMetaSettings(defaultAlertValue(), {
+      description: "Created from an AutoObserve suggestion for svc-a on Nov 6.",
+      destinations: ["ops-webhook", "", 3, "ops-webhook"],
+    });
+
+    expect(data.description).toBe("Created from an AutoObserve suggestion for svc-a on Nov 6.");
+    expect(data.destinations).toEqual(["ops-webhook"]);
+  });
+
+  it("leaves the form's own values when meta carries none", () => {
+    const data = applyMetaSettings(
+      { ...defaultAlertValue(), description: "mine", destinations: ["d"] },
+      {
+        destinations: [],
+      },
+    );
+
+    expect(data.description).toBe("mine");
+    expect(data.destinations).toEqual(["d"]);
+    expect(applyMetaSettings(defaultAlertValue(), undefined).destinations).toEqual([]);
+  });
 });
 
 describe("applyPromqlPrefill", () => {

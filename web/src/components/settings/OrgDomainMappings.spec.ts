@@ -26,6 +26,7 @@ const { mockToast, mockConfirm } = vi.hoisted(() => ({
   mockConfirm: vi.fn(),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mockToast }));
 vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: () => ({ confirm: mockConfirm }),
@@ -51,6 +52,7 @@ vi.mock("@/services/organizations", async (importOriginal) => {
 });
 
 import organizations from "@/services/organizations";
+import analytics from "@/services/product_analytics";
 const api = organizations as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 const DialogStub = defineComponent({
@@ -157,6 +159,7 @@ describe("OrgDomainMappings", () => {
     expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
       domain_org_mappings: [existing, childMapping],
     });
+    expect(analytics.track).toHaveBeenCalledWith("org_domain_mappings_saved", { count: 2 });
   });
 
   it("allows one domain to map to several organizations", async () => {
@@ -266,6 +269,9 @@ describe("OrgDomainMappings", () => {
     expect(mockConfirm).toHaveBeenCalled();
     expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
       enforce_allowed_orgs_only: true,
+    });
+    expect(analytics.track).toHaveBeenCalledWith("org_domain_enforcement_updated", {
+      enabled: true,
     });
   });
 

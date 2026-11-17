@@ -111,6 +111,70 @@ function humanize(value: unknown): string {
 // NOTE: keys inside `values` MUST be normalised (lowercase, no separators).
 
 export const BADGE_GROUPS = {
+  versionVerdict: {
+    mode: "plain",
+    values: {
+      ok: { variant: "success-soft", labelKey: "serviceVersions.verdict.ok" },
+      watch: { variant: "warning-soft", labelKey: "serviceVersions.verdict.watch" },
+      regressed: { variant: "error-soft", labelKey: "serviceVersions.verdict.regressed" },
+      insufficient: { variant: "default-soft", labelKey: "serviceVersions.verdict.insufficient" },
+      firstversion: { variant: "default-soft", labelKey: "serviceVersions.verdict.firstVersion" },
+      preexisting: { variant: "default-soft", labelKey: "serviceVersions.verdict.preExisting" },
+      notserving: { variant: "error-outline", labelKey: "serviceVersions.verdict.notServing" },
+      capped: { variant: "default-soft", labelKey: "serviceVersions.verdict.capped" },
+      restricted: { variant: "default-soft", labelKey: "serviceVersions.verdict.restricted" },
+      rollbackrecovered: {
+        variant: "success-soft",
+        labelKey: "serviceVersions.verdict.rollbackRecovered",
+        icon: "undo",
+      },
+      rollbackstillworse: {
+        variant: "warning-soft",
+        labelKey: "serviceVersions.verdict.rollbackStillWorse",
+        icon: "undo",
+      },
+    },
+  },
+  serviceEnvSource: {
+    mode: "plain",
+    values: {
+      attribute: { variant: "default-soft", labelKey: "serviceVersions.env.attribute" },
+      rum: { variant: "default-soft", labelKey: "serviceVersions.env.rum" },
+      override: { variant: "default-soft", labelKey: "serviceVersions.env.override" },
+      namespace: { variant: "default-soft", labelKey: "serviceVersions.env.namespace" },
+      cluster: { variant: "default-soft", labelKey: "serviceVersions.env.cluster" },
+      workload: { variant: "default-soft", labelKey: "serviceVersions.env.workload" },
+      clustername: { variant: "default-soft", labelKey: "serviceVersions.env.clusterName" },
+      namespacename: { variant: "default-soft", labelKey: "serviceVersions.env.namespaceName" },
+      default: { variant: "default-soft", labelKey: "serviceVersions.env.default" },
+    },
+  },
+  cwvBand: {
+    mode: "plain",
+    values: {
+      good: { variant: "success-soft", labelKey: "serviceVersions.compare.cwv.good" },
+      needsimprovement: { variant: "warning-soft", labelKey: "serviceVersions.compare.cwv.ni" },
+      poor: { variant: "error-soft", labelKey: "serviceVersions.compare.cwv.poor" },
+    },
+  },
+  aliasConfidence: {
+    mode: "plain",
+    shape: "rounded",
+    values: {
+      high: { variant: "success-soft", labelKey: "serviceVersions.nameReview.confidence.high" },
+      medium: { variant: "warning-soft", labelKey: "serviceVersions.nameReview.confidence.medium" },
+      low: { variant: "default-soft", labelKey: "serviceVersions.nameReview.confidence.low" },
+    },
+  },
+  aliasStatus: {
+    mode: "plain",
+    values: {
+      proposed: { variant: "blue-soft", labelKey: "serviceVersions.nameReview.status.proposed" },
+      active: { variant: "success-soft", labelKey: "serviceVersions.nameReview.status.active" },
+      rejected: { variant: "default-soft", labelKey: "serviceVersions.nameReview.status.rejected" },
+    },
+  },
+
   // Alerts: scheduled vs real-time vs anomaly — distinct colour + icon.
   alertType: {
     mode: "icon",
@@ -157,6 +221,15 @@ export const BADGE_GROUPS = {
       training: { variant: "warning-soft", labelKey: "components.badge.alertStatus.training" },
       failed: { variant: "error-soft", labelKey: "components.badge.alertStatus.failed" },
       disabled: { variant: "default-soft", labelKey: "components.badge.alertStatus.disabled" },
+      // Expected data states of an anomaly config: enabled and re-evaluated, so never error colours.
+      waitingfordata: {
+        variant: "default-soft",
+        labelKey: "components.badge.alertStatus.waitingForData",
+      },
+      notapplicable: {
+        variant: "default-soft",
+        labelKey: "components.badge.alertStatus.notApplicable",
+      },
       paused: { variant: "warning-soft", labelKey: "components.badge.alertStatus.paused" },
     },
   },
@@ -287,8 +360,32 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       covered: { variant: "success-soft", labelKey: "oncall.coverage_covered" },
-      gap: { variant: "warning-soft", labelKey: "oncall.coverage_gap" },
-      unreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
+      gap: { variant: "error-soft", labelKey: "oncall.coverage_gap" },
+      unreachable: { variant: "warning-soft", labelKey: "oncall.coverage_cantReach" },
+      allunreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // A routing rule's traffic verdict, from `ownership/stats`; never recomputed on the client.
+  oncallRuleHealth: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      active: { variant: "success-soft", labelKey: "oncall.ruleActive" },
+      shadowed: { variant: "warning-soft", labelKey: "oncall.ruleShadowed" },
+      neverused: { variant: "default-soft", labelKey: "oncall.ruleNeverMatchedYet" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Where an unowned signal landed: the catch-all paged somebody, or nobody was paged at all.
+  oncallUnroutedOutcome: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      defaultteam: { variant: "warning-soft", labelKey: "oncall.unroutedFilterDefault" },
+      nobody: { variant: "error-soft", labelKey: "oncall.unroutedPagedNobody" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -538,6 +635,18 @@ export const BADGE_GROUPS = {
       // Synthetics infrastructure error (backend status 4): the probe could not
       // run, which is not the same as the target failing.
       error: { variant: "error-soft", labelKey: "components.badge.serviceStatus.error" },
+      // Synthetics run classes: failing below quorum, not tested by us, or a
+      // config error the owner must fix.
+      partial: { variant: "amber-soft", labelKey: "components.badge.serviceStatus.partial" },
+      // Looked up as "not_measured"; keys are stored normalised.
+      notmeasured: {
+        variant: "default-soft",
+        labelKey: "components.badge.serviceStatus.notMeasured",
+      },
+      misconfigured: {
+        variant: "error-soft",
+        labelKey: "components.badge.serviceStatus.misconfigured",
+      },
       unknown: { variant: "default-soft", labelKey: "common.unknown" },
     },
   },
@@ -1218,6 +1327,8 @@ export const BADGE_GROUPS = {
       container: { variant: "error-soft" },
       application: { variant: "amber-soft" },
       app: { variant: "amber-soft" },
+      where: { variant: "default-soft" },
+      version: { variant: "indigo-soft" },
     },
   },
 
@@ -1452,6 +1563,14 @@ export const BADGE_GROUPS = {
       failed: { variant: "error-soft", labelKey: "components.badge.anomalyStatus.failed" },
       waiting: { variant: "default-soft", labelKey: "components.badge.anomalyStatus.waiting" },
       disabled: { variant: "default-soft", labelKey: "components.badge.anomalyStatus.disabled" },
+      waitingfordata: {
+        variant: "default-soft",
+        labelKey: "components.badge.anomalyStatus.waitingForData",
+      },
+      notapplicable: {
+        variant: "default-soft",
+        labelKey: "components.badge.anomalyStatus.notApplicable",
+      },
     },
   },
 

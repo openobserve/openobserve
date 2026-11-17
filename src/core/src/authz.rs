@@ -24,11 +24,16 @@ use std::sync::{Arc, LazyLock};
 use axum::response::Response;
 #[cfg(feature = "enterprise")]
 use common::meta::http::HttpResponse as MetaHttpResponse;
-#[cfg(any(feature = "enterprise", test))]
-use config::meta::stream::StreamType;
 use config::meta::user::UserRole;
+#[cfg(any(feature = "enterprise", test))]
+use config::meta::{
+    service_streams::{RelatedStreams, StreamInfo},
+    stream::StreamType,
+};
 #[cfg(feature = "enterprise")]
 use db::user::is_root_user;
+#[cfg(any(feature = "enterprise", test))]
+use infra::table::service_streams::ServiceRecord;
 
 use crate::auth::AuthExtractor;
 
@@ -536,6 +541,14 @@ pub async fn check_permissions(
     } else {
         role.to_string()
     };
+    // an unmapped route carries no object; deny without asking OpenFGA, which would log an error
+    if object_str.is_empty() {
+        log::warn!(
+            "permission denied for {user_id}: {} route has no permission mapping",
+            auth_info.method
+        );
+        return false;
+    }
 
     let org_id = &auth_info.org_id;
     let effective_role = if org_id == config::META_ORG_ID {
@@ -755,6 +768,85 @@ pub async fn authorize_with(
     }
 }
 
+/// Keeps, in order, the streams of `org_id` the user can read; an errored check denies. [no-fail]
+#[cfg(any(feature = "enterprise", test))]
+pub async fn readable_related_streams(
+    checker: &dyn StreamAccessChecker,
+    user_id: &str,
+    org_id: &str,
+    streams: RelatedStreams,
+) -> RelatedStreams {
+    let wanted = [
+        (StreamType::Logs, &streams.logs),
+        (StreamType::Traces, &streams.traces),
+        (StreamType::Metrics, &streams.metrics),
+        (StreamType::Profiles, &streams.profiles),
+    ]
+    .into_iter()
+    .flat_map(|(stream_type, list)| {
+        list.iter()
+            .map(move |info| (stream_type, info.stream_name.clone()))
+    })
+    .collect();
+    let Some(readable) = readable_streams(checker, user_id, org_id, wanted).await else {
+        return streams;
+    };
+    let keep = |stream_type: StreamType, list: Vec<StreamInfo>| -> Vec<StreamInfo> {
+        list.into_iter()
+            .filter(|info| readable.contains(&(stream_type, info.stream_name.clone())))
+            .collect()
+    };
+    let RelatedStreams {
+        logs,
+        traces,
+        metrics,
+        profiles,
+    } = streams;
+    RelatedStreams {
+        logs: keep(StreamType::Logs, logs),
+        traces: keep(StreamType::Traces, traces),
+        metrics: keep(StreamType::Metrics, metrics),
+        profiles: keep(StreamType::Profiles, profiles),
+    }
+}
+
+/// Keeps the services with a stream the user can read, each listing only those streams. [no-fail]
+#[cfg(any(feature = "enterprise", test))]
+pub async fn readable_service_records(
+    checker: &dyn StreamAccessChecker,
+    user_id: &str,
+    org_id: &str,
+    mut records: Vec<ServiceRecord>,
+) -> Vec<ServiceRecord> {
+    let mut wanted = HashSet::new();
+    for record in &mut records {
+        for (stream_type, list) in service_record_streams(record) {
+            let names = list.as_array().into_iter().flatten();
+            wanted.extend(names.filter_map(|v| v.as_str().map(|n| (stream_type, n.to_string()))));
+        }
+    }
+    let Some(readable) = readable_streams(checker, user_id, org_id, wanted).await else {
+        return records;
+    };
+    records
+        .into_iter()
+        .filter_map(|mut record| {
+            let mut any_left = false;
+            for (stream_type, list) in service_record_streams(&mut record) {
+                let Some(items) = list.as_array_mut() else {
+                    continue;
+                };
+                items.retain(|v| {
+                    v.as_str()
+                        .is_some_and(|n| readable.contains(&(stream_type, n.to_string())))
+                });
+                any_left |= !items.is_empty();
+            }
+            any_left.then_some(record)
+        })
+        .collect()
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn authorize_query_sources(
     user_id: &str,
@@ -868,6 +960,49 @@ async fn cipher_key_allowed(
         user.is_external,
     )
     .await
+}
+
+/// The streams of `org_id` the user can read, or `None` when RBAC lets them read every stream.
+#[cfg(any(feature = "enterprise", test))]
+async fn readable_streams(
+    checker: &dyn StreamAccessChecker,
+    user_id: &str,
+    org_id: &str,
+    streams: HashSet<(StreamType, String)>,
+) -> Option<HashSet<(StreamType, String)>> {
+    use futures::stream::StreamExt;
+
+    if !checker.enforces_rbac().await
+        || checker.is_root(user_id).await
+        || checker.is_root_or_admin(org_id, user_id).await
+    {
+        return None;
+    }
+    let readable = futures::stream::iter(streams)
+        .map(|(stream_type, name)| async move {
+            let stream = TypedStream {
+                org_id: org_id.to_string(),
+                stream_type,
+                name,
+            };
+            let allowed = checker.can_read_stream(user_id, &stream).await;
+            allowed.then_some((stream.stream_type, stream.name))
+        })
+        .buffer_unordered(16)
+        .filter_map(std::future::ready)
+        .collect()
+        .await;
+    Some(readable)
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn service_record_streams(record: &mut ServiceRecord) -> [(StreamType, &mut serde_json::Value); 4] {
+    [
+        (StreamType::Logs, &mut record.logs_streams),
+        (StreamType::Traces, &mut record.traces_streams),
+        (StreamType::Metrics, &mut record.metrics_streams),
+        (StreamType::Profiles, &mut record.profiles_streams),
+    ]
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -984,6 +1119,7 @@ mod tests {
         roots: HashSet<String>,
         admins: HashSet<(String, String)>,
         readable: HashSet<(String, String)>,
+        stream_checks: std::sync::atomic::AtomicUsize,
     }
 
     impl FakeChecker {
@@ -1014,6 +1150,8 @@ mod tests {
         }
 
         async fn can_read_stream(&self, user_id: &str, stream: &TypedStream) -> bool {
+            self.stream_checks
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let key = format!("{}/{}/{}", stream.org_id, stream.stream_type, stream.name);
             self.readable.contains(&(user_id.to_string(), key))
         }
@@ -1036,6 +1174,8 @@ mod tests {
             ))
         }
     }
+
+    type ServiceView = Vec<(String, Vec<serde_json::Value>)>;
 
     fn sql(org: &str, text: &str) -> QuerySource {
         QuerySource::Sql {
@@ -1350,6 +1490,217 @@ mod tests {
         ] {
             assert!(!code.contains(needle), "authz.rs calls {needle}");
         }
+    }
+
+    fn related(logs: &[&str], traces: &[&str], metrics: &[&str]) -> RelatedStreams {
+        let infos = |names: &[&str]| -> Vec<StreamInfo> {
+            names
+                .iter()
+                .map(|n| StreamInfo::new(n.to_string()))
+                .collect()
+        };
+        RelatedStreams {
+            logs: infos(logs),
+            traces: infos(traces),
+            metrics: infos(metrics),
+            profiles: infos(&["profile_a"]),
+        }
+    }
+
+    fn related_names(streams: &RelatedStreams) -> [Vec<&str>; 4] {
+        fn names(list: &[StreamInfo]) -> Vec<&str> {
+            list.iter().map(|s| s.stream_name.as_str()).collect()
+        }
+        [
+            names(&streams.logs),
+            names(&streams.traces),
+            names(&streams.metrics),
+            names(&streams.profiles),
+        ]
+    }
+
+    #[tokio::test]
+    async fn related_streams_keep_only_what_the_user_reads_by_list_type() {
+        let all = || related(&["prod_data", "prod_data_uk"], &["prod_data_uk"], &["cpu"]);
+        let mut root = FakeChecker::default();
+        root.roots.insert("u1".to_string());
+        let rbac_off = FakeChecker {
+            rbac_off: true,
+            ..FakeChecker::default()
+        };
+        let cases: [(&str, FakeChecker, [Vec<&str>; 4]); 6] = [
+            (
+                "mixed access",
+                FakeChecker::default()
+                    .reads("u1", "o1/logs/prod_data_uk")
+                    .reads("u1", "o1/logs/cpu")
+                    .reads("u1", "o2/traces/prod_data_uk"),
+                [vec!["prod_data_uk"], vec![], vec![], vec![]],
+            ),
+            (
+                "no access",
+                FakeChecker::default(),
+                [vec![], vec![], vec![], vec![]],
+            ),
+            (
+                "rbac off",
+                rbac_off,
+                [
+                    vec!["prod_data", "prod_data_uk"],
+                    vec!["prod_data_uk"],
+                    vec!["cpu"],
+                    vec!["profile_a"],
+                ],
+            ),
+            (
+                "root",
+                root,
+                [
+                    vec!["prod_data", "prod_data_uk"],
+                    vec!["prod_data_uk"],
+                    vec!["cpu"],
+                    vec!["profile_a"],
+                ],
+            ),
+            (
+                "org admin",
+                FakeChecker::default().admin("u1", "o1"),
+                [
+                    vec!["prod_data", "prod_data_uk"],
+                    vec!["prod_data_uk"],
+                    vec!["cpu"],
+                    vec!["profile_a"],
+                ],
+            ),
+            (
+                "admin of another org",
+                FakeChecker::default().admin("u1", "o2"),
+                [vec![], vec![], vec![], vec![]],
+            ),
+        ];
+        for (case, checker, expected) in cases {
+            let kept = readable_related_streams(&checker, "u1", "o1", all()).await;
+            assert_eq!(related_names(&kept), expected, "{case}");
+        }
+    }
+
+    #[tokio::test]
+    async fn related_streams_keep_their_order_past_the_concurrency_limit() {
+        let names: Vec<String> = (0..40).map(|i| format!("s{i:02}")).collect();
+        let checker = names
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| i % 3 != 0)
+            .fold(FakeChecker::default(), |c, (_, n)| {
+                c.reads("u1", &format!("o1/logs/{n}"))
+            });
+        let streams = RelatedStreams {
+            logs: names
+                .iter()
+                .rev()
+                .map(|n| StreamInfo::new(n.clone()))
+                .collect(),
+            traces: vec![],
+            metrics: vec![],
+            profiles: vec![],
+        };
+        let kept = readable_related_streams(&checker, "u1", "o1", streams).await;
+        let expected: Vec<&str> = names
+            .iter()
+            .enumerate()
+            .rev()
+            .filter(|(i, _)| i % 3 != 0)
+            .map(|(_, n)| n.as_str())
+            .collect();
+        assert_eq!(related_names(&kept)[0], expected);
+    }
+
+    fn service(name: &str, logs: &[&str], traces: &[&str]) -> ServiceRecord {
+        let mut record = ServiceRecord::new("o1", name, "default", serde_json::json!({}));
+        record.logs_streams = serde_json::json!(logs);
+        record.traces_streams = serde_json::json!(traces);
+        record.metrics_streams = serde_json::json!(["cpu"]);
+        record
+    }
+
+    fn service_names(records: &[ServiceRecord]) -> ServiceView {
+        records
+            .iter()
+            .map(|r| {
+                let streams = [&r.logs_streams, &r.traces_streams, &r.metrics_streams];
+                let streams = streams.into_iter().cloned().collect();
+                (r.service_name.clone(), streams)
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn service_records_keep_only_readable_streams_and_drop_emptied_services() {
+        let all = || {
+            vec![
+                service(
+                    "checkout",
+                    &["prod_data", "prod_data_uk"],
+                    &["prod_data_uk"],
+                ),
+                service("billing", &["prod_data_bk"], &[]),
+            ]
+        };
+        let untouched = service_names(&all());
+        let cases: [(&str, FakeChecker, ServiceView); 5] = [
+            (
+                "mixed access",
+                FakeChecker::default()
+                    .reads("u1", "o1/logs/prod_data_uk")
+                    .reads("u1", "o1/logs/cpu"),
+                vec![(
+                    "checkout".to_string(),
+                    vec![
+                        serde_json::json!(["prod_data_uk"]),
+                        serde_json::json!([]),
+                        serde_json::json!([]),
+                    ],
+                )],
+            ),
+            ("no access", FakeChecker::default(), vec![]),
+            (
+                "rbac off",
+                FakeChecker {
+                    rbac_off: true,
+                    ..FakeChecker::default()
+                },
+                untouched.clone(),
+            ),
+            (
+                "org admin",
+                FakeChecker::default().admin("u1", "o1"),
+                untouched.clone(),
+            ),
+            (
+                "admin of another org",
+                FakeChecker::default().admin("u1", "o2"),
+                vec![],
+            ),
+        ];
+        for (case, checker, expected) in cases {
+            let kept = readable_service_records(&checker, "u1", "o1", all()).await;
+            assert_eq!(service_names(&kept), expected, "{case}");
+        }
+    }
+
+    #[tokio::test]
+    async fn service_records_check_each_shared_stream_once() {
+        let checker = FakeChecker::default().reads("u1", "o1/metrics/cpu");
+        let records = vec![
+            service("a", &["shared"], &["shared"]),
+            service("b", &["shared"], &[]),
+        ];
+        let kept = readable_service_records(&checker, "u1", "o1", records).await;
+        assert_eq!(kept.len(), 2);
+        let checks = checker
+            .stream_checks
+            .load(std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(checks, 3, "logs/shared, traces/shared and metrics/cpu");
     }
 
     #[cfg(feature = "enterprise")]

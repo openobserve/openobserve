@@ -54,6 +54,7 @@ fn definition(id: &str, org: &str, name: &str) -> alert_composites::ActiveModel 
         updated_at: Set(None),
         evaluation_generation: Set(0),
         pending_period_sec: Set(0),
+        incident_title_template: Set(None),
     }
 }
 
@@ -163,6 +164,7 @@ async fn migration_creates_only_v1_tables_indexes_and_claim_epoch() {
         "updated_at",
         "evaluation_generation",
         "pending_period_sec",
+        "incident_title_template",
     ]
     .into_iter()
     .map(str::to_string)

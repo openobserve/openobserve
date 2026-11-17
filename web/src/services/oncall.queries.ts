@@ -18,6 +18,10 @@ import oncallService, { RESPONSE_PAGE_LIMIT } from "./oncall";
 import { incidentKeys } from "./incidents.querykeys";
 import { oneAckScopes } from "./alerts.querykeys";
 import { oncallKeys } from "./oncall.querykeys";
+import { configKeys } from "./config.querykeys";
+import { configFullQuery } from "./config.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import store from "@/stores";
 import {
   LIVE_STALE_TIME,
   MEDIUM_STALE_TIME,
@@ -545,15 +549,36 @@ const teamWriteScopes = (org: string, teamId: string) => [
   oncallKeys.myAll(org),
 ];
 
+// Alert forms read `incidents_page_oncall` from the store's copy of the org config, which a team write changes.
+const reloadOrgConfig = (org: string) =>
+  queryClient
+    .fetchQuery(configFullQuery(org))
+    .then((data) => {
+      if (store.state.selectedOrganization?.identifier === org) store.dispatch("setConfig", data);
+    })
+    .catch(() => undefined);
+
+/** Reads the org's teams and config afresh, for a page waiting on a team set up in another tab. */
+export const recheckOncallReach = async (org: string) => {
+  await queryClient.invalidateQueries({ queryKey: oncallKeys.teamsAll(org) });
+  return queryClient.fetchQuery({ ...configFullQuery(org), staleTime: 0 });
+};
+
 export const createTeamMutation = (org: string) =>
   mutationOptions({
     mutationFn: (data: { name: string; timezone: string; description?: string | null }) =>
       oncallService.createTeam({ org_identifier: org, data }),
-    // A new team starts unstaffed, so it is part of the coverage answer at once.
+    // A new team starts unstaffed, so it is part of the coverage answer at once; the first one lets incidents page.
     meta: {
-      invalidates: [oncallKeys.teamsAll(org), oncallKeys.coverageGaps(org), oncallKeys.myAll(org)],
+      invalidates: [
+        oncallKeys.teamsAll(org),
+        oncallKeys.coverageGaps(org),
+        oncallKeys.myAll(org),
+        configKeys.full(org),
+      ],
       silentError: true,
     },
+    onSuccess: () => reloadOrgConfig(org),
   });
 
 /** The timezone moves every resolved shift, and the name is echoed by the coverage, my-on-call and routing-config answers. */
@@ -577,7 +602,8 @@ export const deleteTeamMutation = (org: string) =>
   mutationOptions({
     mutationFn: (teamId: string) =>
       oncallService.deleteTeam({ org_identifier: org, team_id: teamId }),
-    meta: { invalidates: [oncallKeys.all(org)], silentError: true },
+    meta: { invalidates: [oncallKeys.all(org), configKeys.full(org)], silentError: true },
+    onSuccess: () => reloadOrgConfig(org),
   });
 
 export const addTeamMembersMutation = (org: string, teamId: string) =>

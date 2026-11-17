@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             :placeholder="filter.placeholder"
             :data-test="`dbm-queries-filter-${filter.key}`"
-            @update:model-value="filter.onChange"
+            @update:model-value="(value: unknown) => onFilterChange(filter, value)"
           />
         </div>
 
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :remove-label="t('dbm.filters.removeScope')"
           :remove-data-test="`dbm-queries-scope-chip-${filter.key}-remove`"
           :data-test="`dbm-queries-scope-chip-${filter.key}`"
-          @remove="filter.onChange(null)"
+          @remove="onFilterChange(filter, null)"
         />
       </span>
 
@@ -142,6 +142,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 /** One scope dimension: its current value, the values available, and its setter. */
@@ -183,4 +184,9 @@ const open = ref(false);
 
 const activeFilters = computed(() => props.filters.filter((f) => !!f.value));
 const activeCount = computed(() => activeFilters.value.length);
+
+const onFilterChange = (filter: DbmScopeFilter, value: unknown) => {
+  filter.onChange(value);
+  analytics.track("dbm_filter_applied", { dimension: filter.key, cleared: !value });
+};
 </script>

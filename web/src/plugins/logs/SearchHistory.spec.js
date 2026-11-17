@@ -5,6 +5,9 @@ import SearchHistory from "./SearchHistory.vue";
 import searchService from "@/services/search";
 import { useRouter, useRoute } from "vue-router";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock Toast
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -420,6 +423,10 @@ describe("SearchHistory Component", () => {
 
       await wrapper.vm.goToLogs(mockTracesRow);
 
+      expect(analytics.track).toHaveBeenCalledWith("search_history_query_reapplied", {
+        stream_type: "traces",
+        has_function: false,
+      });
       expect(routerPushMock).toHaveBeenCalledWith(
         expect.objectContaining({
           path: "/logs",

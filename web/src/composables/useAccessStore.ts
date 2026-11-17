@@ -197,6 +197,7 @@ const ROUTE_NAME_KEYS: Record<string, I18nKey> = {
   downtime_folders: "accessBoundary.resources.downtimeFolders",
   settings: "accessBoundary.resources.settings",
   db_monitoring: "accessBoundary.resources.databaseMonitoring",
+  security: "accessBoundary.resources.security",
   oncall: "accessBoundary.resources.onCall",
   oncall_responses: "accessBoundary.resources.onCallResponses",
   synthetic_folder: "accessBoundary.resources.syntheticFolders",
@@ -507,6 +508,40 @@ const ROUTE_OVERRIDES: RouteOverride[] = [
     path: /^\/[^/]+\/org_cleanup_tasks\/[^/]+\/retry$/,
     resource: null,
     permissions: { POST: "create" },
+  },
+  {
+    path: /^\/[^/]+\/security\/(?:intel\/(?:sweep|sightings|validate)|entities(?:\/(?:graph|detail))?|ueba|events\/search|sigma\/compile|sources\/match|detections\/preview)$/,
+    resource: "security",
+    permissions: { POST: "get" },
+  },
+  // The server checks a case write as triage (PUT) and a detach as admin (DELETE).
+  {
+    path: /^\/[^/]+\/security\/cases(?:\/(?:bulk|merge))?$/,
+    resource: "security",
+    permissions: { POST: "update" },
+  },
+  // "Suppress similar" is checked as triage; only longer or every-detection ones need authoring.
+  {
+    path: /^\/[^/]+\/security\/suppressions$/,
+    resource: "security",
+    permissions: { POST: "update" },
+  },
+  // Editing a detection, an exception or an allowlist is authoring, checked as POST, not triage PUT.
+  {
+    path: /^\/[^/]+\/security\/(?:detections\/[^/]+(?:\/exceptions\/[^/]+)?|allowlists\/[^/]+)$/,
+    resource: "security",
+    permissions: { PUT: "create", DELETE: "delete" },
+  },
+  {
+    path: /^\/[^/]+\/security\/sources\/[^/]+\/detach$/,
+    resource: "security",
+    permissions: { POST: "delete" },
+  },
+  // Any other Security POST is authoring, which a different preset grants than PUT triage.
+  {
+    path: /^\/[^/]+\/security\//,
+    resource: "security",
+    permissions: { GET: "get", POST: "create", PUT: "update", DELETE: "delete" },
   },
   {
     path: new RegExp(`^/[^/]+/db_monitoring/(?:${DB_MONITORING_ENDPOINTS})$`),
@@ -879,6 +914,8 @@ export function recordForbidden({ url, method, routeKey: stamp }: AccessRequest)
   if (isBackground(verb, url)) return;
   const route = currentRoute.value;
   if (!route) return;
+  // Security pages read their sources through Security routes, so the shell's stream list is not theirs.
+  if (route.path.startsWith("/security") && isStreamList(verb, url)) return;
   const key = routeKey(route);
   // A response from a page the user has already left says nothing about the page now on screen.
   if (!stampedHere(stamp, key)) return;
@@ -1596,6 +1633,16 @@ function isKnownResource(path: string): boolean {
 
 function resolveAlias(path: string): string {
   return Object.hasOwn(RESOURCE_ALIASES, path) ? RESOURCE_ALIASES[path] : path;
+}
+
+function isStreamList(verb: string, url: string): boolean {
+  if (verb !== "GET") return false;
+  try {
+    const segments = apiSegments(new URL(url, "http://localhost").pathname);
+    return segments.length === 2 && segments[1] === "streams";
+  } catch {
+    return false;
+  }
 }
 
 function isBackground(verb: string, url: string): boolean {

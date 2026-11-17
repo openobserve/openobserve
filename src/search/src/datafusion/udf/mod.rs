@@ -15,29 +15,15 @@
 
 use config::{meta::function::ZoFunction, utils::json};
 
-pub mod arr_descending_udf;
-pub mod arrcount_udf;
-pub mod arrindex_udf;
-pub mod arrjoin_udf;
-pub mod arrsort_udf;
-pub mod arrzip_udf;
-pub mod cast_to_arr_udf;
-pub mod cast_to_timestamp_udf;
+pub mod array;
 #[cfg(feature = "enterprise")]
 pub mod cipher_udf;
-pub mod date_format_udf;
 pub mod fold_native_frames_udf;
-pub mod fuzzy_match_udf;
-pub mod histogram_udf;
-pub mod match_all_hash_udf;
-pub mod match_all_udf;
-pub mod regexp_matches_udf;
-pub mod regexp_udf;
+pub mod fulltext;
+pub mod ip;
+pub mod regex;
 pub mod spath_udf;
-pub mod str_match_udf;
-pub mod string_to_array_v2_udf;
-pub mod time_range_udf;
-pub mod to_arr_string_udf;
+pub mod time;
 pub mod transform_udf;
 
 /// The name of the str_match UDF given to DataFusion.
@@ -57,7 +43,7 @@ pub const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
 /// The name of the regex_matches UDF given to DataFusion.
 pub const REGEX_MATCHES_UDF_NAME: &str = "re_matches";
 
-pub const DEFAULT_FUNCTIONS: [ZoFunction; 11] = [
+pub const DEFAULT_FUNCTIONS: [ZoFunction; 16] = [
     ZoFunction {
         name: "match_all",
         text: "match_all('v')",
@@ -99,8 +85,28 @@ pub const DEFAULT_FUNCTIONS: [ZoFunction; 11] = [
         text: "re_matches(field, 'pattern')",
     },
     ZoFunction {
-        name: cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF_NAME,
+        name: time::cast_to_timestamp::CAST_TO_TIMESTAMP_UDF_NAME,
         text: "cast_to_timestamp('pattern')",
+    },
+    ZoFunction {
+        name: ip::ip_cidr_contains::IP_CIDR_CONTAINS_UDF_NAME,
+        text: "ip_cidr_contains('10.0.0.0/8', field)",
+    },
+    ZoFunction {
+        name: ip::ip_subnet::IP_SUBNET_UDF_NAME,
+        text: "ip_subnet(field, '/24', '/64')",
+    },
+    ZoFunction {
+        name: ip::is_ipv4::IS_IPV4_UDF_NAME,
+        text: "is_ipv4(field)",
+    },
+    ZoFunction {
+        name: ip::is_ipv6::IS_IPV6_UDF_NAME,
+        text: "is_ipv6(field)",
+    },
+    ZoFunction {
+        name: ip::is_private_ip::IS_PRIVATE_IP_UDF_NAME,
+        text: "is_private_ip(field)",
     },
 ];
 

@@ -36,6 +36,7 @@ use config::{
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
         slack::DisabledReason,
+        stream::DataRetentionDefaults,
         user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
@@ -65,8 +66,9 @@ use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
     audit::audit,
+    axum::{Extension, http::HeaderMap},
     common::utils::jwt::verify_decode_token,
-    config::{ider, utils::time::now_micros},
+    config::{axum::middlewares::RealIp, ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
@@ -132,6 +134,13 @@ const LOGIN_STATE_COOKIE: &str = "o2_login_state";
 #[cfg(feature = "enterprise")]
 const LOGIN_STATE_MAX_AGE_SECS: i64 = 600;
 
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LoginStateFailure {
+    Invalid { clear_cookie: bool },
+    StoreFailure,
+}
+
 #[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
     status: String,
@@ -145,7 +154,7 @@ pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
 }
 
 /// Authenticated full UI configuration (`GET /api/{org_id}/config`).
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct ConfigResponse<'a> {
     version: String,
     commit_hash: String,
@@ -160,8 +169,11 @@ struct ConfigResponse<'a> {
     sql_base64_enabled: bool,
     timestamp_column: String,
     data_retention_days: i64,
+    data_retention_defaults: DataRetentionDefaults,
+    resolved_data_retention: DataRetentionDefaults,
     extended_data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
+    sample_data_onboarding_enabled: bool,
     sso_enabled: bool,
     native_login_enabled: bool,
     service_account_enabled: bool,
@@ -240,6 +252,8 @@ struct ConfigResponse<'a> {
     /// The clamped operator refresh floor; the share form shows each range's floor from it.
     public_dashboard_min_refresh_secs: u32,
     oncall_enabled: bool,
+    /// Per org: an incident-only alert reaches a person, so on-call is on and the org has a team.
+    incidents_page_oncall: bool,
     slack_enabled: bool,
     /// The same reason for every org, null when on.
     slack_disabled_reason: Option<DisabledReason>,
@@ -255,6 +269,8 @@ struct ConfigResponse<'a> {
     query_history_enabled: bool,
     /// Days unstarred recent searches are kept; 0 or less keeps them until the per-page cap.
     query_history_retention_days: i64,
+    /// Days alert level changes are kept; 0 or less keeps them all.
+    alert_transitions_retention_days: i64,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -279,7 +295,7 @@ struct ConfigResponse<'a> {
 }
 
 #[cfg(feature = "enterprise")]
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct LicenseConfig {
     license_expiry: i64,
     license_server_url: String,
@@ -292,7 +308,7 @@ struct LicenseConfig {
 
 /// Cloud never shows the license search banner, so it does not serve these fields.
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct LicenseSearchConfig {
     license_search_allowed: bool,
     license_waiver_until: Option<i64>,
@@ -319,7 +335,7 @@ impl LicenseSearchConfig {
 struct ConfigBootstrapResponse {
     /// `enterprise` / `cloud` / `opensource`; the o2 CLI and o2-operator read it here.
     build_type: String,
-    /// The UI's stale-build checker compares it across deploys.
+    /// [`config::build_fingerprint`], not the commit: the UI's stale-build checker compares it.
     commit_hash: String,
     telemetry_enabled: bool,
     sso_enabled: bool,
@@ -332,7 +348,8 @@ struct ConfigBootstrapResponse {
     editor_suggest_mode: String,
 }
 
-#[derive(Serialize, serde::Deserialize)]
+#[derive(Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[schema(as = RumConfig)]
 struct Rum {
     pub enabled: bool,
     pub client_token: String,
@@ -377,6 +394,7 @@ impl Rum {
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"}))
     ),
+    security(),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
@@ -463,7 +481,7 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
 
     axum::Json(ConfigBootstrapResponse {
         build_type: build_type.to_string(),
-        commit_hash: config::COMMIT_HASH.to_string(),
+        commit_hash: config::build_fingerprint(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         sso_enabled,
         native_login_enabled,
@@ -488,7 +506,7 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = ConfigResponse<'static>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
@@ -503,7 +521,9 @@ pub async fn zo_config(
 
     // per-user value: false unless this caller may use the search inspector
     let search_inspector_enabled = match &user_email {
-        Some(Headers(user)) => search_inspector_permitted(&org_id, &user.user_id).await,
+        Some(Headers(user)) => {
+            search_inspector_for_edition(search_inspector_permitted(&org_id, &user.user_id).await)
+        }
         None => false,
     };
     let is_org_admin = match &user_email {
@@ -589,6 +609,7 @@ pub async fn zo_config(
         false,
         o2cfg.oncall.enabled && check_features(&[Feature::Oncall])
     );
+    let incidents_page_oncall = enterprise_value!(false, incidents_page_oncall(&org_id).await);
     let slack_disabled_reason = enterprise_value!(
         Some(DisabledReason::Edition),
         o2_enterprise::enterprise::slack::disabled_reason(&org_id)
@@ -670,7 +691,10 @@ pub async fn zo_config(
         .filter_map(|(key, gate)| Some((key.clone(), gate.display_name.clone()?)))
         .collect();
     #[cfg(not(feature = "enterprise"))]
-    let feature_names: HashMap<String, String> = HashMap::new();
+    let feature_names: HashMap<String, String> = featuremap
+        .keys()
+        .map(|f| (<&str>::from(*f).to_string(), f.display_name().to_string()))
+        .collect();
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -692,8 +716,13 @@ pub async fn zo_config(
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
         timestamp_column: TIMESTAMP_COL_NAME.to_string(),
         data_retention_days: cfg.compact.data_retention_days,
+        data_retention_defaults: db::organization::resolved_retention_defaults(
+            &DataRetentionDefaults::default(),
+        ),
+        resolved_data_retention: org_resolved_retention(&org_id).await,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
+        sample_data_onboarding_enabled: cfg.common.sample_data_onboarding_enabled,
         sso_enabled,
         native_login_enabled,
         service_account_enabled,
@@ -762,6 +791,7 @@ pub async fn zo_config(
         public_dashboards_enabled: cfg.public_dashboards.enabled,
         public_dashboard_min_refresh_secs: cfg.public_dashboards.min_refresh_secs,
         oncall_enabled,
+        incidents_page_oncall,
         slack_enabled: slack_disabled_reason.is_none(),
         slack_disabled_reason,
         synthetics_private_locations_enabled,
@@ -770,6 +800,7 @@ pub async fn zo_config(
         database_monitoring_enabled: cfg.db_monitoring.enabled,
         query_history_enabled: cfg.limit.query_history_enabled,
         query_history_retention_days: cfg.limit.query_history_retention_days,
+        alert_transitions_retention_days: transitions_retention_days(&cfg),
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
@@ -810,6 +841,28 @@ async fn license_config(license_server_url: String) -> LicenseConfig {
     }
 }
 
+// A failed team read says no one is paged: a false gap is visible, a hidden one is not.
+#[cfg(feature = "enterprise")]
+async fn incidents_page_oncall(org_id: &str) -> bool {
+    o2_enterprise::enterprise::oncall::incidents_page_oncall_for(org_id)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[CONFIG] org {org_id}: could not read on-call teams: {e}");
+            false
+        })
+}
+
+// Every org member reads this response, unlike org settings, so stream pages can rely on it.
+async fn org_resolved_retention(org_id: &str) -> DataRetentionDefaults {
+    let org = db::organization::org_retention_defaults(org_id)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[RETENTION] org {org_id} settings unreadable for config: {e}");
+            DataRetentionDefaults::default()
+        });
+    db::organization::resolved_retention_defaults(&org)
+}
+
 /// The route check of `GET /{org}/search/profile`, so the UI hides what the caller may not use.
 async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
     if !get_config().common.search_inspector_enabled {
@@ -842,11 +895,25 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
     .await
 }
 
+/// The search inspector is enterprise-only, so OSS never offers it even to root.
+fn search_inspector_for_edition(permitted: bool) -> bool {
+    cfg!(feature = "enterprise") && permitted
+}
+
 async fn org_admin(org_id: &str, user_id: &str) -> bool {
     is_root_user(user_id)
         || openobserve_core::users::get_user(Some(org_id), user_id)
             .await
             .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
+}
+
+/// Only enterprise builds run the transitions reaper; 0 tells the UI nothing is ever dropped.
+fn transitions_retention_days(cfg: &Config) -> i64 {
+    if cfg!(feature = "enterprise") {
+        cfg.limit.alert_transitions_retention_days
+    } else {
+        0
+    }
 }
 
 pub async fn cache_status() -> impl IntoResponse {
@@ -1173,6 +1240,8 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
     // Audit this event
     #[cfg(feature = "enterprise")]
     audit(AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: user_id.to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1278,24 +1347,19 @@ async fn get_stream_schema_status() -> (usize, usize) {
 #[cfg(feature = "enterprise")]
 pub async fn redirect(
     cookies: CookieJar,
+    headers: HeaderMap,
+    real_ip: Option<Extension<RealIp>>,
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use common::meta::user::AuthTokens;
     use config::meta::user::UserRole;
-    use itertools::Itertools;
 
-    let code = match query.get("code") {
-        Some(code) => code,
-        None => {
-            return Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::from("no code in request"))
-                .unwrap();
-        }
-    };
-    let query_string = query.iter().map(|(k, v)| format!("{k}={v}")).join("&");
+    use crate::request::{LoginFailure, audit_login_failure};
+
     let mut audit_message = AuditMessage {
+        login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+        user_agent: super::users::login_user_agent(&headers),
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1304,7 +1368,7 @@ pub async fn redirect(
             http_method: "GET".to_string(),
             http_path: "/config/redirect".to_string(),
             http_body: "".to_string(),
-            http_query_params: query_string,
+            http_query_params: String::new(),
             http_response_code: 302,
             error_msg: None,
             trace_id: None,
@@ -1315,16 +1379,28 @@ pub async fn redirect(
     };
 
     let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
-    if let Err(msg) = consume_login_state(query.get("state"), state_cookie).await {
-        audit_message.response_meta.http_response_code = 400;
-        audit(audit_message).await;
-        return Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(Body::from(msg))
-            .unwrap();
-    }
-
-    log::info!("entering exchange_code: {code}");
+    let state = match validate_login_state(query.get("state"), state_cookie).await {
+        Ok(state) => state,
+        Err(failure) => {
+            let response = login_state_failure_response(failure, &get_config());
+            let reason = match failure {
+                LoginStateFailure::Invalid { .. } => LoginFailure::InvalidLoginState,
+                LoginStateFailure::StoreFailure => LoginFailure::LoginStateStoreFailed,
+            };
+            audit_login_failure(audit_message, reason, response.status()).await;
+            return response;
+        }
+    };
+    let code = match query.get("code") {
+        Some(code) => code,
+        None => {
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("no code in request"))
+                .unwrap();
+        }
+    };
+    let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, state).await;
 
     match exchange_code(code).await {
         Ok(login_data) => {
@@ -1340,6 +1416,7 @@ pub async fn redirect(
             let id_token;
             let login_url = match token_ver {
                 Ok(res) => {
+                    audit_message.user_email = res.0.user_email.clone();
                     // check for service accounts , do not to allow login
                     if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
                         && db_user
@@ -1362,9 +1439,12 @@ pub async fn redirect(
                     {
                         Ok(allowed) => {
                             if !allowed {
-                                audit_message.response_meta.http_response_code = 403;
-                                audit_message._timestamp = now_micros();
-                                audit(audit_message).await;
+                                audit_login_failure(
+                                    audit_message,
+                                    LoginFailure::LoginPolicyDenied,
+                                    StatusCode::UNAUTHORIZED,
+                                )
+                                .await;
                                 return Response::builder()
                                     .status(StatusCode::UNAUTHORIZED)
                                     .header(header::CONTENT_TYPE, "application/json")
@@ -1379,7 +1459,6 @@ pub async fn redirect(
                         }
                     }
 
-                    audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
                         "name": res.0.user_name,
@@ -1409,9 +1488,12 @@ pub async fn redirect(
                     )
                 }
                 Err(e) => {
-                    audit_message.response_meta.http_response_code = 400;
-                    audit_message._timestamp = now_micros();
-                    audit(audit_message).await;
+                    audit_login_failure(
+                        audit_message,
+                        LoginFailure::TokenValidationFailed,
+                        StatusCode::UNAUTHORIZED,
+                    )
+                    .await;
                     return Response::builder()
                         .status(StatusCode::UNAUTHORIZED)
                         .header(header::CONTENT_TYPE, "application/json")
@@ -1424,9 +1506,12 @@ pub async fn redirect(
             let session_id = ider::uuid();
 
             if access_token.is_empty() {
-                audit_message.response_meta.http_response_code = 400;
-                audit_message._timestamp = now_micros();
-                audit(audit_message).await;
+                audit_login_failure(
+                    audit_message,
+                    LoginFailure::TokenValidationFailed,
+                    StatusCode::UNAUTHORIZED,
+                )
+                .await;
                 return Response::builder()
                     .status(StatusCode::UNAUTHORIZED)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -1484,9 +1569,12 @@ pub async fn redirect(
                 .unwrap()
         }
         Err(e) => {
-            audit_message.response_meta.http_response_code = 400;
-            audit_message._timestamp = now_micros();
-            audit(audit_message).await;
+            audit_login_failure(
+                audit_message,
+                LoginFailure::TokenExchangeFailed,
+                StatusCode::UNAUTHORIZED,
+            )
+            .await;
             Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -1508,12 +1596,8 @@ pub async fn dex_login() -> impl IntoResponse {
 
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state.clone();
-    let _ = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
-
-    with_login_state_cookie(
-        common::meta::http::HttpResponse::json(login_data.url),
-        &state,
-    )
+    let saved = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
+    dex_login_saved_response(&login_data.url, &state, saved)
 }
 
 /// Binds the login `state` to this browser so `/config/redirect` rejects a code started elsewhere.
@@ -1549,6 +1633,8 @@ pub async fn refresh_token_with_dex(
         .collect::<Vec<_>>()
         .join("&");
     let mut audit_message = AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1784,22 +1870,98 @@ fn login_state_matches(cookie: Option<&str>, state: &str) -> bool {
 }
 
 #[cfg(feature = "enterprise")]
-async fn consume_login_state(
-    state: Option<&String>,
+fn classify_login_state(
+    state: Option<&str>,
     cookie: Option<&str>,
-) -> Result<(), &'static str> {
+    saved: Result<Option<&[u8]>, ()>,
+) -> Result<(), LoginStateFailure> {
     let Some(state) = state else {
-        return Err("no state in request");
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
     };
-    if !login_state_matches(cookie, state)
-        || openobserve_core::kv::get(PKCE_STATE_ORG, state)
-            .await
-            .is_err()
-    {
-        return Err("invalid state in request");
+    if !login_state_matches(cookie, state) {
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
     }
-    let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, state).await;
-    Ok(())
+    match saved {
+        Ok(Some(value)) if value == state.as_bytes() => Ok(()),
+        Ok(None) => Err(LoginStateFailure::Invalid { clear_cookie: true }),
+        Ok(Some(_)) => Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        }),
+        Err(()) => Err(LoginStateFailure::StoreFailure),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn login_state_failure_response(failure: LoginStateFailure, conf: &Config) -> Response {
+    match failure {
+        LoginStateFailure::Invalid { clear_cookie } => {
+            let location = format!(
+                "{}{}/web/login",
+                conf.common.web_url.trim_end_matches('/'),
+                conf.common.base_uri.trim_end_matches('/')
+            );
+            let mut response = Response::builder()
+                .status(StatusCode::FOUND)
+                .header(header::LOCATION, location);
+            if clear_cookie {
+                response = response.header(
+                    header::SET_COOKIE,
+                    login_state_cookie("", 0, conf).to_string(),
+                );
+            }
+            response.body(Body::empty()).unwrap()
+        }
+        LoginStateFailure::StoreFailure => Response::builder()
+            .status(StatusCode::SERVICE_UNAVAILABLE)
+            .body(Body::from("login state unavailable"))
+            .unwrap(),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn dex_login_saved_response(url: &str, state: &str, saved: Result<(), anyhow::Error>) -> Response {
+    match saved {
+        Ok(()) => with_login_state_cookie(common::meta::http::HttpResponse::json(url), state),
+        Err(error) => {
+            log::error!("failed to save login state: {error}");
+            Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .body(Body::from("login state unavailable"))
+                .unwrap()
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn validate_login_state<'a>(
+    state: Option<&'a String>,
+    cookie: Option<&str>,
+) -> Result<&'a str, LoginStateFailure> {
+    let Some(state) = state else {
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
+    };
+    if !login_state_matches(cookie, state) {
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
+    }
+    let saved = openobserve_core::kv::get_optional(PKCE_STATE_ORG, state)
+        .await
+        .map_err(|error| {
+            log::error!("failed to load login state: {error}");
+        });
+    classify_login_state(
+        Some(state),
+        cookie,
+        saved.as_ref().map(|value| value.as_deref()).map_err(|_| ()),
+    )?;
+    Ok(state)
 }
 
 pub async fn logout(
@@ -1842,6 +2004,8 @@ pub async fn logout(
     #[cfg(feature = "enterprise")]
     if let Some(user_email) = user_email {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email,
             org_id: "".to_string(),
             _timestamp: now_micros(),
@@ -2132,6 +2296,12 @@ mod tests {
     use serde_json;
 
     use super::*;
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn oss_never_reports_the_search_inspector_enabled() {
+        assert!(!search_inspector_for_edition(true));
+    }
 
     #[test]
     fn with_downtimes_off_all_names_the_modules_main_names() {
@@ -2617,20 +2787,149 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn test_consume_login_state_rejects_without_kv_lookup() {
+    async fn test_validate_login_state_rejects_without_kv_lookup() {
         assert_eq!(
-            consume_login_state(None, Some("abc")).await,
-            Err("no state in request")
+            validate_login_state(None, Some("abc")).await,
+            Err(LoginStateFailure::Invalid {
+                clear_cookie: false
+            })
         );
         let state = "abc".to_string();
         assert_eq!(
-            consume_login_state(Some(&state), None).await,
-            Err("invalid state in request")
+            validate_login_state(Some(&state), None).await,
+            Err(LoginStateFailure::Invalid {
+                clear_cookie: false
+            })
         );
         assert_eq!(
-            consume_login_state(Some(&state), Some("abd")).await,
-            Err("invalid state in request")
+            validate_login_state(Some(&state), Some("abd")).await,
+            Err(LoginStateFailure::Invalid {
+                clear_cookie: false
+            })
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_login_state_decisions() {
+        let state = "callback-state";
+        for (callback, cookie, saved, expected) in [
+            (
+                None,
+                Some(state),
+                Ok(Some(state.as_bytes())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (
+                Some(state),
+                None,
+                Ok(Some(state.as_bytes())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (
+                Some(state),
+                Some("other"),
+                Ok(Some(state.as_bytes())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (
+                Some(state),
+                Some(state),
+                Ok(None),
+                Err(LoginStateFailure::Invalid { clear_cookie: true }),
+            ),
+            (
+                Some(state),
+                Some(state),
+                Ok(Some(b"other".as_slice())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (Some(state), Some(state), Ok(Some(state.as_bytes())), Ok(())),
+            (
+                Some(state),
+                Some(state),
+                Err(()),
+                Err(LoginStateFailure::StoreFailure),
+            ),
+        ] {
+            assert_eq!(classify_login_state(callback, cookie, saved), expected);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_login_state_failure_response() {
+        let mut conf = Config::default();
+        conf.common.web_url = "https://observe.example/".to_string();
+        conf.common.base_uri = "/o2".to_string();
+        conf.auth.cookie_secure_only = true;
+        conf.auth.cookie_same_site_lax = true;
+        for (decision, status, cleared) in [
+            (
+                LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                },
+                StatusCode::FOUND,
+                false,
+            ),
+            (
+                LoginStateFailure::Invalid { clear_cookie: true },
+                StatusCode::FOUND,
+                true,
+            ),
+            (
+                LoginStateFailure::StoreFailure,
+                StatusCode::SERVICE_UNAVAILABLE,
+                false,
+            ),
+        ] {
+            let response = login_state_failure_response(decision, &conf);
+            assert_eq!(response.status(), status);
+            assert_eq!(
+                response
+                    .headers()
+                    .get(header::LOCATION)
+                    .map(|v| v.to_str().unwrap()),
+                (status == StatusCode::FOUND).then_some("https://observe.example/o2/web/login")
+            );
+            let cookie = response
+                .headers()
+                .get(header::SET_COOKIE)
+                .map(|v| v.to_str().unwrap());
+            assert_eq!(cookie.is_some(), cleared);
+            if let Some(cookie) = cookie {
+                assert!(cookie.contains("Max-Age=0"));
+                assert!(cookie.contains("Path=/"));
+                assert!(cookie.contains("Secure"));
+                assert!(cookie.contains("SameSite=Lax"));
+            }
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_failed_state_save_has_no_dex_url_or_cookie() {
+        let state = "state";
+        let url = "https://dex.example/login";
+        let failed =
+            dex_login_saved_response(url, state, Err(anyhow::anyhow!("store unavailable")));
+        assert_eq!(failed.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(failed.headers().get(header::SET_COOKIE).is_none());
+        let body = axum::body::to_bytes(failed.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(!String::from_utf8_lossy(&body).contains(url));
+        let saved = dex_login_saved_response(url, state, Ok(()));
+        assert_eq!(saved.status(), StatusCode::OK);
+        assert!(saved.headers().get(header::SET_COOKIE).is_some());
     }
 
     #[tokio::test]
@@ -2649,6 +2948,71 @@ mod tests {
             json["ingest_allowed_in_future"],
             cfg.limit.ingest_allowed_in_future
         );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_says_whether_an_orgs_incidents_page_someone() {
+        async fn paging(org: &str) -> serde_json::Value {
+            let response = zo_config(Path(org.to_string()), None).await.into_response();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap()["incidents_page_oncall"]
+                .clone()
+        }
+        #[cfg(feature = "enterprise")]
+        crate::request::security::tests::meta_store().await;
+        assert_eq!(
+            paging("zo_config_no_team_org").await,
+            serde_json::json!(false)
+        );
+        #[cfg(feature = "enterprise")]
+        {
+            let org = "zo_config_team_org";
+            infra::table::oncall_teams::create(org, "platform", "UTC", None)
+                .await
+                .unwrap();
+            let gate = o2_enterprise::enterprise::oncall::incidents_page_oncall();
+            assert_eq!(paging(org).await, serde_json::json!(gate));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_global_and_merged_retention() {
+        let org_id = "zo_config_retention_org";
+        #[cfg(feature = "enterprise")]
+        crate::common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(
+                format!("{}/{org_id}", db::organization::ORG_SETTINGS_KEY_PREFIX),
+                crate::common::meta::organization::OrganizationSetting {
+                    data_retention: DataRetentionDefaults {
+                        default: 50,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            );
+        let response = zo_config(Path(org_id.to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let global = db::organization::resolved_retention_defaults(&Default::default());
+        assert_eq!(
+            json["data_retention_defaults"],
+            serde_json::to_value(global).unwrap()
+        );
+        #[cfg(not(feature = "enterprise"))]
+        assert_eq!(
+            json["resolved_data_retention"],
+            serde_json::to_value(global).unwrap()
+        );
+        #[cfg(feature = "enterprise")]
+        assert_eq!(json["resolved_data_retention"]["logs"], 50);
     }
 
     #[tokio::test]
@@ -2698,6 +3062,17 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn test_zo_config_serves_the_transitions_retention() {
+        let json = zo_config_json().await;
+        let served = if cfg!(feature = "enterprise") {
+            get_config().limit.alert_transitions_retention_days
+        } else {
+            0
+        };
+        assert_eq!(json["alert_transitions_retention_days"], served);
+    }
+
     async fn zo_config_json() -> serde_json::Value {
         let response = zo_config(Path("default".to_string()), None)
             .await
@@ -2743,6 +3118,14 @@ mod tests {
                 "{key}"
             );
         }
+        for feature in Feature::all() {
+            let key: &str = feature.into();
+            assert_eq!(
+                runtime_definition().features[key].display_name.as_deref(),
+                Some(feature.display_name()),
+                "{key}"
+            );
+        }
     }
 
     #[cfg(not(feature = "enterprise"))]
@@ -2755,6 +3138,28 @@ mod tests {
             "ingestion_quota_used",
         ] {
             assert!(json.get(k).is_none(), "{k}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_zo_config_names_every_locked_feature_in_oss() {
+        let json = zo_config_json().await;
+        let locked: Vec<&str> = json["features"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(_, state)| *state == "locked")
+            .map(|(key, _)| key.as_str())
+            .collect();
+        assert!(!locked.is_empty());
+        for key in locked {
+            let feature = Feature::all().find(|f| <&str>::from(*f) == key).unwrap();
+            assert_eq!(
+                json["feature_names"][key].as_str(),
+                Some(feature.display_name()),
+                "{key}"
+            );
         }
     }
 

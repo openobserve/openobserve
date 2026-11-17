@@ -24,6 +24,7 @@ import {
   applyDevicePixelRatio,
   currentDevicePixelRatio,
   isFractionalDevicePixelRatio,
+  useChartPixelRatio,
   useDevicePixelRatioChange,
   watchDevicePixelRatio,
 } from "./useDevicePixelRatio";
@@ -48,6 +49,24 @@ describe("useDevicePixelRatio", () => {
     expect(currentDevicePixelRatio()).toBe(1);
     display.setRatio(2);
     expect(currentDevicePixelRatio()).toBe(2);
+  });
+
+  it("never reports a ratio below 1, so a zoomed-out chart and its exports keep full resolution", () => {
+    display.setRatio(0.67);
+    expect(currentDevicePixelRatio()).toBe(1);
+    expect(isFractionalDevicePixelRatio(currentDevicePixelRatio())).toBe(false);
+  });
+
+  it("keeps seeing zoom changes below 1, reporting them clamped", () => {
+    const onChange = vi.fn();
+    watchDevicePixelRatio(onChange);
+
+    display.setRatio(0.67);
+    display.setRatio(0.8);
+    display.setRatio(1.5);
+
+    expect(onChange.mock.calls).toEqual([[1], [1], [1.5]]);
+    expect(display.listenerCount()).toBe(1);
   });
 
   it("reports every change, re-arming on the new ratio each time", () => {
@@ -107,6 +126,84 @@ describe("useDevicePixelRatio", () => {
     expect(display.listenerCount()).toBe(0);
     display.setRatio(1);
     expect(onChange).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useChartPixelRatio", () => {
+  let display: DevicePixelRatioFake;
+  const chartWith = (painter: unknown) => ({ getZr: () => ({ painter }) });
+
+  const mountWith = (chart: unknown) => {
+    let state!: ReturnType<typeof useChartPixelRatio>;
+    const wrapper = mount(
+      defineComponent({
+        setup() {
+          state = useChartPixelRatio(() => chart as ReturnType<typeof chartWith>);
+          return () => h("div");
+        },
+      }),
+    );
+    return { wrapper, state };
+  };
+
+  beforeEach(() => {
+    display = fakeDevicePixelRatio(1);
+  });
+
+  afterEach(() => {
+    display.restore();
+  });
+
+  it("pixel-snaps when the canvas was re-rasterized at the new fractional ratio", () => {
+    const painter = fakeCanvasPainter(1);
+    const { wrapper, state } = mountWith(chartWith(painter));
+
+    display.setRatio(1.5);
+    expect(painter.dpr).toBe(1.5);
+    expect(state.pixelated.value).toBe(true);
+
+    display.setRatio(2);
+    expect(state.pixelated.value).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("stays smooth when the change was skipped, since the bitmap is still at the old ratio", () => {
+    const glPainter = fakeCanvasPainter(1);
+    glPainter.getLayers.mockReturnValue({ ...glPainter.layers, gl: { dpr: 1, resize: vi.fn() } });
+    const gl = mountWith(chartWith(glPainter));
+    const svg = mountWith(chartWith(fakeCanvasPainter(1, "svg")));
+
+    display.setRatio(1.5);
+
+    expect(gl.state.pixelated.value).toBe(false);
+    expect(svg.state.pixelated.value).toBe(false);
+    gl.wrapper.unmount();
+    svg.wrapper.unmount();
+  });
+
+  it("recomputes from the live ratio on sync after a re-init", () => {
+    const painter = fakeCanvasPainter(1);
+    painter.getLayers.mockReturnValue({ ...painter.layers, gl: { dpr: 1, resize: vi.fn() } });
+    const { wrapper, state } = mountWith(chartWith(painter));
+    display.setRatio(1.5);
+    expect(state.pixelated.value).toBe(false);
+
+    painter.dpr = 1.5;
+    state.sync();
+
+    expect(state.pixelated.value).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("stays smooth when zoomed out below 1", () => {
+    const painter = fakeCanvasPainter(1);
+    const { wrapper, state } = mountWith(chartWith(painter));
+
+    display.setRatio(0.67);
+
+    expect(painter.dpr).toBe(1);
+    expect(state.pixelated.value).toBe(false);
+    wrapper.unmount();
   });
 });
 
@@ -199,6 +296,68 @@ describe("applyDevicePixelRatio", () => {
     expect(brokenLayer.layers["zr_0.0"].dpr).toBe(1);
     expect(brokenLayer.layers["zr_0.0"].resize).not.toHaveBeenCalled();
     expect(brokenLayer.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyDevicePixelRatio when zrender's internals change", () => {
+  const chartWith = (painter: unknown) => ({ getZr: () => ({ painter }) });
+  let warn: ReturnType<typeof vi.spyOn>;
+  let apply: typeof applyDevicePixelRatio;
+
+  beforeEach(async () => {
+    // The warn-once flag is module state, so each test gets a fresh copy.
+    vi.resetModules();
+    ({ applyDevicePixelRatio: apply } = await import("./useDevicePixelRatio"));
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warn.mockRestore();
+  });
+
+  it("warns once when a canvas painter lacks the methods it relies on", () => {
+    const painter = { ...fakeCanvasPainter(1), getLayers: undefined };
+
+    expect(apply(chartWith(painter), 2)).toBe(false);
+    expect(apply(chartWith(painter), 1.5)).toBe(false);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not warn for the expected skips", () => {
+    const gl = fakeCanvasPainter(1);
+    gl.getLayers.mockReturnValue({ ...gl.layers, gl: { dpr: 1, resize: vi.fn() } });
+
+    apply(null, 2);
+    apply(chartWith(undefined), 2);
+    apply(chartWith(fakeCanvasPainter(1, "svg")), 2);
+    apply(chartWith(fakeCanvasPainter(2)), 2);
+    apply(chartWith(gl), 2);
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("restores every ratio when a layer resize throws, so a later change retries", () => {
+    const painter = fakeCanvasPainter(1);
+    painter.layers["zr_100000.0"].resize.mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+
+    expect(apply(chartWith(painter), 2)).toBe(false);
+    expect(painter.dpr).toBe(1);
+    Object.values(painter.layers).forEach((layer) => {
+      expect(layer.dpr).toBe(1);
+      expect(layer.ctx.dpr).toBe(1);
+    });
+    // Layers are rebuilt at the restored ratio and repainted, so none is left with a cleared bitmap.
+    Object.values(painter.layers).forEach((layer) => {
+      expect(layer.resize).toHaveBeenLastCalledWith(painter.getWidth(), painter.getHeight());
+    });
+    expect(painter.refresh).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    expect(apply(chartWith(painter), 2)).toBe(true);
+    expect(painter.dpr).toBe(2);
   });
 });
 

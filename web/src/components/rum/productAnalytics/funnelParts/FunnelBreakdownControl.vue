@@ -106,15 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
         </template>
-        <SessionFieldPicker
-          v-if="open"
-          :fields="[]"
-          :values="idleValues"
-          :groups="groups"
-          :note="note"
-          @pick="pick"
-          @cancel="setOpen(false)"
-        />
+        <FunnelFieldPicker v-if="open" :groups="groups" :note="note" @pick="pick" />
       </OPopover>
     </template>
   </FunnelSectionRow>
@@ -130,9 +122,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
-import SessionFieldPicker from "@/components/rum/productAnalytics/funnelParts/SessionFieldPicker.vue";
+import FunnelFieldPicker from "@/components/rum/productAnalytics/funnelParts/FunnelFieldPicker.vue";
 import type {
-  FilterValuesState,
   PickerField,
   PickerGroup,
 } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
@@ -170,7 +161,6 @@ const chip = ref<{ $el: HTMLElement } | null>(null);
 const add = ref<{ $el: HTMLElement } | null>(null);
 // Set while the picker was opened from a step's menu: it lists that step's fields and pins the pick to it.
 const limitStep = ref<number | null>(null);
-const idleValues: FilterValuesState = { field: null, status: "idle", rows: [] };
 const DIM_ID = "dim-";
 const FIELD_ID = "field-";
 

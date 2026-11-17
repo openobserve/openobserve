@@ -1,0 +1,458 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use std::sync::Arc;
+
+use datafusion::{
+    common::{
+        Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
+    },
+    config::ConfigOptions,
+    physical_optimizer::PhysicalOptimizerRule,
+    physical_plan::{
+        ChildrenPropertiesMode, ExecutionPlan, ReplaceChildrenOptions,
+        aggregates::{AggregateExec, AggregateMode},
+        projection::ProjectionExec,
+        sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
+    },
+};
+
+use crate::datafusion::{
+    physical_optimizer::utils::get_final_aggregate_plan,
+    physical_plan::aggregate_topk_exec::AggregateTopkExec,
+};
+
+// add remote scan to physical plan
+#[derive(Debug)]
+pub struct AggregateTopkRule {
+    limit: i64,
+}
+
+impl AggregateTopkRule {
+    pub fn new(limit: i64) -> Self {
+        Self { limit }
+    }
+}
+
+impl PhysicalOptimizerRule for AggregateTopkRule {
+    fn optimize(
+        &self,
+        plan: Arc<dyn ExecutionPlan>,
+        _config: &ConfigOptions,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        if self.limit <= 0 || !config::get_config().search.aggregation_topk_enabled {
+            return Ok(plan);
+        }
+
+        // check if there is no aggregate plan, return the original plan
+        let Some(final_agg_plan) = get_final_aggregate_plan(Arc::clone(&plan)) else {
+            return Ok(plan);
+        };
+
+        // check if the group by only one column
+        if final_agg_plan.group_expr().expr().len() != 1 {
+            return Ok(plan);
+        }
+
+        // check if the agg function is count
+        if final_agg_plan.aggr_expr().len() != 1 {
+            return Ok(plan);
+        }
+
+        if let Some(expr) = final_agg_plan.aggr_expr().first() {
+            let eligible = match expr.fun().name() {
+                "min" | "max" => true,
+                // A DISTINCT count/sum partial state is a value list, not the final value.
+                "count" | "sum" => !expr.is_distinct(),
+                _ => false,
+            };
+            if !eligible {
+                return Ok(plan);
+            }
+            let expr_name = expr.name();
+            let mut visitor = SortLimitVisitor::new(expr_name);
+            let _ = plan.visit(&mut visitor);
+            if visitor.is_match {
+                let mut rewriter =
+                    AggregateTopkRewriter::new(expr_name, visitor.descending, visitor.limit as u64);
+                let plan = plan.rewrite(&mut rewriter)?.data;
+                return Ok(plan);
+            }
+        }
+        Ok(plan)
+    }
+
+    fn name(&self) -> &str {
+        "AggregateTopkRule"
+    }
+
+    fn schema_check(&self) -> bool {
+        true
+    }
+}
+
+/// This rewriter is used to add a new node AggregateMergeExec in the middle of the
+/// RemoteScanExec->AggregateExec. It will get the topK records from the AggregateExec and return
+/// them to the RemoteScanExec.
+pub(crate) struct AggregateTopkRewriter {
+    field: String,
+    descending: bool,
+    limit: u64,
+}
+
+impl AggregateTopkRewriter {
+    pub(crate) fn new(field: &str, descending: bool, limit: u64) -> Self {
+        Self {
+            field: field.to_string(),
+            descending,
+            limit,
+        }
+    }
+}
+
+impl TreeNodeRewriter for AggregateTopkRewriter {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
+        // This feature need cluster mode, single node we can skip it
+        if node.children().len() == 1 && node.children().first().unwrap().name() == "AggregateExec"
+        {
+            let agg_node = node.children().first().cloned().unwrap();
+            let Some(agg_exec) = agg_node.downcast_ref::<AggregateExec>() else {
+                return Ok(Transformed::no(node));
+            };
+            if agg_exec.mode() != &AggregateMode::Partial {
+                return Ok(Transformed::no(node));
+            }
+
+            let input_plan = Arc::clone(agg_node);
+            let Ok(agg_plan) =
+                AggregateTopkExec::try_new(input_plan, &self.field, self.descending, self.limit)
+            else {
+                return Ok(Transformed::no(node));
+            };
+
+            let node = node.replace_children(
+                vec![Arc::new(agg_plan) as Arc<dyn ExecutionPlan>],
+                ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+            )?;
+            return Ok(Transformed::new(node, true, TreeNodeRecursion::Stop));
+        }
+        Ok(Transformed::no(node))
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct SortLimitVisitor {
+    field: String,
+    pub(crate) limit: usize,
+    pub(crate) descending: bool,
+    pub(crate) is_match: bool,
+}
+
+impl SortLimitVisitor {
+    pub(crate) fn new(field: &str) -> Self {
+        Self {
+            field: field.to_string(),
+            ..Default::default()
+        }
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for SortLimitVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        if node.name() == "ProjectionExec" {
+            // we need to check if the field is map to any alias
+            let Some(expr) = node.downcast_ref::<ProjectionExec>() else {
+                return Ok(TreeNodeRecursion::Continue);
+            };
+            for projection_expr in expr.expr().iter() {
+                let expr = &projection_expr.expr;
+                let alias = &projection_expr.alias;
+                if expr
+                    .to_string()
+                    .split('@')
+                    .next()
+                    .is_some_and(|v| v == self.field)
+                {
+                    self.field = alias.clone();
+                    break;
+                }
+            }
+        } else if node.name() == "SortExec" {
+            // we need to check if the field is sort by field
+            let Some(expr) = node.downcast_ref::<SortExec>() else {
+                return Ok(TreeNodeRecursion::Continue);
+            };
+            for sort_expr in expr.expr().iter() {
+                if sort_expr
+                    .expr
+                    .to_string()
+                    .split('@')
+                    .next()
+                    .is_some_and(|v| v == self.field)
+                {
+                    self.is_match = true;
+                    self.limit = expr.fetch().unwrap_or(0);
+                    self.descending = sort_expr.options.descending;
+                    return Ok(TreeNodeRecursion::Stop);
+                }
+            }
+        } else if node.name() == "SortPreservingMergeExec" {
+            // we need to check if the field is sort by field
+            let Some(expr) = node.downcast_ref::<SortPreservingMergeExec>() else {
+                return Ok(TreeNodeRecursion::Continue);
+            };
+            for sort_expr in expr.expr().iter() {
+                if sort_expr
+                    .expr
+                    .to_string()
+                    .split('@')
+                    .next()
+                    .is_some_and(|v| v == self.field)
+                {
+                    self.is_match = true;
+                    self.limit = expr.fetch().unwrap_or(0);
+                    self.descending = sort_expr.options.descending;
+                    return Ok(TreeNodeRecursion::Stop);
+                }
+            }
+        }
+        Ok(TreeNodeRecursion::Continue)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow::{
+        array::{Array, Int64Array, RecordBatch, StringArray},
+        compute::cast,
+    };
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{
+        datasource::MemTable,
+        physical_plan::{collect, displayable},
+        prelude::SessionConfig,
+    };
+
+    use super::*;
+    use crate::datafusion::datasource::empty_table::NewEmptyTable;
+
+    /// Pins the flag on so a local env override cannot turn the rule off.
+    fn enable_topk() {
+        static ENABLE: std::sync::Once = std::sync::Once::new();
+        ENABLE.call_once(|| {
+            unsafe { std::env::set_var("ZO_AGGREGATION_TOPK_ENABLED", "true") };
+            config::refresh_config().expect("config refresh");
+        });
+    }
+
+    /// Whether the rule inserts `AggregateTopkExec` for `agg(v)` grouped by `name`, sorted
+    /// on the aggregate and limited.
+    async fn inserts_topk(agg: &str) -> bool {
+        inserts_topk_for(&format!("{agg}(v)")).await
+    }
+
+    async fn inserts_topk_for(select_expr: &str) -> bool {
+        enable_topk();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let ctx = datafusion::prelude::SessionContext::new_with_config(
+            SessionConfig::new().with_target_partitions(2),
+        );
+        ctx.register_table("t", Arc::new(NewEmptyTable::new("t", schema)))
+            .unwrap();
+        let sql = format!(
+            "SELECT name, {select_expr} AS x FROM t GROUP BY name ORDER BY x DESC LIMIT 10"
+        );
+        let plan = ctx
+            .sql(&sql)
+            .await
+            .unwrap()
+            .create_physical_plan()
+            .await
+            .unwrap();
+        let plan = AggregateTopkRule::new(10)
+            .optimize(plan, &ConfigOptions::default())
+            .unwrap();
+        displayable(plan.as_ref())
+            .indent(true)
+            .to_string()
+            .contains("AggregateTopkExec")
+    }
+
+    #[tokio::test]
+    async fn test_topk_keeps_the_supported_aggregates() {
+        for agg in ["count", "min", "max", "sum"] {
+            assert!(inserts_topk(agg).await, "{agg} must stay eligible");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_topk_matches_an_aggregate_name_with_brackets() {
+        let filtered = "COUNT(*) FILTER (WHERE CAST(v AS VARCHAR) IN ('2','5'))";
+        assert!(inserts_topk_for(filtered).await, "{filtered}");
+    }
+
+    #[tokio::test]
+    async fn test_topk_skips_approx_distinct() {
+        assert!(
+            !inserts_topk("approx_distinct").await,
+            "approx_distinct must stay on the regular aggregation path"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_topk_skips_avg() {
+        assert!(
+            !inserts_topk("avg").await,
+            "avg must stay on the regular aggregation path"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_topk_skips_distinct_with_filter() {
+        for expr in [
+            "COUNT(DISTINCT v) FILTER (WHERE v > 0)",
+            "SUM(DISTINCT v) FILTER (WHERE v > 0)",
+        ] {
+            assert!(
+                !inserts_topk_for(expr).await,
+                "{expr} must stay on the regular aggregation path"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_topk_keeps_min_max_distinct_with_filter() {
+        for expr in [
+            "MIN(DISTINCT v) FILTER (WHERE v > 0)",
+            "MAX(DISTINCT v) FILTER (WHERE v > 0)",
+        ] {
+            assert!(inserts_topk_for(expr).await, "{expr} must stay eligible");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_avg_top_group_with_few_rows_is_not_dropped() {
+        enable_topk();
+        // More groups than the heap keeps (1000), each outranking `top` by row count.
+        let mut names = vec!["top".to_string()];
+        let mut values = vec![100_i64];
+        for i in 0..1000 {
+            names.extend([format!("g{i}"), format!("g{i}")]);
+            values.extend([1, 1]);
+        }
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(names)),
+                Arc::new(Int64Array::from(values)),
+            ],
+        )
+        .unwrap();
+        let ctx = datafusion::prelude::SessionContext::new_with_config(
+            SessionConfig::new().with_target_partitions(2),
+        );
+        ctx.register_table(
+            "t",
+            Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+        )
+        .unwrap();
+        let plan = ctx
+            .sql("SELECT name, avg(v) AS x FROM t GROUP BY name ORDER BY x DESC LIMIT 1")
+            .await
+            .unwrap()
+            .create_physical_plan()
+            .await
+            .unwrap();
+        let plan = AggregateTopkRule::new(1)
+            .optimize(plan, &ConfigOptions::default())
+            .unwrap();
+        let batches = collect(plan, ctx.task_ctx()).await.unwrap();
+        let names: Vec<String> = batches
+            .iter()
+            .flat_map(|b| {
+                let col = cast(b.column(0), &DataType::Utf8).unwrap();
+                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                col.iter().flatten().map(String::from).collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(names, vec!["top".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_count_distinct_filter_top_group_is_not_dropped() {
+        enable_topk();
+        // Partial state is a value list: `[5]` outranks `[1, 2, 3]` despite a lower count.
+        let mut names = vec!["top".to_string(); 3];
+        let mut values = vec![1_i64, 2, 3];
+        for i in 0..1000 {
+            names.extend([format!("g{i}"), format!("g{i}")]);
+            values.extend([5, 5]);
+        }
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(names)),
+                Arc::new(Int64Array::from(values)),
+            ],
+        )
+        .unwrap();
+        let ctx = datafusion::prelude::SessionContext::new_with_config(
+            SessionConfig::new().with_target_partitions(2),
+        );
+        ctx.register_table(
+            "t",
+            Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+        )
+        .unwrap();
+        let sql = "SELECT name, COUNT(DISTINCT v) FILTER (WHERE v > 0) AS x FROM t \
+                   GROUP BY name ORDER BY x DESC LIMIT 1";
+        let plan = ctx
+            .sql(sql)
+            .await
+            .unwrap()
+            .create_physical_plan()
+            .await
+            .unwrap();
+        let plan = AggregateTopkRule::new(1)
+            .optimize(plan, &ConfigOptions::default())
+            .unwrap();
+        let batches = collect(plan, ctx.task_ctx()).await.unwrap();
+        let names: Vec<String> = batches
+            .iter()
+            .flat_map(|b| {
+                let col = cast(b.column(0), &DataType::Utf8).unwrap();
+                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                col.iter().flatten().map(String::from).collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(names, vec!["top".to_string()]);
+    }
+}

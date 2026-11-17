@@ -679,7 +679,7 @@ describe("ModelPricingEditor.vue", () => {
       expect(tiers[1].utc_windows).toEqual([]);
     });
 
-    it("addCondition / removeCondition toggle the usage condition", async () => {
+    it("the tier's filter builder writes and clears the usage condition", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       fillValid(wrapper, [
@@ -691,8 +691,15 @@ describe("ModelPricingEditor.vue", () => {
         }),
       ]);
       await nextTick();
+      const builder = wrapper.findComponent(
+        '[data-test="model-pricing-tier-filter-builder-1-root"]',
+      );
+      expect(builder.exists()).toBe(true);
 
-      (wrapper.vm as any).addCondition(1);
+      (wrapper.vm as any).setTierFilter(1, {
+        condition: { usage_key: "input", operator: "gt", value: 200000 },
+        rules: [],
+      });
       await nextTick();
       expect(getForm(wrapper).state.values.tiers[1].condition).toEqual({
         usage_key: "input",
@@ -700,11 +707,10 @@ describe("ModelPricingEditor.vue", () => {
         value: 200000,
       });
 
-      (wrapper.vm as any).removeCondition(1);
+      (wrapper.vm as any).setTierFilter(1, { condition: null, rules: [] });
       await nextTick();
       expect(getForm(wrapper).state.values.tiers[1].condition).toBeNull();
     });
-
     it("hydrates a window-only tier from the API without inventing a condition", async () => {
       mockService.get.mockResolvedValue({
         data: {
@@ -915,7 +921,7 @@ describe("ModelPricingEditor.vue", () => {
       expect("priority" in payload.tiers[0]).toBe(false);
     });
 
-    it("swaps the value field when the operator changes and sends only what the operator reads", async () => {
+    it("sends a rule edited in the builder with only what its operator reads", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       fillValid(wrapper, [
@@ -923,20 +929,28 @@ describe("ModelPricingEditor.vue", () => {
         tier({ name: "Big", rules: [flexRule()], prices: [row("input", 2)] }),
       ]);
       await nextTick();
-      expect(wrapper.find('[data-test="model-pricing-tier-rule-values-input-1-0"]').exists()).toBe(
-        true,
-      );
+      expect((wrapper.vm as any).tierFilter(getForm(wrapper).state.values.tiers[1])).toEqual({
+        condition: null,
+        rules: [
+          {
+            keys: ["openai.response.service_tier", "openai.request.service_tier"],
+            op: "in",
+            values: ["flex"],
+          },
+        ],
+      });
 
-      getForm(wrapper).setFieldValue("tiers[1].rules[0].op", "gte");
-      getForm(wrapper).setFieldValue("tiers[1].rules[0].value", 1000);
+      (wrapper.vm as any).setTierFilter(1, {
+        condition: null,
+        rules: [
+          {
+            keys: ["openai.response.service_tier", "openai.request.service_tier"],
+            op: "gte",
+            value: 1000,
+          },
+        ],
+      });
       await nextTick();
-      expect(wrapper.find('[data-test="model-pricing-tier-rule-values-input-1-0"]').exists()).toBe(
-        false,
-      );
-      expect(wrapper.find('[data-test="model-pricing-tier-rule-value-input-1-0"]').exists()).toBe(
-        true,
-      );
-
       await getForm(wrapper).handleSubmit();
       await flushPromises();
       expect(mockService.create.mock.calls[0][1].tiers[1].rules).toEqual([
@@ -947,8 +961,28 @@ describe("ModelPricingEditor.vue", () => {
         },
       ]);
     });
+    it("keeps the rule chips mounted while other tier fields are typed", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Flex", rules: [flexRule()], prices: [row("input", 2)] }),
+      ]);
+      await nextTick();
+      const chip = () =>
+        wrapper.find(
+          '[data-test="model-pricing-tier-filter-builder-1-chip-openai.response.service_tier, openai.request.service_tier"]',
+        ).element;
+      const before = chip();
+      expect(before).toBeTruthy();
+      for (const name of ["F", "Fl", "Fle", "Flex2"]) {
+        getForm(wrapper).setFieldValue("tiers[1].name", name);
+        await nextTick();
+      }
+      expect(chip()).toBe(before);
+    });
 
-    it("removing a middle rule keeps the surrounding rows bound to the right values", async () => {
+    it("removing a middle rule chip keeps the other rules as they were", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       fillValid(wrapper, [
@@ -960,17 +994,16 @@ describe("ModelPricingEditor.vue", () => {
         }),
       ]);
       await nextTick();
-      (wrapper.vm as any).removeRule(1, 1);
-      await nextTick();
-      expect(getForm(wrapper).state.values.tiers[1].rules.map((r: any) => r.values)).toEqual([
-        "a",
-        "c",
-      ]);
-      expect(wrapper.findAll('[data-test^="model-pricing-tier-rule-remove-btn-1-"]')).toHaveLength(
-        2,
-      );
+      const removes = () =>
+        wrapper.findAll(
+          '[data-test="model-pricing-tier-filter-builder-1-chip-openai.response.service_tier, openai.request.service_tier-remove"]',
+        );
+      expect(removes()).toHaveLength(3);
+      await removes()[1].trigger("click");
+      await flushPromises();
+      expect(getForm(wrapper).state.values.tiers[1].rules).toEqual([flexRule("a"), flexRule("c")]);
+      expect(removes()).toHaveLength(2);
     });
-
     it("shows a tie warning for overlapping tiers of equal rank", async () => {
       const wrapper = createWrapper();
       await flushPromises();
@@ -1187,15 +1220,47 @@ describe("ModelPricingEditor.vue", () => {
         values: ["fl.*"],
         value: 3,
       });
-      expect((wrapper.vm as any).ruleOperatorOptions("regex").map((o: any) => o.value)).toContain(
-        "regex",
-      );
-      expect((wrapper.vm as any).ruleOperatorOptions("in").map((o: any) => o.value)).not.toContain(
-        "regex",
-      );
+      expect(
+        wrapper.find('[data-test="model-pricing-tier-filter-builder-1-chip-locked"]').exists(),
+      ).toBe(true);
       await getForm(wrapper).handleSubmit();
       await flushPromises();
       expect(mockService.update).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="model-pricing-tier-filter-errors-1"]').text()).toContain(
+        "regex",
+      );
+    });
+    it("keeps a usage-keyed rule a rule when another rule's values are edited in the builder", async () => {
+      const kept = { keys: ["input"], op: "gt", value: 5 };
+      const wrapper = await loadTiers([
+        { name: "Default", prices: { input: 0.000001 } },
+        {
+          name: "Tagged",
+          rules: [kept, { keys: ["tier"], op: "in", values: ["x"] }],
+          prices: { input: 0.000002 },
+        },
+      ]);
+      const dt = "model-pricing-tier-filter-builder-1";
+      await wrapper.find(`[data-test="${dt}-chip-tier-value"]`).trigger("click");
+      await flushPromises();
+      const search = document.body.querySelector<HTMLInputElement>(`[data-test="${dt}-search"]`)!;
+      search.value = "y";
+      search.dispatchEvent(new Event("input"));
+      await flushPromises();
+      search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+      document.body
+        .querySelector<HTMLElement>(`[data-test="${dt}-apply"]`)!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flushPromises();
+      expect(wrapper.find('[data-test="model-pricing-tier-filter-errors-1"]').exists()).toBe(false);
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+      const call = mockService.update.mock.calls[0];
+      const saved = call[call.length - 1].tiers[1];
+      expect(saved.condition ?? null).toBeNull();
+      expect(saved.rules).toEqual([kept, { keys: ["tier"], op: "in", values: ["x", "y"] }]);
+      wrapper.unmount();
     });
 
     it("round-trips a priority on the default tier", async () => {
@@ -1324,7 +1389,7 @@ describe("ModelPricingEditor.vue", () => {
       expect(payload.tiers[1].condition).toBeNull();
     });
 
-    it("addRule / removeRule mutate the form-owned tier", async () => {
+    it("a rule added in the builder lands in the form-owned tier", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       fillValid(wrapper, [
@@ -1333,7 +1398,16 @@ describe("ModelPricingEditor.vue", () => {
       ]);
       await nextTick();
 
-      (wrapper.vm as any).addRule(1);
+      (wrapper.vm as any).setTierFilter(1, {
+        condition: null,
+        rules: [
+          {
+            keys: ["openai.response.service_tier", "openai.request.service_tier"],
+            op: "in",
+            values: ["flex"],
+          },
+        ],
+      });
       await nextTick();
       let tiers = getForm(wrapper).state.values.tiers;
       expect(tiers[1].rules).toEqual([
@@ -1344,14 +1418,12 @@ describe("ModelPricingEditor.vue", () => {
           value: 0,
         },
       ]);
-      expect(wrapper.find('[data-test="model-pricing-tier-rules-1"]').exists()).toBe(true);
 
-      (wrapper.vm as any).removeRule(1, 0);
+      (wrapper.vm as any).setTierFilter(1, { condition: null, rules: [] });
       await nextTick();
       tiers = getForm(wrapper).state.values.tiers;
       expect(tiers[1].rules).toEqual([]);
     });
-
     it("hydrates a rule-only tier from the API without inventing a condition", async () => {
       mockService.get.mockResolvedValue({
         data: {

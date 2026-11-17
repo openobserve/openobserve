@@ -23,11 +23,40 @@ use opentelemetry_proto::tonic::collector::{
     profiles::v1development::ExportProfilesServiceResponse, trace::v1::ExportTraceServiceResponse,
 };
 use prost::Message;
+use utoipa::openapi::{
+    RefOr,
+    schema::{AdditionalProperties, ObjectBuilder, Schema, Type},
+};
 
 use super::http::{
     CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, ERROR_HEADER, HttpResponse as MetaHttpResponse,
     error_header_value,
 };
+
+macro_rules! export_json_schema {
+    ($name:ident, $rejected:literal) => {
+        /// ProtoJSON body `export_response_to_proto_json` writes for this signal.
+        pub struct $name;
+
+        impl utoipa::PartialSchema for $name {
+            fn schema() -> RefOr<Schema> {
+                export_json_schema($rejected)
+            }
+        }
+
+        impl utoipa::ToSchema for $name {}
+    };
+}
+
+export_json_schema!(OtlpLogsExportJson, "rejectedLogRecords");
+export_json_schema!(OtlpMetricsExportJson, "rejectedDataPoints");
+export_json_schema!(OtlpTracesExportJson, "rejectedSpans");
+export_json_schema!(OtlpProfilesExportJson, "rejectedProfiles");
+
+/// The protobuf-encoded `Export*ServiceResponse`, sent when the request was protobuf.
+#[derive(utoipa::ToSchema)]
+#[schema(value_type = String, format = Binary)]
+pub struct OtlpProtobufBody(pub Vec<u8>);
 
 /// OTLP `Export*ServiceResponse` whose `partial_success` gets a ProtoJSON body.
 pub trait OtlpExportResponse: Message {
@@ -183,6 +212,28 @@ pub fn export_response_to_proto_json<T: OtlpExportResponse>(res: &T) -> json::Va
         }
         _ => json::json!({}),
     }
+}
+
+// partialSuccess is absent on a clean success, and carries only the keys that are set.
+fn export_json_schema(rejected_field: &str) -> RefOr<Schema> {
+    let partial = ObjectBuilder::new()
+        .schema_type(Type::Object)
+        .property(
+            rejected_field,
+            ObjectBuilder::new()
+                .schema_type(Type::String)
+                .pattern(Some("^-?[0-9]+$")),
+        )
+        .property(
+            "errorMessage",
+            ObjectBuilder::new().schema_type(Type::String),
+        )
+        .additional_properties(Some(AdditionalProperties::FreeForm(false)));
+    ObjectBuilder::new()
+        .schema_type(Type::Object)
+        .property("partialSuccess", partial)
+        .additional_properties(Some(AdditionalProperties::FreeForm(false)))
+        .into()
 }
 
 #[cfg(test)]

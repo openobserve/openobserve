@@ -246,7 +246,14 @@ class LanguagePage {
    * @param {number} settleMs bounded max settle after DOMContentLoaded
    */
   async _navigateForScrape(url, settleMs = 2500) {
-    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    try {
+      await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    } catch (error) {
+      // Firefox fails a goto that the app's own navigation to the same URL supersedes, yet that navigation still lands.
+      if (!String(error?.message).includes('interrupted by another navigation')) throw error;
+      const target = new URL(url, this.page.url());
+      await this.page.waitForURL((u) => u.pathname === target.pathname && u.search === target.search, { waitUntil: 'domcontentloaded' });
+    }
     await this.page.waitForLoadState('networkidle', { timeout: settleMs }).catch(() => {});
   }
 

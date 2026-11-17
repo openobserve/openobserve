@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { toDetectionFunctionSql, buildAnomalyPreviewSql } from "./anomalySqlBuilder";
+import {
+  anomalyWhereClause,
+  toDetectionFunctionSql,
+  buildAnomalyPreviewSql,
+} from "./anomalySqlBuilder";
 
 // ─── toDetectionFunctionSql ──────────────────────────────────────────────────
 
@@ -469,5 +473,112 @@ describe("buildAnomalyPreviewSql", () => {
       training_window_days: 1,
     });
     expect(result).toMatch(/ORDER BY time_bucket$/m);
+  });
+});
+
+describe("anomalyWhereClause", () => {
+  const leaf = (column: string, operator: string, value: unknown, logicalOperator = "AND") => ({
+    filterType: "condition",
+    column,
+    operator,
+    value,
+    logicalOperator,
+  });
+  const group = (conditions: unknown[], logicalOperator = "AND") => ({
+    filterType: "group",
+    logicalOperator,
+    conditions,
+  });
+
+  it("renders saved rows exactly as main did", () => {
+    const rows = [
+      { field: "level", operator: "=", value: "error" },
+      { field: "", operator: "=", value: "x" },
+      { field: "code", operator: "IN", value: "'a', 'b'" },
+      { field: "msg", operator: "Contains", value: "" },
+      { field: "host", operator: "Is Null", value: "" },
+    ];
+    expect(anomalyWhereClause(rows)).toBe(
+      "WHERE\n  level = 'error'\n  AND code IN ('a', 'b')\n  AND host IS NULL",
+    );
+  });
+
+  it("reads null, undefined and a non-object as no WHERE", () => {
+    expect(anomalyWhereClause(null)).toBe("");
+    expect(anomalyWhereClause(undefined)).toBe("");
+    expect(anomalyWhereClause("level = 'error'")).toBe("");
+  });
+
+  it("renders an AND-only V2 group one part per line", () => {
+    const filters = group([
+      leaf("level", "=", "error"),
+      leaf("code", "!=", 500),
+      leaf("host", "is_null", null),
+    ]);
+    expect(anomalyWhereClause(filters)).toBe(
+      "WHERE\n  level = 'error'\n  AND code <> '500'\n  AND host IS NULL",
+    );
+  });
+
+  it("renders OR and nested groups with parentheses", () => {
+    const filters = group([
+      leaf("a", "=", "1"),
+      leaf("b", "=", "2", "OR"),
+      group([leaf("c", "=", "3"), leaf("d", "=", "4", "OR")], "OR"),
+    ]);
+    expect(anomalyWhereClause(filters)).toBe(
+      "WHERE\n  a = '1'\n  OR b = '2'\n  OR (c = '3' OR d = '4')",
+    );
+  });
+
+  it.each([
+    ["contains", "x", false, "str_match(f, 'x')"],
+    ["contains", "x", true, "str_match_ignore_case(f, 'x')"],
+    ["Contains", "x", true, "str_match_ignore_case(f, 'x')"],
+    ["not_contains", "x", false, "f NOT LIKE '%x%'"],
+    ["Not Contains", "x", false, "f NOT LIKE '%x%'"],
+    ["in", ["a", "b"], false, "f IN ('a', 'b')"],
+    ["not_in", '["a"]', false, "f NOT IN ('a')"],
+    ["IN", ["a"], false, "f IN ('a')"],
+    ["starts_with", "x", false, "f LIKE 'x%'"],
+    ["ends_with", "x", false, "f LIKE '%x'"],
+    ["regex", "^a", false, "re_match(f, '^a')"],
+    ["not_regex", "^a", false, "re_not_match(f, '^a')"],
+    ["IsNotNull", null, false, "f IS NOT NULL"],
+  ])("maps the engine operator %s", (operator, value, caseInsensitive, expected) => {
+    const filters = group([{ ...leaf("f", operator, value), case_insensitive: caseInsensitive }]);
+    expect(anomalyWhereClause(filters)).toBe(`WHERE\n  ${expected}`);
+  });
+
+  it("skips leaves it cannot render and the connector before them", () => {
+    const filters = group([
+      leaf("a", "is_empty", null),
+      leaf("b", "=", "2", "OR"),
+      group([]),
+      leaf("c", "in", []),
+    ]);
+    expect(anomalyWhereClause(filters)).toBe("WHERE\n  b = '2'");
+  });
+
+  it("builds the preview from an API-written V2 group instead of throwing", () => {
+    const result = buildAnomalyPreviewSql({
+      query_mode: "filters",
+      stream_name: "logs",
+      detection_function: "count",
+      histogram_interval: "5m",
+      filters: group([leaf("level", "=", "error"), leaf("code", ">", "499")]),
+    });
+    expect(result).toContain("WHERE\n  level = 'error'\n  AND code > '499'\n");
+  });
+
+  it("builds the preview with an OR group instead of dropping it", () => {
+    const result = buildAnomalyPreviewSql({
+      query_mode: "filters",
+      stream_name: "logs",
+      detection_function: "count",
+      histogram_interval: "5m",
+      filters: group([leaf("a", "=", "1"), leaf("b", "=", "2", "OR")]),
+    });
+    expect(result).toContain("FROM logs\nWHERE\n  a = '1'\n  OR b = '2'\nGROUP BY");
   });
 });

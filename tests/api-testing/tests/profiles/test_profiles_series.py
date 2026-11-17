@@ -295,8 +295,8 @@ def test_ser29_start_equals_end(client: OpenObserveClient, ref: RefData):
 
 
 def test_ser30_filter_op_not_equal(client: OpenObserveClient, ref: RefData):
-    resp = _series(client, ref.stream, _checkout(ref, filters=[{"key": "host_name", "op": "!=", "value": "x"}]))
-    _assert_400(resp, "only filter op '=' is supported")
+    body = _series_ok(client, ref.stream, _checkout(ref, filters=[{"key": "host_name", "op": "!=", "value": "host-a"}]))
+    assert _points(body) == [(ref.bucket(4), 7.85e9), (ref.bucket(6), 0.15e9)]
 
 
 @pytest.mark.parametrize("key", ["stack", "a;b", "a" * 129], ids=["ser31-reserved", "ser31-unsafe", "ser31-129-chars"])

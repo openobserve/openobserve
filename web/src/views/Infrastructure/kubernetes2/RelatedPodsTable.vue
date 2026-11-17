@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { TABLE_MAX_HEIGHT } from "./tableSizing";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -54,6 +55,8 @@ const { t } = useI18nTyped();
 const rows = computed(() => sortRows(props.pods, (p) => p.cpuCores, true));
 
 const containersOf = (pod: PodRow) => pod.containers.filter((c) => !c.init);
+
+const readyCount = (pod: PodRow) => containersOf(pod).filter((c) => c.running).length;
 
 const readyText = (pod: PodRow) => {
   const containers = containersOf(pod);
@@ -94,7 +97,7 @@ const columns = computed<OTableColumnDef<PodRow>[]>(() => [
     header: raw(""),
     accessorFn: (p) => p.warnings.length,
     size: 40,
-    sortable: true,
+    sortable: false,
   },
   {
     id: "node",
@@ -109,7 +112,13 @@ const columns = computed<OTableColumnDef<PodRow>[]>(() => [
     accessorFn: (p) => p.namespace,
     sortable: true,
   },
-  { id: "ready", header: t("infra.k8s2.factReady"), accessorFn: readyText, size: 80 },
+  {
+    id: "ready",
+    header: t("infra.k8s2.factReady"),
+    accessorFn: readyCount,
+    size: 80,
+    sortable: true,
+  },
   {
     id: "cpu",
     header: t("infra.k8s2.columnCpu"),
@@ -147,8 +156,10 @@ const openNode = (p: PodRow) =>
     row-key="key"
     dense
     virtual-scroll
-    max-height="41.25rem"
+    :max-height="TABLE_MAX_HEIGHT"
     pagination="none"
+    sorting="client"
+    enable-column-resize
     :frame="false"
     :show-global-filter="false"
     data-test="k8s2-related-pods"

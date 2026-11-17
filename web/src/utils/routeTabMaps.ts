@@ -111,6 +111,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     otelCollector: "otelCollector",
     telegraf: "telegraf",
     cloudwatchMetrics: "cloudwatchMetrics",
+    datadogAgentMetrics: "datadogAgentMetrics",
   },
 
   /** ingestion/logs/Index.vue */
@@ -126,6 +127,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     logstash: "logstash",
     syslogNg: "syslogNg",
     splunkHec: "splunkHec",
+    datadogAgentLogs: "datadogAgentLogs",
     loongcollector: "loongcollector",
   },
 

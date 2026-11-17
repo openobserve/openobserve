@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
@@ -26,6 +26,8 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { k8sInstantQuery } from "@/services/kubernetes.queries";
@@ -37,6 +39,14 @@ import type { Series } from "./kubernetesModel";
 import { VIEW_ICON } from "./k8sTree";
 import type { DetailsRef, K8sUrlState } from "./kubernetesUrlState";
 import type { K8sTime } from "./useKubernetesInventory";
+import {
+  COLLAPSE_THRESHOLD,
+  collapseNamespaces,
+  isBoundary,
+  namespaceId,
+  shouldCollapse,
+  type CollapseMode,
+} from "./dependencyCollapse";
 import {
   FLOW_STREAM,
   buildGraph,
@@ -82,6 +92,9 @@ const forbidden = ref(false);
 const loaded = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
 const selectedEdgeId = ref<string | null>(null);
+const collapseMode = ref<CollapseMode>("auto");
+const expandedNamespaces = ref<Set<string>>(new Set());
+const COLLAPSE_MODES: CollapseMode[] = ["auto", "expanded", "collapsed"];
 
 const hasFlows = computed(() => props.hasStream(FLOW_STREAM));
 
@@ -105,6 +118,7 @@ async function load() {
     totals.value = [];
     loaded.value = false;
     selectedEdgeId.value = null;
+    expandedNamespaces.value = new Set();
     loadedFor = null;
   }
   if (!hasFlows.value || props.clusterPending) {
@@ -170,9 +184,70 @@ const edges = computed(() =>
   ),
 );
 
-const graph = computed(() => buildGraph(edges.value));
+// A namespace filter or a search is the user asking to see workloads, so it never folds them.
+const filtering = computed(() => props.state.namespaces.length > 0 || !!props.state.search);
 
-const capped = computed(() => graph.value.edges.length < edges.value.length);
+const collapseState = computed(() => ({
+  mode: filtering.value ? ("expanded" as const) : collapseMode.value,
+  expanded: expandedNamespaces.value,
+  threshold: COLLAPSE_THRESHOLD,
+}));
+
+const collapsedEdges = computed(() => collapseNamespaces(edges.value, collapseState.value));
+
+const graph = computed(() => buildGraph(collapsedEdges.value));
+
+const capped = computed(() => graph.value.edges.length < collapsedEdges.value.length);
+
+const hasGroups = computed(() => graph.value.nodes.some((n) => isBoundary(n.end)));
+
+// Only while grouping is on, and only for namespaces the map still draws, so a chip always undoes something.
+const expandedList = computed(() => {
+  if (!shouldCollapse(edges.value, collapseState.value)) return [];
+  const drawn = new Set(
+    graph.value.nodes.filter((n) => n.end.kind === "workload").map((n) => boundaryKey(n.end)),
+  );
+  return [...expandedNamespaces.value]
+    .filter((id) => drawn.has(id))
+    .sort((a, b) => a.localeCompare(b));
+});
+
+const groupChips = ref<HTMLElement | null>(null);
+const collapseModeGroup = ref<{ $el: HTMLElement } | null>(null);
+
+const chipEls = () => [...(groupChips.value?.querySelectorAll<HTMLElement>("[data-ns-id]") ?? [])];
+
+async function toggleNamespace(id: string) {
+  const wasExpanded = expandedNamespaces.value.has(id);
+  const index = expandedList.value.indexOf(id);
+  const next = new Set(expandedNamespaces.value);
+  if (!next.delete(id)) next.add(id);
+  expandedNamespaces.value = next;
+  await nextTick();
+  const chips = chipEls();
+  const target = wasExpanded
+    ? (chips[index] ?? chips[index - 1])
+    : chips.find((c) => c.dataset.nsId === id);
+  (
+    target ?? collapseModeGroup.value?.$el?.querySelector<HTMLElement>("button, [tabindex]")
+  )?.focus();
+}
+
+const setCollapseMode = (mode: unknown) => {
+  if (!COLLAPSE_MODES.includes(mode as CollapseMode)) return;
+  collapseMode.value = mode as CollapseMode;
+  expandedNamespaces.value = new Set();
+};
+
+const COLLAPSE_LABEL: Record<CollapseMode, I18nKey> = {
+  auto: "infra.k8s2.depsCollapseAuto",
+  expanded: "infra.k8s2.depsCollapseExpanded",
+  collapsed: "infra.k8s2.depsCollapseCollapsed",
+};
+
+const boundaryKey = (end: FlowEnd) => namespaceId(end.cluster, end.namespace);
+
+const namespaceOfId = (id: string) => id.slice(id.lastIndexOf("/") + 1);
 
 const selectedEdge = computed(
   () => graph.value.edges.find((e) => e.id === selectedEdgeId.value) ?? null,
@@ -196,6 +271,8 @@ function endLabel(end: FlowEnd): string {
 }
 
 function endDetail(end: FlowEnd): I18nText {
+  if (isBoundary(end))
+    return t("infra.k8s2.depsGroupDetail", { count: end.members ?? 0 }, end.members ?? 0);
   if (end.kind === "external") return t("infra.k8s2.depsOutsideCluster");
   if (end.kind === "node") return t("infra.k8s2.depsHostTraffic");
   return t("infra.k8s2.depsTypeIn", { type: end.ownerType, namespace: end.namespace });
@@ -212,7 +289,7 @@ const arrowOf = (edge: FlowEdge) => (edge.directed ? "→" : "↔");
 
 // Workloads by namespace too, so two namespaces' web → api read apart.
 const fullLabel = (end: FlowEnd) =>
-  end.kind === "workload" ? `${end.namespace}/${end.name}` : endLabel(end);
+  end.kind === "workload" && !isBoundary(end) ? `${end.namespace}/${end.name}` : endLabel(end);
 
 const edgeText = (edge: FlowEdge) =>
   `${fullLabel(edge.source)} ${arrowOf(edge)} ${fullLabel(edge.target)}`;
@@ -253,6 +330,7 @@ const colorOf = (end: FlowEnd) =>
 
 // A workload by its owner's kind, as the resource tree shows it.
 function iconOf(end: FlowEnd): IconName {
+  if (isBoundary(end)) return VIEW_ICON.namespaces;
   if (end.kind === "external") return "public";
   if (end.kind === "node") return VIEW_ICON.nodes;
   return (VIEW_ICON as Record<string, IconName>)[`${end.ownerType.toLowerCase()}s`] ?? "widgets";
@@ -267,10 +345,11 @@ const mapNodes = computed<MapNode[]>(() => {
     position: positions.get(end.id)!,
     label: endLabel(end),
     detail: kindText(end),
-    title: `${fullLabel(end)}\n${endDetail(end)}`,
+    title: `${fullLabel(end)} · ${endDetail(end)}`,
     icon: iconOf(end),
     color: colorOf(end),
     clickable: canOpen(end),
+    group: isBoundary(end),
     total,
   }));
 });
@@ -316,9 +395,13 @@ watch(graph, (next) => {
 // Outside addresses, and owner types without a drawer, have nothing to open.
 const kindOf = (end: FlowEnd) => (end.kind === "external" ? null : detailKindOf(end.ownerType));
 
-const canOpen = (end: FlowEnd) => kindOf(end) != null;
+const canOpen = (end: FlowEnd) => isBoundary(end) || kindOf(end) != null;
 
 function openEnd(end: FlowEnd) {
+  if (isBoundary(end)) {
+    toggleNamespace(boundaryKey(end));
+    return;
+  }
   const kind = kindOf(end);
   if (!kind) return;
   emit("open", {
@@ -412,6 +495,13 @@ const switchedEdges = computed(() => {
   return [...new Map([...shown, ...picked].map((e) => [e.id, e])).values()];
 });
 
+// Grouped like the map, so the header compares connections of the same kind.
+const switchedTotal = computed(() =>
+  filtering.value
+    ? switchedEdges.value.length
+    : collapseNamespaces(switchedEdges.value, collapseState.value).length,
+);
+
 // Only the namespace filter and search; the switches keep what they show.
 function clearFilters() {
   emit("update", { namespaces: [], search: "" });
@@ -426,7 +516,7 @@ function clearFilters() {
     <K8sListHeader
       :title="t('infra.k8s2.depsTitle')"
       :count="graph.edges.length"
-      :total="switchedEdges.length"
+      :total="switchedTotal"
       :count-label="t('infra.k8s2.depsCount', { count: graph.edges.length }, graph.edges.length)"
       namespaced
       :namespace-options="namespaceChoices"
@@ -470,6 +560,41 @@ function clearFilters() {
         data-test="k8s2-deps-show-low-traffic"
         @update:model-value="(lowTraffic: unknown) => emit('update', { lowTraffic: !!lowTraffic })"
       />
+      <div class="flex items-center gap-2" data-test="k8s2-deps-collapse">
+        <OText tag="span" class="text-text-secondary text-xs">
+          {{ t("infra.k8s2.depsCollapseMode") }}
+          <OTooltip
+            :content="t('infra.k8s2.depsCollapseHint', { count: COLLAPSE_THRESHOLD })"
+            side="top"
+          />
+        </OText>
+        <OToggleGroup
+          ref="collapseModeGroup"
+          :model-value="filtering ? 'expanded' : collapseMode"
+          :aria-label="t('infra.k8s2.depsCollapseMode')"
+          :disabled="filtering"
+          mobile-dropdown
+          data-test="k8s2-deps-collapse-mode"
+          @update:model-value="setCollapseMode"
+        >
+          <OToggleGroupItem
+            v-for="m in COLLAPSE_MODES"
+            :key="m"
+            :value="m"
+            size="xs"
+            :data-test="`k8s2-deps-collapse-${m}`"
+          >
+            {{ t(COLLAPSE_LABEL[m]) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <OText
+          v-if="filtering"
+          tag="span"
+          class="text-text-secondary text-xs"
+          data-test="k8s2-deps-collapse-off"
+          >{{ t("infra.k8s2.depsCollapseFiltering") }}</OText
+        >
+      </div>
       <div class="flex items-center gap-1">
         <OText tag="span" class="text-text-secondary text-xs" data-test="k8s2-deps-caption">
           {{ t("infra.k8s2.depsCaption", { window: windowText }) }}
@@ -548,8 +673,37 @@ function clearFilters() {
         class="text-text-secondary text-xs"
         data-test="k8s2-deps-capped"
       >
-        {{ t("infra.k8s2.depsCapped", { shown: graph.edges.length, total: edges.length }) }}
+        {{
+          t("infra.k8s2.depsCapped", { shown: graph.edges.length, total: collapsedEdges.length })
+        }}
       </OText>
+      <div
+        v-if="hasGroups || expandedList.length"
+        ref="groupChips"
+        class="flex flex-wrap items-center gap-2"
+        data-test="k8s2-deps-groups"
+      >
+        <OText
+          v-if="hasGroups"
+          tag="span"
+          class="text-text-secondary text-xs"
+          data-test="k8s2-deps-group-hint"
+        >
+          {{ t("infra.k8s2.depsGroupHint") }}
+        </OText>
+        <OButton
+          v-for="id in expandedList"
+          :key="id"
+          variant="outline"
+          size="xs"
+          icon-left="close"
+          :data-ns-id="id"
+          data-test="k8s2-deps-group-collapse"
+          @click="toggleNamespace(id)"
+        >
+          {{ t("infra.k8s2.depsGroupCollapse", { namespace: namespaceOfId(id) }) }}
+        </OButton>
+      </div>
       <div class="relative flex min-h-0 flex-1 max-md:min-h-96" data-test="k8s2-deps-area">
         <!-- Before the map, so keyboard users reach the edge list without tabbing through every card. not-sr-only
              resets position to static, so this wrapper does the overlay positioning. -->

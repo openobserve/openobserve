@@ -33,6 +33,17 @@ use crate::{
     service::functions::FunctionDeleteError,
 };
 
+// Only documents update_function's answer: the function itself when nothing changed.
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum UpdateFunctionVariants {
+    Unchanged(Box<Transform>),
+    Updated(MetaHttpResponse),
+}
+
+config::any_of_schema!(UpdateFunctionAnswer, UpdateFunctionVariants);
+
 /// CreateFunction
 #[utoipa::path(
     post,
@@ -53,7 +64,7 @@ use crate::{
     ),
     request_body(content = inline(Transform), description = "Function data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -171,7 +182,7 @@ pub async fn list_functions(
         ("force" = bool, Query, description = "Force delete function regardless pipeline dependencies"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -312,7 +323,7 @@ pub async fn delete_function_bulk(
     ),
     request_body(content = inline(Transform), description = "Function data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = UpdateFunctionAnswer),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -409,11 +420,12 @@ pub async fn list_pipeline_dependencies(
     ),
     request_body(content = inline(TestVRLRequest), description = "Test run function", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::function::TestVRLResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-mcp" = json!({"category": "functions"})),
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "create"}))
     )
 )]
 pub async fn test_function(

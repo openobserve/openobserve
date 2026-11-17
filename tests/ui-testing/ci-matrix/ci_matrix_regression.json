@@ -15,7 +15,8 @@
       "logs-internal-streams.spec.js",
       "logs-11966-value-multiselect-quotes.spec.js",
       "logs-explain-sql-mode.spec.js",
-      "logs-3322-field-filter-similar-names.spec.js"
+      "logs-3322-field-filter-similar-names.spec.js",
+      "logs-723-custom-range-sql-limit.spec.js"
     ],
     "disabled": []
   },
@@ -52,7 +53,8 @@
       "alerts-14796-destination-usage.spec.js",
       "alerts-15091-alert-edit-flow.spec.js",
       "alerts-15096-query-mode-regressions.spec.js",
-      "alerts-15636-cross-type-join.spec.js"
+      "alerts-15636-cross-type-join.spec.js",
+      "alerts-15497-clone-composite-load-races.spec.js"
     ],
     "disabled": []
   },
@@ -116,7 +118,14 @@
       "traces-15477-open-trace-new-tab.spec.js",
       "traces-ent3126-dag-controls-dark.spec.js",
       "traces-1578-apply-search-same-field.spec.js",
-      "traces-3126-catalog-health-badge.spec.js"
+      "traces-3126-catalog-health-badge.spec.js",
+      "traces-14760-auto-run-off.spec.js",
+      "traces-2693-span-kind-display.spec.js",
+      "traces-15973-trace-graph-views.spec.js",
+      "traces-11145-row-date.spec.js",
+      "traces-12213-cross-linking-tab.spec.js",
+      "traces-ent1272-share-link-stream.spec.js",
+      "traces-ent1740-dag-label-overflow.spec.js"
     ],
     "disabled": []
   },
@@ -140,7 +149,9 @@
       "internal-route-guards.spec.js",
       "datetime-paste-invalid-values-14648.spec.js",
       "iam-users-15546-edit-dialog-cancel.spec.js",
-      "query-management-sql-tooltip.spec.js"
+      "query-management-sql-tooltip.spec.js",
+      "signup-2795-signed-in-redirect.spec.js",
+      "login-2962-entry-payload.spec.js"
     ],
     "disabled": []
   },
@@ -195,11 +206,14 @@
   },
   {
     "testfolder": "SLO-Regression",
+    "_comment": "Pinned to 3 workers like the SLO shard: at 5 the concurrent SLO/folder writes trip SQLite's 'database is locked' on the single-node meta store.",
     "actual_folder": "RegressionSet/SLO",
     "browser": "chrome",
+    "workers": 3,
     "run_files": [
       "slo-error-messages.spec.js",
-      "slo-14273-form-overlay-exclusivity.spec.js"
+      "slo-14273-form-overlay-exclusivity.spec.js",
+      "slo-16546-import.spec.js"
     ],
     "disabled": []
   },
@@ -223,7 +237,19 @@
       "rum-15190-paths-build-funnel.spec.js",
       "rum-15230-paths-drawer-user.spec.js",
       "rum-15304-overview-synthetic-counts.spec.js",
-      "rum-15269-list-view-state.spec.js"
+      "rum-15269-list-view-state.spec.js",
+      "rum-3268-session-link-no-nan.spec.js",
+      "rum-3268-heatmap-no-view-id.spec.js",
+      "rum-3268-trace-duration-skew.spec.js",
+      "rum-3268-no-widen-at-30d.spec.js",
+      "rum-3268-analytics-header-1200.spec.js",
+      "rum-14694-replay-missing-segment.spec.js",
+      "rum-3129-sessions-and-trace-card.spec.js",
+      "rum-replay-v710-traces-tab.spec.js",
+      "rum-2725-cdn-replay-recording.spec.js",
+      "rum-3072-performance-deep-links.spec.js",
+      "rum-2811-widen-range-picker-label.spec.js",
+      "rum-2924-overview-cards-narrow-viewport.spec.js"
     ],
     "disabled": [],
     "ingest_allowed_upto": "1440",
@@ -237,7 +263,8 @@
     "run_files": [
       "synthetics-15269-list-state.spec.js",
       "synthetics-15060-full-text-on-hover.spec.js",
-      "synthetics-ent2691-destination-delete-guard.spec.js"
+      "synthetics-ent2691-destination-delete-guard.spec.js",
+      "synthetics-ent3140-run-detail-steps.spec.js"
     ],
     "disabled": [],
     "synthetics_enabled": "true",

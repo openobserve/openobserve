@@ -22,6 +22,7 @@ import { getUUID } from "@/utils/zincutils";
 import { expireSession } from "@/utils/sessionServices";
 import { attemptTokenRefresh } from "@/services/http";
 import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
+import { isNetworkFailure } from "@/utils/networkFailure";
 
 // Create and manage stream workers
 let streamWorker: Worker | null = null;
@@ -33,11 +34,6 @@ const createStreamWorker = () => {
   }
   return streamWorker;
 };
-
-// Chrome, Safari and Firefox wordings of a fetch body read that lost its connection.
-const NETWORK_FAILURE_PATTERN = /network error|Load failed|Failed to fetch|NetworkError/i;
-const isNetworkFailure = (error: unknown): boolean =>
-  error instanceof TypeError && NETWORK_FAILURE_PATTERN.test(error.message);
 
 // Status and message sit on prototypes of a Response or Error, which the error spread would drop.
 const withErrorFields = (error: unknown): unknown =>
@@ -127,6 +123,7 @@ const useHttpStreaming = () => {
       searchType?: string;
       meta?: any;
       clear_cache?: boolean;
+      use_cache?: boolean;
     },
     handlers: {
       data: (data: any, response: any) => void;
@@ -180,6 +177,7 @@ const useHttpStreaming = () => {
     searchType?: string;
     meta?: any;
     clear_cache?: boolean;
+    use_cache?: boolean;
   }) => {
     const { traceId, org_id, type, queryReq, searchType, pageType, meta, clear_cache } = data;
     const abortController = new AbortController();
@@ -190,7 +188,9 @@ const useHttpStreaming = () => {
 
     // Construct URL based on search type
     let url = "";
-    const use_cache = (window as any).use_cache !== undefined ? (window as any).use_cache : true;
+    const use_cache =
+      data.use_cache ??
+      ((window as any).use_cache !== undefined ? (window as any).use_cache : true);
 
     // Check if this is a multi-stream request (similar to search.ts logic)
     const isMultiStream = typeof queryReq.query?.sql !== "string";
@@ -213,6 +213,7 @@ const useHttpStreaming = () => {
       if (meta?.fallback_order_by_col)
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
       if (clear_cache) url += `&clear_cache=${clear_cache}`;
+      if (meta?.security_scope) url += `&security_scope=true`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
     } else if (type === "values") {
       url = `/_values_stream`;

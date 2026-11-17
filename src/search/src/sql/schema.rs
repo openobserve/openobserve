@@ -26,7 +26,7 @@ use infra::schema::{
     SchemaCache, get_stream_setting_defined_schema_fields, get_stream_setting_fts_fields,
     unwrap_stream_settings,
 };
-use schema::check_schema_for_defined_schema_fields;
+use schema::{effective_uds_fields, required_uds_fields};
 
 pub fn generate_select_star_schema(
     schemas: HashMap<TableReference, Arc<SchemaCache>>,
@@ -43,91 +43,77 @@ pub fn generate_select_star_schema(
     for (name, schema) in schemas {
         let stream_settings = unwrap_stream_settings(schema.schema());
         let defined_schema_fields = get_stream_setting_defined_schema_fields(&stream_settings);
+        let table_type = name.get_stream_type(stream_type);
+        let mut uds_fields = effective_uds_fields(table_type, &defined_schema_fields);
+        uds_fields.remove(&cfg.common.column_all);
+        let uds_present = uds_fields
+            .iter()
+            .filter(|field| schema.contains_field(field))
+            .count();
         let has_original_column = *has_original_column.get(&name).unwrap_or(&false);
         let need_all_column = columns
             .get(&name)
-            .map(|cols| cols.contains(&cfg.common.column_all))
-            .unwrap_or(false);
-        // check if it is user defined schema
-        if defined_schema_fields.is_empty() || defined_schema_fields.len() > quick_mode_num_fields {
-            let quick_mode = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
-            // don't automatically skip _original for scheduled pipeline searches
-            let skip_original_column = !has_original_column
-                && !matches!(search_event_type, Some(SearchEventType::DerivedStream))
-                && (schema.contains_field(ORIGINAL_DATA_COL_NAME)
-                    || schema.contains_field(ALL_VALUES_COL_NAME));
-            if quick_mode || skip_original_column {
-                let fields = if quick_mode {
-                    let mut columns = columns.get(&name).cloned();
-                    // filter columns by defined schema fields
-                    if !defined_schema_fields.is_empty() {
-                        let uds_columns = defined_schema_fields.iter().collect::<HashSet<_>>();
-                        if let Some(columns) = columns.as_mut() {
-                            columns.retain(|column| uds_columns.contains(column));
-                        }
-                    }
-                    let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-                    generate_quick_mode_fields(
-                        schema.schema(),
-                        columns,
-                        &fts_fields,
-                        skip_original_column,
-                        need_fst_fields,
-                        name.get_stream_type(stream_type),
-                    )
-                } else {
-                    // skip selecting "_original" column if `SELECT * ...`
-                    let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
-                    if !need_fst_fields {
-                        fields.retain(|field| {
-                            field.name() != ORIGINAL_DATA_COL_NAME
-                                && field.name() != ALL_VALUES_COL_NAME
-                        });
-                    }
-                    fields
-                };
-                let schema = Arc::new(SchemaCache::new(
-                    Schema::new(fields).with_metadata(schema.schema().metadata().clone()),
-                ));
-                used_schemas.insert(name, schema);
-            } else {
-                used_schemas.insert(name, schema);
-            }
+            .is_some_and(|cols| cols.contains(&cfg.common.column_all));
+        let fts_fields = if need_fst_fields {
+            get_stream_setting_fts_fields(&stream_settings)
         } else {
-            used_schemas.insert(
-                name,
-                generate_user_defined_schema(
-                    schema.as_ref(),
-                    defined_schema_fields,
-                    need_all_column,
-                ),
-            );
+            Vec::new()
+        };
+        let projected = if defined_schema_fields.is_empty() {
+            None
+        } else {
+            Some(project_user_defined_schema(
+                schema.schema(),
+                &uds_fields,
+                &fts_fields,
+                (need_all_column || !cfg.search.feature_query_exclude_all)
+                    .then_some(cfg.common.column_all.as_str()),
+            ))
+        };
+        let quick_active = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
+        if let Some(projected) = projected.as_ref()
+            && !(uds_present > quick_mode_num_fields && quick_active)
+        {
+            used_schemas.insert(name, Arc::new(SchemaCache::new(projected.clone())));
+            continue;
+        }
+        let skip_original_column = !has_original_column
+            && !matches!(search_event_type, Some(SearchEventType::DerivedStream))
+            && (schema.contains_field(ORIGINAL_DATA_COL_NAME)
+                || schema.contains_field(ALL_VALUES_COL_NAME));
+        if quick_active || skip_original_column {
+            let fields = if quick_active {
+                let mut columns = columns.get(&name).cloned().unwrap_or_default();
+                if projected.is_some() {
+                    columns.insert(ID_COL_NAME.to_string());
+                }
+                generate_quick_mode_fields(
+                    projected.as_ref().unwrap_or(schema.schema()),
+                    Some(columns),
+                    &fts_fields,
+                    skip_original_column,
+                    need_fst_fields,
+                    table_type,
+                )
+            } else {
+                let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
+                if !need_fst_fields {
+                    fields.retain(|field| {
+                        field.name() != ORIGINAL_DATA_COL_NAME
+                            && field.name() != ALL_VALUES_COL_NAME
+                    });
+                }
+                fields
+            };
+            let schema = Arc::new(SchemaCache::new(
+                Schema::new(fields).with_metadata(schema.schema().metadata().clone()),
+            ));
+            used_schemas.insert(name, schema);
+        } else {
+            used_schemas.insert(name, schema);
         }
     }
     used_schemas
-}
-
-pub fn generate_user_defined_schema(
-    schema: &SchemaCache,
-    defined_schema_fields: Vec<String>,
-    need_all_column: bool,
-) -> Arc<SchemaCache> {
-    let cfg = get_config();
-    let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-    fields.insert(TIMESTAMP_COL_NAME.to_string());
-    fields.insert(ID_COL_NAME.to_string());
-
-    if need_all_column || !cfg.search.feature_query_exclude_all {
-        fields.insert(cfg.common.column_all.to_string());
-    }
-    let new_fields = fields
-        .iter()
-        .filter_map(|name| schema.field_with_name(name).cloned())
-        .collect::<Vec<_>>();
-
-    Arc::new(SchemaCache::new(
-        Schema::new(new_fields).with_metadata(schema.schema().metadata().clone()),
-    ))
 }
 
 pub fn generate_quick_mode_fields(
@@ -168,23 +154,17 @@ pub fn generate_quick_mode_fields(
         }
     };
 
+    if cfg.search.feature_query_exclude_all {
+        fields.retain(|field| {
+            field.name() != &cfg.common.column_all
+                && field.name() != ORIGINAL_DATA_COL_NAME
+                && field.name() != ALL_VALUES_COL_NAME
+        });
+    }
     let mut fields_name = fields
         .iter()
         .map(|f| f.name().to_string())
         .collect::<HashSet<_>>();
-
-    // check _all column
-    if cfg.search.feature_query_exclude_all {
-        if fields_name.contains(&cfg.common.column_all) {
-            fields.retain(|field| field.name().ne(&cfg.common.column_all));
-        }
-        if fields_name.contains(ORIGINAL_DATA_COL_NAME) {
-            fields.retain(|field| field.name().ne(ORIGINAL_DATA_COL_NAME));
-        }
-        if fields_name.contains(ALL_VALUES_COL_NAME) {
-            fields.retain(|field| field.name().ne(ALL_VALUES_COL_NAME));
-        }
-    }
 
     // check _timestamp column
     if !fields_name.contains(TIMESTAMP_COL_NAME)
@@ -192,6 +172,14 @@ pub fn generate_quick_mode_fields(
     {
         fields.push(Arc::new(field.clone()));
         fields_name.insert(TIMESTAMP_COL_NAME.to_string());
+    }
+    // truncation must not drop _all when the query config keeps it, as in the UDS projection
+    if !cfg.search.feature_query_exclude_all
+        && !fields_name.contains(&cfg.common.column_all)
+        && let Ok(field) = schema.field_with_name(&cfg.common.column_all)
+    {
+        fields.push(Arc::new(field.clone()));
+        fields_name.insert(cfg.common.column_all.clone());
     }
     // add the selected columns
     if let Some(columns) = columns {
@@ -214,7 +202,7 @@ pub fn generate_quick_mode_fields(
                 fields_name.insert(field.name().to_string());
             }
         }
-    } else if fields_name.contains(ALL_VALUES_COL_NAME) {
+    } else if fields_name.remove(ALL_VALUES_COL_NAME) {
         fields.retain(|field| field.name() != ALL_VALUES_COL_NAME);
     }
 
@@ -229,7 +217,7 @@ pub fn generate_quick_mode_fields(
     }
 
     // truncation must not drop the columns a stream type is rendered from
-    for field in check_schema_for_defined_schema_fields(stream_type, schema, Vec::new()) {
+    for field in required_uds_fields(stream_type) {
         if !fields_name.contains(&field)
             && let Ok(field) = schema.field_with_name(&field)
         {
@@ -238,41 +226,7 @@ pub fn generate_quick_mode_fields(
         }
     }
 
-    // include gen AI fields for LLM streams
-    if let Some(settings) = unwrap_stream_settings(schema)
-        && settings.is_llm_stream
-    {
-        use config::meta::traces::{
-            GEN_AI_SENTINEL_COLUMN, OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS,
-            REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
-        };
-
-        let field_lists: &[&[&str]] = if schema.field_with_name(GEN_AI_SENTINEL_COLUMN).is_ok() {
-            &[
-                REQUIRED_GEN_AI_FIELDS,
-                OPTIONAL_GEN_AI_FIELDS,
-                &["trace_id", "gen_ai_conversation_id", "user_id"],
-            ]
-        } else {
-            &[
-                REQUIRED_LLM_FIELDS,
-                OPTIONAL_LLM_FIELDS,
-                &["trace_id", "llm_session_id", "llm_user_id"],
-            ]
-        };
-        for list in field_lists {
-            for field_name in *list {
-                if !fields_name.contains(*field_name)
-                    && let Ok(field) = schema.field_with_name(field_name)
-                {
-                    fields.push(Arc::new(field.clone()));
-                    fields_name.insert(field_name.to_string());
-                }
-            }
-        }
-    }
-
-    if !need_fst_fields && skip_original_column && fields_name.contains(ORIGINAL_DATA_COL_NAME) {
+    if !need_fst_fields && skip_original_column && fields_name.remove(ORIGINAL_DATA_COL_NAME) {
         fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
     }
     fields
@@ -333,6 +287,28 @@ pub fn has_original_column(
     has_original_column
 }
 
+fn project_user_defined_schema(
+    schema: &Schema,
+    uds_fields: &HashSet<String>,
+    fts_fields: &[String],
+    all_column: Option<&str>,
+) -> Schema {
+    let fields = schema
+        .fields()
+        .iter()
+        .filter(|field| {
+            let name = field.name();
+            uds_fields.contains(name)
+                || name == TIMESTAMP_COL_NAME
+                || name == ID_COL_NAME
+                || all_column == Some(name.as_str())
+                || fts_fields.contains(name)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    Schema::new_with_metadata(fields, schema.metadata().clone())
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -343,6 +319,24 @@ mod tests {
     use hashbrown::{HashMap, HashSet};
 
     use super::*;
+
+    fn generate_user_defined_schema(
+        schema: &SchemaCache,
+        stream_type: StreamType,
+        defined_schema_fields: Vec<String>,
+        need_all_column: bool,
+    ) -> Arc<SchemaCache> {
+        let cfg = get_config();
+        let mut fields = effective_uds_fields(stream_type, &defined_schema_fields);
+        fields.remove(&cfg.common.column_all);
+        Arc::new(SchemaCache::new(project_user_defined_schema(
+            schema.schema(),
+            &fields,
+            &[],
+            (need_all_column || !cfg.search.feature_query_exclude_all)
+                .then_some(cfg.common.column_all.as_str()),
+        )))
+    }
 
     #[test]
     fn test_has_original_column_with_original() {
@@ -442,23 +436,40 @@ mod tests {
 
     #[test]
     fn test_generate_quick_mode_fields_with_columns() {
-        let fields = vec![
-            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
-            Arc::new(Field::new("field1", DataType::Utf8, true)),
-            Arc::new(Field::new("field2", DataType::Int32, true)),
-            Arc::new(Field::new("selected_field", DataType::Float64, true)),
-        ];
-        let schema = Schema::new(fields);
+        let cutoff = get_config().limit.quick_mode_num_fields;
+        for position in [0, cutoff, cutoff * 2] {
+            let mut fields = (0..cutoff * 2 + 1)
+                .map(|i| Field::new(format!("field{i}"), DataType::Utf8, true))
+                .collect::<Vec<_>>();
+            fields.insert(
+                position,
+                Field::new(ORIGINAL_DATA_COL_NAME, DataType::Utf8, true),
+            );
+            fields.push(Field::new("selected_field", DataType::Float64, true));
+            fields.push(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false));
+            let schema = Schema::new(fields);
+            let columns = HashSet::from([
+                "selected_field".to_string(),
+                ORIGINAL_DATA_COL_NAME.to_string(),
+            ]);
 
-        let mut columns = HashSet::new();
-        columns.insert("selected_field".to_string());
+            let result = generate_quick_mode_fields(
+                &schema,
+                Some(columns),
+                &[],
+                false,
+                false,
+                StreamType::Logs,
+            );
 
-        let result =
-            generate_quick_mode_fields(&schema, Some(columns), &[], false, false, StreamType::Logs);
-
-        // Should include timestamp and selected field
-        assert!(result.iter().any(|f| f.name() == TIMESTAMP_COL_NAME));
-        assert!(result.iter().any(|f| f.name() == "selected_field"));
+            for name in [TIMESTAMP_COL_NAME, "selected_field", ORIGINAL_DATA_COL_NAME] {
+                assert_eq!(
+                    result.iter().filter(|f| f.name() == name).count(),
+                    1,
+                    "{name} at {position} missing or duplicated"
+                );
+            }
+        }
     }
 
     #[test]
@@ -558,28 +569,34 @@ mod tests {
 
     #[test]
     fn test_generate_quick_mode_fields_with_fts_fields() {
-        let fields = vec![
-            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
-            Arc::new(Field::new("fts_field1", DataType::Utf8, true)),
-            Arc::new(Field::new("fts_field2", DataType::Utf8, true)),
-            Arc::new(Field::new("normal_field", DataType::Int32, true)),
-        ];
-        let schema = Schema::new(fields);
+        let cutoff = get_config().limit.quick_mode_num_fields;
+        for position in [0, cutoff, cutoff * 2] {
+            for auxiliary in [ORIGINAL_DATA_COL_NAME, ALL_VALUES_COL_NAME] {
+                let mut fields = (0..cutoff * 2 + 1)
+                    .map(|i| Field::new(format!("field{i}"), DataType::Utf8, true))
+                    .collect::<Vec<_>>();
+                fields.insert(position, Field::new(auxiliary, DataType::Utf8, true));
+                let schema = Schema::new(fields);
 
-        let fts_fields = vec!["fts_field1".to_string(), "fts_field2".to_string()];
+                let result = generate_quick_mode_fields(
+                    &schema,
+                    None,
+                    &[auxiliary.to_string()],
+                    true,
+                    true,
+                    StreamType::Logs,
+                );
 
-        let result = generate_quick_mode_fields(
-            &schema,
-            None,
-            &fts_fields,
-            false,
-            true, // need_fst_fields = true
-            StreamType::Logs,
-        );
-
-        // Should include FTS fields
-        assert!(result.iter().any(|f| f.name() == "fts_field1"));
-        assert!(result.iter().any(|f| f.name() == "fts_field2"));
+                assert_eq!(
+                    result
+                        .iter()
+                        .filter(|field| field.name() == auxiliary)
+                        .count(),
+                    1,
+                    "{auxiliary} at {position} missing or duplicated"
+                );
+            }
+        }
     }
 
     #[test]
@@ -673,7 +690,7 @@ mod tests {
         let schema_cache = SchemaCache::new(Schema::new(fields));
         let defined = vec!["custom_field".to_string()];
 
-        let result = generate_user_defined_schema(&schema_cache, defined, false);
+        let result = generate_user_defined_schema(&schema_cache, StreamType::Logs, defined, false);
         let schema = result.schema();
         let names: HashSet<_> = schema.fields().iter().map(|f| f.name().as_str()).collect();
         assert!(names.contains(TIMESTAMP_COL_NAME));
@@ -691,7 +708,7 @@ mod tests {
         let schema_cache = SchemaCache::new(Schema::new(fields));
         let defined = vec!["nonexistent_field".to_string()];
 
-        let result = generate_user_defined_schema(&schema_cache, defined, false);
+        let result = generate_user_defined_schema(&schema_cache, StreamType::Logs, defined, false);
         let schema = result.schema();
         let names: HashSet<_> = schema.fields().iter().map(|f| f.name().as_str()).collect();
         assert!(!names.contains("nonexistent_field"));
@@ -712,7 +729,7 @@ mod tests {
         let schema_cache = SchemaCache::new(Schema::new(fields));
         let defined = vec!["f1".to_string()];
 
-        let result = generate_user_defined_schema(&schema_cache, defined, true);
+        let result = generate_user_defined_schema(&schema_cache, StreamType::Logs, defined, true);
         let schema = result.schema();
         let names: HashSet<_> = schema.fields().iter().map(|f| f.name().as_str()).collect();
         assert!(names.contains(all_col));
@@ -737,5 +754,295 @@ mod tests {
         assert!(names.contains(TIMESTAMP_COL_NAME));
         assert!(names.contains(ID_COL_NAME));
         assert!(names.contains("field1"));
+    }
+
+    #[test]
+    fn test_generate_user_defined_schema_keeps_required_columns_missing_from_saved_list() {
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new("service_name", DataType::Utf8, true)),
+            Arc::new(Field::new("trace_id", DataType::Utf8, true)),
+            Arc::new(Field::new("span_id", DataType::Utf8, true)),
+        ];
+        let schema_cache = SchemaCache::new(Schema::new(fields));
+        let defined = vec!["service_name".to_string()];
+
+        let result =
+            generate_user_defined_schema(&schema_cache, StreamType::Profiles, defined, false);
+        let names: HashSet<_> = result
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().as_str())
+            .collect();
+        assert!(names.contains("trace_id"));
+        assert!(names.contains("span_id"));
+        assert!(names.contains("service_name"));
+    }
+
+    #[test]
+    fn test_quick_mode_width_counts_required_columns() {
+        let cutoff = config::get_config().limit.quick_mode_num_fields;
+        let mut fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            // packed historical column sits early in the schema, inside the truncation window
+            Arc::new(Field::new("packed_col", DataType::Utf8, true)),
+        ];
+        let mut defined = Vec::new();
+        for i in 0..cutoff {
+            let name = format!("user_field_{i}");
+            fields.push(Arc::new(Field::new(&name, DataType::Utf8, true)));
+            defined.push(name);
+        }
+        fields.push(Arc::new(Field::new("trace_id", DataType::Utf8, true)));
+        let settings = config::meta::stream::StreamSettings {
+            defined_schema_fields: defined,
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            config::utils::json::to_string(&settings).unwrap(),
+        )]);
+        let name = TableReference::bare("profiles_stream");
+        let schema = Arc::new(SchemaCache::new(Schema::new_with_metadata(
+            fields, metadata,
+        )));
+        let mut columns = HashMap::new();
+        let mut requested = HashSet::new();
+        requested.insert("trace_id".to_string());
+        columns.insert(name.clone(), requested);
+
+        let mut schemas = HashMap::new();
+        schemas.insert(name.clone(), schema.clone());
+        let quick = generate_select_star_schema(
+            schemas,
+            &columns,
+            HashMap::new(),
+            true,
+            StreamType::Profiles,
+            &None,
+            false,
+        );
+        let names: HashSet<_> = quick[&name]
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+        assert!(names.contains("trace_id"));
+        // saved + required crosses the cutoff, so quick mode truncates the saved tail
+        assert!(!names.contains(&format!("user_field_{}", cutoff - 1)));
+        // truncation runs over the UDS projection, so early packed columns stay hidden
+        assert!(!names.contains("packed_col"));
+
+        let mut schemas = HashMap::new();
+        schemas.insert(name.clone(), schema);
+        let full = generate_select_star_schema(
+            schemas,
+            &columns,
+            HashMap::new(),
+            false,
+            StreamType::Profiles,
+            &None,
+            false,
+        );
+        let names: HashSet<_> = full[&name]
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+        // quick mode off: the UDS projection still applies, packed columns stay hidden
+        assert!(names.contains("trace_id"));
+        assert!(names.contains(&format!("user_field_{}", cutoff - 1)));
+        assert!(!names.contains("packed_col"));
+    }
+
+    #[test]
+    fn test_select_star_uses_table_stream_type_for_uds() {
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new("service_name", DataType::Utf8, true)),
+            Arc::new(Field::new("trace_id", DataType::Utf8, true)),
+        ];
+        let settings = config::meta::stream::StreamSettings {
+            defined_schema_fields: vec!["service_name".to_string()],
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            config::utils::json::to_string(&settings).unwrap(),
+        )]);
+        let name = TableReference::partial("profiles", "p");
+        let mut schemas = HashMap::new();
+        schemas.insert(
+            name.clone(),
+            Arc::new(SchemaCache::new(Schema::new_with_metadata(
+                fields, metadata,
+            ))),
+        );
+
+        let result = generate_select_star_schema(
+            schemas,
+            &HashMap::new(),
+            HashMap::new(),
+            false,
+            StreamType::Logs,
+            &None,
+            false,
+        );
+
+        let names: HashSet<_> = result[&name]
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+        assert!(names.contains("trace_id"));
+        assert!(names.contains("service_name"));
+    }
+
+    #[test]
+    fn test_quick_mode_keeps_fts_columns_for_uds_streams() {
+        let cutoff = get_config().limit.quick_mode_num_fields;
+        let mut failures = Vec::new();
+        for width in [1, cutoff + 1] {
+            let mut fields = vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(ID_COL_NAME, DataType::Utf8, false),
+                Field::new("packed_col", DataType::Utf8, true),
+                Field::new(ORIGINAL_DATA_COL_NAME, DataType::Utf8, true),
+                Field::new(ALL_VALUES_COL_NAME, DataType::Utf8, true),
+                Field::new("message", DataType::Utf8, true),
+            ];
+            let mut defined = Vec::new();
+            for i in 0..width {
+                let name = format!("user_field_{i}");
+                fields.push(Field::new(&name, DataType::Utf8, true));
+                defined.push(name);
+            }
+            let settings = config::meta::stream::StreamSettings {
+                defined_schema_fields: defined,
+                index_original_data: true,
+                index_all_values: true,
+                full_text_search_keys: vec!["message".to_string()],
+                ..Default::default()
+            };
+            let metadata = std::collections::HashMap::from([(
+                "settings".to_string(),
+                config::utils::json::to_string(&settings).unwrap(),
+            )]);
+            let name = TableReference::bare("logs_stream");
+            let schema = Arc::new(SchemaCache::new(Schema::new_with_metadata(
+                fields, metadata,
+            )));
+            for quick in [false, true] {
+                let result = generate_select_star_schema(
+                    HashMap::from([(name.clone(), schema.clone())]),
+                    &HashMap::new(),
+                    HashMap::new(),
+                    quick,
+                    StreamType::Logs,
+                    &None,
+                    true,
+                );
+                let projected = result[&name].schema();
+                let names: HashSet<_> = projected
+                    .fields()
+                    .iter()
+                    .map(|f| f.name().as_str())
+                    .collect();
+                for required in [
+                    TIMESTAMP_COL_NAME,
+                    ID_COL_NAME,
+                    "message",
+                    ORIGINAL_DATA_COL_NAME,
+                    ALL_VALUES_COL_NAME,
+                ] {
+                    if !names.contains(required) {
+                        failures.push(format!("{required} missing, quick={quick}, width={width}"));
+                    }
+                }
+                assert!(!names.contains("packed_col"));
+                assert_eq!(projected.metadata(), schema.schema().metadata());
+                if !quick || width == 1 {
+                    let expected = schema
+                        .schema()
+                        .fields()
+                        .iter()
+                        .filter(|f| f.name() != "packed_col")
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    if projected.fields().as_ref() != expected.as_slice() {
+                        failures.push(format!(
+                            "projection order differs, quick={quick}, width={width}"
+                        ));
+                    }
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("; "));
+    }
+
+    #[test]
+    fn test_select_star_all_column_policy() {
+        let cfg = get_config();
+        let cutoff = cfg.limit.quick_mode_num_fields;
+        for position in [0, cutoff, cutoff * 2] {
+            let mut fields = (0..cutoff * 2 + 1)
+                .map(|i| Field::new(format!("user_field_{i}"), DataType::Utf8, true))
+                .collect::<Vec<_>>();
+            let defined = fields.iter().map(|f| f.name().clone()).collect();
+            fields.insert(
+                position,
+                Field::new(&cfg.common.column_all, DataType::Utf8, true),
+            );
+            fields.push(Field::new("packed_col", DataType::Utf8, true));
+            let settings = config::meta::stream::StreamSettings {
+                defined_schema_fields: defined,
+                ..Default::default()
+            };
+            let metadata = std::collections::HashMap::from([(
+                "settings".to_string(),
+                config::utils::json::to_string(&settings).unwrap(),
+            )]);
+            let name = TableReference::bare("logs_stream");
+            let schema = Arc::new(SchemaCache::new(Schema::new_with_metadata(
+                fields, metadata,
+            )));
+            for quick in [false, true] {
+                for explicit in [false, true] {
+                    let columns = if explicit {
+                        HashMap::from([(
+                            name.clone(),
+                            HashSet::from([cfg.common.column_all.clone()]),
+                        )])
+                    } else {
+                        HashMap::new()
+                    };
+                    let result = generate_select_star_schema(
+                        HashMap::from([(name.clone(), schema.clone())]),
+                        &columns,
+                        HashMap::new(),
+                        quick,
+                        StreamType::Logs,
+                        &None,
+                        false,
+                    );
+                    let names: HashSet<_> = result[&name]
+                        .schema()
+                        .fields()
+                        .iter()
+                        .map(|f| f.name().as_str())
+                        .collect();
+                    assert_eq!(
+                        names.contains(cfg.common.column_all.as_str()),
+                        explicit || !cfg.search.feature_query_exclude_all,
+                        "quick={quick}, explicit={explicit}, position={position}"
+                    );
+                    assert!(!names.contains("packed_col"));
+                }
+            }
+        }
     }
 }

@@ -23,9 +23,11 @@ const t = (i18nInstance.global as any).t;
 // ---------------------------------------------------------------------------
 
 const mockFetchQueryDataWithHttpStream = vi.fn();
+const mockCancelStream = vi.fn();
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: (...args: any[]) => mockFetchQueryDataWithHttpStream(...args),
+    cancelStreamQueryBasedOnRequestId: (...args: any[]) => mockCancelStream(...args),
   }),
 }));
 
@@ -438,28 +440,157 @@ describe("useCorrelatedTracesStream", () => {
       expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("default");
     });
 
-    it("chunks past the server's 100-id cap and merges the answers", async () => {
+    it("chunks into URL-safe batches of 40 ids, at most 6 at a time, and merges the answers", async () => {
       const ids = Array.from({ length: 250 }, (_, index) => index.toString(16).padStart(32, "0"));
-      mockGetTraceTimeRanges.mockImplementation((options: any) =>
-        Promise.resolve(
-          indexResponse(
-            options.trace_ids.map((id: string) => ({
-              trace_id: id,
-              stream: "payments_traces",
-              status: "found",
-            })),
-          ),
-        ),
-      );
+      let inFlight = 0;
+      let maxInFlight = 0;
+      mockGetTraceTimeRanges.mockImplementation(async (options: any) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        inFlight -= 1;
+        return indexResponse(
+          options.trace_ids.map((id: string) => ({
+            trace_id: id,
+            stream: "payments_traces",
+            status: "found",
+          })),
+        );
+      });
       const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
 
       const result = await resolveTraceLocationsBulk(ids, 1_000, 2_000);
 
-      expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(3);
-      expect(indexedIds(0)).toHaveLength(100);
-      expect(indexedIds(2)).toHaveLength(50);
+      expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(7);
+      expect(indexedIds(0)).toHaveLength(40);
+      expect(indexedIds(6)).toHaveLength(10);
+      expect(maxInFlight).toBeLessThanOrEqual(6);
+      // The query string a WAF inspects stays under its usual 2,048-byte limit.
+      for (const [options] of mockGetTraceTimeRanges.mock.calls) {
+        const query = new URLSearchParams({
+          trace_id: options.trace_ids.join(","),
+          start_time: String(options.start_time),
+          end_time: String(options.end_time),
+          hint_ts: String(options.hint_ts),
+          streams: (options.streams ?? ["payments_traces"]).join(","),
+        }).toString();
+        expect(query.length).toBeLessThan(2048);
+      }
       expect(Object.keys(result)).toHaveLength(250);
       expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("starts no further chunk and caches nothing once the signal aborts, even answered chunks", async () => {
+      const ids = Array.from({ length: 250 }, (_, index) => index.toString(16).padStart(32, "0"));
+      const controller = new AbortController();
+      mockGetTraceTimeRanges.mockImplementation(async (options: any) => {
+        expect(options.signal).toBe(controller.signal);
+        controller.abort();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        // The chunk still answers: an abort that lands after the request was sent.
+        return indexResponse(
+          options.trace_ids.map((id: string) => ({
+            trace_id: id,
+            stream: "payments_traces",
+            status: "found",
+          })),
+        );
+      });
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+
+      await resolveTraceLocationsBulk(ids, 1_000, 2_000, undefined, controller.signal);
+
+      // Only the chunks already started when the first one aborted ran (at most the 6 in flight).
+      expect(mockGetTraceTimeRanges.mock.calls.length).toBeLessThanOrEqual(6);
+      expect(mockCommit).not.toHaveBeenCalled();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("a lookup joined from another instance resolves on its own when the owner cancels", async () => {
+      mockGetTraceTimeRanges.mockResolvedValue(indexResponse([], true));
+      mockBatch({ payments_traces: [T1] });
+      // The owner's probe never answers; the retry's probe uses the batch mock.
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce(() => new Promise(() => {}));
+      const owner = useCorrelatedTracesStream(t);
+      const other = useCorrelatedTracesStream(t);
+
+      const ownerLookup = owner.resolveTraceLocation(T1, 1_000, 2_000);
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1));
+      const joinedLookup = other.resolveTraceLocation(T1, 1_000, 2_000);
+      owner.cancel();
+
+      expect((await joinedLookup).stream).toBe("payments_traces");
+      expect((await ownerLookup).stream).toBe("default");
+    });
+
+    it("a joined lookup does not retry when its own instance cancelled while waiting", async () => {
+      mockGetTraceTimeRanges.mockResolvedValue(indexResponse([], true));
+      mockFetchQueryDataWithHttpStream.mockImplementation(() => new Promise(() => {}));
+      const owner = useCorrelatedTracesStream(t);
+      const other = useCorrelatedTracesStream(t);
+
+      const ownerLookup = owner.resolveTraceLocation(T1, 1_000, 2_000);
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1));
+      const joinedLookup = other.resolveTraceLocation(T1, 1_000, 2_000);
+      other.cancel();
+      owner.cancel();
+
+      expect((await joinedLookup).stream).toBe("default");
+      await ownerLookup;
+      // No second probe: the joiner did not start its own lookup after cancelling.
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("cancel() settles in-flight probes and starts no further probe chunk", async () => {
+      const ids = Array.from({ length: 450 }, (_, index) => index.toString(16).padStart(32, "0"));
+      mockGetTraceTimeRanges.mockResolvedValue(indexResponse([], true));
+      // Probes that never answer: only cancel() can settle them.
+      mockFetchQueryDataWithHttpStream.mockImplementation(() => new Promise(() => {}));
+      const { resolveTraceLocationsBulk, cancel } = useCorrelatedTracesStream(t);
+
+      const pending = resolveTraceLocationsBulk(ids, 1_000, 2_000);
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2));
+      cancel();
+
+      await expect(pending).resolves.toEqual({});
+      // 450 ids make 3 probe chunks of 200; the third never started.
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2);
+      expect(mockCommit).not.toHaveBeenCalled();
+    });
+
+    it("an abort settles in-flight probes, stops their streams and starts no further chunk", async () => {
+      const ids = Array.from({ length: 450 }, (_, index) => index.toString(16).padStart(32, "0"));
+      mockGetTraceTimeRanges.mockResolvedValue(indexResponse([], true));
+      // Probes that never answer: without the abort wiring the lookup would stay pending.
+      mockFetchQueryDataWithHttpStream.mockImplementation(() => new Promise(() => {}));
+      mockCancelStream.mockClear();
+      const controller = new AbortController();
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+
+      const pending = resolveTraceLocationsBulk(ids, 1_000, 2_000, undefined, controller.signal);
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2));
+      controller.abort();
+
+      await expect(pending).resolves.toEqual({});
+      expect(mockCancelStream).toHaveBeenCalledTimes(2);
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2);
+      expect(mockCommit).not.toHaveBeenCalled();
+    });
+
+    it("an aborted resolve reports a failed outcome, not a clean miss", async () => {
+      const ids = Array.from({ length: 450 }, (_, index) => index.toString(16).padStart(32, "0"));
+      mockGetTraceTimeRanges.mockResolvedValue(indexResponse([], true));
+      mockFetchQueryDataWithHttpStream.mockImplementation(() => new Promise(() => {}));
+      const controller = new AbortController();
+      const outcome = { failed: false, streams: [] as string[] };
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+
+      const pending = resolveTraceLocationsBulk(ids, 1_000, 2_000, outcome, controller.signal);
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2));
+      controller.abort();
+
+      await expect(pending).resolves.toEqual({});
+      expect(outcome.failed).toBe(true);
     });
 
     it("a transient failure probes and does NOT latch the endpoint off", async () => {

@@ -25,7 +25,7 @@ use super::llm_experiments::ExperimentSkipReason;
 
 pub const LLM_SCORES_STREAM: &str = "_llm_scores";
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreDataSourceType {
     LlmJudge,
@@ -36,7 +36,7 @@ pub enum LlmScoreDataSourceType {
     Experiment,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreDataLevel {
     Span,
@@ -45,7 +45,7 @@ pub enum LlmScoreDataLevel {
     Experiment,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreDataType {
     Numeric,
@@ -57,7 +57,7 @@ pub enum LlmScoreDataType {
 ///
 /// Older score records predate this field, so successful scoring remains the
 /// deserialization default.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreStatus {
     #[default]
@@ -67,7 +67,7 @@ pub enum LlmScoreStatus {
     Error,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreTargetScope {
     Span,
@@ -104,7 +104,7 @@ impl From<LlmScoreTargetScope> for LlmScoreDataLevel {
 /// The mirror of `skip_reason`: that explains a `Skipped` status, this explains
 /// an `Error` one. Terminality is a scalar comparison on this column, so
 /// deciding whether a scorer is finished never depends on parsing a JSON blob.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreErrorReason {
     /// The bounded attempt sequence continues. Not terminal.
@@ -118,7 +118,7 @@ pub enum LlmScoreErrorReason {
 /// The distinction is whether a review submission governed it, not which page
 /// it was typed on: Discovery is where a target is found and queued, so an
 /// annotation made there is a direct one, the same as any other.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreAnnotationSource {
     /// Submitted as part of an annotation queue review.
@@ -133,7 +133,7 @@ pub enum LlmScoreAnnotationSource {
 /// stores it and `config` cannot reference the enterprise crate. Enterprise
 /// re-exports it from `eval_jobs::tasks`, so the task message and the Score it
 /// produces carry one type rather than two that have to be kept in step.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EvaluationTaskProducer {
     SpanPipeline,
@@ -243,7 +243,7 @@ pub fn evaluation_key(
 /// `String`. Any field added here that holds open-ended JSON needs the same
 /// `serde_as` attribute.
 #[serde_as]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LlmScoreRecord {
     pub id: String,
     pub task_id: String,

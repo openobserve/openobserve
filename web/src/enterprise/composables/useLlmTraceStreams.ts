@@ -47,7 +47,7 @@ export function useLlmTraceStreams(activeStream: Ref<string>, t: TranslateFn) {
       const llmStreams = list.filter((stream: any) => stream?.settings?.is_llm_stream !== false);
       availableStreams.value = llmStreams.map((stream: any) => stream.name);
       if (!availableStreams.value.includes(activeStream.value)) {
-        activeStream.value = availableStreams.value[0] || "";
+        activeStream.value = defaultLlmStream(availableStreams.value);
       }
     } catch (e) {
       console.error("Error loading trace streams:", e);
@@ -59,4 +59,9 @@ export function useLlmTraceStreams(activeStream: Ref<string>, t: TranslateFn) {
   }
 
   return { availableStreams, streamsLoaded, loadTraceStreams, ensureStreamsLoaded };
+}
+
+/** `_`-prefixed system streams are never the default, so a page does not open on the judge's calls. */
+export function defaultLlmStream(streams: string[]): string {
+  return streams.find((s) => !s.startsWith("_")) ?? streams[0] ?? "";
 }

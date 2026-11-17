@@ -13,14 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount, type VueWrapper } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
 
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import type { EscalationProgress, FiredRung, OnCallResponse } from "@/ts/interfaces/oncall";
+
+vi.mock("@/services/users", () => ({
+  default: {
+    orgUsers: vi.fn().mockResolvedValue({
+      data: { data: [{ email: "pt@russia.com", first_name: "Pyotr", last_name: "Tkachenko" }] },
+    }),
+  },
+}));
 
 const stubs = {
   OIcon: { name: "OIcon", template: "<span />" },
@@ -73,6 +81,14 @@ const text = (wrapper: VueWrapper) =>
   wrapper.find('[data-test="oncall-escalation-cell-level"]').text();
 
 describe("OnCallEscalationCell", () => {
+  /// Two people can share a name, so the email rides in the tooltip rather than the phrase.
+  it("names who acknowledged by display name, with name and email in the tooltip", async () => {
+    const wrapper = render({ state: "acknowledged", acked_by: "pt@russia.com" }, null);
+    await flushPromises();
+    expect(text(wrapper)).toBe("Acknowledged by Pyotr Tkachenko");
+    expect(tooltipText(wrapper)).toContain("Acknowledged by Pyotr Tkachenko (pt@russia.com)");
+  });
+
   /// One phrase per row, and never the bare state word the group header already says.
   it.each([
     [{}, { fired: firedRungs(2, ["bo@o2.ai"]) }, {}, "Paging step 2 of 3 · bo@o2.ai"],

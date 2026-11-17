@@ -2,6 +2,12 @@ large-error-threshold = 200
 
 source-item-ordering = ["module"]
 
+# A span guard held across .await can exit on another worker and leave a stale id behind.
+await-holding-invalid-types = [
+    { path = "tracing::span::Entered", reason = "use `#[tracing::instrument]` or `.instrument(span)` instead" },
+    { path = "tracing::span::EnteredSpan", reason = "use `#[tracing::instrument]` or `.instrument(span)` instead" },
+]
+
 # Ratchets for CI's -W flags: set just above today's worst offenders; tighten
 # over time by fixing code, never raise.
 too-many-lines-threshold = 1024

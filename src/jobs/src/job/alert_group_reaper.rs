@@ -297,6 +297,7 @@ async fn sweep_alert(
     }
 
     let now = now_micros();
+    let observed_at = rollup.as_ref().and_then(|r| r.last_seen);
     let rule_mode = alert.query_condition.promql_rule_mode;
     let plan = plan_sweep(alert_id, &groups, now, rule_mode, |state| {
         // Per row, not per alert: on a cron schedule each group's deadline
@@ -306,7 +307,7 @@ async fn sweep_alert(
             k,
             alert.tz_offset,
         );
-        fate_for_alert(alert, state, now, resolve_after, grace)
+        fate_for_alert(alert, state, now, resolve_after, grace, observed_at)
     });
 
     // No ledger write: a sweep measures nothing.
@@ -415,9 +416,18 @@ fn fate_for_alert(
     now: i64,
     resolve_after: i64,
     grace: i64,
+    observed_at: Option<i64>,
 ) -> GroupFate {
     match group_fate(state, now, resolve_after, grace) {
         GroupFate::Resolve if alert.query_condition.promql_rule_mode => GroupFate::Keep,
+        // Absence needs an evaluation after the group's last sighting, not just elapsed time.
+        GroupFate::Resolve
+            if !observed_at
+                .zip(state.last_seen)
+                .is_some_and(|(at, seen)| at > seen) =>
+        {
+            GroupFate::Keep
+        }
         fate => fate,
     }
 }
@@ -529,14 +539,45 @@ mod tests {
         )
         .state
         .unwrap();
+        let (now, resolve_after, grace) = (600_000_000, 300_000_000, 60_000_000);
+        let later_run = Some(60_000_000);
         assert_eq!(
-            fate_for_alert(&alert, &state, 600_000_000, 300_000_000, 60_000_000),
+            fate_for_alert(&alert, &state, now, resolve_after, grace, later_run),
             GroupFate::Resolve
         );
         alert.query_condition.promql_rule_mode = true;
         assert_eq!(
-            fate_for_alert(&alert, &state, 600_000_000, 300_000_000, 60_000_000),
+            fate_for_alert(&alert, &state, now, resolve_after, grace, later_run),
             GroupFate::Keep
+        );
+    }
+
+    #[test]
+    fn a_group_resolves_only_once_a_later_evaluation_ran_without_it() {
+        let alert = Alert::default();
+        let state = config::meta::alerts::state::apply_outcome(
+            "slow",
+            "host=a",
+            None,
+            RunOutcome::Firing,
+            Some(config::meta::alerts::level::AlertLevel::Critical),
+            0,
+        )
+        .state
+        .unwrap();
+        let (now, resolve_after, grace) = (600_000_000, 300_000_000, 60_000_000);
+
+        // A dispatch still sending, a re-enabled alert or a hung query: no evaluation since.
+        for observed_at in [Some(0), None] {
+            assert_eq!(
+                fate_for_alert(&alert, &state, now, resolve_after, grace, observed_at),
+                GroupFate::Keep,
+                "{observed_at:?}"
+            );
+        }
+        assert_eq!(
+            fate_for_alert(&alert, &state, now, resolve_after, grace, Some(1)),
+            GroupFate::Resolve
         );
     }
 

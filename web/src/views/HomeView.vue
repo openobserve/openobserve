@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align="left"
           reorderable
           data-test="home-tab-bar"
+          @change="onTabChange"
           @reorder="onTabReorder"
         >
           <OTab
@@ -75,14 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="tab.id.startsWith('dash:')" #trailing>
               <button
                 type="button"
-                class="rounded-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-body inline-flex h-4 w-4 cursor-pointer items-center justify-center border-none bg-transparent text-sm leading-none opacity-60 transition-all duration-200 ease-[ease] hover:opacity-100 max-md:h-6 max-md:w-6"
+                class="rounded-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-body inline-flex h-5 w-5 cursor-pointer items-center justify-center border-none bg-transparent opacity-60 transition-all duration-200 ease-[ease] hover:opacity-100 max-md:h-6 max-md:w-6"
                 :data-test="`home-tab-close-${tab.id}`"
                 :aria-label="t('home.removeHomeDashboard')"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
                 @click.stop.prevent="onCloseTab(tab.id)"
               >
-                {{ "×" }}
+                <OIcon name="close" size="xs" />
               </button>
               <OTooltip side="bottom" :content="t('home.removeHomeDashboard')" />
             </template>
@@ -106,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @open="firstDataNotice.open"
           @dismiss="firstDataNotice.dismiss"
         />
+        <SampleDataHomeBanner v-if="activeHomeTab === 'overview'" class="mt-2.5 mb-1" />
         <FirstDataPanel
           v-if="flagOn && isDataTab && arrived"
           signal="any"
@@ -126,7 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden max-md:flex-col"
         >
           <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
-          <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
+          <O2AIChat
+            ref="homeChat"
+            :is-open="true"
+            :header-height="0"
+            :centered-start="true"
+            :ai-chat-payload="aiChatPayload"
+          />
           <ODrawer
             v-if="isMobile"
             v-model:open="mobileChatsOpen"
@@ -199,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab />
+            <OverviewTab @send-to-ai-chat="onSendToAiChat" />
           </div>
           <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
             <UsageTab />
@@ -214,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab />
+            <OverviewTab @send-to-ai-chat="onSendToAiChat" />
           </div>
 
           <!-- Usage tab -->
@@ -241,7 +249,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, ref, watch, onMounted, onUnmounted } from "vue";
+import {
+  computed,
+  defineComponent,
+  inject,
+  nextTick,
+  ref,
+  watch,
+  onMounted,
+  onUnmounted,
+} from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -251,6 +268,7 @@ import UsageTab from "@/views/UsageTab.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { menuState } from "@/utils/featureGate";
+import type { AiChatHandoff } from "@/plugins/traces/utils/traceAiPayload";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -269,10 +287,13 @@ import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
 import { FIRST_DATA_NOTICE } from "@/composables/firstEvent/useFirstDataNotice";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
+import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
+import SampleDataHomeBanner from "@/components/sampleData/SampleDataHomeBanner.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import analytics from "@/services/product_analytics";
 
 export default defineComponent({
   name: "PageHome",
@@ -341,11 +362,12 @@ export default defineComponent({
     // gone" path (onPinnedUnavailable) and the deliberate close (onCloseTab).
     function removeHomePin() {
       const org = store.state.selectedOrganization?.identifier;
-      clearHomeDashboard(org);
+      const cleared = clearHomeDashboard(org);
       // Active tab no longer exists in the recomputed set → fall back to first.
       if (!DEFAULT_TABS.value.find((tb) => tb.id === activeHomeTab.value)) {
         activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
       }
+      return cleared;
     }
 
     let verifyingPin = false;
@@ -381,7 +403,16 @@ export default defineComponent({
     function onCloseTab(id: string) {
       if (!id.startsWith("dash:")) return;
       // Deliberate unpin — no error toast.
-      removeHomePin();
+      void removeHomePin().then(() => {
+        // A failed clear restores the pin, so only a cleared one counts.
+        if (!homeDashboard.value)
+          analytics.track("home_dashboard_unpinned", { source: "home_tab" });
+      });
+    }
+
+    function onTabChange(id: string | number) {
+      const tab = String(id).startsWith("dash:") ? "dashboard" : String(id);
+      analytics.track("home_tab_switched", { tab });
     }
 
     function loadTabOrder() {
@@ -456,7 +487,29 @@ export default defineComponent({
       );
     }
 
-    watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
+    // An org with no stream at all opens on Overview's setup state, not the assistant; that choice
+    // is the app's, so it is not saved as the user's tab.
+    let skipSave = false;
+    watch(activeHomeTab, (val) => {
+      if (skipSave) {
+        skipSave = false;
+        return;
+      }
+      localStorage.setItem(LS_ACTIVE_TAB_KEY, val);
+    });
+    const { hasAnyStream, isFetching } = useOrgHasUserData(
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
+    // O2's own streams count, so the _meta org keeps the assistant; a stale cached list may be out of date
+    watch(
+      [hasAnyStream, isFetching],
+      ([has, fetching]) => {
+        if (has !== false || fetching || activeHomeTab.value !== "ai") return;
+        skipSave = true;
+        activeHomeTab.value = "overview";
+      },
+      { immediate: true },
+    );
 
     // The cached pin can be stale from another device, so it is re-read without holding the tab; a stale folder is caught by onPinnedUnavailable.
     function revalidatePin() {
@@ -523,6 +576,30 @@ export default defineComponent({
       homeChat.value?.addNewChat();
     }
 
+    const aiChatPayload = ref<{
+      text: string;
+      autoSend: boolean;
+      id: number;
+      chipName: string;
+      newChat: boolean;
+      context: Record<string, unknown>;
+    } | null>(null);
+
+    // The chat mounts with the AI tab, so the payload waits a tick for its watcher to see the change.
+    function onSendToAiChat(handoff: AiChatHandoff) {
+      if (aiLocked.value) return;
+      const payload = {
+        text: handoff.query,
+        autoSend: false,
+        id: Date.now(),
+        chipName: handoff.chipName,
+        newChat: handoff.newChat,
+        context: handoff.context,
+      };
+      activeHomeTab.value = "ai";
+      nextTick(() => (aiChatPayload.value = payload));
+    }
+
     function onSwitchTab(e: Event) {
       const tab = (e as CustomEvent).detail;
       if (DEFAULT_TABS.value.find((t) => t.id === tab)) {
@@ -565,12 +642,15 @@ export default defineComponent({
       onTabReorder,
       isEnterpriseOrCloud,
       homeChat,
+      aiChatPayload,
+      onSendToAiChat,
       onLoadChat,
       onNewChat,
       parsePinnedTabId,
       onPinnedLabel,
       onPinnedUnavailable,
       onCloseTab,
+      onTabChange,
       flagOn,
       isDataTab,
       arrived,
@@ -596,6 +676,7 @@ export default defineComponent({
     FirstDataPanel,
     FirstDataNotice,
     HomeNoDataState,
+    SampleDataHomeBanner,
     HomeViewSkeleton,
     TrialPeriod,
     OEmptyState,

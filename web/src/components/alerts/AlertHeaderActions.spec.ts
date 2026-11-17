@@ -27,7 +27,8 @@ vi.mock("@/services/alerts", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), { default: {} });
 });
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
-vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const push = vi.fn();
+vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 
 const ME = (store.state as any).userInfo.email as string;
 
@@ -43,6 +44,9 @@ const downtime = {
   id: "d1",
   name: "Quick mute",
   ends_at: 4_102_444_800_000_000,
+  version: 2,
+  folder_id: "ops",
+  end_here: true,
   end_on_clear: { alert_id: "a1", group_key: null },
 };
 
@@ -216,7 +220,40 @@ describe("AlertHeaderActions", () => {
     expect(find("alerts-alertdetail-extend-until-clear").exists()).toBe(true);
     await find("alerts-alertdetail-end-mute").trigger("click");
     await flushPromises();
-    expect(alerts.cancelAlertMute).toHaveBeenCalledWith("default", "a1", "d1", "ops");
+    expect(alerts.cancelAlertMute).toHaveBeenCalledWith("default", "a1", "d1", "ops", 2);
+    expect(wrapper.emitted("changed")).toHaveLength(1);
+  });
+
+  it("shows only Muted by for a downtime this alert does not own, which opens it", async () => {
+    push.mockReset();
+    await mountActions({ downtime: { ...downtime, name: "Weekly patch", end_here: false } });
+    expect(find("alerts-alertdetail-extend").exists()).toBe(false);
+    expect(find("alerts-alertdetail-end-mute").exists()).toBe(false);
+    expect(find("alerts-alertdetail-mute").exists()).toBe(false);
+    const link = find("alerts-alertdetail-muted-by");
+    expect(link.text()).toContain("Muted by Weekly patch");
+    await link.trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "downtimeDetail",
+      params: { id: "d1" },
+      query: { org_identifier: "default", folder: "ops" },
+    });
+  });
+
+  it.each([403, 404, 409])("refreshes after a %s on End mute", async (status) => {
+    vi.mocked(alerts.cancelAlertMute).mockRejectedValue({ response: { status, data: {} } });
+    await mountActions({ downtime });
+    await find("alerts-alertdetail-end-mute").trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("changed")).toHaveLength(1);
+  });
+
+  it("does not refresh when End mute got no answer", async () => {
+    vi.mocked(alerts.cancelAlertMute).mockRejectedValue(new Error("Network Error"));
+    await mountActions({ downtime });
+    await find("alerts-alertdetail-end-mute").trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("changed")).toBeUndefined();
   });
 
   it("shows no mute controls where downtimes are off", async () => {

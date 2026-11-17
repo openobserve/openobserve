@@ -246,6 +246,7 @@ import {
   PromqlStepSpec,
 } from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
+import analytics from "@/services/product_analytics";
 
 const props = defineProps<{
   operations: PromqlStep[];
@@ -353,6 +354,7 @@ const addOperation = (opDef: PromqlStepSpec) => {
   };
   const newOperations = [...props.operations, newOp];
   emit("update:operations", newOperations);
+  analytics.track("promql_builder_operation_added", { operation: opDef.id, group: opDef.group });
   showOperationSelector.value = false;
   searchQuery.value = "";
 };

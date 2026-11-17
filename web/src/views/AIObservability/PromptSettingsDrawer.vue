@@ -105,6 +105,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import analytics from "@/services/product_analytics";
 import { useMutation } from "@tanstack/vue-query";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -241,6 +242,10 @@ async function save(value: PromptSettingsForm) {
         };
       emit("updated", saved);
     }
+    analytics.track("llm_prompt_settings_updated", {
+      protected_label_count: value.protectedLabels.length,
+      webhook_enabled: value.webhookEnabled,
+    });
     form.reset(promptSettingsDefaults(saved));
     emit("update:open", false);
     toast({ variant: "success", message: t("aiObservability.promptManagement.settingsSaved") });

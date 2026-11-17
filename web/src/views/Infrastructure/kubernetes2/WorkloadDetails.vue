@@ -25,6 +25,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { fitColumnSize, TABLE_MAX_HEIGHT } from "./tableSizing";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
@@ -228,36 +229,107 @@ const when = (us: number | null) => {
   return t("infra.k8s2.drawerAgoAt", { age: age(us), date });
 };
 
-const revisionColumns = computed<OTableColumnDef<ReplicaSetRow>[]>(() => [
-  { id: "name", header: t("infra.k8s2.columnName"), accessorFn: (rs) => rs.name },
-  { id: "warn", header: raw(""), accessorFn: (rs) => rs.warnings.length, size: 40 },
-  { id: "namespace", header: t("infra.k8s2.columnNamespace"), accessorFn: (rs) => rs.namespace },
-  {
-    id: "pods",
-    header: t("infra.k8s2.columnPods"),
-    accessorFn: (rs) => `${n(rs.ready)}/${n(rs.desired)}`,
-  },
-  { id: "age", header: t("infra.k8s2.drawerAge"), accessorFn: (rs) => age(rs.createdAt) },
-]);
+// Ready sorts first, desired breaks ties; the base exceeds any realistic replica count.
+const PODS_SORT_BASE = 1_000_000;
 
-const jobColumns = computed<OTableColumnDef<JobEntry>[]>(() => [
-  { id: "name", header: t("infra.k8s2.columnName"), accessorFn: (j) => j.name },
-  {
-    id: "condition",
-    header: t("infra.k8s2.drawerCondition"),
-    accessorFn: (j) =>
-      j.job
-        ? jobConditions(j.job)
-            .map((c) => c.text)
-            .join(", ")
-        : "",
-  },
-  {
-    id: "age",
-    header: t("infra.k8s2.drawerAge"),
-    accessorFn: (j) => age(j.job?.createdAt ?? null),
-  },
-]);
+const revisionColumns = computed<OTableColumnDef<ReplicaSetRow>[]>(() => {
+  const rs = revisions.value;
+  const colName = t("infra.k8s2.columnName");
+  const colNs = t("infra.k8s2.columnNamespace");
+  const colAge = t("infra.k8s2.drawerAge");
+  return [
+    {
+      id: "name",
+      header: colName,
+      accessorFn: (r) => r.name,
+      size: fitColumnSize(
+        String(colName),
+        rs.map((r) => r.name),
+      ),
+      sortable: true,
+      meta: { flex: true },
+    },
+    {
+      id: "warn",
+      header: raw(""),
+      accessorFn: (r) => r.warnings.length,
+      size: 40,
+      sortable: false,
+    },
+    {
+      id: "namespace",
+      header: colNs,
+      accessorFn: (r) => r.namespace,
+      size: fitColumnSize(
+        String(colNs),
+        rs.map((r) => r.namespace),
+      ),
+      sortable: true,
+    },
+    {
+      id: "pods",
+      header: t("infra.k8s2.columnPods"),
+      accessorFn: (r) => (r.ready ?? 0) * PODS_SORT_BASE + (r.desired ?? 0),
+      size: 90,
+      sortable: true,
+    },
+    {
+      id: "age",
+      header: colAge,
+      accessorFn: (r) => r.createdAt ?? undefined,
+      size: fitColumnSize(
+        String(colAge),
+        rs.map((r) => age(r.createdAt)),
+      ),
+      sortable: true,
+      sortUndefined: "last",
+    },
+  ];
+});
+
+const jobColumns = computed<OTableColumnDef<JobEntry>[]>(() => {
+  const entries = jobs.value;
+  const conditionText = (j: JobEntry) =>
+    j.job
+      ? jobConditions(j.job)
+          .map((c) => c.text)
+          .join(", ")
+      : "";
+  const colName = t("infra.k8s2.columnName");
+  const colCond = t("infra.k8s2.drawerCondition");
+  const colAge = t("infra.k8s2.drawerAge");
+  return [
+    {
+      id: "name",
+      header: colName,
+      accessorFn: (j) => j.name,
+      size: fitColumnSize(
+        String(colName),
+        entries.map((j) => j.name),
+      ),
+      sortable: true,
+      meta: { flex: true },
+    },
+    {
+      id: "condition",
+      header: colCond,
+      accessorFn: conditionText,
+      size: fitColumnSize(String(colCond), entries.map(conditionText)),
+      sortable: true,
+    },
+    {
+      id: "age",
+      header: colAge,
+      accessorFn: (j) => j.job?.createdAt ?? undefined,
+      size: fitColumnSize(
+        String(colAge),
+        entries.map((j) => age(j.job?.createdAt ?? null)),
+      ),
+      sortable: true,
+      sortUndefined: "last",
+    },
+  ];
+});
 
 const open = (kind: DetailsRef["kind"], name: string) =>
   emit("open", { kind, cluster: props.row.cluster, namespace: props.row.namespace, name });
@@ -448,6 +520,9 @@ const phase = computed(() =>
         row-key="key"
         dense
         pagination="none"
+        sorting="client"
+        enable-column-resize
+        :max-height="TABLE_MAX_HEIGHT"
         :frame="false"
         :show-global-filter="false"
       >
@@ -474,6 +549,12 @@ const phase = computed(() =>
             </OTooltip>
           </span>
         </template>
+        <template #cell-pods="{ row: rs }">
+          <span class="tabular-nums">{{ raw(`${n(rs.ready)}/${n(rs.desired)}`) }}</span>
+        </template>
+        <template #cell-age="{ row: rs }">
+          <span class="tabular-nums">{{ raw(age(rs.createdAt)) }}</span>
+        </template>
       </OTable>
     </section>
 
@@ -485,6 +566,9 @@ const phase = computed(() =>
         row-key="name"
         dense
         pagination="none"
+        sorting="client"
+        enable-column-resize
+        :max-height="TABLE_MAX_HEIGHT"
         :frame="false"
         :show-global-filter="false"
       >
@@ -492,6 +576,9 @@ const phase = computed(() =>
           <OButton variant="ghost-primary" size="xs" @click.stop="open('job', j.name)">{{
             raw(j.name)
           }}</OButton>
+        </template>
+        <template #cell-age="{ row: j }">
+          <span class="tabular-nums">{{ raw(age(j.job?.createdAt ?? null)) }}</span>
         </template>
       </OTable>
     </section>

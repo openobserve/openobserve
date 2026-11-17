@@ -6,9 +6,13 @@
 // what lets the parent lay out PAIRS on its grid instead of laying out the dt
 // and the dd as two independent cells that can land in different columns.
 
-import { computed } from "vue";
+import { computed, inject } from "vue";
 import { raw } from "@/types/i18n";
-import type { DescriptionItemProps, DescriptionItemSlots } from "./ODescriptionList.types";
+import {
+  DESCRIPTION_LABEL_WIDTH,
+  type DescriptionItemProps,
+  type DescriptionItemSlots,
+} from "./ODescriptionList.types";
 
 const props = withDefaults(defineProps<DescriptionItemProps>(), {
   emptyLabel: () => raw("—"),
@@ -17,9 +21,13 @@ const props = withDefaults(defineProps<DescriptionItemProps>(), {
 
 defineSlots<DescriptionItemSlots>();
 
-const rowClass = computed(() =>
-  props.stacked ? "flex flex-col gap-0.5" : "grid grid-cols-[10rem_1fr] items-baseline gap-x-3",
-);
+const labelWidth = inject(DESCRIPTION_LABEL_WIDTH, null);
+
+const rowClass = computed(() => {
+  if (props.stacked) return "flex flex-col gap-0.5";
+  const columns = labelWidth?.value === "narrow" ? "grid-cols-[7rem_1fr]" : "grid-cols-[10rem_1fr]";
+  return `grid ${columns} items-baseline gap-x-3`;
+});
 </script>
 
 <template>

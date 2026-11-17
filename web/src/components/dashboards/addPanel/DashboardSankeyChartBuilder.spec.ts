@@ -77,7 +77,8 @@ vi.mock("@/composables/useNotifications", () => ({
   default: () => mockNotifications,
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   getImageURL: vi.fn(() => "mocked-image-url"),
 }));
 

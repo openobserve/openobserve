@@ -20,7 +20,7 @@ A bug-me-not issue is a checklist of bugs, each with a `P0`–`P3` tag and a col
 - `jq`, `node`, `python3`, `git` 2.31 or newer, and `gh auth status` logged in with `repo` scope (the private repo needs it).
 - **Private repo (optional):** a checkout next to the openobserve one (same parent directory) whose `.claude/bounty-board.private.json` describes it: repo name, path prefixes that route to it, extra protected path segments, whether it builds against `../openobserve`. Discovery takes `BB_PRIVATE_DIR` if set, else the one sibling that has the file; more than one is an error (set `BB_PRIVATE_DIR`). With no config the skill works for `openobserve` only, and a private-repo request ends with "no private-repo config found next to this checkout". Never copy facts from that config into public text.
 - The openobserve checkout must be named `openobserve`. Each checkout's `origin` must be `openobserve/<repo>` itself with push access; fork-based setups are not supported.
-- For hunt: an o2-loop reviewer backend (Codex CLI, or Claude with macOS `sandbox-exec`; on Linux the Claude backend needs `review.sh --unsandboxed`, say so to the user).
+- For hunt: the o2-loop reviewer needs the `claude` CLI and macOS `sandbox-exec`; on Linux it needs `review.sh --unsandboxed`, say so to the user.
 
 ## Placeholders
 

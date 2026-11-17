@@ -46,7 +46,7 @@ import {
   type RumPreset,
 } from "@/components/iam/roles/rumPresets";
 
-export type PresetSection = "builtin" | "job";
+export type PresetSection = "security" | "builtin" | "job";
 
 export type PresetInfo = {
   id: string;
@@ -460,7 +460,7 @@ export const useRolePresets = (deps: PresetDeps) => {
     ...BUILTIN_PRESETS.map((preset) => toInfo(preset, "builtin")),
     ...JOB_PRESETS.filter((preset) =>
       Object.keys(preset.grants).every((key) => resourceMapper.value[key]),
-    ).map((preset) => toInfo(preset, "job")),
+    ).map((preset) => toInfo(preset, preset.tone === "security" ? "security" : "job")),
   ]);
 
   const loadStreamType = async (type: string, force: boolean) => {

@@ -62,9 +62,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
       await expect(pm.dashboardNotices.lastRefreshed).toBeVisible({
         timeout: 15000,
       });
-      // The header clock renders the 🕑 icon plus a relative age ("now"); the
-      // "Last Refreshed At" label lives in the hover tooltip title, not text.
-      await expect(pm.dashboardNotices.lastRefreshed).toContainText("🕑");
+      await expect(pm.dashboardNotices.lastRefreshedIcon).toBeVisible();
       await expect(pm.dashboardNotices.noticesContainer).toHaveCount(0);
       await expect(pm.dashboardNotices.errorIcon).toHaveCount(0);
 
@@ -120,11 +118,19 @@ test.describe("Dashboard Panel Notices testcases", () => {
         pm.dashboardNotices.noticeAction("use-top-n")
       ).toBeVisible();
 
+      // The editor drops ?focus= once it applies it, so wait for the link URL before clicking.
+      const topNLink = pm.page.waitForURL(
+        (u) =>
+          u.pathname.includes("add_panel") &&
+          u.searchParams.get("focus") === "top-n" &&
+          !!u.searchParams.get("panelId"),
+        { timeout: 20000 }
+      );
       await pm.dashboardNotices.clickNoticeAction("series-cap", "use-top-n");
-      await pm.page.waitForURL(/add_panel/, { timeout: 20000 });
-      const url = new URL(pm.page.url());
-      expect(url.searchParams.get("focus")).toBe("top-n");
-      expect(url.searchParams.get("panelId")).toBeTruthy();
+      await topNLink;
+      await expect
+        .poll(() => new URL(pm.page.url()).searchParams.get("focus"), { timeout: 10000 })
+        .toBeNull();
 
       testLogger.info("Series-cap notice rendered and Use Top N routed to editor");
 
@@ -247,9 +253,15 @@ test.describe("Dashboard Panel Notices testcases", () => {
 
       // "Copy error" closes the tooltip (PanelErrorButtons `closeTooltip`), so
       // click "Edit function" via the helper that re-opens and stabilises it.
+      const vrlLink = pm.page.waitForURL(
+        (u) => u.pathname.includes("add_panel") && u.searchParams.get("focus") === "vrl",
+        { timeout: 20000 }
+      );
       await pm.dashboardNotices.clickNoticeAction("function-error", "edit-function");
-      await pm.page.waitForURL(/add_panel/, { timeout: 20000 });
-      expect(new URL(pm.page.url()).searchParams.get("focus")).toBe("vrl");
+      await vrlLink;
+      await expect
+        .poll(() => new URL(pm.page.url()).searchParams.get("focus"), { timeout: 10000 })
+        .toBeNull();
 
       testLogger.info("Function-error notice rendered and actions routed");
 

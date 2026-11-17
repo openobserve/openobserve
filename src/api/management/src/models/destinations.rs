@@ -250,7 +250,7 @@ impl Template {
 ///   "url": "https://example.com/webhook",
 ///   "method": "post",
 ///   "type": "http",
-///   "template": "Default",
+///   "template": "prebuilt_default",
 ///   "skip_tls_verify": false
 /// }
 /// ```
@@ -261,7 +261,7 @@ impl Template {
 ///   "name": "my_email_dest",
 ///   "type": "email",
 ///   "emails": ["alerts@example.com", "team@example.com"],
-///   "template": "Default"
+///   "template": "prebuilt_default"
 /// }
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -285,10 +285,10 @@ pub struct Destination {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     /// REQUIRED for alert destinations. Name of the template to use for formatting alert messages.
-    /// Use "Default" for the built-in default template. Without a template, the destination
-    /// becomes a pipeline destination and cannot be used with alerts.
+    /// Use "prebuilt_default" for the built-in default template. Without a template, the
+    /// destination becomes a pipeline destination and cannot be used with alerts.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(example = "Default")]
+    #[schema(example = "prebuilt_default")]
     pub template: Option<String>,
     /// Email recipients for Email destinations. Required when `type` is `email`.
     #[serde(default)]

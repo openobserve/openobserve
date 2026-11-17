@@ -19,10 +19,12 @@ import useRoutes from "./router";
 import Login from "@/views/Login.vue";
 import store from "@/stores";
 import { routeGuard } from "@/utils/zincutils";
+import { loadSecurityAccess } from "@/composables/security/useSecurityAccess";
 import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
+import i18n from "@/locales";
 
 // Routes store an i18n KEY in `meta.titleKey` (src/router/index.ts translates it
 // per navigation), so assert the English copy the key still resolves to — a typo'd
@@ -57,6 +59,11 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalTimezone: vi.fn(),
   invalidateLoginData: vi.fn(),
   getPath: vi.fn(() => "/"),
+}));
+
+vi.mock("@/composables/security/useSecurityAccess", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/security/useSecurityAccess")>()),
+  loadSecurityAccess: vi.fn(async () => ({ read: true, triage: true, admin: true })),
 }));
 
 // ---------------------------------------------------------------------------
@@ -207,6 +214,7 @@ describe("useRoutes (router.ts)", () => {
     vi.clearAllMocks();
     config.isCloud = "false";
     config.isEnterprise = "false";
+    store.state.zoConfig = {};
   });
 
   // =========================================================================
@@ -265,6 +273,12 @@ describe("useRoutes (router.ts)", () => {
       const { parentRoutes } = useRoutes();
       const loginRoute = parentRoutes.find((r: any) => r.path === "/login");
       expect(loginRoute).toBeDefined();
+    });
+
+    it("should name the /login route so RUM gets a stable view name", () => {
+      const { parentRoutes } = useRoutes();
+      const loginRoute = parentRoutes.find((r: any) => r.path === "/login");
+      expect(loginRoute.name).toBe("login");
     });
 
     it("should have Login component for /login", () => {
@@ -1026,12 +1040,19 @@ describe("useRoutes (router.ts)", () => {
     const GATED = ["dbmDeadlocks", "dbmBlocking", "dbmTableHealth"] as const;
     const OPEN = ["dbmDatabases", "dbmQueries", "dbmSamples", "dbmActivity"] as const;
 
-    it.each(GATED)("redirects %s to the DBM overview on an OSS build", (name) => {
+    it.each(GATED)("sends %s to the upgrade screen on an OSS build", (name) => {
       config.isEnterprise = "false";
       const { homeChildRoutes } = useRoutes();
       const next = vi.fn();
-      findRoute(homeChildRoutes, name).beforeEnter({ query: { range: "360" } }, {}, next);
-      expect(next).toHaveBeenCalledWith({ name: "dbmDatabases", query: { range: "360" } });
+      findRoute(homeChildRoutes, name).beforeEnter(
+        { query: { range: "360" }, fullPath: "/x" },
+        {},
+        next,
+      );
+      expect(next).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "dbmInsights", org_identifier: undefined, redirect: "/x" },
+      });
     });
 
     it.each(GATED)("lets %s through on an enterprise build", async (name) => {
@@ -1049,8 +1070,15 @@ describe("useRoutes (router.ts)", () => {
       config.isEnterprise = value;
       const { homeChildRoutes } = useRoutes();
       const next = vi.fn();
-      findRoute(homeChildRoutes, "dbmDeadlocks").beforeEnter({ query: {} }, {}, next);
-      expect(next).toHaveBeenCalledWith({ name: "dbmDatabases", query: {} });
+      findRoute(homeChildRoutes, "dbmDeadlocks").beforeEnter(
+        { query: {}, fullPath: "/x" },
+        {},
+        next,
+      );
+      expect(next).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "dbmInsights", org_identifier: undefined, redirect: "/x" },
+      });
     });
 
     /** The four OSS tabs must stay reachable — the gate is three routes, not the section. */
@@ -1068,6 +1096,21 @@ describe("useRoutes (router.ts)", () => {
       config.isEnterprise = "false";
       const { homeChildRoutes } = useRoutes();
       expect(findRoute(homeChildRoutes, name)).toBeDefined();
+    });
+  });
+
+  describe("homeChildRoutes — Security enterprise gate", () => {
+    it("does not register any Security route on an OSS build", () => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes.some((r: any) => r.path?.startsWith("security"))).toBe(false);
+    });
+
+    it("registers the Security routes on an enterprise build", () => {
+      config.isEnterprise = "true";
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, "securityOverview")).toBeDefined();
+      expect(findRoute(homeChildRoutes, "securityContent")).toBeDefined();
     });
   });
 
@@ -1387,6 +1430,22 @@ describe("useRoutes (router.ts)", () => {
       expect(enTitle(route.meta.titleKey)).toBe("Alerts");
     });
 
+    it("sends an old /alerts/firing bookmark to the Firing tile, or its selected alert to that alert's page", () => {
+      const firing = useRoutes().homeChildRoutes.find(
+        (route: any) => route.path === "alerts/firing",
+      );
+      expect(firing.component).toBeUndefined();
+      expect(firing.redirect({ query: { org_identifier: "o" } })).toEqual({
+        name: "alertList",
+        query: { org_identifier: "o", state: "firing", all_folders: "true" },
+      });
+      expect(firing.redirect({ query: { org_identifier: "o", alert: "a1" } })).toEqual({
+        name: "alertDetail",
+        params: { alert_id: "a1" },
+        query: { org_identifier: "o" },
+      });
+    });
+
     it("should include addAlert route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "addAlert");
@@ -1470,10 +1529,8 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("alerts/anomaly/edit/:anomaly_id");
     });
 
-    it("should redirect addAnomalyDetection to alertList when build_type is opensource", () => {
-      (window as any).store = {
-        state: { zoConfig: { build_type: "opensource" } },
-      };
+    it("should send addAnomalyDetection to the upgrade screen when build_type is opensource", () => {
+      store.state.zoConfig = { build_type: "opensource" };
 
       config.isCloud = "true";
       config.isEnterprise = "true";
@@ -1482,18 +1539,18 @@ describe("useRoutes (router.ts)", () => {
       const route = findRoute(homeChildRoutes, "addAnomalyDetection");
 
       const mockNext = vi.fn();
-      const mockTo = { query: { org_identifier: "test_org" } };
+      const mockTo = { query: { org_identifier: "test_org" }, fullPath: "/x" };
       route.beforeEnter(mockTo, {}, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith({
-        name: "alertList",
-        query: { org_identifier: "test_org" },
+        name: "enterpriseFeatureLocked",
+        query: { feature: "anomalyDetection", org_identifier: "test_org", redirect: "/x" },
       });
 
       delete (window as any).store;
     });
 
-    it("should redirect addAnomalyDetection to alertList when not enterprise and not cloud", () => {
+    it("should send addAnomalyDetection to the upgrade screen when not enterprise and not cloud", () => {
       (window as any).store = {
         state: { zoConfig: { build_type: "enterprise" } },
       };
@@ -1505,12 +1562,12 @@ describe("useRoutes (router.ts)", () => {
       const route = findRoute(homeChildRoutes, "addAnomalyDetection");
 
       const mockNext = vi.fn();
-      const mockTo = { query: { org_identifier: "test_org" } };
+      const mockTo = { query: { org_identifier: "test_org" }, fullPath: "/x" };
       route.beforeEnter(mockTo, {}, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith({
-        name: "alertList",
-        query: { org_identifier: "test_org" },
+        name: "enterpriseFeatureLocked",
+        query: { feature: "anomalyDetection", org_identifier: "test_org", redirect: "/x" },
       });
 
       delete (window as any).store;
@@ -1560,10 +1617,8 @@ describe("useRoutes (router.ts)", () => {
       delete (window as any).store;
     });
 
-    it("should redirect editAnomalyDetection to alertList when build_type is opensource", () => {
-      (window as any).store = {
-        state: { zoConfig: { build_type: "opensource" } },
-      };
+    it("should send editAnomalyDetection to the upgrade screen when build_type is opensource", () => {
+      store.state.zoConfig = { build_type: "opensource" };
 
       config.isCloud = "true";
       config.isEnterprise = "true";
@@ -1572,18 +1627,18 @@ describe("useRoutes (router.ts)", () => {
       const route = findRoute(homeChildRoutes, "editAnomalyDetection");
 
       const mockNext = vi.fn();
-      const mockTo = { query: { org_identifier: "my_org" } };
+      const mockTo = { query: { org_identifier: "my_org" }, fullPath: "/x" };
       route.beforeEnter(mockTo, {}, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith({
-        name: "alertList",
-        query: { org_identifier: "my_org" },
+        name: "enterpriseFeatureLocked",
+        query: { feature: "anomalyDetection", org_identifier: "my_org", redirect: "/x" },
       });
 
       delete (window as any).store;
     });
 
-    it("should redirect editAnomalyDetection to alertList when not enterprise and not cloud", () => {
+    it("should send editAnomalyDetection to the upgrade screen when not enterprise and not cloud", () => {
       (window as any).store = {
         state: { zoConfig: { build_type: "enterprise" } },
       };
@@ -1595,12 +1650,12 @@ describe("useRoutes (router.ts)", () => {
       const route = findRoute(homeChildRoutes, "editAnomalyDetection");
 
       const mockNext = vi.fn();
-      const mockTo = { query: { org_identifier: "my_org" } };
+      const mockTo = { query: { org_identifier: "my_org" }, fullPath: "/x" };
       route.beforeEnter(mockTo, {}, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith({
-        name: "alertList",
-        query: { org_identifier: "my_org" },
+        name: "enterpriseFeatureLocked",
+        query: { feature: "anomalyDetection", org_identifier: "my_org", redirect: "/x" },
       });
 
       delete (window as any).store;
@@ -2257,6 +2312,7 @@ describe("useRoutes (router.ts)", () => {
   describe("Route Guard Invocations", () => {
     it("should call routeGuard for searchJobInspector route beforeEnter", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
+      config.isEnterprise = "true";
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "searchJobInspector");
 
@@ -2395,6 +2451,7 @@ describe("useRoutes (router.ts)", () => {
 
     it("should call routeGuard for member_subscription route beforeEnter", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
+      config.isCloud = "true";
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "member_subscription");
 
@@ -2443,6 +2500,7 @@ describe("useRoutes (router.ts)", () => {
 
     it("should call routeGuard for pipelineBackfill route beforeEnter", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
+      config.isEnterprise = "true";
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "pipelineBackfill");
 
@@ -2632,6 +2690,33 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("SLO import route", () => {
+    it("resolves slos/import to the import page, not an SLO detail with id 'import'", () => {
+      const { homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+        ],
+      });
+      expect(router.resolve("/slos/import").name).toBe("importSlo");
+      expect(router.resolve("/slos/some-id").name).toBe("sloDetail");
+      expect(enTitle(findRoute(homeChildRoutes, "importSlo").meta.titleKey)).toBe("Import SLOs");
+    });
+
+    it("guards the import page with routeGuard", () => {
+      const route = findRoute(useRoutes().homeChildRoutes, "importSlo");
+      const next = vi.fn();
+      route.beforeEnter({}, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
+    });
+  });
+
   describe("profiles route guard", () => {
     const enter = (zoConfig: Record<string, unknown>) => {
       const previous = store.state.zoConfig;
@@ -2703,6 +2788,276 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("enterprise-only pages land on the upgrade screen on OSS", () => {
+    const GATED: Array<[string, string]> = [
+      ["searchJobInspector", "searchInspector"],
+      ["pipelineBackfill", "pipelineBackfill"],
+      ["downtimes", "downtimes"],
+      ["addDowntime", "downtimes"],
+      ["editDowntime", "downtimes"],
+      ["downtimeDetail", "downtimes"],
+      ["alertSources", "incidents"],
+      ["alertCalibration", "alertCalibration"],
+      ["alertCalibrationRuns", "alertCalibration"],
+      ["alertCalibrationSettings", "alertCalibration"],
+      ["alertCalibrationDigest", "alertCalibration"],
+      ["importSemanticGroups", "semanticGroups"],
+      ["addAnomalyDetection", "anomalyDetection"],
+      ["editAnomalyDetection", "anomalyDetection"],
+      ["searchScheduler", "scheduledSearch"],
+      ["dbmDeadlocks", "dbmInsights"],
+      ["dbmBlocking", "dbmInsights"],
+      ["dbmTableHealth", "dbmInsights"],
+      ["sharedChat", "aiAssistant"],
+    ];
+    const to = { query: { org_identifier: "acme" }, fullPath: "/x?org_identifier=acme" };
+
+    const enter = (route: any) => {
+      const next = vi.fn();
+      route.beforeEnter(to, {}, next);
+      return next;
+    };
+
+    it.each(GATED)("sends %s to the locked screen for %s on OSS", (name, feature) => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const next = enter(findRoute(useRoutes().homeChildRoutes, name));
+      expect(next).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature, org_identifier: "acme", redirect: to.fullPath },
+      });
+    });
+
+    it.each([
+      ["alertCalibration", "alertCalibration"],
+      ["alertSources", "incidents"],
+      ["importSemanticGroups", "semanticGroups"],
+    ])("sends %s to the locked screen when the backend reports opensource", (name, feature) => {
+      config.isEnterprise = "true";
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = { build_type: "opensource" };
+      try {
+        const next = enter(findRoute(useRoutes().homeChildRoutes, name));
+        expect(next).toHaveBeenCalledWith({
+          name: "enterpriseFeatureLocked",
+          query: { feature, org_identifier: "acme", redirect: to.fullPath },
+        });
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    });
+
+    it("sends a runtime-opensource build to the locked screen even with enterprise flags", () => {
+      config.isEnterprise = "true";
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = { build_type: "opensource" };
+      try {
+        const next = enter(findRoute(useRoutes().homeChildRoutes, "downtimes"));
+        expect(next).toHaveBeenCalledWith({
+          name: "enterpriseFeatureLocked",
+          query: { feature: "downtimes", org_identifier: "acme", redirect: to.fullPath },
+        });
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    });
+
+    it.each(GATED)("lets %s through on an enterprise build", async (name) => {
+      config.isEnterprise = "true";
+      const { routeGuard: guard } = await import("@/utils/zincutils");
+      const route = findRoute(useRoutes().homeChildRoutes, name);
+      const next = vi.fn();
+      route.beforeEnter(to, {}, next);
+      const passed = (guard as any).mock.calls.length > 0 || next.mock.calls.length > 0;
+      expect(passed).toBe(true);
+      expect(next).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: "enterpriseFeatureLocked" }),
+      );
+    });
+
+    it("lets a cloud build through to the downtimes page", async () => {
+      config.isEnterprise = "false";
+      config.isCloud = "true";
+      const { routeGuard: guard } = await import("@/utils/zincutils");
+      const next = vi.fn();
+      findRoute(useRoutes().homeChildRoutes, "downtimes").beforeEnter(to, {}, next);
+      expect(guard).toHaveBeenCalledWith(to, {}, next);
+    });
+
+    it("keeps a flag-off downtimes page on Alerts for an enterprise build", () => {
+      config.isEnterprise = "true";
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = { downtimes_enabled: false };
+      try {
+        const next = enter(findRoute(useRoutes().homeChildRoutes, "downtimes"));
+        expect(next).toHaveBeenCalledWith({ name: "alertList", query: { org_identifier: "acme" } });
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    });
+  });
+
+  describe("member_subscription is Cloud-only", () => {
+    const to = { query: {}, fullPath: "/member_subscription" };
+
+    it("sends a non-cloud build home", () => {
+      config.isCloud = "false";
+      const next = vi.fn();
+      findRoute(useRoutes().homeChildRoutes, "member_subscription").beforeEnter(to, {}, next);
+      expect(next).toHaveBeenCalledWith("/");
+    });
+
+    it("lets a cloud build through", async () => {
+      config.isCloud = "true";
+      const { routeGuard: guard } = await import("@/utils/zincutils");
+      const next = vi.fn();
+      findRoute(useRoutes().homeChildRoutes, "member_subscription").beforeEnter(to, {}, next);
+      expect(guard).toHaveBeenCalledWith(to, {}, next);
+    });
+  });
+
+  describe("security route guard", () => {
+    const SECURITY_ROUTES = [
+      "securityOverview",
+      "securityEvents",
+      "securityDetections",
+      "securityAlerts",
+      "securityCases",
+      "securityEntities",
+      "securityIntel",
+      "securityUEBA",
+      "securityMitre",
+      "securitySources",
+      "securityContent",
+    ];
+
+    const enter = async (
+      name: string,
+      zoConfig: Record<string, unknown>,
+      query: Record<string, string> = { org_identifier: "acme" },
+    ) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const next = vi.fn();
+        findRoute(useRoutes().homeChildRoutes, name).beforeEnter({ query }, {}, next);
+        await vi.waitFor(() => expect(next).toHaveBeenCalled());
+        return next;
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    const global = i18n.global as any;
+    const setLocale = (locale: string) =>
+      typeof global.locale === "string" ? (global.locale = locale) : (global.locale.value = locale);
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+      vi.mocked(loadSecurityAccess).mockResolvedValue({ read: true, triage: false, admin: false });
+    });
+
+    it.each(SECURITY_ROUTES)("tags %s with the security license feature", (name) => {
+      expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe("security");
+    });
+
+    it("opens a page for a reader of the org", async () => {
+      const next = await enter("securityCases", {});
+      expect(loadSecurityAccess).toHaveBeenCalledWith("acme");
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it.each(SECURITY_ROUTES)(
+      "opens %s without read, for the layout's access lock",
+      async (name) => {
+        vi.mocked(loadSecurityAccess).mockResolvedValue({
+          read: false,
+          triage: false,
+          admin: false,
+        });
+        const next = await enter(name, {});
+        expect(next).toHaveBeenCalledWith();
+      },
+    );
+
+    it("waits for the access answer instead of bouncing a cold load", async () => {
+      let answer!: (value: { read: boolean; triage: boolean; admin: boolean }) => void;
+      vi.mocked(loadSecurityAccess).mockReturnValue(new Promise((resolve) => (answer = resolve)));
+      const next = vi.fn();
+      findRoute(useRoutes().homeChildRoutes, "securityEvents").beforeEnter(
+        { query: { org_identifier: "acme" } },
+        {},
+        next,
+      );
+      await Promise.resolve();
+      expect(next).not.toHaveBeenCalled();
+      answer({ read: true, triage: false, admin: false });
+      await vi.waitFor(() => expect(next).toHaveBeenCalledWith());
+    });
+
+    it("renders a locked license locked rather than redirecting", async () => {
+      vi.mocked(loadSecurityAccess).mockResolvedValue({ read: false, triage: false, admin: false });
+      const next = await enter("securityAlerts", { features: { security: "locked" } });
+      expect(next).toHaveBeenCalledWith();
+      expect(loadSecurityAccess).not.toHaveBeenCalled();
+    });
+
+    it("sends a hidden license home without asking for access", async () => {
+      const next = await enter("securityAlerts", { features: { security: "hidden" } });
+      expect(next).toHaveBeenCalledWith({ name: "home", query: { org_identifier: "acme" } });
+      expect(loadSecurityAccess).not.toHaveBeenCalled();
+    });
+
+    it("lets a load with no org yet through, for the layout to decide", async () => {
+      const previousOrg = store.state.selectedOrganization;
+      store.state.selectedOrganization = {} as any;
+      try {
+        const next = await enter("securityOverview", {}, {});
+        expect(next).toHaveBeenCalledWith();
+        expect(loadSecurityAccess).not.toHaveBeenCalled();
+      } finally {
+        store.state.selectedOrganization = previousOrg;
+      }
+    });
+
+    it("merges the Security messages for the active locale before the page renders", async () => {
+      setLocale("ja");
+      try {
+        expect(global.te("siem.nav.cases", "ja")).toBe(false);
+        const next = vi.fn(() => global.te("siem.nav.cases", "ja"));
+        findRoute(useRoutes().homeChildRoutes, "securityCases").beforeEnter(
+          { query: { org_identifier: "acme" } },
+          {},
+          next,
+        );
+        await vi.waitFor(() => expect(next).toHaveBeenCalledWith());
+        expect(next).toHaveReturnedWith(true);
+      } finally {
+        setLocale("en-us");
+      }
+    });
+
+    it("loads the Security messages for a locked license too, whose page still renders", async () => {
+      setLocale("ko");
+      try {
+        const next = await enter("securityAlerts", { features: { security: "locked" } });
+        expect(next).toHaveBeenCalledWith();
+        expect(global.te("siem.nav.alerts", "ko")).toBe(true);
+      } finally {
+        setLocale("en-us");
+      }
+    });
+
+    it("forwards a routeGuard redirect untouched", async () => {
+      vi.mocked(routeGuard).mockImplementationOnce((_to: any, _from: any, next: any) =>
+        next({ name: "plans" }),
+      );
+      const next = await enter("securityOverview", {});
+      expect(next).toHaveBeenCalledWith({ name: "plans" });
+      expect(loadSecurityAccess).not.toHaveBeenCalled();
+    });
+  });
+
   describe("license feature tags", () => {
     const shell = (path: string): any =>
       useRoutes().homeChildRoutes.find((r: any) => r.path === path);
@@ -2741,6 +3096,7 @@ describe("useRoutes (router.ts)", () => {
       ["editAnomalyDetection", "anomaly_detection"],
       ["sloList", "anomaly_detection"],
       ["addSlo", "anomaly_detection"],
+      ["importSlo", "anomaly_detection"],
       ["editSlo", "anomaly_detection"],
       ["sloDetail", "anomaly_detection"],
       ["pipelines", "pipelines"],

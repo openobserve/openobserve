@@ -297,6 +297,9 @@ export class ReportFoldersPage {
       .waitFor({ state: 'visible', timeout: 5000 })
       .catch(() => {});
 
+    // The option list is virtualised, so a destination past the rendered window is not in the DOM until the search narrows the list.
+    await this.page.locator('[data-test="reports-index-dropdown-stream_type-search"]').fill(folderName);
+
     // Click the option by data-test-value matching the resolved folderId.
     const option = this.page.locator(
       `[data-test="reports-index-dropdown-stream_type-option"][data-test-value="${folderId}"]`

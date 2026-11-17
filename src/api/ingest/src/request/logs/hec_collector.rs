@@ -22,7 +22,7 @@ use axum::{
     Extension, Json,
     body::{Body, Bytes},
     extract::{Request, rejection::BytesRejection},
-    http::{StatusCode, header},
+    http::{Method, StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
 };
@@ -35,7 +35,10 @@ use ingestion_common::IngestUser;
 use serde::{Deserialize, Serialize};
 
 use crate::service::{
-    ingestion::{check_ingestion_allowed, get_thread_id, rejections::RejectionOrg},
+    ingestion::{
+        check_ingestion_allowed, check_memory_circuit_breaker, get_thread_id,
+        rejections::RejectionOrg,
+    },
     logs::hec::{HecParseError, parse_body, preflight_records, preflight_streams},
 };
 
@@ -271,7 +274,7 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
     // §6 step 2: the GUID converts to its `o2oi_` token, which is what actually
     // authorizes ingestion, and is validated through the existing org-scoped path.
     match validate_o2oi_token(&org_id, &o2oi_token).await {
-        O2oiCheck::Valid => {}
+        O2oiCheck::Valid(_) => {}
         O2oiCheck::NotFound => {
             return reject(
                 HecCollectorStatus::TokenDisabled,
@@ -333,6 +336,13 @@ pub async fn wire_body_limit_middleware(req: Request, next: Next) -> Response {
     };
     next.run(Request::from_parts(parts, Body::from(bytes)))
         .await
+}
+
+/// Answers a write with "Server is busy" on a tripped memory circuit breaker.
+///
+/// Layer it outside [`wire_body_limit_middleware`], which reads the whole body before auth.
+pub async fn memory_breaker_middleware(req: Request, next: Next) -> Response {
+    busy_when_tripped(req, next, check_memory_circuit_breaker).await
 }
 
 /// `POST /services/collector` and `/services/collector/event`.
@@ -404,9 +414,9 @@ fn canonical_guid(token: &str) -> Option<String> {
     groups.next().is_none().then(|| token.to_ascii_lowercase())
 }
 
-/// Outcome of re-validating the `o2oi_` token a GUID converts to (design §6).
-enum O2oiCheck {
-    Valid,
+/// Outcome of validating an `o2oi_` token; `Valid` carries the token's name.
+pub(crate) enum O2oiCheck {
+    Valid(String),
     NotFound,
     StoreError(String),
 }
@@ -461,14 +471,14 @@ fn resolve_guid(guid: &str, loaded: bool) -> TokenLookup {
 /// what the Basic-auth `o2oi_` path already does — §6.2's "a miss never reaches
 /// the database" is about the GUID map, whose miss is already answered with code
 /// 4 above, so only a holder of a live GUID can get this far.
-async fn validate_o2oi_token(org_id: &str, o2oi_token: &str) -> O2oiCheck {
-    if ORG_INGESTION_TOKENS.contains_key(&format!("{org_id}/{o2oi_token}")) {
-        return O2oiCheck::Valid;
+pub(crate) async fn validate_o2oi_token(org_id: &str, o2oi_token: &str) -> O2oiCheck {
+    if let Some(name) = ORG_INGESTION_TOKENS.get(&format!("{org_id}/{o2oi_token}")) {
+        return O2oiCheck::Valid(name.value().clone());
     }
     match db::org_ingestion_tokens::find_enabled_token(org_id, o2oi_token).await {
         Ok(Some(record)) => {
-            ORG_INGESTION_TOKENS.insert(format!("{org_id}/{o2oi_token}"), record.name);
-            O2oiCheck::Valid
+            ORG_INGESTION_TOKENS.insert(format!("{org_id}/{o2oi_token}"), record.name.clone());
+            O2oiCheck::Valid(record.name)
         }
         Ok(None) => O2oiCheck::NotFound,
         Err(e) => O2oiCheck::StoreError(e.to_string()),
@@ -619,8 +629,19 @@ fn admission_status(e: &infra::errors::Error) -> HecCollectorStatus {
 /// `check_ingestion_allowed` flattens these into one stringly-typed variant, so
 /// the message is the only thing separating "retry later" from "your index is
 /// wrong"; matched on the literals it builds.
-fn is_retryable_admission(msg: &str) -> bool {
+pub(crate) fn is_retryable_admission(msg: &str) -> bool {
     msg == "not an ingester" || msg.starts_with("Quota exceeded for this organization")
+}
+
+async fn busy_when_tripped(
+    req: Request,
+    next: Next,
+    check: impl FnOnce() -> infra::errors::Result<()>,
+) -> Response {
+    if check().is_err() && req.method() == Method::POST {
+        return count_and_respond(HecCollectorStatus::ServerBusy, "");
+    }
+    next.run(req).await
 }
 
 /// Count one collector outcome and render its Splunk body.
@@ -869,7 +890,7 @@ mod tests {
         ORG_INGESTION_TOKENS.insert(format!("orgstep2/{O2OI}"), "step2".to_string());
         assert!(matches!(
             validate_o2oi_token("orgstep2", O2OI).await,
-            O2oiCheck::Valid
+            O2oiCheck::Valid(_)
         ));
         ORG_INGESTION_TOKENS.remove(&format!("orgstep2/{O2OI}"));
     }
@@ -1045,5 +1066,65 @@ mod tests {
         ] {
             assert!(canonical_guid(bad).is_none(), "{bad}");
         }
+    }
+
+    fn watched_body() -> (Body, std::sync::Arc<std::sync::atomic::AtomicBool>) {
+        let read = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = read.clone();
+        let stream = futures::stream::once(async move {
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok::<_, std::convert::Infallible>(Bytes::from_static(b"{}"))
+        });
+        (Body::from_stream(stream), read)
+    }
+
+    async fn collector(
+        check: fn() -> infra::errors::Result<()>,
+        method: Method,
+    ) -> (StatusCode, bool, HecCollectorResponse) {
+        use tower::ServiceExt;
+        let app = axum::Router::new()
+            .route(
+                "/services/collector",
+                axum::routing::any(|_: Bytes| async { HecCollectorStatus::Success }),
+            )
+            .layer(axum::middleware::from_fn(wire_body_limit_middleware))
+            .layer(axum::middleware::from_fn(move |req, next| {
+                busy_when_tripped(req, next, check)
+            }));
+        let (body, read) = watched_body();
+        let req = Request::builder()
+            .method(method)
+            .uri("/services/collector")
+            .body(body)
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let status = resp.status();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let read = read.load(std::sync::atomic::Ordering::SeqCst);
+        (status, read, json::from_slice(&body).unwrap())
+    }
+
+    #[tokio::test]
+    async fn tripped_breaker_is_server_busy_before_the_wire_limit_reads_the_body() {
+        let tripped = || Err(infra::errors::Error::ResourceError("tripped".to_string()));
+        let (status, read, body) = collector(tripped, Method::POST).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert!(!read, "the body was read before the write was refused");
+        assert_eq!((body.code, body.text.as_str()), (9, "Server is busy"));
+
+        let (status, read, _) = collector(tripped, Method::GET).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(read);
+    }
+
+    #[tokio::test]
+    async fn closed_breaker_lets_the_event_through() {
+        let (status, read, body) = collector(|| Ok(()), Method::POST).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(read);
+        assert_eq!(body.code, 0);
     }
 }

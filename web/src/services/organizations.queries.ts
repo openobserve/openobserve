@@ -44,7 +44,15 @@ export const myOrganizationsQuery = () =>
 export const orgSettingsQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.settings(org),
-    queryFn: async () => (await organizations.get_organization_settings(org)).data,
+    queryFn: async () => {
+      try {
+        return (await organizations.get_organization_settings(org)).data;
+      } catch (e: any) {
+        // A role without the settings grant gets 403 for good; cached as "none" so every page load stops asking.
+        if (e?.response?.status === 403 || e?.response?.status === 404) return null;
+        throw e;
+      }
+    },
     staleTime: NORMAL_STALE_TIME,
   });
 
@@ -120,25 +128,38 @@ export const adminOrgsQuery = (org: string) =>
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
+// Callers copy the token list into the store and re-arm row buttons as soon as these resolve.
 export const createIngestionTokenMutation = (org: string) =>
   mutationOptions({
     mutationFn: (data: { name: string; description?: string; splunk_token?: boolean }) =>
       organizations.create_org_ingestion_token(org, data),
-    meta: { invalidates: [organizationKeys.ingestionTokens(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.ingestionTokens(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });
 
 export const setIngestionTokenEnabledMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { name: string; enabled: boolean }) =>
       organizations.enable_disable_org_ingestion_token(org, vars.name, vars.enabled),
-    meta: { invalidates: [organizationKeys.ingestionTokens(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.ingestionTokens(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });
 
 export const setIngestionSplunkTokenMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { name: string; action: "generate" | "revoke" }) =>
       organizations.set_org_ingestion_splunk_token(org, vars.name, vars.action),
-    meta: { invalidates: [organizationKeys.ingestionTokens(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.ingestionTokens(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });
 
 export const resetPasscodeMutation = (org: string) =>

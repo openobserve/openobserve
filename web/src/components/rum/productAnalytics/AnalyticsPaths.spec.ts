@@ -26,11 +26,13 @@ vi.mock("@/services/rumProductAnalytics", async () => ({
   default: (await import("@/utils/rum/__fixtures__/namedEventsApiMock")).rumPaApiMock.service,
 }));
 const confirmMock = vi.hoisted(() => vi.fn(async (_o: Record<string, unknown>) => true));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: () => ({ confirm: confirmMock }),
 }));
 
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import { rumPaApiMock as api } from "@/utils/rum/__fixtures__/namedEventsApiMock";
 import { resetNamedEvents } from "@/composables/rum/useNamedEvents";
 import usePerformance from "@/composables/rum/usePerformance";
@@ -255,6 +257,8 @@ describe("AnalyticsPaths", () => {
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("productAnalyticsFunnelBuilder");
     expect(useProductAnalytics().funnel.value.steps).toEqual(steps);
+    expect(analytics.track).toHaveBeenCalledWith("rum_path_sessions_opened", { source: "tuple" });
+    expect(analytics.track).toHaveBeenCalledWith("rum_funnel_built_from_path", { steps: 2 });
   });
 
   it("Build funnel from a branch closes an unedited saved funnel without asking, so Save never overwrites it", async () => {
@@ -395,6 +399,37 @@ describe("AnalyticsPaths", () => {
     expect(has("rum-analytics-paths-loading")).toBe(false);
     expect(has("rum-analytics-paths-no-anchor")).toBe(true);
     expect(pathSqls()).toEqual([]);
+  });
+
+  it.each([
+    ["30d", false],
+    ["1d", true],
+  ])("the no-entry-pages widen button at a %s range is present: %s", async (period, shown) => {
+    entryRows = [];
+    await mountPaths(() => {
+      useProductAnalytics().setScope({
+        datetime: { valueType: "relative", relativeTimePeriod: period, startTime: 0, endTime: 0 },
+      });
+    });
+    expect(wrapper!.find('[data-test="rum-analytics-paths-no-anchor"]').exists()).toBe(true);
+    expect(
+      wrapper!.find('[data-test="rum-analytics-paths-no-anchor-widen-range-btn"]').exists(),
+    ).toBe(shown);
+  });
+
+  it.each([
+    ["30d", false],
+    ["1d", true],
+  ])("the empty-flow widen button at a %s range is present: %s", async (period, shown) => {
+    pathRows = [];
+    await mountPaths(() => {
+      useProductAnalytics().setScope({
+        datetime: { valueType: "relative", relativeTimePeriod: period, startTime: 0, endTime: 0 },
+      });
+      useProductAnalytics().paths.value = COHORT_DEF();
+    });
+    expect(wrapper!.find('[data-test="rum-analytics-paths-empty"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="rum-analytics-paths-widen-range-btn"]').exists()).toBe(shown);
   });
 
   it("a cold tab anchors at the top entry page", async () => {
@@ -701,6 +736,7 @@ describe("AnalyticsPaths", () => {
     const drawer = wrapper!.findComponent(DrawerStub);
     expect(drawer.props("predicate")).toContain("s1 = 'p:/web/dashboards'");
     expect(drawer.props("expectedTotal")).toBe(30);
+    expect(analytics.track).toHaveBeenCalledWith("rum_path_sessions_opened", { source: "node" });
   });
 
   it("a deep flow link keeps every intermediate step, not just the endpoints (bug: dropped steps)", async () => {

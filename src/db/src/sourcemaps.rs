@@ -47,7 +47,8 @@ type SourceMapKey = (
 /// `(service, env, version)`: the rows one [`delete_group`] call removes.
 type GroupKey = (Option<String>, Option<String>, Option<String>);
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, utoipa::ToSchema)]
+#[schema(as = SourcemapValues)]
 pub struct ParamValues {
     services: Vec<String>,
     envs: Vec<String>,

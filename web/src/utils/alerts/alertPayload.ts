@@ -60,6 +60,7 @@ export interface PayloadFormData {
   row_template?: string;
   row_template_type?: string;
   creates_incident?: boolean;
+  incident_title_template?: string;
   notify_on_recovery?: boolean;
   recovery_destinations?: string[];
   keep_firing_for?: number;
@@ -358,6 +359,9 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   if (typeof payload.oncall_team !== "string" || payload.oncall_team.trim() === "") {
     delete (payload as any).oncall_team;
   }
+  const titleTemplate = payload.creates_incident ? payload.incident_title_template?.trim() : "";
+  if (titleTemplate) payload.incident_title_template = titleTemplate;
+  else delete payload.incident_title_template;
 
   if (formData.query_condition.vrl_function) {
     payload.query_condition.vrl_function = b64EncodeUnicode(
@@ -387,7 +391,11 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   return payload;
 };
 
-export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext): Promise<void> => {
+/** Saves the JSON editor's alert; true once the server accepted it. */
+export const prepareAndSaveAlert = async (
+  data: any,
+  context: SaveAlertContext,
+): Promise<boolean> => {
   const { store, t, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
     context;
 
@@ -466,7 +474,9 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       });
     }
     dismiss();
+    return true;
   } catch (err: any) {
     handleAlertError(err);
+    return false;
   }
 };

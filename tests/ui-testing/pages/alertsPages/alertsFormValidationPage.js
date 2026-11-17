@@ -2,6 +2,7 @@
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { openNavFlyoutChild } = require('../commonActions.js');
+const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 export class AlertsFormValidationPage {
   /**
@@ -123,38 +124,9 @@ export class AlertsFormValidationPage {
     this.wizardStreamTypePopover      = '[data-test="add-alert-stream-type-select-dropdown-popover"]';
     this.wizardStreamNamePopover      = '[data-test="add-alert-stream-name-select-dropdown-popover"]';
 
-    // ── FilterCondition — condition row elements ──────────────────────────────
-    // AND/OR toggle button
-    this.filterConditionToggleOperatorBtn = '[data-test="alert-conditions-toggle-operator-btn"]';
-    // Column selector: OSelect → trigger to open, -popover panel, -error message
-    this.filterConditionColumnTrigger = '[data-test="alert-conditions-select-column-trigger"]';
-    this.filterConditionColumnPopover = '[data-test="alert-conditions-select-column-popover"]';
-    this.filterConditionColumnError   = '[data-test="alert-conditions-select-column-error"]';
-    // Operator selector: OSelect → trigger to open, -popover panel, -error message
-    this.filterConditionOperatorTrigger = '[data-test="alert-conditions-operator-select-trigger"]';
-    this.filterConditionOperatorPopover = '[data-test="alert-conditions-operator-select-popover"]';
-    this.filterConditionOperatorError   = '[data-test="alert-conditions-operator-select-error"]';
-    // Value input: OInput → fill via -field, error via -error
-    this.filterConditionValueTrigger = '[data-test="alert-conditions-value-input"]';
-    this.filterConditionValueField = '[data-test="alert-conditions-value-input-field"]';
-    this.filterConditionValueError = '[data-test="alert-conditions-value-input-error"]';
-    // AND/OR label span (FilterCondition.vue) — readable operator text for the
-    // row, used to assert the toggle button flipped the logical operator.
-    this.filterConditionOperatorLabel = '[data-test="alert-conditions-operator-label"]';
-
-    // ── FieldsInput — condition management buttons ─────────────────────────────
-    // The redesigned form renders conditions via FilterGroup.vue → FilterCondition.vue
-    // (FieldsInput.vue is unused by alerts). The conditions group starts EMPTY —
-    // an "Add Condition" button creates each FilterCondition row.
-    // Initial "Add" button shown when no conditions exist
-    this.fieldsInputAddBtn         = '[data-test="alert-conditions-add-btn"]';
-    // Add Condition button (FilterGroup.vue) — appends a FilterCondition row
-    this.fieldsInputAddConditionBtn    = '[data-test="alert-conditions-add-condition-btn"]';
-    // Per-row Delete button (FilterGroup.vue) — one per condition row
-    this.fieldsInputDeleteConditionBtn = '[data-test="alert-conditions-delete-condition-btn"]';
-    // Condition rows have no wrapper data-test; count them via the per-row column
-    // OSelect trigger which is present once per FilterCondition row.
-    this.fieldsInputRowMarker      = '[data-test="alert-conditions-select-column-trigger"]';
+    // ── Condition builder (shared FilterBuilder, prefix "alert-conditions") ──
+    this.conditions = new FilterBuilderDriver(page, 'alert-conditions');
+    this.conditionsError = '[data-test="alert-conditions-error"]';
   }
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
@@ -392,41 +364,16 @@ export class AlertsFormValidationPage {
   getWizardStreamTypeDropdownLocator()     { return this.page.locator(this.wizardStreamTypeDropdown); }
   getWizardStreamNameDropdownLocator()     { return this.page.locator(this.wizardStreamNameDropdown); }
 
-  // ── FilterCondition locator getters ───────────────────────────────────────
-  getFilterConditionToggleOperatorBtnLocator() { return this.page.locator(this.filterConditionToggleOperatorBtn); }
-  // The always-present clickable OSelect trigger (the popover panel only exists
-  // in the DOM while it is open), so these getters return the trigger element.
-  getFilterConditionColumnPopoverLocator()     { return this.page.locator(this.filterConditionColumnTrigger); }
-  getFilterConditionColumnErrorLocator()       { return this.page.locator(this.filterConditionColumnError); }
-  getFilterConditionOperatorPopoverLocator()   { return this.page.locator(this.filterConditionOperatorTrigger); }
-  getFilterConditionOperatorErrorLocator()     { return this.page.locator(this.filterConditionOperatorError); }
-  getFilterConditionValueFieldLocator()        { return this.page.locator(this.filterConditionValueField); }
-  getFilterConditionValueErrorLocator()        { return this.page.locator(this.filterConditionValueError); }
+  // ── Condition builder getters ─────────────────────────────────────────────
   async clickAlertSubmit()                     { await this.page.locator(this.alertSubmitBtn).click(); }
-
-  // ── FieldsInput locator getters ───────────────────────────────────────────
-  getFieldsInputAddBtnLocator()            { return this.page.locator(this.fieldsInputAddBtn); }
-  getFieldsInputAddConditionBtnLocator()   { return this.page.locator(this.fieldsInputAddConditionBtn); }
-  getFieldsInputDeleteConditionBtnLocator(){ return this.page.locator(this.fieldsInputDeleteConditionBtn); }
-  // Condition rows have no wrapper data-test; resolve the Nth row via the
-  // per-row column trigger marker (0-based index).
-  getFieldsInputRowLocator(index)          { return this.page.locator(this.fieldsInputRowMarker).nth(index); }
-
-  // ── FilterCondition row helpers (FilterGroup-rendered rows) ───────────────
-  getFilterConditionOperatorLabelLocator() { return this.page.locator(this.filterConditionOperatorLabel); }
-  // Nth-row value OInput field (0-based)
-  getFilterConditionValueFieldByRow(index) { return this.page.locator(this.filterConditionValueField).nth(index); }
-  // Nth-row column OSelect trigger (0-based)
-  getFilterConditionColumnTriggerByRow(index) { return this.page.locator(this.filterConditionColumnTrigger).nth(index); }
+  getConditionsErrorLocator()                  { return this.page.locator(this.conditionsError); }
 
   /**
-   * Appends a new FilterCondition row via the "Add Condition" button.
+   * Builds a condition on the `position`-th listed column through the builder's picker.
    */
-  async addFilterCondition() {
-    testLogger.info('Clicking Add Condition to append a FilterCondition row');
-    const addBtn = this.page.locator(this.fieldsInputAddConditionBtn);
-    await addBtn.waitFor({ state: 'visible', timeout: 10000 });
-    await addBtn.click();
+  async addFilterCondition(position = 0, operator = '=', value = 'e2e') {
+    testLogger.info('Adding a condition through the condition builder', { position, operator });
+    await this.conditions.addConditionOnListedField(position, operator, value);
   }
 
   // ── Alert wizard helpers ───────────────────────────────────────────────────
@@ -458,12 +405,11 @@ export class AlertsFormValidationPage {
   }
 
   /**
-   * Clicks the AND/OR toggle operator button in a FilterCondition row.
+   * Switches the AND/OR in front of the second condition line.
    */
   async clickFilterConditionToggleOperator() {
-    testLogger.info('Clicking FilterCondition AND/OR toggle button');
-    await this.page.locator(this.filterConditionToggleOperatorBtn).waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.locator(this.filterConditionToggleOperatorBtn).click();
+    testLogger.info('Clicking the AND/OR connector of the second condition');
+    await this.conditions.toggleConnector('1');
   }
 
   // OSelect option factories — pick by `data-test-value` (§4) rather than text.
@@ -496,11 +442,10 @@ export class AlertsFormValidationPage {
   }
 
   /**
-   * Opens the column selector popover in a FilterCondition row.
+   * Opens the builder's field picker for a new condition.
    */
   async openFilterConditionColumnPopover() {
-    testLogger.info('Opening FilterCondition column selector popover');
-    await this.page.locator(this.filterConditionColumnTrigger).waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.locator(this.filterConditionColumnTrigger).click();
+    testLogger.info('Opening the condition builder field picker');
+    await this.conditions.openNewCondition();
   }
 }

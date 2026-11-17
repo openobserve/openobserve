@@ -27,7 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="rounded-default bg-status-success-bg flex items-center gap-3 px-3 py-1.5"
     data-test="oncall-shift-banner"
   >
-    <OUserCell :value="userEmail" :name="youLabel" />
+    <span class="text-text-body shrink-0 text-sm" data-test="oncall-shift-banner-you">
+      {{ youLabel }}
+      <OTooltip :content="youTooltip" />
+    </span>
 
     <span class="flex min-w-0 flex-col">
       <OTruncatedText class="text-text-heading text-sm font-semibold">
@@ -46,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-shift-banner-handover"
     >
       <span class="text-text-heading text-sm font-semibold">{{ handover }}</span>
-      <OText variant="section">{{ t("oncall.tillHandover") }}</OText>
+      <OText variant="meta">{{ t("oncall.tillHandover") }}</OText>
     </span>
   </div>
 </template>
@@ -55,9 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import { useOnCallClock } from "@/composables/useOnCallClock";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -79,7 +83,10 @@ const props = withDefaults(
 const { t } = useI18nTyped();
 const nowMicros = useOnCallClock();
 
-const youLabel = computed(() => String(t("oncall.onCallYou")));
+const { tooltipOf } = useOrgUserNames();
+
+const youLabel = computed(() => t("oncall.onCallYou"));
+const youTooltip = computed<I18nText>(() => tooltipOf(props.userEmail));
 
 /// Being on call for three teams at once is worth knowing about, but naming
 /// them all would push the countdown off the header.

@@ -131,9 +131,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <DbmSubheaderBand data-test="dbm-deadlocks-summary">
-            <OStatStrip :items="summaryStats" :loading="loading" />
-          </DbmSubheaderBand>
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            row
+            data-test="dbm-deadlocks-summary"
+          />
 
           <!-- ONE storm band, not two. The completion-bias caution has no
                condition of its own beyond `storm`, so it rides inside this
@@ -436,7 +439,6 @@ import DateTime from "@/components/DateTime.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
-import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmLockEmptyState, {
   type DbmLockCheck,
@@ -459,6 +461,7 @@ import dbMonitoringService, {
   type DeadlockEvent,
   type DeadlockParticipant,
 } from "@/services/db_monitoring";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
@@ -1007,6 +1010,7 @@ const stepEvent = (row: DeadlockRow, direction: number) => {
 };
 
 const onRowAction = (id: string, row: DeadlockRow) => {
+  analytics.track("dbm_row_action_clicked", { page: "deadlocks", action: id });
   if (id === "copy") {
     copyToClipboard(row.queries.join("\n\n"), t);
     return;
@@ -1103,6 +1107,7 @@ const summaryLines = (row: DeadlockRow): string[] => [
 
 const copySummary = (row: DeadlockRow) => {
   copyToClipboard(summaryLines(row).join("\n"), t);
+  analytics.track("dbm_deadlock_summary_copied", { scope: "pair" });
 };
 
 /**
@@ -1117,6 +1122,7 @@ const copyStormSummary = () => {
   if (!rows.length) return;
   const header = `*${eventCount.value} deadlocks in this window, from ${rows.length} query pair(s)*`;
   copyToClipboard([header, "", ...rows.flatMap((r) => [...summaryLines(r), ""])].join("\n"), t);
+  analytics.track("dbm_deadlock_summary_copied", { scope: "storm" });
 };
 
 const onEmptyAction = (id: string) => {
@@ -1246,6 +1252,7 @@ const load = () =>
  * around it.
  */
 const askAiForFix = (row: DeadlockRow) => {
+  analytics.track("dbm_ai_fix_requested", { page: "deadlocks" });
   const participants = row.selectedEvent?.participants ?? [];
   const queries = participants.map((p) => p.query ?? "").filter(Boolean);
   emit("sendToAiChat", {

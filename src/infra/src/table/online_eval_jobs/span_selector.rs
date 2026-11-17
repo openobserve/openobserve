@@ -122,6 +122,20 @@ impl SpanSelector {
     }
 }
 
+/// Extended-operator value checks on a stored condition JSON; shapes that do not parse pass.
+pub fn validate_condition_json_operator_values(
+    condition: &serde_json::Value,
+) -> Result<(), String> {
+    if let Ok(params) = serde_json::from_value::<ConditionParams>(condition.clone()) {
+        return params.validate_operator_values();
+    }
+    if let Ok(group) = serde_json::from_value::<ConditionGroup>(condition.clone()) {
+        return group.validate_operator_values();
+    }
+    serde_json::from_value::<ConditionList>(condition.clone())
+        .map_or(Ok(()), |list| list.validate_operator_values())
+}
+
 fn is_valid_selector_filter(filter: &serde_json::Value) -> bool {
     if filter.is_null()
         || filter.as_object().is_some_and(|value| value.is_empty())

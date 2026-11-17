@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- One shift rule as labelled rows; its name, stop date and removal live in its tab menu. -->
 <template>
-  <div class="grid grid-cols-[auto_1fr] items-start gap-x-6 gap-y-5">
+  <!-- A fixed label column, so switching rule tabs never moves the controls. -->
+  <div class="grid grid-cols-[10rem_1fr] items-start gap-x-6 gap-y-5">
     <!-- An empty team has nobody to pick, so the reader is sent to the roster instead. -->
     <div
       v-if="!hasTeamMembers"
@@ -29,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm-action"
+        icon-left="person-add"
         data-test="oncall-rotation-open-members"
         @click="$emit('open-members')"
       >
@@ -60,13 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="clash.id"
         class="text-status-warning-text text-xs"
       >
-        {{
-          t("oncall.rotationMemberAway", {
-            who: raw(clash.user_email),
-            from: raw(shortDate(clash.start_at)),
-            to: raw(shortDate(clash.end_at)),
-          })
-        }}
+        <i18n-t keypath="oncall.rotationMemberAway" tag="span" scope="global">
+          <template #who><OnCallPersonName :email="clash.user_email" /></template>
+          <template #from>{{ raw(shortDate(clash.start_at)) }}</template>
+          <template #to>{{ raw(shortDate(clash.end_at)) }}</template>
+        </i18n-t>
       </p>
     </div>
 
@@ -102,18 +102,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`oncall-schedule-handover-${ruleIndex}-time`"
         @update:model-value="(v: unknown) => moveHandover(handover.weekday, Number(v))"
       />
+      <OText variant="meta" as="span" :data-test="`oncall-schedule-handover-${ruleIndex}-zone`">
+        {{ raw(timezone) }}
+      </OText>
     </div>
 
     <OText variant="body-strong" class="pt-1.5">{{ t("oncall.ruleCovers") }}</OText>
     <div class="flex min-w-0 flex-col gap-2">
-      <OSelect
-        :model-value="covers"
-        width="md"
-        :aria-label="t('oncall.ruleCovers')"
-        :options="coversOptions"
-        :data-test="`oncall-schedule-covers-${ruleIndex}`"
-        @update:model-value="(v: unknown) => setCovers(v as CoversPreset)"
-      />
+      <span class="flex flex-wrap items-center gap-2">
+        <OSelect
+          :model-value="covers"
+          width="md"
+          :aria-label="t('oncall.ruleCovers')"
+          :options="coversOptions"
+          :data-test="`oncall-schedule-covers-${ruleIndex}`"
+          @update:model-value="(v: unknown) => setCovers(v as CoversPreset)"
+        />
+        <OText variant="meta" as="span" :data-test="`oncall-schedule-covers-${ruleIndex}-zone`">
+          {{ raw(timezone) }}
+        </OText>
+      </span>
 
       <template v-if="covers === 'custom'">
         <div
@@ -207,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             :data-test="`oncall-schedule-overlap-${ruleIndex}-loses`"
           >
-            {{ t("oncall.ruleOverlapOthersWin", { names: raw(overlapNames) }, overlapCount) }}
+            {{ t("oncall.ruleOverlapOthersWin", { names: raw(overlapNames) }) }}
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
@@ -245,6 +253,7 @@ import {
   formatMinuteOfDay,
 } from "@/utils/oncall";
 import OnCallRulePeople from "./OnCallRulePeople.vue";
+import OnCallPersonName from "./OnCallPersonName.vue";
 
 const props = defineProps<{
   rule: ShiftRule;
@@ -267,6 +276,8 @@ const props = defineProps<{
   overlapCount: number;
   /** Unset when this rule wins against some overlaps and loses to others. */
   overlapChoice: "wins" | "loses" | undefined;
+  /** No window of its own, and higher rules take some of its hours. */
+  allOtherHours?: boolean;
   setMembers: (rule: ShiftRule, members: string[]) => void;
   awayClashesFor: (rule: ShiftRule) => Unavailability[];
   shortDate: (micros: number) => string;
@@ -308,7 +319,7 @@ function moveHandover(weekday: number, minute: number) {
 }
 
 const coversOptions = computed(() => [
-  { label: t("oncall.coversAll"), value: "all" },
+  { label: t(props.allOtherHours ? "oncall.coversAllOther" : "oncall.coversAll"), value: "all" },
   { label: t("oncall.coversBusinessHours"), value: "businessHours" },
   { label: t("oncall.coversWeekdays"), value: "weekdays" },
   { label: t("oncall.coversWeekends"), value: "weekends" },

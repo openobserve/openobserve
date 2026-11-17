@@ -182,7 +182,7 @@ const onNativeCopy = () => {
           <i class="bg-warning block size-2.5 rounded-full" />
           <i class="bg-status-positive block size-2.5 rounded-full" />
         </span>
-        <span class="o2-code-lang text-2xs font-mono opacity-55">{{
+        <span class="o2-code-lang text-text-body font-mono text-xs">{{
           t("components.codeBlock.terminal")
         }}</span>
       </span>
@@ -195,7 +195,7 @@ const onNativeCopy = () => {
           filename || lang || t("common.plainText")
         }}</span>
       </span>
-      <span v-else class="o2-code-lang text-2xs font-mono opacity-55">{{
+      <span v-else class="o2-code-lang text-text-body font-mono text-xs">{{
         lang || t("common.plainText")
       }}</span>
       <div class="flex items-center gap-1">

@@ -50,6 +50,16 @@ watch(
   },
   { flush: "post", immediate: true },
 );
+const failed = computed(() => copyConfirm.tone === "error");
+// `!` because OTooltip's own surface classes would otherwise win or lose by stylesheet order.
+const bubbleClass = computed(() =>
+  failed.value
+    ? "bg-copy-confirm-error-bg! border border-status-error-text/40"
+    : "bg-copy-confirm-bg! text-copy-confirm-text!",
+);
+const bubbleArrowClass = computed(() =>
+  failed.value ? "fill-copy-confirm-error-bg" : "fill-copy-confirm-bg",
+);
 const bubbleOpen = computed(
   () => copyConfirm.open && !!copyConfirm.anchor && placedAnchor.value === copyConfirm.anchor,
 );
@@ -88,21 +98,33 @@ function handleOpenChange(id: string, open: boolean): void {
   <OTooltip
     :anchor="copyConfirm.anchor"
     :open="bubbleOpen"
-    side="top"
+    :side="copyConfirm.side"
+    :content-class="bubbleClass"
+    :arrow-class="bubbleArrowClass"
     @update:open="(open) => open || dismissCopyConfirm()"
   >
     <template #content>
       <span
-        class="inline-flex items-center gap-1"
+        :class="['inline-flex items-center gap-1', failed && 'text-status-error-text']"
         data-test="copy-confirm"
-        data-test-variant="success"
+        :data-test-side="copyConfirm.side"
+        :data-test-variant="copyConfirm.tone"
         :data-test-message="copyConfirm.message"
       >
-        <OIcon name="check" size="sm" />{{ copyConfirm.message }}
+        <OIcon :name="failed ? 'error-outline' : 'check'" size="sm" />{{ copyConfirm.message }}
       </span>
     </template>
   </OTooltip>
   <div aria-live="polite" aria-atomic="true" class="sr-only" data-test="copy-confirm-announcer">
-    {{ copyConfirm.open ? copyConfirm.message : "" }}
+    {{ copyConfirm.open && !failed ? copyConfirm.message : "" }}
+  </div>
+  <!-- An alert is announced when it is inserted, so it exists only while the failure shows. -->
+  <div
+    v-if="copyConfirm.open && failed"
+    role="alert"
+    class="sr-only"
+    data-test="copy-confirm-alert"
+  >
+    {{ copyConfirm.message }}
   </div>
 </template>

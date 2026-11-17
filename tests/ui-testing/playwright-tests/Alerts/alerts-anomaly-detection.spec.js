@@ -408,7 +408,10 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.addFilter('kubernetes_namespace_name', '=', 'ziox');
       await expect(rows).toHaveCount(initial + 1);
 
-      await pm.anomalyDetectionPage.removeFilter(initial);
+      await expect(pm.anomalyDetectionPage.filterBuilder().chip('kubernetes_namespace_name'))
+        .toContainText('ziox');
+
+      await pm.anomalyDetectionPage.removeFilter('kubernetes_namespace_name');
       await expect(rows).toHaveCount(initial);
     });
 
@@ -690,8 +693,7 @@ test.describe('Anomaly Detection', () => {
         await expect(pauseBtn).toHaveAttribute('data-row-action', 'pause');
 
         await pm.anomalyDetectionPage.togglePause(name);
-        await expect(pm.anomalyDetectionPage.getToastLocator(/success/i)).toBeVisible();
-        // Pause must actually flip the state: the control now offers "resume".
+        // No success toast: the row's control reports the result. Pause must flip it to offer "resume".
         await expect(pauseBtn).toHaveAttribute('data-row-action', 'resume');
 
         await pm.anomalyDetectionPage.togglePause(name);
@@ -1015,12 +1017,33 @@ test.describe('Anomaly Detection', () => {
         `detection failed: ${JSON.stringify(detected.data)}`,
       ).toBe(200);
 
+      // A scheduler tick right after save can score the window before this manual run, so the spike is read from _anomalies, which every run writes.
+      let scoredPoints = [];
+      await expect
+        .poll(
+          async () => {
+            scoredPoints = await searchSql(
+              page,
+              `SELECT actual_value, is_anomaly, score, threshold_value FROM "_anomalies" ` +
+                `WHERE anomaly_id = '${id}'`,
+            );
+            // A run's rows can become searchable piecemeal, so wait for the spike row itself.
+            return scoredPoints.filter((a) => a.is_anomaly === true && a.actual_value === 120).length;
+          },
+          {
+            timeout: 60000,
+            message: `no flagged spike row in _anomalies for ${id} after detection (manual run scored ${detected.data.points_scored})`,
+          },
+        )
+        .toBeGreaterThan(0);
+      const flaggedPoints = scoredPoints.filter((a) => a.is_anomaly === true);
+
       // The spike must be found, and found as the worst point — a run that
       // flags only baseline noise would otherwise look like a pass.
-      expect(detected.data.anomalies_found).toBeGreaterThan(0);
-      const worst = Math.max(...detected.data.anomalies.map((a) => a.actual_value));
+      expect(flaggedPoints.length, `none of the ${scoredPoints.length} scored points for ${id} was flagged`).toBeGreaterThan(0);
+      const worst = Math.max(...flaggedPoints.map((a) => a.actual_value));
       expect(worst).toBe(120);
-      const spike = detected.data.anomalies.find((a) => a.actual_value === 120);
+      const spike = flaggedPoints.find((a) => a.actual_value === 120);
       expect(spike.is_anomaly).toBe(true);
       expect(spike.score).toBeGreaterThan(spike.threshold_value);
 

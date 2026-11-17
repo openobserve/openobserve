@@ -131,15 +131,11 @@ describe("SloList export", () => {
     expect(exported.sli_type).toBe("count");
     expect(exported.target).toBe(99.9);
     expect(exported.config).toBeTruthy();
+    // The operator's own sizing input, which create needs to reserve a grouped SLO's rows.
+    expect(exported.groups_estimate).toBe(12);
 
     // The measurement and everything the server assigns does not.
-    for (const key of [
-      "status",
-      "id",
-      "definition_generation",
-      "groups_estimate",
-      "groups_reserved",
-    ]) {
+    for (const key of ["status", "id", "definition_generation", "groups_reserved"]) {
       expect(exported, `${key} leaked into the export`).not.toHaveProperty(key);
     }
   });
@@ -167,5 +163,23 @@ describe("SloList export", () => {
 
     expect(wrapper.vm.exportDialog).toBe(false);
     expect(wrapper.vm.slosToExport).toEqual([]);
+  });
+});
+
+describe("SloList import", () => {
+  it("opens the import page in the folder the list is showing", async () => {
+    (router as any).currentRoute.value.query = { folder: "payments" };
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    const wrapper: any = await mountList();
+
+    await wrapper.find('[data-test="slos-slolist-import"]').trigger("click");
+
+    expect(push).toHaveBeenCalledWith({
+      name: "importSlo",
+      query: { folder: "payments", org_identifier: store.state.selectedOrganization.identifier },
+    });
+    expect(router.resolve({ name: "importSlo" }).path).toMatch(/\/slos\/import$/);
+    push.mockRestore();
+    (router as any).currentRoute.value.query = {};
   });
 });

@@ -372,25 +372,6 @@ describe("OnCallEscalation", () => {
     expect(wrapper.findAll('[data-test^="oncall-escalation-level-"]')).toHaveLength(2);
   });
 
-  /// The policy's own ending, which `/escalation` cannot say: an exhausted
-  /// ladder that notifies the default team did not stop with nobody left.
-  it("says which ending the policy chose when the rungs ran out", () => {
-    const wrapper = mount(OnCallEscalation, {
-      props: {
-        progress: {
-          fired: [],
-          next_targets: [],
-          next_at: null,
-          exhausted: true,
-          stopped_because: null,
-        },
-        finalAction: "notify_default_team",
-      },
-      global: { plugins: [i18n], stubs },
-    });
-    expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain("default team");
-  });
-
   /// The rail offers the edit only when the caller says where it goes; the
   /// component itself has no opinion about routing.
   it("offers the edit affordance only with a team", () => {

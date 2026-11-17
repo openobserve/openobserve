@@ -183,6 +183,44 @@ describe("useChatStream", () => {
     await turn;
   });
 
+  describe("dropped stream", () => {
+    const droppingResponse = (error: Error) => ({
+      ok: true,
+      body: {
+        getReader: () => ({
+          read: async () => {
+            throw error;
+          },
+        }),
+      },
+    });
+
+    it("logs a dropped connection as a warning, not an error", async () => {
+      const error = new TypeError("network error");
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockFetchAiChat.mockResolvedValue(droppingResponse(error));
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(errorSpy).not.toHaveBeenCalledWith("Error reading stream:", expect.anything());
+      expect(warnSpy).toHaveBeenCalledWith("Error reading stream:", error);
+      expect(trackedEvents()).toContain("ai_assistant_answer_failed");
+    });
+
+    it("still logs an unexpected read failure as an error", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = new Error("boom");
+      mockFetchAiChat.mockResolvedValue(droppingResponse(error));
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(errorSpy).toHaveBeenCalledWith("Error reading stream:", error);
+    });
+  });
+
   it("runs teardown when the fetch throws, clearing loading and the controller", async () => {
     mockFetchAiChat.mockRejectedValue(new Error("network"));
     const { stream } = makeStream();

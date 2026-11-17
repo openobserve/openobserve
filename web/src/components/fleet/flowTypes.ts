@@ -17,6 +17,9 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nText } from "@/types/i18n";
 import type { PathSeverity } from "./flowIssues";
 
+// Vue Flow clamps every zoom to this, so it has to let a map of hundreds of rows fit the canvas.
+export const MIN_FLOW_ZOOM = 0.01;
+
 export type Telemetry = "logs" | "metrics" | "traces";
 
 export type FlowSignal = Telemetry | "all";

@@ -16,6 +16,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
+import { routeLocationKey } from "vue-router";
 import SplunkHec from "@/components/ingestion/logs/SplunkHec.vue";
 
 const barStart = vi.fn();
@@ -65,7 +66,7 @@ const mockStore = createStore({
 describe("SplunkHec", () => {
   let wrapper: any;
 
-  const createWrapper = (props = {}, customStore = mockStore) =>
+  const createWrapper = (props = {}, customStore = mockStore, provide = {}) =>
     mount(SplunkHec, {
       props: {
         currOrgIdentifier: "test_org_123",
@@ -75,6 +76,7 @@ describe("SplunkHec", () => {
       global: {
         plugins: [customStore],
         mocks: { $store: customStore },
+        provide,
         stubs: {
           OBanner: { template: "<div class='o-banner-mock'><slot /></div>" },
           OText: { template: "<div class='o-text-mock'><slot /></div>" },
@@ -233,6 +235,16 @@ describe("SplunkHec", () => {
         expect.objectContaining({ partial: true }),
       );
       expect(barStart).toHaveBeenCalledWith("copy");
+    });
+
+    it("tracks the route the page is given, as onboarding gives it when it shows the page", async () => {
+      wrapper = createWrapper({}, mockStore, {
+        [routeLocationKey as symbol]: { name: "splunkHec", query: {} },
+      });
+      await wrapper
+        .findAllComponents({ name: "OCodeBlock" })[1]
+        .vm.$emit("copy", { partial: false });
+      expect(track).toHaveBeenCalledWith("snippet_copied", { route: "splunkHec", partial: false });
     });
   });
 

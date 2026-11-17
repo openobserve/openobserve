@@ -274,7 +274,7 @@ UPDATE pipeline
         let query = r#"
 SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 AND stream_name = $4 AND stream_type = $5 ORDER BY kind ASC, id ASC;
         "#;
-        let pipelines = sqlx::query_as::<_, Pipeline>(query)
+        let rows = sqlx::query(query)
             .bind(stream_params.org_id.as_str())
             .bind("realtime")
             .bind(stream_params.org_id.as_str())
@@ -282,24 +282,25 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
             .bind(stream_params.stream_type.as_str())
             .fetch_all(&pool)
             .await?;
-        Ok(pipelines)
+        Ok(super::decode_rows(rows))
     }
 
-    async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline> {
+    async fn get_by_id(&self, pipeline_id: &str) -> Result<super::Decoded> {
         let pool = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline WHERE id = $1;";
-        sqlx::query_as::<_, Pipeline>(query)
+        let row = sqlx::query(query)
             .bind(pipeline_id)
-            .fetch_one(&pool)
+            .fetch_optional(&pool)
             .await
-            .map_err(|_| Error::from(DbError::KeyNotExists(pipeline_id.to_string())))
+            .map_err(|_| Error::from(DbError::KeyNotExists(pipeline_id.to_string())))?;
+        super::decode_row(pipeline_id, row)
     }
 
     async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Vec<Pipeline>> {
         let pool = CLIENT_RO.clone();
         let similar_pipelines = match &pipeline.source {
             PipelineSource::Realtime(stream_params) => {
-                sqlx::query_as::<_, Pipeline>(
+                let rows = sqlx::query(
                     r#"
 SELECT * FROM pipeline 
     WHERE source_type = $1 AND stream_org = $2 AND stream_name = $3 AND stream_type = $4
@@ -311,7 +312,8 @@ SELECT * FROM pipeline
                 .bind(stream_params.stream_name.as_str())
                 .bind(stream_params.stream_type.as_str())
                 .fetch_all(&pool)
-                .await?
+                .await?;
+                super::decode_rows(rows)
             }
             PipelineSource::Scheduled(_) => {
                 // only checks for realtime pipelines
@@ -322,30 +324,23 @@ SELECT * FROM pipeline
         Ok(similar_pipelines)
     }
 
-    async fn list(&self) -> Result<Vec<Pipeline>> {
+    async fn list(&self) -> Result<super::DecodedPipelines> {
         let client = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline ORDER BY id;";
-        match sqlx::query_as::<_, Pipeline>(query)
-            .fetch_all(&client)
-            .await
-        {
-            Ok(pipelines) => Ok(pipelines),
+        match sqlx::query(query).fetch_all(&client).await {
+            Ok(rows) => Ok(super::decode_all_rows(rows)),
             Err(e) => {
                 log::debug!("[SQLITE] list all pipelines error: {e}");
-                Ok(vec![])
+                Ok(super::DecodedPipelines::default())
             }
         }
     }
 
-    async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>> {
+    async fn list_by_org(&self, org: &str) -> Result<super::DecodedPipelines> {
         let client = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline WHERE org = $1 ORDER BY id;";
-        match sqlx::query_as::<_, Pipeline>(query)
-            .bind(org)
-            .fetch_all(&client)
-            .await
-        {
-            Ok(pipelines) => Ok(pipelines),
+        match sqlx::query(query).bind(org).fetch_all(&client).await {
+            Ok(rows) => Ok(super::decode_all_rows(rows)),
             Err(e) => {
                 log::error!("[SQLITE] list pipeline by org error: {e}");
                 Err(e.into())
@@ -368,13 +363,13 @@ SELECT * FROM pipeline
         let query = r#"
 SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
         "#;
-        match sqlx::query_as::<_, Pipeline>(query)
+        match sqlx::query(query)
             .bind(org)
             .bind("realtime")
             .fetch_all(&client)
             .await
         {
-            Ok(pipelines) => Ok(pipelines),
+            Ok(rows) => Ok(super::decode_rows(rows)),
             Err(e) => {
                 log::debug!("[SQLITE] list streams with pipelines error: {e}");
                 Ok(vec![])
@@ -409,7 +404,161 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
 
 #[cfg(test)]
 mod tests {
+    use config::meta::stream::StreamType;
+
     use super::*;
+    use crate::table::testing::{capture_error_logs, logged_errors_containing};
+
+    fn stream_node() -> json::Value {
+        json::json!({"id": "in", "io_type": "input", "position": {"x": 0.0, "y": 0.0},
+                     "data": {"node_type": "stream", "org_id": "o", "stream_name": "s",
+                              "stream_type": "logs"}})
+    }
+
+    fn condition_group(operator: &str) -> json::Value {
+        json::json!({"filterType": "group", "logicalOperator": "AND", "conditions": [
+            {"filterType": "condition", "column": "level", "operator": operator,
+             "value": "error", "logicalOperator": "AND"}]})
+    }
+
+    fn condition_nodes(operator: &str) -> String {
+        json::json!([stream_node(), {"id": "c", "io_type": "default",
+            "position": {"x": 0.0, "y": 0.0},
+            "data": {"node_type": "condition", "version": 2,
+                     "conditions": condition_group(operator)}}])
+        .to_string()
+    }
+
+    fn scheduled_source(operator: &str) -> String {
+        json::json!({"org_id": "o", "stream_type": "logs", "query_condition": {
+            "type": "custom",
+            "conditions": {"version": 2, "conditions": condition_group(operator)}}})
+        .to_string()
+    }
+
+    /// One readable pipeline, three this version cannot read: a Condition node and a scheduled
+    /// source with an unknown operator, and junk nodes.
+    async fn pool_with_unreadable_rows() -> sqlx::Pool<sqlx::Sqlite> {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE TABLE pipeline (id TEXT PRIMARY KEY, version INT, enabled BOOLEAN, name TEXT,
+             description TEXT, org TEXT, source_type TEXT, stream_org TEXT, stream_name TEXT,
+             stream_type TEXT, derived_stream TEXT, nodes TEXT, edges TEXT);",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let rows = [
+            ("p1_good", "realtime", None, condition_nodes("=")),
+            ("p2_in_node", "realtime", None, condition_nodes("future_op")),
+            (
+                "p3_in_source",
+                "scheduled",
+                Some(scheduled_source("future_op")),
+                condition_nodes("="),
+            ),
+            ("p4_junk", "realtime", None, "not json".to_string()),
+        ];
+        for (id, source_type, derived_stream, nodes) in rows {
+            sqlx::query(
+                "INSERT INTO pipeline VALUES ($1, 1, true, $2, '', 'o', $3, 'o', 's', 'logs', $4,
+                 $5, '[]');",
+            )
+            .bind(id)
+            .bind(id)
+            .bind(source_type)
+            .bind(derived_stream)
+            .bind(nodes)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        pool
+    }
+
+    #[tokio::test]
+    async fn test_decode_rows_skips_and_logs_pipelines_it_cannot_read() {
+        capture_error_logs();
+        let pool = pool_with_unreadable_rows().await;
+        let rows = sqlx::query("SELECT * FROM pipeline ORDER BY id;")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+
+        let ids: Vec<String> = super::super::decode_rows(rows)
+            .into_iter()
+            .map(|p| p.id)
+            .collect();
+
+        assert_eq!(ids, ["p1_good"]);
+        for id in ["p2_in_node", "p3_in_source", "p4_junk"] {
+            let logged = logged_errors_containing(&format!("org=o id={id}"));
+            assert!(!logged.is_empty(), "{id} was not logged");
+        }
+        assert!(
+            logged_errors_containing("id=p2_in_node")
+                .iter()
+                .any(|l| l.contains("unknown variant `future_op`"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_decode_all_rows_reports_the_rows_it_cannot_read() {
+        let pool = pool_with_unreadable_rows().await;
+        let rows = sqlx::query("SELECT * FROM pipeline ORDER BY id;")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+
+        let decoded = super::super::decode_all_rows(rows);
+
+        let ids: Vec<&str> = decoded.pipelines.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, ["p1_good"]);
+        let unreadable: Vec<(&str, bool, Option<&StreamParams>)> = decoded
+            .unreadable
+            .iter()
+            .map(|u| (u.id.as_str(), u.enabled, u.realtime_stream.as_ref()))
+            .collect();
+        let stream = StreamParams::new("o", "s", StreamType::Logs);
+        assert_eq!(
+            unreadable,
+            [
+                ("p2_in_node", true, Some(&stream)),
+                ("p3_in_source", true, None),
+                ("p4_junk", true, Some(&stream)),
+            ]
+        );
+        assert_eq!(decoded.unreadable[0].name, "p2_in_node");
+        let err = decoded.into_fully_decoded().unwrap_err().to_string();
+        assert!(err.contains("org=o id=p2_in_node is unreadable"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn test_decode_row_of_an_unreadable_pipeline_is_an_error_not_missing() {
+        let pool = pool_with_unreadable_rows().await;
+        let fetch = |id: &'static str| {
+            sqlx::query("SELECT * FROM pipeline WHERE id = $1;")
+                .bind(id)
+                .fetch_optional(&pool)
+        };
+
+        let good = super::super::decode_row("p1_good", fetch("p1_good").await.unwrap());
+        assert_eq!(good.unwrap().unwrap().id, "p1_good");
+        let bad = super::super::decode_row("p3_in_source", fetch("p3_in_source").await.unwrap())
+            .unwrap()
+            .unwrap_err();
+        assert_eq!((bad.id.as_str(), bad.org.as_str()), ("p3_in_source", "o"));
+        assert!(bad.error.contains("unknown variant `future_op`"), "{bad:?}");
+        let missing = super::super::decode_row("nope", fetch("nope").await.unwrap());
+        assert!(matches!(
+            missing,
+            Err(Error::DbError(DbError::KeyNotExists(_)))
+        ));
+    }
 
     #[test]
     fn test_sqlite_pipeline_table_new() {

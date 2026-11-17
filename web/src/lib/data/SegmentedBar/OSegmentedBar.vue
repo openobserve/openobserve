@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { SEGMENT_SWATCH } from "./OSegmentedBar.types";
+import { SEGMENT_SWATCH, seriesSwatch } from "./OSegmentedBar.types";
 import type { SegmentedBarProps, SegmentedBarVariant } from "./OSegmentedBar.types";
 
 const props = withDefaults(defineProps<SegmentedBarProps>(), {
@@ -36,10 +36,13 @@ const fill = (variant: SegmentedBarVariant | undefined) => SEGMENT_SWATCH[varian
         :key="segment.id"
         class="h-full transition-[width] duration-300"
         :class="[
-          fill(segment.variant),
+          segment.series ? undefined : fill(segment.variant),
           props.gapped ? (segment.pct > 0 ? 'min-w-1 shrink' : 'hidden') : 'shrink-0',
         ]"
-        :style="{ width: clampPct(segment.pct) }"
+        :style="{
+          width: clampPct(segment.pct),
+          ...(segment.series ? seriesSwatch(segment.series) : {}),
+        }"
         :data-test="`o-segmented-bar-segment-${segment.id}`"
       />
     </div>

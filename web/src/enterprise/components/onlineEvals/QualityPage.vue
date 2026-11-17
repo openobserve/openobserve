@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex min-h-0 min-w-0 flex-1 flex-col" data-test="quality-page">
     <!-- With a config open the page header is the detail header, as on the other detail pages. -->
     <OPageHeader
-      :title="header.title"
-      :subtitle="header.subtitle"
-      :icon="configId ? undefined : 'star-rate'"
+      :title="!configId && sectionHeader ? sectionHeader.title : header.title"
+      :subtitle="!configId && sectionHeader ? sectionHeader.subtitle : header.subtitle"
+      :icon="configId ? undefined : (sectionHeader?.icon ?? 'star-rate')"
       :back="
         configId
           ? {
@@ -31,7 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : undefined
       "
       title-data-test="quality-page-title"
+      :tabs-below="hasTabs && !configId"
+      overflow-first
     >
+      <!-- The config list's peer tabs; a config's detail has its back button instead. -->
+      <template v-if="hasTabs && !configId" #tabs><AiSectionTabs /></template>
       <template v-if="configId" #title-trail>
         <div class="flex shrink-0 items-center gap-1.5" data-test="quality-detail-tags">
           <OTag v-if="header.dataType" type="evalDataType" :value="header.dataType" />
@@ -42,6 +46,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="raw(`v${header.version}`)"
           />
         </div>
+      </template>
+      <!-- One-click stays reachable once configs exist; the empty state offers it too. -->
+      <template v-if="showOneClick" #actions-overflow>
+        <OButton
+          variant="outline"
+          size="sm-toolbar"
+          data-test="quality-one-click-btn"
+          @click="oneClickOpen = true"
+        >
+          {{
+            agent ? t("oneClickEval.headerActionAgent", { agent }) : t("oneClickEval.headerAction")
+          }}
+        </OButton>
       </template>
       <template #actions>
         <OButton
@@ -62,6 +79,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
         data-test="quality-body"
       >
+        <!-- The list's search sits above the scope bar, as on Insights. -->
+        <div v-if="!configId" class="px-page-edge shrink-0 pt-2">
+          <OSearchInput
+            v-model="search"
+            class="w-full"
+            :placeholder="t('onlineEvals.quality.table.searchPlaceholder')"
+            data-test="quality-configs-search"
+          />
+        </div>
         <!-- Env, Agent and Version scope the list and the detail alike; the detail adds its scope toggle. -->
         <div
           class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-2"
@@ -115,13 +141,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows="visibleRows"
           :tiles="tiles"
           :loading="listQuery.isPending.value || configsLoading"
-          :forbidden="listStatus === 403"
+          :forbidden="tableForbidden"
           :load-error="!!listQuery.error.value && listStatus !== 403"
           @open="openConfig"
+          :agent="agent ?? null"
+          @one-click="oneClickOpen = true"
           @retry="retryList"
         />
       </section>
     </OPageLockedBody>
+    <!-- Outside the header: the phone's More menu unmounts its content on close. -->
+    <OneClickEvalDialog
+      v-model:open="oneClickOpen"
+      :agent="agent"
+      :stream="agentStream || undefined"
+      @created="emit('created')"
+    />
   </div>
 </template>
 
@@ -132,10 +167,13 @@ import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import AiSectionTabs from "@/enterprise/components/AIObservability/AiSectionTabs.vue";
+import { useAiSectionTabs } from "@/enterprise/components/AIObservability/aiSectionTabs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import type {
   EvalTargetScope,
   QualityAgentParams,
@@ -158,22 +196,34 @@ import {
 } from "./utils/qualityFormat";
 import QualityConfigsTable from "./quality/QualityConfigsTable.vue";
 import QualityConfigDetail from "./quality/QualityConfigDetail.vue";
+import OneClickEvalDialog from "./OneClickEvalDialog.vue";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
   configsLoading: boolean;
+  /** The score config list was denied; Quality then lists only configs shared with the user. */
+  configsForbidden?: boolean;
   dateWindow: DateWindow;
   agentParams: QualityAgentParams;
   /** False until the agent list first loads, so a deep-linked agent is applied before the first request. */
   enabled: boolean;
+  /** The agent the Agent filter has selected; one-click evaluates it. */
+  agent?: string | null;
+  /** The selected agent's trace stream, preselected in one-click. */
+  agentStream?: string;
+  /** The scorer, score config or job list was denied: one-click creates all three. */
+  createForbidden?: boolean;
 }>();
 
 const emit = defineEmits<{
   /** Oldest data time and fetch state of the reads on screen, for the header's last-refreshed label. */
   (e: "status", status: { updatedAt: number | null; fetching: boolean }): void;
+  /** One-click created a score config, scorer and job: the evaluation lists are stale. */
+  (e: "created"): void;
 }>();
 
 const { t } = useI18nTyped();
+const { hasTabs, header: sectionHeader } = useAiSectionTabs();
 const route = useRoute();
 const router = useRouter();
 const orgId = useOrgId();
@@ -184,6 +234,28 @@ const { listQuery, rows, visibleRows, tiles, tileFilter, listStatus } = useQuali
   agentParams: toRef(props, "agentParams"),
   enabled: toRef(props, "enabled"),
 });
+// The quality read returns an empty list, not a 403, to users without config read.
+const tableForbidden = computed(
+  () => listStatus.value === 403 || (!!props.configsForbidden && rows.value.length === 0),
+);
+// Opened from the header or the empty state.
+const oneClickOpen = ref(false);
+const showOneClick = computed(
+  () => !configId.value && !props.createForbidden && !tableForbidden.value,
+);
+// Back from adding a provider for it (`one_click`): the dialog reopens once.
+watch(
+  () => route.query.one_click,
+  (flag) => {
+    if (flag !== "1") return;
+    oneClickOpen.value = true;
+    const query = { ...route.query };
+    delete query.one_click;
+    router.replace({ query }).catch(() => {});
+  },
+  { immediate: true },
+);
+
 // The table unmounts while a config is open, so the page keeps its search, as it keeps the tile filter.
 const search = ref("");
 

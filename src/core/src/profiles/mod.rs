@@ -471,7 +471,11 @@ async fn buffer_records(
     )
     .await?;
     // the check that turned the UDS on projected the schema, which would drop unpacked columns
-    if let Some(fields) = newly_enabled_uds_fields(had_uds, stream_schema_map.get(stream_name)) {
+    if let Some(fields) = newly_enabled_uds_fields(
+        StreamType::Profiles,
+        had_uds,
+        stream_schema_map.get(stream_name),
+    ) {
         repack_records(records.iter_mut(), &fields);
         check_for_schema(
             org_id,

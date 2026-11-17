@@ -15,7 +15,9 @@
 
 //! Semantic field group endpoints (Enterprise feature), under the historical `deduplication` path.
 
-use axum::{Json, extract::Path, response::Response};
+#[cfg(feature = "enterprise")]
+use axum::Json;
+use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(feature = "enterprise")]
@@ -57,6 +59,10 @@ pub struct SemanticGroupModification {
         (status = 200, description = "Success", body = Vec<FieldAlias>),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
 )]
 pub async fn get_semantic_groups(Path(org_id): Path<String>) -> Response {
     // Use system_settings which has proper caching and cluster watch
@@ -85,6 +91,10 @@ pub async fn get_semantic_groups(Path(org_id): Path<String>) -> Response {
     responses(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
 )]
 pub async fn get_semantic_groups(_org_id: Path<String>) -> Response {
     axum::response::Response::builder()
@@ -119,7 +129,8 @@ pub async fn get_semantic_groups(_org_id: Path<String>) -> Response {
         (status = 500, description = "Internal server error"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
     )
 )]
 pub async fn preview_semantic_groups_diff(
@@ -199,17 +210,16 @@ pub async fn preview_semantic_groups_diff(
     params(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
+    request_body(content = serde_json::Value, content_type = "application/json"),
     responses(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
     )
 )]
-pub async fn preview_semantic_groups_diff(
-    _org_id: Path<String>,
-    _proposed_groups: Json<serde_json::Value>,
-) -> Response {
+pub async fn preview_semantic_groups_diff(_org_id: Path<String>) -> Response {
     axum::response::Response::builder()
         .status(axum::http::StatusCode::FORBIDDEN)
         .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -243,7 +253,8 @@ pub async fn preview_semantic_groups_diff(
         (status = 500, description = "Internal server error"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 pub async fn save_semantic_groups(
@@ -335,17 +346,16 @@ pub async fn save_semantic_groups(
     params(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
+    request_body(content = serde_json::Value, content_type = "application/json"),
     responses(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
-pub async fn save_semantic_groups(
-    _org_id: Path<String>,
-    _groups: Json<serde_json::Value>,
-) -> Response {
+pub async fn save_semantic_groups(_org_id: Path<String>) -> Response {
     axum::response::Response::builder()
         .status(axum::http::StatusCode::FORBIDDEN)
         .header(axum::http::header::CONTENT_TYPE, "application/json")

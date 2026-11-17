@@ -397,7 +397,7 @@ pub async fn resolve_target(org_id: &str, alert_id: &str) -> Result<AckTarget, A
             evaluates_through_silence: config::meta::alerts::dispatch::evaluates_through_silence(
                 multi_alert,
                 multi_level,
-            ),
+            ) || siem_evaluates_through_silence(&alert),
         });
     }
     match crate::alerts::composite::get_composite(org_id, alert_id).await {
@@ -910,20 +910,48 @@ pub(crate) async fn firing_incident(org_id: &str, alert_id: &str) -> Option<Stri
     }
 }
 
-/// The incident the alert's firing belongs to: the episode's, else the open one by alert id.
+/// A firing's incident: the episode's when of the alert's kind, else an open one of that kind,
+/// else the episode's. Acknowledgement and the alert list both pick by this, so they agree.
+#[cfg(feature = "enterprise")]
+pub async fn pick_firing_incident<E>(
+    episode: Option<(String, Option<bool>)>,
+    detection: bool,
+    open_of_kind: impl AsyncFnOnce() -> Result<Option<String>, E>,
+) -> Result<Option<String>, E> {
+    match episode {
+        Some((id, marked)) if episode_stands(marked, detection) => Ok(Some(id)),
+        // A converted alert's old incident still pages until a firing opens one of its new kind.
+        episode => Ok(open_of_kind().await?.or(episode.map(|(id, _)| id))),
+    }
+}
+
+/// Whether an episode incident with this marker (`None`: no such incident) needs no kind lookup.
+#[cfg(feature = "enterprise")]
+pub fn episode_stands(marked: Option<bool>, detection: bool) -> bool {
+    marked != Some(!detection)
+}
+
 #[cfg(feature = "enterprise")]
 async fn firing_incident_checked(org_id: &str, alert_id: &str) -> Result<Option<String>, AckError> {
+    let detection = db::alerts::alert::any_siem_alert(org_id, [alert_id]).await;
     let episode = infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY)
         .await?
         .and_then(|s| s.episode_incident_id);
-    if episode.is_some() {
-        return Ok(episode);
-    }
-    Ok(
-        infra::table::alert_incidents::find_open_incident_containing_alert(org_id, alert_id)
-            .await?
-            .map(|m| m.id),
-    )
+    let episode = match episode {
+        Some(id) => {
+            let marked = infra::table::alert_incidents::security_case_of(org_id, &id).await?;
+            Some((id, marked))
+        }
+        None => None,
+    };
+    let cases = infra::table::alert_incidents::CaseFilter::of_kind(detection);
+    pick_firing_incident(episode, detection, async || {
+        let open = infra::table::alert_incidents::find_open_incident_containing_alert(
+            org_id, alert_id, cases,
+        );
+        Ok(open.await?.map(|m| m.id))
+    })
+    .await
 }
 
 /// The rows an ack can name: a multi-alert's firing groups, else the alert's own row.
@@ -1087,10 +1115,27 @@ async fn gather_facts(
     }
 }
 
-/// OpenFGA edit on the alert, or on any alert of the incident (D24).
+/// Edit on the alert or any of the incident's (D24); Security triage stands in for detections.
 #[cfg(feature = "enterprise")]
 async fn may_edit_any_alert(p: &Problem, actor: &str) -> bool {
+    if let Problem::Incident {
+        org_id,
+        incident_id,
+    } = p
+        && incident_alert_ids(incident_id)
+            .await
+            .is_ok_and(|ids| ids.is_empty())
+    {
+        return may_update_alertless_incident(org_id, incident_id, actor).await;
+    }
+    let siem = db::alerts::alert::resolve_siem_alert_ids(p.org_id()).await;
+    let triage =
+        !siem.is_empty() && crate::security::security_allowed(p.org_id(), actor, "PUT").await;
+    let siem = &siem;
     may_edit_any_alert_with(p, |target: AckTarget| async move {
+        if triage_admits(triage, siem, &target.alert_id) {
+            return true;
+        }
         crate::auth::check_permissions(
             &target.alert_id,
             &target.org_id,
@@ -1105,6 +1150,36 @@ async fn may_edit_any_alert(p: &Problem, actor: &str) -> bool {
         .await
     })
     .await
+}
+
+/// An incident opened by hand has no alert to hold edit rights on, so updating it is the test.
+#[cfg(feature = "enterprise")]
+async fn may_update_alertless_incident(org_id: &str, incident_id: &str, actor: &str) -> bool {
+    let is_case = matches!(
+        infra::table::alert_incidents::security_case_of(org_id, incident_id).await,
+        Ok(Some(true))
+    );
+    if is_case {
+        return crate::security::security_allowed(org_id, actor, "PUT").await;
+    }
+    crate::auth::check_permissions(
+        org_id,
+        org_id,
+        actor,
+        "incidents",
+        "PUT",
+        None,
+        true,
+        false,
+        false,
+    )
+    .await
+}
+
+/// Security triage stands in for alert edit, but only on a security detection.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn triage_admits(triage: bool, siem_ids: &[String], alert_id: &str) -> bool {
+    triage && siem_ids.iter().any(|id| id == alert_id)
 }
 
 /// The members of every team with an open page on the problem, owner or impacted.
@@ -2010,6 +2085,19 @@ async fn incident_of(_target: &AckTarget) -> Result<Option<String>, AckError> {
     Ok(None)
 }
 
+/// A security detection keeps evaluating through silence, so an unack never pauses it.
+#[cfg(feature = "enterprise")]
+fn siem_evaluates_through_silence(alert: &config::meta::alerts::alert::Alert) -> bool {
+    o2_enterprise::enterprise::security::detection::evaluates_through_silence(
+        alert.context_attributes.as_ref(),
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn siem_evaluates_through_silence(_alert: &config::meta::alerts::alert::Alert) -> bool {
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2724,5 +2812,29 @@ mod tests {
         ] {
             assert_eq!(source_of_page(page_source), source, "{page_source}");
         }
+    }
+
+    #[test]
+    fn security_triage_admits_an_ack_only_on_a_security_detection() {
+        let siem = vec!["siem-1".to_string()];
+        assert!(triage_admits(true, &siem, "siem-1"));
+        assert!(!triage_admits(true, &siem, "ops-1"));
+        assert!(!triage_admits(false, &siem, "siem-1"));
+        assert!(!triage_admits(true, &[], "siem-1"));
+    }
+
+    #[test]
+    fn a_security_detection_keeps_evaluating_through_an_unack_only_with_enterprise() {
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        assert!(!siem_evaluates_through_silence(&alert));
+        alert.context_attributes = Some(
+            [("siem".to_string(), "true".to_string())]
+                .into_iter()
+                .collect(),
+        );
+        assert_eq!(
+            siem_evaluates_through_silence(&alert),
+            cfg!(feature = "enterprise")
+        );
     }
 }

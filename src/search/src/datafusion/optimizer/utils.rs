@@ -30,12 +30,11 @@ use datafusion::{
     logical_expr::{
         Limit, LogicalPlan, Projection, Sort, SortExpr, TableScanBuilder, TableSource, col,
     },
-    physical_plan::ExecutionPlan,
     prelude::Expr,
     scalar::ScalarValue,
 };
 
-use crate::datafusion::{sort_order::FileSortOrder, table_provider::empty_table::NewEmptyTable};
+use crate::datafusion::{datasource::empty_table::NewEmptyTable, sort_order::FileSortOrder};
 
 // check if the plan is a complex query that we can't add sort _timestamp
 pub fn is_complex_query(plan: &LogicalPlan) -> bool {
@@ -336,15 +335,6 @@ pub fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
 pub fn is_empty_relation(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::EmptyRelation(_))))
         .unwrap_or(true)
-}
-
-pub fn is_place_holder_or_empty(plan: &Arc<dyn ExecutionPlan>) -> bool {
-    plan.exists(|plan| {
-        Ok(plan.name() == "PlaceholderRowExec"
-            || plan.name() == "EmptyExec"
-            || plan.name() == "DataSourceExec")
-    })
-    .unwrap_or(true)
 }
 
 #[cfg(test)]

@@ -23,7 +23,7 @@ use arrow_schema::{Field, Schema};
 use common::meta::{authz::Authz, stream::SchemaEvolution};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, O2_INGEST_TS_COL_NAME, ORIGINAL_DATA_COL_NAME,
-    SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
@@ -33,8 +33,9 @@ use config::{
             BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
             VALUE_LABEL,
         },
+        service_identity::SERVICE_IDENTITY_FIELDS,
         stream::{StreamSettings, StreamType},
-        traces::ALL_INFER_FIELDS,
+        traces::{ALL_INFER_FIELDS, GEN_AI_UDS_KEEP_FIELDS},
     },
     metrics,
     utils::{
@@ -48,7 +49,8 @@ use config::{
 use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
 use hashbrown::HashSet;
 use infra::schema::{
-    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, SchemaCache, unwrap_stream_settings,
+    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, SchemaCache, get_stream_setting_fts_fields,
+    get_stream_setting_index_fields, unwrap_stream_settings,
 };
 use ingestion_common::StreamSchemaChk;
 use serde_json::{Map, Value};
@@ -56,7 +58,8 @@ use serde_json::{Map, Value};
 mod watcher;
 
 pub use watcher::{
-    OrganizationProvisioner, SchemaWatcher, create_watcher, set_organization_provisioner,
+    OrganizationProvisioner, SchemaWatcher, StreamDeleteHook, create_watcher,
+    set_organization_provisioner, set_stream_delete_hook,
 };
 
 const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
@@ -298,22 +301,16 @@ async fn persist_stream_settings(
 
     normalize_stream_settings(&mut settings);
 
+    let required_fields = required_uds_fields(stream_type);
     if !settings.defined_schema_fields.is_empty() {
-        let fields = check_schema_for_defined_schema_fields(
-            stream_type,
-            schema,
-            std::mem::take(&mut settings.defined_schema_fields),
-        );
-        let mut fields = fields.into_iter().collect::<Vec<_>>();
-        fields.sort_unstable();
-        fields.retain(|field| schema_fields.contains(field));
-        settings.defined_schema_fields = fields;
+        settings.defined_schema_fields = uds_fields_to_save(stream_type, &settings, &schema_fields);
     }
 
+    // required columns are product-mandated, so they never occupy user field slots
     let uds_user_fields = settings
         .defined_schema_fields
         .iter()
-        .filter(|field| !is_uds_internal_column(field))
+        .filter(|field| !is_uds_internal_column(field) && !required_fields.contains(*field))
         .count();
     if uds_user_fields > cfg.limit.user_defined_schema_max_fields {
         return Err(StreamSettingsError::BadRequest(format!(
@@ -451,6 +448,72 @@ async fn persist_stream_settings(
     })
 }
 
+/// The UDS a save stores: the saved fields, required columns and enabled partition keys in schema.
+fn uds_fields_to_save(
+    stream_type: StreamType,
+    settings: &StreamSettings,
+    schema_fields: &HashSet<&String>,
+) -> Vec<String> {
+    let mut fields = effective_uds_fields(stream_type, &settings.defined_schema_fields);
+    fields.extend(enabled_partition_fields(settings).cloned());
+    let mut fields = fields
+        .into_iter()
+        .filter(|field| schema_fields.contains(field))
+        .collect::<Vec<_>>();
+    fields.sort_unstable();
+    fields
+}
+
+fn auto_uds_fields(
+    stream_type: StreamType,
+    settings: &StreamSettings,
+    final_schema: &Schema,
+    current_schema: Option<&Schema>,
+    limit: usize,
+) -> HashSet<String> {
+    let mut uds_fields = HashSet::with_capacity(limit);
+
+    let mut keep_fields = required_uds_fields(stream_type);
+    keep_fields.extend(get_stream_setting_fts_fields(&Some(settings)));
+    keep_fields.extend(get_stream_setting_index_fields(
+        &Some(settings),
+        stream_type,
+    ));
+    keep_fields.extend(enabled_partition_fields(settings).cloned());
+    for field in keep_fields {
+        if !is_uds_internal_column(&field) && final_schema.field_with_name(&field).is_ok() {
+            uds_fields.insert(field);
+        }
+    }
+
+    if let Some(schema) = current_schema {
+        fill_uds_fields(&mut uds_fields, schema, limit);
+    }
+    fill_uds_fields(&mut uds_fields, final_schema, limit);
+    uds_fields
+}
+
+fn fill_uds_fields(uds_fields: &mut HashSet<String>, schema: &Schema, limit: usize) {
+    for field in schema.fields() {
+        if uds_fields.len() >= limit {
+            break;
+        }
+        let field = field.name();
+        if !is_uds_internal_column(field) {
+            uds_fields.insert(field.to_string());
+        }
+    }
+}
+
+/// A partition key outside the UDS is packed into `_all`, so its rows would partition as null.
+fn enabled_partition_fields(settings: &StreamSettings) -> impl Iterator<Item = &String> {
+    settings
+        .partition_keys
+        .iter()
+        .filter(|partition| !partition.disabled)
+        .map(|partition| &partition.field)
+}
+
 /// Make stream settings internally consistent before validation and persistence.
 fn normalize_stream_settings(settings: &mut StreamSettings) {
     dedup_preserve_order(&mut settings.full_text_search_keys);
@@ -548,7 +611,7 @@ pub async fn check_for_schema(
     let is_new = schema.schema().fields().is_empty();
     if !is_new {
         let (is_schema_changed, field_datatype_delta) =
-            get_schema_changes(schema, &inferred_schema);
+            get_schema_changes(stream_type, schema, &inferred_schema);
         if !is_schema_changed {
             // check defined_schema_fields
             let stream_setting = unwrap_stream_settings(schema.schema());
@@ -660,7 +723,7 @@ pub async fn handle_diff_schema(
     // check if the schema has been updated by another thread
     let read_cache = STREAM_SCHEMAS_LATEST.read().await;
     if let Some(updated_schema) = read_cache.get(&cache_key)
-        && let (false, _) = get_schema_changes(updated_schema, inferred_schema)
+        && let (false, _) = get_schema_changes(stream_type, updated_schema, inferred_schema)
     {
         // the caller still holds the schema it started from, empty for a just-created stream
         stream_schema_map.insert(stream_name.to_string(), updated_schema.clone());
@@ -737,77 +800,21 @@ pub async fn handle_diff_schema(
     let mut stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
     let mut defined_schema_fields = stream_setting.defined_schema_fields.clone();
 
-    // Automatically enable User-defined schema when
-    // 1. allow_user_defined_schemas is enabled
-    // 2. log ingestion
-    // 3. user defined schema is not already enabled
-    // 4. final schema fields count exceeds schema_max_fields_to_enable_uds
-    // Internal columns are implicit in the UDS: never persisted and never
-    // occupy slots in the field list (see is_uds_internal_column).
     if cfg.common.allow_user_defined_schemas
         && cfg.limit.schema_max_fields_to_enable_uds > 0
         && stream_type.support_uds()
         && defined_schema_fields.is_empty()
         && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds
     {
-        let mut uds_fields = HashSet::with_capacity(cfg.limit.schema_max_fields_to_enable_uds);
-
-        // Fields that must survive auto-enable
-        let mut keep_fields =
-            check_schema_for_defined_schema_fields(stream_type, &final_schema, vec![]);
-        // add FTS fields (default SQL FTS fields)
-        for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-            keep_fields.insert(field.to_string());
-        }
-        // add secondary index fields (default SQL secondary index fields)
-        for field in SQL_SECONDARY_INDEX_SEARCH_FIELDS.iter() {
-            keep_fields.insert(field.to_string());
-        }
-        // add user-configured FTS fields
-        for field in stream_setting.full_text_search_keys.iter() {
-            keep_fields.insert(field.to_string());
-        }
-        // add user-configured index fields
-        for field in stream_setting.index_fields.iter() {
-            keep_fields.insert(field.to_string());
-        }
-
-        // Add keep fields first
-        for field in keep_fields {
-            if !is_uds_internal_column(&field) && final_schema.field_with_name(&field).is_ok() {
-                uds_fields.insert(field);
-            }
-        }
-
-        // Add fields from current schema if available
-        if let Some(stream_schema) = stream_schema_map.get(stream_name) {
-            for field in stream_schema.schema().fields() {
-                let field = field.name();
-                if is_uds_internal_column(field) {
-                    continue;
-                }
-                if uds_fields.insert(field.to_string())
-                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-                {
-                    break;
-                }
-            }
-        }
-
-        // Add remaining fields from final schema
-        if uds_fields.len() < cfg.limit.schema_max_fields_to_enable_uds {
-            for field in final_schema.fields() {
-                let field = field.name();
-                if is_uds_internal_column(field) {
-                    continue;
-                }
-                if uds_fields.insert(field.to_string())
-                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
-                {
-                    break;
-                }
-            }
-        }
+        let uds_fields = auto_uds_fields(
+            stream_type,
+            &stream_setting,
+            &final_schema,
+            stream_schema_map
+                .get(stream_name)
+                .map(|schema| schema.schema().as_ref()),
+            cfg.limit.schema_max_fields_to_enable_uds,
+        );
 
         let mut candidate_settings = stream_setting.clone();
         candidate_settings.defined_schema_fields = uds_fields.into_iter().collect();
@@ -889,8 +896,7 @@ pub fn generate_schema_for_defined_schema_fields(
     }
 
     let cfg = get_config();
-    let mut fields =
-        check_schema_for_defined_schema_fields(stream_type, schema.schema(), fields.to_vec());
+    let mut fields = effective_uds_fields(stream_type, fields);
     fields.insert(TIMESTAMP_COL_NAME.to_string());
     let is_llm_trace_stream = matches!(stream_type, StreamType::Traces)
         && unwrap_stream_settings(schema.schema()).is_some_and(|settings| settings.is_llm_stream);
@@ -922,12 +928,9 @@ pub fn generate_schema_for_defined_schema_fields(
     ))
 }
 
-pub fn check_schema_for_defined_schema_fields(
-    stream_type: StreamType,
-    schema: &Schema,
-    fields: Vec<String>,
-) -> HashSet<String> {
-    let mut fields: HashSet<String> = fields.into_iter().collect();
+/// Columns the product queries read per stream type; a UDS keeps them without persisting.
+pub fn required_uds_fields(stream_type: StreamType) -> HashSet<String> {
+    let mut fields = HashSet::new();
     match stream_type {
         StreamType::Logs => {}
         StreamType::Metrics => {
@@ -956,17 +959,8 @@ pub fn check_schema_for_defined_schema_fields(
             fields.insert("events".to_string());
             // ingest-derived join keys are not user attributes, so UDS keeps them
             fields.extend(ALL_INFER_FIELDS.iter().map(|f| f.to_string()));
-            // Automatically include all OTEL Gen-AI and LLM evaluation fields from the schema
-            for field in schema.fields() {
-                let name = field.name();
-                if name.starts_with("gen_ai_")
-                    || name.starts_with("llm_")
-                    || name == "user_id"
-                    || name == "session_id"
-                {
-                    fields.insert(name.to_string());
-                }
-            }
+            fields.extend(SERVICE_IDENTITY_FIELDS.iter().map(|f| f.to_string()));
+            fields.extend(GEN_AI_UDS_KEEP_FIELDS.iter().map(|f| f.to_string()));
         }
         StreamType::Profiles => {
             fields.insert("stack".to_string());
@@ -987,7 +981,24 @@ pub fn check_schema_for_defined_schema_fields(
     fields
 }
 
-pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
+/// Saved UDS fields plus required columns; empty while UDS is off (empty saved list).
+pub fn effective_uds_fields(
+    stream_type: StreamType,
+    defined_schema_fields: &[String],
+) -> HashSet<String> {
+    if defined_schema_fields.is_empty() {
+        return HashSet::new();
+    }
+    let mut fields = required_uds_fields(stream_type);
+    fields.extend(defined_schema_fields.iter().cloned());
+    fields
+}
+
+pub fn get_schema_changes(
+    stream_type: StreamType,
+    schema: &SchemaCache,
+    inferred_schema: &Schema,
+) -> (bool, Vec<Field>) {
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
 
@@ -995,6 +1006,7 @@ pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bo
     let defined_schema_fields = stream_setting
         .map(|s| s.defined_schema_fields)
         .unwrap_or_default();
+    let uds_fields = effective_uds_fields(stream_type, &defined_schema_fields);
 
     for item in inferred_schema.fields.iter() {
         let item_name = item.name();
@@ -1005,7 +1017,7 @@ pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bo
                 is_schema_changed = true;
             }
             Some(idx) => {
-                if !defined_schema_fields.is_empty() && !defined_schema_fields.contains(item_name) {
+                if !uds_fields.is_empty() && !uds_fields.contains(item_name) {
                     continue;
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
@@ -1074,6 +1086,7 @@ mod tests {
     use std::str::FromStr;
 
     use arrow_schema::DataType;
+    use config::meta::stream::StreamPartition;
 
     use super::*;
 
@@ -1138,6 +1151,107 @@ mod tests {
     }
 
     #[test]
+    fn test_auto_uds_keeps_default_bloom_fields() {
+        let mut fields = (0..10)
+            .map(|i| Field::new(format!("a{i}"), DataType::Utf8, true))
+            .collect::<Vec<_>>();
+        fields.extend(
+            config::BLOOM_FILTER_DEFAULT_FIELDS
+                .iter()
+                .map(|field| Field::new(field, DataType::Utf8, true)),
+        );
+        let schema = Schema::new(fields);
+        let settings = StreamSettings::default();
+        for current_schema in [None, Some(&schema)] {
+            let selected = auto_uds_fields(StreamType::Logs, &settings, &schema, current_schema, 3);
+            for field in config::BLOOM_FILTER_DEFAULT_FIELDS.iter() {
+                assert!(
+                    selected.contains(field),
+                    "default bloom field {field} was omitted"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_auto_uds_keeps_configured_index_fields() {
+        let mut fields = (0..10)
+            .map(|i| Field::new(format!("a{i}"), DataType::Utf8, true))
+            .collect::<Vec<_>>();
+        fields.extend(
+            ["z_fts", "z_index", "z_bloom"].map(|field| Field::new(field, DataType::Utf8, true)),
+        );
+        let schema = Schema::new(fields);
+        let settings = StreamSettings {
+            full_text_search_keys: vec!["z_fts".into()],
+            index_fields: vec!["z_index".into(), "missing_index".into()],
+            bloom_filter_fields: vec!["z_bloom".into()],
+            ..Default::default()
+        };
+        for current_schema in [None, Some(&schema)] {
+            let selected = auto_uds_fields(StreamType::Logs, &settings, &schema, current_schema, 5);
+            for field in ["z_fts", "z_index", "z_bloom"] {
+                assert!(
+                    selected.contains(field),
+                    "configured index field {field} was omitted"
+                );
+            }
+            assert!(!selected.contains("missing_index"));
+        }
+    }
+
+    #[test]
+    fn test_auto_uds_keeps_enabled_distinct_fields() {
+        use config::meta::stream::DistinctField;
+
+        let schema = Schema::new(
+            ["a_filler", "z_distinct"]
+                .map(|field| Field::new(field, DataType::Utf8, true))
+                .to_vec(),
+        );
+        for enable_distinct_fields in [true, false] {
+            let settings = StreamSettings {
+                distinct_value_fields: vec![DistinctField {
+                    name: "z_distinct".into(),
+                    added_ts: 1,
+                }],
+                enable_distinct_fields,
+                ..Default::default()
+            };
+            for current_schema in [None, Some(&schema)] {
+                let selected =
+                    auto_uds_fields(StreamType::Logs, &settings, &schema, current_schema, 1);
+                assert_eq!(selected.contains("z_distinct"), enable_distinct_fields);
+            }
+        }
+    }
+
+    #[test]
+    fn test_auto_uds_prioritizes_indexes_when_field_budget_is_full() {
+        let settings = StreamSettings {
+            index_fields: vec!["z_index1".into(), "z_index2".into()],
+            ..Default::default()
+        };
+        let schema = Schema::new(
+            ["a_filler", "z_index1", "z_index2"]
+                .map(|field| Field::new(field, DataType::Utf8, true))
+                .to_vec(),
+        );
+        for max_fields in [1, 2] {
+            for current_schema in [None, Some(&schema)] {
+                let selected = auto_uds_fields(
+                    StreamType::Logs,
+                    &settings,
+                    &schema,
+                    current_schema,
+                    max_fields,
+                );
+                assert_eq!(selected, HashSet::from_iter(settings.index_fields.clone()));
+            }
+        }
+    }
+
+    #[test]
     fn test_generate_schema_for_defined_schema_fields_includes_internal_columns() {
         // internal columns must be part of the effective schema even when they
         // are not persisted in defined_schema_fields
@@ -1185,10 +1299,26 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_schema_for_defined_schema_fields_keeps_infer_columns_for_traces() {
+    fn test_generate_schema_for_defined_schema_fields_keeps_derived_columns_for_traces() {
         let mut fields = vec![Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true)];
-        for name in ALL_INFER_FIELDS {
-            fields.push(Field::new(name, DataType::Utf8, true));
+        let query_columns = [
+            "gen_ai_usage_cost",
+            "gen_ai_usage_cost_usd",
+            "gen_ai_tool_input",
+            "gen_ai_tool_output",
+            "gen_ai_usage_prompt_tokens",
+            "gen_ai_usage_completion_tokens",
+            "llm_request_type",
+            "llm_agent_id",
+        ];
+        let kept: Vec<&str> = ALL_INFER_FIELDS
+            .iter()
+            .chain(SERVICE_IDENTITY_FIELDS.iter())
+            .copied()
+            .chain(query_columns)
+            .collect();
+        for name in &kept {
+            fields.push(Field::new(*name, DataType::Utf8, true));
         }
         for i in 0..15 {
             fields.push(Field::new(format!("field{i}"), DataType::Utf8, true));
@@ -1213,9 +1343,9 @@ mod tests {
         };
 
         let traces = names(StreamType::Traces);
-        for name in ALL_INFER_FIELDS {
+        for name in &kept {
             assert!(
-                traces.contains(name),
+                traces.contains(*name),
                 "{name} dropped from the traces UDS schema"
             );
         }
@@ -1223,7 +1353,7 @@ mod tests {
         assert!(!traces.contains("field1"));
 
         let logs = names(StreamType::Logs);
-        assert!(ALL_INFER_FIELDS.iter().all(|name| !logs.contains(*name)));
+        assert!(kept.iter().all(|name| !logs.contains(*name)));
     }
 
     #[test]
@@ -1283,20 +1413,17 @@ mod tests {
     }
 
     #[test]
-    fn test_check_schema_for_defined_schema_fields_logs() {
-        let schema = Schema::new(vec![] as Vec<Field>);
+    fn test_effective_uds_fields_logs_keeps_saved_fields() {
         let input = vec!["level".to_string(), "message".to_string()];
-        let result = check_schema_for_defined_schema_fields(StreamType::Logs, &schema, input);
+        let result = effective_uds_fields(StreamType::Logs, &input);
         assert!(result.contains("level"));
         assert!(result.contains("message"));
     }
 
     #[test]
-    fn test_check_schema_for_defined_schema_fields_metrics_adds_labels() {
-        let schema = Schema::new(vec![] as Vec<Field>);
+    fn test_effective_uds_fields_metrics_adds_labels() {
         let input = vec!["custom_field".to_string()];
-        let result =
-            check_schema_for_defined_schema_fields(StreamType::Metrics, &schema, input.clone());
+        let result = effective_uds_fields(StreamType::Metrics, &input);
         // Metrics should include the special labels
         assert!(result.contains(NAME_LABEL));
         assert!(result.contains(HASH_LABEL));
@@ -1306,10 +1433,9 @@ mod tests {
     }
 
     #[test]
-    fn test_check_schema_for_defined_schema_fields_traces_adds_trace_fields() {
-        let schema = Schema::new(vec![] as Vec<Field>);
+    fn test_effective_uds_fields_traces_adds_trace_fields() {
         let input = vec!["my_field".to_string()];
-        let result = check_schema_for_defined_schema_fields(StreamType::Traces, &schema, input);
+        let result = effective_uds_fields(StreamType::Traces, &input);
         assert!(result.contains("trace_id"));
         assert!(result.contains("span_id"));
         assert!(result.contains("service_name"));
@@ -1318,10 +1444,29 @@ mod tests {
     }
 
     #[test]
-    fn test_check_schema_for_defined_schema_fields_profiles_adds_query_columns() {
-        let schema = Schema::new(vec![] as Vec<Field>);
+    fn test_effective_uds_fields_empty_saved_list_means_uds_off() {
+        assert!(effective_uds_fields(StreamType::Profiles, &[]).is_empty());
+        assert!(effective_uds_fields(StreamType::Metrics, &[]).is_empty());
+        assert!(effective_uds_fields(StreamType::Traces, &[]).is_empty());
+    }
+
+    #[test]
+    fn test_required_uds_fields_traces_uses_static_list_not_prefixes() {
+        let result = required_uds_fields(StreamType::Traces);
+        assert!(result.contains("gen_ai_usage_cost"));
+        assert!(result.contains("gen_ai_system"));
+        assert!(result.contains("llm_model_name"));
+        assert!(result.contains("session_id"));
+        // non-canonical prefix matches stay ordinary user fields under UDS
+        assert!(!result.contains("gen_ai_prompt"));
+        assert!(!result.contains("llm_model"));
+        assert!(!result.contains("other_field"));
+    }
+
+    #[test]
+    fn test_effective_uds_fields_profiles_adds_query_columns() {
         let input = vec!["k8s_pod_name".to_string()];
-        let result = check_schema_for_defined_schema_fields(StreamType::Profiles, &schema, input);
+        let result = effective_uds_fields(StreamType::Profiles, &input);
         let mut fields = result.iter().map(String::as_str).collect::<Vec<_>>();
         fields.sort_unstable();
         assert_eq!(
@@ -1344,18 +1489,57 @@ mod tests {
         );
     }
 
+    fn partitioned_settings(disabled: bool) -> StreamSettings {
+        StreamSettings {
+            partition_keys: vec![StreamPartition {
+                disabled,
+                ..StreamPartition::new("pk")
+            }],
+            ..Default::default()
+        }
+    }
+
     #[test]
-    fn test_check_schema_for_defined_schema_fields_traces_includes_gen_ai_fields() {
-        let schema = Schema::new(vec![
-            Field::new("gen_ai_prompt", DataType::Utf8, true),
-            Field::new("llm_model", DataType::Utf8, true),
-            Field::new("other_field", DataType::Utf8, true),
+    fn test_auto_uds_fields_keeps_partition_key_past_the_cap() {
+        let schema = Schema::new(
+            ["_timestamp", "a", "b", "c", "pk"]
+                .map(|name| Field::new(name, DataType::Utf8, true))
+                .to_vec(),
+        );
+        let fields = |disabled, limit| {
+            let fields = auto_uds_fields(
+                StreamType::Logs,
+                &partitioned_settings(disabled),
+                &schema,
+                Some(&schema),
+                limit,
+            );
+            let mut fields = fields.into_iter().collect::<Vec<_>>();
+            fields.sort_unstable();
+            fields
+        };
+        assert_eq!(fields(false, 2), ["a", "pk"]);
+        assert_eq!(fields(true, 2), ["a", "b"]);
+        assert_eq!(fields(false, 1), ["pk"]);
+    }
+
+    #[test]
+    fn test_uds_fields_to_save_adds_enabled_partition_keys_in_schema() {
+        let mut settings = partitioned_settings(false);
+        settings.defined_schema_fields = vec!["a".to_string()];
+        settings.partition_keys.extend([
+            StreamPartition {
+                disabled: true,
+                ..StreamPartition::new("old")
+            },
+            StreamPartition::new("missing"),
         ]);
-        let result = check_schema_for_defined_schema_fields(StreamType::Traces, &schema, vec![]);
-        assert!(result.contains("gen_ai_prompt"));
-        assert!(result.contains("llm_model"));
-        // "other_field" has no gen_ai_ or llm_ prefix → not auto-included
-        assert!(!result.contains("other_field"));
+        let names = ["a", "b", "pk", "old"].map(String::from);
+        let schema_fields = names.iter().collect::<HashSet<_>>();
+        assert_eq!(
+            uds_fields_to_save(StreamType::Logs, &settings, &schema_fields),
+            ["a", "pk"]
+        );
     }
 
     #[tokio::test]
@@ -1478,6 +1662,32 @@ mod tests {
                 .unwrap()
                 .enable_distinct_fields
         );
+    }
+
+    #[test]
+    fn test_get_schema_changes_widens_required_column_missing_from_saved_uds() {
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            "settings".to_string(),
+            json::to_string(&StreamSettings {
+                defined_schema_fields: vec!["foo".to_string()],
+                ..Default::default()
+            })
+            .unwrap(),
+        );
+        let schema = SchemaCache::new(
+            Schema::new(vec![
+                Field::new("foo", DataType::Utf8, true),
+                Field::new("le", DataType::Int64, true),
+            ])
+            .with_metadata(metadata),
+        );
+        let inferred = Schema::new(vec![Field::new("le", DataType::Float64, true)]);
+
+        let (changed, delta) = get_schema_changes(StreamType::Metrics, &schema, &inferred);
+
+        assert!(changed);
+        assert_eq!(delta.len(), 1);
     }
 
     #[tokio::test]

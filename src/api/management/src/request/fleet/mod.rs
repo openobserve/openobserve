@@ -66,6 +66,10 @@ const FLEET_CHECK_CONCURRENCY: usize = 16;
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::CollectorList),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_collectors(
     Path(org_id): Path<String>,
@@ -126,6 +130,10 @@ pub async fn list_collectors(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "get"}))
+    )
 )]
 pub async fn get_collector(
     Path((org_id, id)): Path<(String, String)>,
@@ -170,6 +178,10 @@ pub async fn get_collector(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn rename_collector(
     Path((org_id, id)): Path<(String, String)>,
@@ -222,6 +234,10 @@ pub async fn rename_collector(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "delete"}))
+    )
 )]
 pub async fn delete_collector(
     Path((org_id, id)): Path<(String, String)>,
@@ -266,6 +282,10 @@ pub async fn delete_collector(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "The collector is offline or does not accept restart commands", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn restart_collector(
     Path((org_id, id)): Path<(String, String)>,
@@ -310,6 +330,10 @@ pub async fn restart_collector(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Nothing assigned", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn redeliver_collector(
     Path((org_id, id)): Path<(String, String)>,
@@ -349,6 +373,10 @@ pub async fn redeliver_collector(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::FleetList),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_fleets(
     Path(org_id): Path<String>,
@@ -411,6 +439,10 @@ pub async fn list_fleets(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 409, description = "Name exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn create_fleet(
     Path(org_id): Path<String>,
@@ -472,6 +504,10 @@ pub async fn create_fleet(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "get"}))
+    )
 )]
 pub async fn get_fleet(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -522,6 +558,10 @@ pub async fn get_fleet(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Name exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn rename_fleet(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -592,6 +632,10 @@ pub async fn rename_fleet(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Still referenced, with the counts in `references`; the default fleet; or changing", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "delete"}))
+    )
 )]
 pub async fn delete_fleet(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -638,6 +682,10 @@ pub async fn delete_fleet(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn get_fleet_settings(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -682,6 +730,10 @@ pub async fn get_fleet_settings(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn put_fleet_settings(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -737,6 +789,10 @@ pub async fn put_fleet_settings(
         (status = 404, description = "Fleet, configuration or version not found", content_type = "application/json", body = Object),
         (status = 409, description = "A cluster upgrade is in progress, or desired keeps changing", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn set_desired(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -786,6 +842,10 @@ pub async fn set_desired(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Fleet not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn preview_desired(
     Path((org_id, fleet_id)): Path<(String, String)>,
@@ -826,6 +886,10 @@ pub async fn preview_desired(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::TokenList),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_tokens(
     Path(org_id): Path<String>,
@@ -872,6 +936,10 @@ pub async fn list_tokens(
         (status = 404, description = "Fleet not found", content_type = "application/json", body = Object),
         (status = 409, description = "Name exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn create_token(
     Path(org_id): Path<String>,
@@ -928,6 +996,10 @@ pub async fn create_token(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn revoke_token(
     Path((org_id, id)): Path<(String, String)>,
@@ -976,6 +1048,10 @@ pub async fn revoke_token(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::FleetConfigList),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_configs(
     Path(org_id): Path<String>,
@@ -1023,6 +1099,10 @@ pub async fn list_configs(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 409, description = "Id exists", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn create_config(
     Path(org_id): Path<String>,
@@ -1071,6 +1151,10 @@ pub async fn create_config(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "get"}))
+    )
 )]
 pub async fn get_config(
     Path((org_id, id)): Path<(String, String)>,
@@ -1123,6 +1207,10 @@ pub async fn get_config(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Referenced; the body's `references` holds the counts", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "delete"}))
+    )
 )]
 pub async fn delete_config(
     Path((org_id, id)): Path<(String, String)>,
@@ -1165,6 +1253,10 @@ pub async fn delete_config(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn save_config_draft(
     Path((org_id, id)): Path<(String, String)>,
@@ -1217,6 +1309,10 @@ pub async fn save_config_draft(
         (status = 409, description = "Published concurrently", content_type = "application/json", body = Object),
         (status = 422, description = "Validation errors", content_type = "application/json", body = config::meta::fleet::ValidationFailed),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn publish_config_version(
     Path((org_id, id)): Path<(String, String)>,
@@ -1267,6 +1363,10 @@ pub async fn publish_config_version(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "get"}))
+    )
 )]
 pub async fn get_config_version(
     Path((org_id, id, version)): Path<(String, String, i64)>,
@@ -1308,6 +1408,10 @@ pub async fn get_config_version(
         (status = 200, description = "The issues found, also when there are errors", content_type = "application/json", body = config::meta::fleet::ValidationResult),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn validate_config(
     Path(org_id): Path<String>,
@@ -1345,6 +1449,10 @@ pub async fn validate_config(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::RolloutList),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_rollouts(
     Path(org_id): Path<String>,
@@ -1407,6 +1515,10 @@ pub async fn list_rollouts(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "get"}))
+    )
 )]
 pub async fn get_rollout(
     Path((org_id, id)): Path<(String, String)>,
@@ -1448,6 +1560,10 @@ pub async fn get_rollout(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Not halted, or the halt does not offer this exit", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn resume_rollout(
     Path((org_id, id)): Path<(String, String)>,
@@ -1495,6 +1611,10 @@ pub async fn resume_rollout(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Not halted, or the halt does not offer this exit", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn skip_rollout(
     Path((org_id, id)): Path<(String, String)>,
@@ -1548,6 +1668,10 @@ pub async fn skip_rollout(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Not halted, or the halt does not offer this exit", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "create"}))
+    )
 )]
 pub async fn rollback_rollout(
     Path((org_id, id)): Path<(String, String)>,
@@ -1588,6 +1712,10 @@ pub async fn rollback_rollout(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::FleetSummary),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn summary(
     Path(org_id): Path<String>,
@@ -1629,6 +1757,10 @@ pub async fn summary(
         (status = 400, description = "Invalid window", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn get_pipelines(
     Path(org_id): Path<String>,
@@ -1678,6 +1810,10 @@ pub async fn get_pipelines(
         (status = 400, description = "Invalid period or filter", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn list_audit(
     Path(org_id): Path<String>,
@@ -1723,6 +1859,10 @@ pub async fn list_audit(
         (status = 200, description = "Success", content_type = "application/json", body = Settings),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "list"}))
+    )
 )]
 pub async fn get_settings(
     Path(org_id): Path<String>,
@@ -1760,6 +1900,10 @@ pub async fn get_settings(
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Fleet", "operation": "update"}))
+    )
 )]
 pub async fn update_settings(
     Path(org_id): Path<String>,

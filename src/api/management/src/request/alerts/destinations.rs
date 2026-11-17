@@ -28,7 +28,7 @@ use openobserve_core::auth::check_permissions;
 use openobserve_core::{
     alerts::{
         destinations,
-        notifications::{TestSendError, check_rate_limit, jira, test_send as core_test_send},
+        notifications::{TestSendError, jira, test_send as core_test_send},
     },
     auth::UserEmail,
     http::destination_error_response,
@@ -320,7 +320,8 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 pub async fn jira_setup(
@@ -397,7 +398,7 @@ async fn saved_token_refusal(
       ),
     request_body(content = inline(Destination), description = "Alert destination data. The 'template' field is required (use 'Default' for the built-in template).", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -414,6 +415,9 @@ pub async fn save_destination(
     // Check the module query parameter to determine if this is an alert or pipeline destination
     let module = query.get("module").map(|s| s.as_str());
     let is_alert = module != Some("pipeline");
+    if !is_alert && !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
 
     let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
@@ -451,7 +455,7 @@ pub async fn save_destination(
       ),
     request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -468,6 +472,9 @@ pub async fn update_destination(
     // Check the module query parameter to determine if this is an alert or pipeline destination
     let module = query.get("module").map(|s| s.as_str());
     let is_alert = module != Some("pipeline");
+    if !is_alert && !cfg!(feature = "enterprise") {
+        return MetaHttpResponse::forbidden("Not supported in the open source version");
+    }
 
     let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
@@ -636,7 +643,7 @@ pub async fn list_destinations(
         ("destination_name" = String, Path, description = "Destination name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Conflict", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
@@ -806,7 +813,8 @@ pub struct TestSendResponse {
     description = "Renders a content-template definition (draft, via `definition`, or saved, via `template_name`) \
                    against a deterministic synthetic sample and DISPATCHES it to the named destination's real \
                    channel, with every title/subject prefixed `[TEST] `. Requires destination write permission. \
-                   Rate-capped per user (`ZO_ALERT_TEST_SEND_PER_MINUTE`, default 6/min) — returns 429 when exceeded.",
+                   Rate-capped per user (`ZO_ALERT_TEST_SEND_PER_MINUTE`, default 6/min); only a request that reaches dispatch counts, \
+                   and an exceeded cap returns 429 with a `Retry-After` header.",
     security(
         ("Authorization"= [])
     ),
@@ -836,6 +844,7 @@ pub async fn test_send(
 
     // Permission: destination WRITE, not template read — reading a template
     // must never by itself grant the ability to post into a channel.
+    // `use_self_parent` lets an org-wide `_all_` grant count, as in `can_write_destination`.
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &destination_name,
@@ -846,16 +855,11 @@ pub async fn test_send(
         None,
         false,
         false,
-        false,
+        true,
     )
     .await
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
-    }
-
-    // Rate cap: per-user, config `ZO_ALERT_TEST_SEND_PER_MINUTE` (default 6).
-    if let Err(e @ TestSendError::RateLimited { .. }) = check_rate_limit(user_id) {
-        return MetaHttpResponse::too_many_requests(e.to_string());
     }
 
     // Exactly one of definition / template_name.
@@ -880,6 +884,12 @@ pub async fn test_send(
                     ));
                 }
             };
+            // A Custom body would parse as an all-default spec and send a blank card.
+            if template.kind != config::meta::destinations::TemplateKind::Content {
+                return MetaHttpResponse::bad_request(format!(
+                    "Template {template_name} is not a valid content template"
+                ));
+            }
             match db::alerts::templates::get_parsed_content(&template) {
                 Ok(spec) => (*spec).clone(),
                 Err(e) => {
@@ -902,12 +912,24 @@ pub async fn test_send(
         return MetaHttpResponse::bad_request("Test-send is only supported for alert destinations");
     };
 
-    match core_test_send(&org_id, destination_type, &spec, req.kind).await {
+    // Rate cap: per-user, config `ZO_ALERT_TEST_SEND_PER_MINUTE` (default 6), charged in core
+    // just before dispatch.
+    match core_test_send(&org_id, user_id, destination_type, &spec, req.kind).await {
         Ok(message) => MetaHttpResponse::json(TestSendResponse {
             success: true,
             message,
         }),
-        Err(e) => MetaHttpResponse::bad_request(e.to_string()),
+        Err(e) => test_send_error_response(e),
+    }
+}
+
+/// A rate-limited test-send is a 429 that says when to retry; every other failure is a 400.
+fn test_send_error_response(e: TestSendError) -> Response {
+    match e {
+        TestSendError::RateLimited { retry_after_secs } => {
+            MetaHttpResponse::too_many_requests_retry_after(e.to_string(), retry_after_secs)
+        }
+        e => MetaHttpResponse::bad_request(e.to_string()),
     }
 }
 
@@ -1233,6 +1255,12 @@ mod tests {
             status(DestinationError::JiraTokenChanged),
             StatusCode::BAD_REQUEST
         );
+        assert_eq!(
+            status(DestinationError::JiraAlertsUnsupported(
+                "'x' cannot become a Jira destination".to_string()
+            )),
+            StatusCode::BAD_REQUEST
+        );
     }
 
     #[test]
@@ -1270,5 +1298,64 @@ mod tests {
                 .await
                 .is_none()
         );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn pipeline_destinations_are_refused_without_enterprise() {
+        use std::collections::HashMap;
+
+        use axum::extract::Query;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        use super::{save_destination, update_destination};
+
+        let args = |module: &str| {
+            let query = HashMap::from([("module".to_string(), module.to_string())]);
+            let user = UserEmail {
+                user_id: "root@example.com".to_string(),
+            };
+            let dest =
+                serde_json::from_value(serde_json::json!({"name": "d", "type": "sns"})).unwrap();
+            (Query(query), Headers(user), Json(dest))
+        };
+        let path = || Path("default".to_string());
+        let named = || Path(("default".to_string(), "d".to_string()));
+        let refusal = async |resp: axum::response::Response| {
+            let status = resp.status();
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let says_oss = String::from_utf8_lossy(&body).contains("open source version");
+            (status, says_oss)
+        };
+        for (module, expected) in [
+            ("pipeline", (StatusCode::FORBIDDEN, true)),
+            ("alert", (StatusCode::BAD_REQUEST, false)),
+        ] {
+            let (query, user, dest) = args(module);
+            let saved = refusal(save_destination(path(), query, user, dest).await).await;
+            assert_eq!(saved, expected, "save module={module}");
+            let (query, user, dest) = args(module);
+            let updated = refusal(update_destination(named(), query, user, dest).await).await;
+            assert_eq!(updated, expected, "update module={module}");
+        }
+    }
+
+    #[test]
+    fn a_rate_limited_test_send_is_a_429_with_retry_after_and_others_a_400() {
+        use openobserve_core::alerts::notifications::TestSendError;
+
+        let limited = super::test_send_error_response(TestSendError::RateLimited {
+            retry_after_secs: 42,
+        });
+        assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(limited.headers()[axum::http::header::RETRY_AFTER], "42");
+
+        let skipped = super::test_send_error_response(TestSendError::PlatformSkipped(
+            config::meta::alerts::notification_kind::NotificationKind::Downtime,
+        ));
+        assert_eq!(skipped.status(), StatusCode::BAD_REQUEST);
     }
 }

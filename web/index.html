@@ -21,6 +21,49 @@
       window.global = window;
       var exports = {};
     </script>
+    <script>
+      (function () {
+        if ("%VITE_OPENOBSERVE_CLOUD%" !== "true" || !/\/(login|signup)\/?$/.test(location.pathname)) return;
+        if (location.hash) return;
+        var query = new URLSearchParams(location.search);
+        if (query.has("utm_content") || /^https?:\/\/([^/]*\.)?openobserve\.ai\/docs/i.test(document.referrer)) return;
+        var api = "%VITE_OPENOBSERVE_ENDPOINT%";
+        if (api.charAt(0) === "%") {
+          var pos = location.pathname.indexOf("/web/");
+          api = location.origin + (pos > -1 ? location.pathname.slice(0, pos) : "");
+        }
+        var controller = new AbortController();
+        setTimeout(function () {
+          controller.abort();
+        }, 10000);
+        window.__o2SsoFastPath = fetch(api.replace(/\/$/, "") + "/config/dex_login", {
+          credentials: "include",
+          signal: controller.signal,
+        })
+          .then(function (res) {
+            return res.ok ? res.text() : "";
+          })
+          .then(function (text) {
+            var url = text;
+            try {
+              url = JSON.parse(text);
+            } catch (e) {}
+            if (typeof url !== "string" || !/^https?:\/\//.test(url)) return false;
+            if (query.get("mode") === "signup" || /\/signup\/?$/.test(location.pathname)) {
+              var target = new URL(url, location.href);
+              if (!target.searchParams.has("screen_hint")) {
+                target.search = (target.search ? target.search + "&" : "?") + "screen_hint=signup";
+              }
+              url = target.toString();
+            }
+            location.href = url;
+            return true;
+          })
+          .catch(function () {
+            return false;
+          });
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

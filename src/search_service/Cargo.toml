@@ -63,3 +63,4 @@ usage_reporting.workspace = true
 
 [dev-dependencies]
 o2_enterprise = { workspace = true, default-features = false, features = ["test-utils"] }
+tracing-subscriber.workspace = true

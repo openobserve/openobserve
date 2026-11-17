@@ -373,6 +373,10 @@ describe("SlackSelfHostedWizard Step 2", () => {
     await flushPromises();
     expect(step(w)).toBe("3");
     expect(w.text()).toContain("App created · A0SAMPLE01");
+    await w.setProps({ installation: pending });
+    await flushPromises();
+    expect(step(w)).toBe("3");
+    expect(w.find('[data-test="slack-wizard-pending"]').exists()).toBe(false);
   });
 
   it("refuses an app-level or configuration access token in the configuration-token field before Slack is called", async () => {

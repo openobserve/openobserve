@@ -116,9 +116,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-agent-name="selectedAgentName"
         :selected-version="selectedVersion"
         :show-version="showVersion"
+        :agent-streams="agentStreams"
+        :selected-stream="selectedAgentStream"
         @update:selected-env="onSelectedEnvChange"
         @update:selected-agent-name="onSelectedAgentNameChange"
         @update:selected-version="onSelectedVersionChange"
+        @update:selected-stream="onSelectedAgentStreamChange"
       />
       <!-- Page-supplied affordance beside the cascade (agent mode only). Agent
            Graph rides its version-agnostic hint here since it hides the Version
@@ -186,6 +189,9 @@ const props = withDefaults(
     selectedAgentName: string;
     /** Selected version (two-way via update:selectedVersion). */
     selectedVersion: string;
+    /** Streams carrying the selected agent; two or more show the cascade's Stream dropdown. */
+    agentStreams?: SelectOption[];
+    selectedAgentStream?: string;
     /** Gate the stream select behind an OSkeleton until streams load
         (Sessions/LLM). Graph/Behavior derive the stream from the agents API
         and never skeleton it. */
@@ -233,6 +239,8 @@ const props = withDefaults(
     showVersion: true,
     showAgentToggle: true,
     agentToggleLockedMessage: undefined,
+    agentStreams: () => [],
+    selectedAgentStream: "",
   },
 );
 
@@ -246,9 +254,10 @@ const emit = defineEmits<{
   (e: "update:selectedEnv", value: string): void;
   (e: "update:selectedAgentName", value: string): void;
   (e: "update:selectedVersion", value: string): void;
+  (e: "update:selectedAgentStream", value: string): void;
   (e: "filter-mode-change", value: FilterMode): void;
   (e: "stream-change", value: string): void;
-  /** The user picked an env, agent or version: the agent scope is now an explicit choice. */
+  /** The user picked an env, agent, version or stream: the agent scope is now an explicit choice. */
   (e: "agent-pick"): void;
 }>();
 
@@ -293,6 +302,11 @@ const onSelectedAgentNameChange = (value: string) => {
 
 const onSelectedVersionChange = (value: string) => {
   emit("update:selectedVersion", value);
+  emit("agent-pick");
+};
+
+const onSelectedAgentStreamChange = (value: string) => {
+  emit("update:selectedAgentStream", value);
   emit("agent-pick");
 };
 </script>

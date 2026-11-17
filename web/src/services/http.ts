@@ -36,6 +36,8 @@ declare module "axios" {
     /** Route the request started on, so a late 403 is not pinned on the page the user moved to. */
     accessRouteKey?: string;
     startedAt?: number;
+    /** Set on the retry after a token refresh, so a second 401 is not refreshed again. */
+    _afterRefresh?: boolean;
   }
 }
 
@@ -93,6 +95,40 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   return Promise.reject(new Error("Not SSO: cannot refresh"));
 };
 
+// `/security/access` answers any signed-in member, so it is the probe and never probed itself.
+const SECURITY_ROUTE = /\/api\/([^/?#]+)\/security\/(?!access(?:[/?#]|$))/;
+
+// One probe per org at a time: a page fires several Security requests that 401 together.
+const sessionProbes = new Map<string, Promise<boolean>>();
+
+/** Org of a Security request other than the access probe, or null. */
+export const securityRequestOrg = (url: string): string | null =>
+  SECURITY_ROUTE.exec(url)?.[1] ?? null;
+
+/** Whether the session still answers `/security/access`; only a 401 there means it really expired. */
+export const sessionStillAlive = (org: string): Promise<boolean> => {
+  let probe = sessionProbes.get(org);
+  if (!probe) {
+    probe = axios
+      .create({ withCredentials: true, baseURL: store.state.API_ENDPOINT })
+      .get(`/api/${org}/security/access`)
+      .then(
+        () => true,
+        (err) => err?.response?.status !== 401,
+      )
+      .finally(() => sessionProbes.delete(org));
+    sessionProbes.set(org, probe);
+  }
+  return probe;
+};
+
+const recordRefusal = (error: any) =>
+  recordForbidden({
+    url: error.request?.responseURL || error.config?.url || "",
+    method: error.config?.method,
+    routeKey: error.config?.accessRouteKey,
+  });
+
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
 
@@ -136,33 +172,49 @@ const http = ({ headers } = {} as any) => {
         switch (error.response.status) {
           case 400:
             break;
-          case 401:
-            if (config.isCloud == "true" && !error.request.responseURL.includes("/auth/login")) {
+          case 401: {
+            const responseUrl: string = error.request?.responseURL || error.config?.url || "";
+            // A fresh token that still gets 401 is a refusal, not an expiry: refreshing again would loop.
+            if (error.config?._afterRefresh) {
+              recordRefusal(error);
+              return Promise.reject(error);
+            }
+            const sso =
+              config.isCloud != "true" &&
+              config.isEnterprise == "true" &&
+              (store.state as any).zoConfig.sso_enabled;
+            const securityOrg = sso ? null : securityRequestOrg(responseUrl);
+            if (securityOrg) {
+              return sessionStillAlive(securityOrg).then((alive) => {
+                if (alive) recordRefusal(error);
+                else expireSession(store);
+                return Promise.reject(error);
+              });
+            }
+            if (config.isCloud == "true" && !responseUrl.includes("/auth/login")) {
               expireSession(store);
             }
             // Delegate to the shared refresh helper — it owns the URL exclusion
             // checks and the logout-on-failure path. Retry the original request
             // once the token is refreshed.
-            else if (config.isEnterprise == "true" && (store.state as any).zoConfig.sso_enabled) {
+            else if (sso) {
               return attemptTokenRefresh(error.config.url)
-                .then(() => instance.request(error.config))
-                .catch(() => Promise.reject(error));
+                .then(() => instance.request({ ...error.config, _afterRefresh: true }))
+                .catch((retryError) =>
+                  Promise.reject(retryError?.config?._afterRefresh ? retryError : error),
+                );
             } else {
-              if (!error.request.responseURL.includes("/login")) expireSession(store);
+              if (!responseUrl.includes("/login")) expireSession(store);
             }
             break;
+          }
           case 403:
             if (
               (config.isEnterprise == "true" || config.isCloud == "true") &&
               !error.config?.skipAccessToast &&
               !error.config?.silentForbidden
             ) {
-              const responseUrl = error.request?.responseURL || error.config?.url || "";
-              recordForbidden({
-                url: responseUrl,
-                method: error.config?.method,
-                routeKey: error.config?.accessRouteKey,
-              });
+              recordRefusal(error);
             }
             break;
           case 404:

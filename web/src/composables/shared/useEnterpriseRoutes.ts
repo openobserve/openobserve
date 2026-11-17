@@ -52,16 +52,19 @@ const syntheticsRouteGuard = (to: any, from: any, next: any) => {
 // narrower flag as well. Same `=== false` stance as above: /config is fetched
 // without await, so redirecting on "not yet known" would bounce a bookmarked
 // link on a cold load.
-const privateLocationRouteGuard = (to: any, from: any, next: any) => {
-  if (
-    store.state.zoConfig?.synthetics_private_locations_enabled === false &&
-    !isLicenseLocked("synthetics")
-  ) {
-    next("/");
-    return;
-  }
-  syntheticsRouteGuard(to, from, next);
-};
+const privateLocationRouteGuard = withFeatureGate(
+  "privateLocations",
+  (to: any, from: any, next: any) => {
+    if (
+      store.state.zoConfig?.synthetics_private_locations_enabled === false &&
+      !isLicenseLocked("synthetics")
+    ) {
+      next("/");
+      return;
+    }
+    syntheticsRouteGuard(to, from, next);
+  },
+);
 
 // Workflows routes are gated on the backend /config flag `workflows_enabled`
 // (enterprise O2_WORKFLOWS_ENABLED); `withFeatureGate("workflows", ...)` at
@@ -397,7 +400,8 @@ const useEnterpriseRoutes = () => {
       path: "autoobserve",
       name: "autoobserve",
       component: () => import("@/views/AutoObserveHome.vue"),
-      meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true },
+      // Home, coverage, issues and What I've changed share this route but read different things.
+      meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true, accessScopeQuery: ["page"] },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -406,6 +410,18 @@ const useEnterpriseRoutes = () => {
       path: "auto-observe-2",
       redirect: (to: any) => ({ name: "autoobserve", query: to.query }),
     });
+    // Test builds only: the bulk review drawer with fixture rows, before any page opens it.
+    if (import.meta.env.VITE_O2_UI_HARNESS === "true") {
+      routes.push({
+        path: "autoobserve/dev/bulk-review",
+        name: "autoobserveBulkReviewHarness",
+        component: () => import("@/components/autoobserve/insight/bulk/BulkReviewHarness.vue"),
+        meta: { allowOnEmptyData: true },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      });
+    }
     // Every Fleet API answers 403 on OSS, so the routes (and with them the nav entry) exist only here.
     routes.push(
       {
@@ -520,6 +536,17 @@ const useEnterpriseRoutes = () => {
       path: "invitations",
       name: "invitations",
       component: Invitations,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+
+    // Menu-free first-run setup; cloud only, self-hosted builds keep today's Home.
+    routes.push({
+      path: "onboarding/:path*",
+      name: "onboarding",
+      component: () => import("@/views/OnboardingView.vue"),
+      meta: { focusMode: true, titleKey: "routeTitles.onboarding", allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },

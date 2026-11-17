@@ -365,6 +365,7 @@ import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 
 interface SemanticGroup {
   id: string;
@@ -547,6 +548,10 @@ const applyChanges = async () => {
     await alertsService.saveSemanticGroups(org, finalGroups);
     // The groups are cached, and dimension analytics is computed from them.
     void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(org) });
+    analytics.track("semantic_groups_imported", {
+      added: selectedAdditionGroups.length,
+      modified: selectedModificationGroups.length,
+    });
 
     toast({
       message: t("toastMessages.alerts.successfullyAppliedChanges", {

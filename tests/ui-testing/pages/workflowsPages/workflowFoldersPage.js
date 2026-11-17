@@ -133,6 +133,16 @@ class WorkflowFoldersPage {
     }, folderName);
   }
 
+  // The store fills folders after the list mounts, so a lookup right after goToList can miss.
+  async waitForFolderIdResolved(folderName) {
+    await expect
+      .poll(async () => ((await this.resolveFolderIdByName(folderName)) ? 'ready' : 'pending'), {
+        timeout: DIALOG_TIMEOUT_MS,
+        message: `folder "${folderName}" never appeared in the store's workflow folders`,
+      })
+      .toBe('ready');
+  }
+
   async getTabByName(folderName) {
     const folderId = await this.resolveFolderIdByName(folderName);
     if (!folderId) {
@@ -204,11 +214,7 @@ class WorkflowFoldersPage {
   }
 
   async expectFolderTabVisible(folderName) {
-    await expect
-      .poll(async () => ((await this.resolveFolderIdByName(folderName)) ? 'ready' : 'pending'), {
-        timeout: DIALOG_TIMEOUT_MS,
-      })
-      .toBe('ready');
+    await this.waitForFolderIdResolved(folderName);
     const tab = await this.getTabByName(folderName);
     await expect(tab).toBeVisible({ timeout: DIALOG_TIMEOUT_MS });
   }
@@ -232,6 +238,7 @@ class WorkflowFoldersPage {
   }
 
   async clickMoreIcon(folderName) {
+    await this.waitForFolderIdResolved(folderName);
     const tab = await this.getTabByName(folderName);
     await tab.hover();
     const moreBtn = tab.locator(this.moreIconSelector);

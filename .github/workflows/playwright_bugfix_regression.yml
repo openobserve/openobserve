@@ -769,7 +769,7 @@ jobs:
   report_result:
     name: Report result
     needs: [ui_integration_tests, playwright_summary]
-    if: ${{ always() && needs.ui_integration_tests.result != 'skipped' }}
+    if: ${{ always() && github.ref == 'refs/heads/main' && needs.ui_integration_tests.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

@@ -182,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConstrainedPage
       v-else-if="constrained"
       :size="contentSize"
+      :align="contentAlign === 'start' ? 'left' : 'center'"
       :class="[bodyEnter, 'min-h-0 flex-1']"
     >
       <OPageLockedBody :replace="showsOwnBody"><slot /></OPageLockedBody>
@@ -204,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { ref, computed, watch, useSlots, provide } from "vue";
+import { ref, computed, watch, useSlots, provide, inject, onActivated } from "vue";
 import { useRouter } from "vue-router";
 // The route view already fades the whole page in, so the body takes only the slide and the header stays still.
 import { ENTER_SLIDE as BODY_ENTER } from "@/lib/styles/motion";
@@ -220,6 +221,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useFeatureLock } from "@/composables/useFeatureLock";
 import { PAGE_LAYOUT_SIDEBAR_KEY } from "./pageLayoutSidebar";
+import { PAGE_ENTRANCE_KEY } from "./pageEntrance";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
@@ -264,6 +266,7 @@ const props = withDefaults(
     // Reading-column mode
     constrained?: boolean;
     contentSize?: "sm" | "md" | "lg" | "xl";
+    contentAlign?: "center" | "start";
     // Header wrapper override (rare)
     headerClass?: string;
   }>(),
@@ -279,6 +282,7 @@ const props = withDefaults(
     splitterLimits: () => [0, 400] as [number, number],
     constrained: false,
     contentSize: "lg",
+    contentAlign: "center",
     headerClass: undefined,
   },
 );
@@ -289,6 +293,12 @@ const emit = defineEmits<{
 
 const slots = useSlots();
 const { t } = useI18nTyped();
+
+const pageEntering = inject(PAGE_ENTRANCE_KEY, () => true);
+const bodyEnterClass = () => (pageEntering() ? BODY_ENTER : "");
+const enterClass = ref(bodyEnterClass());
+// A kept-alive return re-inserts the body, which would replay the slide unless the class is dropped first.
+onActivated(() => (enterClass.value = bodyEnterClass()));
 
 const { isMobile } = useBreakpoint();
 const mobileSidebarOpen = ref(false);
@@ -324,7 +334,7 @@ const hasHeader = computed(
 const showsOwnBody = computed(() => hasHeader.value || !slots.sidebar);
 // A locked page, and the shell around it, shows its license message without the slide so nothing moves while it appears.
 const { locked: pageLocked } = useFeatureLock();
-const bodyEnter = computed(() => (pageLocked.value ? "" : BODY_ENTER));
+const bodyEnter = computed(() => (pageLocked.value ? "" : enterClass.value));
 
 const internalWidth = ref(props.sidebarWidth);
 

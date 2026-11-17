@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
 import DbmTerminateSql from "./DbmTerminateSql.vue";
 
 const copyToClipboard = vi.fn().mockResolvedValue(true);
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: (...args: unknown[]) => copyToClipboard(...args),
 }));
@@ -37,6 +39,15 @@ describe("DbmTerminateSql", () => {
     await wrapper.find("[data-test='dbm-terminate-sql-copy']").trigger("click");
     expect(copyToClipboard).toHaveBeenCalledOnce();
     expect(copyToClipboard.mock.calls[0][0]).toBe("SELECT pg_terminate_backend(1069);");
+  });
+
+  it("tracks a successful copy with the engine only", async () => {
+    vi.mocked(analytics.track).mockClear();
+    await mountWith({}).find("[data-test='dbm-terminate-sql-copy']").trigger("click");
+    await flushPromises();
+    expect(analytics.track).toHaveBeenCalledWith("dbm_terminate_sql_copied", {
+      db_system: "postgres",
+    });
   });
 
   it("renders nothing without a pid — no half-formed statement can be copied", () => {

@@ -43,7 +43,7 @@ export interface SeriesObject {
 
 export type AnnotationSourceMode = "builder" | "sql";
 
-/** AND/OR condition tree, the alerts condition-builder shape (FilterGroup.vue's v2 format). */
+/** AND/OR condition tree, the alerts condition-builder shape (the engine V2 tree). */
 export type AnnotationConditionLogicalOperator = "AND" | "OR";
 
 export interface AnnotationConditionLeaf {
@@ -51,7 +51,9 @@ export interface AnnotationConditionLeaf {
   filterType: "condition";
   column: string;
   operator: string;
+  /** `in` / `not_in` hold a JSON array string, since the backend stores the value as text. */
   value: string;
+  case_insensitive?: boolean;
   logicalOperator: AnnotationConditionLogicalOperator;
 }
 

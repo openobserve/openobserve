@@ -132,13 +132,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
-          @click="onPanelClick"
+          @click="
+            (event: any) =>
+              event.componentType === 'markLine' &&
+              event.data?.deployKey &&
+              panelSchema.config?.chart_mark_line_click
+                ? panelSchema.config.chart_mark_line_click(event.data)
+                : onPanelClick(event)
+          "
           @contextmenu="(event) => !store.state.kioskMode && onChartContextMenu(event)"
           @domcontextmenu="(event) => !store.state.kioskMode && onChartDomContextMenu(event)"
           :find-line-on-context-menu="findsLineOnContextMenu"
           @mouseover="onChartMouseOver"
           @mouseout="onChartMouseOut"
           @finished="onChartFinished"
+          @painted="onChartPainted"
         />
         <ExemplarMarkerList
           v-if="exemplarPoints.length"
@@ -203,6 +211,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
+      <PanelChartPlaceholder
+        v-if="showsChartPlaceholder"
+        class="absolute inset-0"
+        data-test="panel-chart-placeholder"
+      />
       <OEmptyState
         v-if="
           noData &&
@@ -466,6 +479,7 @@ import {
   withTimeRangeVariables,
 } from "@/utils/dashboard/variables/variablesUtils";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import {
   forecastPointOf,
   usePanelAlertCreation,
@@ -599,6 +613,7 @@ export default defineComponent({
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
+    PanelChartPlaceholder,
     OButton,
     OIcon,
     OTooltip,
@@ -784,6 +799,8 @@ export default defineComponent({
     "show-legends",
     "format-column",
     "sendToAiChat",
+    "painted",
+    "chart-click",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -1035,6 +1052,21 @@ export default defineComponent({
         isFirstLoadSettled?.value === false &&
         !["html", "markdown", "alert-list"].includes(panelSchema.value?.type),
     );
+
+    // An ECharts canvas stays blank until a frame of the converted data is drawn, so the placeholder waits for that frame.
+    const chartPainted = ref(false);
+    let chartDataConverted = false;
+    const onChartPainted = () => {
+      if (chartDataConverted) chartPainted.value = true;
+    };
+    // Only a mounted ChartRenderer reports painted frames; until the renderer branch has rendered, assume it will.
+    const rendererRendered = ref(false);
+    watch(
+      () => !errorDetail.value?.message && !isAwaitingFirstLoad.value,
+      (shown) => (rendererRendered.value = shown),
+      { flush: "post", immediate: true },
+    );
+    const drawsWithECharts = computed(() => !rendererRendered.value || !!chartRendererRef.value);
 
     // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
     const {
@@ -1757,6 +1789,7 @@ export default defineComponent({
           }
 
           panelData.value = result;
+          chartDataConverted = true;
           customChartRunSkipped = false;
 
           limitNumberOfSeriesWarningMessage.value =
@@ -2318,6 +2351,20 @@ export default defineComponent({
         { tabId: tabId.value, panelId: panelSchema.value?.id },
       ),
     );
+    const showsChartPlaceholder = computed(
+      () =>
+        !errorDetail.value?.message &&
+        (isAwaitingFirstLoad.value ||
+          (drawsWithECharts.value && !chartPainted.value && !noData.value)),
+    );
+    watch(
+      showsChartPlaceholder,
+      (shown) => {
+        if (!shown && !errorDetail.value?.message) emit("painted");
+      },
+      { immediate: true },
+    );
+
     const noDataTitle = computed(() =>
       customNoDataText.value ? raw(customNoDataText.value) : t("panel.noData"),
     );
@@ -2355,7 +2402,37 @@ export default defineComponent({
         return { source, place, colors, data };
       },
     );
-    const withExemplars = (value: any) => {
+    // Deploy marker labels sit above the plot, so a marked chart needs headroom for them.
+    const markerRoom = (grid: any) =>
+      grid && !Array.isArray(grid) && (grid.top === undefined || typeof grid.top === "number")
+        ? { ...grid, top: Math.max(grid.top ?? 0, 24) }
+        : grid;
+    const withExemplars = (input: any) => {
+      const lines = panelSchema.value.config?.chart_mark_lines;
+      const value =
+        lines?.length && input?.options?.series?.length
+          ? {
+              ...input,
+              options: {
+                ...input.options,
+                grid: markerRoom(input.options.grid),
+                series: input.options.series.map((series: any, index: number) =>
+                  index === 0
+                    ? {
+                        ...series,
+                        markLine: {
+                          ...series.markLine,
+                          symbol: ["none", "none"],
+                          lineStyle: { ...series.markLine?.lineStyle, type: "dashed", width: 1 },
+                          silent: false,
+                          data: [...(series.markLine?.data || []), ...lines],
+                        },
+                      }
+                    : series,
+                ),
+              },
+            }
+          : input;
       if (!exemplarMarkers.value.length || !value?.options) return value;
       if (!exemplarsEligible.value && !injectedExemplars.value) return value;
       if (panelSchema.value?.type === "heatmap") return heatmapExemplarData.value.data;
@@ -2483,9 +2560,11 @@ export default defineComponent({
       ].filter((item) => item.state !== "hidden");
     });
 
-    // A chart or table click opens the drilldown menu, so it does nothing where drilldowns are off.
-    const onPanelClick = (...args: Parameters<typeof onChartClick>) =>
-      allowDrilldown.value && !store.state.kioskMode ? onChartClick(...args) : undefined;
+    // A click opens the drilldown menu, so it does nothing where drilldowns are off.
+    const onPanelClick = (...args: Parameters<typeof onChartClick>) => {
+      emit("chart-click", args[0]);
+      return allowDrilldown.value && !store.state.kioskMode ? onChartClick(...args) : undefined;
+    };
     // The copy hover zone covers its value, so a click there stands in for a click on that cell's series.
     const onMetricZoneClick = (
       m: { idx: number; layout?: { left?: number; top?: number } },
@@ -2907,6 +2986,8 @@ export default defineComponent({
       exemplarActiveUnit,
       formatExemplarValue,
       onChartFinished,
+      onChartPainted,
+      showsChartPlaceholder,
     };
   },
 });
