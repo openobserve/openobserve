@@ -52,7 +52,6 @@ impl From<MetricsQueryRequest> for proto::cluster_rpc::MetricsQueryRequest {
                 partition: 0,
             }),
             org_id: String::new(),
-            need_wal: false,
             query: Some(query),
             use_cache: req.use_cache.unwrap_or(true),
             timeout: 0,
@@ -64,6 +63,7 @@ impl From<MetricsQueryRequest> for proto::cluster_rpc::MetricsQueryRequest {
             regions: req.regions,
             clusters: req.clusters,
             is_super_cluster: false,
+            wal_start_time: 0,
         }
     }
 }
