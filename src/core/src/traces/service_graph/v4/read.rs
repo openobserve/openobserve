@@ -1036,7 +1036,6 @@ mod tests {
             org_id: "org".to_string(),
             query_exemplars: false,
             query_data: false,
-            need_wal: false,
             use_cache: false,
             timeout: 30,
             search_event_type: None,
