@@ -1421,6 +1421,7 @@ describe("AddAlert (OForm owner)", () => {
         form.setFieldValue("stream_name", "_rundata");
         await flushPromises();
         wrapper.vm.anomalyConfig.alert_enabled = false;
+        await wrapper.find('[data-test="anomaly-sensitivity-row-change"]').trigger("click");
         await wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').trigger("click");
         await wrapper.find('[data-test="anomaly-sensitivity-level"] input').setValue(String(draft));
         await flushPromises();
