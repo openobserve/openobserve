@@ -3,6 +3,7 @@ import {
   envListText,
   envSet,
   inEnv,
+  isExplicitEnv,
   NO_ENV,
   otherEnvs,
   scopesInEnv,
@@ -42,6 +43,21 @@ describe("scope env set", () => {
     expect(scopesInEnv([seen, pinned], "staging")).toEqual([pinned]);
     expect(scopesInEnv([seen], "staging")).toEqual([seen]);
     expect(scopesInEnv([seen], "dev")).toEqual([]);
+  });
+});
+
+describe("explicit env", () => {
+  it.each([
+    ["attribute", false, true],
+    ["rum", false, true],
+    ["override", false, true],
+    ["cluster_name", false, false],
+    ["namespace_name", false, false],
+    ["workload", false, false],
+    ["default", false, false],
+    ["attribute", true, false],
+  ])("source %s with no_env %s is explicit: %s", (source, noEnv, explicit) => {
+    expect(isExplicitEnv({ env: "prod", env_source: source, no_env: noEnv })).toBe(explicit);
   });
 });
 

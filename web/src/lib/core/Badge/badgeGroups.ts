@@ -1320,7 +1320,7 @@ export const BADGE_GROUPS = {
       host: { variant: "purple-soft" },
       servicename: { variant: "cyan-soft" },
       service: { variant: "cyan-soft" },
-      region: { variant: "error-soft" },
+      region: { variant: "default-soft" },
       zone: { variant: "error-soft" },
       cluster: { variant: "indigo-soft" },
       pod: { variant: "teal-soft" },

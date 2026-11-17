@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "페이지 번호가 범위를 벗어났습니다. 유효한 페이지 번호를 제공하세요.",
       "noMatchingService": "상관관계에 일치하는 서비스가 없습니다",
       "unableToRetrieveCorrelation": "상관관계 데이터를 검색할 수 없습니다",
-      "noMetricStreams": "서비스 \"{service}\"에 대한 메트릭 스트림이 없습니다",
       "correlationError": "상관관계 오류: {error}",
       "contentCopied": "콘텐츠가 성공적으로 복사되었습니다!",
       "noTraceIdForInspection": "검사에 사용할 수 있는 트레이스 ID가 없습니다."

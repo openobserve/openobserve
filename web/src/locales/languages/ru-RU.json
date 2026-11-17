@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "Номер страницы вне диапазона. Укажите корректный номер страницы.",
       "noMatchingService": "Не найдено соответствующего сервиса для корреляции",
       "unableToRetrieveCorrelation": "Не удалось получить данные корреляции",
-      "noMetricStreams": "Для сервиса \"{service}\" не найдено потоков метрик",
       "correlationError": "Ошибка корреляции: {error}",
       "contentCopied": "Содержимое успешно скопировано!",
       "noTraceIdForInspection": "Нет доступного Trace ID для просмотра"

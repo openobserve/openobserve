@@ -277,7 +277,7 @@ const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchServic
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 79] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 80] = [
     ("api/management/src/request/alert_calibration/digests.rs", "search_at", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
@@ -346,6 +346,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 79] = [
     ("core/src/self_reporting/search.rs", "get_usage", Caller::Exempt("licence usage from the meta org")),
     ("core/src/service_identity/signals/metrics.rs", "range", Caller::Helper("version compare arms and RUM vitals; service_versions::compare is in the gated group, deploy detection and verdict ticks call it in the background")),
     ("core/src/service_identity/signals/processor.rs", "query", Caller::Background("service version deploy detection and verdict ticks")),
+    ("core/src/service_identity/signals/record_services.rs", "search", Caller::Helper("correlation span vote; request/service_streams/mod.rs checks the licence before it")),
     ("core/src/service_identity/signals/rum_drill.rs", "hits", Caller::Routed("service_versions::compare")),
     ("core/src/slo/job.rs", "prom_search", Caller::Background("SLO job")),
     ("core/src/slo/job.rs", "search", Caller::Background("SLO job")),
