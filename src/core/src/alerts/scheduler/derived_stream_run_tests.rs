@@ -323,24 +323,24 @@ fn t23_frequency_below_the_period() {
 }
 
 #[test]
-fn t24_tolerance_below_the_frequency_is_dropped_with_a_delay() {
+fn t24_tolerance_is_drawn_after_the_alignment_with_a_delay() {
     let mut ds = interval(60, 60, 10);
     ds.trigger_condition.tolerance_in_secs = Some(30);
-    for _ in 0..200 {
-        assert_eq!(
-            next_run_after(&ds, RunEnd::Normal, hm(10, 10)).unwrap(),
-            hm(11, 10)
+    let mut seen = std::collections::HashSet::new();
+    for _ in 0..500 {
+        let next = next_run_after(&ds, RunEnd::Normal, hm(10, 10)).unwrap();
+        assert!(
+            (hm(11, 10)..hm(11, 10) + second_micros(30)).contains(&next),
+            "{next}"
         );
+        // The next run still has slot 11:00 and searches 10:00 to 11:00.
+        let plan = plan_derived_stream_run(&ds, next, Some(hm(10, 0)), false).unwrap();
+        assert_eq!((plan.start, plan.end), (Some(hm(10, 0)), hm(11, 0)));
+        assert!(!plan.skip && !plan.catch_up);
+        seen.insert(next);
     }
-    // Each possible draw is below 30 seconds, and the aligned path rounds it down to the slot.
-    for draw in 0..30 {
-        let with_tolerance = hm(11, 0) + second_micros(draw);
-        assert_eq!(
-            TriggerCondition::align_time(with_tolerance, 0, Some(60 * 60), None),
-            hm(11, 0),
-            "{draw}"
-        );
-    }
+    // The random seconds are kept, so pipelines with the same delay do not all run at once.
+    assert!(seen.len() > 1);
 }
 
 #[test]

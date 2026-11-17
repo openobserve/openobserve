@@ -98,6 +98,32 @@ enum TriggerKeyCheck {
     Deleted,
 }
 
+/// How a scheduled pipeline run ended, for the choice of its next run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum RunEnd {
+    /// The start was not before the aligned end.
+    Skipped,
+    /// The run started with no retries left.
+    MaxRetries,
+    /// The window ended before the slot, so the next window can run at once.
+    CatchUp { end: i64 },
+    /// A finished run, or a failure that used the last retry.
+    Normal,
+}
+
+/// The window of one scheduled pipeline run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct RunPlan {
+    /// `None` for a run without a cursor and without `start_at`: the window is one period.
+    start: Option<i64>,
+    /// The window end, aligned to the period boundary for an interval pipeline.
+    end: i64,
+    /// The end before the alignment, for the run record.
+    unaligned_end: i64,
+    skip: bool,
+    catch_up: bool,
+}
+
 /// Why a stored pipeline's scheduled source cannot run.
 #[derive(Debug)]
 enum Unrunnable {
@@ -5764,8 +5790,8 @@ async fn handle_derived_stream_triggers(
     };
 
     if let Some(start_time) = start.filter(|_| plan.skip) {
-        // The start is not before the aligned end, most probably due to a non-zero delay.
-        // Don't do any further processing, just skip to next run.
+        // The start is not before the aligned end, most often after a changed save in the
+        // middle of a period. Don't do any further processing, just skip to next run.
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, Invalid timerange. Skipping to next run. start: {}, end: {}",
             new_trigger.module_key,
@@ -6103,32 +6129,6 @@ async fn handle_derived_stream_triggers(
     Ok(())
 }
 
-/// How a scheduled pipeline run ended, for the choice of its next run.
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum RunEnd {
-    /// The start was not before the aligned end.
-    Skipped,
-    /// The run started with no retries left.
-    MaxRetries,
-    /// The window ended before the slot, so the next window can run at once.
-    CatchUp { end: i64 },
-    /// A finished run, or a failure that used the last retry.
-    Normal,
-}
-
-/// The window of one scheduled pipeline run.
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct RunPlan {
-    /// `None` for a run without a cursor and without `start_at`: the window is one period.
-    start: Option<i64>,
-    /// The window end, aligned to the period boundary for an interval pipeline.
-    end: i64,
-    /// The end before the alignment, for the run record.
-    unaligned_end: i64,
-    skip: bool,
-    catch_up: bool,
-}
-
 /// The window of a scheduled pipeline run whose stored run time is `next_run_at`.
 fn plan_derived_stream_run(
     derived_stream: &DerivedStream,
@@ -6191,15 +6191,30 @@ fn plan_derived_stream_run(
 }
 
 /// The next run of a scheduled pipeline: the next slot after `base`, plus the delay.
+/// With a delay, the tolerance is drawn after the alignment, so that it is not rounded away.
 fn next_derived_stream_run(
     trigger_condition: &TriggerCondition,
     tz_offset: i32,
     base: i64,
     delay_micros: i64,
 ) -> Result<i64, anyhow::Error> {
-    let next_slot = trigger_condition.get_next_trigger_time(false, tz_offset, false, Some(base))?;
+    if delay_micros <= 0 {
+        return trigger_condition.get_next_trigger_time(false, tz_offset, false, Some(base));
+    }
+    let without_tolerance = TriggerCondition {
+        tolerance_in_secs: None,
+        ..trigger_condition.clone()
+    };
+    let next_slot = without_tolerance.get_next_trigger_time(false, tz_offset, false, Some(base))?;
+    let tolerance = match trigger_condition.tolerance_in_secs {
+        Some(tolerance) if tolerance > 0 => {
+            second_micros(get_rand_num_within(0, tolerance as u64) as i64)
+        }
+        _ => 0,
+    };
     next_slot
         .checked_add(delay_micros)
+        .and_then(|t| t.checked_add(tolerance))
         .ok_or_else(|| anyhow::anyhow!("delay is out of range"))
 }
 
@@ -7794,6 +7809,10 @@ fn publish_slo_pass_timed(
         ..Default::default()
     });
 }
+
+#[cfg(test)]
+#[path = "derived_stream_run_tests.rs"]
+mod derived_stream_run_tests;
 
 #[cfg(test)]
 mod tests {
@@ -10810,7 +10829,3 @@ mod tests {
         assert!(infra::scheduler::get(&org, module, "engine").await.is_err());
     }
 }
-
-#[cfg(test)]
-#[path = "derived_stream_run_tests.rs"]
-mod derived_stream_run_tests;
