@@ -123,6 +123,19 @@ describe("searchAlertSettings", () => {
     expect(found).toContain("rowTemplate");
   });
 
+  it.each([
+    ["measure", "anomalyFunction"],
+    ["function", "anomalyFunction"],
+    ["resolution", "anomalyResolution"],
+    ["training", "anomalyTraining"],
+  ])("finds the anomaly sentence part %s", (query, id) => {
+    const entry = searchAlertSettings(query, t, isAnomalyFindId)[0]?.entry;
+    expect(entry?.id).toBe(id);
+    expect(entry?.targets).toContain(
+      id === "anomalyTraining" ? "anomaly-training-window-row" : "anomaly-measure-row",
+    );
+  });
+
   it("finds anomaly settings only through the anomaly filter", () => {
     expect(top("sensitivity", isAnomalyFindId)).toBe("anomalySensitivity");
     expect(top("look back", isAnomalyFindId)).toBe("anomalyLookBack");

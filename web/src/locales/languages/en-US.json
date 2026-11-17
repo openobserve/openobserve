@@ -15481,7 +15481,8 @@
         "holdFor": "Hold for at least",
         "groupBy": "Group by",
         "cron": "Cron schedule",
-        "recoveryPlan": "What each destination does on recovery"
+        "recoveryPlan": "What each destination does on recovery",
+        "anomalyResolution": "Resolution"
       },
       "groups": {
         "type": "Alert type",
