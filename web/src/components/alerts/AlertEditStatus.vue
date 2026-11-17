@@ -24,6 +24,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -47,6 +48,10 @@ const preset = computed(
 );
 
 const mute = () => props.header.muteFor(preset.value.secs);
+
+const toggleEnabled = () => {
+  if (!props.header.pending.value) void props.header.toggleEnabled();
+};
 
 const openHistory = () =>
   router.push({
@@ -161,6 +166,18 @@ const openHistory = () =>
       :label="t('alerts.editMode.state.notRun')"
       data-test="add-alert-state-chip"
     />
+    <!-- OSwitch flips itself on click; taking the click first keeps it on the saved state until the write confirms. -->
+    <span class="inline-flex" @click.capture.stop="toggleEnabled">
+      <OSwitch
+        :model-value="header.enabled.value"
+        :label="t('alerts.editMode.enabled')"
+        label-position="left"
+        off-tone="neutral"
+        :disabled="header.pending.value"
+        :aria-busy="header.pending.value"
+        data-test="add-alert-enabled-switch"
+      />
+    </span>
     <OButton
       variant="ghost-primary"
       size="sm"

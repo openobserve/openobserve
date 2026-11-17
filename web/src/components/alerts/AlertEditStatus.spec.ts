@@ -5,6 +5,7 @@ import { computed, defineComponent, h, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { raw } from "@/types/i18n";
 import AlertEditStatus from "./AlertEditStatus.vue";
+import AlertEditActions from "./AlertEditActions.vue";
 import type { AlertEditHeader, AlertEditState } from "@/composables/alerts/useAlertEditHeader";
 
 const push = vi.fn();
@@ -14,13 +15,15 @@ const fakeHeader = (opts: {
   muteEnabled?: boolean;
   muted?: boolean;
   state?: AlertEditState;
+  enabled?: { value: boolean };
+  pending?: { value: boolean };
 }): AlertEditHeader => ({
   muteEnabled: computed(() => opts.muteEnabled ?? true),
   muted: computed(() => (opts.muted ? { id: "dt1", ends_at: 1, version: 1 } : null)),
   mutedUntilText: computed(() => raw(opts.muted ? "Muted until 14:00" : "")),
-  enabled: computed(() => true),
+  enabled: computed(() => opts.enabled?.value ?? true),
   state: computed(() => opts.state ?? { kind: "notRun" }),
-  pending: computed(() => false),
+  pending: computed(() => opts.pending?.value ?? false),
   fireOpen: computed(() => false),
   setFireOpen: vi.fn(),
   muteFor: vi.fn().mockResolvedValue(true),
@@ -124,6 +127,43 @@ describe("AlertEditStatus", () => {
       params: { alert_id: "a1" },
       query: { folder: "f1", org_identifier: "default" },
     });
+  });
+});
+
+describe("the Enabled switch", () => {
+  it("reflects the saved state, toggles it, and waits for the server before it moves", async () => {
+    const enabled = ref(true);
+    const pending = ref(false);
+    const header = fakeHeader({ enabled, pending });
+    const wrapper = mountStatus(header);
+    const control = () => wrapper.find('[data-test="add-alert-enabled-switch"] [role="switch"]');
+    await control().trigger("click");
+    expect(header.toggleEnabled).toHaveBeenCalledTimes(1);
+    expect(control().attributes("aria-checked")).toBe("true");
+    pending.value = true;
+    await wrapper.vm.$nextTick();
+    expect(control().attributes("disabled")).toBeDefined();
+    expect(control().attributes("aria-busy")).toBe("true");
+    enabled.value = false;
+    pending.value = false;
+    await wrapper.vm.$nextTick();
+    expect(control().attributes("aria-checked")).toBe("false");
+  });
+
+  it("is not repeated as an Enable item in More…", () => {
+    const wrapper = mount(AlertEditActions, {
+      props: { header: fakeHeader({}), name: "errors", part: "more" },
+      global: {
+        stubs: {
+          ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+          ODropdownItem: ItemStub,
+          ODialog: true,
+          ExportResourceDialog: true,
+        },
+      },
+    });
+    expect(wrapper.find('[data-test="add-alert-more-clone"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-alert-more-toggle-enabled"]').exists()).toBe(false);
   });
 });
 

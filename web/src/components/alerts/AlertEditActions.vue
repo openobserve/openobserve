@@ -119,13 +119,6 @@ const onExported = ({ count }: { count: number }) =>
         <slot name="menu-start" />
         <ODropdownSeparator />
       </template>
-      <ODropdownItem
-        :icon-left="header.enabled.value ? 'pause' : 'play-arrow'"
-        data-test="add-alert-more-toggle-enabled"
-        @select="header.toggleEnabled()"
-      >
-        {{ header.enabled.value ? t("alerts.editMode.disable") : t("alerts.editMode.enable") }}
-      </ODropdownItem>
       <ODropdownItem icon-left="content-copy" data-test="add-alert-more-clone" @select="openClone">
         {{ t("alerts.editMode.clone") }}
       </ODropdownItem>
