@@ -968,6 +968,33 @@ describe("useStarterPacks", () => {
       );
     });
 
+    it("leaves out a dashboard that cannot load and installs the rest", async () => {
+      const lost: StarterPack = {
+        ...PACK,
+        alerts: [],
+        bundledAlerts: BUNDLED_PACK.bundledAlerts,
+        dashboards: [
+          ...PACK.dashboards,
+          {
+            id: "gallery",
+            title: "Gallery",
+            load: async () => {
+              throw new Error("gallery 404");
+            },
+          },
+        ],
+      };
+      const api = packs();
+      const preview = await api.previewPack(lost);
+      expect(preview.notIncluded).toContainEqual(
+        expect.objectContaining({ kind: "dashboard", itemId: "gallery", reason: "unavailable" }),
+      );
+      expect(preview.items.some(({ itemId }) => itemId === "gallery")).toBe(false);
+      const record = await api.installPack(lost, { exclude: leftOutIds(preview) });
+      expect(record.status).toBe("complete");
+      expect(fake.state.dashboards.map(({ body }: any) => body.title)).toEqual(["Overview"]);
+    });
+
     it("keeps a panel that reads a traces stream", async () => {
       const tracesPack: StarterPack = {
         ...PACK,

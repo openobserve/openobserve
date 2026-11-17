@@ -254,11 +254,10 @@ export function useStarterPacks(org: string) {
     return schemas;
   };
 
-  const fitPackDashboard = async (
-    dashboard: PackDashboard,
+  const fitLoadedDashboard = async (
+    loaded: Record<string, any>,
     adaptation: PackAdaptation = NO_ADAPTATION,
   ): Promise<DashboardFit> => {
-    const loaded = await dashboard.load();
     if (!adaptation.repairs.length && !adaptation.bindings.length) {
       return fitDashboard(loaded, await readDashboardSchemas(loaded));
     }
@@ -269,6 +268,9 @@ export function useStarterPacks(org: string) {
     await planKeptPanels(fit.doc, rewriteChecks);
     return fit;
   };
+
+  const fitPackDashboard = async (dashboard: PackDashboard, adaptation?: PackAdaptation) =>
+    fitLoadedDashboard(await dashboard.load(), adaptation);
 
   const dashboardAdapter = (
     pack: StarterPack,
@@ -501,6 +503,7 @@ export function useStarterPacks(org: string) {
   const adaptationFor = async (
     pack: StarterPack,
     listed: AlertLibraryEntry[],
+    loaded: Map<string, Record<string, any> | null>,
     choices?: PackChoices,
   ) => {
     const streams = await readOrgStreams(org);
@@ -513,8 +516,9 @@ export function useStarterPacks(org: string) {
     );
     const { flavours, unsupported } = pickFlavours(pack, alerts, streams);
     // A shared dashboard is imported as its importer ships it, so the plan never rewrites it.
-    const adaptable = pack.dashboards.filter(({ shared }) => !shared);
-    const docs = await Promise.all(adaptable.map((dashboard) => dashboard.load()));
+    const docs = pack.dashboards.flatMap(({ id, shared }) =>
+      shared ? [] : (loaded.get(id) ?? []),
+    );
     const sources = await readBindingSources(org, [pack]);
     const plan = await planAdaptation({
       pack,
@@ -548,7 +552,13 @@ export function useStarterPacks(org: string) {
   const previewPack = async (pack: StarterPack, choices?: PackChoices): Promise<PackPreview> => {
     const { entries, offline } = await loadEntries(pack);
     const listed = pack.alerts.flatMap((id) => entries.get(id) ?? []);
-    const plan = await adaptationFor(pack, listed, choices);
+    // A dashboard the gallery cannot serve is left out like a missing alert, not a failed preview.
+    const loaded = new Map(
+      await Promise.all(
+        pack.dashboards.map(async ({ id, load }) => [id, await load().catch(() => null)] as const),
+      ),
+    );
+    const plan = await adaptationFor(pack, listed, loaded, choices);
     const { repairs, bindings, flavours, alerts, unsupported, streams } = plan;
     const flavoured = listed.map((entry) => flavouredEntry(pack, entry, flavours[entry.id]));
     const verdicts = STARTER_PACKS_ENABLED
@@ -575,16 +585,21 @@ export function useStarterPacks(org: string) {
     }
 
     const panels = { kept: 0, dropped: 0 };
-    const noFit = new Set<string>();
+    const noFit = new Map<string, PackNotIncludedReason>();
     for (const dashboard of pack.dashboards) {
+      const doc = loaded.get(dashboard.id);
+      if (!doc) {
+        noFit.set(dashboard.id, "unavailable");
+        continue;
+      }
       const adaptation = dashboard.shared ? NO_ADAPTATION : { repairs, bindings };
-      const fit = await fitPackDashboard(dashboard, adaptation).catch((error) => {
+      const fit = await fitLoadedDashboard(doc, adaptation).catch((error) => {
         if (error instanceof StreamRewriteError) return { doc: {}, kept: 0, dropped: 1 };
         throw error;
       });
       panels.kept += fit.kept;
       panels.dropped += fit.dropped;
-      if (!fit.kept && fit.dropped) noFit.add(dashboard.id);
+      if (!fit.kept && fit.dropped) noFit.set(dashboard.id, "no_data");
     }
 
     const alertReason = (id: string): PackNotIncludedReason | null => {
@@ -612,8 +627,10 @@ export function useStarterPacks(org: string) {
     const reported = new Set<string>();
     for (const item of await planItems(pack, copies)) {
       const name = names[item.itemId] ?? item.itemId;
-      if (item.kind === "dashboard" && item.status !== "existing" && noFit.has(item.itemId)) {
-        notIncluded.push({ kind: "dashboard", itemId: item.itemId, name, reason: "no_data" });
+      const unfit =
+        item.kind === "dashboard" && item.status !== "existing" && noFit.get(item.itemId);
+      if (unfit) {
+        notIncluded.push({ kind: "dashboard", itemId: item.itemId, name, reason: unfit });
         continue;
       }
       const id = item.copyOf ?? item.itemId;

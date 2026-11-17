@@ -15128,12 +15128,12 @@
         "flavours": {
           "opentelemetry": "OpenTelemetry"
         },
-        "pausedImpact": "your cluster runs out of CPU, memory or pods"
+        "pausedImpact": "pods crash or run out of memory, or a deployment loses replicas"
       },
       "hosts": {
         "title": "Hosts",
-        "description": "The host metrics dashboard and alerts for servers and virtual machines.",
-        "pausedImpact": "a host runs out of CPU, memory or disk"
+        "description": "The host metrics dashboard for servers and virtual machines.",
+        "pausedImpact": "a host runs out of CPU, memory or disk, or stops reporting"
       },
       "traces": {
         "title": "Traces (APM)",

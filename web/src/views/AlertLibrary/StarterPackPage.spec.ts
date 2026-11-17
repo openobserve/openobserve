@@ -385,7 +385,7 @@ describe("StarterPackPage", () => {
       const wrapper = await render();
       const notice = wrapper.get('[data-test="starter-pack-page-notice-paused"]');
       expect(notice.text()).toContain("1 alert is paused");
-      expect(notice.text()).toContain("CPU, memory or pods");
+      expect(notice.text()).toContain("pods crash or run out of memory");
       expect(has(wrapper, "starter-pack-page-notice-paused-action")).toBe(false);
     });
 
