@@ -1070,7 +1070,7 @@ test.describe('Line links (4c Part C)', () => {
     await expect(page.locator(lineJson)).toContainText('[REDACTED]');
   });
 
-  test('J-C17: a view saved while a line link is open stores no permalink or link columns', async ({ page, browser, request }) => {
+  test('J-C17: a view saved while a line link is open stores no permalink or link columns', async ({ page, browser }) => {
     const seed = { logFilterField: JSON.stringify({ [`${LINK_ORG}_${LINE_STREAM}`]: ['level', 'message'] }) };
     await page.addInitScript((value) => {
       for (const [key, item] of Object.entries(value)) localStorage.setItem(key, item);
@@ -1087,16 +1087,8 @@ test.describe('Line links (4c Part C)', () => {
     await pmB.logsPage.clickSaveViewButton();
     await pmB.logsPage.fillSavedViewName(name);
     await pmB.logsPage.clickSavedViewDialogSave();
-    await expect
-      .poll(async () => {
-        const list = await request.get(`${process.env.ZO_BASE_URL}/api/${LINK_ORG}/savedviews`, { headers: getAuthHeaders() });
-        return list.ok() ? ((await list.json()).views ?? []).some((v) => v.view_name === name) : false;
-      }, { timeout: 30000 })
-      .toBe(true);
-    const views = (await (await request.get(`${process.env.ZO_BASE_URL}/api/${LINK_ORG}/savedviews`, { headers: getAuthHeaders() })).json()).views;
-    const view = views.find((v) => v.view_name === name);
-    const detail = await request.get(`${process.env.ZO_BASE_URL}/api/${LINK_ORG}/savedviews/${view.view_id}`, { headers: getAuthHeaders() });
-    const raw = JSON.stringify(await detail.json());
+    const view = await pmB.logsPage.waitForSavedViewViaApi(LINK_ORG, name, 30000);
+    const raw = JSON.stringify(await pmB.logsPage.fetchSavedViewViaApi(LINK_ORG, view.view_id));
     const payload = /"data":"([^"]+)"/.test(raw) ? Buffer.from(JSON.parse(raw).data, 'base64').toString() : raw;
     expect(payload).toContain(LINE_STREAM);
     expect(payload).not.toMatch(/columnsFromUrl|permalink|log_ts|log_fp/);
