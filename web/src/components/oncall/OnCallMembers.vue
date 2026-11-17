@@ -13,7 +13,7 @@
       data-test="oncall-members-table"
     >
       <template #toolbar>
-        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div class="flex flex-1 flex-wrap items-center gap-2">
           <OSearchInput
             v-model="memberFilter"
             clearable

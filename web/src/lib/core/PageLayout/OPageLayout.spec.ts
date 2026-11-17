@@ -51,7 +51,7 @@ describe("OPageLayout entrance", () => {
     const root = bodyOf(mountLayout()).parentElement!;
 
     expect(root.classList).toContain("h-full");
-    expect(root.classList).toContain("overflow-clip");
+    expect(root.classList).toContain("overflow-y-clip");
   });
 
   it("shows the license message without the slide while the page is locked", () => {

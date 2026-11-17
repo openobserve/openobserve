@@ -184,7 +184,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     @update:sort-order="emit('update:sortOrder', $event)"
   >
     <template #toolbar>
-      <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+      <div class="flex flex-1 items-center gap-2 max-md:contents">
         <OSearchInput
           :model-value="globalFilter"
           :placeholder="t('iam.searchRole')"

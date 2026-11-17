@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @row-click="open"
         >
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+            <div class="flex flex-1 items-center gap-2 max-md:contents">
               <OToggleGroup
                 :model-value="scope"
                 mobile-dropdown

@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="openConfig"
     >
       <template #toolbar>
-        <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+        <div class="flex flex-1 items-center gap-2 max-md:contents">
           <div class="min-w-0 flex-1 max-md:min-w-40">
             <OSearchInput
               v-model="search"
