@@ -248,7 +248,11 @@ describe("anomalyDetectionFunctionPayload", () => {
   it("a new custom_sql alert does not send the Filters tab field as a value column", () => {
     expect(
       anomalyDetectionFunctionPayload(
-        { query_mode: "custom_sql", detection_function: "avg", detection_function_field: "latency" },
+        {
+          query_mode: "custom_sql",
+          detection_function: "avg",
+          detection_function_field: "latency",
+        },
         null,
       ),
     ).toEqual({ detection_function: "count", detection_function_field: undefined });
@@ -257,16 +261,49 @@ describe("anomalyDetectionFunctionPayload", () => {
   it("a stored custom_sql row round-trips its combined function verbatim", () => {
     expect(
       anomalyDetectionFunctionPayload(
-        { query_mode: "custom_sql", detection_function: "avg", detection_function_field: "p99_ms" },
+        {
+          query_mode: "custom_sql",
+          custom_sql: "SELECT histogram(_timestamp) AS ts, avg(latency) AS p99_ms FROM app",
+          detection_function: "avg",
+          detection_function_field: "p99_ms",
+        },
         { detection_function: "avg(p99_ms)", detection_function_field: null },
       ),
     ).toEqual({ detection_function: "avg(p99_ms)", detection_function_field: undefined });
   });
 
+  it("a stored custom_sql row drops a value column the edited query no longer returns", () => {
+    expect(
+      anomalyDetectionFunctionPayload(
+        {
+          query_mode: "custom_sql",
+          custom_sql: "SELECT histogram(_timestamp) AS ts, avg(latency) AS value FROM app",
+          detection_function: "avg",
+          detection_function_field: "p99_ms",
+        },
+        { detection_function: "avg(p99_ms)", detection_function_field: null },
+      ),
+    ).toEqual({ detection_function: "count", detection_function_field: undefined });
+  });
+
+  it("a stored custom_sql count row round-trips with any query", () => {
+    expect(
+      anomalyDetectionFunctionPayload(
+        { query_mode: "custom_sql", custom_sql: "SELECT 1", detection_function: "max" },
+        { detection_function: "count(*)", detection_function_field: null },
+      ),
+    ).toEqual({ detection_function: "count(*)", detection_function_field: undefined });
+  });
+
   it("a stored custom_sql row returned as a split pair keeps both halves", () => {
     expect(
       anomalyDetectionFunctionPayload(
-        { query_mode: "custom_sql", detection_function: "count", detection_function_field: "" },
+        {
+          query_mode: "custom_sql",
+          custom_sql: "SELECT avg(latency) AS p99_ms FROM app",
+          detection_function: "count",
+          detection_function_field: "",
+        },
         { detection_function: "avg", detection_function_field: "p99_ms" },
       ),
     ).toEqual({ detection_function: "avg", detection_function_field: "p99_ms" });
