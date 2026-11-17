@@ -692,7 +692,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-snap-stop
                 >
                   <OTruncatedText
-                    class="text-text-body text-sm"
+                    class="text-text-body text-sm leading-8.5"
                     data-test="add-alert-details-name-text"
                   >
                     {{ formData.name }}
@@ -767,7 +767,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OTruncatedText
                     v-else
-                    class="text-text-body text-sm"
+                    class="text-text-body text-sm leading-8.5"
                     data-test="add-alert-details-folder-name"
                   >
                     {{ activeFolderName }}
