@@ -19,6 +19,7 @@ import autoobserve, { type AutoObserveIncidentList } from "./autoobserve";
 import http from "./http";
 import {
   autoobserveGapSuggestionsQuery,
+  autoobserveIncidentItemQuery,
   autoobserveIncidentsPageQuery,
   autoobserveSuggestionsPageQuery,
 } from "./autoobserve.queries";
@@ -128,5 +129,27 @@ describe("autoobserveIncidentsPageQuery (D9-web)", () => {
     expect(interval({ state: { data: running } })).toBe(30_000);
     expect(interval({ state: { data: settled } })).toBe(false);
     expect(interval({ state: { data: undefined } })).toBe(false);
+  });
+
+  it("finds one incident past the first page, says when the list ended, and when the cap stopped it", async () => {
+    const [first, second] = running.items;
+    const page = (items: unknown[], has_more: boolean) => ({
+      data: { ...running, has_more, items },
+    });
+    incidents
+      .mockResolvedValueOnce(page([first], true) as never)
+      .mockResolvedValueOnce(page([second], false) as never);
+    const options = autoobserveIncidentItemQuery("demo-org", second.incident.id);
+    expect(options.queryKey.slice(0, 4)).toEqual(orgKey("demo-org", "autoobserve", "incidents"));
+    expect(await new QueryClient().fetchQuery(options)).toEqual({ item: second, capped: false });
+    expect(incidents).toHaveBeenLastCalledWith("demo-org", { limit: 100, offset: 100 });
+
+    incidents.mockResolvedValueOnce(page([], false) as never);
+    expect(await new QueryClient().fetchQuery(options)).toEqual({ item: null, capped: false });
+
+    incidents.mockReset();
+    incidents.mockResolvedValue(page([first], true) as never);
+    expect(await new QueryClient().fetchQuery(options)).toEqual({ item: null, capped: true });
+    expect(incidents).toHaveBeenLastCalledWith("demo-org", { limit: 100, offset: 900 });
   });
 });

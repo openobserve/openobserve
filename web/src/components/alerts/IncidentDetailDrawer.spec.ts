@@ -363,6 +363,8 @@ describe("IncidentDetailDrawer.vue", () => {
 
   afterEach(() => {
     serverSkew.ms = 0;
+    delete store.state.zoConfig.autoobserve_context_enabled;
+    delete store.state.zoConfig.autoobserve_next_step_enabled;
     if (wrapper) {
       wrapper.unmount();
     }
@@ -2211,6 +2213,87 @@ describe("IncidentDetailDrawer.vue", () => {
       const logs = byTest("autoobserve-issue-logs");
       expect(logs.text()).toContain("See checkout and 2 more streams in Logs");
       expect(logs.text()).toContain("an hour after it ended");
+    });
+
+    it.each([
+      ["a failed lookup says so and retries", "failed", null, true],
+      ["an incident on the second page still gets its card", "located", null, true],
+      ["with the Next step flag off, the card has no Next step box", "located", null, false],
+      [
+        "an item without context holds the space with the no-cause line",
+        "off",
+        "No cause found yet.",
+        true,
+      ],
+      [
+        "a lookup stopped by the cap says so, not the no-cause line",
+        "capped",
+        "isn't available for incidents older than the newest 1,000",
+        true,
+      ],
+      ["with the context flag off, there is no card", "flag-off", null, true],
+    ])("the Incident Analysis card: %s", async (_name, outcome, note, step) => {
+      Object.assign(store.state.zoConfig, {
+        autoobserve_context_enabled: outcome !== "flag-off",
+        autoobserve_next_step_enabled: step,
+      });
+      const at = 1_794_309_300_000_000;
+      const item = (id: string, context: unknown) => ({
+        finding: {
+          id,
+          kind: "stream_silence",
+          stream_type: "logs",
+          stream_name: "checkout",
+          first_seen_at: at,
+        },
+        incident: { id, status: "open", severity: "P2", title: "t", created_at: at },
+        investigation: {
+          run_id: null,
+          state: null,
+          outcome: null,
+          summary: null,
+          not_run_reason: null,
+        },
+        context,
+      });
+      const context = {
+        causes: { top: [], more: 0 },
+        impact: [],
+        classes: [],
+        window: [at, at],
+        asked_at: null,
+        settled: false,
+        checks: [],
+        hidden: 0,
+        region_only: false,
+        next_step: null,
+      };
+      queryClient.clear();
+      const incidents = vi.mocked(autoobserveService.incidents);
+      incidents.mockReset();
+      if (outcome === "failed") incidents.mockRejectedValueOnce(new Error("down"));
+      const other = { data: { paging: true, has_more: true, items: [item("other", null)] } };
+      if (outcome === "capped") incidents.mockResolvedValue(other as never);
+      else
+        incidents.mockResolvedValueOnce(other as never).mockResolvedValue({
+          data: {
+            paging: true,
+            has_more: false,
+            items: [item("inc-1", outcome === "off" ? undefined : context)],
+          },
+        } as never);
+      await openOn("incidentAnalysis", { group_values: FINDING, triggers: [findingTrigger(5)] });
+      if (outcome === "failed") {
+        expect(byTest("autoobserve-issue-context-card-failed").exists()).toBe(true);
+        await byTest("autoobserve-issue-context-card-retry").trigger("click");
+        await flushPromises();
+      }
+      const card = outcome !== "flag-off";
+      expect(byTest("autoobserve-issue-context-card").exists()).toBe(card);
+      expect(byTest("autoobserve-issue-context-card-failed").exists()).toBe(false);
+      expect(byTest("autoobserve-cause-list").exists()).toBe(card && note === null);
+      expect(byTest("autoobserve-next-step-line").exists()).toBe(card && note === null && step);
+      if (note) expect(byTest("autoobserve-issue-context-card-note").text()).toContain(note);
     });
 
     it("an incident with alerts keeps every tab and its correlated Logs", async () => {

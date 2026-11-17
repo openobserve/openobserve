@@ -47,6 +47,7 @@ export function rcaTriggerLabel(trigger: RcaTrigger, startedBy: string): I18nTex
   const user = userLocalPart(startedBy);
   switch (trigger) {
     case "auto_new_incident":
+    case "evidence_settled":
       return gt("alerts.incidents.rcaRun.trigger.autoNewIncident");
     case "auto_new_alert_type":
       return gt("alerts.incidents.rcaRun.trigger.autoNewAlertType");

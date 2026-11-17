@@ -161,6 +161,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
 
+          <OTag
+            v-if="findingBadge"
+            :variant="findingBadge.quiet ? 'error-soft' : 'default-soft'"
+            icon="shield"
+            :label="findingBadge.label"
+            data-test="incident-detail-security-source"
+          />
+
           <!-- Last in the row, so its skeleton growing into the chip moves nothing after it. -->
           <OSkeleton
             v-if="liveChip === 'loading'"
@@ -286,6 +294,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
           <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <div
+              v-if="activeTab === 'incidentAnalysis' && findingCardShown"
+              class="max-h-[70%] shrink-0 overflow-auto px-7 pt-4"
+            >
+              <IssueContextCard
+                :key="incidentDetails?.id"
+                :item="findingItem"
+                :context="findingContext"
+                :held="findingHeld"
+                class="max-w-215"
+                @retry="findingItemQuery.refetch()"
+              />
+            </div>
             <!-- Incident Analysis tab: its own analysis column + thread column (02 E5) -->
             <IncidentRCAAnalysis
               v-if="activeTab === 'incidentAnalysis' || activeTab === 'report'"
@@ -1287,6 +1308,10 @@ import IncidentOverviewTimeline from "./IncidentOverviewTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import IncidentFindingDetails from "./IncidentFindingDetails.vue";
 import IssueLogsLink from "@/components/autoobserve/live/IssueLogsLink.vue";
+import IssueContextCard from "@/components/autoobserve/live/IssueContextCard.vue";
+import { securityBadge } from "@/components/autoobserve/live/causeCopy";
+import { issueContextOf } from "@/components/autoobserve/live/liveAdapter";
+import { useContextFlags } from "@/components/autoobserve/live/liveModel";
 import {
   logsForFinding,
   PAGED_LEAD_US,
@@ -1297,7 +1322,8 @@ import {
   issueLogsEndMs,
   issueLogStreams,
 } from "@/components/autoobserve/live/issueModel";
-import { autoobserveIncidentsPageQuery } from "@/services/autoobserve.queries";
+import { LOCATE_INCIDENT_CAP, autoobserveIncidentItemQuery } from "@/services/autoobserve.queries";
+import { isLiveRca } from "@/utils/incidents/rcaCell";
 import {
   AUTOOBSERVE_TRIGGER_KIND,
   dimensionDisplay,
@@ -1387,8 +1413,6 @@ function loadIncidentTabOrder(): IncidentTab[] {
   return [...DEFAULT_INCIDENT_TAB_ORDER];
 }
 
-// The newest page of AutoObserve incidents; an older incident falls back to its lead stream.
-const FINDING_LOOKUP_LIMIT = 100;
 const SHOWN_SERVICES = 3;
 
 export default defineComponent({
@@ -1404,6 +1428,7 @@ export default defineComponent({
     IncidentAlertTriggersTable,
     IncidentFindingDetails,
     IssueLogsLink,
+    IssueContextCard,
     IncidentRCAAnalysis,
     IncidentTimeline,
     IncidentOverviewAlerts,
@@ -1730,14 +1755,36 @@ export default defineComponent({
 
     // The AutoObserve list names the incident's member streams, so this Logs tab says what its drawer says.
     const findingItemQuery = useQuery(() => ({
-      ...autoobserveIncidentsPageQuery(incidentOrgId.value, FINDING_LOOKUP_LIMIT, 0),
-      enabled: isFinding.value && !!incidentOrgId.value,
+      ...autoobserveIncidentItemQuery(incidentOrgId.value, incidentDetails.value?.id ?? ""),
+      enabled: isFinding.value && !!incidentOrgId.value && !!incidentDetails.value?.id,
     }));
-    const findingItem = computed(
-      () =>
-        findingItemQuery.data.value?.items.find(
-          (i) => i.incident.id === incidentDetails.value?.id,
-        ) ?? null,
+    const findingItem = computed(() => findingItemQuery.data.value?.item ?? null);
+    const contextFlags = useContextFlags();
+    const findingContext = computed(() =>
+      isFinding.value && contextFlags.value.context ? issueContextOf(findingItem.value) : null,
+    );
+    // Whether context comes is known only once the item loads, so the card holds its place throughout.
+    const findingCardShown = computed(() => isFinding.value && contextFlags.value.context);
+    const findingHeld = computed<{ failed: true } | { note: I18nText } | null>(() => {
+      const lookup = findingItemQuery.data.value;
+      if (findingContext.value) return null;
+      if (!lookup) return findingItemQuery.isError.value ? { failed: true } : null;
+      if (lookup.capped) {
+        const count = LOCATE_INCIDENT_CAP.toLocaleString(getIntlLocale());
+        return { note: t("autoobserve.context.olderThanCap", { count }) };
+      }
+      if (isLiveRca(rcaSummary.value)) return { note: t("autoobserve.issueLive.noCauseRunning") };
+      return {
+        note:
+          store.state.zoConfig?.incidents_rca_enabled === true
+            ? t("autoobserve.issueLive.noCause")
+            : t("autoobserve.issueLive.noCauseOff"),
+      };
+    });
+    const findingBadge = computed(() =>
+      findingContext.value && findingItem.value
+        ? securityBadge(t, findingContext.value, issueEndUs(findingItem.value) !== null)
+        : null,
     );
     const findingEndUs = computed(
       () =>
@@ -2776,6 +2823,11 @@ export default defineComponent({
     };
 
     return {
+      findingItem,
+      findingContext,
+      findingCardShown,
+      findingHeld,
+      findingBadge,
       firingsChip,
       zone,
       nowMicros,

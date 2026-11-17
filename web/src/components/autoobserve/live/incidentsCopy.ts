@@ -31,7 +31,9 @@ import {
 import type { AiFinding } from "../insight/insightCta";
 import { logsForFinding, PAGED_LEAD_US } from "../insight/targets/logsTargets";
 import type { IssuesRange } from "../v2/autoobserveRoute";
+import { RECHECK_AFTER_US } from "./causeCopy";
 import { agoText, dayKey, formatWhen } from "./liveCopy";
+import { WORKING_MAX_MS } from "./nextStepCopy";
 
 export interface AnalysisLine {
   label: I18nText;
@@ -71,6 +73,9 @@ export const ISSUES_CAP = 500;
 export const ISSUES_PAGE_SIZE = 100;
 
 const DAY_MS = 86_400_000;
+
+// How long past a due write the list keeps polling before it takes the write as not coming.
+export const CONTEXT_GRACE_MS = 2 * 60_000;
 
 const FINDING_KEY: Record<AutoObserveFindingKind, I18nKey> = {
   stream_silence: "autoobserveLive.incidents.finding.stream_silence",
@@ -426,8 +431,34 @@ export const incidentListLink = (org: string): IncidentRoute => ({
   query: { org_identifier: org },
 });
 
-export const anyLive = (list: AutoObserveIncidentList | undefined): boolean =>
-  !!list?.items.some((item) => isLiveRca(item.investigation));
+// A run's step attaches just after the run ends and no served time marks that end, so the client notes when it saw it.
+const runEndSeenMs = new Map<string, number>();
+
+const awaitsStep = (item: AutoObserveIncidentItem, nowMs: number): boolean => {
+  const run = item.investigation;
+  const view = item.context?.next_step;
+  if (!run.run_id || run.state !== "completed" || !view || view.state === "ready") return false;
+  if (view.step.run_id === run.run_id) return false;
+  const seen = runEndSeenMs.get(run.run_id) ?? nowMs;
+  runEndSeenMs.set(run.run_id, seen);
+  return nowMs - seen < CONTEXT_GRACE_MS;
+};
+
+/** True while the item's analysis runs or its context still owes a write: the first ask, the recheck or a step. */
+export const itemPolls = (item: AutoObserveIncidentItem, nowMs: number): boolean => {
+  if (isLiveRca(item.investigation)) return true;
+  const cx = item.context;
+  if (!cx) return false;
+  if (cx.asked_at === null) return nowMs < item.incident.created_at / 1000 + WORKING_MAX_MS;
+  if (!cx.settled && nowMs < (cx.asked_at + RECHECK_AFTER_US) / 1000 + CONTEXT_GRACE_MS)
+    return true;
+  const state = cx.next_step?.state;
+  if (typeof state === "object" && nowMs < state.working.since / 1000 + WORKING_MAX_MS) return true;
+  return awaitsStep(item, nowMs);
+};
+
+export const listPolls = (list: AutoObserveIncidentList | undefined, nowMs: number): boolean =>
+  !!list?.items.some((item) => itemPolls(item, nowMs));
 
 // Range start in microseconds, the unit of `first_seen_at`.
 export const issuesRangeStart = (range: IssuesRange, nowMs: number): number =>
