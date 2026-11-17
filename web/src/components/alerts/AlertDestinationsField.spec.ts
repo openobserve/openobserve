@@ -48,7 +48,13 @@ vi.mock("@/services/workflows", async (importOriginal) => {
 
 const TargetsStub = defineComponent({
   name: "AlertTargetsSelect",
-  props: ["workflowOptions", "workflowsEnabled", "placeholder", "lockedWorkflowNames"],
+  props: [
+    "workflowOptions",
+    "workflowsEnabled",
+    "placeholder",
+    "lockedWorkflowNames",
+    "noWorkflowButton",
+  ],
   emits: ["refresh"],
   template: "<div />",
 });
@@ -113,6 +119,38 @@ describe("AlertDestinationsField workflows", () => {
 
     expect(listWorkflowsMock).toHaveBeenCalledTimes(2);
     expect(wrapper.emitted("refresh")).toHaveLength(1);
+  });
+});
+
+describe("AlertDestinationsField New workflow link", () => {
+  const LINK = '[data-test="create-workflow-btn"]';
+  const lockedEdition = {
+    workflows_enabled: true,
+    features: { workflows: "locked" },
+    feature_names: { workflows: "Workflows" },
+  };
+
+  it("sits on a setting row's status line, in place of the picker's button", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const wrapper = mountField({ settingRow: true, showStatus: true, destinations: ["ops"] });
+    expect(wrapper.findComponent(TargetsStub).props("noWorkflowButton")).toBe(true);
+    await wrapper.find(LINK).trigger("click");
+    expect(open).toHaveBeenCalledTimes(1);
+    open.mockRestore();
+  });
+
+  it("is disabled while the license locks workflows", () => {
+    const wrapper = mountField({ settingRow: true, showStatus: true }, lockedEdition);
+    expect(wrapper.find(LINK).attributes("disabled")).toBeDefined();
+  });
+
+  it.each([
+    ["outside a setting row", { showStatus: true }],
+    ["on the recovery field", { settingRow: true, supportsWorkflows: false }],
+  ])("leaves the workflow button to the picker %s", (_where, props) => {
+    const wrapper = mountField(props);
+    expect(wrapper.find(LINK).exists()).toBe(false);
+    expect(wrapper.findComponent(TargetsStub).props("noWorkflowButton")).toBeFalsy();
   });
 });
 

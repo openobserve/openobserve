@@ -341,6 +341,16 @@ describe("AlertTargetsSelect", () => {
       expect(wrapper.find('[data-test="create-workflow-btn"]').exists()).toBe(false);
     });
 
+    it.each([
+      { workflowsEnabled: true },
+      { workflowsEnabled: false, workflowsLocked: true },
+      { workflowsEnabled: false, workflowsLocked: true, workflowsLicenseLocked: true },
+    ])("draws no workflow button when the parent offers it (%o)", (state) => {
+      const wrapper = createWrapper({ ...state, noWorkflowButton: true });
+      expect(wrapper.find('[data-test="create-workflow-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="create-destination-btn"]').exists()).toBe(true);
+    });
+
     it("shows and emits create-workflow in enterprise", async () => {
       const wrapper = createWrapper({ workflowsEnabled: true });
       const btn = wrapper.find('[data-test="create-workflow-btn"]');

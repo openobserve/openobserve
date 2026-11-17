@@ -93,13 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="create-destination-btn"
       variant="outline"
       size="sm"
+      icon-left="add"
       class="ms-2 max-md:ms-0"
       @click="emit('create-destination')"
     >
       {{ t("alerts.alertSettings.addNewDestination") }}
     </OButton>
     <OButton
-      v-if="workflowsEnabled"
+      v-if="workflowsEnabled && !noWorkflowButton"
       data-test="create-workflow-btn"
       variant="outline"
       size="sm"
@@ -111,7 +112,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Locked (not hidden): the family supports workflow routing, but this
          edition doesn't unlock it — kept as the discovery point since the
          dropdown's own "Workflows" header has no icon/tooltip slot to attach. -->
-    <OTooltip v-else-if="workflowsLicenseLocked" :content="workflowsLockMessage">
+    <OTooltip
+      v-else-if="workflowsLicenseLocked && !noWorkflowButton"
+      :content="workflowsLockMessage"
+    >
       <span class="ms-2 inline-flex">
         <OButton
           data-test="create-workflow-btn"
@@ -124,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </span>
     </OTooltip>
-    <template v-else-if="workflowsLocked">
+    <template v-else-if="workflowsLocked && !noWorkflowButton">
       <OButton
         data-test="create-workflow-btn"
         variant="outline"
@@ -177,6 +181,8 @@ const props = defineProps<{
   wrap?: boolean;
   /** Show the targets as checkboxes while there are few enough to scan. */
   list?: boolean;
+  /** The parent offers New workflow itself, so the row draws no workflow button. */
+  noWorkflowButton?: boolean;
 }>();
 
 const emit = defineEmits<{
