@@ -2548,7 +2548,7 @@ describe("AlertList - filters from the Overview links", () => {
     ["with a state", { state: "firing", all_folders: "true" }],
     ["alone", { all_folders: "true" }],
   ])(
-    "applies an all-folders link %s to a mounted list, despite the folder list mirroring its missing folder",
+    "applies an all-folders link %s to a mounted list and keeps it through folder-list syncs",
     async (_case, linkQuery) => {
       const folders = [
         { folderId: "default", name: "Default" },
@@ -2572,6 +2572,14 @@ describe("AlertList - filters from the Overview links", () => {
       await flushPromises();
       expect(wrapper.vm.searchAcrossFolders).toBe(true);
       expect(router.currentRoute.value.query.all_folders).toBeUndefined();
+
+      // A created or renamed folder refreshes the list, which is no folder pick.
+      store.state.organizationData.foldersByType = {
+        alerts: [...folders, { folderId: "new", name: "New" }],
+      } as any;
+      await flushPromises();
+      expect(wrapper.vm.searchAcrossFolders).toBe(true);
+      expect(wrapper.vm.activeFolderId).toBe("production");
     },
   );
 
@@ -4136,7 +4144,11 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
   const loadAckRows = async () => {
     alertsDB = [
       { ...makeAlert(1, { name: "acked-firing" }), last_outcome: "firing", ack } as any,
-      { ...makeAlert(2, { name: "plain-firing", enabled: true }), last_outcome: "firing" } as any,
+      {
+        ...makeAlert(2, { name: "plain-firing", enabled: true }),
+        last_outcome: "firing",
+        firing_started_at: 1_800_000_000_000_000,
+      } as any,
       {
         ...makeAlert(3, {
           name: "multi-firing",
@@ -4200,7 +4212,7 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
     expect(wrapper.vm.canAcknowledgeRow(row("resting"))).toBe(false);
   });
 
-  it("acknowledges a single-row alert, or every firing group of a multi-alert", async () => {
+  it("acknowledges the firing a single-row alert shows, or every firing group of a multi-alert", async () => {
     alertsSvc.ackAlert.mockResolvedValue({
       data: { changed: true, acks: [], other_groups_unacked: 0 },
     });
@@ -4209,7 +4221,7 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
     expect(alertsSvc.ackAlert).toHaveBeenLastCalledWith(
       "default",
       "alert-2",
-      { group_key: "" },
+      { group_key: "", firing_started_at: 1_800_000_000_000_000 },
       "default",
     );
     await wrapper.vm.acknowledgeRow(row("multi-firing"));
@@ -4219,6 +4231,24 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
       { all_groups: true },
       "default",
     );
+  });
+
+  it("says the alert fired again and reloads the list when an ack meets a newer firing", async () => {
+    alertsSvc.ackAlert.mockRejectedValue({
+      response: { status: 409, data: { code: "firing_changed", firing_started_at: 7 } },
+    });
+    const { wrapper, row } = await loadAckRows();
+    const reads = alertsSvc.listByFolderId.mock.calls.length;
+    vi.mocked(toast).mockClear();
+    expect(await wrapper.vm.acknowledgeRow(row("plain-firing"))).toBe(false);
+    await flushPromises();
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "error",
+        message: wrapper.vm.t("alerts.ack.errors.firingChanged"),
+      }),
+    );
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(reads);
   });
 
   it("mutes a row through the alert route, Until it clears or for a preset", async () => {
@@ -4576,6 +4606,45 @@ describe("AlertList - first run and the alert library", () => {
     await flushPromises();
     expect(emptyState(wrapper).props("filtered")).toBe(false);
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(true);
+  });
+
+  it("scopes the quiet state to the alert type the toggle narrowed the rows to", async () => {
+    router.currentRoute.value.query = {};
+    alertsDB = [
+      { ...makeAlert(1, { is_real_time: false }), last_outcome: "normal" },
+      { ...makeAlert(2, { is_real_time: true }), last_outcome: "firing" },
+    ] as any;
+    alertsSvc.listByFolderId.mockImplementation(async (...args: any[]) => ({
+      data: { list: alertsDB.filter((a: any) => args[8] !== "scheduled" || !a.is_real_time) },
+    }));
+    const wrapper: any = await mountAlertList({ renderTable: false });
+    await flushPromises();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-2"]);
+
+    await wrapper.vm.onAlertTabChange("scheduled");
+    await flushPromises();
+    const type = wrapper.vm.t("alerts.scheduled");
+    expect(wrapper.vm.noFiringCopy).toEqual({
+      title: "alerts.noTypeAlertsFiringThisFolder",
+      description: "alerts.noTypeAlertsFiringThisFolderDescription",
+      params: { type },
+    });
+    wrapper.vm.searchAcrossFolders = true;
+    await flushPromises();
+    expect(wrapper.vm.noFiringCopy).toEqual({
+      title: "alerts.noTypeAlertsFiringAnyFolder",
+      description: "alerts.noTypeAlertsFiringAnyFolderDescription",
+      params: { type },
+    });
+
+    alertsDB[1].last_outcome = "normal";
+    await wrapper.vm.onAlertTabChange("all");
+    await flushPromises();
+    expect(wrapper.vm.noFiringCopy).toEqual({
+      title: "alerts.noAlertsFiringAnyFolder",
+      description: "alerts.noAlertsFiringAnyFolderDescription",
+      params: {},
+    });
   });
 
   it("hides both library entry points when custom_hide_menus lists alertLibrary", async () => {

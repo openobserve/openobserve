@@ -998,17 +998,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @action="routeTo('alertTemplates')"
                 />
                 <OEmptyState
-                  v-else-if="noFiringTitle"
+                  v-else-if="noFiringCopy"
                   size="block"
                   preset="no-alerts"
                   variant="neutral"
                   illustration="check"
-                  :title="noFiringTitle"
-                  :description="
-                    searchAcrossFolders
-                      ? t('alerts.noAlertsFiringAnyFolderDescription')
-                      : t('alerts.noAlertsFiringThisFolderDescription')
-                  "
+                  :title="t(noFiringCopy.title, noFiringCopy.params)"
+                  :description="t(noFiringCopy.description, noFiringCopy.params)"
                   data-test="alert-list-empty-no-firing"
                 >
                   <template #actions>
@@ -1389,7 +1385,7 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import {
   isErrorOutcome,
   isFiringOutcome,
@@ -2219,13 +2215,41 @@ export default defineComponent({
           stateFilterEmptied.value &&
           stateFilters.value.some((f) => LIVE_STATE_KEYS.includes(f))),
     );
-    const noFiringTitle = computed<I18nText | undefined>(() => {
+    const NO_FIRING_KEYS: Record<
+      "folder" | "anyFolder",
+      Record<"anyType" | "oneType", { title: I18nKey; description: I18nKey }>
+    > = {
+      folder: {
+        anyType: {
+          title: "alerts.noAlertsFiringThisFolder",
+          description: "alerts.noAlertsFiringThisFolderDescription",
+        },
+        oneType: {
+          title: "alerts.noTypeAlertsFiringThisFolder",
+          description: "alerts.noTypeAlertsFiringThisFolderDescription",
+        },
+      },
+      anyFolder: {
+        anyType: {
+          title: "alerts.noAlertsFiringAnyFolder",
+          description: "alerts.noAlertsFiringAnyFolderDescription",
+        },
+        oneType: {
+          title: "alerts.noTypeAlertsFiringAnyFolder",
+          description: "alerts.noTypeAlertsFiringAnyFolderDescription",
+        },
+      },
+    };
+    // A type toggle narrows the rows, so the quiet claim names that type instead of the whole scope.
+    const noFiringCopy = computed(() => {
       if (statusUnavailable.value || listLoadFailed.value || !stateFilterEmptied.value)
         return undefined;
       if (stateFilters.value.join() !== "firing") return undefined;
-      return searchAcrossFolders.value
-        ? t("alerts.noAlertsFiringAnyFolder")
-        : t("alerts.noAlertsFiringThisFolder");
+      const type = alertTabs.value.find(
+        (tab) => tab.value !== "all" && tab.value === activeTab.value,
+      )?.label;
+      const keys = NO_FIRING_KEYS[searchAcrossFolders.value ? "anyFolder" : "folder"];
+      return type ? { ...keys.oneType, params: { type } } : { ...keys.anyType, params: {} };
     });
     const markIfLeftFilter = (row: any): boolean => {
       const f = stateFilters.value;
@@ -3169,13 +3193,17 @@ export default defineComponent({
       return ok;
     };
 
-    const acknowledgeRow = async (row: any) =>
-      refreshAfter(
-        await alertActions.acknowledge(
-          rowActionTarget(row),
-          row.multi_alert ? { allGroups: true } : {},
-        ),
+    // The shown firing's start lets the backend refuse an ack of a newer one; a refusal leaves the row stale, so any answer reloads.
+    const acknowledgeRow = async (row: any) => {
+      const ok = await alertActions.acknowledge(
+        rowActionTarget(row),
+        row.multi_alert
+          ? { allGroups: true }
+          : { firingStartedAt: row.firing_started_at ?? undefined },
       );
+      await refreshAlerts();
+      return ok;
+    };
 
     const muteRowWith = async (row: any, end: AlertMuteEnd) =>
       refreshAfter(await alertActions.mute(rowActionTarget(row), end));
@@ -3282,8 +3310,13 @@ export default defineComponent({
 
         const folderQuery = router.currentRoute.value.query.folder;
         const matchingFolder = folders.find((it: any) => it.folderId === folderQuery);
+        // An all-folders link carries no folder param, so the folder it returns to is the one already held.
+        const keptFolder =
+          searchAcrossFolders.value &&
+          folders.some((it: any) => it.folderId === activeFolderId.value);
 
-        activeFolderId.value = matchingFolder ? folderQuery : "default";
+        if (matchingFolder) activeFolderId.value = folderQuery;
+        else if (!keptFolder) activeFolderId.value = "default";
         filterAlertsByTab();
       },
       { immediate: true },
@@ -3292,6 +3325,8 @@ export default defineComponent({
       () => activeFolderId.value,
       async (newVal) => {
         folderIdToBeCloned.value = newVal;
+        // A folder pick ends all-folders scope before it lands here; any other change only moves where the scope returns to.
+        if (searchAcrossFolders.value) return;
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
 
@@ -3303,11 +3338,6 @@ export default defineComponent({
         }
         // A folder switch starts a new list; the page persisted for the previous folder must not be restored onto it.
         currentPage.value = 1;
-        if (searchAcrossFolders.value) {
-          searchAcrossFolders.value = false;
-          searchQuery.value = "";
-          filteredResults.value = [];
-        }
         await getAlertsByFolderId(store, newVal);
         if (router.currentRoute.value.query.folder != newVal) {
           router.push({
@@ -4973,7 +5003,7 @@ export default defineComponent({
       listFiltered,
       statusErrorEmpty,
       noTemplatesEmpty,
-      noFiringTitle,
+      noFiringCopy,
       statusUnavailable,
       listLoadFailed,
       levelFilter,
