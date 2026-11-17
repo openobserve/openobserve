@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "Seitenzahl außerhalb des Bereichs. Bitte geben Sie eine gültige Seitenzahl an.",
       "noMatchingService": "Kein passender Dienst für Korrelation gefunden",
       "unableToRetrieveCorrelation": "Korrelationsdaten konnten nicht abgerufen werden",
-      "noMetricStreams": "Keine Metrik-Streams für Dienst \"{service}\" gefunden",
       "correlationError": "Korrelationsfehler: {error}",
       "contentCopied": "Inhalt erfolgreich kopiert!",
       "noTraceIdForInspection": "Keine Trace-ID zur Überprüfung verfügbar"

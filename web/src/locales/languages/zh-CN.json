@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "页码超出范围。请提供有效的页码。",
       "noMatchingService": "未找到关联的匹配服务",
       "unableToRetrieveCorrelation": "无法检索关联数据",
-      "noMetricStreams": "未找到服务 \"{service}\" 的指标流",
       "correlationError": "关联错误：{error}",
       "contentCopied": "内容复制成功！",
       "noTraceIdForInspection": "没有可用于检查的追踪ID"

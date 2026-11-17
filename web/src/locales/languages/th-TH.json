@@ -20610,7 +20610,6 @@
       "pageOutOfRange": "Page number is out of range. Please provide valid page number.",
       "noMatchingService": "No matching service found for correlation",
       "unableToRetrieveCorrelation": "Unable to retrieve correlation data",
-      "noMetricStreams": "No metric streams found for service \"{service}\"",
       "correlationError": "Correlation error: {error}",
       "contentCopied": "Content Copied Successfully!",
       "noTraceIdForInspection": "No trace ID available for inspection"

@@ -60,7 +60,7 @@ const correlationProps = {
     k8s_namespace_name: "c1",
   },
   availableDimensions: { k8s_pod_name: "c1-openobserve-ingester-7" },
-  semanticGroups: [{ id: "service", fields: ["service_name"] }],
+  semanticGroups: correlationFixtures.groups,
   metricStreams: [],
   logStreams: [],
   traceStreams: [],
@@ -73,9 +73,12 @@ const servicesCalls = () =>
   transport.get.mock.calls.filter(([url]: [string]) => url.endsWith("/service_versions/_services"));
 
 function serve(services: () => Promise<unknown>) {
-  transport.get.mockImplementation(async (url: string) =>
-    url.endsWith("/service_versions/_services") ? services() : { data: {} },
-  );
+  transport.get.mockImplementation(async (url: string) => {
+    if (url.endsWith("/service_versions/_services")) return services();
+    if (url.endsWith("/service_streams/config/identity"))
+      return { data: correlationFixtures.identityConfig };
+    return { data: {} };
+  });
 }
 async function render(
   initialTab = "correlated-logs",
@@ -133,7 +136,6 @@ describe("Source Details correlation header", () => {
         "detected as c1-openobserve-ingester",
       );
       expect($("svcver-correlation-env-chip")).not.toBe(null);
-      expect($("svcver-correlation-where")?.textContent).toContain("c1 · c1");
       expect($("svcver-correlation-version")?.textContent).toContain("0.0.2");
       expect($("svcver-correlation-rollout-verdict")).not.toBe(null);
       expect($("svcver-correlation-rollout-verdict")!.textContent).toContain("Deploy verdict");
@@ -170,7 +172,7 @@ describe("Source Details correlation header", () => {
     );
   });
 
-  it("opens the service panel from Open service", async () => {
+  it("opens the service panel from Versions & deploys", async () => {
     const w = await render();
     $("svcver-correlation-open-service")!.click();
     await flushPromises();
@@ -195,7 +197,7 @@ describe("Source Details correlation header", () => {
   });
 });
 
-describe("Source Details scope picked through the log row's pod", () => {
+describe("Source Details scope picked through the spans of the log's applied dimensions", () => {
   const logTime = 1_793_000_000_000_000;
   const fiveMinutes = 300_000_000;
   // The shipper stamps its own cluster on the log line, which no span scope reports; its env alone would pick env:dev.
@@ -207,17 +209,22 @@ describe("Source Details scope picked through the log row's pod", () => {
       k8s_namespace_name: "c1",
       deployment_environment: "dev",
     },
-    traceStreams: [{ stream_name: "default", stream_type: "traces", filters: {} }],
+    traceStreams: [
+      {
+        stream_name: "default",
+        stream_type: "traces",
+        filters: { service_k8s_pod_name: "c1-openobserve-ingester-7" },
+      },
+    ],
     sourceEvent: { timestamp: logTime },
   };
-  const tip = { OTooltip: { template: "<div><slot /><slot name='content' /></div>" } };
   type Handlers = {
     data: (a: unknown, r: unknown) => void;
     error: (a: unknown, e: unknown) => void;
     complete: (a: unknown, r: unknown) => void;
   };
   type Request = { queryReq: { query: { sql: string; start_time: number; end_time: number } } };
-  const podReads = () =>
+  const whereReads = () =>
     stream.mock.calls
       .map(([request]: [Request]) => request)
       .filter((request) => request.queryReq.query.sql.includes("o2_service_where"));
@@ -228,15 +235,17 @@ describe("Source Details scope picked through the log row's pod", () => {
       else handlers.complete(request, null);
     });
   }
-  const hits = (...wheres: string[]) => ({
+  const hits = (...rows: object[]) => ({
     type: "search_response_hits",
-    content: { results: { hits: wheres.map((where_key) => ({ where_key })) } },
+    content: { results: { hits: rows } },
   });
 
   beforeEach(() => {
     transport.get.mockImplementation(async (url: string) => {
       if (url.endsWith("/service_versions/_services"))
         return { data: { services: correlationFixtures.scopes, envs: [] } };
+      if (url.endsWith("/service_streams/config/identity"))
+        return { data: correlationFixtures.identityConfig };
       if (url.includes("/streams/default/schema"))
         return correlationFixtures.traceSchema([
           ...correlationFixtures.traceFields.k8s,
@@ -246,19 +255,20 @@ describe("Source Details scope picked through the log row's pod", () => {
     });
   });
 
-  it("renders the chips when the pod's spans name one place, with the pod in the where tooltip", async () => {
-    answer([hits("k8s:c1/c1")]);
-    await render("correlated-traces", podContext, tip);
-    expect($("svcver-correlation-where")?.textContent).toContain("c1 · c1");
-    expect($("svcver-correlation-version")?.textContent).toContain("0.0.2");
-    const tooltip = $("svcver-correlation-where-by-pod")?.textContent?.replace(/\s+/g, " ");
-    expect(tooltip).toContain("c1 · c1 · picked from this log's pod");
-    expect(tooltip).toContain(
-      "Pod c1-openobserve-ingester-7 sent its spans from cluster c1, namespace c1.",
-    );
-    expect(tooltip).toContain("This log's own cluster field reads logging-a.");
-    const [read] = podReads();
-    expect(read.queryReq.query.sql).toContain("service_k8s_pod_name = 'c1-openobserve-ingester-7'");
+  it("picks the scope from the record's spans and shows the version they run", async () => {
+    const pod = "c1-openobserve-ingester-7";
+    answer([hits({ where_key: "k8s:c1/c1", version: "v1.1.0-rc2", pod, last_seen: 30 })]);
+    await render("correlated-traces", podContext);
+    expect($("svcver-correlation-rollout-verdict")).not.toBe(null);
+    expect($("svcver-correlation-version")?.textContent).toContain("v1.1.0-rc2");
+    const versionRead = stream.mock.calls
+      .map(([request]: [Request]) => request.queryReq.query)
+      .find((query) => query.sql.includes("AS version"));
+    expect(versionRead?.sql).toContain(`"service_k8s_pod_name" = '${pod}'`);
+    expect(versionRead?.sql).toContain("o2_service_where = 'k8s:c1/c1'");
+    expect(versionRead?.start_time).toBe(logTime - fiveMinutes);
+    const [read] = whereReads();
+    expect(read.queryReq.query.sql).toContain(`"service_k8s_pod_name" = '${pod}'`);
     expect(read.queryReq.query.sql).toContain("LIMIT 2");
     expect(read.queryReq.query.start_time).toBe(logTime - fiveMinutes);
     expect(read.queryReq.query.end_time).toBe(logTime + fiveMinutes);
@@ -266,5 +276,21 @@ describe("Source Details scope picked through the log row's pod", () => {
       expect.objectContaining({ type: "search", pageType: "traces" }),
     );
     expect(search).not.toHaveBeenCalled();
+  });
+
+  // A dimension shared across places (an HTTP method) names none, so the env decides as it would without spans.
+  it("falls back to the env when the record's spans name two places", async () => {
+    const pod = "c1-openobserve-ingester-7";
+    answer([
+      hits(
+        { where_key: "k8s:c1/c1", version: "v1.1.0-rc2", pod, last_seen: 30 },
+        { where_key: "env:dev", version: "v9.0.0", pod, last_seen: 90 },
+      ),
+    ]);
+    await render("correlated-traces", podContext);
+    const versionRead = stream.mock.calls
+      .map(([request]: [Request]) => request.queryReq.query)
+      .find((query) => query.sql.includes("AS version"));
+    expect(versionRead?.sql).toContain("o2_service_where = 'env:dev'");
   });
 });

@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "Sayfa numarası aralık dışında. Lütfen geçerli bir sayfa numarası girin.",
       "noMatchingService": "Korelasyon için eşleşen hizmet bulunamadı",
       "unableToRetrieveCorrelation": "Korelasyon verileri alınamıyor",
-      "noMetricStreams": "\"{service}\" hizmeti için metrik akışı bulunamadı",
       "correlationError": "Korelasyon hatası: {error}",
       "contentCopied": "İçerik Başarıyla Kopyalandı!",
       "noTraceIdForInspection": "İnceleme için iz kimliği yok"
