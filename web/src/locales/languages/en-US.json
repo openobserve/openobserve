@@ -10073,7 +10073,6 @@
       "duplicatePanelId": "Duplicate panel ID found: {id}",
       "panelMissingLayoutI": "Panel {id} is missing a layout.i value",
       "duplicateLayoutI": "Duplicate layout.i value found in tab {tabId}: {value}",
-      "customChartCallbacksDropped": "Custom chart: {count} function callback in this panel's code was ignored. Stored chart code cannot run callbacks in the app; use plain values instead. | Custom chart: {count} function callbacks in this panel's code were ignored. Stored chart code cannot run callbacks in the app; use plain values instead.",
       "unsafeCodeDetected": "Unsafe code detected: {error}",
       "forbiddenFunctionCall": "Use of '{name}()' is not allowed.",
       "forbiddenInsideSetTimeout": "Use of {name} inside 'setTimeout()' is not allowed.",
@@ -23356,6 +23355,7 @@
       "deleteTitle": "Delete location",
       "deleteBody": "Delete the {name} private location? Its agents will stop receiving jobs.",
       "deleteBlocked": "In use by {count} checks — unassign them first",
+      "deleteBlockedHidden": "In use by checks in folders you can't open — ask someone with access to unassign them",
       "status": {
         "online": "Online",
         "offline": "Offline",

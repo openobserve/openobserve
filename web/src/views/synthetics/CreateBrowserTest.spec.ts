@@ -232,6 +232,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { syntheticsKeys } from "@/services/synthetics.querykeys";
 import { onBeforeRouteLeave } from "vue-router";
 import {
+  deleteEditorDraft,
   hashDraftValue,
   readEditorDraft,
   writeEditorDraft,
@@ -660,7 +661,10 @@ describe("CreateBrowserTest", () => {
     mockServiceUpdateGlobalVariable.mockResolvedValue({ data: {} });
     mockServiceListGlobalVariables.mockResolvedValue({ data: [] });
     mockRecorderReplay.mockResolvedValue({});
-    mockGetFoldersListByType.mockResolvedValue([]);
+    mockGetFoldersListByType.mockResolvedValue([
+      { folderId: "default", name: "Default" },
+      { folderId: "folder-1", name: "Checkout" },
+    ]);
     // Re-primed here because clearAllMocks keeps implementations — a test that
     // resolves the probe true must not leak into the next one.
     mockDetectExtension.mockResolvedValue(false);
@@ -990,6 +994,7 @@ describe("CreateBrowserTest", () => {
     });
 
     it("should create (not update) and navigate back to the list in create mode", async () => {
+      mockGetFoldersListByType.mockResolvedValue([{ folderId: "default", name: "Default" }]);
       wrapper = await mountCreateAtConfigure();
 
       await wrapper.find('[data-test="synthetics-create-save-btn"]').trigger("click");
@@ -1475,6 +1480,15 @@ describe("CreateBrowserTest", () => {
       expect((dialog.props("range") as BrowserStep[]).map((s) => s.id)).toEqual(["s2", "s3"]);
       expect(dialog.props("parentName")).toBe("Checkout");
       expect(dialog.props("defaultFolder")).toBe("folder-1");
+      // A parent kept in a folder the user cannot list (direct grant) defaults the child to a listed one.
+      (wrapper.vm as any).folders = [{ folderId: "folder-2", name: "Shared" }];
+      await flushPromises();
+      expect(dialog.props("defaultFolder")).toBe("folder-2");
+      // While the list is still loading, the saved check's own folder is the default.
+      (wrapper.vm as any).foldersLoaded = false;
+      (wrapper.vm as any).folders = [];
+      await flushPromises();
+      expect(dialog.props("defaultFolder")).toBe("folder-1");
       expect(dialog.props("needsSchedule")).toBe(false);
       expect(dialog.props("parentLocations")).toEqual(["us-east"]);
       expect(dialog.props("authoredCount")).toBe(5);
@@ -1725,13 +1739,13 @@ describe("CreateBrowserTest", () => {
       expect(await leaveAsks(wrapper)).toBe(false);
     });
 
-    it("no unsaved dot after the folder fallback", async () => {
+    it("keeps the check's own folder, unedited, when the caller may not list it", async () => {
       mockGetFoldersListByType.mockResolvedValue([{ folderId: "folder-1", name: "Checkout" }]);
       mockServiceGet.mockResolvedValue({
         data: {
           name: "Checkout",
           url: "https://shop.test",
-          folder: "gone",
+          folder: "direct-grant-folder",
           environments: [],
           journey: saved.map((step) => ({ ...step })),
         },
@@ -1739,6 +1753,12 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
+      expect((wrapper.vm as any).check.folder).toBe("direct-grant-folder");
+      expect((wrapper.vm as any).validationErrors.folder).toBeUndefined();
+      expect((wrapper.vm as any).pickerFolders).toEqual([
+        { folderId: "folder-1", name: "Checkout" },
+        { folderId: "direct-grant-folder", name: "Current Folder" },
+      ]);
       expect(wrapper.find(DOT).exists()).toBe(false);
       expect(await leaveAsks(wrapper)).toBe(false);
     });
@@ -3203,6 +3223,40 @@ describe("CreateBrowserTest", () => {
       expect(errors.folder).toContain("folder-from-another-org");
     });
 
+    it.each([undefined, "gone"])(
+      "selects a listable folder without default for URL %s",
+      async (folder) => {
+        mockRoute.query = folder ? { folder } : {};
+        mockGetFoldersListByType.mockResolvedValue([{ folderId: "team", name: "Team" }]);
+        wrapper = await mountCreateAtConfigure();
+        expect(configuredCheck(wrapper).folder).toBe("team");
+      },
+    );
+
+    it("protects a new check typed while the folder list is still loading", async () => {
+      let listFolders: (list: { folderId: string; name: string }[]) => void = () => {};
+      mockGetFoldersListByType.mockReturnValue(new Promise((resolve) => (listFolders = resolve)));
+      wrapper = mountPage();
+      await flushPromises();
+      firstInput();
+      await wrapper.find('[data-test="synthetics-create-url-input"]').setValue("https://shop.test");
+      await wrapper.find('[data-test="synthetics-create-name-input"]').setValue("Shop");
+      await wrapper.find('[data-test="synthetics-create-build-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(await leaveAsks(wrapper)).toBe(true);
+      listFolders([{ folderId: "team", name: "Team" }]);
+      await flushPromises();
+      expect((wrapper.vm as any).check.folder).toBe("team");
+    });
+
+    it("clears the URL folder when no folders are listable", async () => {
+      mockRoute.query = { folder: "gone" };
+      mockGetFoldersListByType.mockResolvedValue([]);
+      wrapper = await mountCreateAtConfigure();
+      expect(configuredCheck(wrapper).folder).toBe("");
+    });
+
     it("should not discard the preselected folder when the folder list failed to load", async () => {
       mockRoute.query = { folder: "folder-1" };
       mockGetFoldersListByType.mockRejectedValue(new Error("boom"));
@@ -3697,19 +3751,35 @@ describe("CreateBrowserTest", () => {
     });
 
     it("drops a draft holding only the gate fields the setup reload carries in the query", async () => {
-      writeEditorDraft(newScope, {
-        data: {
-          check: { ...defaultDraftCheck(), name: "Shop", url: "https://shop.test", journey: [] },
-          currentStep: 1,
-          journeyStepDone: false,
-        },
-      });
-      mockRoute.query = { url: "https://shop.test", name: "Shop", setup: "1" };
-      wrapper = mountPage();
-      await flushPromises();
+      // Folders still loading; a draft in a folder the query does not carry is real work.
+      mockGetFoldersListByType.mockReturnValue(new Promise(() => {}));
+      for (const [folder, dropped] of [
+        ["default", true],
+        ["team", false],
+      ] as const) {
+        writeEditorDraft(newScope, {
+          data: {
+            check: {
+              ...defaultDraftCheck(),
+              folder,
+              name: "Shop",
+              url: "https://shop.test",
+              journey: [],
+            },
+            currentStep: 1,
+            journeyStepDone: false,
+          },
+        });
+        mockRoute.query = { url: "https://shop.test", name: "Shop", setup: "1" };
+        wrapper = mountPage();
+        await flushPromises();
 
-      expect(wrapper.find('[data-test="editor-draft-restore-dialog"]').exists()).toBe(false);
-      expect(readEditorDraft(newScope)).toBeNull();
+        const restore = wrapper.find('[data-test="editor-draft-restore-dialog"]');
+        expect(restore.exists(), folder).toBe(!dropped);
+        expect(readEditorDraft(newScope) === null, folder).toBe(dropped);
+        wrapper.unmount();
+        deleteEditorDraft(newScope);
+      }
     });
 
     it("save from the leave dialog persists without navigating", async () => {

@@ -59,7 +59,7 @@ test.describe('Slack workspace card', { tag: ['@slack', '@enterprise'] }, () => 
     const rootName = await api.displayName(apiContext, orgs.main, rootEmail);
     await expect(slack.card.meta).toContainText(`Connected by ${rootName} on `);
     if (rootName !== rootEmail) {
-      await slack.card.meta.hover();
+      await slack.card.metaText.hover();
       await expect(slack.card.tooltip.filter({ hasText: rootEmail })).toBeVisible();
     }
     await expect(slack.card.status).toBeVisible();
