@@ -280,7 +280,7 @@ fn split_legacy_metrics(files: Vec<FileKey>) -> (Vec<FileKey>, Vec<FileKey>) {
 fn legacy_batches(mut files: Vec<FileKey>, limits: &BatchLimits<'_>) -> Vec<PlannedBatch> {
     // a whole-hour query lists every file; the classic merge never rewrites the full-sized ones
     files.retain(|f| f.meta.original_size <= limits.merge_max_original_size);
-    size_bounded::batches(&files, limits, &MergeMode::Classic)
+    size_bounded::plan(&files, limits, &MergeMode::Classic).batches
 }
 
 /// `files` in chunks of at most `max_files` (0: one chunk); a lone trailing file is left out.

@@ -18,25 +18,18 @@
 use config::meta::stream::{FileKey, MergeStrategy};
 use search::merge::MergeMode;
 
-use super::{BatchLimits, PlannedBatch, RoundPlan};
+use super::{BatchLimits, RoundPlan};
 
 /// Files already at the size target are left alone, so the window query skips them.
 pub(super) const READS_WHOLE_WINDOW: bool = false;
 
 pub(super) fn plan(files: &[FileKey], limits: &BatchLimits<'_>, mode: &MergeMode) -> RoundPlan {
-    RoundPlan::new(batches(files, limits, mode))
-}
-
-/// Size-bounded groups of `files`, each merged in `mode`.
-pub(super) fn batches(
-    files: &[FileKey],
-    limits: &BatchLimits<'_>,
-    mode: &MergeMode,
-) -> Vec<PlannedBatch> {
-    size_bounded_groups(files, limits)
-        .into_iter()
-        .map(|group| (group, mode.clone()))
-        .collect()
+    RoundPlan::new(
+        size_bounded_groups(files, limits)
+            .into_iter()
+            .map(|group| (group, mode.clone()))
+            .collect(),
+    )
 }
 
 /// Size-bounded merge groups in the planner's file order.
@@ -123,7 +116,7 @@ mod tests {
         ] {
             for incremental in [false, true] {
                 let limits = limits(&strategy, 0, incremental);
-                let planned = batches(&files, &limits, &MergeMode::Classic);
+                let planned = plan(&files, &limits, &MergeMode::Classic).batches;
                 let actual: Vec<_> = planned.iter().map(|(files, _)| names(files)).collect();
                 let count = if incremental { 2 } else { 3 };
                 assert_eq!(
@@ -172,7 +165,7 @@ mod tests {
                 })
                 .collect();
             let limits = limits(&strategy, 0, false);
-            let planned = batches(&files, &limits, &MergeMode::Classic);
+            let planned = plan(&files, &limits, &MergeMode::Classic).batches;
             let actual: Vec<_> = planned.iter().map(|(files, _)| names(files)).collect();
             assert_eq!(actual, expected, "{strategy:?}, sizes={sizes:?}");
             for (files, _) in planned {
@@ -204,12 +197,16 @@ mod tests {
         }
         let limits = limits(&MergeStrategy::FileTime, 0, false);
         // 900 original bytes fit the 1000 target, 1350 compressed bytes do not
-        let planned = batches(&files, &limits, &MergeMode::Classic);
+        let planned = plan(&files, &limits, &MergeMode::Classic).batches;
         assert_eq!(planned.len(), 1);
         assert_eq!(names(&planned[0].0), ["1.parquet", "2.parquet"]);
         // Neither singleton can form a merge within the compressed-size budget.
         files.truncate(2);
         files[1].meta.compressed_size = 600;
-        assert!(batches(&files, &limits, &MergeMode::Classic).is_empty());
+        assert!(
+            plan(&files, &limits, &MergeMode::Classic)
+                .batches
+                .is_empty()
+        );
     }
 }
