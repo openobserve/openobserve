@@ -169,7 +169,7 @@ test.describe('Composite alerts — builder', {
 
     // B is gone and C has been relettered into the freed slot.
     const expression = await pm.compositeAlertsPage.expressionInput().inputValue();
-    expect(expression).toMatch(/^\s*A\s*&&\s*B\s*$/);
+    expect(expression).toMatch(/^\s*A\s*AND\s*B\s*$/);
     await expect(pm.compositeAlertsPage.selectedChild(c.id)).toContainText('B');
     await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
   });
@@ -181,9 +181,9 @@ test.describe('Composite alerts — builder', {
 
     await pm.compositeAlertsPage.removeChild(b.id);
 
-    // A dangling "!" would make the draft unparseable and block Save.
+    // A dangling NOT would make the draft unparseable and block Save.
     const expression = await pm.compositeAlertsPage.expressionInput().inputValue();
-    expect(expression).not.toContain('!');
+    expect(expression).not.toMatch(/!|\bNOT\b/);
     await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
   });
 
@@ -193,7 +193,7 @@ test.describe('Composite alerts — builder', {
     const [a, b] = await children(page, 'c1', 2);
     await openBuilderWith(page, [a, b]);
 
-    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*&&\s*B/);
+    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*AND\s*B/);
     await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
     await expect(pm.compositeAlertsPage.expressionLive()).toBeVisible();
   });
@@ -208,7 +208,7 @@ test.describe('Composite alerts — builder', {
     await pm.compositeAlertsPage.expressionNot().click();
     await pm.compositeAlertsPage.expressionInsert(b.id).click();
 
-    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue('A || ! B');
+    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue('A OR NOT B');
   });
 
   test('C3b · group buttons append parentheses', async ({ page }) => {
@@ -222,7 +222,7 @@ test.describe('Composite alerts — builder', {
     await pm.compositeAlertsPage.expressionInsert(c.id).click();
     await pm.compositeAlertsPage.expressionCloseGroup().click();
 
-    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue('A && ( B || C )');
+    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue('A AND ( B OR C )');
     await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
   });
 
@@ -245,7 +245,7 @@ test.describe('Composite alerts — builder', {
 
     await pm.compositeAlertsPage.fillAdvancedExpression(`{${a.id}} || {${b.id}}`);
 
-    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*\|\|\s*B/);
+    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*OR\s*B/);
     await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
   });
 
@@ -349,7 +349,7 @@ test.describe('Composite alerts — builder', {
 
     await expect(pm.compositeAlertsPage.selectedChild(a.id)).toContainText('A');
     await expect(pm.compositeAlertsPage.selectedChild(b.id)).toContainText('B');
-    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*&&\s*B/);
+    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*AND\s*B/);
     await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
   });
 
@@ -366,7 +366,7 @@ test.describe('Composite alerts — builder', {
     });
 
     await pm.compositeAlertsPage.openEdit(parent.id);
-    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*&&\s*B/);
+    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*AND\s*B/);
     await pm.compositeAlertsPage.save().click();
 
     await expect.poll(() => submitted).toBeTruthy();
