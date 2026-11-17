@@ -446,60 +446,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OButton>
                       </div>
                     </OSettingRow>
-
-                    <!-- Simple vs Multi alert (M-9) — only once a group-by exists -->
-                    <AlertMultiToggle
-                      v-if="selectedFunction !== 'total_events' && hasLogGroupByFields"
-                      :enabled="isMultiAlert"
-                      @change="onMultiAlertChange"
-                    />
-
-                    <!-- no. of groups row — visible only when group-by fields are
-                     added, and NOT for a multi-alert: per-group evaluation
-                     fires on any breaching group, so a group-count rule has no
-                     meaning there and M-10 rejects it at save time. -->
-                    <OSettingRow
-                      v-if="
-                        selectedFunction !== 'total_events' && hasLogGroupByFields && !isMultiAlert
-                      "
-                      data-test="alert-having-groups-row"
-                      :label="t('alerts.plain.groupsCount')"
-                      :info="t('alerts.queryConfig.havingGroupsTooltip')"
-                      fill
-                    >
-                      <div class="flex flex-nowrap items-start gap-2">
-                        <OFormSelect
-                          :aria-label="t('common.operator')"
-                          name="trigger_condition.operator"
-                          :options="plainOperators"
-                          :searchable="false"
-                          class="max-w-30 min-w-17.5"
-                          @update:model-value="onTriggerOperatorChange"
-                        />
-                        <!-- Message hangs under the threshold field it describes. -->
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.alertIfNoOfEvents')"
-                            name="trigger_condition.threshold"
-                            type="number"
-                            width="xs"
-                            min="1"
-                            @update:model-value="onTriggerThresholdChange($event)"
-                            @blur="restoreDefaultThreshold"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="thresholdError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-having-groups-threshold-error"
-                            role="alert"
-                          >
-                            {{ thresholdError }}
-                          </div>
-                        </div>
-                      </div>
-                    </OSettingRow>
                   </template>
 
                   <!-- METRICS -->
@@ -834,60 +780,113 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OButton>
                       </div>
                     </OSettingRow>
-
-                    <!-- Simple vs Multi alert (M-9) — only once a group-by exists -->
-                    <AlertMultiToggle
-                      v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields"
-                      :enabled="isMultiAlert"
-                      @change="onMultiAlertChange"
-                    />
-
-                    <!-- no. of groups row — hidden for a multi-alert, see the log
-                     branch above for why. -->
-                    <OSettingRow
-                      v-if="
-                        selectedFunction !== 'total_events' &&
-                        hasMetricGroupByFields &&
-                        !isMultiAlert
-                      "
-                      :label="t('alerts.plain.groupsCount')"
-                      :info="t('alerts.queryConfig.havingGroupsTooltip')"
-                      fill
-                    >
-                      <div class="flex flex-nowrap items-start gap-2">
-                        <OFormSelect
-                          :aria-label="t('common.operator')"
-                          name="trigger_condition.operator"
-                          :options="plainOperators"
-                          :searchable="false"
-                          class="max-w-30 min-w-17.5"
-                          @update:model-value="onTriggerOperatorChange"
-                        />
-                        <!-- Message hangs under the threshold field it describes. -->
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.alertIfNoOfEvents')"
-                            name="trigger_condition.threshold"
-                            type="number"
-                            width="xs"
-                            min="1"
-                            @update:model-value="onTriggerThresholdChange($event)"
-                            @blur="restoreDefaultThreshold"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="thresholdError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-metric-having-groups-threshold-error"
-                            role="alert"
-                          >
-                            {{ thresholdError }}
-                          </div>
-                        </div>
-                      </div>
-                    </OSettingRow>
                   </template>
+                  <OSettingRow
+                    v-if="groupQuestion.offered"
+                    :label="groupQuestionTitle"
+                    :description="t('alerts.form.group.lookBack', { minutes: periodMinutes })"
+                    fill
+                    data-test="add-alert-group-question-row"
+                  >
+                    <div class="flex min-w-0 flex-col gap-1.5">
+                      <ORadioGroup
+                        :model-value="groupAnswer"
+                        :label="groupQuestionTitle"
+                        :disabled="isRuleMultiRequired"
+                        data-test="add-alert-group-question"
+                        @update:model-value="onGroupAnswer"
+                      >
+                        <ORadio value="one" size="sm" data-test="add-alert-group-question-one">
+                          <template #label>
+                            <span
+                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                            >
+                              <template v-if="countOperatorShown">
+                                <span class="leading-8.5">{{ t("alerts.form.group.sqlOne") }}</span>
+                                <OFormSelect
+                                  :aria-label="t('common.operator')"
+                                  name="trigger_condition.operator"
+                                  :options="plainOperators"
+                                  :searchable="false"
+                                  width="xs"
+                                  :disabled="groupAnswer === 'each'"
+                                  :data-test="countTestIds.operator"
+                                  @update:model-value="onTriggerOperatorChange"
+                                />
+                                <div class="flex flex-col gap-1">
+                                  <OFormInput
+                                    :aria-label="t('alerts.alertIfNoOfEvents')"
+                                    name="trigger_condition.threshold"
+                                    type="number"
+                                    width="xs"
+                                    min="1"
+                                    :disabled="groupAnswer === 'each'"
+                                    :data-test="countTestIds.threshold"
+                                    @update:model-value="onTriggerThresholdChange($event)"
+                                    @blur="restoreDefaultThreshold"
+                                  >
+                                    <template #error />
+                                  </OFormInput>
+                                  <div
+                                    v-if="thresholdError && groupAnswer === 'one'"
+                                    class="text-input-error-text text-xs whitespace-nowrap"
+                                    :data-test="countErrorTest"
+                                    role="alert"
+                                  >
+                                    {{ thresholdError }}
+                                  </div>
+                                </div>
+                                <span class="leading-8.5">{{ t("alerts.form.group.rows") }}</span>
+                              </template>
+                              <template v-else>
+                                <span class="leading-8.5">{{
+                                  t("alerts.form.group.builderOne")
+                                }}</span>
+                                <div class="flex flex-col gap-1">
+                                  <OFormInput
+                                    :aria-label="t('alerts.alertIfNoOfEvents')"
+                                    name="trigger_condition.threshold"
+                                    type="number"
+                                    width="xs"
+                                    min="1"
+                                    :disabled="groupAnswer === 'each'"
+                                    :data-test="countTestIds.threshold"
+                                    @update:model-value="onTriggerThresholdChange($event)"
+                                    @blur="restoreDefaultThreshold"
+                                  >
+                                    <template #error />
+                                  </OFormInput>
+                                  <div
+                                    v-if="thresholdError && groupAnswer === 'one'"
+                                    class="text-input-error-text text-xs whitespace-nowrap"
+                                    :data-test="countErrorTest"
+                                    role="alert"
+                                  >
+                                    {{ thresholdError }}
+                                  </div>
+                                </div>
+                                <span class="leading-8.5">{{
+                                  t("alerts.form.group.builderOneTail")
+                                }}</span>
+                              </template>
+                            </span>
+                          </template>
+                        </ORadio>
+                        <ORadio value="each" size="sm" data-test="add-alert-group-question-each">
+                          <template #label>
+                            <span
+                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                            >
+                              <span class="leading-8.5">{{ groupEachLabel }}</span>
+                            </span>
+                          </template>
+                        </ORadio>
+                      </ORadioGroup>
+                      <p v-if="isRuleMultiRequired" class="text-text-secondary text-xs">
+                        {{ t("alerts.promRuleModePendingMulti") }}
+                      </p>
+                    </div>
+                  </OSettingRow>
                 </div></Teleport
               >
 
@@ -1389,252 +1388,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="sectionTargets?.queryCondition"
                 :disabled="!sectionTargets?.queryCondition"
                 ><div class="flex flex-col gap-0">
-                  <!-- SQL: Simple vs Multi alert choice — placed before the
-                   condition row so the row below reads as "pick a mode,
-                   then fill in its shape", not "fill in a row, then a
-                   switch silently repurposes it". -->
-                  <AlertMultiToggle
-                    v-if="!showVrl && localTab === 'sql'"
-                    :enabled="isMultiAlert"
-                    @change="onSqlMultiAlertChange"
-                  />
-
-                  <!-- SQL Simple: Alert if No. of events -->
-                  <OSettingRow
-                    v-if="localTab === 'sql' && !isMultiAlert"
-                    :label="t('alerts.plain.queryReturns')"
-                    fill
-                  >
-                    <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
-                      <div class="flex flex-wrap items-start gap-2">
-                        <OFormSelect
-                          :aria-label="t('common.operator')"
-                          name="trigger_condition.operator"
-                          :options="plainOperators"
-                          :searchable="false"
-                          width="xs"
-                          data-test="alert-trigger-operator-select"
-                          @update:model-value="onTriggerOperatorChange"
-                        />
-                        <!-- The message belongs to the threshold, so it hangs under the
-                       threshold — not at the row's left edge. The column is capped
-                       to the field's width and the message is nowrap, so it spills
-                       right into empty space instead of widening the row. -->
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.alertIfNoOfEvents')"
-                            name="trigger_condition.threshold"
-                            type="number"
-                            width="xs"
-                            data-test="alert-trigger-threshold-input"
-                            min="1"
-                            @update:model-value="onTriggerThresholdChange($event)"
-                            @blur="restoreDefaultThreshold"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="thresholdError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-trigger-threshold-error"
-                            role="alert"
-                          >
-                            {{ thresholdError }}
-                          </div>
-                        </div>
-                        <span
-                          class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                          >{{ t("alerts.plain.rowsInTheLast", { n: periodMinutes }) }}</span
-                        >
-                      </div>
-                      <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
-                       critical's operator, so the row only echoes it. -->
-                      <div v-if="countWarningVisible" class="flex basis-full items-start gap-2">
-                        <span
-                          class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
-                          >{{ t("alerts.plain.warnWhen") }}</span
-                        >
-                        <span
-                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                          >{{ operatorLabel(triggerOperator) }}</span
-                        >
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.warningIf')"
-                            name="trigger_condition.warning_threshold"
-                            type="number"
-                            width="xs"
-                            data-test="alert-warning-threshold-input-1020"
-                            :placeholder="t('alerts.optional')"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="warningThresholdError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-warning-threshold-error-1020"
-                            role="alert"
-                          >
-                            {{ warningThresholdError }}
-                          </div>
-                        </div>
-                        <OButton
-                          variant="ghost"
-                          size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text self-center"
-                          :aria-label="t('alerts.removeWarning')"
-                          data-test="alert-remove-warning-button"
-                          @click="removeCountWarning"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
-                      </div>
-                      <div v-else-if="tierShows('warning')" class="basis-full">
-                        <OButton
-                          variant="ghost-primary"
-                          size="sm"
-                          data-test="alert-add-warning-button"
-                          @click="addCountWarning"
-                        >
-                          <OIcon name="add" size="sm" />
-                          {{ t("alerts.addWarning") }}
-                        </OButton>
-                      </div>
-                    </div>
-                  </OSettingRow>
-
-                  <!-- SQL Multi: Alert if [column]. Reuses the exact
-                   having.operator/.value + warning_value fields Custom's
-                   Measure mode uses (this flow classifies the whole SQL
-                   result set as one aggregate value, the same value-based
-                   severity shape). The column itself is a dropdown sourced
-                   from the query's own resolved output columns (§11 of
-                   sql_simple_multi_alert_fe_prd.md) rather than a fixed
-                   literal — options are refreshed on the same validate-sql
-                   pass as the SQL editor's own validation. -->
-                  <OSettingRow
-                    v-if="localTab === 'sql' && isMultiAlert"
-                    :label="t('alerts.plain.notifyMeWhen')"
-                    fill
-                  >
-                    <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
-                      <div class="flex items-start gap-2">
-                        <span
-                          class="text-text-secondary text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                          >{{ t("alerts.plain.theColumn") }}</span
-                        >
-                        <!-- onLogMeasureColumnChange's body is generic (reads/writes
-                         aggregation.having.column via the form) despite its
-                         name — reused as-is rather than duplicating it. -->
-                        <OFormSelect
-                          :aria-label="t('alerts.column')"
-                          name="query_condition.aggregation.having.column"
-                          :options="sqlAggColumnOptions"
-                          searchable
-                          width="xs"
-                          data-test="alert-sql-agg-column-select"
-                          :placeholder="t('alerts.placeholders.selectColumn')"
-                          @update:model-value="onLogMeasureColumnChange($event)"
-                        />
-                      </div>
-                      <div class="flex flex-wrap items-start gap-2">
-                        <span
-                          class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                          >{{ t("alerts.plain.is") }}</span
-                        >
-                        <OFormSelect
-                          :aria-label="t('common.operator')"
-                          name="query_condition.aggregation.having.operator"
-                          :options="numericOperators"
-                          :searchable="false"
-                          width="xs"
-                          data-test="alert-sql-agg-operator-select"
-                          @update:model-value="onConditionOperatorChange"
-                        />
-                        <!-- Message hangs under the value field it describes. -->
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('common.value')"
-                            name="query_condition.aggregation.having.value"
-                            type="number"
-                            width="xs"
-                            data-test="alert-sql-agg-value-input"
-                            :placeholder="t('alerts.placeholders.value')"
-                            @update:model-value="onConditionValueChange($event)"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="havingValueError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-sql-agg-value-error"
-                            role="alert"
-                          >
-                            {{ havingValueError }}
-                          </div>
-                        </div>
-                        <span
-                          class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                          >{{ t("alerts.plain.inTheLast", { n: periodMinutes }) }}</span
-                        >
-                      </div>
-                      <!-- Optional WARNING level, same pattern as Custom's
-                       Measure mode. Shares critical's operator, so the row
-                       only echoes it. -->
-                      <div v-if="aggWarningVisible" class="flex basis-full items-start gap-2">
-                        <span
-                          class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
-                          >{{ t("alerts.plain.warnWhen") }}</span
-                        >
-                        <span
-                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                          >{{ conditionOperator }}</span
-                        >
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.warningIf')"
-                            name="query_condition.aggregation.warning_value"
-                            type="number"
-                            width="xs"
-                            data-test="alert-sql-agg-warning-value-input"
-                            :placeholder="t('alerts.optional')"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="aggregationWarningError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-sql-agg-warning-value-error"
-                            role="alert"
-                          >
-                            {{ aggregationWarningError }}
-                          </div>
-                        </div>
-                        <OButton
-                          variant="ghost"
-                          size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text self-center"
-                          :aria-label="t('alerts.removeWarning')"
-                          data-test="alert-remove-warning-button"
-                          @click="removeAggWarning"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
-                      </div>
-                      <div v-else-if="tierShows('warning')" class="basis-full">
-                        <OButton
-                          variant="ghost-primary"
-                          size="sm"
-                          data-test="alert-add-warning-button"
-                          @click="addAggWarning"
-                        >
-                          <OIcon name="add" size="sm" />
-                          {{ t("alerts.addWarning") }}
-                        </OButton>
-                      </div>
-                    </div>
-                  </OSettingRow>
-
                   <div
                     v-if="localTab === 'promql' && !isForecastMode && tierShows('ruleExpression')"
                     class="flex flex-col gap-1 px-3 py-2"
@@ -1650,6 +1403,278 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("alerts.promRuleModeDescription") }}
                     </p>
                   </div>
+                  <OSettingRow
+                    v-if="
+                      groupQuestion.offered &&
+                      (localTab === 'sql' || promqlCondition || isPromRuleMode)
+                    "
+                    :label="groupQuestionTitle"
+                    :description="t('alerts.form.group.lookBack', { minutes: periodMinutes })"
+                    fill
+                    data-test="add-alert-group-question-row"
+                  >
+                    <div class="flex min-w-0 flex-col gap-1.5">
+                      <ORadioGroup
+                        :model-value="groupAnswer"
+                        :label="groupQuestionTitle"
+                        :disabled="isRuleMultiRequired"
+                        data-test="add-alert-group-question"
+                        @update:model-value="onGroupAnswer"
+                      >
+                        <ORadio value="one" size="sm" data-test="add-alert-group-question-one">
+                          <template #label>
+                            <span
+                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                            >
+                              <span
+                                v-if="localTab === 'promql' && isPromRuleMode"
+                                class="leading-8.5"
+                                >{{ t("alerts.multiAlert.simple") }}</span
+                              >
+                              <template v-else-if="localTab === 'sql' || countOperatorShown">
+                                <span class="leading-8.5">{{ t("alerts.form.group.sqlOne") }}</span>
+                                <OFormSelect
+                                  :aria-label="t('common.operator')"
+                                  name="trigger_condition.operator"
+                                  :options="plainOperators"
+                                  :searchable="false"
+                                  width="xs"
+                                  :disabled="groupAnswer === 'each'"
+                                  :data-test="countTestIds.operator"
+                                  @update:model-value="onTriggerOperatorChange"
+                                />
+                                <div class="flex flex-col gap-1">
+                                  <OFormInput
+                                    :aria-label="t('alerts.alertIfNoOfEvents')"
+                                    name="trigger_condition.threshold"
+                                    type="number"
+                                    width="xs"
+                                    min="1"
+                                    :disabled="groupAnswer === 'each'"
+                                    :data-test="countTestIds.threshold"
+                                    @update:model-value="onTriggerThresholdChange($event)"
+                                    @blur="restoreDefaultThreshold"
+                                  >
+                                    <template #error />
+                                  </OFormInput>
+                                  <div
+                                    v-if="thresholdError && groupAnswer === 'one'"
+                                    class="text-input-error-text text-xs whitespace-nowrap"
+                                    :data-test="countErrorTest"
+                                    role="alert"
+                                  >
+                                    {{ thresholdError }}
+                                  </div>
+                                </div>
+                                <span class="leading-8.5">{{
+                                  localTab === "promql"
+                                    ? t("alerts.form.group.series")
+                                    : t("alerts.form.group.rows")
+                                }}</span>
+                              </template>
+                              <template v-else>
+                                <span class="leading-8.5">{{
+                                  t("alerts.form.group.promqlOne")
+                                }}</span>
+                                <div class="flex flex-col gap-1">
+                                  <OFormInput
+                                    :aria-label="t('alerts.alertIfNoOfEvents')"
+                                    name="trigger_condition.threshold"
+                                    type="number"
+                                    width="xs"
+                                    min="1"
+                                    :disabled="groupAnswer === 'each'"
+                                    :data-test="countTestIds.threshold"
+                                    @update:model-value="onTriggerThresholdChange($event)"
+                                    @blur="restoreDefaultThreshold"
+                                  >
+                                    <template #error />
+                                  </OFormInput>
+                                  <div
+                                    v-if="thresholdError && groupAnswer === 'one'"
+                                    class="text-input-error-text text-xs whitespace-nowrap"
+                                    :data-test="countErrorTest"
+                                    role="alert"
+                                  >
+                                    {{ thresholdError }}
+                                  </div>
+                                </div>
+                                <span class="leading-8.5">{{
+                                  t("alerts.form.group.promqlOneTail")
+                                }}</span>
+                              </template>
+                            </span>
+                          </template>
+                        </ORadio>
+                        <ORadio value="each" size="sm" data-test="add-alert-group-question-each">
+                          <template #label>
+                            <span
+                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                            >
+                              <span class="leading-8.5">{{ groupEachLabel }}</span>
+                              <template v-if="localTab === 'sql'">
+                                <OFormSelect
+                                  :aria-label="t('alerts.column')"
+                                  name="query_condition.aggregation.having.column"
+                                  :options="sqlAggColumnOptions"
+                                  searchable
+                                  width="xs"
+                                  :disabled="groupAnswer === 'one'"
+                                  data-test="alert-sql-agg-column-select"
+                                  :placeholder="t('alerts.placeholders.selectColumn')"
+                                  @update:model-value="onLogMeasureColumnChange($event)"
+                                />
+                                <OFormSelect
+                                  :aria-label="t('common.operator')"
+                                  name="query_condition.aggregation.having.operator"
+                                  :options="numericOperators"
+                                  :searchable="false"
+                                  width="xs"
+                                  :disabled="groupAnswer === 'one'"
+                                  data-test="alert-sql-agg-operator-select"
+                                  @update:model-value="onConditionOperatorChange"
+                                />
+                                <div class="flex flex-col gap-1">
+                                  <OFormInput
+                                    :aria-label="t('common.value')"
+                                    name="query_condition.aggregation.having.value"
+                                    type="number"
+                                    width="xs"
+                                    :disabled="groupAnswer === 'one'"
+                                    data-test="alert-sql-agg-value-input"
+                                    :placeholder="t('alerts.placeholders.value')"
+                                    @update:model-value="onConditionValueChange($event)"
+                                  >
+                                    <template #error />
+                                  </OFormInput>
+                                  <div
+                                    v-if="havingValueError && groupAnswer === 'each'"
+                                    class="text-input-error-text text-xs whitespace-nowrap"
+                                    data-test="alert-sql-agg-value-error"
+                                    role="alert"
+                                  >
+                                    {{ havingValueError }}
+                                  </div>
+                                </div>
+                              </template>
+                            </span>
+                          </template>
+                        </ORadio>
+                      </ORadioGroup>
+                      <div v-if="localTab === 'sql'" class="ps-6">
+                        <template v-if="groupAnswer === 'one'">
+                          <div v-if="countWarningVisible" class="flex items-start gap-2">
+                            <span
+                              class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                              >{{ t("alerts.plain.warnWhen") }}</span
+                            >
+                            <span
+                              class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                              >{{ operatorLabel(triggerOperator) }}</span
+                            >
+                            <div class="flex flex-col gap-1">
+                              <OFormInput
+                                :aria-label="t('alerts.warningIf')"
+                                name="trigger_condition.warning_threshold"
+                                type="number"
+                                width="xs"
+                                data-test="alert-warning-threshold-input-1020"
+                                :placeholder="t('alerts.optional')"
+                              >
+                                <template #error />
+                              </OFormInput>
+                              <div
+                                v-if="warningThresholdError"
+                                class="text-input-error-text text-xs whitespace-nowrap"
+                                data-test="alert-warning-threshold-error-1020"
+                                role="alert"
+                              >
+                                {{ warningThresholdError }}
+                              </div>
+                            </div>
+                            <OButton
+                              variant="ghost"
+                              size="icon-circle-sm"
+                              class="text-icon-color hover:text-status-error-text self-center"
+                              :aria-label="t('alerts.removeWarning')"
+                              data-test="alert-remove-warning-button"
+                              @click="removeCountWarning"
+                            >
+                              <OIcon name="close" size="sm" />
+                            </OButton>
+                          </div>
+                          <div v-else-if="tierShows('warning')">
+                            <OButton
+                              variant="ghost-primary"
+                              size="sm"
+                              data-test="alert-add-warning-button"
+                              @click="addCountWarning"
+                            >
+                              <OIcon name="add" size="sm" />
+                              {{ t("alerts.addWarning") }}
+                            </OButton>
+                          </div>
+                        </template>
+                        <template v-else>
+                          <div v-if="aggWarningVisible" class="flex items-start gap-2">
+                            <span
+                              class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                              >{{ t("alerts.plain.warnWhen") }}</span
+                            >
+                            <span
+                              class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                              >{{ conditionOperator }}</span
+                            >
+                            <div class="flex flex-col gap-1">
+                              <OFormInput
+                                :aria-label="t('alerts.warningIf')"
+                                name="query_condition.aggregation.warning_value"
+                                type="number"
+                                width="xs"
+                                data-test="alert-sql-agg-warning-value-input"
+                                :placeholder="t('alerts.optional')"
+                              >
+                                <template #error />
+                              </OFormInput>
+                              <div
+                                v-if="aggregationWarningError"
+                                class="text-input-error-text text-xs whitespace-nowrap"
+                                data-test="alert-sql-agg-warning-value-error"
+                                role="alert"
+                              >
+                                {{ aggregationWarningError }}
+                              </div>
+                            </div>
+                            <OButton
+                              variant="ghost"
+                              size="icon-circle-sm"
+                              class="text-icon-color hover:text-status-error-text self-center"
+                              :aria-label="t('alerts.removeWarning')"
+                              data-test="alert-remove-warning-button"
+                              @click="removeAggWarning"
+                            >
+                              <OIcon name="close" size="sm" />
+                            </OButton>
+                          </div>
+                          <div v-else-if="tierShows('warning')">
+                            <OButton
+                              variant="ghost-primary"
+                              size="sm"
+                              data-test="alert-add-warning-button"
+                              @click="addAggWarning"
+                            >
+                              <OIcon name="add" size="sm" />
+                              {{ t("alerts.addWarning") }}
+                            </OButton>
+                          </div>
+                        </template>
+                      </div>
+                      <p v-if="isRuleMultiRequired" class="text-text-secondary text-xs">
+                        {{ t("alerts.promRuleModePendingMulti") }}
+                      </p>
+                    </div>
+                  </OSettingRow>
+
                   <ForecastAlertFields
                     v-if="localTab === 'promql' && isForecastMode"
                     @remove="onPromqlModeChange('threshold')"
@@ -1768,57 +1793,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </OSettingRow>
-                    <AlertMultiToggle
-                      :enabled="isPromqlMultiAlert"
-                      :disabled="isRuleMultiRequired"
-                      name="query_condition.promql_multi_alert"
-                      unit="series"
-                      @change="onPromqlMultiAlertChange"
-                    />
-
-                    <p v-if="isRuleMultiRequired" class="text-text-secondary px-3 text-xs">
-                      {{ t("alerts.promRuleModePendingMulti") }}
-                    </p>
-
-                    <!-- Rule expressions own matching, so an extra series-count gate would change their semantics. -->
-                    <OSettingRow
-                      v-if="!isPromqlMultiAlert && !isPromRuleMode"
-                      :label="t('alerts.plain.seriesCount')"
-                      :info="t('alerts.queryConfig.havingSeriesTooltip')"
-                      fill
-                    >
-                      <div class="flex items-start gap-2">
-                        <OFormSelect
-                          :aria-label="t('common.operator')"
-                          name="trigger_condition.operator"
-                          :options="plainOperators"
-                          :searchable="false"
-                          @update:model-value="onTriggerOperatorChange"
-                        />
-                        <!-- Message hangs under the threshold field it describes. -->
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.alertIfNoOfEvents')"
-                            name="trigger_condition.threshold"
-                            type="number"
-                            width="xs"
-                            min="1"
-                            @update:model-value="onTriggerThresholdChange($event)"
-                            @blur="restoreDefaultThreshold"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="thresholdError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-having-series-threshold-error"
-                            role="alert"
-                          >
-                            {{ thresholdError }}
-                          </div>
-                        </div>
-                      </div>
-                    </OSettingRow>
                   </template>
                 </div></Teleport
               >
@@ -1921,7 +1895,8 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ForecastAlertFields from "@/components/alerts/steps/ForecastAlertFields.vue";
 import {
   FORECAST_FREQUENCY_MINUTES,
@@ -1967,13 +1942,49 @@ const withoutBlankRows = (group: FilterGroup): FilterGroup => ({
 
 const EDITOR_FOLD_LINES = 5;
 
+/** The columns a SQL query groups by, in order; the first GROUP BY wins. */
+function sqlGroupByLabels(sql: string): string[] {
+  const clause = /\bgroup\s+by\s+([\s\S]*?)(?=\s+(?:having|order\s+by|limit|qualify)\b|;|$)/i.exec(
+    sql,
+  );
+  if (!clause) return [];
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const ch of clause[1]) {
+    if (ch === "(") depth++;
+    if (ch === ")") depth--;
+    if (ch === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else current += ch;
+  }
+  parts.push(current);
+  const labels = parts.map((p) => p.trim().replace(/^["'`](.*)["'`]$/, "$1")).filter(Boolean);
+  return [...new Set(labels)];
+}
+
+/** Every label a PromQL query aggregates `by`, across all its `by (...)` clauses. */
+function promqlByLabels(query: string): string[] {
+  const labels = new Set<string>();
+  for (const match of query.matchAll(/\bby\s*\(([^)]*)\)/gi)) {
+    match[1]
+      .split(",")
+      .map((label) => label.trim())
+      .filter(Boolean)
+      .forEach((label) => labels.add(label));
+  }
+  return [...labels];
+}
+
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
 export default defineComponent({
   name: "Step2QueryConfig",
   components: {
     OTag,
-    AlertMultiToggle,
+    ORadio,
+    ORadioGroup,
     ForecastAlertFields,
     AlertQueryPreview,
     AlertFilterSentence,
@@ -2643,6 +2654,15 @@ export default defineComponent({
       get: () => fv("trigger_condition.threshold"),
       set: (v) => setFV("trigger_condition.threshold", v),
     });
+    // The count sentences read "at least"; a saved count with any other comparison keeps its picker.
+    const countOperatorShown = ref(false);
+    watch(
+      triggerOperator,
+      (op) => {
+        if (op && op !== ">=") countOperatorShown.value = true;
+      },
+      { immediate: true },
+    );
     // (Removed a mount-time `props.triggerCondition.threshold = 1` reset that
     // mutated the readonly form read-view — it silently failed (no-op) and only
     // logged a warning. The measure-mode "reset to >= 1 when group-by is empty"
@@ -2956,13 +2976,13 @@ export default defineComponent({
      * so switching Multi on just clears any stale column and leaves the
      * dropdown to be filled in.
      */
+    // The one-alert limit stays as typed: the payload pins SQL multi-alert to >= 1 (M-10) on save.
     const onSqlMultiAlertChange = (value: unknown) => {
-      onMultiAlertChange(value);
       if (!value) return;
       writeAggregation((agg) => {
         agg.function = "count";
         agg.group_by = [];
-        agg.having.column = "";
+        if (!props.sqlAggColumnOptions.includes(agg.having.column)) agg.having.column = "";
       });
     };
 
@@ -3007,6 +3027,114 @@ export default defineComponent({
         groupByLabels.value.length > 0 &&
         !groupByEditing.value,
     );
+    const groupQuestion = computed<{
+      offered: boolean;
+      grouped: boolean;
+      labels: string[];
+      noun: "row" | "series" | "group";
+    }>(() => {
+      const scheduled = props.isRealTime === "false";
+      if (localTab.value === "sql") {
+        const labels = sqlGroupByLabels(localSqlQuery.value ?? "");
+        return {
+          offered: scheduled && !showVrl.value,
+          grouped: !!labels.length,
+          labels,
+          noun: "row",
+        };
+      }
+      if (localTab.value === "promql") {
+        const labels = promqlByLabels(editorPromqlQuery.value ?? "");
+        return {
+          offered: scheduled && !isForecastMode.value,
+          grouped: !!labels.length,
+          labels,
+          noun: "series",
+        };
+      }
+      const labels = groupByLabels.value;
+      return {
+        offered: scheduled && selectedFunction.value !== "total_events" && !!labels.length,
+        grouped: true,
+        labels,
+        noun: "group",
+      };
+    });
+    const groupQuestionTitle = computed(() => {
+      const q = groupQuestion.value;
+      if (!q.grouped) {
+        return q.noun === "series"
+          ? t("alerts.form.group.promqlUngrouped")
+          : t("alerts.form.group.sqlUngrouped");
+      }
+      return q.labels.length === 1
+        ? t("alerts.form.group.grouped", { label: raw(q.labels[0]) })
+        : t("alerts.form.group.groupedMany");
+    });
+    const groupEachLabel = computed(() => {
+      const q = groupQuestion.value;
+      const labels = q.grouped
+        ? raw(groupLabelsText(q.labels, locale.value))
+        : q.noun === "series"
+          ? t("alerts.form.group.series")
+          : t("alerts.form.group.row");
+      return q.noun === "row"
+        ? t("alerts.form.group.eachOf", { labels })
+        : t("alerts.form.group.eachOfPlain", { labels });
+    });
+    const groupAnswer = computed(() =>
+      (localTab.value === "promql" ? isPromqlMultiAlert.value : isMultiAlert.value)
+        ? "each"
+        : "one",
+    );
+    const countTestIds = computed(() =>
+      localTab.value === "sql"
+        ? { operator: "alert-trigger-operator-select", threshold: "alert-trigger-threshold-input" }
+        : { operator: undefined, threshold: undefined },
+    );
+    const countErrorTest = computed(() =>
+      localTab.value === "sql"
+        ? "alert-trigger-threshold-error"
+        : localTab.value === "promql"
+          ? "alert-having-series-threshold-error"
+          : "alert-having-groups-threshold-error",
+    );
+    // Per-group forces the count gate to >= 1 (M-10); the one-alert answer gets its own limit back.
+    let oneAlertLimit: { operator: unknown; threshold: unknown } | null = null;
+    const onGroupAnswer = (answer: unknown) => {
+      const each = answer === "each";
+      if (localTab.value === "sql") {
+        writeAggregation((agg) => {
+          agg.multi_alert = each;
+        });
+        onSqlMultiAlertChange(each);
+        emitAggregationUpdate();
+        return;
+      }
+      if (each) {
+        oneAlertLimit = {
+          operator: fv("trigger_condition.operator"),
+          threshold: fv("trigger_condition.threshold"),
+        };
+      }
+      if (localTab.value === "promql") {
+        setFV("query_condition.promql_multi_alert", each);
+        onPromqlMultiAlertChange(each);
+      } else {
+        writeAggregation((agg) => {
+          agg.multi_alert = each;
+        });
+        onMultiAlertChange(each);
+        emitAggregationUpdate();
+      }
+      if (!each && oneAlertLimit) {
+        setFV("trigger_condition.operator", oneAlertLimit.operator);
+        setFV("trigger_condition.threshold", oneAlertLimit.threshold);
+        oneAlertLimit = null;
+      }
+      emitTriggerUpdate();
+    };
+
     const clearGroupBy = () => {
       if (isEventBased.value) setFV("logGroupBy", []);
       if (fv("query_condition.aggregation")) {
@@ -4203,6 +4331,14 @@ export default defineComponent({
       hasLogGroupByFields,
       hasMetricGroupByFields,
       groupByLabels,
+      groupQuestion,
+      groupQuestionTitle,
+      groupEachLabel,
+      groupAnswer,
+      countErrorTest,
+      countTestIds,
+      countOperatorShown,
+      onGroupAnswer,
       groupByEditing,
       groupBySettled,
       clearGroupBy,

@@ -899,21 +899,20 @@ describe("QueryConfig.vue", () => {
     it("locks Multi only while rule mode has a pending duration", async () => {
       await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
       await flushPromises();
-      const toggle = () => wrapper.findComponent({ name: "AlertMultiToggle" });
-      expect(toggle().props("disabled")).toBe(false);
+      const one = () => wrapper.find('[data-test="add-alert-group-question-one"]');
+      expect(one().attributes("disabled")).toBeUndefined();
       hostForm().setFieldValue("pending_period_sec", 4);
       await flushPromises();
       expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(true);
-      expect(toggle().props("disabled")).toBe(true);
-      expect(wrapper.find('[data-test-value="false"]').attributes("disabled")).toBeDefined();
+      expect(one().attributes("disabled")).toBeDefined();
       hostForm().setFieldValue("query_condition.promql_multi_alert", false);
       await flushPromises();
       expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(true);
       expect(await submit()).toBe(true);
       hostForm().setFieldValue("pending_period_sec", 0);
       await flushPromises();
-      expect(toggle().props("disabled")).toBe(false);
-      await wrapper.find('[data-test-value="false"]').trigger("click");
+      expect(one().attributes("disabled")).toBeUndefined();
+      wrapper.vm.onGroupAnswer("one");
       await flushPromises();
       expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(false);
       expect(await submit()).toBe(true);
@@ -2245,6 +2244,11 @@ describe("QueryConfig.vue", () => {
     };
     const columns = ["service", "status"].map((c) => ({ label: c, value: c, type: "utf8" }));
     const sectioned = { sectionTargets: {} };
+    const mockInputDataShape = () => ({
+      conditions: { filterType: "group", logicalOperator: "AND", conditions: [] },
+      period: 10,
+      multi_time_range: [],
+    });
     const leaf = (column: string, value: string, logicalOperator = "AND") => ({
       filterType: "condition",
       column,
@@ -2381,6 +2385,130 @@ describe("QueryConfig.vue", () => {
       handlers.ruleExpression();
       await flushPromises();
       expect(hostForm().state.values.query_condition.promql_rule_mode).toBe(true);
+    });
+
+    const forecast = { U: "x", T: 1, direction: "rises", W: "2d", H: 7 };
+    const tenLabels = Array.from({ length: 10 }, (_, i) => `label_${i + 1}`);
+    it.each([
+      [
+        "SQL without GROUP BY",
+        { tab: "sql", sqlQuery: "SELECT * FROM t" },
+        {},
+        true,
+        [],
+        "sqlUngrouped",
+      ],
+      [
+        "SQL GROUP BY service",
+        {
+          tab: "sql",
+          sqlQuery: "SELECT service, count(*) AS n FROM t GROUP BY service ORDER BY n",
+        },
+        {},
+        true,
+        ["service"],
+        "grouped",
+      ],
+      [
+        "PromQL sum by (a,b,c)",
+        {
+          tab: "promql",
+          streamType: "metrics",
+          promqlQuery: "sum by (a, b, c) (x) > 1",
+          promqlCondition: { operator: ">=", value: 1 },
+        },
+        {},
+        true,
+        ["a", "b", "c"],
+        "groupedMany",
+      ],
+      [
+        "PromQL by 10 labels",
+        {
+          tab: "promql",
+          streamType: "metrics",
+          promqlQuery: `sum by (${tenLabels.join(",")}) (x)`,
+          promqlCondition: { operator: ">=", value: 1 },
+        },
+        {},
+        true,
+        tenLabels,
+        "groupedMany",
+      ],
+      [
+        "PromQL forecast",
+        { tab: "promql", streamType: "metrics", promqlQuery: "x" },
+        { _ui: { checkEvery: 10, forecast } },
+        false,
+        [],
+        null,
+      ],
+      ["Builder count", { tab: "custom" }, {}, false, [], null],
+      [
+        "Builder avg grouped by service",
+        {
+          tab: "custom",
+          isAggregationEnabled: true,
+          inputData: {
+            ...mockInputDataShape(),
+            aggregation: {
+              function: "avg",
+              group_by: ["service"],
+              having: { column: "n", operator: ">=", value: 1 },
+            },
+          },
+        },
+        {
+          logGroupBy: ["service"],
+          query_condition: {
+            ...hostDefaults().query_condition,
+            aggregation: {
+              function: "avg",
+              group_by: ["service"],
+              having: { column: "n", operator: ">=", value: 1 },
+            },
+          },
+        },
+        true,
+        ["service"],
+        "grouped",
+      ],
+    ])("the per-group question for %s", (_case, qc, form, offered, labels, titleKey) => {
+      remount({ ...sectioned, ...qc }, form);
+      const q = wrapper.vm.groupQuestion;
+      expect(q.offered).toBe(offered);
+      expect(host.find('[data-test="add-alert-group-question"]').exists()).toBe(offered);
+      if (!offered) return;
+      expect(q.labels).toEqual(labels);
+      if (titleKey === "grouped") {
+        expect(wrapper.vm.groupQuestionTitle).toBe(
+          t("alerts.form.group.grouped", { label: labels[0] }),
+        );
+      } else {
+        expect(wrapper.vm.groupQuestionTitle).toBe(t(`alerts.form.group.${titleKey}`));
+      }
+      labels.forEach((label: string) => expect(wrapper.vm.groupEachLabel).toContain(label));
+    });
+
+    it("switching to one per row keeps the one-alert limit", async () => {
+      remount(
+        { ...sectioned, tab: "sql", sqlQuery: "SELECT * FROM t" },
+        {
+          trigger_condition: { ...hostDefaults().trigger_condition, operator: ">", threshold: 5 },
+          query_condition: {
+            ...hostDefaults().query_condition,
+            type: "sql",
+            sql: "SELECT * FROM t",
+          },
+        },
+      );
+      wrapper.vm.onGroupAnswer("each");
+      wrapper.vm.onGroupAnswer("one");
+      wrapper.vm.onGroupAnswer("each");
+      await flushPromises();
+      const v = hostForm().state.values;
+      expect(v.query_condition.aggregation.multi_alert).toBe(true);
+      expect([v.trigger_condition.operator, v.trigger_condition.threshold]).toEqual([">", 5]);
     });
 
     it("an invalid SQL error shows under the editor with Use 'service'", async () => {
