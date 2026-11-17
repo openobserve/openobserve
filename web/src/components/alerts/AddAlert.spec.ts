@@ -2156,6 +2156,33 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-watch-summary"]').exists()).toBe(false);
     });
 
+    it.each([
+      ["a jump from the section list", true],
+      ["a Tab into section 2", false],
+    ])("%s folds section 1 without moving the view or focus", async (_, jump) => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      const control = wrapper.get('[data-test="add-alert-section-condition-next"]')
+        .element as HTMLElement;
+      if (jump) wrapper.vm.goToSection("schedule");
+      else control.focus();
+      wrapper.vm.activeSection = "condition";
+      await flushPromises();
+      const watchOpen = () => wrapper.find('[data-test="add-alert-section-watch"]').exists();
+      expect(watchOpen()).toBe(jump);
+      if (jump) {
+        wrapper.vm.activeSection = "schedule";
+        await vi.waitFor(() => expect(watchOpen()).toBe(false));
+      }
+      expect(scrollToSection.mock.calls).toEqual(jump ? [["schedule"]] : []);
+      if (!jump) expect(document.activeElement).toBe(control);
+    });
+
     it("saving an untouched edit sends the loaded trigger values", async () => {
       const trigger = {
         period: 10,

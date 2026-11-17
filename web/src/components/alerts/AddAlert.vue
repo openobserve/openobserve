@@ -1097,7 +1097,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import { defineComponent, computed, watch, provide, ref, reactive, onMounted, nextTick } from "vue";
+import {
+  defineComponent,
+  computed,
+  watch,
+  provide,
+  ref,
+  reactive,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+} from "vue";
 import { useStore } from "vuex";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1222,6 +1232,29 @@ const RAIL_VERDICT_ICONS = {
   quiet: { name: "check-circle", class: "text-status-positive" },
   note: { name: "info", class: "text-text-secondary" },
 } as const;
+// A jump has landed once no scroll event has fired for this long (the snap scroller's own settle time).
+const JUMP_SETTLE_MS = 150;
+
+// The focused control stays put when it survives the fold; otherwise the section in view does.
+function foldAnchor(active: string): HTMLElement | null {
+  const focused = document.activeElement;
+  if (
+    focused instanceof HTMLElement &&
+    focused.closest("[data-snap-section]") &&
+    !focused.closest('[data-snap-section="watch"]')
+  ) {
+    return focused;
+  }
+  return document.querySelector<HTMLElement>(`[data-snap-section="${active}"]`);
+}
+
+function scrollParent(el: HTMLElement): HTMLElement | null {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if (overflowY === "auto" || overflowY === "scroll") return node;
+  }
+  return document.scrollingElement as HTMLElement | null;
+}
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -1313,6 +1346,7 @@ export default defineComponent({
         else expandWatch();
         return;
       }
+      if (!watchCollapsed.value) startJump();
       snapScrollRef.value?.scrollToSection(id);
     };
     const alertForm = useAlertForm(props, formEmit, { showSection: goToSection });
@@ -1657,11 +1691,41 @@ export default defineComponent({
     const activeSection = ref<AlertSectionId>("watch");
     const visitedSections = ref<ReadonlySet<AlertSectionId>>(new Set());
     const leftWatch = ref(false);
-    watch(activeSection, (now, left) => {
-      visitedSections.value = new Set([...visitedSections.value, left]);
-      if (left === "watch" && now !== "watch" && alertForm.formData.value.stream_name) {
+    const foldDue = ref(false);
+    // A jump glides past section 2; folding section 1 mid-glide would cut it short, so the fold waits until scrolling stops.
+    const jumping = ref(false);
+    let jumpSettle: ReturnType<typeof setTimeout> | undefined;
+    const foldWhenDue = () => {
+      if (foldDue.value && !jumping.value) {
+        foldDue.value = false;
         leftWatch.value = true;
       }
+    };
+    const endJump = () => {
+      jumping.value = false;
+      foldWhenDue();
+    };
+    const onJumpScroll = () => {
+      if (!jumping.value) return;
+      clearTimeout(jumpSettle);
+      jumpSettle = setTimeout(endJump, JUMP_SETTLE_MS);
+    };
+    const startJump = () => {
+      jumping.value = true;
+      onJumpScroll();
+    };
+    onMounted(() =>
+      document.addEventListener("scroll", onJumpScroll, { capture: true, passive: true }),
+    );
+    onBeforeUnmount(() => {
+      document.removeEventListener("scroll", onJumpScroll, { capture: true });
+      clearTimeout(jumpSettle);
+    });
+    watch(activeSection, (now, left) => {
+      visitedSections.value = new Set([...visitedSections.value, left]);
+      if (now === "watch") foldDue.value = false;
+      else if (left === "watch" && alertForm.formData.value.stream_name) foldDue.value = true;
+      foldWhenDue();
     });
 
     const isEditing = computed(
@@ -1678,14 +1742,21 @@ export default defineComponent({
       );
     };
     const expandWatch = () => {
+      foldDue.value = false;
       leftWatch.value = false;
       void nextTick(() => snapScrollRef.value?.scrollToSection("watch"));
     };
-    // Folding removes the content above, so the view is put back on the section the user moved to.
+    // Folding removes content above the view; scrolling back by the shift holds the view and focus still.
     watch(watchCollapsed, (folded) => {
-      if (folded && !isEditing.value) {
-        void nextTick(() => snapScrollRef.value?.scrollToSection(activeSection.value));
-      }
+      if (!folded || isEditing.value) return;
+      const anchor = foldAnchor(activeSection.value);
+      if (!anchor) return;
+      const before = anchor.getBoundingClientRect().top;
+      void nextTick(() => {
+        const shift = anchor.getBoundingClientRect().top - before;
+        const scroller = scrollParent(anchor.closest<HTMLElement>("[data-snap-section]") ?? anchor);
+        if (shift && scroller) scroller.scrollTop += shift;
+      });
     });
     const watchSummary = computed(() => {
       const fd = alertForm.formData.value;
