@@ -134,6 +134,7 @@ import {
   anomalyWindowShareErrors,
   type AnomalyIntervalUnit,
   type AnomalyStoredIntervals,
+  type AnomalyStoredSqlFunction,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 // ─── Default Values ─────────────────────────────────────────────────────────
@@ -257,35 +258,8 @@ export const anomalyWindowSecondsToParts = (
   return { value: secs, unit: "s" };
 };
 
-/** The function a stored custom_sql row carries, as the edit fetch returned it. */
-export interface AnomalyStoredSqlFunction {
-  detection_function: string;
-  detection_function_field?: string | null;
-}
-
-/**
- * The value column a stored custom_sql function declares, when the edited query no longer names
- * it. The server reads that column as authoritative, so such a save would fail every training run.
- */
-export const anomalyMissingValueColumn = (
-  c: { query_mode?: string; custom_sql?: string | null },
-  storedSql: AnomalyStoredSqlFunction | null,
-): string | null => {
-  if (c.query_mode !== "custom_sql" || !storedSql) return null;
-  const declared = (
-    storedSql.detection_function_field ||
-    /\(([^)]*)\)\s*$/.exec(storedSql.detection_function)?.[1] ||
-    ""
-  ).trim();
-  if (!declared || declared === "*") return null;
-  // Substring on purpose: a quoted or dotted alias ("p99.ms") has no word boundary to split on.
-  return (c.custom_sql ?? "").includes(declared) ? null : declared;
-};
-
-/**
- * custom_sql has no function control, so the form value there is a Filters-tab leftover: a
- * stored custom_sql row round-trips its own function VERBATIM, any other sends `count`.
- */
+// custom_sql has no function control, so the form value there is a Filters-tab leftover:
+// a stored custom_sql row round-trips its own function VERBATIM, any other sends `count`.
 export const anomalyDetectionFunctionPayload = (
   c: { query_mode?: string; detection_function?: string; detection_function_field?: string },
   storedSql: AnomalyStoredSqlFunction | null,
@@ -2249,16 +2223,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         anomalySaving.value = false;
         return;
       }
-      const missingColumn = anomalyMissingValueColumn(c, anomalyStoredSqlFunction.value);
-      if (missingColumn) {
-        toast({
-          variant: "error",
-          message: t("alerts.messages.anomalyValueColumnMissing", { column: missingColumn }),
-        });
-        wizardStep.value = 2;
-        anomalySaving.value = false;
-        return;
-      }
       try {
         await searchService.search({
           org_identifier: orgId,
@@ -3440,6 +3404,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // Anomaly state
     anomalyConfig,
     anomalyStoredIntervals,
+    anomalyStoredSqlFunction,
     anomalyStep2Ref,
     showAnomalySummary,
     anomalyEditMode,

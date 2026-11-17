@@ -439,6 +439,42 @@ describe("AnomalyDetectionConfig", () => {
       );
     });
 
+    it("blocks a stored row whose query dropped its value column, and clears on the fix", async () => {
+      const renamed = VALID_CUSTOM_SQL.replace("AS value", "AS p95_ms");
+      wrapper = mountConfig(
+        { query_mode: "custom_sql", stream_name: "events", custom_sql: renamed },
+        { storedSqlFunction: { detection_function: "avg(p99_ms)" } },
+      );
+      await flushPromises();
+      const form = getForm(wrapper);
+      const error = () => wrapper.find('[data-test="anomaly-custom-sql-value-column-error"]');
+
+      expect(error().exists()).toBe(false);
+      await form.handleSubmit();
+      await nextTick();
+      expect(form.state.isValid).toBe(false);
+      expect(error().text()).toContain("p99_ms");
+
+      (wrapper.vm as any).onCustomSqlChange(VALID_CUSTOM_SQL.replace("AS value", "AS p99_ms"));
+      await form.handleSubmit();
+      await nextTick();
+      expect(form.state.isValid).toBe(true);
+      expect(error().exists()).toBe(false);
+    });
+
+    it("a new custom_sql alert has no stored value column to check", async () => {
+      wrapper = mountConfig({
+        query_mode: "custom_sql",
+        stream_name: "events",
+        custom_sql: VALID_CUSTOM_SQL.replace("AS value", "AS p95_ms"),
+      });
+      await flushPromises();
+      const form = getForm(wrapper);
+      await form.handleSubmit();
+      await nextTick();
+      expect(form.state.isValid).toBe(true);
+    });
+
     it("detection-window error div (kept data-test) is submission-gated", async () => {
       wrapper = mountConfig();
       await flushPromises();

@@ -5,11 +5,11 @@
 // truncated server-side, so the alert reopens showing a number nobody chose.
 
 import { describe, it, expect } from "vitest";
+import { anomalyMissingValueColumn } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import {
   anomalyBandPayload,
   anomalyDetectionFunctionPayload,
   anomalyIntervalPayload,
-  anomalyMissingValueColumn,
   anomalySensitivityPayload,
   anomalyWindowSecondsToParts,
   defaultAnomalyConfig,
