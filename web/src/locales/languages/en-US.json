@@ -13791,6 +13791,7 @@
       "summaryTrainingDays": "{days} days",
       "summaryWindowShare": "✓ Window share: {rule}",
       "timestampAliasBanned": "{column} cannot be used as a column alias. Use {timeBucket} instead.",
+      "valueColumnMissing": "This alert reads its value from the column {column}. Keep that column name in the SQL query.",
       "tooltipAnomalyAbove": "Anomaly: above the expected range",
       "tooltipAnomalyBelow": "Anomaly: below the expected range",
       "trainingSpan": "Training span",
