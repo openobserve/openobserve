@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OIcon name="close" size="sm" />
                             </OButton>
                           </div>
-                          <div v-else-if="tierShows('warning')" class="basis-full">
+                          <div v-else-if="warningOffered" class="basis-full">
                             <OButton
                               variant="ghost-primary"
                               size="sm"
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OIcon name="close" size="sm" />
                             </OButton>
                           </div>
-                          <div v-else-if="tierShows('warning')" class="basis-full">
+                          <div v-else-if="warningOffered" class="basis-full">
                             <OButton
                               variant="ghost-primary"
                               size="sm"
@@ -614,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OIcon name="close" size="sm" />
                             </OButton>
                           </div>
-                          <div v-else-if="tierShows('warning')" class="basis-full">
+                          <div v-else-if="warningOffered" class="basis-full">
                             <OButton
                               variant="ghost-primary"
                               size="sm"
@@ -710,7 +710,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OIcon name="close" size="sm" />
                             </OButton>
                           </div>
-                          <div v-else-if="tierShows('warning')" class="basis-full">
+                          <div v-else-if="warningOffered" class="basis-full">
                             <OButton
                               variant="ghost-primary"
                               size="sm"
@@ -799,7 +799,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <ORadio value="one" size="sm" data-test="add-alert-group-question-one">
                           <template #label>
                             <span
-                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                              class="text-text-body flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm"
                             >
                               <template v-if="countOperatorShown">
                                 <span class="leading-8.5">{{ t("alerts.form.group.sqlOne") }}</span>
@@ -808,7 +808,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   name="trigger_condition.operator"
                                   :options="plainOperators"
                                   :searchable="false"
-                                  width="xs"
+                                  class="w-23!"
                                   :disabled="groupAnswer === 'each'"
                                   :data-test="countTestIds.operator"
                                   @update:model-value="onTriggerOperatorChange"
@@ -818,7 +818,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    width="xs"
+                                    class="w-14!"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -847,7 +847,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    width="xs"
+                                    class="w-14!"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -875,7 +875,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <ORadio value="each" size="sm" data-test="add-alert-group-question-each">
                           <template #label>
                             <span
-                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                              class="text-text-body flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm"
                             >
                               <span class="leading-8.5">{{ groupEachLabel }}</span>
                             </span>
@@ -946,9 +946,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-else>
           <div class="flex w-full flex-col gap-2 overflow-hidden">
             <!-- Editor area — position:relative shell owns the size; inner absolute never leaks -->
+            <!-- isolate keeps the editor's own z-index (its AI button) under the sticky section heading. -->
             <div
               ref="sqlPromqlPreviewRef"
-              class="relative motion-safe:transition-[height]"
+              class="relative isolate motion-safe:transition-[height]"
               :class="editorShellClass"
             >
               <div class="absolute inset-0 flex overflow-hidden">
@@ -971,6 +972,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : t("alerts.promqlEditor")
                       }}</span>
                     </div>
+                    <OSwitch
+                      v-if="localTab === 'sql' && !showVrl && tierShows('vrl')"
+                      :model-value="false"
+                      :label="t('alerts.queryConfig.vrlToggle')"
+                      label-position="left"
+                      off-tone="neutral"
+                      :aria-label="t('alerts.queryConfig.showVrlEditor')"
+                      data-test="alert-vrl-toggle"
+                      @update:model-value="onVrlSwitch"
+                    >
+                      <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" />
+                    </OSwitch>
                   </div>
                   <div class="relative min-h-0 flex-1">
                     <div class="absolute inset-0">
@@ -1203,16 +1216,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OSettingRow
                     v-if="
-                      groupQuestion.offered &&
-                      (localTab === 'sql' || promqlCondition || isPromRuleMode)
+                      sqlPlainLimit ||
+                      (groupQuestion.offered &&
+                        (localTab === 'sql' || promqlCondition || isPromRuleMode))
                     "
-                    :label="groupQuestionTitle"
+                    :label="sqlPlainLimit ? t('alerts.plain.queryReturns') : groupQuestionTitle"
                     :description="t('alerts.form.group.lookBack', { minutes: periodMinutes })"
                     fill
                     data-test="add-alert-group-question-row"
                   >
                     <div class="flex min-w-0 flex-col gap-1.5">
+                      <span
+                        v-if="sqlPlainLimit"
+                        class="text-text-body flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm"
+                      >
+                        <OFormSelect
+                          :aria-label="t('common.operator')"
+                          name="trigger_condition.operator"
+                          :options="plainOperators"
+                          :searchable="false"
+                          class="w-23!"
+                          data-test="alert-trigger-operator-select"
+                          @update:model-value="onTriggerOperatorChange"
+                        />
+                        <div class="flex flex-col gap-1">
+                          <OFormInput
+                            :aria-label="t('alerts.alertIfNoOfEvents')"
+                            name="trigger_condition.threshold"
+                            type="number"
+                            class="w-14!"
+                            min="1"
+                            data-test="alert-trigger-threshold-input"
+                            @update:model-value="onTriggerThresholdChange($event)"
+                            @blur="restoreDefaultThreshold"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <div
+                            v-if="thresholdError"
+                            class="text-input-error-text text-xs whitespace-nowrap"
+                            data-test="alert-trigger-threshold-error"
+                            role="alert"
+                          >
+                            {{ thresholdError }}
+                          </div>
+                        </div>
+                        <span class="leading-8.5">{{ t("alerts.form.group.rows") }}</span>
+                      </span>
                       <ORadioGroup
+                        v-else
                         :model-value="groupAnswer"
                         :label="groupQuestionTitle"
                         :disabled="isRuleMultiRequired"
@@ -1222,7 +1274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <ORadio value="one" size="sm" data-test="add-alert-group-question-one">
                           <template #label>
                             <span
-                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                              class="text-text-body flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm"
                             >
                               <span
                                 v-if="localTab === 'promql' && isPromRuleMode"
@@ -1236,7 +1288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   name="trigger_condition.operator"
                                   :options="plainOperators"
                                   :searchable="false"
-                                  width="xs"
+                                  class="w-23!"
                                   :disabled="groupAnswer === 'each'"
                                   :data-test="countTestIds.operator"
                                   @update:model-value="onTriggerOperatorChange"
@@ -1246,7 +1298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    width="xs"
+                                    class="w-14!"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -1279,7 +1331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    width="xs"
+                                    class="w-14!"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -1307,7 +1359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <ORadio value="each" size="sm" data-test="add-alert-group-question-each">
                           <template #label>
                             <span
-                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                              class="text-text-body flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm"
                             >
                               <span class="leading-8.5">{{ groupEachLabel }}</span>
                               <template v-if="localTab === 'sql'">
@@ -1316,7 +1368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   name="query_condition.aggregation.having.column"
                                   :options="sqlAggColumnOptions"
                                   searchable
-                                  width="xs"
+                                  class="w-28!"
                                   :disabled="groupAnswer === 'one'"
                                   data-test="alert-sql-agg-column-select"
                                   :placeholder="t('alerts.placeholders.selectColumn')"
@@ -1327,7 +1379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   name="query_condition.aggregation.having.operator"
                                   :options="numericOperators"
                                   :searchable="false"
-                                  width="xs"
+                                  class="w-23!"
                                   :disabled="groupAnswer === 'one'"
                                   data-test="alert-sql-agg-operator-select"
                                   @update:model-value="onConditionOperatorChange"
@@ -1337,7 +1389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('common.value')"
                                     name="query_condition.aggregation.having.value"
                                     type="number"
-                                    width="xs"
+                                    class="w-14!"
                                     :disabled="groupAnswer === 'one'"
                                     data-test="alert-sql-agg-value-input"
                                     :placeholder="t('alerts.placeholders.value')"
@@ -1359,7 +1411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </template>
                         </ORadio>
                       </ORadioGroup>
-                      <div v-if="localTab === 'sql'" class="ps-6">
+                      <div v-if="localTab === 'sql'" :class="!sqlPlainLimit && 'ps-6'">
                         <template v-if="groupAnswer === 'one'">
                           <div v-if="countWarningVisible" class="flex items-start gap-2">
                             <span
@@ -1401,7 +1453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OIcon name="close" size="sm" />
                             </OButton>
                           </div>
-                          <div v-else-if="tierShows('warning')">
+                          <div v-else-if="warningOffered">
                             <OButton
                               variant="ghost-primary"
                               size="sm"
@@ -1454,7 +1506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OIcon name="close" size="sm" />
                             </OButton>
                           </div>
-                          <div v-else-if="tierShows('warning')">
+                          <div v-else-if="warningOffered">
                             <OButton
                               variant="ghost-primary"
                               size="sm"
@@ -1578,7 +1630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OIcon name="close" size="sm" />
                           </OButton>
                         </div>
-                        <div v-else-if="tierShows('warning')" class="basis-full">
+                        <div v-else-if="warningOffered" class="basis-full">
                           <OButton
                             variant="ghost-primary"
                             size="sm"
@@ -2103,7 +2155,7 @@ export default defineComponent({
     const pendingTab = ref<"sql" | "promql" | "custom" | null>(null);
 
     // Field refs for focus manager
-    const customPreviewRef = ref(null);
+    const customPreviewRef = ref<HTMLElement | null>(null);
     const sqlPromqlPreviewRef = ref(null);
 
     // Local query values
@@ -2115,18 +2167,12 @@ export default defineComponent({
     // Aggregation state
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
 
+    // Revealing VRL only offers its switch; turning it off clears the function.
     const showVrl = ref(!!props.vrlFunction?.trim());
-    // More options reveals VRL; the pane's own switch is its Remove and clears the function.
-    watch(
-      () => localTab.value === "sql" && !!tiers?.isVisible("vrl"),
-      (shown) => {
-        if (shown) showVrl.value = true;
-      },
-      { immediate: true },
-    );
     const onVrlSwitch = (on: unknown) => {
       if (on) {
         showVrl.value = true;
+        tiers?.reveal("vrl");
         return;
       }
       showVrl.value = false;
@@ -2947,7 +2993,7 @@ export default defineComponent({
       if (localTab.value === "sql") {
         const labels = sqlGroupByLabels(localSqlQuery.value ?? "");
         return {
-          offered: scheduled && !showVrl.value,
+          offered: scheduled && (!showVrl.value || isMultiAlert.value),
           grouped: !!labels.length,
           labels,
           noun: "row",
@@ -2970,6 +3016,14 @@ export default defineComponent({
         noun: "group",
       };
     });
+    // VRL output has no per-row answer, so its limit is the plain one-alert sentence.
+    const sqlPlainLimit = computed(
+      () =>
+        localTab.value === "sql" &&
+        props.isRealTime === "false" &&
+        showVrl.value &&
+        !isMultiAlert.value,
+    );
     const groupQuestionTitle = computed(() => {
       const q = groupQuestion.value;
       if (!q.grouped) {
@@ -3385,6 +3439,8 @@ export default defineComponent({
     );
     const periodMinutes = computed(() => Number(props.triggerCondition?.period) || 0);
     const tierShows = useTierVisibility();
+    // tierAvailable("warning"): every scheduled alert can carry a warning, so its link is never hidden.
+    const warningOffered = computed(() => !tiers || props.isRealTime === "false");
 
     // Ensure at least one empty filter condition exists on mount (filters are always visible now)
     // Empty condition is now provided by default form data in useAlertForm.ts
@@ -3576,6 +3632,10 @@ export default defineComponent({
     const filtersFolded = computed(
       () => !!props.sectionTargets && !filtersOpen.value && !showConditionsError.value,
     );
+    // A failed Save opens the builder for good, so fixing the last chip does not fold it under the cursor.
+    watch(showConditionsError, (shown) => {
+      if (shown) filtersOpen.value = true;
+    });
     const filterContext = computed(() => ({ fields: conditionFields.value }));
     const filterTree = computed(() =>
       FILTER_PROFILES.alert.codec.parse(props.inputData.conditions, filterContext.value),
@@ -3595,6 +3655,24 @@ export default defineComponent({
       });
       onConditionsChange(FILTER_PROFILES.alert.codec.serialize(next, filterContext.value));
     };
+    // Builder pickers render in a portal, so a press inside one is not leaving the builder.
+    const foldFiltersOnLeave = (e: Event) => {
+      const target = e.target as Element | null;
+      if (!conditionsValid.value || !target || customPreviewRef.value?.contains(target)) return;
+      if (target.closest?.("[data-reka-popper-content-wrapper]")) return;
+      filtersOpen.value = false;
+    };
+    const leaveEvents = ["pointerdown", "focusin"] as const;
+    watch(filtersOpen, (open) =>
+      leaveEvents.forEach((type) =>
+        open
+          ? document.addEventListener(type, foldFiltersOnLeave, true)
+          : document.removeEventListener(type, foldFiltersOnLeave, true),
+      ),
+    );
+    onBeforeUnmount(() =>
+      leaveEvents.forEach((type) => document.removeEventListener(type, foldFiltersOnLeave, true)),
+    );
     const removeFilters = () => {
       const current = props.inputData.conditions;
       const empty = current
@@ -4258,6 +4336,8 @@ export default defineComponent({
       groupByLabels,
       groupQuestion,
       groupQuestionTitle,
+      sqlPlainLimit,
+      warningOffered,
       groupEachLabel,
       groupAnswer,
       countErrorTest,

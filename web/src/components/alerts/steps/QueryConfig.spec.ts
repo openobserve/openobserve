@@ -2330,13 +2330,110 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.vm.editorFolded).toBe(false);
     });
 
-    it("the VRL editor opens only from More options", async () => {
-      const provide = tiersWith();
-      remount({ ...sectioned, tab: "sql" }, {}, provide);
-      expect(host.find('[data-test="alert-vrl-toggle"]').exists()).toBe(false);
-      (provide[ALERT_SETTING_TIERS_KEY as symbol] as any).reveal("vrl");
+    const tiersFor = (showAll: boolean) => ({
+      [ALERT_SETTING_TIERS_KEY as symbol]: useAlertSettingTiers({
+        available: () => true,
+        isSet: () => false,
+        showAll: ref(showAll),
+      }),
+    });
+    const tiersOf = (provide: Record<symbol, unknown>) =>
+      provide[ALERT_SETTING_TIERS_KEY as symbol] as any;
+    const shown = (id: string) => host.find(`[data-test="${id}"]`).exists();
+    const sql = { tab: "sql", sqlQuery: "SELECT * FROM t" };
+    const sqlForm = {
+      query_condition: { ...hostDefaults().query_condition, type: "sql", sql: sql.sqlQuery },
+    };
+    const sqlLimit = ["alert-trigger-operator-select", "alert-trigger-threshold-input"];
+
+    it.each([
+      ["More options", (p: any) => tiersOf(p).toggle("condition"), false],
+      ["Find", (p: any) => tiersOf(p).reveal("vrl"), false],
+      ["Show all settings", () => {}, true],
+    ])("revealing VRL through %s leaves it off and the limit in place", async (_c, reveal, all) => {
+      const provide = tiersFor(all);
+      remount({ ...sectioned, ...sql }, sqlForm, provide);
+      reveal(provide);
       await flushPromises();
-      expect(host.find('[data-test="add-alert-vrl-pane"]').exists()).toBe(true);
+      expect(shown("add-alert-vrl-pane")).toBe(false);
+      expect(shown("alert-vrl-toggle")).toBe(true);
+      sqlLimit.forEach((id) => expect(shown(id)).toBe(true));
+    });
+
+    it.each([
+      ["a saved function", { vrlFunction: ".x = 1" }, false],
+      ["the user's switch", {}, true],
+    ])("SQL with VRL on from %s keeps the limit", async (_c, qc, flip) => {
+      remount({ ...sectioned, ...sql, ...qc }, sqlForm, tiersFor(true));
+      if (flip) await host.find('[data-test="alert-vrl-toggle-btn"]').trigger("click");
+      await flushPromises();
+      expect(shown("add-alert-vrl-pane")).toBe(true);
+      sqlLimit.forEach((id) => expect(shown(id)).toBe(true));
+    });
+
+    const promql = {
+      tab: "promql",
+      streamType: "metrics",
+      promqlQuery: "avg(x)",
+      promqlCondition: { operator: ">=", value: 1 },
+    };
+    const promqlForm = {
+      query_condition: {
+        ...hostDefaults().query_condition,
+        type: "promql",
+        promql: "avg(x)",
+        promql_condition: { column: "value", operator: ">=", value: 1 },
+      },
+    };
+    it.each([
+      ["Builder", { tab: "custom" }, {}],
+      ["SQL", sql, sqlForm],
+      ["SQL with VRL", { ...sql, vrlFunction: ".x = 1" }, sqlForm],
+      ["PromQL", promql, promqlForm],
+    ])("+ Add warning shows by default in %s", async (_c, qc, form) => {
+      remount({ ...sectioned, ...qc }, form, tiersFor(false));
+      await flushPromises();
+      expect(shown("alert-add-warning-button")).toBe(true);
+    });
+
+    it("the SQL warning can be added and removed", async () => {
+      remount({ ...sectioned, ...sql }, sqlForm, tiersFor(false));
+      await host.find('[data-test="alert-add-warning-button"]').trigger("click");
+      expect(shown("alert-warning-threshold-input-1020")).toBe(true);
+      await host.find('[data-test="alert-remove-warning-button"]').trigger("click");
+      expect(shown("alert-warning-threshold-input-1020")).toBe(false);
+      expect(hostForm().state.values.trigger_condition.warning_threshold).toBe("");
+    });
+
+    it.each([
+      ["a complete filter, clicking elsewhere", true, false, true],
+      ["an unfinished filter, clicking elsewhere", false, false, false],
+      ["a complete filter, clicking inside it", true, true, false],
+    ])("the open builder with %s folds: %s", async (_c, valid, inside, folds) => {
+      remount({
+        ...sectioned,
+        inputData: { ...mockInputData, conditions: group(leaf("level", "error")) },
+      });
+      await host.find('[data-test="add-alert-filter-sentence-change"]').trigger("click");
+      const builder = host.findComponent({ name: "FilterBuilder" });
+      builder.vm.$emit("update:valid", valid);
+      const target = inside ? builder.element : document.body;
+      target.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+      await flushPromises();
+      expect(host.findComponent({ name: "FilterBuilder" }).isVisible()).toBe(!folds);
+    });
+
+    it("a failed Save keeps the builder open after its filter is fixed", async () => {
+      remount({
+        ...sectioned,
+        inputData: { ...mockInputData, conditions: group(leaf("level", "error")) },
+      });
+      const builder = host.findComponent({ name: "FilterBuilder" });
+      builder.vm.$emit("update:valid", false);
+      await hostForm().handleSubmit();
+      builder.vm.$emit("update:valid", true);
+      await flushPromises();
+      expect(builder.isVisible()).toBe(true);
     });
 
     it("the forecast link switches to forecast mode and Remove switches back", async () => {
