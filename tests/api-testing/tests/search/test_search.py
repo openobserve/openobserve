@@ -1812,31 +1812,35 @@ DAY_US = 86_400_000_000
 INGEST_WINDOW_HOURS = int(os.environ.get("ZO_INGEST_ALLOWED_UPTO", "5"))
 
 
-def _origin_search(client: OpenObserveClient, sql: str, start: int, end: int, use_cache: bool) -> list[dict]:
+def _origin_search(client: OpenObserveClient, sql: str, start: int, end: int, use_cache: bool) -> tuple[list[dict], int]:
+    """(hits, result_cache_ratio) of one /_search call."""
     body = {"query": {"sql": sql, "start_time": start, "end_time": end, "from": 0, "size": 100}}
     resp = client.post("_search", params={"type": "logs", "use_cache": str(use_cache).lower()}, json=body)
     assert resp.status_code == 200, f"{sql} [{start}, {end}): {resp.status_code} {resp.text}"
-    return resp.json()["hits"]
+    body = resp.json()
+    return body["hits"], body.get("result_cache_ratio", 0)
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def origin_grid_stream(client: OpenObserveClient) -> Generator[tuple[str, list[int]], None, None]:
     """Rows every 10 minutes across almost the whole ingest window, so off-epoch bucket edges fall among them."""
     name = unique_name("pytest_hist_origin")
     now = int(time.time()) * 1_000_000
     span_minutes = min(47, INGEST_WINDOW_HOURS - 1) * 60
     stamps = [now - span_minutes * 60_000_000 + k * 600_000_000 for k in range(span_minutes // 10)]
-    resp = client.post(f"{name}/_json", json=[{"_timestamp": ts, "k": k} for k, ts in enumerate(stamps)])
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["status"][0]["successful"] == len(stamps), resp.text
 
     def all_visible() -> bool:
-        hits = _origin_search(client, f'SELECT count(*) AS c FROM "{name}"', stamps[0], stamps[-1] + 1, False)
+        hits, _ = _origin_search(client, f'SELECT count(*) AS c FROM "{name}"', stamps[0], stamps[-1] + 1, False)
         return bool(hits) and hits[0]["c"] == len(stamps)
 
-    wait_until(all_visible, timeout=60, interval=1, msg=f"{name} never showed every row")
-    yield name, stamps
-    client.streams.delete(name)
+    try:
+        resp = client.post(f"{name}/_json", json=[{"_timestamp": ts, "k": k} for k, ts in enumerate(stamps)])
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"][0]["successful"] == len(stamps), resp.text
+        wait_until(all_visible, timeout=60, interval=1, msg=f"{name} never showed every row")
+        yield name, stamps
+    finally:
+        client.streams.delete(name)
 
 
 @pytest.mark.parametrize("days", [30, 7, 2], ids=["30-day", "7-day", "2-day"])
@@ -1848,7 +1852,8 @@ def test_long_histogram_buckets_sit_on_the_origin_grid_across_partitions(
     step = days * DAY_US
     sql = f"SELECT histogram(_timestamp, '{days} day') AS ts, count(*) AS c FROM \"{stream}\" GROUP BY ts ORDER BY ts DESC"
     end = int(time.time()) * 1_000_000
-    start = end - 60 * DAY_US
+    # The cache drops the bucket before the last edge, so 30-day buckets need four edges in range to cache any.
+    start = end - 120 * DAY_US
 
     def key(ts: int) -> str:
         edge = HISTOGRAM_ORIGIN_US + (ts - HISTOGRAM_ORIGIN_US) // step * step
@@ -1863,14 +1868,27 @@ def test_long_histogram_buckets_sit_on_the_origin_grid_across_partitions(
     )
     assert resp.status_code == 200, resp.text
     partitions = resp.json()["partitions"]
-    assert len(partitions) > 1, f"precondition: a 60-day range is split into partitions: {partitions}"
-    per_partition = [_origin_search(client, sql, p_start, p_end, False) for p_start, p_end in partitions]
+    assert len(partitions) > 1, f"precondition: a 120-day range is split into partitions: {partitions}"
+    per_partition = [_origin_search(client, sql, p_start, p_end, False)[0] for p_start, p_end in partitions]
     keys = [hit["ts"] for hits in per_partition for hit in hits]
     assert len(keys) == len(set(keys)), f"a bucket came back from more than one partition: {per_partition}"
     merged = {hit["ts"]: hit["c"] for hits in per_partition for hit in hits}
     assert merged == expected, f"partition buckets are off the histogram() origin grid: {merged}"
 
-    for use_cache in (False, True, True):
-        hits = _origin_search(client, sql, start, end, use_cache)
+    for use_cache in (False, True):
+        hits, _ = _origin_search(client, sql, start, end, use_cache)
         assert {hit["ts"]: hit["c"] for hit in hits} == expected, f"use_cache={use_cache}: {hits}"
         assert len(hits) == len(expected), f"use_cache={use_cache} repeated a bucket: {hits}"
+
+    def served_from_cache() -> tuple[list[dict], int] | None:
+        hits, ratio = _origin_search(client, sql, start, end, True)
+        return (hits, ratio) if ratio > 0 else None
+
+    # The cache keeps only finished buckets, which exist only when the rows (ending 10 min ago) cross a bucket edge.
+    if len(expected) > 1:
+        # The cache file is written after the response, so only a repeat that reports a cache hit tests the cached buckets.
+        hits, _ = wait_until(
+            served_from_cache, timeout=30, interval=1, msg=f"the {days}-day histogram was never answered from the result cache"
+        )
+        assert {hit["ts"]: hit["c"] for hit in hits} == expected, f"cached repeat: {hits}"
+        assert len(hits) == len(expected), f"the cached repeat repeated a bucket: {hits}"
