@@ -95,6 +95,7 @@ describe("searchAlertSettings", () => {
     ["folder", "folder"],
     ["group by", "groupBy"],
     ["multi", "groupBy"],
+    ["one per", "groupBy"],
     ["aggregation", "groupBy"],
     ["frequency", "checkEvery"],
     ["oncall", "oncall"],

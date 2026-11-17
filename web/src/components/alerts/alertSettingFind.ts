@@ -188,11 +188,20 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
   {
     id: "groupBy",
     labelKey: "alerts.find.labels.groupBy",
-    aliases: ["group", "multi", "multi alert", "per", "split by", "simple", "aggregation"],
+    aliases: [
+      "group",
+      "multi",
+      "multi alert",
+      "per",
+      "one per",
+      "split by",
+      "simple",
+      "aggregation",
+    ],
     section: "condition",
     tier: "more",
     groupKey: MORE,
-    targets: ["alert-group-by-select-0", "alert-group-by-add-btn", "alerts-alertmultitoggle-row"],
+    targets: ["alert-group-by-select-0", "alert-group-by-add-btn", "add-alert-group-question"],
   },
   {
     id: "compareWithPast",
@@ -219,7 +228,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     section: "notify",
     tier: "add",
     groupKey: "alerts.form.incident.label",
-    targets: ["alert-creates-incident-toggle"],
+    targets: ["alert-creates-incident-toggle", "add-alert-incident-row"],
   },
   {
     id: "template",
@@ -426,10 +435,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     section: "condition",
     tier: "add",
     groupKey: "alerts.find.groups.condition",
-    targets: [
-      "alerts-composite-expression-advanced",
-      "alerts-composite-expression-advanced-toggle",
-    ],
+    targets: ["add-alert-add-compositeExpression", "alerts-composite-expression-advanced"],
   },
   {
     id: "compositeWarningCounts",
@@ -456,7 +462,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     section: "condition",
     tier: "shown",
     groupKey: "alerts.find.groups.query",
-    targets: ["anomaly-query-tabs"],
+    targets: ["anomaly-query-tabs", "add-alert-filter-sentence", "anomaly-custom-sql"],
   },
   {
     id: "anomalyFunction",
@@ -517,7 +523,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     section: "notify",
     tier: "more",
     groupKey: MORE,
-    targets: ["anomaly-alert-enabled", "anomaly-notifications-row"],
+    targets: ["anomaly-alert-enabled", "anomaly-notifications-row", "anomaly-record-only-row"],
   },
   {
     id: "anomalyDestination",

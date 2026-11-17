@@ -1997,7 +1997,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(row().exists()).toBe(true);
       expect(wrapper.find('[data-test="alert-settings-pending-period-error"]').text()).not.toBe("");
       expect(wrapper.find('[data-test="o-section-nav-item-condition"]').text()).toContain(
-        "1 thing to fix",
+        i18n.global.t("alerts.sections.needsFix", { count: 1 }, 1),
       );
       expect(alertsService.update_by_alert_id).not.toHaveBeenCalled();
     });

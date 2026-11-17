@@ -12135,7 +12135,7 @@
       },
       "next": "Next: {title}",
       "back": "Back: {title}",
-      "needsFix": "{count} thing to fix | {count} things to fix",
+      "needsFix": "{count} issue | {count} issues",
       "howItChecks": "How it checks",
       "everyMinutes": "Every {count} min",
       "everyHours": "Every {count} h",
@@ -12177,9 +12177,7 @@
       "timeline": {
         "label": "What this looks like",
         "now": "Now",
-        "minutesAgo": "{count} min ago",
-        "caption": "Every {frequency} min we read the last {period} min of data.",
-        "gap": "Each check reads less than the time between checks, so some events are never read."
+        "minutesAgo": "{count} min ago"
       },
       "review": {
         "title": "Your alert so far"
@@ -12242,8 +12240,6 @@
         "whichEventsSql": "Write a query. The rows it returns are what the alert looks at.",
         "whichEventsPromql": "Write a PromQL query. The value it returns is what the alert looks at.",
         "checkEvery": "How often we run the check",
-        "lookBack": "How much recent data each check reads",
-        "cooldown": "Stops repeat alerts for the same problem",
         "rowTemplate": "How each matching row reads in the message",
         "descriptionPlaceholder": "Optional. What should someone do when this fires?",
         "name": "Shown in the alert list and in notifications"
@@ -13894,7 +13890,6 @@
       "sqlEditorHint": "Use open full editor to run and validate",
       "checkEvery": "Check every",
       "pendingPeriod": "Hold for",
-      "pendingPeriodTooltip": "Wait this long before firing, so a condition has to hold rather than trip on one bad interval.",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "timezone",
       "onThese": "on these",
@@ -15292,7 +15287,6 @@
       "addVariable": "Add a variable",
       "rowTemplate": "Row template",
       "lookBack": "Look back over",
-      "cooldown": "Quiet after alerting",
       "compareTitle": "Compare with the past",
       "compareThisCheck": "This check",
       "compareRuns": "Runs",
@@ -15650,6 +15644,9 @@
       },
       "forecast": {
         "sentence": "{direction} {threshold} within {horizon}, based on the last {window}"
+      },
+      "composite": {
+        "previewEmpty": "Add two or more alerts to see when they would have fired together."
       }
     }
   },

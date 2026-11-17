@@ -296,7 +296,7 @@ watch(
               data-test="alerts-composite-preview-empty"
             >
               <OIcon name="query-stats" size="lg" class="opacity-20" />
-              {{ t("alerts.composite.noChildren") }}
+              {{ t("alerts.form.composite.previewEmpty") }}
             </div>
           </div>
         </div>

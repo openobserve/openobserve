@@ -242,7 +242,7 @@ describe("useAlertFormSections", () => {
     expect(errorCounts.value.notify).toBe(1);
     expect(byId(items.value, "schedule")).toMatchObject({
       state: "error",
-      stateLabel: "1 thing to fix",
+      stateLabel: t("alerts.sections.needsFix", { count: 1 }, 1),
     });
     expect(byId(items.value, "condition").state).toBe("done");
   });
