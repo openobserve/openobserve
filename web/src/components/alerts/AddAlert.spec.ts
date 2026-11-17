@@ -1845,16 +1845,6 @@ describe("AddAlert (OForm owner)", () => {
   });
 
   describe("edit header and tucked settings", () => {
-    it("titles the last step for its optional details, since the name is fixed", async () => {
-      wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
-      await flushPromises();
-      expect(wrapper.get('[data-test="add-alert-section-details-title"]').text()).toBe("Details");
-      expect(wrapper.get('[data-test="add-alert-section-details-help"]').text()).toBe(
-        "The name stays as saved. Everything here is optional.",
-      );
-      expect(wrapper.find('[data-test="add-alert-details-name-input"]').exists()).toBe(false);
-    });
-
     it("keeps a header Disable through the next Save and does not count it as unsaved", async () => {
       wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
       await flushPromises();
@@ -2278,7 +2268,16 @@ describe("AddAlert (OForm owner)", () => {
         wrapper = withHeader(props);
         await flushPromises();
         const details = wrapper.get('[data-test="add-alert-section-details"]');
+        expect(details.get('[data-test="add-alert-section-details-title"]').text()).toBe(
+          i18n.global.t("alerts.sections.details.title"),
+        );
+        expect(details.find('[data-test="add-alert-details-name-input"]').exists()).toBe(pick);
+        expect(details.find('[data-test="add-alert-details-name-text"]').exists()).toBe(!pick);
         expect(details.find('[data-test="add-alert-details-folder-select"]').exists()).toBe(pick);
+        if (pick) {
+          const picker = details.findComponent({ name: "InlineSelectFolderDropdown" });
+          expect(picker.props("variant")).toBe("inline");
+        }
         expect(details.find('[data-test="add-alert-details-folder-name"]').exists()).toBe(!pick);
         expect(wrapper.get('[data-test="add-alert-header-folder"]').text()).toBe("default");
         expect(wrapper.findAllComponents({ name: "InlineSelectFolderDropdown" })).toHaveLength(

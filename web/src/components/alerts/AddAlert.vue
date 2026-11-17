@@ -675,11 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               id="details"
               :current="activeSection === 'details'"
               :index="5"
-              :title="
-                beingUpdated || anomalyEditMode
-                  ? t('alerts.sections.details.editTitle')
-                  : t('alerts.sections.details.title')
-              "
+              :title="t('alerts.sections.details.title')"
               :help="
                 beingUpdated || anomalyEditMode
                   ? t('alerts.sections.details.editHelp')
@@ -689,7 +685,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="flex flex-col" data-snap-stop>
                 <OSettingRow
-                  v-if="!(beingUpdated || anomalyEditMode)"
+                  v-if="beingUpdated || anomalyEditMode"
+                  :label="t('alerts.sections.details.name')"
+                  fill
+                  data-snap-stop
+                >
+                  <OTruncatedText
+                    class="text-text-body text-sm"
+                    data-test="add-alert-details-name-text"
+                  >
+                    {{ formData.name }}
+                  </OTruncatedText>
+                </OSettingRow>
+                <OSettingRow
+                  v-else
                   :label="t('alerts.sections.details.name')"
                   :description="t('alerts.sections.rows.name')"
                   fill
@@ -747,7 +756,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <InlineSelectFolderDropdown
                     v-if="!isEditing"
-                    class="max-w-75"
+                    variant="inline"
                     :model-value="activeFolderId as string"
                     type="alerts"
                     data-test="add-alert-details-folder-select"

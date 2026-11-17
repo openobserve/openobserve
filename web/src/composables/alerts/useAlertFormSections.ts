@@ -357,12 +357,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       } else if (seen && !invalid && !("empty" in facts && facts.empty)) {
         state = input.isEditing.value ? "saved" : "done";
       }
-      // A saved alert's name is fixed, so its last step holds only the optional details.
-      const title =
-        id === "details" && input.isEditing.value
-          ? t("alerts.sections.details.editTitle")
-          : t(navKey);
-      return { id, title, summary: facts.summary, state, stateLabel };
+      return { id, title: t(navKey), summary: facts.summary, state, stateLabel };
     });
   });
 

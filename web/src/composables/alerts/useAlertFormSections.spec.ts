@@ -157,9 +157,9 @@ describe("useAlertFormSections", () => {
     expect(byId(items.value, "notify").summary).toBe("slack and an incident");
   });
 
-  it("names the step after its optional details while editing", () => {
+  it("keeps the last step's name while editing", () => {
     const { items } = setup(scheduled({ stream_name: "k8s_logs", name: "errors" }), {}, true);
-    expect(byId(items.value, "details").title).toBe("Details");
+    expect(byId(items.value, "details").title).toBe("Name it");
   });
 
   describe("anomaly condition", () => {

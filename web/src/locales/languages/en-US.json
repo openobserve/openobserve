@@ -12247,7 +12247,6 @@
         "title": "What should we call it?",
         "nav": "Name it",
         "help": "A name your team will recognise in the alert list.",
-        "editTitle": "Details",
         "editHelp": "The name stays as saved. Everything here is optional.",
         "name": "Name",
         "folder": "Folder",
