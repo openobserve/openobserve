@@ -190,7 +190,7 @@ export const defaultAlertValue: any = () => {
       operator: ">=",
       frequency: 10,
       cron: "",
-      threshold: 3,
+      threshold: 1,
       silence: 10,
       frequency_type: "minutes",
       timezone: "UTC",

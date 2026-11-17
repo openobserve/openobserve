@@ -1516,20 +1516,35 @@ export default defineComponent({
         !alertForm.isAggregationEnabled.value
       );
     });
-    const conditionPresetOptions = computed<ChoiceCardOption[]>(() =>
-      ALERT_CONDITION_PRESETS.map((preset) => ({
+    // A typed limit no card fits gets its own selected card, so the cards never read as unset.
+    const activeConditionPreset = computed(() => {
+      const tc = alertForm.formData.value.trigger_condition;
+      if (tc?.operator !== ">=") return undefined;
+      return (
+        ALERT_CONDITION_PRESETS.find((preset) => Number(tc.threshold) === preset.threshold)?.id ??
+        "custom"
+      );
+    });
+    const conditionPresetOptions = computed<ChoiceCardOption[]>(() => [
+      ...ALERT_CONDITION_PRESETS.map((preset) => ({
         value: preset.id,
         label: alertForm.t(preset.labelKey),
         description: alertForm.t("alerts.sections.presets.orMore", { count: preset.threshold }),
         dataTest: `add-alert-condition-preset-${preset.id}`,
       })),
-    );
-    const activeConditionPreset = computed(() => {
-      const tc = alertForm.formData.value.trigger_condition;
-      return ALERT_CONDITION_PRESETS.find(
-        (preset) => tc?.operator === ">=" && Number(tc?.threshold) === preset.threshold,
-      )?.id;
-    });
+      ...(activeConditionPreset.value === "custom"
+        ? [
+            {
+              value: "custom",
+              label: alertForm.t("alerts.form.presets.custom"),
+              description: alertForm.t("alerts.sections.presets.orMore", {
+                count: Number(alertForm.formData.value.trigger_condition?.threshold),
+              }),
+              dataTest: "add-alert-condition-preset-custom",
+            },
+          ]
+        : []),
+    ]);
     const applyConditionPreset = (id: string) => {
       const preset = ALERT_CONDITION_PRESETS.find((candidate) => candidate.id === id);
       if (!preset) return;

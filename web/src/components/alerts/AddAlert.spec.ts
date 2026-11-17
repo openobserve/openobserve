@@ -1708,7 +1708,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-rail-sentence"]').text()).toBe(
-        "Won't notify anyone yet. Fires when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
+        "Won't notify anyone yet. Fires when 1+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
       );
       expect(wrapper.find('[data-test="add-alert-read-back"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="alerts-alert-summary"]').exists()).toBe(false);
@@ -2182,6 +2182,29 @@ describe("AddAlert (OForm owner)", () => {
       const payload = (alertsService.update_by_alert_id as any).mock.calls[0][1];
       expect(payload.trigger_condition).toMatchObject(trigger);
       expect(payload.keep_firing_for).toBe(45);
+    });
+  });
+
+  describe("condition presets", () => {
+    it.each([
+      ["a new alert", null, null, "any"],
+      ["a limit of 5", ">=", 5, "few"],
+      ["a limit no card fits", ">=", 3, "custom"],
+      ["a strict comparison", ">", 3, undefined],
+    ])("%s selects its card", async (_, operator, threshold, preset) => {
+      wrapper = mountAlert();
+      await flushPromises();
+      if (operator) wrapper.vm.form.setFieldValue("trigger_condition.operator", operator);
+      if (threshold) wrapper.vm.form.setFieldValue("trigger_condition.threshold", threshold);
+      await flushPromises();
+      expect(wrapper.vm.activeConditionPreset).toBe(preset);
+      if (!operator) expect(wrapper.vm.form.state.values.trigger_condition.threshold).toBe(1);
+      const custom = wrapper.vm.conditionPresetOptions.find((o: any) => o.value === "custom");
+      expect(custom?.description).toBe(
+        preset === "custom"
+          ? i18n.global.t("alerts.sections.presets.orMore", { count: threshold })
+          : undefined,
+      );
     });
   });
 
