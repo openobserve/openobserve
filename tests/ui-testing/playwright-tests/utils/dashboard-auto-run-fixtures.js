@@ -63,7 +63,7 @@ function namespaceTablePanel(id, key, where = '') {
   };
 }
 
-async function createDashboard(title, { panels }) {
+async function createDashboard(title, { panels, variables = [] }) {
   const res = await fetch(`${BASE}/api/${ORG()}/dashboards?folder=default`, {
     method: 'POST',
     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -71,7 +71,7 @@ async function createDashboard(title, { panels }) {
       version: 8,
       title,
       description: 'auto run e2e',
-      variables: { list: [], showDynamicFilters: false },
+      variables: { list: variables, showDynamicFilters: false },
       tabs: [{ tabId: 'default', name: 'Default', panels }],
     }),
   });

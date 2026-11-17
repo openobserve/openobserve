@@ -15,7 +15,18 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier, getAuthHeaders } = require('../utils/cloud-auth.js');
+const {
+  NAMESPACE_FIELD,
+  STREAM,
+  namespaceTablePanel,
+  createDashboard,
+  deleteDashboard,
+} = require('../utils/dashboard-auto-run-fixtures.js');
+
+const API_BASE = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || '').replace(/\/$/, '');
+const HOME_PIN_KEY = 'home_dashboard';
+const orgId = () => getOrgIdentifier() || process.env.ORGNAME || 'default';
 
 test.describe("Landing Page Test Cases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -547,5 +558,118 @@ test.describe("Landing Page Test Cases", () => {
 
     // This test is informational - it always passes
     expect(true).toBe(true);
+  });
+});
+
+async function settingsApi(method, path, body) {
+  const res = await fetch(`${API_BASE}/api/${orgId()}/settings/v2${path}`, {
+    method,
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  return { status: res.status, body: await res.json().catch(() => ({})) };
+}
+
+async function setHomePin(value) {
+  const { status } = await settingsApi('POST', '', { setting_key: HOME_PIN_KEY, setting_value: value, setting_category: 'ui' });
+  if (status >= 400) throw new Error(`pin home dashboard -> ${status}`);
+}
+
+// The pin is org-wide, so the previous value is put back rather than deleted.
+async function restoreHomePin(previous) {
+  if (previous) await setHomePin(previous);
+  else await settingsApi('DELETE', `/${HOME_PIN_KEY}`);
+}
+
+function inListValues(sql) {
+  const match = /IN \(([^)]*)\)/.exec(sql);
+  return match ? match[1].split(',').map((v) => v.trim()).sort() : null;
+}
+
+test.describe('Home Overview on the OSS build (#16634)', { tag: ['@landingPage', '@homeOverview', '@P1'] }, () => {
+  test('Overview sends no anomaly_detection request and the user stays signed in', async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    const pm = new PageManager(page);
+    const buildType = await pm.statusPagesPage.detectBuildType(orgId());
+    test.skip(buildType !== 'opensource', `OSS build only: the ${buildType} build registers the anomaly_detection routes, so Overview calling them is correct there`);
+
+    const anomalyRequests = [];
+    page.on('request', (req) => {
+      if (/\/api\/[^/]+\/anomaly_detection/.test(new URL(req.url()).pathname)) anomalyRequests.push(req.url());
+    });
+    // Recent events load in the same batch as anomalies, so their answer proves the anomaly loader already ran.
+    const historyAnswered = page.waitForResponse(
+      (res) => res.url().includes(`/api/v2/${orgId()}/alerts/history?`) && res.request().method() === 'GET',
+      { timeout: 60000 },
+    );
+
+    await navigateToBase(page);
+    await pm.homePage.openHomeTab('overview');
+    expect((await historyAnswered).status(), 'Overview recent-events request').toBeLessThan(400);
+
+    await expect(pm.homePage.homeOverviewPanel).toBeVisible();
+    expect(anomalyRequests, 'OSS Overview must not call the unregistered anomaly_detection route').toEqual([]);
+    await expect(page).not.toHaveURL(/\/login/);
+    await pm.homePage.loadHome(orgId());
+    await expect(page).not.toHaveURL(/\/login/);
+    expect(anomalyRequests).toEqual([]);
+  });
+});
+
+test.describe('Home pinned dashboard variables (#16699)', { tag: ['@landingPage', '@homePinnedDashboard', '@P1'] }, () => {
+  test('a multi-select variable change applies on Refresh with quoted IN values', async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    test.setTimeout(180000);
+    const pm = new PageManager(page);
+    const autoRun = pm.dashboardAutoRun;
+    const title = `home_pin_vars_${Date.now()}_${Math.floor(Math.random() * 1e4)}`;
+
+    await navigateToBase(page);
+    await pm.ingestionPage.ingestion();
+    // Auto Run would apply the change without Refresh, so it is pinned off to test the Refresh path.
+    await autoRun.pinAutoQuery(false);
+
+    const previousPin = await settingsApi('GET', `/${HOME_PIN_KEY}`);
+    let dashboardId;
+    try {
+      dashboardId = await createDashboard(title, {
+        panels: [namespaceTablePanel('p_home', 'home', `${NAMESPACE_FIELD} IN ($ns)`)],
+        variables: [{
+          type: 'query_values',
+          name: 'ns',
+          label: 'ns',
+          query_data: { stream_type: 'logs', stream: STREAM, field: NAMESPACE_FIELD, max_record_size: null, filter: [] },
+          // A scalar saved on a multi-select is what Home used to put into SQL unquoted.
+          value: 'ziox',
+          options: [],
+          multiSelect: true,
+          hideOnDashboard: false,
+          selectAllValueForMultiSelect: 'first',
+          customMultiSelectValue: [],
+          escapeSingleQuotes: true,
+        }],
+      });
+      await setHomePin({ dashboardId, folderId: 'default', label: title });
+
+      autoRun.trackRuns();
+      await pm.homePage.loadHome(orgId());
+      await pm.homePage.openHomeTab(`dash:default:${dashboardId}`);
+
+      await autoRun.expectPanelRows('p_home', { shows: ['ziox'], hides: ['velero'] });
+      const base = await autoRun.settledRunCount('home');
+      expect(inListValues(autoRun.runsOf('home')[base - 1]), 'saved scalar is quoted as a one-item list').toEqual(["'ziox'"]);
+
+      await autoRun.openVariableDropdown('ns');
+      await autoRun.toggleVariableOptions('ns', ['velero']);
+      await autoRun.closeVariableDropdownWithEscape('ns');
+      await pm.homePage.clickPinnedDashboardRefresh();
+
+      await autoRun.waitForRuns('home', base + 1);
+      expect(inListValues(autoRun.runsOf('home')[base]), 'Refresh runs the panel with both selected values').toEqual(["'velero'", "'ziox'"]);
+      await autoRun.expectPanelRows('p_home', { shows: ['ziox', 'velero'] });
+    } finally {
+      await restoreHomePin(previousPin.status < 400 ? previousPin.body?.setting_value ?? null : null);
+      await deleteDashboard(dashboardId);
+    }
   });
 });

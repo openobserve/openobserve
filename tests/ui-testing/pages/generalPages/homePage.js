@@ -68,6 +68,8 @@ export class HomePage {
         this.iamPageIndicator = page.locator('[data-test="iam-users-tab"]').first();
         this.pipelinesPageIndicator = page.locator('[data-test="function-list-add-function-btn"]').first();
         this.homePageIndicator = page.locator('[data-test="home-page"]').first();
+        this.homeOverviewPanel = page.locator('[data-test="home-overview-panel"]').first();
+        this.pinnedDashboardRefreshBtn = page.locator('[data-test="pinned-dashboard-refresh-btn"]');
 
         // ===== FAVICON SELECTOR (Bug #9217) =====
         this.faviconLink = page.locator('link#favicon');
@@ -145,6 +147,26 @@ export class HomePage {
     async navigateToIam() {
         await openNavFlyoutChild(this.page, 'iam');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    }
+
+    // A full load re-reads the org's home pin, which a client-side route change serves from cache.
+    async loadHome(orgId) {
+        await this.page.goto(`/web/?org_identifier=${orgId}`, { waitUntil: 'domcontentloaded' });
+        await expect(this.homePageIndicator).toBeVisible({ timeout: 30000 });
+    }
+
+    homeTab(tabId) {
+        return this.page.locator(`[data-test="home-tab-${tabId}"]`);
+    }
+
+    /** `tabId` is "overview", "usage" or a pinned dashboard's "dash:<folderId>:<dashboardId>". */
+    async openHomeTab(tabId) {
+        await this.homeTab(tabId).click();
+        await expect(this.homeTab(tabId)).toHaveAttribute('aria-selected', 'true', { timeout: 10000 });
+    }
+
+    async clickPinnedDashboardRefresh() {
+        await this.pinnedDashboardRefreshBtn.click();
     }
 
     // ===== VALIDATION METHODS =====
