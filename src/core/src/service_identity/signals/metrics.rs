@@ -530,7 +530,6 @@ pub(crate) mod engine_tests {
             org_id: "o".into(),
             query_exemplars: false,
             query_data: false,
-            need_wal: false,
             use_cache: false,
             timeout: 30,
             search_event_type: None,

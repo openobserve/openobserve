@@ -686,35 +686,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_query_reading_the_wal_still_streams_when_the_provider_returns_one_source() {
-        enable_streaming();
-        let streaming = provider(true, false);
-        let streaming_calls = Arc::clone(&streaming.streaming_calls);
-        let query_ctx = Arc::new(config::meta::promql::value::QueryContext {
-            need_wal: true,
-            ..(*create_test_query_ctx("test_trace", "test_org", 30)).clone()
-        });
-        let eval_ctx = EvalContext::new(
-            BASE + 60 * SECOND,
-            BASE + 180 * SECOND,
-            60 * SECOND,
-            "test_trace".into(),
-        );
-        let mut ctx = PromqlContext::new(query_ctx, streaming, vec![]);
-        ctx.start = eval_ctx.start;
-        ctx.end = eval_ctx.end;
-        let mut engine = Engine::new("test_trace", Arc::new(ctx), eval_ctx);
-        let expr = promql_parser::parser::parse("sum(rate(m[1m]))").unwrap();
-        let (streamed, _) = engine.exec(&expr).await.unwrap();
-
-        assert_eq!(streaming_calls.load(Ordering::SeqCst), 1);
-        assert_eq!(
-            canonical(streamed),
-            canonical(eval_sum_rate(provider(false, false), 30).await.unwrap())
-        );
-    }
-
-    #[tokio::test]
     async fn test_streaming_run_stops_on_cancel() {
         let err = eval_sum_rate(provider(true, true), 30).await.unwrap_err();
         assert!(matches!(

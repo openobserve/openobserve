@@ -52,7 +52,6 @@ impl From<MetricsQueryRequest> for proto::cluster_rpc::MetricsQueryRequest {
                 partition: 0,
             }),
             org_id: String::new(),
-            need_wal: false,
             query: Some(query),
             use_cache: req.use_cache.unwrap_or(true),
             timeout: 0,

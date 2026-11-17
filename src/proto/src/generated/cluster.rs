@@ -531,9 +531,6 @@ pub struct MetricsQueryRequest {
     pub job: ::core::option::Option<Job>,
     #[prost(string, tag = "2")]
     pub org_id: ::prost::alloc::string::String,
-    /// ignored on receipt: the receiver sets it for each group from wal_start_time
-    #[prost(bool, tag = "4")]
-    pub need_wal: bool,
     #[prost(message, optional, tag = "5")]
     pub query: ::core::option::Option<MetricsQueryStmt>,
     #[prost(int64, tag = "8")]

@@ -152,7 +152,8 @@ pub async fn search(
 
     let mut results = Vec::new();
     if start == end {
-        results.push(search_inner(req, query_tracker).await?);
+        let need_wal = instant_need_wal(&trace_id, req, false).await?;
+        results.push(search_inner(req, need_wal, query_tracker).await?);
     } else {
         // 1. get max records stream
         let start_ts = std::time::Instant::now();
@@ -224,14 +225,13 @@ pub async fn search(
 
         // 3. search each group
         for (start, end) in group {
+            let need_wal = plan.window.reaches(end, wal_floor);
             let mut req = req.clone();
-            req.need_wal = plan.window.reaches(end, wal_floor);
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
-            let resp = search_inner(&req, query_tracker).await?;
+            let resp = search_inner(&req, need_wal, query_tracker).await?;
             log::info!(
-                "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] need_wal: {}, get resp, took: {} ms",
-                req.need_wal,
+                "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] need_wal: {need_wal}, get resp, took: {} ms",
                 start_ts.elapsed().as_millis()
             );
             results.push(resp);
@@ -305,7 +305,8 @@ pub async fn data(
 
     let start_ts = std::time::Instant::now();
     if start == end {
-        let ret = search_inner(req, query_tracker).await?;
+        let need_wal = instant_need_wal(&trace_id, req, true).await?;
+        let ret = search_inner(req, need_wal, query_tracker).await?;
         if let Err(e) = data_tx.send(ret).await {
             log::error!("[trace_id {trace_id}] promql->data->grpc: send data error: {e}");
         }
@@ -371,14 +372,13 @@ pub async fn data(
         };
     let wal_floor = request_floor(wal_start_time);
     for (start, end) in group {
+        let need_wal = plan.window.reaches(end, wal_floor);
         let mut req = req.clone();
-        req.need_wal = plan.window.reaches(end, wal_floor);
         req.query.as_mut().unwrap().start = start;
         req.query.as_mut().unwrap().end = end;
-        let resp = search_inner(&req, query_tracker).await?;
+        let resp = search_inner(&req, need_wal, query_tracker).await?;
         log::info!(
-            "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] need_wal: {}, get resp, took: {} ms",
-            req.need_wal,
+            "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] need_wal: {need_wal}, get resp, took: {} ms",
             start_ts.elapsed().as_millis()
         );
         if let Err(e) = data_tx.send(resp).await {
@@ -402,6 +402,7 @@ pub async fn data(
 #[tracing::instrument(name = "promql:search:grpc:search_inner", skip_all, fields(org_id = req.org_id))]
 pub async fn search_inner(
     req: &cluster_rpc::MetricsQueryRequest,
+    need_wal: bool,
     query_tracker: &QueryTracker,
 ) -> Result<(value::Value, String, ScanStats, i64, Vec<String>)> {
     let start = std::time::Instant::now();
@@ -430,7 +431,6 @@ pub async fn search_inner(
         org_id: org_id.to_string(),
         query_exemplars: query.query_exemplars,
         query_data: query.query_data,
-        need_wal: req.need_wal,
         use_cache: req.use_cache,
         timeout,
         search_event_type: req.search_event_type.parse::<SearchEventType>().ok(),
@@ -444,7 +444,7 @@ pub async fn search_inner(
         StorageProvider {
             trace_id: trace_id.to_string(),
             query_tracker: query_tracker.clone(),
-            need_wal: req.need_wal,
+            need_wal,
         },
         query.label_selector.clone(),
     );
@@ -584,6 +584,26 @@ fn request_floor(wal_start_time: i64) -> i64 {
     } else {
         wal_floor()
     }
+}
+
+/// Whether an unsplit request reads the WAL, decided as a group ending at its end would be.
+async fn instant_need_wal(
+    trace_id: &str,
+    req: &cluster_rpc::MetricsQueryRequest,
+    probe_if_unknown: bool,
+) -> Result<bool> {
+    let query = req.query.as_ref().unwrap();
+    let ast = promql::parse(&query.query).map_err(DataFusionError::Execution)?;
+    let window = selector_window(&ast);
+    let mut wal_start_time = req.wal_start_time;
+    if probe_if_unknown
+        && wal_start_time == 0
+        && wal_probe::needs_probe(&window, query.start, query.end)
+        && let Ok(streams) = query_streams(&req.org_id, &ast, query.query_exemplars).await
+    {
+        wal_start_time = wal_probe::wal_start_time(trace_id, &req.org_id, &streams).await;
+    }
+    Ok(window.reaches(query.end, request_floor(wal_start_time)))
 }
 
 /// The grid-aligned cut before the WAL head, `None` when the range does not straddle it.
@@ -908,6 +928,45 @@ mod tests {
         let before = wal_floor();
         let floor = request_floor(0);
         assert!(floor >= before && floor <= wal_floor());
+    }
+
+    #[tokio::test]
+    async fn test_instant_need_wal_decides_like_a_group_ending_at_the_instant() {
+        let req = |at: i64, wal_start_time: i64| cluster_rpc::MetricsQueryRequest {
+            org_id: "org".to_string(),
+            query: Some(cluster_rpc::MetricsQueryStmt {
+                query: "m".to_string(),
+                start: at,
+                end: at,
+                ..Default::default()
+            }),
+            wal_start_time,
+            ..Default::default()
+        };
+        let hour = second_micros(3600);
+        assert!(
+            instant_need_wal("t", &req(now_micros(), 0), false)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !instant_need_wal("t", &req(wal_floor() - hour, 0), false)
+                .await
+                .unwrap()
+        );
+        // between floor and head: read only when the probe saw a late sample that old
+        let late = wal_head() - hour;
+        assert!(instant_need_wal("t", &req(late, 0), false).await.unwrap());
+        assert!(
+            !instant_need_wal("t", &req(late, wal_head()), false)
+                .await
+                .unwrap()
+        );
+        assert!(
+            instant_need_wal("t", &req(late, late - hour), false)
+                .await
+                .unwrap()
+        );
     }
 
     #[test]
