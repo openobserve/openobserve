@@ -41,7 +41,12 @@ describe("isFiringNow", () => {
 });
 
 describe("ackCanChange", () => {
-  const ack = { acked_by: "a@example.com", acked_at: 1, ack_source: "ui" as const, groups_acked: 2 };
+  const ack = {
+    acked_by: "a@example.com",
+    acked_at: 1,
+    ack_source: "ui" as const,
+    groups_acked: 2,
+  };
   it.each([
     [{}, true],
     [{ ack }, false],
