@@ -110,14 +110,18 @@ async function pinAutoQuery(page, enabled) {
   });
 }
 
-// SQL is sent URL-safe base64 with "." padding when sql_base64_enabled is on.
+// The UI's URL-safe base64 uses "-", "_" and "." padding, for search SQL and for the Logs `query` URL parameter.
+function decodeUrlSafeBase64(encoded) {
+  const std = encoded.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
+  return Buffer.from(std, 'base64').toString('utf8');
+}
+
 function decodeSql(body) {
   const query = body && typeof body.query === 'object' ? body.query : body;
   const sql = query?.sql;
   if (typeof sql !== 'string') return '';
   if (body.encoding !== 'base64') return sql;
-  const std = sql.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
-  return Buffer.from(std, 'base64').toString('utf8');
+  return decodeUrlSafeBase64(sql);
 }
 
 function trackPanelRuns(page) {
@@ -138,6 +142,7 @@ function trackPanelRuns(page) {
 }
 
 module.exports = {
+  BASE,
   ORG,
   STREAM,
   NAMESPACES,
@@ -151,4 +156,5 @@ module.exports = {
   trackDashboard,
   pinAutoQuery,
   trackPanelRuns,
+  decodeUrlSafeBase64,
 };

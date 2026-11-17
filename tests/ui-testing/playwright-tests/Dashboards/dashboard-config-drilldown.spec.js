@@ -21,11 +21,8 @@ const {
   namespaceTablePanel,
   createDashboard,
   deleteCreatedDashboards,
+  decodeUrlSafeBase64,
 } = require('../utils/dashboard-auto-run-fixtures.js');
-
-// Same URL-safe base64 ("-", "_", "." padding) the panel uses for the Logs `query` parameter.
-const decodeLogsQuery = (encoded) =>
-  Buffer.from(encoded.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '='), 'base64').toString('utf8');
 
 test.describe.configure({ mode: "parallel" });
 test.describe.configure({ retries: 1 });
@@ -561,7 +558,7 @@ test.describe("Panel Go To Logs (#16395)", { tag: ['@dashboards', '@goToLogs', '
 
     const logsTab = await pm.dashboardPanelEdit.goToLogsInNewTab('p_gtl');
     const params = new URL(logsTab.url()).searchParams;
-    expect(decodeLogsQuery(params.get('query')), 'Logs gets the log lines behind the panel, filtered by its WHERE').toBe(
+    expect(decodeUrlSafeBase64(params.get('query')), 'Logs gets the log lines behind the panel, filtered by its WHERE').toBe(
       `SELECT * FROM "${STREAM}" WHERE ${where} ORDER BY _timestamp DESC`,
     );
     expect(params.get('show_histogram')).toBe('true');
