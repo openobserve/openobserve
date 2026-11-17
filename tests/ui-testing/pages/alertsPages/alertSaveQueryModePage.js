@@ -38,7 +38,6 @@ export class AlertSaveQueryModePage {
       threshold: '[data-test="alert-trigger-threshold-input-field"]',
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
       scheduledTab: '[data-test="add-alert-type-tab-false"]',
-      watchSectionTitle: '[data-test="add-alert-section-watch-title"]',
       streamTypeCard: (type) => `[data-test="add-alert-stream-type-card-${type}"]`,
       // Compare-with-Past is a tucked setting of "When is it a problem?".
       multiWindowAdd: '[data-test="multi-time-range-alerts-add-btn"]',
@@ -101,6 +100,8 @@ export class AlertSaveQueryModePage {
   }
 
   async addBuilderCondition(column, value) {
+    // A field list opened mid-scroll loses its anchor when the snap settles, and the list hides.
+    await goToAlertSection(this.page, 'condition');
     await new FilterBuilderDriver(this.page, 'alert-conditions').addCondition(column, '=', value);
   }
 
@@ -185,9 +186,13 @@ export class AlertSaveQueryModePage {
       await input.fill(sql, { force: true });
       await expect(editor).toContainText(table, { timeout: 5000 });
     }).toPass({ timeout: 40000 });
-    // Click away afterwards: the stream-name sync runs off the committed value,
-    // which is why #15091/#15092 both say "click outside the editor and wait".
-    await this.page.locator(this.locators.watchSectionTitle).click();
+    // The stream-name sync runs off the value Monaco commits on blur; a click-away
+    // lands on the signature-help popup the fill opens, so close it and blur directly.
+    await this.page.keyboard.press('Escape');
+    await input.evaluate((el) => el.blur());
+    await expect(this.page.locator(this.locators.streamTrigger)).toHaveAttribute('data-test-selected-value', table, {
+      timeout: 15000,
+    });
   }
 
   // ── dialog actions ─────────────────────────────────────────────────────
