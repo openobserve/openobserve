@@ -24,11 +24,10 @@ export interface FieldFilter {
 }
 
 /** One View logs / View traces row of the point menu; `detail` is its slice or its lock reason. */
-export interface PointExploreItem {
+export type PointExploreItem =
   // A license lock stays visible so the user learns what the plan lacks; any other gap is hidden.
-  state: "enabled" | "pending" | "locked" | "hidden";
-  detail: I18nText;
-}
+  | { state: "enabled" | "pending" | "locked"; detail: I18nText }
+  | { state: "hidden"; detail?: never };
 
 /** The slice a clicked point explores, in microseconds. */
 export interface PointTarget {

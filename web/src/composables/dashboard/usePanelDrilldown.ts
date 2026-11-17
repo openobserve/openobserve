@@ -843,7 +843,7 @@ export function usePanelDrilldown({
         })
       : sliceText(target);
 
-  const hiddenItem: PointExploreItem = { state: "hidden", detail: "" };
+  const hiddenItem: PointExploreItem = { state: "hidden" };
 
   const lockedItem = (feature: string): PointExploreItem => ({
     state: "locked",

@@ -182,6 +182,7 @@ import {
 } from "@/utils/dashboard/convertCustomChartData";
 import { FORECAST_MIN_DAYS, forecastAlertFromChart } from "@/utils/alerts/forecastAlert";
 import { getPanelDataForPageKey } from "@/composables/dashboard/useDashboardPanel";
+import config from "@/aws-exports";
 import searchService from "@/services/search";
 import { DASHBOARD_ANNOTATION_SOURCES_KEY } from "@/composables/dashboard/usePanelAnnotationSources";
 import {
@@ -850,20 +851,36 @@ describe("PanelSchemaRenderer", () => {
     };
     const item = (id: string) => wrapper.find(`[data-test="drilldown-menu-item-${id}"]`);
 
-    it("a line point with no drilldowns lists View logs and a pending View traces", async () => {
+    // Correlation needs an enterprise build, so each test pins the build instead of reading .env.
+    const asBuild = (build: "oss" | "enterprise") => {
+      const previous = config.isEnterprise;
+      config.isEnterprise = build === "enterprise" ? "true" : "false";
+      onTestFinished(() => {
+        config.isEnterprise = previous;
+      });
+    };
+
+    it("OSS: a line point with no drilldowns lists View logs and hides View traces", async () => {
+      asBuild("oss");
       await clickPoint();
       expect(item("view-logs").exists()).toBe(true);
       expect(item("view-logs").text()).toContain("View logs at this time");
       expect(wrapper.find('[data-test="drilldown-menu-item-view-logs-detail"]').text()).toContain(
         "svc=cart",
       );
+      expect(item("view-traces").exists()).toBe(false);
+      expect(wrapper.vm.drilldownArray).toEqual([]);
+    });
+
+    it("enterprise: View traces shows as pending while the service lookup runs", async () => {
+      asBuild("enterprise");
+      await clickPoint();
       expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-pending"]').exists()).toBe(
         true,
       );
       expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-lock"]').exists()).toBe(
         false,
       );
-      expect(wrapper.vm.drilldownArray).toEqual([]);
     });
 
     it("keeps a license-locked item visible with its lock and reason", async () => {
@@ -900,6 +917,7 @@ describe("PanelSchemaRenderer", () => {
         { name: "First", type: "byUrl", data: { url: "https://a.example" } },
         { name: "Second", type: "byUrl", data: { url: "https://b.example" } },
       ];
+      asBuild("oss");
       await clickPoint({ panelSchema: breakdownPanel({ config: { drilldown } }) });
       const ids = wrapper
         .findAll('[data-test="drilldown-menu"] [data-test^="drilldown-menu-item-"]')
@@ -907,7 +925,6 @@ describe("PanelSchemaRenderer", () => {
         .filter((id) => !/-(detail|reason|lock|pending)$/.test(id!));
       expect(ids).toEqual([
         "drilldown-menu-item-view-logs",
-        "drilldown-menu-item-view-traces",
         "drilldown-menu-item-First",
         "drilldown-menu-item-Second",
       ]);
@@ -932,9 +949,10 @@ describe("PanelSchemaRenderer", () => {
         timeSlice: "panelRange",
       });
       const drawer = () => wrapper.findComponent({ name: "DashboardLogDrawer" });
-      await vi.waitFor(() => expect(drawer().exists()).toBe(true), { timeout: 5000 });
+      // The drawer is a lazy component; its first import alone can take seconds on a cold run.
+      await vi.waitFor(() => expect(drawer().exists()).toBe(true), { timeout: 10000 });
       expect(drawer().props("filters")).toEqual([{ field: "svc", value: "cart" }]);
-    });
+    }, 15000);
 
     it("kiosk mode opens no point menu", async () => {
       store.state.kioskMode = true;
