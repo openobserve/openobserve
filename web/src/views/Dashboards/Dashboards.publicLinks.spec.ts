@@ -40,14 +40,27 @@ vi.mock("@/services/settings", async (importOriginal) => {
     },
   });
 });
+const shortcuts = vi.hoisted(() => new Map<string, () => void>());
+vi.mock("@/lib/vue-shortcut-manager", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/vue-shortcut-manager")>()),
+  useShortcuts: (list: Array<{ id: string; handler: () => void }>) =>
+    list.forEach(({ id, handler }) => shortcuts.set(id, handler)),
+}));
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({ showPositiveNotification: vi.fn(), showErrorNotification: vi.fn() }),
 }));
 
 import Dashboards from "./Dashboards.vue";
 import { loadDashboardsByFolderId } from "@/utils/commons";
-
-const PUBLIC_ID = "__public_links__";
+import { PUBLIC_LINKS_FOLDER_ID as PUBLIC_ID } from "@/utils/dashboard/pseudoFolders";
+const refreshLinks = vi.fn().mockResolvedValue(undefined);
+const PublicLinksTableStub = {
+  setup(_: unknown, { expose }: { expose: (e: Record<string, unknown>) => void }) {
+    expose({ refreshLinks });
+  },
+  template:
+    "<div data-test='dashboards-public-links'><input data-test='dashboards-public-links-search' /></div>",
+};
 
 const buildStore = (enabled: boolean) =>
   createStore({
@@ -73,21 +86,28 @@ const buildRouter = () =>
 const mountAt = async (
   router: Router,
   enabled: boolean,
-  { folder = "default", realRail = false }: { folder?: string; realRail?: boolean } = {},
+  {
+    folder = "default",
+    realRail = false,
+    attach = false,
+  }: { folder?: string; realRail?: boolean; attach?: boolean } = {},
 ) => {
   await router.push({ path: "/dashboards", query: { folder } });
   const store = buildStore(enabled);
   const w = shallowMount(Dashboards, {
+    attachTo: attach ? document.body : undefined,
     global: {
       plugins: [store, router, i18n],
       provide: { store },
       stubs: {
         OPageLayout: {
-          template: "<div><slot name='actions' /><slot name='actions-overflow' /><slot /></div>",
+          props: ["subtitle"],
+          template:
+            "<div><p data-test='page-subtitle'>{{ subtitle }}</p><slot name='actions' /><slot name='actions-overflow' /><slot /></div>",
         },
         OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
         OTable: { name: "OTable", template: "<div data-test='dashboard-table' />" },
-        PublicLinksTable: { template: "<div data-test='dashboards-public-links' />" },
+        PublicLinksTable: PublicLinksTableStub,
         ...(realRail ? { FolderList: false } : {}),
       },
     },
@@ -145,6 +165,30 @@ describe("Dashboards.vue public links entry", () => {
     expect(router.currentRoute.value.query.folder).toBe("default");
   });
 
+  it("shows the public links subtitle on the public view and the dashboards one elsewhere", async () => {
+    const subtitle = (w: VueWrapper) => w.find('[data-test="page-subtitle"]').text();
+    wrapper = await mountAt(router, true);
+    expect(subtitle(wrapper)).toBe(i18n.global.t("dashboard.subtitle"));
+
+    await pick(wrapper, PUBLIC_ID);
+    expect(subtitle(wrapper)).toBe("Every public link in this organization");
+
+    await pick(wrapper, "default");
+    expect(subtitle(wrapper)).toBe(i18n.global.t("dashboard.subtitle"));
+  });
+
+  it("imports into the Default folder from the public view, which has no folder of its own", async () => {
+    wrapper = await mountAt(router, true, { folder: PUBLIC_ID });
+    const push = vi.spyOn(router, "push");
+
+    (wrapper.vm as any).importDashboard();
+
+    expect(push).toHaveBeenCalledWith({
+      path: "/dashboards/import",
+      query: { org_identifier: "test-org", folder: "default" },
+    });
+  });
+
   it("opens the public links table from ?folder on load, without a folder fetch", async () => {
     wrapper = await mountAt(router, true, { folder: PUBLIC_ID });
 
@@ -163,6 +207,52 @@ describe("Dashboards.vue public links entry", () => {
     expect(wrapper.find('[data-test="dashboards-public-links"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="dashboard-table"]').exists()).toBe(true);
     expect(router.currentRoute.value.query.folder).toBe("default");
+  });
+
+  it("replaces the ?folder entry on that fallback, so Back does not return to it", async () => {
+    const push = vi.spyOn(router, "push");
+    const replace = vi.spyOn(router, "replace");
+    wrapper = await mountAt(router, false, { folder: PUBLIC_ID });
+
+    const toDefault = (calls: unknown[][]) =>
+      calls.filter(([to]) => (to as { query?: { folder?: string } }).query?.folder === "default");
+    expect(toDefault(push.mock.calls)).toHaveLength(0);
+    expect(toDefault(replace.mock.calls)).toHaveLength(1);
+    expect(router.currentRoute.value.query).toMatchObject({
+      folder: "default",
+      org_identifier: "test-org",
+    });
+  });
+
+  it("moves to the Default folder, replacing the entry, when the feature turns off while open", async () => {
+    wrapper = await mountAt(router, true, { folder: PUBLIC_ID });
+    const push = vi.spyOn(router, "push");
+    const replace = vi.spyOn(router, "replace");
+
+    (wrapper.vm as any).store.state.zoConfig.public_dashboards_enabled = false;
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="dashboards-public-links"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="dashboard-table"]').exists()).toBe(true);
+    expect(push).not.toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ folder: "default" }) }),
+    );
+    expect(router.currentRoute.value.query.folder).toBe("default");
+  });
+
+  it("points / at the links search and r at the links refresh on the public view", async () => {
+    wrapper = await mountAt(router, true, { folder: PUBLIC_ID, attach: true });
+    vi.mocked(loadDashboardsByFolderId).mockClear();
+
+    shortcuts.get("dashboardsListRefresh")!();
+    expect(refreshLinks).toHaveBeenCalledTimes(1);
+    expect(loadDashboardsByFolderId).not.toHaveBeenCalled();
+
+    shortcuts.get("dashboardsListFocusSearch")!();
+    expect(document.activeElement?.getAttribute("data-test")).toBe(
+      "dashboards-public-links-search",
+    );
   });
 
   it("follows the real rail: its entry renders and selecting it shows the public links", async () => {

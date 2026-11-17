@@ -13,6 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Reserved pseudo-folder id for the folder-rail "Public dashboards" entry; the
-// dunder name cannot collide with a generated folder id.
-export const PUBLIC_LINKS_FOLDER_ID = "__public_links__";
+import { describe, expect, it } from "vitest";
+import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import { PUBLIC_LINKS_FOLDER_ID, isPseudoFolder } from "./pseudoFolders";
+
+describe("isPseudoFolder", () => {
+  it("is true for the Favorites and Public dashboards entries", () => {
+    expect(isPseudoFolder(FAVORITES_FOLDER_ID)).toBe(true);
+    expect(isPseudoFolder(PUBLIC_LINKS_FOLDER_ID)).toBe(true);
+  });
+
+  it("is false for real folders, the default folder included", () => {
+    expect(isPseudoFolder("default")).toBe(false);
+    expect(isPseudoFolder("7f3a9c")).toBe(false);
+    expect(isPseudoFolder("")).toBe(false);
+  });
+});

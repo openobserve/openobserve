@@ -25,7 +25,7 @@ import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
 import i18n from "@/locales";
-import { PUBLIC_LINKS_FOLDER_ID } from "@/components/dashboards/publicLinksFolder";
+import { PUBLIC_LINKS_FOLDER_ID } from "@/utils/dashboard/pseudoFolders";
 
 // Routes store an i18n KEY in `meta.titleKey` (src/router/index.ts translates it
 // per navigation), so assert the English copy the key still resolves to — a typo'd

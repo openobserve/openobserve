@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <FolderIcon
                   :token="iconFor(tab)"
                   :favorite="tab.folderId === FAVORITES_FOLDER_ID"
-                  :icon="tab.folderId === PUBLIC_LINKS_FOLDER_ID ? 'language' : undefined"
+                  :icon="isPublicTab(tab) ? 'language' : undefined"
                   :data-test="`dashboard-folder-icon-${tab.name}`"
                 />
                 <OTruncatedText
@@ -119,11 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-folder-name-${tab.name}`"
                   >{{ tab.name }}</OTruncatedText
                 >
-                <BetaBadge
-                  v-if="tab.folderId === PUBLIC_LINKS_FOLDER_ID"
-                  size="xs"
-                  class="shrink-0"
-                />
+                <BetaBadge v-if="isPublicTab(tab)" size="xs" class="shrink-0" />
                 <!-- Kept in flow rather than overlaid: an overlay needs a backdrop
                  matching the row, and OTab only paints a hover background on
                  INACTIVE tabs, so it would read wrong on the open folder. -->
@@ -218,7 +214,7 @@ import FolderIcon from "./FolderIcon.vue";
 import AddFolder from "./AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
-import { PUBLIC_LINKS_FOLDER_ID } from "@/components/dashboards/publicLinksFolder";
+import { PUBLIC_LINKS_FOLDER_ID, isPseudoFolder } from "@/utils/dashboard/pseudoFolders";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import { useFolderIcons } from "@/composables/useFolderIcons";
 import { selectSyntheticsFolder } from "@/utils/synthetics/selectFolder";
@@ -299,8 +295,7 @@ export default defineComponent({
     const publicLinksActive = computed(
       () => !props.hideActive && activeFolderId.value === PUBLIC_LINKS_FOLDER_ID,
     );
-    const isPseudoFolder = (folderId: string) =>
-      folderId === FAVORITES_FOLDER_ID || folderId === PUBLIC_LINKS_FOLDER_ID;
+    const isPublicTab = (tab: { folderId: string }) => tab.folderId === PUBLIC_LINKS_FOLDER_ID;
     const showAddFolderDialog = ref(false);
     const isFolderEditMode = ref(false);
     const selectedFolderToEdit = ref(null);
@@ -479,8 +474,8 @@ export default defineComponent({
       iconFor,
       folderKey,
       FAVORITES_FOLDER_ID,
-      PUBLIC_LINKS_FOLDER_ID,
       publicLinksActive,
+      isPublicTab,
       isPseudoFolder,
     };
   },

@@ -32,7 +32,7 @@ import {
 } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES, redirectHeatmaps } from "@/utils/rum/productAnalyticsRoutes";
 import { ALERT_LIST_ALL_FOLDERS } from "@/utils/alerts/alertListLink";
-import { PUBLIC_LINKS_FOLDER_ID } from "@/components/dashboards/publicLinksFolder";
+import { PUBLIC_LINKS_FOLDER_ID } from "@/utils/dashboard/pseudoFolders";
 import { endSignedInSession } from "@/utils/drafts/signOutFlow";
 import { silenceUnloadPrompts } from "@/utils/sessionServices";
 import {
@@ -736,6 +736,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         titleKey: "menu.dashboard",
+        titleKeyByFolder: { [PUBLIC_LINKS_FOLDER_ID]: "dashboard.publicLinks.pageTitle" },
         allowOnEmptyData: true,
         licenseFeature: "dashboards",
       },

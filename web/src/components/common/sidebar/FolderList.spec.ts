@@ -6,6 +6,7 @@ import { useRouter } from "vue-router";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
+import { PUBLIC_LINKS_FOLDER_ID as PUBLIC_ID } from "@/utils/dashboard/pseudoFolders";
 
 // the overlay surface itself via v-model:open. This stub mirrors the public
 // prop/emit shape FolderList relies on so the parent dialog open/close logic
@@ -241,7 +242,6 @@ describe("FolderList.vue", () => {
     });
 
     describe("Public dashboards entry", () => {
-      const PUBLIC_ID = "__public_links__";
       const mountRail = (props: Record<string, unknown>) =>
         mount(FolderList, {
           global: {
