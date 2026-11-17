@@ -2,7 +2,7 @@
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { openNavFlyoutChild } = require('../commonActions.js');
-import { goToAlertSection, openAlertFilterBuilder } from './alertSectionHelpers.js';
+import { goToAlertSection, openAlertFilterBuilder, selectAlertStreamType } from './alertSectionHelpers.js';
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 export class AlertsFormValidationPage {
@@ -118,7 +118,7 @@ export class AlertsFormValidationPage {
     this.alertTriggerThresholdError   = '[data-test="alert-trigger-threshold-input-error"]';
 
     // ── Alert wizard step 1 stream selectors ─────────────────────────────────
-    this.wizardStreamTypeDropdown     = '[data-test="add-alert-stream-type-cards"]';
+    this.wizardStreamTypeDropdown     = '[data-test="add-alert-stream-type-select-dropdown"]';
     this.wizardStreamNameDropdown     = '[data-test="add-alert-stream-name-select-dropdown"]';
     // OSelect popovers — options carry `data-test-value` for value-specific picks
     this.wizardStreamNamePopover      = '[data-test="add-alert-stream-name-select-dropdown-popover"]';
@@ -412,11 +412,6 @@ export class AlertsFormValidationPage {
   }
 
   // OSelect option factories — pick by `data-test-value` (§4) rather than text.
-  getWizardStreamTypeOption(value) {
-    return this.page.locator(
-      `[data-test="add-alert-stream-type-card-${value}"]`,
-    );
-  }
 
   getWizardStreamNameOption(value) {
     return this.page.locator(
@@ -428,7 +423,7 @@ export class AlertsFormValidationPage {
     testLogger.info('Selecting alert wizard stream type: ' + typeLabel);
     // streamTypes are the lowercase values logs/metrics/traces (AddAlert.vue)
     const value = typeLabel.trim().toLowerCase();
-    await this.getWizardStreamTypeOption(value).click();
+    await selectAlertStreamType(this.page, value);
   }
 
   async selectWizardStreamName(streamName) {

@@ -32,7 +32,14 @@ const ANOMALY_OPERATOR_IDS = {
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 const { cleanupTestAnomalies: apiCleanupTestAnomalies } = require('../../playwright-tests/utils/api-helper.js');
 const { discardEditorDraftIfAsked } = require('../alertsPages/editorDraftHelpers.js');
-const { goToAlertSection, settleIntoView } = require('../alertsPages/alertSectionHelpers.js');
+const {
+    expandAlertSettingGroups,
+    fillAlertName,
+    goToAlertSection,
+    openAlertFilterBuilder,
+    selectAlertStreamType,
+    settleIntoView,
+} = require('../alertsPages/alertSectionHelpers.js');
 
 class AnomalyDetectionPage {
     /**
@@ -58,14 +65,10 @@ class AnomalyDetectionPage {
             addBtn: '[data-test="alert-list-add-alert-btn"]',
             searchInput: '[data-test="alert-list-search-input"]',
 
-            // Wizard topbar
-            // OFormInlineEdit: click -trigger to reveal -input; -error carries
-            // the validation message.
-            nameTrigger: '[data-test="add-anomaly-name-input-trigger"]',
-            nameInput: '[data-test="add-anomaly-name-input-input"]',
-            nameValue: '[data-test="add-anomaly-name-input-value"]',
-            nameError: '[data-test="add-anomaly-name-input-error"]',
-            streamTypeSelect: '[data-test="add-alert-stream-type-cards"]',
+            // The name is typed in section 5; the header only shows it.
+            nameValue: '[data-test="add-alert-header-title"]',
+            nameError: '[data-test="add-alert-details-name-error"]',
+            streamTypeSelect: '[data-test="add-alert-stream-type-select-dropdown"]',
             streamNameSelect: '[data-test="add-alert-stream-name-select-dropdown"]',
 
             // Wizard chrome
@@ -74,6 +77,11 @@ class AnomalyDetectionPage {
 
             // Detection config step
             queryTabs: '[data-test="anomaly-query-tabs"]',
+            writeSqlInstead: '[data-test="add-alert-add-anomalySql"]',
+            retrainAdd: '[data-test="add-alert-add-anomalyRetrain"]',
+            sensitivityChange: '[data-test="anomaly-sensitivity-row-change"]',
+            recordOnlyRow: '[data-test="anomaly-record-only-row"]',
+            destinationRow: '[data-test="anomaly-destination-row"]',
             filterBuilder: '[data-test="anomaly-filter-builder-root"]',
             customSql: '[data-test="anomaly-custom-sql"]',
             customSqlRequiredError: '[data-test="anomaly-custom-sql-required-error"]',
@@ -299,19 +307,8 @@ class AnomalyDetectionPage {
 
     // Wizard topbar
 
-    /** OFormInlineEdit renders as text until its trigger is clicked. */
     async fillAnomalyName(name) {
-        const trigger = this.page.locator(this.selectors.nameTrigger);
-        if (await trigger.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await trigger.click();
-        }
-        const input = this.page.locator(this.selectors.nameInput);
-        await input.waitFor({ state: 'visible', timeout: 10000 });
-        await input.fill(name);
-        // Blur, never Enter: OInlineEdit commits on both, but Enter also SUBMITS
-        // the owning form, which runs a premature save and leaves a 30s error
-        // toast covering the wizard footer for every step that follows.
-        await input.blur();
+        await fillAlertName(this.page, name);
         await expect(this.page.locator(this.selectors.nameValue)).toContainText(name, {
             timeout: 10000,
         });
@@ -319,7 +316,7 @@ class AnomalyDetectionPage {
     }
 
     async selectStreamType(streamType = 'logs') {
-        await this.page.locator(`[data-test="add-alert-stream-type-card-${streamType}"]`).click();
+        await selectAlertStreamType(this.page, streamType);
     }
 
     async selectStreamName(streamName) {
@@ -335,13 +332,25 @@ class AnomalyDetectionPage {
     // Editor sections: detection config starts in "What should we watch?", alerting is "Who should hear about it?".
 
     async openConfigTab() {
-        await goToAlertSection(this.page, 'watch');
-        await this.page.locator(this.selectors.queryTabs).waitFor({ state: 'visible', timeout: 10000 });
+        await goToAlertSection(this.page, 'condition');
+        await this.page
+            .locator(`${this.selectors.queryTabs}, ${this.selectors.writeSqlInstead}`)
+            .first()
+            .waitFor({ state: 'visible', timeout: 10000 });
     }
 
+    /** Scrolls to Who to tell; Record only sits behind its More options line. */
     async openAlertingTab() {
         await goToAlertSection(this.page, 'notify');
-        await this.page.locator(this.selectors.alertEnabled).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page
+            .locator(`${this.selectors.destinationRow}, ${this.selectors.recordOnlyRow}`)
+            .first()
+            .waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    /** Shows the settings anomaly tucks behind More options: SQL preview, Record only, priority and tags. */
+    async showAnomalyMoreOptions() {
+        await expandAlertSettingGroups(this.page, ['condition', 'notify', 'details']);
     }
 
     // Detection config
@@ -357,6 +366,15 @@ class AnomalyDetectionPage {
      */
     async selectQueryMode(mode) {
         const tab = this.page.locator(this.selectors.queryTab(mode));
+        if (!(await tab.count())) {
+            // Tabs appear only after "+ Write SQL instead"; until then the mode is filters.
+            if (mode === 'filters') return;
+            const add = this.page.locator(this.selectors.writeSqlInstead);
+            await settleIntoView(this.page, add);
+            await add.click();
+            await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+            return;
+        }
         if (await tab.count()) {
             await tab.click();
             await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 5000 });
@@ -406,6 +424,7 @@ class AnomalyDetectionPage {
 
 
     async getSqlPreviewText() {
+        await this.showAnomalyMoreOptions();
         return this.monaco.getContent(this.page.locator(this.selectors.sqlPreview));
     }
 
@@ -468,6 +487,8 @@ class AnomalyDetectionPage {
 
     /** @param {0|1|7|14} days 0 means "Never". */
     async selectRetrainInterval(days) {
+        const add = this.page.locator(this.selectors.retrainAdd);
+        if (await add.isVisible().catch(() => false)) await add.click();
         await this.selectOptionByValue(this.selectors.retrainInterval, days);
     }
 
@@ -487,6 +508,7 @@ class AnomalyDetectionPage {
      * spelling (=, <>, IN, Contains, Is Null, ...); `value` a string, or a list for IN / NOT IN.
      */
     async addFilter(field, operator = '=', value = null) {
+        await openAlertFilterBuilder(this.page);
         const before = await this.getFilterRows().count();
         const id = ANOMALY_OPERATOR_IDS[String(operator).toLowerCase()];
         if (!id) throw new Error(`Unknown anomaly filter operator: ${operator}`);
@@ -515,6 +537,7 @@ class AnomalyDetectionPage {
      * @returns {Promise<boolean>} whether the tier control was present
      */
     async selectSensitivityTier(k) {
+        await this.openSensitivityRow();
         const tier = this.page.locator(this.selectors.sensitivityTierItem(k));
         if (!(await tier.count())) {
             testLogger.info('Sensitivity tiers absent on this build; keeping the default threshold');
@@ -524,8 +547,18 @@ class AnomalyDetectionPage {
         return true;
     }
 
+    /** Sensitivity reads as a sentence row until Change opens the tiers. */
+    async openSensitivityRow() {
+        const change = this.page.locator(this.selectors.sensitivityChange);
+        if (!(await change.isVisible().catch(() => false))) return;
+        await settleIntoView(this.page, change);
+        await change.click();
+        await this.page.locator(this.selectors.sensitivityTier).first().waitFor({ state: 'visible', timeout: 10000 });
+    }
+
     /** True when the build exposes the tier/level sensitivity controls. */
     async hasSensitivityTiers() {
+        await this.openSensitivityRow();
         return (await this.page.locator(this.selectors.sensitivityTier).count()) > 0;
     }
 
@@ -619,10 +652,12 @@ class AnomalyDetectionPage {
 
     /** @param {1|2|3|4|5} priority */
     async selectPriority(priority) {
+        await this.showAnomalyMoreOptions();
         await this.selectOptionByValue(this.selectors.prioritySelect, priority);
     }
 
     async addTags(tags) {
+        await this.showAnomalyMoreOptions();
         const input = this.page.locator(`${this.selectors.tagsInput} input`).first();
         await input.waitFor({ state: 'visible', timeout: 10000 });
         for (const tag of tags) {
@@ -632,20 +667,23 @@ class AnomalyDetectionPage {
     }
 
     /**
-     * Set the notifications switch to `enabled`.
-     *
-     * OSwitch toggles from a click handler on its WRAPPER, not on the inner
-     * role=switch button, so a click on the button is not self-evidently a
-     * state change. Assert the end state — silently leaving this on saves an
-     * anomaly config that notifies nobody.
+     * Notify (true) or Record only (false). Record only is a More options switch; once on it reads as a
+     * sentence row whose Remove turns notifications back on. Asserts the end state.
      */
     async toggleNotifications(enabled) {
+        const recordOnly = this.page.locator(this.selectors.recordOnlyRow);
+        const isRecordOnly = await recordOnly.isVisible().catch(() => false);
+        if (isRecordOnly === !enabled) return;
+        if (enabled) {
+            await this.page.locator('[data-test="anomaly-record-only-row-remove"]').click();
+            await expect(this.page.locator(this.selectors.destinationRow)).toBeVisible({ timeout: 5000 });
+            return;
+        }
+        await this.showAnomalyMoreOptions();
         const root = this.page.locator(this.selectors.alertEnabled);
-        const sw = root.locator('[role="switch"]');
-        await sw.waitFor({ state: 'visible', timeout: 10000 });
-        if (((await sw.getAttribute('aria-checked')) === 'true') === enabled) return;
+        await settleIntoView(this.page, root);
         await root.click();
-        await expect(sw).toHaveAttribute('aria-checked', String(enabled), { timeout: 5000 });
+        await expect(recordOnly).toBeVisible({ timeout: 5000 });
     }
 
     /**
