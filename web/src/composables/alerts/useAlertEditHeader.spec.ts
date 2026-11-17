@@ -9,6 +9,7 @@ const createMute = vi.fn();
 const endMute = vi.fn();
 const downtimesEnabled = ref(true);
 let listRows: Record<string, unknown>[] = [];
+let detail: Record<string, unknown> | undefined;
 const trigger = vi.fn();
 const toastSpy = vi.fn();
 
@@ -27,6 +28,10 @@ vi.mock("@/services/alerts.queries", () => ({
     queryKey: ["alerts-test", org, folder, name],
     queryFn: async () => listRows,
   }),
+  alertDetailQuery: (org: string, id: string) => ({
+    queryKey: ["alert-detail-test", org, id],
+    queryFn: async () => detail ?? {},
+  }),
   toggleAlertStateMutation: () => ({
     mutationFn: async (vars: { enabled: boolean }) => ({ data: { enabled: vars.enabled } }),
   }),
@@ -36,7 +41,7 @@ vi.mock("@/services/alerts", () => ({
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (o: unknown) => toastSpy(o) }));
 
-const host = (onEnabledSaved?: (enabled: boolean) => void) => {
+const host = (onEnabledSaved?: (enabled: boolean) => void, folderId: string | undefined = "f1") => {
   let api: AlertEditHeader | null = null;
   mount(
     defineComponent({
@@ -44,7 +49,7 @@ const host = (onEnabledSaved?: (enabled: boolean) => void) => {
         api = useAlertEditHeader({
           alertId: () => "a1",
           name: () => "errors",
-          folderId: () => "f1",
+          folderId: () => folderId,
           onEnabledSaved,
         });
         return () => h("div");
@@ -65,6 +70,7 @@ describe("useAlertEditHeader", () => {
     toastSpy.mockReset();
     downtimesEnabled.value = true;
     listRows = [];
+    detail = undefined;
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(ENDS_AT / 1000 - 3_600_000);
   });
@@ -164,6 +170,14 @@ describe("useAlertEditHeader", () => {
     listRows = [{ alert_id: "a1", enabled: false, last_outcome: "firing" }];
     const api = host();
     await flushPromises();
+    expect(api().state.value).toEqual({ kind: "disabled" });
+  });
+
+  it("an alert opened without its folder shows its saved disabled state", async () => {
+    detail = { enabled: false, folder_id: "f1" };
+    const api = host(undefined, undefined);
+    await flushPromises();
+    expect(api().enabled.value).toBe(false);
     expect(api().state.value).toEqual({ kind: "disabled" });
   });
 

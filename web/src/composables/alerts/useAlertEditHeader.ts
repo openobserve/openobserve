@@ -21,7 +21,11 @@ import { useOrgId } from "@/composables/query";
 import { useAlertActions, type AlertMuteRef } from "@/composables/alerts/useAlertActions";
 import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
-import { alertsListQuery, toggleAlertStateMutation } from "@/services/alerts.queries";
+import {
+  alertDetailQuery,
+  alertsListQuery,
+  toggleAlertStateMutation,
+} from "@/services/alerts.queries";
 import alertsService from "@/services/alerts";
 import type { ActiveDowntime } from "@/services/downtimes";
 import type { EnableAlertResponseBody, TriggerAlertResponseBody } from "@/ts/interfaces/alert";
@@ -85,11 +89,23 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
   const toggleWrite = useMutation(() => toggleAlertStateMutation(orgId.value));
   const busy = ref(false);
 
+  // The list row is found by folder; without one the alert's own read still knows its saved state.
+  const rowFound = ref(false);
+  const detailQuery = useQuery(() =>
+    Object.assign(alertDetailQuery(orgId.value, input.alertId()), {
+      enabled: !!orgId.value && !!input.alertId() && !rowFound.value,
+    }),
+  );
+  const detail = computed(
+    () => detailQuery.data.value as { enabled?: boolean; folder_id?: string } | undefined,
+  );
+
   // The alert GET carries no run state or mute, so the header reads the alert's list row, as AlertDetail does.
   const listQuery = useQuery(() =>
-    Object.assign(alertsListQuery(orgId.value, input.folderId() ?? "", input.name()), {
-      enabled: !!orgId.value && !!input.alertId() && !!input.name(),
-    }),
+    Object.assign(
+      alertsListQuery(orgId.value, input.folderId() || detail.value?.folder_id || "", input.name()),
+      { enabled: !!orgId.value && !!input.alertId() && !!input.name() },
+    ),
   );
   const row = computed<AlertListRow | null>(
     () =>
@@ -97,6 +113,7 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
         (r) => (r.alert_id ?? r.id) === input.alertId(),
       ) ?? null,
   );
+  watch(row, (r) => (rowFound.value = !!r), { immediate: true });
 
   // undefined = the list row decides; an action here holds only until a list read started after it lands.
   const localMute = ref<AlertMuteRef | null | undefined>(undefined);
@@ -159,7 +176,9 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
       : raw(""),
   );
 
-  const enabled = computed(() => localEnabled.value ?? row.value?.enabled ?? true);
+  const enabled = computed(
+    () => localEnabled.value ?? row.value?.enabled ?? detail.value?.enabled ?? true,
+  );
 
   const state = computed<AlertEditState>(() => {
     if (!enabled.value) return { kind: "disabled" };
