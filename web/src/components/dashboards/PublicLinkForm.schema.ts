@@ -194,8 +194,10 @@ export const rangesWindow = (
   ranges: PublicLinkRange[],
   nowMs: number,
 ): { start_time: Date; end_time: Date } => {
+  const nowMicros = nowMs * 1000;
+  // The variable pickers read these Dates as microseconds, as the dashboard builds its own time object.
   const spans = (ranges.length ? ranges : publicLinkDefaults().ranges).map((r) =>
-    r.type === "relative" ? [nowMs - r.secs * 1000, nowMs] : [r.start / 1000, r.end / 1000],
+    r.type === "relative" ? [nowMicros - r.secs * 1_000_000, nowMicros] : [r.start, r.end],
   );
   return {
     start_time: new Date(Math.min(...spans.map(([start]) => start))),

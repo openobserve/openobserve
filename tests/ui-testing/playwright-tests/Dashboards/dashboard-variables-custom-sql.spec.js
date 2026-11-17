@@ -303,6 +303,30 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     await expect(qv.previewCapped).toHaveText(/Capped at 3/);
   });
 
+  test("the public link form lists a custom variable's values for the link's time range", async ({ page }) => {
+    const pm = new PageManager(page);
+    const qv = pm.dashboardQueryVariable;
+    const id = await createDashboard([customSql(`SELECT DISTINCT service_name FROM "${S}"`)]);
+    await qv.openDashboard(fx.dashboardUrl(id));
+    await expect(qv.shownValue("svc")).toHaveText(/\S/, { timeout: 45000 });
+
+    await pm.dashboardShareExport.openPublicLinksPanel();
+    // A dashboard without links opens straight on the new-link form.
+    const form = page.locator('[data-test="dashboards-public-links-panel-form"]');
+    const newLink = page.locator('[data-test="dashboards-public-links-panel-new-btn"]');
+    await expect(form.or(newLink)).toBeVisible({ timeout: 15000 });
+    if (await newLink.isVisible()) await newLink.click();
+    const formSvc = form.locator('[data-test="variable-selector-svc-inner-trigger"]');
+    await expect(async () => {
+      await formSvc.click();
+      const options = qv.optionItems("svc");
+      await expect(options.first()).toBeVisible({ timeout: 3000 });
+      const values = await options.evaluateAll((els) => els.map((e) => e.getAttribute("data-test-value")));
+      await page.keyboard.press("Escape");
+      expect(values.sort()).toEqual(fx.ALL_SERVICES);
+    }).toPass({ timeout: 45000, intervals: [1000, 2000, 3000] });
+  });
+
   test("multi-select, default value choices, All and hide on dashboard work for a custom SQL variable", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const id = await startCustomVariable(qv, { panelWhere: "service_name IN ($svc)" });
