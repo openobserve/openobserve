@@ -32,13 +32,21 @@ describe("optionalFoldersQuery", () => {
   });
 
   it("lists the folders with default first and asks the interceptor not to toast a 403", async () => {
-    listFolders.mockResolvedValue({
-      data: { list: [{ folderId: "ops", name: "Ops" }] },
-    } as any);
-    const result = await fetchOptional("alerts");
-    expect(result.forbidden).toBe(false);
-    expect(result.folders.map((f) => f.folderId)).toEqual(["default", "ops"]);
-    expect(listFolders).toHaveBeenCalledWith("org", "alerts", { skipAccessToast: true });
+    const ops = { folderId: "ops", name: "Ops" };
+    const listed = { folderId: "default", name: "default" };
+    // Synthetics gets no injected default: its server lists one only to callers who may list it.
+    const cases: [string, object[], string[]][] = [
+      ["alerts", [ops], ["default", "ops"]],
+      ["synthetics", [ops], ["ops"]],
+      ["synthetics", [ops, listed], ["default", "ops"]],
+    ];
+    for (const [type, list, want] of cases) {
+      listFolders.mockResolvedValue({ data: { list } } as any);
+      const result = await fetchOptional(type);
+      expect(result.forbidden).toBe(false);
+      expect(result.folders.map((f) => f.folderId)).toEqual(want);
+      expect(listFolders).toHaveBeenCalledWith("org", type, { skipAccessToast: true });
+    }
   });
 
   it("answers a 403 as no access to the module instead of an error", async () => {

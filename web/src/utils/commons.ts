@@ -1201,7 +1201,11 @@ const refreshFolderLists = async (store: any, type: any) => {
 
 export const deleteFolderByIdByType = async (store: any, folderId: any, type: any) => {
   await commonService.delete_Folder(store.state.selectedOrganization.identifier, type, folderId);
-  await refreshFolderLists(store, type);
+  await refreshFolderLists(store, type).catch((err) => {
+    // The synthetics list answers 403 once no listable folder is left; the delete still succeeded.
+    if (type !== "synthetics" || err?.response?.status !== 403) throw err;
+    store.dispatch("setFoldersByType", { synthetics: [] });
+  });
 };
 
 export const createFolder = async (store: any, data: any) => {
