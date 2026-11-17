@@ -12112,10 +12112,11 @@
         "loading": "Checking the last 24 hours…",
         "failed": "Could not check the last 24 hours.",
         "slow": "Took too long to check the last 24 hours.",
-        "result": "{count} of {total} checks would have alerted (one every {period} min).",
+        "result": "{count} of {total} checks would have alerted (one every {frequency} min).",
         "dayAgo": "24 h ago",
         "never": "It would not have alerted at all. If you expected it to, lower the limit.",
-        "noisy": "That is often, so people may start to ignore it. A higher limit would make it quieter."
+        "noisy": "That is often, so people may start to ignore it. A higher limit would make it quieter.",
+        "cronResult": "{count} of {total} checks would have alerted."
       },
       "filtersMode": "Filters",
       "typeHelp": {
@@ -12169,7 +12170,7 @@
         "label": "Start from",
         "help": "Pick one, then adjust it below",
         "any": "Any event",
-        "few": "A few events",
+        "few": "A few",
         "burst": "A burst",
         "orMore": "{count} or more"
       },
@@ -12184,11 +12185,12 @@
         "title": "Your alert so far"
       },
       "watch": {
-        "title": "What kind of alert is this?",
+        "title": "What should we watch?",
         "nav": "Alert type and data",
         "help": "This decides which settings you see next.",
         "pickStream": "Pick a stream",
-        "childCount": "{count} alert combined | {count} alerts combined"
+        "childCount": "{count} alert combined | {count} alerts combined",
+        "navSummary": "{stream} · {type}"
       },
       "condition": {
         "title": "When should we alert you?",
@@ -12213,14 +12215,14 @@
       "schedule": {
         "title": "How often should we check?",
         "nav": "How often to check",
-        "help": "The defaults suit most alerts, so change these only if you need to.",
+        "help": "How often the alert runs, and how far back each check looks.",
         "realtime": "As events arrive",
         "cron": "Cron {cron}"
       },
       "details": {
         "title": "What should we call it?",
         "nav": "Name it",
-        "help": "Pick a name you will recognize in a notification. Everything else is optional.",
+        "help": "A name your team will recognise in the alert list.",
         "editTitle": "Details",
         "editHelp": "The name stays as saved. Everything here is optional.",
         "name": "Name",
@@ -15307,20 +15309,53 @@
       "showFewer": "Show fewer",
       "names": {
         "warning": "warning level",
-        "holdFor": "how long it must last",
-        "groupBy": "group by",
-        "compareWithPast": "compare with the past",
+        "holdFor": "Must last at least",
+        "groupBy": "Group by",
+        "compareWithPast": "Compare with the past",
         "destinations": "destinations",
         "createsIncident": "Open an incident",
         "template": "Message template",
         "variables": "Variables",
-        "recovery": "recovery message",
-        "oncall": "on-call",
-        "keepFiring": "keep firing",
+        "recovery": "Tell them when it recovers",
+        "oncall": "On-call team",
+        "keepFiring": "Keep firing after it clears",
         "description": "description",
         "rowTemplate": "row template",
-        "priority": "priority",
-        "tags": "tags"
+        "priority": "Priority",
+        "tags": "Tags",
+        "generatedSql": "Show generated SQL",
+        "vrl": "Transform results with VRL",
+        "ruleExpression": "Treat the query as a rule expression",
+        "anomalyDirection": "Only alert on spikes, or only on drops",
+        "anomalyWindow": "How many unusual buckets fire it",
+        "anomalySqlPreview": "Show generated SQL",
+        "compositeWarningCounts": "Count a warning as firing",
+        "compositeStalePolicy": "If an alert stops reporting",
+        "suppressRepeats": "Suppress repeats",
+        "anomalyRecordOnly": "Record only, don't notify",
+        "anomalyTags": "Tags",
+        "anomalyPriority": "Priority"
+      },
+      "defaults": {
+        "anomalyDirection": "(default: both)",
+        "anomalyWindow": "(default: {fire}% of the last {buckets}; recovers below the same share)",
+        "compositeWarningCounts": "(default: yes)",
+        "compositeStalePolicy": "(default: keep its last state)"
+      },
+      "add": {
+        "warning": "Add warning",
+        "forecast": "or forecast instead of a fixed limit",
+        "anomalySql": "Write SQL instead",
+        "anomalyRetrain": "Retrain every",
+        "compositeExpression": "Write the expression yourself",
+        "createsIncident": "Open an incident",
+        "template": "Message template",
+        "anomalyTemplate": "Message template",
+        "rowTemplate": "Row template",
+        "variables": "Variables",
+        "cron": "Use a cron schedule",
+        "description": "Description",
+        "filters": "Add filter"
       }
     },
     "verdict": {
@@ -15438,7 +15473,8 @@
         "failed": "Couldn't load recent runs.",
         "openRun": "Open run",
         "note": "Shows the outcome each run recorded."
-      }
+      },
+      "enabled": "Enabled"
     },
     "find": {
       "label": "Find a setting",
@@ -15509,6 +15545,125 @@
     "siemDetection": {
       "notice": "This alert is a Security detection. Its query is compiled from its Sigma rule, so the rule, stream and schedule are edited in Security, which keeps the rule and the query in step.",
       "open": "Edit in Security"
+    },
+    "form": {
+      "showAll": "Show all settings",
+      "change": "Change",
+      "notNow": "Not now",
+      "moreOptions": "More options ({count})",
+      "suggestionsQueued": "({count} more suggestion after this) | ({count} more suggestions after this)",
+      "messageRow": "What the message says",
+      "messageRowHelp": "Defaults work for most alerts",
+      "watch": {
+        "library": "Or {link} in the Alert Library.",
+        "libraryLink": "start from a template",
+        "summary": "{type} · {stream} · {how}",
+        "locked": "Can't change after the alert is created"
+      },
+      "filter": {
+        "where": "Where",
+        "and": "and",
+        "or": "or",
+        "allEvents": "All events in {stream}",
+        "toggleConnector": "{connector}: switch between and and or"
+      },
+      "group": {
+        "sqlUngrouped": "One alert for all rows, or one per row?",
+        "promqlUngrouped": "One alert for all series, or one per series?",
+        "grouped": "One alert, or one per {label}?",
+        "groupedMany": "One alert, or one per group?",
+        "sqlOne": "One alert, when the query returns",
+        "rows": "rows",
+        "eachOf": "One per {labels}, when",
+        "eachOfPlain": "One per {labels}",
+        "promqlOne": "One alert, when at least",
+        "promqlOneTail": "series crosses the limit",
+        "builderOne": "One alert, when at least",
+        "builderOneTail": "groups cross the limit",
+        "lookBack": "Each check looks at the last {minutes} min",
+        "row": "row",
+        "series": "series"
+      },
+      "editor": {
+        "showAll": "Show all {count} lines"
+      },
+      "sqlError": {
+        "unknownColumn": "Line {line}: unknown column '{column}'. Did you mean '{match}'?",
+        "unknownColumnNoLine": "Unknown column '{column}'. Did you mean '{match}'?",
+        "use": "Use '{match}'"
+      },
+      "presets": {
+        "custom": "Custom"
+      },
+      "remind": {
+        "label": "Remind at most every",
+        "help": "Quiet time between repeats"
+      },
+      "units": {
+        "min": "min",
+        "h": "h",
+        "seconds": "seconds"
+      },
+      "keepFiring": {
+        "label": "Keep firing for",
+        "tail": "after it clears"
+      },
+      "incident": {
+        "label": "Incident",
+        "on": "Opens an incident when it fires",
+        "titleLabel": "Incident title:",
+        "titleDefault": "the alert name",
+        "defaultTag": "(default)"
+      },
+      "recovery": {
+        "plan": "{destination} — {action}"
+      },
+      "schedule": {
+        "lookingAt": "looking at the last",
+        "lookingAtRow": "Looking at the last",
+        "cronRow": "Run on cron",
+        "cronIn": "in",
+        "overlap": "Each check looks at the last {period} min, so checks overlap by {minutes} min.",
+        "equal": "Each check looks at the last {period} min, the same as the time between checks: no gaps, no overlap.",
+        "gaps": "Each check looks at the last {period} min, so there are gaps of {minutes} min between checks.",
+        "cron": "Each check looks at the {period} min before it runs.",
+        "realtime": "Each event is checked as it arrives.",
+        "composite": "It checks whenever one of its alerts fires."
+      },
+      "header": {
+        "editName": "Change the name in Name it"
+      },
+      "suggest": {
+        "holdFor": "{spikes} of {alerts} would-be alerts in the last 24 h were single-check spikes. Only alert if it lasts at least {minutes} min?",
+        "keepFiring": "It fired, cleared and fired again within two checks {count} time in the last 24 h. Keep firing for {minutes} min to stop flapping? | It fired, cleared and fired again within two checks {count} times in the last 24 h. Keep firing for {minutes} min to stop flapping?",
+        "ruleExpression": "The query already compares ({ops}). Alert on whatever it returns?",
+        "useAsRule": "Use as rule",
+        "recoveryDestinations": "{destinations} can resolve alerts. Tell them when it recovers?",
+        "recoveryIncident": "This alert opens an incident. Tell them when it recovers?",
+        "oncall": "Page an on-call team?",
+        "priority": "This alert opens incidents. Set a priority so they sort right?"
+      },
+      "save": {
+        "fixIssues": "Fix {count} issue | Fix {count} issues",
+        "compositeNeeds": "Add 2 to 10 alerts and a Fire when expression to save."
+      },
+      "anomaly": {
+        "sensitivityAuto": "Auto",
+        "learned": "· learned from your data",
+        "scheduleLine": "Checks every {every}, looking at the last {window}. Set in {link}.",
+        "scheduleLink": "How often to check",
+        "windowSentence": "Fire when {fire}% of the last {buckets} buckets are unusual, and recover below {recover}%"
+      },
+      "holdFor": {
+        "label": "Must last",
+        "sentence": "Only alert if it lasts at least"
+      },
+      "compare": {
+        "addWindow": "Add another past window"
+      },
+      "forecast": {
+        "sentence": "{direction} {threshold} within {horizon}, based on the last {window}"
+      }
     }
   },
   "alert_dependencies": {
