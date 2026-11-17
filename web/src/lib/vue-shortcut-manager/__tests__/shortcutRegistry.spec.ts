@@ -13,6 +13,7 @@ import {
   SHORTCUT_REGISTRY,
   type ShortcutCapabilities,
 } from "../shortcutRegistry";
+import enUS from "@/locales/languages/en-US.json";
 
 const { capabilityDisposed } = vi.hoisted(() => ({ capabilityDisposed: vi.fn() }));
 
@@ -362,8 +363,10 @@ describe("cheatsheet with the assistant", () => {
       global: { plugins: [store, i18n] },
     });
     await flushPromises();
-    await vi.waitFor(() => expect(document.body.textContent).toContain("Open Autobot"));
-    expect(document.body.textContent).toContain("Autobot composer");
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain(`Open ${enUS.brand.autobot}`),
+    );
+    expect(document.body.textContent).toContain(`${enUS.brand.autobot} composer`);
     expect(document.body.textContent).not.toContain("{product}");
     expect(capabilityDisposed).not.toHaveBeenCalled();
     wrapper.unmount();

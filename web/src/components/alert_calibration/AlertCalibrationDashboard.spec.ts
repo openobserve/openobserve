@@ -30,6 +30,7 @@ import type { DigestRecord, RunRow } from "./digests";
 import analytics from "@/services/product_analytics";
 import { openAlertReview } from "./reviewAlert";
 import autoobserveDecisions, { type DecisionView } from "@/services/autoobserveDecisions";
+import enUS from "@/locales/languages/en-US.json";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("./reviewAlert", () => ({ openAlertReview: vi.fn() }));
@@ -1268,7 +1269,12 @@ describe("AlertCalibrationDashboard row next steps", () => {
 
   it("Review alert comes first and opens the editor at the finding's focus", async () => {
     const w = await openFailures();
-    expect(rowButtons(w)).toEqual(["Review alert", "Open alert", "Ask Autobot", "Dismiss…"]);
+    expect(rowButtons(w)).toEqual([
+      "Review alert",
+      "Open alert",
+      enUS.brand.askAutobot,
+      "Dismiss…",
+    ]);
     await w.find('[data-test="alert-calibration-dashboard-review-alert"]').trigger("click");
     expect(openAlertReview).toHaveBeenCalledWith(
       w.router,

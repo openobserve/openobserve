@@ -10547,7 +10547,7 @@
         "title": "No data yet · send your first logs, metrics or traces",
         "note": "Home fills in by itself once a service sends data: Now and Problems with no alert. Building it uses no AI."
       },
-      "tabLabel": "@:{'brand.askAutobot'}"
+      "tabLabel": "@:{'brand.autobot'}"
     },
     "answersReady": "{count} answer ready | {count} answers ready"
   },
