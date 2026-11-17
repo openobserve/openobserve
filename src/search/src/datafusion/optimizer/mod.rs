@@ -417,7 +417,6 @@ mod tests {
             time_range: (0, 0),
             group_by: vec![],
             order_by: vec![],
-            leading_order_by_unrecorded: false,
             histogram_interval: None,
             timezone: None,
             histogram_offset: Some(0),

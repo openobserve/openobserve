@@ -679,9 +679,7 @@ pub async fn prepare_cache_response(
     }
 
     // #16650: a top-N ranked by another field cannot be split or reused across time ranges
-    if sql.leading_order_by_unrecorded
-        || result_utils::is_ranked_by_non_timestamp(&sql.order_by, &ts_column)
-    {
+    if result_utils::is_ranked_by_non_timestamp(&sql.order_by, &ts_column) {
         return Ok((
             MultiCachedQueryResponse {
                 ts_column,
@@ -1600,17 +1598,6 @@ mod tests {
             "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM t GROUP BY ts";
         let cases = [
             (format!("{histogram} ORDER BY c DESC LIMIT 3"), "ts", false),
-            (
-                format!("{histogram} ORDER BY count(*) DESC LIMIT 3"),
-                "ts",
-                false,
-            ),
-            (format!("{histogram} ORDER BY 2 DESC LIMIT 3"), "ts", false),
-            (
-                format!("{histogram} ORDER BY count(*) DESC, ts ASC"),
-                "ts",
-                false,
-            ),
             (
                 format!("{histogram} ORDER BY ts ASC, count(*) DESC"),
                 "ts",

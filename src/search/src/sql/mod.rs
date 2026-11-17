@@ -83,8 +83,6 @@ pub struct Sql {
     pub time_range: (i64, i64),
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>,
-    /// `order_by` misses the leading ORDER BY key: an expression such as `count(*)` or `2`.
-    pub leading_order_by_unrecorded: bool,
     pub histogram_interval: Option<i64>,
     pub timezone: Option<String>,
     /// Shifted-time offset of every `histogram()` in microseconds; `None` when they disagree.
@@ -230,7 +228,6 @@ impl Sql {
             .collect::<Vec<_>>();
         let group_by = column_visitor.group_by;
         let mut order_by = column_visitor.order_by;
-        let leading_order_by_unrecorded = column_visitor.leading_order_by_unrecorded;
 
         // check if need sort by time
         if order_by.is_empty()
@@ -349,7 +346,6 @@ impl Sql {
             time_range: (query.start_time, query.end_time),
             group_by,
             order_by,
-            leading_order_by_unrecorded,
             histogram_interval,
             timezone: query.timezone.clone(),
             histogram_offset,
