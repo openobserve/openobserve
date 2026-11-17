@@ -829,32 +829,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @add="onTierAdd"
                   @toggle="tiers.toggle('details')"
                 />
-                <div
-                  class="border-border-default mt-3 flex flex-col gap-2 border-t pt-3"
+                <section
+                  class="border-border-default bg-surface-base rounded-surface mt-3 flex flex-col overflow-hidden border"
+                  aria-labelledby="add-alert-review-title"
                   data-test="add-alert-review"
                 >
-                  <span class="text-text-heading text-sm font-medium">{{
-                    t("alerts.sections.review.title")
-                  }}</span>
-                  <dl class="m-0 flex flex-col gap-1.5">
-                    <div
-                      v-for="item in reviewItems"
-                      :key="item.id"
-                      class="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm"
+                  <h3
+                    id="add-alert-review-title"
+                    class="text-text-heading m-0 px-3.5 pt-2.5 pb-1.5 text-sm font-semibold"
+                  >
+                    {{ t("alerts.sections.review.title") }}
+                  </h3>
+                  <div
+                    v-for="(line, index) in reviewLines"
+                    :key="line.id"
+                    class="text-compact flex min-w-0 items-center gap-3 px-3.5 py-1.75"
+                    :class="{ 'border-border-subtle border-t': index > 0 }"
+                  >
+                    <i18n-t
+                      :keypath="line.keypath"
+                      :plural="line.plural"
+                      tag="span"
+                      scope="global"
+                      class="text-text-body min-w-0 flex-1 break-words"
+                      :data-test="`add-alert-review-${line.id}-text`"
                     >
-                      <dt class="text-text-secondary">{{ item.title }}</dt>
-                      <dd class="text-text-body m-0 min-w-0 break-words">{{ item.summary }}</dd>
-                      <dd class="m-0">
-                        <OButton
-                          variant="link"
-                          :data-test="`add-alert-review-${item.id}`"
-                          @click="goToSection(item.id)"
-                          >{{ t("alerts.form.change") }}</OButton
-                        >
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
+                      <template v-for="(part, name) in line.parts" :key="name" #[name]>
+                        <strong v-if="part.strong" class="text-text-heading font-semibold">{{
+                          part.text
+                        }}</strong>
+                        <template v-else>{{ part.text }}</template>
+                      </template>
+                    </i18n-t>
+                    <OButton
+                      variant="link"
+                      :data-test="`add-alert-review-${line.id}`"
+                      @click="goToSection(line.id)"
+                      >{{ t("alerts.form.change") }}</OButton
+                    >
+                  </div>
+                </section>
               </div>
             </AlertFormSection>
           </OSnapScroll>
@@ -1780,7 +1794,11 @@ export default defineComponent({
         (config.isEnterprise === "true" || config.isCloud === "true") &&
         store.state.zoConfig?.incidents_enabled === true,
     );
-    const { items: sectionItems, errorCounts } = useAlertFormSections({
+    const {
+      items: sectionItems,
+      errorCounts,
+      review: reviewLines,
+    } = useAlertFormSections({
       extraErrors: computed(() => ({
         condition: submitAttempted.value && querySaveProblem.value ? 1 : 0,
         schedule: submitAttempted.value && cronSaveProblem.value ? 1 : 0,
@@ -1801,7 +1819,6 @@ export default defineComponent({
       t: alertForm.t,
     });
 
-    const reviewItems = computed(() => sectionItems.value.filter((item) => item.id !== "details"));
     const issueCount = computed(() =>
       Object.values(errorCounts.value).reduce((sum, count) => sum + count, 0),
     );
@@ -2135,7 +2152,7 @@ export default defineComponent({
       showsCheckTimeline,
       showsBacktest,
       backtestQuery,
-      reviewItems,
+      reviewLines,
       issueCount,
       saveLabel,
       compositeNeedsChildren,

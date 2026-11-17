@@ -4,7 +4,12 @@ import { describe, it, expect, afterEach } from "vitest";
 import { computed, ref } from "vue";
 import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
-import { useAlertFormSections, checkEveryLabel, type FieldMetaMap } from "./useAlertFormSections";
+import {
+  useAlertFormSections,
+  checkEveryLabel,
+  reviewLineText,
+  type FieldMetaMap,
+} from "./useAlertFormSections";
 import { AGGREGATION_ENABLED_FIELD, sectionOfField } from "@/components/alerts/alertFormSections";
 import config from "@/aws-exports";
 
@@ -19,6 +24,20 @@ const scheduled = (over: Record<string, unknown> = {}) => ({
   query_condition: { type: "custom", aggregation: null },
   trigger_condition: { operator: ">=", threshold: 3, frequency: 10, frequency_type: "minutes" },
   ...over,
+});
+
+const base = scheduled({
+  stream_name: "default",
+  stream_type: "logs",
+  destinations: ["ops-slack"],
+  trigger_condition: {
+    operator: ">=",
+    threshold: 1,
+    period: 5,
+    frequency: 5,
+    frequency_type: "minutes",
+    silence: 10,
+  },
 });
 
 const setup = (
@@ -268,6 +287,67 @@ describe("useAlertFormSections", () => {
       expect(byId(items.value, "condition").stateLabel).toBe(
         t("alerts.sections.needsFix", { count: 1 }, 1),
       );
+  });
+
+  it.each([
+    ["SQL", { type: "sql" }, ">=", "3+ rows"],
+    ["SQL with a strict limit", { type: "sql" }, ">", "> 3 rows"],
+    [
+      "PromQL",
+      { type: "promql", promql_condition: { operator: ">=", value: 80 } },
+      ">=",
+      "3+ series ≥ 80",
+    ],
+    ["PromQL with no value yet", { type: "promql", promql_condition: null }, ">=", "3+ series"],
+  ])("counts %s results by their own noun", (_, query_condition, operator, summary) => {
+    const fd = scheduled({ query_condition, trigger_condition: { operator, threshold: 3 } });
+    expect(byId(setup(fd).items.value, "condition").summary).toBe(summary);
+  });
+
+  it.each([
+    [
+      "a scheduled alert",
+      {},
+      [
+        "Watches Logs in default, on a schedule.",
+        "Fires when 1+ events turn up in the last 5 min.",
+        "Tells ops-slack, reminding at most every 10 min.",
+        "Checks every 5 min, looking at the last 5 min.",
+      ],
+    ],
+    [
+      "a SQL alert on cron that opens an incident",
+      {
+        query_condition: { type: "sql" },
+        destinations: [],
+        creates_incident: true,
+        trigger_condition: {
+          ...base.trigger_condition,
+          frequency_type: "cron",
+          cron: "0 9 * * *",
+          silence: 120,
+        },
+      },
+      [
+        "Watches Logs in default, on a schedule.",
+        "Fires when the query returns 1+ rows in the last 5 min.",
+        "Opens an incident, reminding at most every 2 h.",
+        "Checks on the cron schedule 0 9 * * *, looking at the last 5 min.",
+      ],
+    ],
+    [
+      "a real-time alert telling nobody",
+      { is_real_time: "true", destinations: [], trigger_condition: { silence: 0 } },
+      [
+        "Watches Logs in default, as events arrive.",
+        "Fires on each matching event.",
+        "Tells no one yet.",
+        "Checks as events arrive.",
+      ],
+    ],
+  ])("reads back %s in sentences", (_, over, sentences) => {
+    const { review } = setup({ ...base, ...over });
+    expect(review.value.map((line) => reviewLineText(line, t))).toEqual(sentences);
   });
 
   it("names the stream and its type in the watch summary", () => {

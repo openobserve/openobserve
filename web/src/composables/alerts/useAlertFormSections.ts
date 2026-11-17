@@ -26,12 +26,19 @@ import {
 } from "@/components/alerts/alertFormSections";
 import { alertConditionText } from "@/utils/alerts/alertCondition";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
-import { eventCountText, type ReadBackAlert } from "@/utils/alerts/alertReadBack";
+import { eventCountText, operatorSymbol, type ReadBackAlert } from "@/utils/alerts/alertReadBack";
 
 export type FieldMetaMap = Record<string, { errors?: readonly unknown[] } | undefined>;
 
 /** The slice of the alert form the section list reads. */
-export interface AlertSectionsFormData extends Omit<ReadBackAlert, "is_real_time"> {
+export interface AlertSectionsFormData extends Omit<
+  ReadBackAlert,
+  "is_real_time" | "query_condition"
+> {
+  query_condition?: ReadBackAlert["query_condition"] & {
+    promql_rule_mode?: boolean;
+    promql_multi_alert?: boolean;
+  };
   is_real_time?: string | boolean;
   stream_type?: string;
   name?: string;
@@ -75,6 +82,32 @@ export interface AlertFormSectionsInput {
   t: TranslateFn;
 }
 
+/** One read-back sentence; a strong part is a value the user chose. */
+export interface AlertReviewLine {
+  id: Exclude<AlertSectionId, "details">;
+  keypath: I18nKey;
+  parts: Record<string, { text: I18nText; strong?: boolean }>;
+  plural?: number;
+}
+
+type ConditionKind = "events" | "rows" | "value" | "realtime" | "anomaly" | "composite" | "unset";
+type ReviewSentence = Omit<AlertReviewLine, "id">;
+
+const FIRES_KEYS: Record<ConditionKind, I18nKey> = {
+  events: "alerts.sections.review.firesCount",
+  rows: "alerts.sections.review.firesRows",
+  value: "alerts.sections.review.firesValue",
+  realtime: "alerts.sections.review.firesRealtime",
+  anomaly: "alerts.sections.review.firesAnomaly",
+  composite: "alerts.sections.review.firesComposite",
+  unset: "alerts.sections.review.firesCompositeUnset",
+};
+
+const WATCH_KEYS: Record<string, I18nKey> = {
+  true: "alerts.sections.review.watchRealtime",
+  anomaly: "alerts.sections.review.watchAnomaly",
+};
+
 const STREAM_TYPE_LABELS: Record<string, I18nKey> = {
   logs: "alerts.sections.dataTypes.logs.label",
   metrics: "alerts.sections.dataTypes.metrics.label",
@@ -94,6 +127,16 @@ export function checkEveryLabel(formData: AlertSectionsFormData, t: TranslateFn)
   return t("alerts.sections.everyMinutes", { count: minutes });
 }
 
+/** A read-back line as plain text, the way its slots render it. */
+export function reviewLineText(line: AlertReviewLine, t: TranslateFn): I18nText {
+  const named = Object.fromEntries(Object.entries(line.parts).map(([k, p]) => [k, p.text]));
+  return t(line.keypath, named, line.plural ?? 1);
+}
+
+// "3+" for the default at-least limit, otherwise "> 3", "≤ 3"...
+const countLimit = (operator: string | undefined, threshold: unknown): string =>
+  !operator || operator === ">=" ? `${threshold}+` : `${operatorSymbol(operator)} ${threshold}`;
+
 /** Status, a one-line phrase and the title of each section, for the section list. */
 // The stored expression names child alerts by id; the editor labels them A, B, … in list order.
 const lettersForAlertIds = (expression: string, childIds: string[]): string => {
@@ -109,6 +152,7 @@ const lettersForAlertIds = (expression: string, childIds: string[]): string => {
 export function useAlertFormSections(input: AlertFormSectionsInput): {
   items: ComputedRef<SectionNavItem[]>;
   errorCounts: ComputedRef<Record<AlertSectionId, number>>;
+  review: ComputedRef<AlertReviewLine[]>;
 } {
   const { t } = input;
   const { fieldMeta } = input;
@@ -134,25 +178,50 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     return counts;
   });
 
-  const conditionPhrase = (fd: AlertSectionsFormData): I18nText => {
-    if (mode.value === "true") return t("alerts.sections.condition.realtime");
-    if (mode.value === "anomaly") return t("alerts.sections.condition.anomaly");
+  // PromQL's one-alert answer counts the series past the value limit.
+  const promqlPhrase = (fd: AlertSectionsFormData): I18nText => {
+    const qc = fd.query_condition ?? {};
+    if (qc.promql_rule_mode || qc.promql_multi_alert) return raw(alertConditionText(fd));
+    const tc = fd.trigger_condition ?? {};
+    const count = countLimit(tc.operator, tc.threshold ?? 1);
+    const pc = qc.promql_condition;
+    if (!pc || !hasValue(pc.value)) return t("alerts.sections.condition.series", { count });
+    const limit = `${operatorSymbol(pc.operator)} ${pc.value}`.trim();
+    return t("alerts.sections.condition.seriesOver", { count, limit });
+  };
+
+  const conditionPhrase = (fd: AlertSectionsFormData): { kind: ConditionKind; text: I18nText } => {
+    if (mode.value === "true") {
+      return { kind: "realtime", text: t("alerts.sections.condition.realtime") };
+    }
+    if (mode.value === "anomaly") {
+      return { kind: "anomaly", text: t("alerts.sections.condition.anomaly") };
+    }
     if (mode.value === "composite") {
       const expression = fd.composite_condition?.expression;
       return typeof expression === "string" && hasValue(expression)
-        ? raw(
-            lettersForAlertIds(
-              expression,
-              (fd.children ?? []).map((child) => child.alert_id ?? ""),
+        ? {
+            kind: "composite",
+            text: raw(
+              lettersForAlertIds(
+                expression,
+                (fd.children ?? []).map((child) => child.alert_id ?? ""),
+              ),
             ),
-          )
-        : t("alerts.sections.condition.composite");
+          }
+        : { kind: "unset", text: t("alerts.sections.condition.composite") };
     }
     const qc = fd.query_condition ?? {};
-    if (qc.type === "promql" || (qc.aggregation && input.isAggregationEnabled.value)) {
-      return raw(alertConditionText(fd));
+    if (qc.type === "promql") return { kind: "value", text: promqlPhrase(fd) };
+    if (qc.aggregation && input.isAggregationEnabled.value) {
+      return { kind: "value", text: raw(alertConditionText(fd)) };
     }
-    return eventCountText(fd.trigger_condition, t);
+    if (qc.type === "sql") {
+      const tc = fd.trigger_condition ?? {};
+      const count = countLimit(tc.operator, tc.threshold ?? "");
+      return { kind: "rows", text: t("alerts.sections.condition.rows", { count }) };
+    }
+    return { kind: "events", text: eventCountText(fd.trigger_condition, t) };
   };
 
   // Until the detection is fully described there is nothing for the step to be done with.
@@ -243,7 +312,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
         const incomplete =
           mode.value !== "composite" &&
           (!hasValue(fd.stream_name) || (mode.value === "anomaly" && anomalyConditionMissing()));
-        return { missing: false, empty: incomplete, summary: conditionPhrase(fd) };
+        return { missing: false, empty: incomplete, summary: conditionPhrase(fd).text };
       }
       case "notify": {
         const count = notifyCount(fd);
@@ -297,5 +366,116 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     });
   });
 
-  return { items, errorCounts };
+  const durationPart = (minutes: number): I18nText =>
+    minutes >= 60 && minutes % 60 === 0
+      ? t("alerts.sections.review.hours", { count: minutes / 60 })
+      : t("alerts.sections.review.minutes", { count: minutes });
+  const strong = (text: I18nText) => ({ text, strong: true });
+  const plain = (text: I18nText) => ({ text });
+
+  const watchLine = (fd: AlertSectionsFormData): ReviewSentence => {
+    if (mode.value === "composite") {
+      const count = fd.children?.length ?? 0;
+      return {
+        keypath: "alerts.sections.review.watchCombined",
+        parts: { count: strong(raw(String(count))) },
+        plural: count,
+      };
+    }
+    if (!hasValue(fd.stream_name)) {
+      return { keypath: "alerts.sections.review.watchNoStream", parts: {} };
+    }
+    const typeKey = STREAM_TYPE_LABELS[fd.stream_type ?? ""];
+    return {
+      keypath: WATCH_KEYS[mode.value] ?? "alerts.sections.review.watchScheduled",
+      parts: {
+        type: strong(typeKey ? t(typeKey) : raw(fd.stream_type)),
+        stream: strong(raw(fd.stream_name)),
+      },
+    };
+  };
+
+  const conditionLine = (fd: AlertSectionsFormData): ReviewSentence => {
+    const { kind, text } = conditionPhrase(fd);
+    const window = plain(durationPart(Number(fd.trigger_condition?.period ?? 0)));
+    let parts: ReviewSentence["parts"] = {};
+    if (kind === "composite") parts = { expression: strong(text) };
+    else if (kind === "events" || kind === "rows" || kind === "value") {
+      parts = { condition: strong(text), window };
+    }
+    return { keypath: FIRES_KEYS[kind], parts };
+  };
+
+  const notifyLine = (fd: AlertSectionsFormData): ReviewSentence => {
+    const count = notifyCount(fd);
+    const incident = opensIncident(fd);
+    if (count === 0 && !incident)
+      return { keypath: "alerts.sections.review.tellsNobody", parts: {} };
+    const silence = mode.value === "anomaly" ? 0 : Number(fd.trigger_condition?.silence ?? 0);
+    const reminder = plain(
+      silence > 0
+        ? t("alerts.sections.review.reminder", { duration: durationPart(silence) })
+        : raw(""),
+    );
+    const listed = (fd.destinations?.length ?? 0) + (fd.workflows?.length ?? 0);
+    if (incident && listed === 0) {
+      return {
+        keypath: "alerts.sections.review.incidentOnly",
+        parts: { incident: plain(notifySummary(fd, count)), reminder },
+      };
+    }
+    const shown = incident ? listed : count;
+    const targets =
+      shown === 1 && fd.destinations?.length === 1
+        ? raw(fd.destinations[0])
+        : t("alerts.sections.notify.destinationCount", { count: shown }, shown);
+    return {
+      keypath: "alerts.sections.review.tells",
+      parts: {
+        targets: strong(targets),
+        incident: plain(incident ? t("alerts.sections.review.incidentTail") : raw("")),
+        reminder,
+      },
+    };
+  };
+
+  const scheduleLine = (fd: AlertSectionsFormData): ReviewSentence => {
+    if (mode.value === "true" || mode.value === "composite") {
+      return { keypath: "alerts.sections.review.checksRealtime", parts: {} };
+    }
+    if (mode.value === "anomaly") {
+      const anomaly = input.anomalyConfig.value ?? {};
+      const value = Number(anomaly.schedule_interval_value ?? 1);
+      return {
+        keypath: "alerts.sections.review.checksAnomaly",
+        parts: {
+          every: strong(durationPart(anomaly.schedule_interval_unit === "m" ? value : value * 60)),
+        },
+      };
+    }
+    const tc = fd.trigger_condition ?? {};
+    const window = plain(durationPart(Number(tc.period ?? 0)));
+    if (tc.frequency_type === "cron") {
+      return {
+        keypath: "alerts.sections.review.checksCron",
+        parts: { cron: strong(raw(tc.cron ?? "")), window },
+      };
+    }
+    return {
+      keypath: "alerts.sections.review.checksEvery",
+      parts: { every: strong(durationPart(Number(tc.frequency ?? 10))), window },
+    };
+  };
+
+  const review = computed<AlertReviewLine[]>(() => {
+    const fd = input.formData.value ?? {};
+    return [
+      { id: "watch", ...watchLine(fd) },
+      { id: "condition", ...conditionLine(fd) },
+      { id: "notify", ...notifyLine(fd) },
+      { id: "schedule", ...scheduleLine(fd) },
+    ];
+  });
+
+  return { items, errorCounts, review };
 }

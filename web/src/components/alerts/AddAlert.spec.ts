@@ -2262,6 +2262,18 @@ describe("AddAlert (OForm owner)", () => {
     );
   });
 
+  it("reads the alert back in sentences, each with a Change link to its section", async () => {
+    wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
+    await flushPromises();
+    const scrollToSection = vi.fn();
+    wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+    const watchLine = wrapper.get('[data-test="add-alert-review-watch-text"]');
+    expect(watchLine.text()).toBe("Watches Logs in app_logs, on a schedule.");
+    expect(watchLine.findAll("strong").map((b) => b.text())).toEqual(["Logs", "app_logs"]);
+    await wrapper.get('[data-test="add-alert-review-notify"]').trigger("click");
+    expect(scrollToSection).toHaveBeenCalledWith("notify");
+  });
+
   describe("Save names the issues to fix", () => {
     const submitText = () => wrapper.get('[data-test="add-alert-submit-btn"]').text();
     const failField = (name: string) =>
