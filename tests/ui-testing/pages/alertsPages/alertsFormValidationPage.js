@@ -2,7 +2,7 @@
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { openNavFlyoutChild } = require('../commonActions.js');
-import { goToAlertSection, openAlertFilterBuilder, selectAlertStreamType } from './alertSectionHelpers.js';
+import { openAlertFilterBuilder, selectAlertStreamType } from './alertSectionHelpers.js';
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 export class AlertsFormValidationPage {
@@ -398,9 +398,10 @@ export class AlertsFormValidationPage {
    * once a stream type + name are chosen. This method now simply ensures that
    * the condition tab is the active tab so the downstream assertions resolve.
    */
+  /** No wizard Next any more: goes to the condition section and unfolds its filter builder. */
   async clickWizardNext() {
-    testLogger.info('Scrolling to the first editor section (no wizard Next button)');
-    await goToAlertSection(this.page, 'watch');
+    testLogger.info('Opening the condition filter builder (no wizard Next button)');
+    await openAlertFilterBuilder(this.page);
   }
 
   /**

@@ -39,7 +39,8 @@ export class AlertManagement {
         // Change the first condition's operator from Contains to = to verify update functionality.
         // Wait 15s: the edit page fetches the alert and renders the conditions asynchronously.
         const conditions = new FilterBuilderDriver(this.page, 'alert-conditions');
-        await expect(this.page.locator('[data-test="add-alert-filter-sentence"]')).toBeVisible({ timeout: 15000 });
+        // Threshold and anomaly forms are both mounted, one hidden, and each has a filter sentence.
+        await expect(this.page.locator('[data-test="add-alert-filter-sentence"]:visible').first()).toBeVisible({ timeout: 15000 });
         await openAlertFilterBuilder(this.page);
         await expect(conditions.chips.first()).toBeVisible({ timeout: 15000 });
         await conditions.changeOperator(0, '=');

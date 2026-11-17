@@ -27,6 +27,7 @@ export function alertSectionForTab(tabName) {
 
 /** Scrolls the editor to a section through the section list, or straight to the section when the list is hidden. */
 export async function goToAlertSection(page, sectionId) {
+    if (sectionId === 'watch') sectionId = await unfoldWatchSection(page);
     const section = page.locator(`[data-test="add-alert-section-${sectionId}"]`).first();
     await section.waitFor({ state: 'attached', timeout: 15000 });
     const navItem = page.locator(`[data-test="o-section-nav-item-${sectionId}"]`).first();
@@ -38,6 +39,22 @@ export async function goToAlertSection(page, sectionId) {
     // Smooth scroll plus snap settle.
     await page.waitForTimeout(600);
     testLogger.info('Scrolled to alert section', { sectionId });
+}
+
+/**
+ * Section 1 folds into a summary atop section 2 once left, and is locked on edit. Change unfolds it;
+ * returns the section that now holds the stream controls or, when locked, their summary.
+ */
+async function unfoldWatchSection(page) {
+    const watch = page.locator('[data-test="add-alert-section-watch"]').first();
+    const summary = page.locator('[data-test="add-alert-watch-summary"]').first();
+    await watch.or(summary).first().waitFor({ state: 'attached', timeout: 15000 });
+    if (await watch.count()) return 'watch';
+    const change = page.locator('[data-test="add-alert-watch-summary-change"]').first();
+    if (!(await change.isVisible().catch(() => false))) return 'condition';
+    await change.click();
+    await watch.waitFor({ state: 'attached', timeout: 10000 });
+    return 'watch';
 }
 
 /** Opens every section's "N more" group so tucked settings render. Opening only reveals; it sets no value. */
@@ -90,7 +107,8 @@ export async function openAlertSectionForTab(page, tabName) {
 export async function openAlertFilterBuilder(page) {
     await goToAlertSection(page, 'condition');
     for (const id of ['add-alert-add-filters', 'add-alert-filter-sentence-change']) {
-        const link = page.locator(`[data-test="${id}"]`).first();
+        // Anomaly mode keeps the threshold form mounted but hidden, so its links must be skipped.
+        const link = page.locator(`[data-test="${id}"]:visible`).first();
         if (!(await link.isVisible().catch(() => false))) continue;
         await link.click();
         await page.waitForTimeout(300);
@@ -113,6 +131,7 @@ export const ALERT_NAME_FIELD = '[data-test="add-alert-details-name-input-field"
 /** Picks logs, metrics or traces in the Watch section's stream-type dropdown. */
 export async function selectAlertStreamType(page, streamType) {
     const trigger = page.locator(STREAM_TYPE_TRIGGER).first();
+    if (!(await trigger.count())) await goToAlertSection(page, 'watch');
     await trigger.waitFor({ state: 'visible', timeout: 15000 });
     await settleIntoView(page, trigger);
     if ((await trigger.getAttribute('data-test-selected-value')) === streamType) return;

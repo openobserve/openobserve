@@ -1876,9 +1876,9 @@ export class AlertsPage {
 
         // An empty-name Save is rejected with a toast reading "Alert name is required."
         // (alerts.nameRequired); the name OFormInput may additionally surface an inline field
-        // error (add-alert-details-name-error). Assert whichever signal is present — both
+        // error (add-alert-details-name-input-error). Assert whichever signal is present — both
         // confirm the empty-name save was blocked, which is what this validation verifies.
-        const nameError = this.page.locator('[data-test="add-alert-details-name-error"], [data-test="add-alert-details-name-input-error"]');
+        const nameError = this.page.locator('[data-test="add-alert-details-name-input-error"]');
         const nameRequiredToast = this.page
             .locator('[data-test="o-toast-message"]')
             .filter({ hasText: 'Alert name is required.' });

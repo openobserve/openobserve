@@ -67,7 +67,7 @@ class AnomalyDetectionPage {
 
             // The name is typed in section 5; the header only shows it.
             nameValue: '[data-test="add-alert-header-title"]',
-            nameError: '[data-test="add-alert-details-name-error"]',
+            nameError: '[data-test="add-alert-details-name-input-error"]',
             streamTypeSelect: '[data-test="add-alert-stream-type-select-dropdown"]',
             streamNameSelect: '[data-test="add-alert-stream-name-select-dropdown"]',
 
@@ -87,11 +87,7 @@ class AnomalyDetectionPage {
             customSqlRequiredError: '[data-test="anomaly-custom-sql-required-error"]',
             customSqlTimestampError: '[data-test="anomaly-custom-sql-timestamp-alias-error"]',
             detectionFunction: '[data-test="anomaly-detection-function"]',
-            // The Detection Function info icon renders as a bare OIcon (no data-test), so anchor on
-            // the label and take the cursor-pointer icon span — the OTooltip's hidden anchor span
-            // (also aria-hidden) has no cursor-pointer class and is excluded.
-            detectionFunctionInfo:
-              'div.font-semibold:has-text("Detection Function") span[aria-hidden="true"].cursor-pointer',
+            detectionFunctionInfo: '[data-test="anomaly-detection-function-row-info"]',
             detectionFunctionField: '[data-test="anomaly-detection-function-field"]',
             histogramIntervalValue: '[data-test="anomaly-histogram-interval-value"]',
             histogramIntervalUnit: '[data-test="anomaly-histogram-interval-unit"]',
@@ -337,6 +333,7 @@ class AnomalyDetectionPage {
             .locator(`${this.selectors.queryTabs}, ${this.selectors.writeSqlInstead}`)
             .first()
             .waitFor({ state: 'visible', timeout: 10000 });
+        await this.openSensitivityRow();
     }
 
     /** Scrolls to Who to tell; Record only sits behind its More options line. */
@@ -572,6 +569,7 @@ class AnomalyDetectionPage {
     }
 
     async getActiveSensitivityTier() {
+        await this.openSensitivityRow();
         const active = this.page.locator(
             `${this.selectors.sensitivityTier} [data-state="on"]`,
         );

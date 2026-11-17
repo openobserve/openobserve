@@ -37,6 +37,7 @@ export class AlertSaveQueryModePage {
       // ── the editor ──────────────────────────────────────────────────────
       submit: '[data-test="add-alert-submit-btn"]',
       streamTrigger: '[data-test="add-alert-stream-name-select-dropdown-trigger"]',
+      watchSummary: '[data-test="add-alert-watch-summary"] > span:first-child',
       threshold: '[data-test="alert-trigger-threshold-input-field"]',
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
       scheduledTab: '[data-test="add-alert-type-tab-false"]',
@@ -63,11 +64,10 @@ export class AlertSaveQueryModePage {
   async openEditor(alertId, { folder = 'default' } = {}) {
     await this.page.goto(`/web/alerts?org_identifier=${getOrgIdentifier()}&action=update&alert_id=${alertId}&folder=${folder}`);
     await expect(this.page.locator(this.locators.submit)).toBeVisible({ timeout: 30000 });
-    // The form shell renders before the alert is fetched, and a Save fired in
-    // that window reads an unpopulated form. The stream select is empty until
-    // the alert lands, so it doubles as the "data is in" signal.
-    await expect(this.page.locator(this.locators.streamTrigger))
-      .not.toHaveAttribute('data-test-selected-value', '', { timeout: 30000 });
+    // A Save fired before the alert is fetched reads an empty form. Edit locks section 1 to a
+    // "type · stream · how" summary whose stream slot stays blank until the alert lands.
+    await expect(this.page.locator(this.locators.watchSummary)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.locators.watchSummary)).not.toHaveText(/·\s*·/, { timeout: 30000 });
     testLogger.info('Opened alert editor', { alertId });
   }
 

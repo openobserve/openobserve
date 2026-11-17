@@ -432,6 +432,7 @@ test.describe('Anomaly Detection', () => {
     test('the SQL preview is hidden in custom_sql mode', {
       tag: ['@anomaly', '@P2', '@functional', '@all'],
     }, async ({ page }) => {
+      await pm.anomalyDetectionPage.showAnomalyMoreOptions();
       await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeVisible();
       await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
       await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeHidden();
