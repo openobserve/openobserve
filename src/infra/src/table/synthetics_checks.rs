@@ -1365,6 +1365,16 @@ pub async fn reset_false_alarm_holds<C: ConnectionTrait>(
 ) -> Result<(), errors::Error> {
     // Read before the move: after it, no row reads as signed.
     let failing = signed_failing_rows(conn).await?;
+    move_stamps_and_resign(conn, failing, now).await
+}
+
+/// The write half of [`reset_false_alarm_holds`], split out so a test can run two resets that
+/// read the same rows before either one writes.
+pub(crate) async fn move_stamps_and_resign<C: ConnectionTrait>(
+    conn: &C,
+    failing: Vec<(String, StatusStreaks)>,
+    now: i64,
+) -> Result<(), errors::Error> {
     // Two updates, so no SQL dialect needs GREATEST. The order matters: the second one sets
     // values that the first one would move again.
     Entity::update_many()
@@ -1390,7 +1400,7 @@ pub async fn reset_false_alarm_holds<C: ConnectionTrait>(
 }
 
 /// Failing rows whose signature is valid, with the streaks the reset starts from.
-async fn signed_failing_rows<C: ConnectionTrait>(
+pub(crate) async fn signed_failing_rows<C: ConnectionTrait>(
     conn: &C,
 ) -> Result<Vec<(String, StatusStreaks)>, errors::Error> {
     let rows = Entity::find()
@@ -1430,7 +1440,9 @@ async fn signed_failing_rows<C: ConnectionTrait>(
 }
 
 /// Signs one row again after the reset moved its stamp the way [`reset_false_alarm_holds`] does.
-/// Writes only if the row still holds the streaks read before the move and the moved stamp; any
+/// Writes only if the row still holds the streaks read before the move and the moved stamp, and
+/// nothing voided it. It does not require the old signature: a reset that overlaps this one moves
+/// the same stamp and signs it for its own value, and this write then signs the final stamp. Any
 /// other write in between leaves the row unsigned, which only fails open.
 async fn resign_moved_row<C: ConnectionTrait>(
     conn: &C,
@@ -1463,13 +1475,7 @@ async fn resign_moved_row<C: ConnectionTrait>(
         .filter(Column::StatusRunTs.eq(before.run_ts))
         .filter(Column::LastRunClass.eq(before.run_class))
         .filter(Column::StatusRecoveredAt.eq(moved))
-        .filter(Column::StatusStreakSig.eq(streak_sig(
-            before.down_runs,
-            before.up_runs,
-            before.run_ts,
-            before.run_class,
-            before.recovered_at,
-        )))
+        .filter(Column::StatusStreakSig.ne(UNSIGNED))
         .exec(conn)
         .await?;
     Ok(())

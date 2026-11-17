@@ -1706,6 +1706,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn two_resets_that_read_the_same_row_leave_it_signed() {
+        let db = db().await;
+        with_notices(&db).await;
+        let (cur, _) = check_row(&db).await;
+        assert!(
+            synthetics_checks::swap_status_streaks(&db, "mon-1", &cur, &failing(50))
+                .await
+                .unwrap()
+        );
+        // Reset B reads the row, then reset A runs to the end before B writes.
+        let read_b = synthetics_checks::signed_failing_rows(&db).await.unwrap();
+        synthetics_checks::reset_false_alarm_holds(&db, 1_000)
+            .await
+            .unwrap();
+        assert_eq!(check_row(&db).await.0.recovered_at, 1_001);
+        synthetics_checks::move_stamps_and_resign(&db, read_b, 1_100)
+            .await
+            .unwrap();
+        let (row, _) = check_row(&db).await;
+        assert_eq!(row.recovered_at, 1_101);
+        assert!(row.signed, "the later reset signs the final stamp");
+    }
+
+    #[tokio::test]
     async fn a_reset_keeps_an_unsigned_failing_row_unsigned() {
         let db = db().await;
         with_notices(&db).await;
