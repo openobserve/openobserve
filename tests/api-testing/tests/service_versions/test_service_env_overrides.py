@@ -13,6 +13,7 @@ from .svcver_helpers import (
     OVERRIDES,
     REGISTRY_POLL,
     REGISTRY_TIMEOUT,
+    delete_versions,
     ingest,
     list_versions,
     overrides_for,
@@ -43,6 +44,7 @@ def seeded(client: OpenObserveClient) -> Generator[dict[str, Any], None, None]:
     for rule_key in overrides_for(client, service):
         removed = client.delete(f"{OVERRIDES}/{rule_key}")
         assert removed.status_code in (200, 404), removed.text
+    delete_versions(client, service)
 
 
 def test_override_relabels_the_versions_until_it_is_removed(client: OpenObserveClient, seeded):
