@@ -120,7 +120,7 @@ import {
 } from "./latencyHeatmap";
 import useTraces from "@/composables/useTraces";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
-import { analyzeTracesSql, traceSelector } from "@/utils/traces/tracesSql";
+import { analyzeTracesSql } from "@/utils/traces/tracesSql";
 import { activeScopePredicate, withScope } from "@/utils/traces/tracesScope";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { buildTracesRedPanel, tracesBucketNotice, type TracesRedChart } from "./tracesRedPanels";
@@ -190,20 +190,16 @@ const effectiveFilter = computed(() => searchObj.data.editorValue);
 
 const decodeFilter = (text: string | undefined): string =>
   resolveTracesFilter(text, tracesParser.value, searchObj.data.stream.selectedStream.value);
-const sqlInTracesView = () => !!searchObj.meta.sqlMode && searchObj.meta.searchMode === "traces";
-// Typed SQL feeds the panels only its top-level WHERE, or in the Traces view its trace selector, bracketed so the panels' own conditions bind outside it.
+// Typed SQL feeds the panels only its top-level WHERE, bracketed so the panels' own conditions bind outside it.
 const parseEffectiveFilter = (): string => {
   if (!searchObj.meta.sqlMode) return decodeFilter(effectiveFilter.value);
-  const sql = effectiveFilter.value ?? "";
-  const where = sqlInTracesView()
-    ? traceSelector(sql, tracesParser.value).filter
-    : analyzeTracesSql(sql, tracesParser.value).where;
+  const where = analyzeTracesSql(effectiveFilter.value ?? "", tracesParser.value).where;
   return where ? `(${where})` : "";
 };
-// Typed SQL may alias its stream, and its WHERE refers to that alias; the Traces view selector reads the stream itself.
+// Typed SQL may alias its stream, and its WHERE refers to that alias.
 const panelFrom = (streamName: string): string => {
   const quoted = `"${streamName}"`;
-  if (!searchObj.meta.sqlMode || sqlInTracesView()) return quoted;
+  if (!searchObj.meta.sqlMode) return quoted;
   return analyzeTracesSql(effectiveFilter.value ?? "", tracesParser.value).fromClause || quoted;
 };
 

@@ -661,12 +661,6 @@ describe("TracesSearchResultList", () => {
       wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "spans" as any });
       expect(wrapper.findComponent({ name: "OTable" }).props("sorting")).toBe("none");
     });
-
-    it("keeps server sorting for SQL in the Traces view, which still sends the sort", () => {
-      (sharedSearchObj.meta as any).sqlMode = true;
-      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "traces" as any });
-      expect(wrapper.findComponent({ name: "OTable" }).props("sorting")).toBe("server");
-    });
   });
 
   describe("Columns button — fill column", () => {

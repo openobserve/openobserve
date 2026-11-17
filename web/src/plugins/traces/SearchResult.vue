@@ -654,7 +654,7 @@ export default defineComponent({
       Number(searchObj.data.queryResults?.total ?? hits.value.length),
     );
 
-    // Results carry the SQL they ran, so a staged edit never reshapes the table; Traces view rows stay traces.
+    // Results carry the SQL they ran, so a staged edit never reshapes the table; only the Spans view runs SQL.
     const sqlInfo = computed(() => {
       const sql = searchObj.data.queryResults?.sql;
       if (searchObj.meta.searchMode !== "spans") return null;

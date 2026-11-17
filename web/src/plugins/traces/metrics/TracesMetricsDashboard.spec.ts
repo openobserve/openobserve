@@ -1886,23 +1886,6 @@ ORDER BY start_time DESC`;
       expect(getPanelQuery(wrapper, "Rate")).toContain("duration > 2");
     });
 
-    it("feeds the Traces view panels the trace selector over the selected stream", async () => {
-      const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
-      mockTracesParser.value = new mod.default.Parser();
-      const selector = `SELECT t.trace_id, count(*) AS n FROM "default" t GROUP BY t.trace_id HAVING count(*) > 200`;
-      await remountWith(`${selector};`);
-      mockSearchObj.meta.searchMode = "traces";
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      mockTracesParser.value = null;
-
-      const where = `(trace_id IN (SELECT trace_id FROM (${selector})))`;
-      expect(getPanelQuery(wrapper, "Rate")).toContain(`FROM "default" WHERE ${where}`);
-      expect(getPanelQuery(wrapper, "Rate")).toContain("approx_distinct(trace_id)");
-      expect(getPanelQuery(wrapper, "Errors")).toContain(`span_status = 'ERROR' AND ${where}`);
-      expect(getHeatmapSql(wrapper)).toContain(`FROM "default" WHERE ${where}`);
-    });
-
     it("tells the heatmap it is showing typed SQL", async () => {
       await remountWith(typed);
       expect(wrapper.findComponent({ name: "TracesLatencyHeatmap" }).props("sqlMode")).toBe(true);

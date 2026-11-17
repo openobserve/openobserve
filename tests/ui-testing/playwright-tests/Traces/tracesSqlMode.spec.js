@@ -1,5 +1,5 @@
 // tracesSqlMode.spec.js
-// SQL mode in the Traces explorer: toggle, typed SQL in the Spans view, trace selectors in the Traces view.
+// SQL mode in the Traces explorer: SQL runs in the Spans view only; the Traces view takes a filter.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -9,8 +9,7 @@ const { ingestTraces } = require('../utils/trace-ingestion.js');
 const FILTER = "service_name = 'api-gateway'";
 const PREFILLED = `SELECT * FROM "default" WHERE ${FILTER} ORDER BY start_time DESC`;
 const GROUPED = `SELECT service_name, count(*) AS spans FROM "default" GROUP BY service_name`;
-const BIG_TRACES = 'SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200';
-const NO_TRACE_ID = 'SELECT service_name, duration\nFROM "default"\nWHERE duration > 0';
+const GROUPED_WHERE = `SELECT service_name, count(*) AS spans FROM "default" WHERE ${FILTER} GROUP BY service_name`;
 const TYPO = `SELECT servce_name, count(*) AS spans FROM "default" GROUP BY servce_name`;
 
 test.describe("Traces SQL mode testcases", () => {
@@ -77,78 +76,97 @@ test.describe("Traces SQL mode testcases", () => {
     await expect(pm.tracesPage.getRedMetricsDashboard()).toHaveCount(0);
   });
 
-  test("P1: Turning SQL mode off a plain SELECT returns the filter", {
+  test("P1: Turning SQL mode off shows and runs the filter with no dialog, and keeps the SQL", {
     tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
   }, async () => {
     await pm.tracesPage.setQueryEditorValue(FILTER);
     await pm.tracesPage.toggleSqlModeFromToolbar();
     await pm.tracesPage.expectQueryEditorValue(PREFILLED);
+    await pm.tracesPage.setQueryEditorValue(GROUPED);
 
     await pm.tracesPage.toggleSqlModeFromToolbar();
 
     await expect(pm.tracesPage.getSqlModeConfirmDialog()).toHaveCount(0);
     await pm.tracesPage.expectSqlMode(false);
     await pm.tracesPage.expectQueryEditorValue(FILTER);
-  });
-
-  test("P2: Turning SQL mode off a GROUP BY asks first, and Cancel keeps the SQL", {
-    tag: ['@tracesSqlMode', '@traces', '@query', '@P2', '@all']
-  }, async () => {
-    await pm.tracesPage.toggleSqlModeFromToolbar();
-    await pm.tracesPage.setQueryEditorValue(GROUPED);
-    await pm.tracesPage.expectSqlMode(true);
+    await expect(pm.tracesPage.getToastMessage('Your SQL is kept.')).toBeVisible({ timeout: 10000 });
 
     await pm.tracesPage.toggleSqlModeFromToolbar();
-    await expect(pm.tracesPage.getSqlModeConfirmDialog()).toBeVisible({ timeout: 10000 });
-    await pm.tracesPage.cancelSqlModeSwitchOff();
-
     await pm.tracesPage.expectSqlMode(true);
     await pm.tracesPage.expectQueryEditorValue(GROUPED);
   });
 
-  test("P1: A Traces view template fills the editor, and the query lists traces", {
+  test("P1: The SQL switch in the Traces view moves to Spans, runs nothing, and Back to Traces returns", {
     tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
   }, async () => {
     await pm.tracesPage.switchToTracesMode();
-    await pm.tracesPage.setQueryEditorValue('');
+    await pm.tracesPage.setQueryEditorValue(FILTER);
+    await pm.tracesPage.expectSqlMode(false);
+
     await pm.tracesPage.toggleSqlModeFromToolbar();
+
     await pm.tracesPage.expectSqlMode(true);
-    await expect(pm.tracesPage.getSqlTemplateGallery()).toBeVisible({ timeout: 10000 });
+    await pm.tracesPage.expectQueryEditorValue(PREFILLED);
+    await expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 });
+    await expect(pm.tracesPage.getToastMessage('SQL runs in the Spans view')).toBeVisible();
 
-    await pm.tracesPage.useSqlTemplate('Big traces');
-    await pm.tracesPage.expectQueryEditorValue(BIG_TRACES);
-    await expect(pm.tracesPage.getTraceResultRows()).toHaveCount(0);
+    await pm.tracesPage.clickToastAction('Back to Traces');
 
-    await pm.tracesPage.setQueryEditorValue(BIG_TRACES.replace('> 200', '> 1'));
-    await pm.tracesPage.setTimeRange('15m');
-    await pm.tracesPage.runSearch();
-
-    await expect(pm.tracesPage.getTraceResultRows().first()).toBeVisible({ timeout: 20000 });
-    await expect(pm.tracesPage.getRedMetricsDashboard()).toBeVisible();
+    await pm.tracesPage.expectSqlMode(false);
+    await pm.tracesPage.expectQueryEditorValue(FILTER);
+    // The pre-fill was never edited or run, so nothing is kept for Spans.
+    await expect(pm.tracesPage.getSqlKeptLine()).toHaveCount(0);
   });
 
-  test("P1: A Traces view query without trace_id explains why, and Add trace_id and Run fixes it", {
+  test("P1: Leaving Spans SQL for Traces keeps the SQL, and Use WHERE from SQL runs its WHERE", {
     tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
   }, async () => {
-    await pm.tracesPage.switchToTracesMode();
+    await pm.tracesPage.setQueryEditorValue('');
     await pm.tracesPage.toggleSqlModeFromToolbar();
-    await pm.tracesPage.setQueryEditorValue(NO_TRACE_ID);
-    await pm.tracesPage.expectSqlMode(true);
+    await pm.tracesPage.setQueryEditorValue(GROUPED_WHERE);
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
+    await expect(pm.tracesPage.getSqlResultTable()).toBeVisible({ timeout: 20000 });
 
-    await expect(pm.tracesPage.getSqlSelectorProblem()).toBeVisible({ timeout: 10000 });
-    await expect(pm.tracesPage.getSqlSuggestedChange()).toContainText(
-      'SELECT trace_id, service_name, duration',
+    await pm.tracesPage.switchToTracesMode();
+
+    await pm.tracesPage.expectSqlMode(false);
+    await expect(pm.tracesPage.getSqlKeptLine()).toContainText(
+      'No filter is set, so this shows every trace in the range.',
+      { timeout: 10000 },
     );
 
-    await pm.tracesPage.addTraceIdAndRun();
+    await pm.tracesPage.getUseWhereFromSqlButton().click();
 
-    await pm.tracesPage.expectQueryEditorValue(
-      NO_TRACE_ID.replace('SELECT service_name', 'SELECT trace_id, service_name'),
-    );
-    await expect(pm.tracesPage.getSqlSelectorProblem()).toHaveCount(0);
+    await pm.tracesPage.expectQueryEditorValue(FILTER);
+    await expect(pm.tracesPage.getSqlKeptLine()).toContainText('Using the WHERE from your SQL.');
     await expect(pm.tracesPage.getTraceResultRows().first()).toBeVisible({ timeout: 20000 });
+
+    await pm.tracesPage.backToSql();
+
+    await pm.tracesPage.expectSqlMode(true);
+    await pm.tracesPage.expectQueryEditorValue(GROUPED_WHERE);
+    await expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 });
+  });
+
+  test("P2: A SELECT typed in the Traces view sends nothing, and Open in Spans view carries it", {
+    tag: ['@tracesSqlMode', '@traces', '@query', '@P2', '@all']
+  }, async () => {
+    await pm.tracesPage.switchToTracesMode();
+    await pm.tracesPage.setQueryEditorValue(GROUPED);
+    await pm.tracesPage.expectSqlMode(false);
+    await pm.tracesPage.runSearch();
+
+    await expect(pm.tracesPage.getStatementInTracesCard()).toContainText(
+      'The Traces view takes a filter, not a SELECT',
+      { timeout: 10000 },
+    );
+
+    await pm.tracesPage.openStatementInSpans();
+
+    await pm.tracesPage.expectSqlMode(true);
+    await pm.tracesPage.expectQueryEditorValue(GROUPED);
+    await expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 });
   });
 
   test("P1: An unknown column offers Did you mean, and the fix replaces it and runs", {

@@ -44,6 +44,7 @@ import {
   TRACES_LIST_URL_KEYS,
 } from "@/plugins/traces/tracesUrlState";
 import type { TracesScope } from "@/utils/traces/tracesScope";
+import { createTracesSqlTexts } from "@/utils/traces/tracesSqlTexts";
 import {
   DEFAULT_GROUPS_SORT,
   type GroupsSort,
@@ -313,6 +314,9 @@ const loadTracesParser = async (): Promise<void> => {
   await _loadTracesParserPromise;
 };
 
+// The Spans SQL text and the shared filter live beside searchObj for the whole tab.
+const tracesSqlTexts = createTracesSqlTexts(searchObj, tracesParser);
+
 const useTraces = () => {
   const store = useStore();
   const router = useRouter();
@@ -342,6 +346,7 @@ const useTraces = () => {
     searchObj.data.query = "";
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
+    tracesSqlTexts.reset();
     searchObj.meta.scope = "all";
     searchObj.meta.groupBy = "";
     searchObj.meta.groupsSort = { ...DEFAULT_GROUPS_SORT };
@@ -432,9 +437,13 @@ const useTraces = () => {
     return query;
   }
 
-  // Only a non-empty SQL query is worth reopening in SQL mode.
+  // A non-empty SQL query outside the Traces view is worth reopening in SQL mode; graph and catalog keep it for Spans.
   function sqlModeUrlState(): { sql_mode?: "true" } {
-    return searchObj.meta.sqlMode && searchObj.data.editorValue?.trim() ? { sql_mode: "true" } : {};
+    return searchObj.meta.sqlMode &&
+      searchObj.meta.searchMode !== "traces" &&
+      searchObj.data.editorValue?.trim()
+      ? { sql_mode: "true" }
+      : {};
   }
 
   function listUrlState() {
@@ -837,6 +846,13 @@ const useTraces = () => {
     getOrSetServiceColor,
     tracesParser,
     loadTracesParser,
+    sqlTexts: tracesSqlTexts.sqlTexts,
+    noteFilterText: tracesSqlTexts.noteFilterText,
+    clearSqlText: tracesSqlTexts.clearSqlText,
+    leaveSql: tracesSqlTexts.leaveSql,
+    turnSqlOn: tracesSqlTexts.turnSqlOn,
+    takeTypedSql: tracesSqlTexts.takeTypedSql,
+    normalizeTracesView: tracesSqlTexts.normalizeTracesView,
   };
 };
 

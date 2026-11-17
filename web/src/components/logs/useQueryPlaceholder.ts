@@ -34,8 +34,6 @@ interface Options {
   /** When true, all example queries containing match_all() are omitted (e.g. traces page). */
   excludeMatchAll?: boolean;
   freeText?: boolean;
-  /** The select list of the SQL examples. Default: "*". */
-  sqlColumns?: Ref<string>;
 }
 
 const SYSTEM_FIELDS = new Set(["_timestamp", "_all", "_stream"]);
@@ -121,9 +119,8 @@ export function useQueryPlaceholder(
 
     if (isSql) {
       const result: string[] = [];
-      const columns = options.sqlColumns?.value ?? "*";
       if (kf0) {
-        const base = `SELECT ${columns} FROM stream WHERE ${fieldExprSql(kf0)}`;
+        const base = `SELECT * FROM stream WHERE ${fieldExprSql(kf0)}`;
         result.push(base);
         if (kf1) result.push(`${base} AND ${fieldExprSql(kf1)}`);
         if (kf1) result.push(`${base} OR ${fieldExprSql(kf1)}`);
