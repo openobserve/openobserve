@@ -126,7 +126,17 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
         } else if let Some(projection) = node.downcast_ref::<ProjectionExec>() {
             // Check ProjectionExec for the structure: [index_field]
             let exprs = projection.expr();
-            if exprs.len() == 1 {
+            // below the aggregate the distinct field must pass through under its own name, or
+            // the index is read for a different field than the one the query groups by
+            let renames_field = self.simple_distinct.as_ref().is_some_and(|(field, ..)| {
+                !field.is_empty()
+                    && exprs.first().is_some_and(|expr| {
+                        !is_column(&expr.expr)
+                            || get_column_name(&expr.expr) != field
+                            || expr.alias != *field
+                    })
+            });
+            if exprs.len() == 1 && !renames_field {
                 // First expression should be the index field
                 // We'll validate this in the AggregateExec
                 return Ok(TreeNodeRecursion::Continue);
@@ -237,6 +247,15 @@ mod tests {
                     10,
                     false,
                 )),
+            ),
+            // a subquery alias makes the group by field another column than the filter's
+            (
+                "select name from (select id as name from t where str_match(name, 'a') and _timestamp >= 175256100000000 and _timestamp < 17525610000000000) s group by name order by name asc limit 10",
+                None,
+            ),
+            (
+                "select name from (select id as name from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000) s group by name order by name asc limit 10",
+                None,
             ),
             // str_match on another index field filters rows, not the distinct field's terms
             (

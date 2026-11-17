@@ -162,24 +162,27 @@ fn validate_time_alignment_daily(start_time: i64, end_time: i64) -> Result<(), a
     Ok(())
 }
 
-/// True when the delete must be sent as whole days: a day of the range is stored as one daily
-/// file. Such a delete is refused unless it is day aligned, because the file goes as a whole.
+/// True when the delete must be sent as whole days: the stream is not a logs stream, or a day
+/// of the range is stored as one daily file. Such a delete is refused unless it is day aligned,
+/// because the whole day goes.
 pub(crate) async fn delete_covers_daily_days(
     stream: &config::meta::stream::StreamParams,
     start_time: i64,
     end_time: i64,
 ) -> Result<bool, anyhow::Error> {
     let range = config::meta::stream::TimeRange::new(start_time, end_time);
-    let needs_whole_days = stream::delete_range_needs_whole_days(
-        &stream.org_id,
-        stream.stream_type,
-        &stream.stream_name,
-        &range,
-    )
-    .await;
+    // only a logs delete can be sent by the hour: every other type is deleted by date
+    let needs_whole_days = stream.stream_type != config::meta::stream::StreamType::Logs
+        || stream::delete_range_needs_whole_days(
+            &stream.org_id,
+            stream.stream_type,
+            &stream.stream_name,
+            &range,
+        )
+        .await;
     if needs_whole_days && !is_day_aligned(start_time, end_time) {
         return Err(anyhow::anyhow!(
-            "Stream {} stores a day of this range as one daily file, so delete_before_backfill must cover whole days: start_time and end_time must be aligned to day boundary (e.g., 2024-01-15T00:00:00Z)",
+            "Stream {} is deleted by whole days for this range (a day of it is stored as one daily file, or the stream is not a logs stream), so with delete_before_backfill enabled start_time and end_time must be aligned to day boundary (e.g., 2024-01-15T00:00:00Z)",
             stream.stream_name
         ));
     }

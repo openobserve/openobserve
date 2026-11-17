@@ -7628,12 +7628,10 @@ async fn initiate_stream_deletion(
     end_time: i64,
 ) -> Result<String, anyhow::Error> {
     use chrono::TimeZone;
-    use config::meta::stream::StreamType;
 
-    // a day stored as one daily file is deleted whole, so the range must be whole days
+    // only a logs delete outside a daily day is sent by the hour, so the range must be whole days
     let whole_days =
-        crate::alerts::backfill::delete_covers_daily_days(stream, start_time, end_time).await?
-            || stream.stream_type != StreamType::Logs;
+        crate::alerts::backfill::delete_covers_daily_days(stream, start_time, end_time).await?;
 
     // Convert microseconds to formatted time range strings
     let time_range_start = {
