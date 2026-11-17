@@ -8189,6 +8189,7 @@ dependencies = [
  "search_service",
  "serde",
  "serde_json",
+ "sqlparser",
  "stream",
  "svix-ksuid",
  "time",
