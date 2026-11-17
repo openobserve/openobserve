@@ -19,7 +19,7 @@ import { buildSQLChartQuery } from "./dashboardAutoQueryBuilder";
 import { buildFunnelStages } from "./convertFunnelData";
 
 vi.mock("./convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn(),
+  prepareCustomChartRun: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
 
