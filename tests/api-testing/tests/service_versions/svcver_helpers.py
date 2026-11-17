@@ -10,6 +10,8 @@ from support.client import OpenObserveClient
 from support.wait import wait_until
 
 STREAM = "svcver_api_e2e"
+ALIASES = "service_identity/aliases"
+OVERRIDES = "service_identity/overrides"
 CLUSTER = "svcver-e2e-cluster"
 OSS_DENIAL = "Service versions require the enterprise build"
 # The registry flushes once a minute; four flushes leave room for a loaded CI runner.
@@ -95,6 +97,54 @@ def wait_for_versions(client: OpenObserveClient, service: str, expected: set[str
         interval=REGISTRY_POLL,
         msg=f"versions {sorted(expected)} of {service} in the registry",
     )
+
+
+def delete_versions(client: OpenObserveClient, *services: str) -> None:
+    """Delete every registry version of `services`; a version already gone answers 200 or 404."""
+    for service in services:
+        for row in list_versions(client, service):
+            resp = client.delete(f"service_versions/{row['version_key']}")
+            assert resp.status_code in (200, 404), resp.text
+
+
+def compare_body(seeded: dict[str, Any], new: str, old: str, **changes: Any) -> dict[str, Any]:
+    body = {
+        "service": seeded["service"],
+        "where": seeded["versions"][new]["where_key"],
+        "a": {"version": new},
+        "b": {"version": old},
+        "signals": ["traces"],
+    }
+    return body | changes
+
+
+def listed(client: OpenObserveClient, q: str, **params: str) -> dict[str, dict[str, Any]]:
+    resp = client.get(ALIASES, params={"q": q, "limit": "1000", **params})
+    assert resp.status_code == 200, resp.text
+    return {row["alias_key"]: row for row in resp.json()["aliases"]}
+
+
+def service_override(seeded: dict[str, Any], value: str, **changes: str) -> dict[str, str]:
+    body = {
+        "scope": "service",
+        "service_name": seeded["service"],
+        "where_key": seeded["where_key"],
+        "k8s_cluster": CLUSTER,
+        "value": value,
+    }
+    return body | changes
+
+
+def overrides_for(client: OpenObserveClient, service: str) -> dict[str, dict[str, Any]]:
+    resp = client.get(OVERRIDES, params={"q": service})
+    assert resp.status_code == 200, resp.text
+    return {row["rule_key"]: row for row in resp.json()["overrides"]}
+
+
+def unversioned(client: OpenObserveClient) -> dict[str, dict[str, Any]]:
+    resp = client.get("service_identity/unresolved", params={"limit": "1000"})
+    assert resp.status_code == 200, resp.text
+    return {row["service"]: row for row in resp.json()["no_version"]}
 
 
 def catalog(client: OpenObserveClient, **params: str) -> list[dict[str, Any]]:

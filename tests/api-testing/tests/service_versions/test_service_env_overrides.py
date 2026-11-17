@@ -10,19 +10,21 @@ from support.client import OpenObserveClient
 from support.wait import wait_until
 
 from .svcver_helpers import (
-    CLUSTER,
+    OVERRIDES,
     REGISTRY_POLL,
     REGISTRY_TIMEOUT,
     ingest,
     list_versions,
+    overrides_for,
     resource_spans,
+    service_override,
     uniq,
+    unversioned,
     wait_for_versions,
 )
 
 pytestmark = pytest.mark.enterprise
 
-OVERRIDES = "service_identity/overrides"
 VERSION = "3.0.0"
 
 
@@ -38,28 +40,9 @@ def seeded(client: OpenObserveClient) -> Generator[dict[str, Any], None, None]:
     )
     row = wait_for_versions(client, service, {VERSION})[VERSION]
     yield {"service": service, "unversioned": unversioned, "where_key": row["where_key"]}
-    resp = client.get(OVERRIDES, params={"q": service})
-    assert resp.status_code == 200, resp.text
-    for item in resp.json()["overrides"]:
-        removed = client.delete(f"{OVERRIDES}/{item['rule_key']}")
+    for rule_key in overrides_for(client, service):
+        removed = client.delete(f"{OVERRIDES}/{rule_key}")
         assert removed.status_code in (200, 404), removed.text
-
-
-def service_override(seeded: dict[str, Any], value: str, **changes: str) -> dict[str, str]:
-    body = {
-        "scope": "service",
-        "service_name": seeded["service"],
-        "where_key": seeded["where_key"],
-        "k8s_cluster": CLUSTER,
-        "value": value,
-    }
-    return body | changes
-
-
-def overrides_for(client: OpenObserveClient, service: str) -> dict[str, dict[str, Any]]:
-    resp = client.get(OVERRIDES, params={"q": service})
-    assert resp.status_code == 200, resp.text
-    return {row["rule_key"]: row for row in resp.json()["overrides"]}
 
 
 def test_override_relabels_the_versions_until_it_is_removed(client: OpenObserveClient, seeded):
@@ -135,12 +118,6 @@ def test_envs_lists_prod_with_the_seeded_service(client: OpenObserveClient, seed
     assert (prod[0]["no_env"], prod[0]["inferred"]) == (False, False)
     assert prod[0]["services"] >= 1
     assert body["scope_counts"]["service"] == 1, body
-
-
-def unversioned(client: OpenObserveClient) -> dict[str, dict[str, Any]]:
-    resp = client.get("service_identity/unresolved", params={"limit": "1000"})
-    assert resp.status_code == 200, resp.text
-    return {row["service"]: row for row in resp.json()["no_version"]}
 
 
 def test_unresolved_lists_the_service_without_a_version(client: OpenObserveClient, seeded):

@@ -19,7 +19,7 @@ test.describe('Service versions — catalog columns and env filter', {
 
   test.beforeAll(async ({ playwright }) => {
     test.setTimeout(360_000);
-    api = await playwright.request.newContext();
+    api = await ServiceVersionsPage.apiContext(playwright);
     Object.assign(gate, await ServiceVersionsPage.probe(api));
     if (!gate.available) return;
     fixture = ServiceVersionsPage.fixture('cat');
@@ -27,6 +27,7 @@ test.describe('Service versions — catalog columns and env filter', {
   });
 
   test.afterAll(async () => {
+    if (gate.available && fixture) await ServiceVersionsPage.deleteSeeded(api, fixture);
     await api?.dispose();
   });
 
@@ -42,7 +43,7 @@ test.describe('Service versions — catalog columns and env filter', {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  test('Env, Where, Version and Deploy verdict columns show the registry values', async () => {
+  test('The four version column headers render and the Env, Where and Version cells show the registry values', async () => {
     const sv = pm.serviceVersionsPage;
     await sv.expectServiceRow(fixture.multi);
     await sv.expectVersionColumns();

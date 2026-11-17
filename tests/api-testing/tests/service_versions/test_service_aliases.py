@@ -8,11 +8,10 @@ import pytest
 
 from support.client import OpenObserveClient
 
-from .svcver_helpers import uniq
+from .svcver_helpers import ALIASES, listed, uniq
 
 pytestmark = pytest.mark.enterprise
 
-ALIASES = "service_identity/aliases"
 MAX_BULK_ROWS = 500
 
 
@@ -33,12 +32,6 @@ def make_alias(client: OpenObserveClient) -> Generator[Callable[..., dict[str, A
     for key in keys:
         resp = client.delete(f"{ALIASES}/{key}")
         assert resp.status_code in (204, 404), resp.text
-
-
-def listed(client: OpenObserveClient, q: str, **params: str) -> dict[str, dict[str, Any]]:
-    resp = client.get(ALIASES, params={"q": q, "limit": "1000", **params})
-    assert resp.status_code == 200, resp.text
-    return {row["alias_key"]: row for row in resp.json()["aliases"]}
 
 
 def test_create_returns_an_active_manual_alias(client: OpenObserveClient, make_alias):

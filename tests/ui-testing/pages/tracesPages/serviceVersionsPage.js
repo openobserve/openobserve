@@ -56,6 +56,9 @@ export class ServiceVersionsPage {
         has: page.locator(`[data-test="services-catalog-service-link-${service}"]`),
       });
     this.catalogCell = (service, column) => this.catalogRow(service).locator(`[data-test="o2-table-cell-${column}"]`);
+    // The value segment alone, so the chip's key label or "inferred" qualifier never joins the text.
+    this.envChipValue = (service) =>
+      this.catalogCell(service, 'version_env').locator('[data-test="svcver-env-chip"] [data-test="o-truncated-text"]');
     this.columnHeader = (column) => this.catalogTable.locator(`[data-test="o2-table-th-${column}"]`);
     this.versionCheckbox = (key) => this.sidePanel.locator(`[data-test="svcver-select-${key}"] [role="checkbox"]`);
     this.versionLabel = (key) => this.sidePanel.locator(`[data-test="svcver-version-${key}"]`);
@@ -63,6 +66,10 @@ export class ServiceVersionsPage {
   }
 
   // ---------------------------------------------------------------- REST: gate, seed, read
+
+  static async apiContext(playwright) {
+    return playwright.request.newContext();
+  }
 
   /** `available: false` only on an OSS build that denies the routes; anything else unexpected throws. */
   static async probe(request) {
@@ -161,6 +168,19 @@ export class ServiceVersionsPage {
     return Object.fromEntries(rows.map((row) => [row.version, row]));
   }
 
+  /** Delete every registry version of the fixture's services; a version already gone is fine. */
+  static async deleteSeeded(request, fixture) {
+    for (const service of [fixture.multi, fixture.single, fixture.noEnv]) {
+      for (const row of await this.listVersions(request, service)) {
+        const res = await request.delete(`${apiBase()}/api/${orgId()}/service_versions/${row.version_key}`, {
+          headers: getAuthHeaders(),
+        });
+        expect([200, 404], `DELETE service_versions/${row.version_key}: ${res.status()}`).toContain(res.status());
+      }
+    }
+    testLogger.info('Service versions seeded rows deleted', { namespace: fixture.namespace });
+  }
+
   static async overridesFor(request, whereKey) {
     const res = await request.get(`${apiBase()}/api/${orgId()}/service_identity/overrides`, {
       headers: getAuthHeaders(),
@@ -219,7 +239,7 @@ export class ServiceVersionsPage {
   }
 
   async expectEnvCell(service, env) {
-    await expect(this.catalogCell(service, 'version_env')).toContainText(env, { timeout: 30_000 });
+    await expect(this.envChipValue(service)).toHaveText(env, { timeout: 30_000 });
   }
 
   async openEnvFilter() {

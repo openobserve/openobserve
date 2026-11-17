@@ -20,7 +20,7 @@ test.describe('Service versions — service panel Versions tab', {
 
   test.beforeAll(async ({ playwright }) => {
     test.setTimeout(360_000);
-    api = await playwright.request.newContext();
+    api = await ServiceVersionsPage.apiContext(playwright);
     Object.assign(gate, await ServiceVersionsPage.probe(api));
     if (!gate.available) return;
     fixture = ServiceVersionsPage.fixture('panel');
@@ -28,6 +28,7 @@ test.describe('Service versions — service panel Versions tab', {
   });
 
   test.afterAll(async () => {
+    if (gate.available && fixture) await ServiceVersionsPage.deleteSeeded(api, fixture);
     await api?.dispose();
   });
 
