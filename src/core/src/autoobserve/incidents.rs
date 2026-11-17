@@ -735,9 +735,7 @@ mod tests {
 
     #[test]
     fn a_cohort_reads_every_members_issue_with_its_recorded_recovery() {
-        use o2_enterprise::enterprise::autoobserve::context::{
-            ImpactEffect, ImpactKind, ImpactRecord, impact_sentence, subject_of,
-        };
+        use o2_enterprise::enterprise::autoobserve::context::subject_of;
         const MINUTE: i64 = 60_000_000;
         let (org, silence, drop) = (
             "demo-org",
@@ -795,38 +793,25 @@ mod tests {
                 })
             })
             .collect();
-        let sentence = |i: &IssueRef| {
-            let record = ImpactRecord {
-                provider: "security_blind_spot".into(),
-                kind: ImpactKind::Detection,
-                effect: if i.decision_kind == drop {
-                    ImpactEffect::Partial
-                } else {
-                    ImpactEffect::Blind
-                },
-                subject: i.subject.clone(),
-                counts: BTreeMap::from([("detections".to_string(), 12)]),
-                items: Vec::new(),
-                more: 0,
-                needs: None,
-                classes: Vec::new(),
-                issue: Some(i.decision_id.clone()),
-            };
-            impact_sentence(&record, i, false)
-        };
-        let read: Vec<Vec<String>> = per_incident(items.len(), &members, found)
+        let incidents = per_incident(items.len(), &members, found);
+        let read: Vec<Vec<(&str, Option<i64>)>> = incidents
             .iter()
-            .map(|issues| issues.iter().map(sentence).collect())
+            .map(|issues| {
+                issues
+                    .iter()
+                    .map(|i| (i.decision_kind.as_str(), i.recovered_us))
+                    .collect()
+            })
             .collect();
         assert_eq!(
             read,
             [
                 vec![
-                    "12 detections get no data.",
-                    "12 detections saw only part of the data for 75 minutes.",
-                    "12 detections got no data for 3 hours.",
+                    (silence, None),
+                    (drop, Some(95 * MINUTE)),
+                    (silence, Some(210 * MINUTE)),
                 ],
-                vec!["12 detections get no data."],
+                vec![(silence, None)],
             ]
         );
     }
