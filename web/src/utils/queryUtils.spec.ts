@@ -879,6 +879,19 @@ describe("convertMinutesToCron", () => {
   it("returns cron expression for 1 minute", () => {
     expect(convertMinutesToCron(1)).toBe("0 */1 * * * *");
   });
+
+  it("steps whole hours and days in the hour and day fields", () => {
+    expect(convertMinutesToCron(60)).toBe("0 0 */1 * * *");
+    expect(convertMinutesToCron(120)).toBe("0 0 */2 * * *");
+    expect(convertMinutesToCron(720)).toBe("0 0 */12 * * *");
+    expect(convertMinutesToCron(1440)).toBe("0 0 0 */1 * *");
+    expect(convertMinutesToCron(2880)).toBe("0 0 0 */2 * *");
+  });
+
+  it("returns '' for an interval no cron step can express", () => {
+    expect(convertMinutesToCron(90)).toBe("");
+    expect(convertMinutesToCron(1500)).toBe("");
+  });
 });
 
 // ---------------------------------------------------------------------------
