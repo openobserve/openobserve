@@ -58,22 +58,30 @@ pub async fn guard_settings_update(
         db::organization::stream_retention_days(org_id, stream_type, stream_name, 0).await;
     let weakens = current
         .as_ref()
-        .is_some_and(|current| weakens_security_source(current, update, inherited_days(inherited)));
+        .is_some_and(|current| weakens_under(current, update, inherited));
     refuse_unless_admin(org_id, user_id, weakens).await?;
     Ok(source || update.security.is_some())
 }
 
-/// The days a stream with no value of its own keeps data. 0 keeps it forever, and a failed read
-/// counts as the shortest retention, so the guard refuses instead of guessing.
-fn inherited_days(resolved: Result<i64, infra::errors::Error>) -> i64 {
-    match resolved {
-        Ok(0) => i64::MAX,
-        Ok(days) => days,
+/// Judges the update by the days a stream with no value of its own keeps data, where 0 keeps
+/// it forever. After a failed read the value is unknown, so the update is refused if it weakens
+/// the source under the shortest or the longest value.
+fn weakens_under(
+    current: &config::meta::stream::StreamSettings,
+    update: &UpdateStreamSettings,
+    inherited: Result<i64, infra::errors::Error>,
+) -> bool {
+    let candidates = match inherited {
+        Ok(0) => vec![i64::MAX],
+        Ok(days) => vec![days],
         Err(e) => {
             log::error!("[SECURITY] inherited retention read failed: {e}");
-            1
+            vec![1, i64::MAX]
         }
-    }
+    };
+    candidates
+        .into_iter()
+        .any(|days| weakens_security_source(current, update, days))
 }
 
 /// A `security` change is audited by its summary row, so its request row is not stamped too.
@@ -116,19 +124,32 @@ mod tests {
             }),
             ..Default::default()
         };
-        let to_default = UpdateStreamSettings {
-            data_retention: Some(0),
+        let retention = |days| UpdateStreamSettings {
+            data_retention: Some(days),
             ..Default::default()
         };
-        let weakens =
-            |resolved| weakens_security_source(&source, &to_default, inherited_days(resolved));
-        assert!(weakens(Ok(3)), "the org default is shorter than 30 days");
-        assert!(!weakens(Ok(90)));
-        assert!(!weakens(Ok(0)), "0 keeps the data forever");
+        let down = || Err(infra::errors::Error::Message("down".to_string()));
         assert!(
-            weakens(Err(infra::errors::Error::Message("down".to_string()))),
+            weakens_under(&source, &retention(0), Ok(3)),
+            "the org default is shorter than 30 days"
+        );
+        assert!(!weakens_under(&source, &retention(0), Ok(90)));
+        assert!(
+            !weakens_under(&source, &retention(0), Ok(0)),
+            "0 keeps the data forever"
+        );
+        assert!(
+            weakens_under(&source, &retention(0), down()),
             "an unknown default is refused"
         );
+        // a source that inherits its retention: an unknown default never hides a shorter value
+        let inheriting = config::meta::stream::StreamSettings {
+            data_retention: 0,
+            ..source.clone()
+        };
+        assert!(weakens_under(&inheriting, &retention(7), Ok(90)));
+        assert!(weakens_under(&inheriting, &retention(7), down()));
+        assert!(!weakens_under(&source, &retention(60), down()));
     }
 
     #[test]

@@ -6748,7 +6748,33 @@ async fn handle_backfill_triggers(
                 let mut failed = false;
                 let mut error_msg = String::new();
 
+                // refuse before any deletion is queued: a queued deletion is not taken back
+                for stream in destination_streams.iter() {
+                    if let Err(e) = crate::alerts::backfill::delete_covers_daily_days(
+                        stream,
+                        config.start_time,
+                        config.end_time,
+                    )
+                    .await
+                    {
+                        error_msg = format!(
+                            "Failed to initiate deletion for stream {}/{}: {}",
+                            stream.stream_type, stream.stream_name, e
+                        );
+                        log::error!(
+                            "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] {}",
+                            job_id,
+                            error_msg
+                        );
+                        failed = true;
+                        break;
+                    }
+                }
+
                 for (idx, stream) in destination_streams.iter().enumerate() {
+                    if failed {
+                        break;
+                    }
                     log::debug!(
                         "[BACKFILL trace_id {trace_id}] [job_id: {}] Initiating deletion for stream {}/{} ({}/{})",
                         job_id,
