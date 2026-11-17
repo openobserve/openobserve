@@ -96,6 +96,7 @@ impl RoundPlan {
     }
 }
 
+/// A job's resolved window and merge rule, shared by file discovery and batch planning.
 #[derive(Debug)]
 pub(super) struct MergePolicy {
     window: MergeWindow,
@@ -103,6 +104,7 @@ pub(super) struct MergePolicy {
 }
 
 impl MergePolicy {
+    /// Resolve the job window, incremental state and merge rule before file discovery.
     pub(super) fn resolve(
         stream: &StreamParams,
         schema: &Schema,
@@ -124,6 +126,8 @@ impl MergePolicy {
         Self { window, rule }
     }
 
+    /// Build merge batches for one partition using the selected rule.
+    /// Return non-empty batches and whether a follow-up round is needed.
     pub(super) async fn plan(
         &self,
         files: Vec<FileKey>,
@@ -143,10 +147,12 @@ impl MergePolicy {
         plan
     }
 
+    /// Return the query window paired with this rule; its read range can exceed the job range.
     pub(super) fn window(&self) -> &MergeWindow {
         &self.window
     }
 
+    /// Whether file discovery must include files regardless of their original size.
     pub(super) fn reads_whole_window(&self) -> bool {
         match &self.rule {
             MergeRule::SizeBounded(_) => size_bounded::READS_WHOLE_WINDOW,
@@ -158,6 +164,7 @@ impl MergePolicy {
     }
 }
 
+/// Determines which files to select and how to group them into merge batches.
 #[derive(Debug)]
 enum MergeRule {
     SizeBounded(MergeMode),
@@ -168,6 +175,8 @@ enum MergeRule {
 }
 
 impl MergeRule {
+    /// Prefer eligible downsampling rules, falling back to the stream's normal merge rule.
+    /// Return the selected rule and its file-query read level.
     fn select(
         stream: &StreamParams,
         schema: &Schema,
@@ -188,6 +197,7 @@ impl MergeRule {
         )
     }
 
+    /// Use open/closed-hour rules for indexed metrics, and size-bounded merging otherwise.
     fn for_stream(stream: &StreamParams, schema: &Schema, is_incremental: bool) -> Self {
         if metrics_index_stream(stream.stream_type, schema) {
             return if is_incremental {
@@ -203,6 +213,8 @@ impl MergeRule {
     }
 }
 
+/// Stream identity, scheduling state and file-query dates for one merge job.
+/// The query range may be wider than the scheduled job range.
 #[derive(Debug)]
 pub(super) struct MergeWindow {
     pub(super) org_id: String,
