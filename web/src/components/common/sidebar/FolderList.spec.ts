@@ -240,6 +240,66 @@ describe("FolderList.vue", () => {
       expect(wrapper.find('[data-test="dashboard-folder-tab-__favorites__"]').exists()).toBe(false);
     });
 
+    describe("Public dashboards entry", () => {
+      const PUBLIC_ID = "__public_links__";
+      const mountRail = (props: Record<string, unknown>) =>
+        mount(FolderList, {
+          global: {
+            plugins: [i18n],
+            stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+            mocks: { $store: mockStore },
+            provide: { store: mockStore },
+          },
+          props: { type: "dashboards", ...props },
+        });
+
+      afterEach(() => {
+        mockRouter.currentRoute.value.query = {};
+      });
+
+      it("sits directly under Favorites, as a beta entry with the language icon", () => {
+        const w = mountRail({ showFavorites: true, showPublicDashboards: true });
+        expect(w.vm.filteredTabs.slice(0, 3).map((t: any) => t.folderId)).toEqual([
+          "__favorites__",
+          PUBLIC_ID,
+          "default",
+        ]);
+        const row = w.find(`[data-test="dashboard-folder-tab-${PUBLIC_ID}"]`);
+        expect(row.text()).toContain("Public dashboards");
+        expect(row.find('[data-test="beta-badge"]').exists()).toBe(true);
+        expect(row.findComponent({ name: "FolderIcon" }).props("icon")).toBe("language");
+        expect(row.find('[data-test="dashboard-more-icon"]').exists()).toBe(false);
+        w.unmount();
+      });
+
+      it("is never hidden by the folder search", async () => {
+        const w = mountRail({ showFavorites: true, showPublicDashboards: true });
+        w.vm.searchQuery = "another";
+        await nextTick();
+        expect(w.vm.filteredTabs.map((t: any) => t.folderId)).toEqual([PUBLIC_ID, "folder3"]);
+        w.unmount();
+      });
+
+      it("is absent without the prop", () => {
+        const w = mountRail({ showFavorites: true });
+        expect(w.find(`[data-test="dashboard-folder-tab-${PUBLIC_ID}"]`).exists()).toBe(false);
+        expect(wrapper.find(`[data-test="dashboard-folder-tab-${PUBLIC_ID}"]`).exists()).toBe(
+          false,
+        );
+        w.unmount();
+      });
+
+      it("is selected from the URL folder on load", async () => {
+        mockRouter.currentRoute.value.query = { folder: PUBLIC_ID };
+        const w = mountRail({ showFavorites: true, showPublicDashboards: true });
+        await flushPromises();
+        expect(w.vm.activeFolderId).toBe(PUBLIC_ID);
+        expect(w.vm.publicLinksActive).toBe(true);
+        expect(w.emitted("update:activeFolderId")?.at(-1)).toEqual([PUBLIC_ID]);
+        w.unmount();
+      });
+    });
+
     it("does not re-emit from a click on a NON-active tab (change path owns that)", async () => {
       // The click re-emit is only for the already-active tab; a different tab
       // emits via the v-model watcher (covered by the watcher tests below),

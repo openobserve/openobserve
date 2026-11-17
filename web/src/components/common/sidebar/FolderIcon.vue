@@ -26,6 +26,7 @@ import OGlyph from "@/lib/forms/EmojiPicker/OGlyph.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconToken } from "@/lib/forms/EmojiPicker/OGlyph.types";
 import { isUnresolvedFlatToken } from "@/lib/forms/EmojiPicker/flatIconCatalog";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 const props = withDefaults(
   defineProps<{
@@ -33,8 +34,10 @@ const props = withDefaults(
     token?: IconToken | null;
     /** Renders the favourites star instead of the folder fallback. */
     favorite?: boolean;
+    /** A fixed glyph for a pseudo-folder entry, shown in place of the folder fallback. */
+    icon?: IconName;
   }>(),
-  { token: null, favorite: false },
+  { token: null, favorite: false, icon: undefined },
 );
 
 const showGlyph = computed(() => !!props.token && !isUnresolvedFlatToken(props.token));
@@ -44,6 +47,7 @@ const showGlyph = computed(() => !!props.token && !isUnresolvedFlatToken(props.t
   <span class="flex size-4 shrink-0 items-center justify-center" data-test="folder-icon">
     <OGlyph v-if="showGlyph" :token="token" size="sm" />
     <OIcon v-else-if="favorite" name="star" size="sm" class="text-favorite" />
+    <OIcon v-else-if="icon" :name="icon" size="sm" class="text-current" />
     <OIcon v-else name="folder-outline" size="sm" class="text-current" />
   </span>
 </template>
