@@ -16,23 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import type { AlertSectionId } from "./alertFormSections";
-import {
-  moreLinkLabel,
-  type AlertAddRow,
-  type AlertSectionTierView,
-  type AlertSettingId,
-} from "./alertSettingTiers";
+import type { AlertSectionTierView, AlertSettingId } from "./alertSettingTiers";
 
 const props = defineProps<{
   section: AlertSectionId;
   view: AlertSectionTierView;
-  /** The section opened by itself because everything fits, so there is nothing to offer hiding. */
-  autoOpened?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -41,50 +33,31 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const SEP = raw(" · ");
+// Only the anomaly window hint has values, and a listed setting always holds its default.
+const HINT_DEFAULTS = { fire: 100, buckets: 1 };
 
-const ROW_LABELS: Record<AlertAddRow, I18nKey> = {
-  fires: "alerts.tiers.rowFires",
-  message: "alerts.tiers.rowMessage",
-};
-
-const rows = computed(() =>
-  (Object.keys(ROW_LABELS) as AlertAddRow[])
-    .map((row) => ({
-      row,
-      label: t(ROW_LABELS[row]),
-      items: props.view.addLinks.filter((d) => d.row === row),
-    }))
-    .filter((r) => r.items.length > 0),
-);
-
-const showToggle = computed(
-  () => props.view.tucked.length > 0 && !(props.autoOpened && props.view.expanded),
-);
-
-const moreLabel = computed(() =>
-  moreLinkLabel(
-    props.view.tucked.map((d) => t(d.nameKey)),
-    t,
-  ),
-);
+const links = computed(() => props.view.addLinks.filter((d) => !d.inline));
+const messageLinks = computed(() => links.value.filter((d) => d.row === "message"));
+const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
 </script>
 
 <template>
   <div
-    v-if="rows.length || showToggle"
+    v-if="links.length || view.more.length"
     class="flex flex-col"
     :data-test="`add-alert-section-${section}-tiers`"
   >
     <OSettingRow
-      v-for="r in rows"
-      :key="r.row"
-      :label="r.label"
+      v-if="messageLinks.length"
+      :label="t('alerts.form.messageRow')"
+      :description="t('alerts.form.messageRowHelp')"
       fill
-      :data-test="`add-alert-section-${section}-row-${r.row}`"
+      :data-test="`add-alert-section-${section}-row-message`"
     >
       <div class="flex flex-wrap items-center gap-1">
         <OButton
-          v-for="item in r.items"
+          v-for="item in messageLinks"
           :key="item.id"
           variant="ghost-primary"
           size="sm"
@@ -96,9 +69,22 @@ const moreLabel = computed(() =>
         </OButton>
       </div>
     </OSettingRow>
-    <div v-if="showToggle" class="py-1">
+    <div v-if="ownLinks.length" class="flex flex-wrap items-center gap-1 py-1">
       <OButton
-        class="max-w-full"
+        v-for="item in ownLinks"
+        :key="item.id"
+        variant="ghost-primary"
+        size="sm"
+        icon-left="add"
+        :data-test="`add-alert-add-${item.id}`"
+        @click="emit('add', item.id)"
+      >
+        {{ t(item.nameKey) }}
+      </OButton>
+    </div>
+    <div v-if="view.more.length" class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-1">
+      <OButton
+        class="shrink-0"
         variant="ghost-primary"
         size="sm"
         :icon-left="view.expanded ? 'expand-less' : 'expand-more'"
@@ -106,10 +92,25 @@ const moreLabel = computed(() =>
         :data-test="`add-alert-section-${section}-more`"
         @click="emit('toggle')"
       >
-        <OTruncatedText>{{
-          view.expanded ? t("alerts.tiers.showFewer") : moreLabel
-        }}</OTruncatedText>
+        {{
+          view.expanded
+            ? t("alerts.tiers.showFewer")
+            : t("alerts.form.moreOptions", { count: view.more.length })
+        }}
       </OButton>
+      <span
+        v-if="!view.expanded"
+        class="text-text-secondary min-w-0 flex-1 text-xs whitespace-normal"
+        :data-test="`add-alert-section-${section}-more-names`"
+      >
+        <template v-for="(item, index) in view.more" :key="item.id"
+          ><template v-if="index">{{ SEP }}</template
+          >{{ t(item.nameKey)
+          }}<template v-if="item.defaultHintKey"
+            >{{ " " }}{{ t(item.defaultHintKey, HINT_DEFAULTS) }}</template
+          ></template
+        >
+      </span>
     </div>
   </div>
 </template>
