@@ -204,7 +204,7 @@ export class ServiceVersionsPage {
 
   /** The cell names one of `versions`: which one (current or newest) depends on deploy tracking. */
   async expectVersionCell(service, versions) {
-    const anyOf = new RegExp(versions.map((v) => v.replace(/[.]/g, '\\.')).join('|'));
+    const anyOf = new RegExp(versions.map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'));
     await expect(this.catalogCell(service, 'service_versions')).toContainText(anyOf, { timeout: 30_000 });
   }
 
