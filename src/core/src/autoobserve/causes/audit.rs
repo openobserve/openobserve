@@ -58,6 +58,7 @@ pub enum Object {
     },
     Pipeline {
         id: Option<String>,
+        name: Option<String>,
     },
     Alert {
         id: Option<String>,
@@ -137,25 +138,22 @@ pub fn change_of(method: &str, path: &str, query: &str, body: &str) -> Option<Ch
             token(&body_field(body, "name").unwrap_or_default(), true),
         ),
         ("PATCH", [_, "ingestion-tokens", name]) => (ChangeKind::TokenChanged, token(name, true)),
-        ("POST" | "PUT", [_, "pipelines"]) => (
-            ChangeKind::PipelineChanged,
-            Object::Pipeline {
-                id: body_field(body, "pipeline_id"),
-            },
-        ),
-        ("DELETE", [_, "pipelines", id]) if *id != "bulk" => (
-            ChangeKind::PipelineChanged,
-            Object::Pipeline {
-                id: Some(id.to_string()),
-            },
-        ),
-        ("PUT", [_, "pipelines", id, "enable"]) if query_value(query, "value") == Some("false") => {
+        ("POST" | "PUT", [_, "pipelines"]) => {
+            // A create without `overwrite` gets its id from the server, not from the body.
+            let kept = method == "PUT" || query_value(query, "overwrite") == Some("true");
             (
                 ChangeKind::PipelineChanged,
                 Object::Pipeline {
-                    id: Some(id.to_string()),
+                    id: body_field(body, "pipeline_id").filter(|id| kept && !id.is_empty()),
+                    name: body_field(body, "name"),
                 },
             )
+        }
+        ("DELETE", [_, "pipelines", id]) if *id != "bulk" => {
+            (ChangeKind::PipelineChanged, pipeline_id(id))
+        }
+        ("PUT", [_, "pipelines", id, "enable"]) if query_value(query, "value") == Some("false") => {
+            (ChangeKind::PipelineChanged, pipeline_id(id))
         }
         ("POST", ["v2", _, "alerts"]) => (
             ChangeKind::AlertChanged,
@@ -206,10 +204,13 @@ async fn changes(
         .await?;
     let audited: Vec<Audited> = page.hits.iter().filter_map(Audited::of).collect();
     let wants = |f: fn(&Object) -> bool| audited.iter().any(|a| f(&a.change.object));
-    let (fed, cut) = if wants(|o| matches!(o, Object::Pipeline { .. })) {
-        fed_pipelines(&lookups.pipelines(&ask.org).await?, &streams)
+    let (names, fed, cut) = if wants(|o| matches!(o, Object::Pipeline { .. })) {
+        let pipelines = lookups.pipelines(&ask.org).await?;
+        let (fed, cut) = fed_pipelines(&pipelines, &streams);
+        let names = pipelines.into_iter().map(|p| (p.id, p.name)).collect();
+        (names, fed, cut)
     } else {
-        (BTreeMap::new(), false)
+        (BTreeMap::new(), BTreeMap::new(), false)
     };
     let alerts = if wants(|o| matches!(o, Object::Alert { .. })) {
         lookups.alerts(&ask.org).await?
@@ -218,7 +219,7 @@ async fn changes(
     };
     let records = audited
         .into_iter()
-        .filter_map(|a| record(a, &streams, &fed, &alerts))
+        .filter_map(|a| record(a, &streams, (&names, &fed), &alerts))
         .collect();
     let partial = cut || page.is_partial || page.hits.len() >= ROWS as usize;
     let state = if partial {
@@ -261,10 +262,11 @@ fn audit_sql(org: &str, streams: &BTreeSet<EntityRef>, has_target: bool) -> Stri
 }
 
 /// Keeps a change only when it touches an issue stream, or is org-wide like a token.
+/// `names` holds every pipeline's name by id, `fed` those that touch an issue stream.
 fn record(
     a: Audited,
     streams: &BTreeSet<EntityRef>,
-    fed: &BTreeMap<String, Fed>,
+    (names, fed): (&BTreeMap<String, String>, &BTreeMap<String, Fed>),
     alerts: &[AlertStream],
 ) -> Option<ChangeRecord> {
     let (subject, name, affects, open) = match a.change.object {
@@ -293,13 +295,9 @@ fn record(
             let open = link("iam/ingestionTokens", &[]).filter(|_| named);
             (subject, name, Vec::new(), open)
         }
-        Object::Pipeline { id } => {
-            let id = id.or_else(|| {
-                let target = a.target.as_deref()?;
-                fed.iter()
-                    .find(|(_, f)| f.name == target)
-                    .map(|(id, _)| id.clone())
-            })?;
+        Object::Pipeline { id, name } => {
+            let named = a.target.clone().or(name);
+            let id = id.or_else(|| only_named(names, named.as_deref()?))?;
             let f = fed.get(&id)?;
             let subject = EntityRef::new(kinds::PIPELINE, &[(dims::ENTITY_ID, &id)]);
             let open = link("pipeline/pipelines/edit", &[("id", &id)]).filter(|_| !a.deleted);
@@ -348,6 +346,26 @@ fn record(
         needs: Some(Need::Subject),
         open,
     })
+}
+
+/// Pipeline names are not unique, so only a single match names the pipeline a call created.
+fn only_named(names: &BTreeMap<String, String>, name: &str) -> Option<String> {
+    let name = name.trim().to_lowercase();
+    let mut ids = names
+        .iter()
+        .filter(|(_, n)| n.trim().to_lowercase() == name)
+        .map(|(id, _)| id);
+    match (ids.next(), ids.next()) {
+        (Some(id), None) => Some(id.clone()),
+        _ => None,
+    }
+}
+
+fn pipeline_id(id: &str) -> Object {
+    Object::Pipeline {
+        id: Some(id.to_string()),
+        name: None,
+    }
 }
 
 fn token(id: &str, named: bool) -> Object {
@@ -422,8 +440,9 @@ mod tests {
     #[test]
     fn audited_calls_map_to_the_change_they_made() {
         let change = |kind, object| Some(Change { kind, object });
-        let pipeline = |id: Option<&str>| Object::Pipeline {
+        let pipeline = |id: Option<&str>, name: Option<&str>| Object::Pipeline {
             id: id.map(str::to_string),
+            name: name.map(str::to_string),
         };
         let alert = |id: Option<&str>, stream: Option<EntityRef>| Object::Alert {
             id: id.map(str::to_string),
@@ -489,28 +508,41 @@ mod tests {
                 "acme/pipelines",
                 "",
                 r#"{"name":"mask","pipeline_id":"p1","nodes":[{"id":"#,
-                change(ChangeKind::PipelineChanged, pipeline(Some("p1"))),
+                change(
+                    ChangeKind::PipelineChanged,
+                    pipeline(Some("p1"), Some("mask")),
+                ),
             ),
             (
                 "POST",
                 "acme/pipelines",
                 "",
-                r#"{"name":"mask"}"#,
-                change(ChangeKind::PipelineChanged, pipeline(None)),
+                r#"{"pipeline_id":"p1","name":"mask"}"#,
+                change(ChangeKind::PipelineChanged, pipeline(None, Some("mask"))),
+            ),
+            (
+                "POST",
+                "acme/pipelines",
+                "overwrite=true",
+                r#"{"pipeline_id":"p1","name":"mask"}"#,
+                change(
+                    ChangeKind::PipelineChanged,
+                    pipeline(Some("p1"), Some("mask")),
+                ),
             ),
             (
                 "DELETE",
                 "acme/pipelines/p1",
                 "",
                 "",
-                change(ChangeKind::PipelineChanged, pipeline(Some("p1"))),
+                change(ChangeKind::PipelineChanged, pipeline(Some("p1"), None)),
             ),
             (
                 "PUT",
                 "acme/pipelines/p1/enable",
                 "value=false",
                 "",
-                change(ChangeKind::PipelineChanged, pipeline(Some("p1"))),
+                change(ChangeKind::PipelineChanged, pipeline(Some("p1"), None)),
             ),
             ("PUT", "acme/pipelines/p1/enable", "value=true", "", None),
             ("DELETE", "acme/pipelines/bulk", "", "", None),
@@ -614,6 +646,13 @@ mod tests {
             audit_row(115, "DELETE", "acme/streams/api", "type=logs", ""),
             audit_row(120, "PATCH", "acme/ingestion-tokens/ci", "", "{}"),
             audit_row(130, "PUT", "acme/pipelines", "", r#"{"pipeline_id":"p1"}"#),
+            audit_row(
+                132,
+                "POST",
+                "acme/pipelines",
+                "",
+                r#"{"name":"Mask-App ","nodes":[{"id":"#,
+            ),
             audit_row(135, "PUT", "acme/pipelines", "", r#"{"pipeline_id":"p9"}"#),
             audit_row(140, "PUT", "v2/acme/alerts/a1", "", "{}"),
             audit_row(145, "POST", "v2/acme/alerts/a1/ack", "", ""),
@@ -621,7 +660,8 @@ mod tests {
             audit_row(5_000, "PUT", "acme/streams/app/settings", "", "{}"),
         ];
         let mut rows = rows;
-        rows[6]["target"] = "5xx".into();
+        let alert = rows.iter_mut().find(|r| r["_timestamp"] == 140).unwrap();
+        alert["target"] = "5xx".into();
         for (at, method, path, code) in [
             (105, "PUT", "acme/streams/app/settings", 400),
             (125, "DELETE", "acme/streams/api", 500),
@@ -637,7 +677,14 @@ mod tests {
         let written = fields(&all);
         let search = MemSearch::new(vec![(AUDIT_STREAM, all)]);
         let mut lookups = FakeLookups {
-            pipelines: vec![pipeline("p1", "app"), pipeline("p9", "elsewhere")],
+            pipelines: vec![
+                pipeline("p1", "app"),
+                Pipeline {
+                    name: "mask-app".to_string(),
+                    ..pipeline("p2", "app")
+                },
+                pipeline("p9", "elsewhere"),
+            ],
             alerts: vec![AlertStream {
                 id: "a1".to_string(),
                 name: "5xx".to_string(),
@@ -673,6 +720,12 @@ mod tests {
                     140,
                     ChangeKind::AlertChanged,
                     kinds::ALERT,
+                    vec![logs("app")]
+                ),
+                (
+                    132,
+                    ChangeKind::PipelineChanged,
+                    kinds::PIPELINE,
                     vec![logs("app")]
                 ),
                 (
@@ -717,12 +770,14 @@ mod tests {
                 .all(|r| r.actor.as_deref() == Some("priya@acme.io")
                     && r.needs == Some(Need::Subject))
         );
-        assert_eq!(records[0].subject_name, "5xx");
-        assert_eq!(records[4].subject_name, "app");
+        let at = |t: i64| records.iter().find(|r| r.at == t).unwrap();
+        assert_eq!(at(140).subject_name, "5xx");
+        assert_eq!(at(100).subject_name, "app");
         assert_eq!(
-            records[0].open.as_ref().map(|l| l.query["folder"].as_str()),
+            at(140).open.as_ref().map(|l| l.query["folder"].as_str()),
             Some("ops")
         );
+        assert_eq!(at(132).subject.key_dims[dims::ENTITY_ID], "p2");
         assert_eq!(*search.orgs.lock().unwrap(), [META_ORG_ID]);
     }
 }
