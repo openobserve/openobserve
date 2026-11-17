@@ -799,6 +799,18 @@ export function usePanelDrilldown({
     return columns;
   };
 
+  // A builder join or a custom SQL JOIN; either way the executed SQL reads more than one table.
+  const queryJoinsStreams = async (queryIndex: number, resultIndex: number): Promise<boolean> => {
+    if (panelSchema.value?.queries?.[queryIndex]?.joins?.length) return true;
+    const sql =
+      metadata?.value?.queries?.[resultIndex]?.query ??
+      panelSchema.value?.queries?.[queryIndex]?.query;
+    if (!sql) return false;
+    if (!parser) await importSqlParser();
+    const from = parseSelectColumns(sql)?.from;
+    return Array.isArray(from) && from.length > 1;
+  };
+
   // An h-bar time label is the raw histogram key in UTC, without a zone suffix.
   const labelTimestamp = (label: unknown): number | null => {
     if (typeof label === "number") return label > 1e14 ? label : label * 1000;
@@ -854,10 +866,11 @@ export function usePanelDrilldown({
     detail: licenseLocks.lockedReason(feature),
   });
 
-  const logsItem = (target: PointTarget): PointExploreItem => {
+  const logsItem = (target: PointTarget, joinsStreams: boolean): PointExploreItem => {
     const availability = logsAvailability({
       queryType: panelSchema.value?.queryType,
       streamType: target.streamType,
+      joinsStreams,
       isLocked: licenseLocks.isLocked,
     });
     if (availability.kind === "locked") return lockedItem(availability.feature);
@@ -998,9 +1011,11 @@ export function usePanelDrilldown({
       timeSlice: family === "category" || wholeRange ? "panelRange" : "bucket",
       filters,
     };
+    const joinsStreams =
+      schema.queryType !== "promql" && (await queryJoinsStreams(queryIndex, resultIndex));
     if (request !== pointRequest) return false;
     const traces = tracesItem(target);
-    const logs = logsItem(target);
+    const logs = logsItem(target, joinsStreams);
     if (logs.state === "hidden" && traces.state === "hidden") {
       pointExplore.value = null;
       return false;

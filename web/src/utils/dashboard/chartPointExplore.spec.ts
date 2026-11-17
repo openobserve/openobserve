@@ -360,18 +360,11 @@ describe("logsAvailability", () => {
   it.each([
     [{ queryType: "sql", streamType: "logs" }, { kind: "enabled" }],
     [{ queryType: "sql", streamType: undefined }, { kind: "enabled" }],
-    [
-      { queryType: "sql", streamType: "metrics" },
-      { kind: "blocked", reason: "logsNeedLogsStream" },
-    ],
-    [
-      { queryType: "sql", streamType: "traces" },
-      { kind: "blocked", reason: "logsNeedLogsStream" },
-    ],
-    [
-      { queryType: "promql", streamType: "metrics" },
-      { kind: "blocked", reason: "logsNeedLogsStream" },
-    ],
+    [{ queryType: "sql", streamType: "metrics" }, { kind: "blocked" }],
+    [{ queryType: "sql", streamType: "traces" }, { kind: "blocked" }],
+    [{ queryType: "promql", streamType: "metrics" }, { kind: "blocked" }],
+    [{ queryType: "sql", streamType: "logs", joinsStreams: true }, { kind: "blocked" }],
+    [{ queryType: "sql", streamType: "logs", joinsStreams: false }, { kind: "enabled" }],
   ])("%o gives %o", (input, expected) => {
     expect(logsAvailability({ ...input, isLocked: unlocked })).toEqual(expected);
   });
@@ -395,19 +388,10 @@ describe("tracesAvailability", () => {
     [{ streamType: "traces" }, { kind: "tracesStream" }],
     [{ streamType: "logs" }, { kind: "correlate" }],
     [{ streamType: "metrics" }, { kind: "correlate" }],
-    [
-      { streamType: "metrics", queryType: "promql", hasGroupValues: false },
-      { kind: "blocked", reason: "needsGroupBy" },
-    ],
-    [
-      { streamType: "logs", hasGroupValues: false },
-      { kind: "blocked", reason: "needsGroupBy" },
-    ],
-    [
-      { streamType: "logs", correlationEnabled: false },
-      { kind: "blocked", reason: "noTraceCorrelation" },
-    ],
-    [{ streamType: "enrichment_tables" }, { kind: "blocked", reason: "noTraceCorrelation" }],
+    [{ streamType: "metrics", queryType: "promql", hasGroupValues: false }, { kind: "blocked" }],
+    [{ streamType: "logs", hasGroupValues: false }, { kind: "blocked" }],
+    [{ streamType: "logs", correlationEnabled: false }, { kind: "blocked" }],
+    [{ streamType: "enrichment_tables" }, { kind: "blocked" }],
   ])("%o gives %o", (input, expected) => {
     expect(tracesAvailability({ ...base, ...input })).toEqual(expected);
   });

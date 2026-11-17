@@ -70,19 +70,14 @@ export interface PointClick {
   fieldValues?: Map<string, unknown>;
 }
 
-/** Why View logs or View traces cannot open for this chart. */
-export type ExploreBlock = "logsNeedLogsStream" | "noTraceCorrelation" | "needsGroupBy";
-
 export type LogsAvailability =
-  | { kind: "enabled" }
-  | { kind: "locked"; feature: string }
-  | { kind: "blocked"; reason: ExploreBlock };
+  { kind: "enabled" } | { kind: "locked"; feature: string } | { kind: "blocked" };
 
 export type TracesAvailability =
   | { kind: "tracesStream" }
   | { kind: "correlate" }
   | { kind: "locked"; feature: string }
-  | { kind: "blocked"; reason: ExploreBlock };
+  | { kind: "blocked" };
 
 const TIME_TYPES = ["line", "area", "area-stacked", "bar", "stacked", "scatter"];
 const HORIZONTAL_TYPES = ["h-bar", "h-stacked"];
@@ -198,11 +193,14 @@ export const filtersWhere = (baseWhere: string | undefined, filters: FieldFilter
 export const logsAvailability = (input: {
   queryType?: string;
   streamType?: string;
+  joinsStreams?: boolean;
   isLocked: (feature: string) => boolean;
 }): LogsAvailability => {
   if (input.queryType === "promql" || (input.streamType || "logs") !== "logs") {
-    return { kind: "blocked", reason: "logsNeedLogsStream" };
+    return { kind: "blocked" };
   }
+  // A JOIN's WHERE and group-by fields span several streams, so no one stream's logs match the point.
+  if (input.joinsStreams) return { kind: "blocked" };
   return input.isLocked("logs") ? { kind: "locked", feature: "logs" } : { kind: "enabled" };
 };
 
@@ -218,10 +216,10 @@ export const tracesAvailability = (input: {
   const streamType = input.streamType || "logs";
   if (input.queryType !== "promql" && streamType === "traces") return { kind: "tracesStream" };
   if (!["logs", "metrics"].includes(streamType) || !input.correlationEnabled) {
-    return { kind: "blocked", reason: "noTraceCorrelation" };
+    return { kind: "blocked" };
   }
   if (input.isLocked("correlation")) return { kind: "locked", feature: "correlation" };
-  if (!input.hasGroupValues) return { kind: "blocked", reason: "needsGroupBy" };
+  if (!input.hasGroupValues) return { kind: "blocked" };
   return { kind: "correlate" };
 };
 

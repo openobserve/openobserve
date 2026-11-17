@@ -480,6 +480,46 @@ describe("usePanelDrilldown point menu", () => {
     });
   });
 
+  describe("JOIN charts", () => {
+    // Enterprise keeps View traces pending, so the section stays and View logs can be read on its own.
+    const joinDeps = () => {
+      appConfig.isEnterprise = "true";
+      const deps = makeDeps();
+      deps.findRelatedTelemetry.mockImplementation(() => new Promise(() => undefined));
+      return deps;
+    };
+
+    it("a custom SQL JOIN hides View logs", async () => {
+      const deps = joinDeps();
+      const sql =
+        'SELECT histogram(a._timestamp) AS x_axis_1, b.service AS breakdown_1 FROM "app" a JOIN "users" b ON a.uid = b.id GROUP BY x_axis_1, breakdown_1';
+      deps.panelSchema.value.queries[0].query = sql;
+      deps.metadata.value = { queries: [{ query: sql }] } as any;
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick(lineClick);
+
+      expect(api.pointExplore.value?.logs.state).toBe("hidden");
+      expect(api.pointExplore.value?.traces.state).toBe("pending");
+    });
+
+    it("a builder join hides View logs", async () => {
+      const deps = joinDeps();
+      (deps.panelSchema.value.queries[0] as any).joins = [{ stream: "users" }];
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick(lineClick);
+
+      expect(api.pointExplore.value?.logs.state).toBe("hidden");
+    });
+
+    it("a single-stream query keeps View logs", async () => {
+      const deps = joinDeps();
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick(lineClick);
+
+      expect(api.pointExplore.value?.logs.state).toBe("enabled");
+    });
+  });
+
   describe("multi-query funnel", () => {
     const funnelDeps = () => {
       const deps = makeDeps({ type: "funnel" });
