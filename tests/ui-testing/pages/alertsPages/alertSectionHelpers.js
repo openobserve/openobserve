@@ -86,10 +86,51 @@ export async function openAlertSectionForTab(page, tabName) {
     return sectionId;
 }
 
+/** Unfolds the condition filter builder, which stays behind its sentence until "+ Add filters" or Change. */
+export async function openAlertFilterBuilder(page) {
+    await goToAlertSection(page, 'condition');
+    for (const id of ['add-alert-add-filters', 'add-alert-filter-sentence-change']) {
+        const link = page.locator(`[data-test="${id}"]`).first();
+        if (!(await link.isVisible().catch(() => false))) continue;
+        await link.click();
+        await page.waitForTimeout(300);
+        testLogger.info('Opened the filter builder', { via: id });
+        return true;
+    }
+    return false;
+}
+
 /** Scrolls a control into view and waits out the scroll event; an OSelect opened in the same frame as a scroll closes again. */
 export async function settleIntoView(page, locator) {
     await locator.first().scrollIntoViewIfNeeded();
     await page.waitForTimeout(400);
+}
+
+const STREAM_TYPE_TRIGGER = '[data-test="add-alert-stream-type-select-dropdown-trigger"]';
+const STREAM_TYPE_OPTION = '[data-test="add-alert-stream-type-select-dropdown-option"]';
+export const ALERT_NAME_FIELD = '[data-test="add-alert-details-name-input-field"]';
+
+/** Picks logs, metrics or traces in the Watch section's stream-type dropdown. */
+export async function selectAlertStreamType(page, streamType) {
+    const trigger = page.locator(STREAM_TYPE_TRIGGER).first();
+    await trigger.waitFor({ state: 'visible', timeout: 15000 });
+    await settleIntoView(page, trigger);
+    if ((await trigger.getAttribute('data-test-selected-value')) === streamType) return;
+    await trigger.click();
+    const option = page.locator(`${STREAM_TYPE_OPTION}[data-test-value="${streamType}"]`).first();
+    await option.waitFor({ state: 'visible', timeout: 10000 });
+    await option.click();
+    testLogger.info('Selected stream type', { streamType });
+}
+
+/** Types the alert name into section 5; the header only shows it. */
+export async function fillAlertName(page, name) {
+    await goToAlertSection(page, 'details');
+    const field = page.locator(ALERT_NAME_FIELD).first();
+    await field.waitFor({ state: 'visible', timeout: 15000 });
+    await settleIntoView(page, field);
+    await field.fill(name);
+    testLogger.info('Filled alert name', { name });
 }
 
 const DESTINATION_LIST = '[data-test="alert-destinations-list"]';

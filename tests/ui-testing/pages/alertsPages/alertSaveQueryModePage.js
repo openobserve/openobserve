@@ -4,9 +4,13 @@ import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 import {
+  ALERT_NAME_FIELD,
   expandAlertSettingGroups,
+  fillAlertName,
   goToAlertSection,
+  openAlertFilterBuilder,
   pickAlertDestination,
+  selectAlertStreamType,
   settleIntoView,
 } from './alertSectionHelpers.js';
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
@@ -32,13 +36,10 @@ export class AlertSaveQueryModePage {
 
       // ── the editor ──────────────────────────────────────────────────────
       submit: '[data-test="add-alert-submit-btn"]',
-      nameTrigger: '[data-test="add-alert-name-input-trigger"]',
-      nameInput: '[data-test="add-alert-name-input-input"]',
       streamTrigger: '[data-test="add-alert-stream-name-select-dropdown-trigger"]',
       threshold: '[data-test="alert-trigger-threshold-input-field"]',
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
       scheduledTab: '[data-test="add-alert-type-tab-false"]',
-      streamTypeCard: (type) => `[data-test="add-alert-stream-type-card-${type}"]`,
       // Compare-with-Past is a tucked setting of "When is it a problem?".
       multiWindowAdd: '[data-test="multi-time-range-alerts-add-btn"]',
       multiWindowDelete: '[data-test="multi-time-range-alerts-delete-btn"]',
@@ -101,15 +102,14 @@ export class AlertSaveQueryModePage {
 
   async addBuilderCondition(column, value) {
     // A field list opened mid-scroll loses its anchor when the snap settles, and the list hides.
-    await goToAlertSection(this.page, 'condition');
+    await openAlertFilterBuilder(this.page);
     await new FilterBuilderDriver(this.page, 'alert-conditions').addCondition(column, '=', value);
   }
 
-  /** The name field is an inline edit: open it, then type. Enter submits the form. */
+  /** Enter in the name field submits the form. */
   async setName(name, { submit = false } = {}) {
-    await this.page.locator(this.locators.nameTrigger).click();
-    await this.page.locator(this.locators.nameInput).fill(name);
-    if (submit) await this.page.locator(this.locators.nameInput).press('Enter');
+    await fillAlertName(this.page, name);
+    if (submit) await this.page.locator(ALERT_NAME_FIELD).first().press('Enter');
   }
 
   async setThreshold(value) {
@@ -129,7 +129,7 @@ export class AlertSaveQueryModePage {
   }
 
   async selectStreamType(streamType) {
-    await this.page.locator(this.locators.streamTypeCard(streamType.toLowerCase())).click();
+    await selectAlertStreamType(this.page, streamType.toLowerCase());
   }
 
   async openAdvancedTab() {

@@ -2,7 +2,7 @@
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { openNavFlyoutChild } = require('../commonActions.js');
-import { goToAlertSection } from './alertSectionHelpers.js';
+import { goToAlertSection, openAlertFilterBuilder } from './alertSectionHelpers.js';
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 export class AlertsFormValidationPage {
@@ -373,6 +373,7 @@ export class AlertsFormValidationPage {
   async addFilterCondition(position = 0, operator = '=', value = 'e2e') {
     testLogger.info('Adding a condition through the condition builder', { position, operator });
     // A text field: a number field refuses text such as 'e2e' for `=`.
+    await openAlertFilterBuilder(this.page);
     await this.conditions.addConditionOnListedField(position, operator, value, { type: 'Text' });
   }
 
@@ -442,6 +443,7 @@ export class AlertsFormValidationPage {
    */
   async openFilterConditionColumnPopover() {
     testLogger.info('Opening the condition builder field picker');
+    await openAlertFilterBuilder(this.page);
     await this.conditions.openNewCondition();
   }
 }

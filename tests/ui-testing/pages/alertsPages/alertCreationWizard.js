@@ -15,8 +15,11 @@ import { FilterBuilderDriver } from '../generalPages/filterBuilderPage.js';
 import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
 import {
     destinationsShowAsList,
+    fillAlertName,
+    openAlertFilterBuilder,
     openAlertSectionForTab,
     pickAlertDestination,
+    selectAlertStreamType,
     settleIntoView,
 } from './alertSectionHelpers.js';
 
@@ -29,19 +32,9 @@ export class AlertCreationWizard {
         this.conditions = new FilterBuilderDriver(page, 'alert-conditions');
     }
 
-    /**
-     * Fill the alert name. The name is an inline-edited title (OFormInlineEdit):
-     * a display trigger swaps to an input on click. This helper is idempotent —
-     * if a caller already opened the editor (e.g. clicked the wrapper), the input
-     * is filled directly; otherwise the trigger is clicked first.
-     */
+    /** Fill the alert name (section 5). */
     async fillAlertNameField(name) {
-        const input = this.page.locator(this.locators.alertNameInputField);
-        if (!(await input.isVisible().catch(() => false))) {
-            await this.page.locator(this.locators.alertNameTrigger).click();
-            await input.waitFor({ state: 'visible', timeout: 5000 });
-        }
-        await input.fill(name);
+        await fillAlertName(this.page, name);
     }
 
     /**
@@ -99,7 +92,7 @@ export class AlertCreationWizard {
             await this.fillAlertNameField(this.currentAlertName);
 
             // Re-select stream type (logs) via OSelect popover pattern (§4)
-            await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
+            await selectAlertStreamType(this.page, 'logs');
             await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
             await this.page.waitForTimeout(1000);
 
@@ -130,7 +123,7 @@ export class AlertCreationWizard {
 
             await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
             await this.fillAlertNameField(this.currentAlertName);
-            await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
+            await selectAlertStreamType(this.page, 'logs');
             await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
             await this.page.waitForTimeout(1000);
 
@@ -200,11 +193,10 @@ export class AlertCreationWizard {
 
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.alertNameInput).click();
         await this.fillAlertNameField(randomAlertName);
 
         // Select stream type via OSelect popover pattern (§4)
-        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
+        await selectAlertStreamType(this.page, 'logs');
         // Wait for stream list API call to complete after stream type selection
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
@@ -217,6 +209,7 @@ export class AlertCreationWizard {
 
         // ==================== STEP 2: CONDITIONS ====================
         // The builder offers only stream columns; a missing column falls back to the first listed one.
+        await openAlertFilterBuilder(this.page);
         await this.conditions.addCondition(column, 'Contains', value);
 
         // ==================== ALERT SETTINGS ====================
@@ -291,11 +284,10 @@ export class AlertCreationWizard {
 
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.alertNameInput).click();
         await this.fillAlertNameField(randomAlertName);
 
         // Select stream type via OSelect popover pattern (§4)
-        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
+        await selectAlertStreamType(this.page, 'logs');
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
         await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
@@ -305,6 +297,7 @@ export class AlertCreationWizard {
         await this._selectAlertType('Real-time');
 
         // ==================== STEP 2: CONDITIONS ====================
+        await openAlertFilterBuilder(this.page);
         await this.conditions.addConditionOnListedField(0, 'Contains', 'test');
 
         // ==================== ALERT SETTINGS ====================
@@ -380,11 +373,10 @@ export class AlertCreationWizard {
 
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.alertNameInput).click();
         await this.fillAlertNameField(randomAlertName);
 
         // Select stream type via OSelect popover pattern (§4)
-        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
+        await selectAlertStreamType(this.page, 'logs');
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
         await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
@@ -576,11 +568,10 @@ export class AlertCreationWizard {
 
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.alertNameInput).click();
         await this.fillAlertNameField(randomAlertName);
 
         // Select stream type (logs) via OSelect popover pattern (§4)
-        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
+        await selectAlertStreamType(this.page, 'logs');
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
         await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
@@ -593,8 +584,10 @@ export class AlertCreationWizard {
 
         // ==================== CONDITIONS (Multiple) ====================
         // 'test' and 'validation' match the log field of the ingested validation data.
+        await openAlertFilterBuilder(this.page);
         await this.conditions.addConditionOnListedField(0, 'Contains', 'test');
         testLogger.info('Added first condition with Contains operator');
+        await openAlertFilterBuilder(this.page);
         await this.conditions.addConditionOnListedField(1, 'Contains', 'validation');
         testLogger.info('Added second condition with Contains operator');
 
@@ -677,7 +670,7 @@ export class AlertCreationWizard {
         await this.fillAlertNameField(alertName);
 
         // Select stream type (logs) via OSelect popover pattern (§4)
-        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
+        await selectAlertStreamType(this.page, 'logs');
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
         await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
@@ -687,8 +680,10 @@ export class AlertCreationWizard {
         // Select real-time alert type via dropdown (v3 UI)
         await this._selectAlertType('Real-time');
 
+        await openAlertFilterBuilder(this.page);
         await this.conditions.addConditionOnListedField(0, 'Contains', 'test');
         testLogger.info('Added first condition');
+        await openAlertFilterBuilder(this.page);
         await this.conditions.addConditionOnListedField(1, 'Contains', 'validation');
         testLogger.info('Added second condition');
 
@@ -714,6 +709,7 @@ export class AlertCreationWizard {
      * Add a condition group (AND/OR) during alert creation in Step 2
      */
     async addConditionGroup() {
+        await openAlertFilterBuilder(this.page);
         await this.conditions.addGroup();
         testLogger.info('Added condition group');
     }
@@ -818,7 +814,7 @@ export class AlertCreationWizard {
         await this.fillAlertNameField(randomAlertName);
 
         // Select stream type (logs) via OSelect popover pattern (§4)
-        await this.page.locator(`[data-test="add-alert-stream-type-card-logs"]`).click();
+        await selectAlertStreamType(this.page, 'logs');
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
         await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
@@ -831,6 +827,7 @@ export class AlertCreationWizard {
         // ==================== CONDITIONS + AGGREGATION (Alert Rules tab) ====================
         // Builder tab should be active by default for logs
         // A string column avoids type_coercion errors ("Contains" on an Int64 column like _timestamp fails in DataFusion).
+        await openAlertFilterBuilder(this.page);
         await this.conditions.addCondition('level', 'Contains', 'test');
         testLogger.info('Added condition');
 
@@ -1018,7 +1015,7 @@ export class AlertCreationWizard {
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
         // Select stream type (metrics) via OSelect popover pattern (§4) — IMPORTANT: Must be metrics for PromQL tab to appear
-        await this.page.locator(`[data-test="add-alert-stream-type-card-metrics"]`).click();
+        await selectAlertStreamType(this.page, 'metrics');
         // Wait for stream listing API to complete after type change
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)

@@ -11,7 +11,7 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-import { openAlertSectionForTab } from './alertSectionHelpers.js';
+import { openAlertFilterBuilder, openAlertSectionForTab } from './alertSectionHelpers.js';
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const { holdGet } = require('../../playwright-tests/utils/route-hold.js');
@@ -39,6 +39,8 @@ export class AlertManagement {
         // Change the first condition's operator from Contains to = to verify update functionality.
         // Wait 15s: the edit page fetches the alert and renders the conditions asynchronously.
         const conditions = new FilterBuilderDriver(this.page, 'alert-conditions');
+        await expect(this.page.locator('[data-test="add-alert-filter-sentence"]')).toBeVisible({ timeout: 15000 });
+        await openAlertFilterBuilder(this.page);
         await expect(conditions.chips.first()).toBeVisible({ timeout: 15000 });
         await conditions.changeOperator(0, '=');
         await conditions.expectOperator(0, '=');

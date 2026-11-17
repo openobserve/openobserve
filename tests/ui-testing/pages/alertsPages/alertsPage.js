@@ -23,10 +23,12 @@ import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
 import {
     destinationsShowAsList,
     expandAlertSettingGroups,
+    fillAlertName,
     goToAlertSection,
     openAlertSectionForTab,
     pickAlertDestination,
     revealAlertSetting,
+    selectAlertStreamType,
     settleIntoView,
 } from './alertSectionHelpers.js';
 import { AlertManagement } from './alertManagement.js';
@@ -72,19 +74,17 @@ export class AlertsPage {
 
             // Alert creation locators - Alerts 2.0 Wizard UI
             addAlertButton: '[data-test="alert-list-add-alert-btn"]',
-            alertNameInput: '[data-test="add-alert-name-input"]',
-            // Alert name is an inline-edited title (OFormInlineEdit): a display
-            // trigger swaps to an input on click. -trigger opens, -input edits.
-            alertNameTrigger: '[data-test="add-alert-name-input-trigger"]',
-            alertNameInputField: '[data-test="add-alert-name-input-input"]',
-            // Display-mode value of the inline-edit title (present when NOT editing).
-            alertNameValue: '[data-test="add-alert-name-input-value"]',
+            alertNameInput: '[data-test="add-alert-details-name-input"]',
+            // The name is typed in section 5; the header shows it as text with a pencil that jumps there.
+            alertNameTrigger: '[data-test="add-alert-header-name-edit"]',
+            alertNameInputField: '[data-test="add-alert-details-name-input-field"]',
+            alertNameValue: '[data-test="add-alert-header-title"]',
             alertSubmitButton: '[data-test="add-alert-submit-btn"]',
             alertBackButton: '[data-test="add-alert-back-btn"]',
 
             // Step 1: Alert Setup selectors (v3 UI)
             // OSelect: trigger wrapper + `${parent}-popover` + `${parent}-option` with `data-test-value="<value>"` (§4)
-            streamTypeCards: '[data-test="add-alert-stream-type-cards"]',
+            streamTypeDropdown: '[data-test="add-alert-stream-type-select-dropdown"]',
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
             queryEditorDialog: '[data-test="query-editor-dialog"]',
             queryResultLabel: 'Query Result',
@@ -125,8 +125,9 @@ export class AlertsPage {
             advancedTemplateOverrideSelect: '[data-test="advanced-template-override-select"]',
             // Alert destinations select (in AlertSettings.vue, condition tab)
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
-            // Alerts 4.0 (multi-alerts) — Simple/Multi toggle choice group
-            alertMultiToggleChoice: '[data-test="alerts-alertmultitoggle-choice"]',
+            // Per-group question: one alert for all groups, or one per group.
+            alertGroupQuestionOne: '[data-test="add-alert-group-question-one"]',
+            alertGroupQuestionEach: '[data-test="add-alert-group-question-each"]',
             // Alerts 4.0 — priority & tags (Feature 2)
             prioritySelect: '[data-test="alert-priority-select"]',
             tagsInput: '[data-test="alert-tags-input"]',
@@ -1271,16 +1272,13 @@ export class AlertsPage {
         testLogger.info('Alert visible on list', { name });
     }
 
-    /**
-     * Assert the Simple/Multi toggle has "Multi alert" (value "true") selected.
-     * Reka-ui renders options as <button role="radio" data-test-value> carrying
-     * aria-checked (NOT native input.checked).
-     */
+    /** Assert the per-group question answers "one alert per group" (the saved multi-alert). */
     async expectMultiAlertSelected() {
-        const choice = this.page.locator(this.locators.alertMultiToggleChoice);
-        await expect(choice).toBeVisible({ timeout: 15000 });
-        await expect(choice.locator('[role="radio"][data-test-value="true"]')).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
-        await expect(choice.locator('[role="radio"][data-test-value="false"]')).toHaveAttribute('aria-checked', 'false');
+        await goToAlertSection(this.page, 'condition');
+        const each = this.page.locator(this.locators.alertGroupQuestionEach).first();
+        await expect(each).toBeVisible({ timeout: 15000 });
+        await expect(each).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
+        await expect(this.page.locator(this.locators.alertGroupQuestionOne).first()).toHaveAttribute('aria-checked', 'false');
     }
 
     // ==================== ALERTS 4.0 (PRIORITY & TAGS) HELPERS ====================
@@ -1878,9 +1876,9 @@ export class AlertsPage {
 
         // An empty-name Save is rejected with a toast reading "Alert name is required."
         // (alerts.nameRequired); the name OFormInput may additionally surface an inline field
-        // error (add-alert-name-input-error). Assert whichever signal is present — both
+        // error (add-alert-details-name-error). Assert whichever signal is present — both
         // confirm the empty-name save was blocked, which is what this validation verifies.
-        const nameError = this.page.locator('[data-test="add-alert-name-input-error"]');
+        const nameError = this.page.locator('[data-test="add-alert-details-name-error"], [data-test="add-alert-details-name-input-error"]');
         const nameRequiredToast = this.page
             .locator('[data-test="o-toast-message"]')
             .filter({ hasText: 'Alert name is required.' });
@@ -3236,39 +3234,26 @@ export class AlertsPage {
         testLogger.info('Clicked Add Alert button');
     }
 
-    /**
-     * Fill the alert name input
-     */
+    /** Fill the alert name (section 5). */
     async fillAlertName(alertName) {
-        // Inline-edit title: click the trigger to open the editor, then fill the input.
-        await this.page.locator(this.locators.alertNameTrigger).click();
-        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
-        await this.page.locator(this.locators.alertNameInputField).fill(alertName);
-        testLogger.info('Filled alert name', { alertName });
+        await fillAlertName(this.page, alertName);
     }
 
-    /**
-     * Current alert name, read from the value element — OFormInlineEdit only mounts an <input> while editing.
-     * @returns {Promise<string>}
-     */
+    /** Current alert name as the header shows it. */
     async getAlertNameValue() {
-        const valueEl = this.page.locator('[data-test="add-alert-name-input-value"]').first();
+        const valueEl = this.getAlertNameValueLocator();
         await valueEl.waitFor({ state: 'visible', timeout: 30000 });
         return ((await valueEl.textContent()) ?? '').trim();
     }
 
-    /** Display-mode alert name value element (OFormInlineEdit span, not an <input>). */
+    /** Header alert name (plain text). */
     getAlertNameValueLocator() {
-        return this.page.locator('[data-test="add-alert-name-input-value"]').first();
+        return this.page.locator(this.locators.alertNameValue).first();
     }
 
-    /**
-     * Select stream type from dropdown
-     * OSelect popover pattern: open trigger, wait for popover, click option keyed by data-test-value (§4)
-     */
+    /** Select logs, metrics or traces in the stream-type dropdown. */
     async selectStreamType(streamType) {
-        await this.page.locator(`[data-test="add-alert-stream-type-card-${streamType}"]`).click();
-        testLogger.info('Selected stream type', { streamType });
+        await selectAlertStreamType(this.page, streamType);
     }
 
     /**
