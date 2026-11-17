@@ -32,9 +32,15 @@ const MIN_STOP = 0.1;
 const REVEAL_BEHAVIOR: ScrollBehavior = "instant";
 // Without `scrollend`, a scroll counts as finished after this long without a scroll event.
 const SETTLE_MS = 150;
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
 const BUTTON_LIKE =
   'button, summary, [role="button"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"]';
+
+const reducedMotion = (): boolean =>
+  typeof window !== "undefined" && window.matchMedia?.(REDUCED_MOTION)?.matches === true;
+
+const motionBehavior = (): ScrollBehavior => (reducedMotion() ? "instant" : "smooth");
 
 const sections = (): HTMLElement[] =>
   root.value ? Array.from(root.value.querySelectorAll<HTMLElement>("[data-snap-section]")) : [];
@@ -107,24 +113,69 @@ const targetFor = (direction: 1 | -1, sectionsOnly: boolean): number | null => {
   return Math.max(prev, sectionsOnly ? prev : top - viewport, 0);
 };
 
-// A section start inside the view means two sections show; rest on the one the scroll was heading for.
+const nearest = (stops: number[], top: number): number =>
+  stops.reduce(
+    (best, stop) => (Math.abs(stop - top) < Math.abs(best - top) ? stop : best),
+    Infinity,
+  );
+
+// A section start inside the view means two sections show. A tall section rests on its nearest
+// stop so its end stays reachable; a short one rests on the one the scroll was heading for.
 const settleTarget = (top: number, direction: number): number | null => {
   const scroller = root.value;
   if (!scroller) return null;
   const view = scroller.clientHeight;
-  const lower = sections()
-    .map(offsetOf)
-    .find((start) => start > top + EDGE && start < top + view - EDGE);
+  const list = sections();
+  const lower = list.map(offsetOf).find((start) => start > top + EDGE && start < top + view - EDGE);
   if (lower === undefined) return null;
-  const up = direction < 0 || (direction === 0 && top - (lower - view) < lower - top);
-  return Math.max(0, Math.min(up ? lower - view : lower, scroller.scrollHeight - view));
+  const upper = list.filter((section) => offsetOf(section) <= top + EDGE).pop();
+  let target: number;
+  if (upper && upper.offsetHeight > view + EDGE) {
+    markStops();
+    target = nearest(stopOffsets(false), top);
+  } else {
+    const up = direction < 0 || (direction === 0 && top - (lower - view) < lower - top);
+    target = up ? lower - view : lower;
+  }
+  return Math.max(0, Math.min(target, scroller.scrollHeight - view));
+};
+
+// Never glide away from the section being worked in. The heading takes focus only as a Tab
+// start after a jump, so it pins nothing.
+const leavesFocus = (target: number): boolean => {
+  const scroller = root.value;
+  const focused = document.activeElement;
+  if (!scroller || !(focused instanceof HTMLElement) || !scroller.contains(focused)) return false;
+  if (focused.matches("[data-snap-heading]")) return false;
+  const section = focused.closest<HTMLElement>("[data-snap-section]");
+  if (!section) return false;
+  const start = offsetOf(section);
+  const end = start + section.getBoundingClientRect().height;
+  return end <= target + EDGE || start >= target + scroller.clientHeight - EDGE;
+};
+
+// Focus moves a control into view below the sticky section header rather than under it.
+const padForStickyHeader = (): void => {
+  const scroller = root.value;
+  if (!scroller) return;
+  let height = 0;
+  if (props.snap) {
+    for (const section of sections()) {
+      for (const child of Array.from(section.children)) {
+        if (child instanceof HTMLElement && getComputedStyle(child).position === "sticky") {
+          height = Math.max(height, child.offsetHeight);
+        }
+      }
+    }
+  }
+  scroller.style.scrollPaddingTop = height ? `${height}px` : "";
 };
 
 const go = (direction: 1 | -1, sectionsOnly: boolean): void => {
   markStops();
   const target = targetFor(direction, sectionsOnly);
   if (target === null || !root.value) return;
-  root.value.scrollTo({ top: target, behavior: "smooth" });
+  root.value.scrollTo({ top: target, behavior: motionBehavior() });
 };
 
 const pageStop = (direction: 1 | -1): void => go(direction, false);
@@ -135,9 +186,9 @@ const scrollToSection = (id: string): void => {
   const section = sections().find((el) => el.dataset.snapSection === id);
   if (!section) return;
   if (props.snap && root.value) {
-    root.value.scrollTo({ top: offsetOf(section), behavior: "smooth" });
+    root.value.scrollTo({ top: offsetOf(section), behavior: motionBehavior() });
   } else {
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    section.scrollIntoView({ behavior: motionBehavior(), block: "start" });
   }
   section.querySelector<HTMLElement>("[data-snap-heading]")?.focus({ preventScroll: true });
 };
@@ -197,17 +248,30 @@ const onAnyScroll = (): void => {
   });
 };
 
+// Only a scroll the user drives settles. A press on content cancels it, so a click never
+// glides the control it pressed away, and a scripted scroll (focus, a test runner) never settles.
+let driven = false;
+const onDrive = (): void => {
+  driven = true;
+};
+const onPress = (e: PointerEvent): void => {
+  driven = e.target === root.value;
+};
+
 // The wheel is never intercepted: only once a scroll has stopped does it glide on to a whole section.
 let restTop = 0;
 const settle = (): void => {
   const scroller = root.value;
   if (!scroller || !props.snap) return;
   const top = scroller.scrollTop;
-  const target = settleTarget(top, Math.sign(top - restTop));
+  const direction = Math.sign(top - restTop);
   restTop = top;
-  if (target !== null && Math.abs(target - top) > EDGE) {
-    scroller.scrollTo({ top: target, behavior: "smooth" });
-  }
+  const wanted = driven;
+  driven = false;
+  if (!wanted || reducedMotion()) return;
+  const target = settleTarget(top, direction);
+  if (target === null || Math.abs(target - top) <= EDGE || leavesFocus(target)) return;
+  scroller.scrollTo({ top: target, behavior: "smooth" });
 };
 
 let settleTimer: ReturnType<typeof setTimeout> | undefined;
@@ -245,15 +309,20 @@ onMounted(() => {
   document.addEventListener("scroll", onAnyScroll, { capture: true, passive: true });
   root.value?.addEventListener("scroll", onOwnScroll, { passive: true });
   root.value?.addEventListener("scrollend", settle);
+  root.value?.addEventListener("wheel", onDrive, { passive: true });
+  root.value?.addEventListener("touchmove", onDrive, { passive: true });
+  root.value?.addEventListener("pointerdown", onPress, { capture: true, passive: true });
   if (typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(() => {
       markStops();
+      padForStickyHeader();
       updateActive();
     });
     if (root.value) resizeObserver.observe(root.value);
     if (content.value) resizeObserver.observe(content.value);
   }
   markStops();
+  padForStickyHeader();
   updateActive();
 });
 
@@ -261,6 +330,9 @@ onBeforeUnmount(() => {
   document.removeEventListener("scroll", onAnyScroll, { capture: true });
   root.value?.removeEventListener("scroll", onOwnScroll);
   root.value?.removeEventListener("scrollend", settle);
+  root.value?.removeEventListener("wheel", onDrive);
+  root.value?.removeEventListener("touchmove", onDrive);
+  root.value?.removeEventListener("pointerdown", onPress, { capture: true });
   clearTimeout(settleTimer);
   resizeObserver?.disconnect();
   if (frame) cancelAnimationFrame(frame);
@@ -271,6 +343,7 @@ watch(
   async () => {
     await nextTick();
     markStops();
+    padForStickyHeader();
     updateActive();
   },
 );

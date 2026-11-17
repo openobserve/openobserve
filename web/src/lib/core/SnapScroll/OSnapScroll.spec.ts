@@ -61,7 +61,8 @@ describe("OSnapScroll", () => {
 
   describe("when a scroll stops", () => {
     const fullViewTops = { one: 0, two: 500, three: 1000 };
-    const stopAt = (root: HTMLElement, top: number) => {
+    const stopAt = (root: HTMLElement, top: number, driven = true) => {
+      if (driven) wheel(root, 40);
       root.scrollTop = top;
       root.dispatchEvent(new Event("scrollend"));
     };
@@ -97,6 +98,41 @@ describe("OSnapScroll", () => {
       });
     });
 
+    it("rests on the end of a section taller than the view instead of gliding past it", () => {
+      withTops({ one: 0, two: 1250, three: 1750 }, () => {
+        wrapper = mountScroll();
+        const { root, scrollTo } = layOut(wrapper);
+        Object.defineProperty(root, "scrollHeight", { configurable: true, value: 2250 });
+        Object.defineProperty(root.querySelector("#one"), "offsetHeight", { value: 1250 });
+        stopAt(root, 760);
+        expect(scrollTo).toHaveBeenLastCalledWith({ top: 750, behavior: "smooth" });
+      });
+    });
+
+    it.each([
+      { when: "a press inside a section during the scroll", press: "#two", glides: false },
+      { when: "a scroll nobody drove, such as a test runner's", driven: false, glides: false },
+      { when: "focus in the section the glide would leave", focus: "#one", glides: false },
+      { when: "a drag on the scrollbar", press: "root", glides: true },
+      { when: "focus in the section it heads for", focus: "#two", glides: true },
+    ])("settles only as the user meant: $when", ({ press, driven = true, focus, glides }) => {
+      withTops(fullViewTops, () => {
+        wrapper = mountScroll();
+        const { root, scrollTo } = layOut(wrapper);
+        if (focus) {
+          const input = document.createElement("input");
+          root.querySelector(focus)!.appendChild(input);
+          input.focus();
+        }
+        if (driven) wheel(root, 40);
+        const target = press === "root" ? root : press && root.querySelector(press);
+        target?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+        stopAt(root, 120, false);
+        if (glides) expect(scrollTo).toHaveBeenLastCalledWith({ top: 500, behavior: "smooth" });
+        else expect(scrollTo).not.toHaveBeenCalled();
+      });
+    });
+
     it("leaves the position alone while the content flows", () => {
       withTops(fullViewTops, () => {
         wrapper = mountScroll(false);
@@ -119,6 +155,7 @@ describe("OSnapScroll", () => {
         withTops(fullViewTops, () => {
           wrapper = mountScroll();
           const { root, scrollTo } = layOut(wrapper);
+          wheel(root, 40);
           root.scrollTop = 120;
           root.dispatchEvent(new Event("scroll"));
           vi.advanceTimersByTime(149);
@@ -131,6 +168,48 @@ describe("OSnapScroll", () => {
         if (owner && descriptor) Object.defineProperty(owner, "onscrollend", descriptor);
       }
     });
+  });
+
+  it("under reduced motion jumps instantly and never settles on its own", () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      ({ matches: query.includes("reduce") }) as MediaQueryList) as typeof window.matchMedia;
+    try {
+      wrapper = mountScroll();
+      const { root, scrollTo } = layOut(wrapper);
+      paging(wrapper).pageStop(1);
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 400, behavior: "instant" });
+      (wrapper.vm as unknown as { scrollToSection: (id: string) => void }).scrollToSection("three");
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 800, behavior: "instant" });
+      scrollTo.mockClear();
+      wheel(root, 40);
+      root.scrollTop = 120;
+      root.dispatchEvent(new Event("scrollend"));
+      expect(scrollTo).not.toHaveBeenCalled();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+
+  it("pads its top by the sticky section header while snapping, so focus lands below it", async () => {
+    const header = () => {
+      const el = document.createElement("header");
+      el.style.position = "sticky";
+      Object.defineProperty(el, "offsetHeight", { value: 96 });
+      return el;
+    };
+    wrapper = mountScroll();
+    const root = wrapper.find('[data-test="o-snap-scroll"]').element as HTMLElement;
+    root.querySelector("#two")!.prepend(header());
+    for (const [snap, padding] of [
+      [false, ""],
+      [true, "96px"],
+      [false, ""],
+    ] as const) {
+      await wrapper.setProps({ snap });
+      await wrapper.vm.$nextTick();
+      expect(root.style.scrollPaddingTop).toBe(padding);
+    }
   });
 
   it("pages one stop at a time", () => {
