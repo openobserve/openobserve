@@ -30,6 +30,8 @@ const SPY_BAND = 0.3;
 const MIN_STOP = 0.1;
 // A reveal hands focus to the element at once; a dropdown opened during a smooth glide closes on its next scroll event.
 const REVEAL_BEHAVIOR: ScrollBehavior = "instant";
+// Without `scrollend`, a scroll counts as finished after this long without a scroll event.
+const SETTLE_MS = 150;
 
 const BUTTON_LIKE =
   'button, summary, [role="button"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"]';
@@ -103,6 +105,19 @@ const targetFor = (direction: 1 | -1, sectionsOnly: boolean): number | null => {
   }
   const prev = [...stops].reverse().find((s) => s < top - EDGE) ?? 0;
   return Math.max(prev, sectionsOnly ? prev : top - viewport, 0);
+};
+
+// A section start inside the view means two sections show; rest on the one the scroll was heading for.
+const settleTarget = (top: number, direction: number): number | null => {
+  const scroller = root.value;
+  if (!scroller) return null;
+  const view = scroller.clientHeight;
+  const lower = sections()
+    .map(offsetOf)
+    .find((start) => start > top + EDGE && start < top + view - EDGE);
+  if (lower === undefined) return null;
+  const up = direction < 0 || (direction === 0 && top - (lower - view) < lower - top);
+  return Math.max(0, Math.min(up ? lower - view : lower, scroller.scrollHeight - view));
 };
 
 const go = (direction: 1 | -1, sectionsOnly: boolean): void => {
@@ -182,6 +197,27 @@ const onAnyScroll = (): void => {
   });
 };
 
+// The wheel is never intercepted: only once a scroll has stopped does it glide on to a whole section.
+let restTop = 0;
+const settle = (): void => {
+  const scroller = root.value;
+  if (!scroller || !props.snap) return;
+  const top = scroller.scrollTop;
+  const target = settleTarget(top, Math.sign(top - restTop));
+  restTop = top;
+  if (target !== null && Math.abs(target - top) > EDGE) {
+    scroller.scrollTo({ top: target, behavior: "smooth" });
+  }
+};
+
+let settleTimer: ReturnType<typeof setTimeout> | undefined;
+const hasScrollEnd = typeof window !== "undefined" && "onscrollend" in window;
+const onOwnScroll = (): void => {
+  if (hasScrollEnd) return;
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(settle, SETTLE_MS);
+};
+
 const onPageKey = (e: KeyboardEvent | undefined, run: () => void): void => {
   const focused = document.activeElement;
   // The shortcut swallowed Space, so a focused button still has to be pressed.
@@ -207,6 +243,8 @@ useShortcuts(
 let resizeObserver: ResizeObserver | null = null;
 onMounted(() => {
   document.addEventListener("scroll", onAnyScroll, { capture: true, passive: true });
+  root.value?.addEventListener("scroll", onOwnScroll, { passive: true });
+  root.value?.addEventListener("scrollend", settle);
   if (typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(() => {
       markStops();
@@ -221,6 +259,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener("scroll", onAnyScroll, { capture: true });
+  root.value?.removeEventListener("scroll", onOwnScroll);
+  root.value?.removeEventListener("scrollend", settle);
+  clearTimeout(settleTimer);
   resizeObserver?.disconnect();
   if (frame) cancelAnimationFrame(frame);
 });
