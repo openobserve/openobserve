@@ -58,13 +58,13 @@ const unusedChildren = computed(() =>
   ),
 );
 
-// The editable expression is lettered ("A && B"); the raw `{id}` form lives
-// behind the Advanced toggle. The input mirrors the stored form via a watcher so
-// stray keystrokes are normalised instead of corrupting the raw expression.
+// The editable expression is lettered in words ("A AND B"); the raw `{id}` form lives
+// behind the Advanced toggle. Re-sync only when the stored form moved under the text being typed.
 const letteredInput = ref("");
 watch(
   () => effectiveExpression.value,
   (expr) => {
+    if (letteredToRaw(letteredInput.value, props.selectedChildren) === expr) return;
     letteredInput.value = rawToLettered(expr, props.selectedChildren);
   },
   { immediate: true },
@@ -107,7 +107,7 @@ onMounted(maybeApplyDefault);
     <OInput
       :model-value="letteredInput"
       :aria-label="t('alerts.composite.expression')"
-      :placeholder="t('alerts.composite.expressionPlaceholder')"
+      :placeholder="t('alerts.composite.expressionExample', { example: raw('A AND (B OR C)') })"
       data-test="alerts-composite-expression-input"
       @update:model-value="onLetteredInput"
     />
@@ -139,7 +139,7 @@ onMounted(maybeApplyDefault);
         size="xs"
         data-test="alerts-composite-expression-and"
         :aria-label="t('alerts.composite.addAnd')"
-        @click="appendToken('&&')"
+        @click="appendToken('AND')"
       >
         {{ t("alerts.composite.and") }}
       </OButton>
@@ -148,7 +148,7 @@ onMounted(maybeApplyDefault);
         size="xs"
         data-test="alerts-composite-expression-or"
         :aria-label="t('alerts.composite.addOr')"
-        @click="appendToken('||')"
+        @click="appendToken('OR')"
       >
         {{ t("alerts.composite.or") }}
       </OButton>
@@ -157,7 +157,7 @@ onMounted(maybeApplyDefault);
         size="xs"
         data-test="alerts-composite-expression-not"
         :aria-label="t('alerts.composite.addNot')"
-        @click="appendToken('!')"
+        @click="appendToken('NOT')"
       >
         {{ t("alerts.composite.not") }}
       </OButton>

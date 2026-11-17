@@ -100,7 +100,7 @@ const childLink = (child: CompositeChildOption): string =>
         data-test="alerts-composite-child-cap"
         :variant="atCap ? 'warning-soft' : 'default-soft'"
         size="sm"
-        :label="t('alerts.composite.childCap', { count, max })"
+        :label="t('alerts.composite.alertCap', { count, max })"
       />
     </div>
 
@@ -173,7 +173,7 @@ const childLink = (child: CompositeChildOption): string =>
         class="text-text-secondary text-xs"
         data-test="alerts-composite-child-empty"
       >
-        {{ t("alerts.composite.noChildren") }}
+        {{ t("alerts.composite.noAlertsChosen") }}
       </div>
     </div>
   </section>

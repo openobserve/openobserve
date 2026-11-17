@@ -5,7 +5,12 @@ import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { raw } from "@/types/i18n";
-import { type CompositeChildOption, letterFor, tokenizeExpression } from "./expression";
+import {
+  type CompositeChildOption,
+  letterFor,
+  operatorWord,
+  tokenizeExpression,
+} from "./expression";
 
 const props = defineProps<{
   expression: string;
@@ -34,7 +39,9 @@ const levelFor = (id: string): string => {
         :label="raw(letterById.get(token.id) ?? '?')"
         size="sm"
       />
-      <span v-else class="text-text-secondary font-semibold">{{ raw(token.text) }}</span>
+      <span v-else class="text-text-secondary font-semibold">{{
+        raw(operatorWord(token.text))
+      }}</span>
     </template>
   </span>
 </template>

@@ -152,6 +152,12 @@ export const LETTERS = "ABCDEFGHIJ";
 
 export const letterFor = (index: number): string => LETTERS[index] ?? "?";
 
+const OPERATOR_WORDS: Record<string, string> = { "&&": "AND", "||": "OR", "!": "NOT" };
+const WORD_OPERATORS: Record<string, string> = { and: "&&", or: "||", not: "!" };
+
+/** The word users read and type for a stored operator symbol. */
+export const operatorWord = (symbol: string): string => OPERATOR_WORDS[symbol] ?? symbol;
+
 export type ExpressionToken =
   | { kind: "operand"; id: string }
   | { kind: "operator"; text: string }
@@ -175,17 +181,21 @@ export const rawToLettered = (
   const idToLetter = new Map(children.map((child, index) => [child.alert_id, LETTERS[index]]));
   return tokenizeExpression(expression)
     .map((token) =>
-      token.kind === "operand" ? (idToLetter.get(token.id) ?? `{${token.id}}`) : token.text,
+      token.kind === "operand"
+        ? (idToLetter.get(token.id) ?? `{${token.id}}`)
+        : operatorWord(token.text),
     )
     .join(" ");
 };
 
-/** Translate a lettered expression ("A && B") back to the stored `{id}` form. */
+/** Translate a lettered expression ("A AND B", or "A && B") back to the stored `{id}` form. */
 export const letteredToRaw = (
   expression: string,
   children: readonly { alert_id: string }[],
 ): string =>
-  expression.replace(/[A-J]/g, (letter) => {
-    const child = children[LETTERS.indexOf(letter)];
-    return child ? `{${child.alert_id}}` : letter;
+  expression.replace(/\{[^{}]*\}|\b(?:and|or|not)\b|\b[A-J]\b/gi, (token) => {
+    const operator = WORD_OPERATORS[token.toLowerCase()];
+    if (operator) return operator;
+    const child = token.length === 1 ? children[LETTERS.indexOf(token)] : undefined;
+    return child ? `{${child.alert_id}}` : token;
   });

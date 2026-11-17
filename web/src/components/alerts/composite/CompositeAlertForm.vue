@@ -196,8 +196,8 @@ watch(
   >
     <div class="flex min-w-0 flex-col">
       <OSettingRow
-        :label="t('alerts.composite.subAlerts')"
-        required
+        :label="t('alerts.composite.whichAlerts')"
+        :description="t('alerts.composite.whichAlertsHelp')"
         fill
         data-test="alerts-composite-sub-alerts-row"
       >
@@ -214,9 +214,9 @@ watch(
         :disabled="!sectionTargets?.compositeCondition"
       >
         <OSettingRow
-          :label="t('alerts.composite.triggerExpression')"
+          :label="t('alerts.composite.fireWhen')"
+          :description="t('alerts.composite.fireWhenHelp')"
           :info="t('alerts.composite.banner')"
-          required
           fill
           data-test="alerts-composite-expression-row"
         >
@@ -324,7 +324,7 @@ watch(
               {{ raw(summaryExpression) }}
             </dd>
             <dt class="text-text-secondary whitespace-nowrap">
-              {{ t("alerts.composite.subAlerts") }}
+              {{ t("alerts.composite.alertsLabel") }}
             </dt>
             <dd class="text-text-heading">{{ raw(String(selectedIds.length)) }}</dd>
             <dt class="text-text-secondary whitespace-nowrap">

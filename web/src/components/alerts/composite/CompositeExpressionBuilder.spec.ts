@@ -66,6 +66,20 @@ describe("CompositeExpressionBuilder", () => {
     expect(live.text()).not.toContain("High error rate");
   });
 
+  it("reads and inserts operators as words while storing symbols, and keeps typed text", async () => {
+    const wrapper = mountBuilder("{id-a}", selectedChildren.slice(0, 2));
+    const input = wrapper.find('[data-test="alerts-composite-expression-input-field"]');
+
+    expect(wrapper.find('[data-test="alerts-composite-expression-live"]').text()).toBe("A");
+    await wrapper.find('[data-test="alerts-composite-expression-and"]').trigger("click");
+    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toBe("{id-a} &&");
+
+    await wrapper.setProps({ modelValue: "{id-a} &&" });
+    await input.setValue("A AND ");
+    await wrapper.setProps({ modelValue: "{id-a} && " });
+    expect((input.element as HTMLInputElement).value).toBe("A AND ");
+  });
+
   it("places an operand via its letter chip without disturbing a custom expression", async () => {
     const wrapper = mountBuilder("{id-a} && {id-b}", selectedChildren.slice(0, 2));
     await wrapper.find('[data-test="alerts-composite-expression-insert-id-b"]').trigger("click");
