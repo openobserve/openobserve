@@ -777,7 +777,9 @@ export function createRecordConverter(): RecordConverter {
 
         case ChangeType.InputValue:
           for (let i = 1; i < group.length; i++) {
-            const [nodeId, value] = group[i];
+            const entry = group[i];
+            if (!Array.isArray(entry)) continue;
+            const [nodeId, value] = entry;
             extraRecords.push(
               inputRecord(timestamp, { id: nodeId, text: decodeStr(value), isChecked: false }),
             );
