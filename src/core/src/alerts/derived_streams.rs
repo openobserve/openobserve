@@ -182,24 +182,8 @@ pub async fn upsert_trigger(
     pipeline_id: &str,
 ) -> Result<(), anyhow::Error> {
     let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
-    let next_run_at = if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
-        match derived_stream.trigger_condition.get_next_trigger_time(
-            false,
-            derived_stream.tz_offset,
-            false,
-            None,
-        ) {
-            Ok(t) => t,
-            Err(e) => {
-                log::error!(
-                    "Failed to compute next trigger time for DerivedStream {trigger_module_key}: {e}"
-                );
-                chrono::Utc::now().timestamp_micros()
-            }
-        }
-    } else {
-        chrono::Utc::now().timestamp_micros()
-    };
+    let next_run_at =
+        initial_derived_stream_run(derived_stream, chrono::Utc::now().timestamp_micros());
     // Save the trigger to db
     match db::scheduler::get(
         &derived_stream.org_id,
@@ -227,6 +211,42 @@ pub async fn upsert_trigger(
             db::scheduler::push(trigger)
                 .await
                 .map_err(|e| anyhow::anyhow!("Error save DerivedStream trigger: {}", e))
+        }
+    }
+}
+
+/// The delay in microseconds; `None` and a negative value give 0.
+pub(crate) fn derived_stream_delay_micros(derived_stream: &DerivedStream) -> i64 {
+    derived_stream
+        .delay
+        .filter(|delay_in_mins| *delay_in_mins > 0)
+        .and_then(|delay_in_mins| {
+            chrono::Duration::try_minutes(delay_in_mins as _).and_then(|td| td.num_microseconds())
+        })
+        .unwrap_or_default()
+}
+
+/// The first run of a saved trigger: now for an interval, the next cron time plus the delay
+/// for a cron. A cron without a next time keeps now.
+fn initial_derived_stream_run(derived_stream: &DerivedStream, now: i64) -> i64 {
+    if derived_stream.trigger_condition.frequency_type != FrequencyType::Cron {
+        return now;
+    }
+    match derived_stream.trigger_condition.get_next_trigger_time(
+        false,
+        derived_stream.tz_offset,
+        false,
+        Some(now),
+    ) {
+        Ok(t) => t
+            .checked_add(derived_stream_delay_micros(derived_stream))
+            .unwrap_or(now),
+        Err(e) => {
+            log::error!(
+                "Failed to compute next trigger time for DerivedStream in org {}: {e}",
+                derived_stream.org_id
+            );
+            now
         }
     }
 }
@@ -281,6 +301,14 @@ fn check_schedule(derived_stream: &DerivedStream) -> Result<(), anyhow::Error> {
     {
         return Err(anyhow::anyhow!(
             "tolerance_in_secs must be between 0 and {SCHEDULE_FIELD_MAX_SECS} seconds"
+        ));
+    }
+    if let Some(delay) = derived_stream.delay
+        && !(0..=SCHEDULE_FIELD_MAX_SECS / 60).contains(&i64::from(delay))
+    {
+        return Err(anyhow::anyhow!(
+            "delay must be between 0 and {} minutes",
+            SCHEDULE_FIELD_MAX_SECS / 60
         ));
     }
     Ok(())
@@ -420,5 +448,76 @@ mod tests {
         ] {
             assert!(!err.contains(field), "{err}");
         }
+    }
+
+    /// T9: a save maps this error to `InvalidDerivedStream`, a 400.
+    #[tokio::test]
+    async fn save_rejects_an_out_of_range_delay() {
+        let max = SCHEDULE_FIELD_MAX_SECS / 60;
+        for delay in [-1, i32::try_from(max + 1).unwrap(), i32::MAX] {
+            let err = save_err(|d| d.delay = Some(delay)).await;
+            assert!(
+                err.contains("delay must be between 0 and"),
+                "{delay}: {err}"
+            );
+        }
+        for delay in [0, i32::try_from(max).unwrap()] {
+            let mut derived_stream = DerivedStream {
+                delay: Some(delay),
+                ..Default::default()
+            };
+            derived_stream.trigger_condition.frequency = 1;
+            assert!(check_schedule(&derived_stream).is_ok(), "{delay}");
+        }
+    }
+
+    fn hm(h: u32, m: u32) -> i64 {
+        chrono::NaiveDate::from_ymd_opt(2026, 11, 16)
+            .unwrap()
+            .and_hms_opt(h, m, 0)
+            .unwrap()
+            .and_utc()
+            .timestamp_micros()
+    }
+
+    fn cron_stream(cron: &str, delay: i32) -> DerivedStream {
+        let mut derived_stream = DerivedStream {
+            delay: Some(delay),
+            ..Default::default()
+        };
+        derived_stream.trigger_condition.frequency_type = FrequencyType::Cron;
+        derived_stream.trigger_condition.cron = cron.to_string();
+        derived_stream.trigger_condition.align_time = true;
+        derived_stream
+    }
+
+    /// T15
+    #[test]
+    fn first_cron_run_is_the_next_cron_time_plus_the_delay() {
+        let derived_stream = cron_stream("0 0 * * * *", 10);
+        assert_eq!(
+            initial_derived_stream_run(&derived_stream, hm(9, 37)),
+            hm(10, 10)
+        );
+    }
+
+    /// T26
+    #[test]
+    fn first_cron_run_without_a_later_time_is_now() {
+        let derived_stream = cron_stream("0 0 0 1 1 * 2020", 10);
+        assert_eq!(
+            initial_derived_stream_run(&derived_stream, hm(9, 37)),
+            hm(9, 37)
+        );
+    }
+
+    #[test]
+    fn first_interval_run_is_now_with_any_delay() {
+        let mut derived_stream = cron_stream("", 10);
+        derived_stream.trigger_condition.frequency_type = FrequencyType::Minutes;
+        assert_eq!(
+            initial_derived_stream_run(&derived_stream, hm(9, 37)),
+            hm(9, 37)
+        );
     }
 }

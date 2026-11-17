@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
           @update:activeFolderId="updateActiveFolderId"
+          @folders-loaded="clearFolderFailure"
         />
       </div>
 
@@ -148,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="filteredMonitors"
           :loading="loading"
           :forbidden="forbidden"
+          :error="foldersError"
           :timezone="store.state.timezone"
           :empty-message="emptyMessage"
           :selected-ids="selectedMonitorIds"
@@ -160,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :bulk-action-loading="bulkActionLoading"
           :has-filters="hasActiveFilters"
           @row-click="openDetail"
+          @retry="refreshMonitors"
           @edit="openEdit"
           @toggle-enabled="toggleEnabled"
           @duplicate="duplicateMonitor"
@@ -273,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
               data-test="synthetic-monitoring-refresh-btn"
-              @click="loadMonitors(undefined, true)"
+              @click="refreshMonitors"
             />
           </template>
         </MonitorTable>
@@ -528,6 +531,7 @@ import statusPagesService, {
 import SyntheticsVariablesTab from "@/components/synthetics/variables/SyntheticsVariablesTab.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
+import { selectSyntheticsFolder } from "@/utils/synthetics/selectFolder";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
@@ -756,12 +760,24 @@ const monitorsList = useQuery(() =>
   }),
 );
 
-const loading = monitorsList.isPending;
+const foldersLoaded = ref(false);
+const foldersFailed = ref(false);
+// Without a listable folder no check request runs, so the folder list's own 403 is the denial.
+const foldersForbidden = ref<ForbiddenState>(false);
+const loading = computed(
+  () => !foldersLoaded.value || (!!activeFolderId.value && monitorsList.isPending.value),
+);
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = monitorsList.error.value;
-  return forbiddenState(e) || e?.status === 403;
+  return foldersForbidden.value || forbiddenState(e) || e?.status === 403;
 });
+// With no folder to read, no checks request runs, so an empty table would hide the failure.
+const foldersError = computed(() =>
+  foldersFailed.value && !foldersForbidden.value && !folderResolved.value
+    ? t("synthetics.checkDetails.foldersUnavailable")
+    : null,
+);
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
 const fetching = monitorsList.isFetching;
@@ -789,6 +805,7 @@ async function loadMonitors(folderId?: string, force = false) {
       : searchAcrossFolders.value
         ? undefined
         : activeFolderId.value;
+  if (!foldersLoaded.value || (!targetFolder && !searchAcrossFolders.value)) return;
   readFolder.value = targetFolder;
   folderResolved.value = true;
   // Let the key pick up the new folder before asking for the data.
@@ -796,18 +813,48 @@ async function loadMonitors(folderId?: string, force = false) {
   if (force) await monitorsList.refetch();
 }
 
-async function initPage() {
-  // Load folders first so the sidebar tablist renders with data.
+async function loadFolders() {
+  // A request before the org hydrates would fail and leave no folder to read checks from.
+  await waitForOrgIdentifier();
   try {
-    await getFoldersListByType(store, "synthetics");
+    const folders = await getFoldersListByType(store, "synthetics");
+    const folder = selectSyntheticsFolder(folders, route.query.folder);
+    activeFolderId.value = folder ?? "";
+    clearFolderFailure();
   } catch (err) {
     console.error("[synthetics] failed to load folders", err);
+    foldersFailed.value = true;
+    foldersForbidden.value = forbiddenState(err);
+  } finally {
+    foldersLoaded.value = true;
   }
+}
 
-  // Wait for the organisation identifier to be resolved before making API
-  // calls — loadMonitors silently returns when orgIdentifier is empty, and
-  // the table skeleton would stay forever because loading is never cleared.
-  await waitForOrgIdentifier();
+// A delete that leaves no listable folder empties the list, which the server answers with a 403.
+watch(
+  () => (store.state as any).organizationData?.foldersByType?.synthetics,
+  (folders) => {
+    if (!foldersLoaded.value || folders?.length !== 0) return;
+    foldersFailed.value = true;
+    foldersForbidden.value = true;
+  },
+);
+
+// The sidebar refetches on remount, so its success must lift a denial this page saw earlier.
+function clearFolderFailure() {
+  foldersFailed.value = false;
+  foldersForbidden.value = false;
+}
+
+/** Refresh retries a failed folder load, since no check can be read without a folder. */
+async function refreshMonitors() {
+  if (foldersFailed.value) await loadFolders();
+  await loadMonitors(undefined, true);
+}
+
+async function initPage() {
+  // Load folders first so the sidebar tablist renders with data.
+  await loadFolders();
 
   await loadMonitors(activeFolderId.value);
 
@@ -887,9 +934,6 @@ const savedView = useListViewState("synthetics", {
   sortBy: "",
   sortOrder: "asc" as "asc" | "desc",
 });
-// A stored page belongs to the folder it was viewed in; arriving on another folder starts at page 1.
-const savedFolder = (route.query.folder as string) ?? "default";
-if (savedView.folder && savedView.folder !== savedFolder) savedView.currentPage = 1;
 const activeTab = ref(savedView.activeTab);
 const monitorTableMode = computed(() => (activeTab.value === "browser" ? "browser" : "all"));
 const isStatusKey = (key: string): key is string => !!key && key !== "all";
@@ -943,7 +987,7 @@ watch(loading, (isLoading) => {
 const showTypePicker = ref(false);
 
 // ── Folder state ───────────────────────────────────────────────────────
-const activeFolderId = ref<string>((route.query.folder as string) ?? "default");
+const activeFolderId = ref<string>("");
 const searchAcrossFolders = ref(false);
 
 const updateActiveFolderId = (folderId: string) => {
@@ -953,12 +997,16 @@ const updateActiveFolderId = (folderId: string) => {
 const activeFolderName = computed(() => {
   const folders: any[] = (store.state as any).organizationData?.foldersByType?.synthetics ?? [];
   const folder = folders.find((f: any) => f.folderId === activeFolderId.value);
-  return folder?.name ?? "Default";
+  return folder?.name ?? activeFolderId.value;
 });
 
-watch(activeFolderId, async (newFolderId) => {
-  currentPage.value = 1;
+watch(activeFolderId, async (newFolderId, oldFolderId) => {
+  if (oldFolderId || (savedView.folder && savedView.folder !== newFolderId)) currentPage.value = 1;
   savedView.folder = newFolderId;
+  if (!newFolderId) {
+    folderResolved.value = false;
+    return;
+  }
   selectedMonitorIds.value = [];
   duplicateFolder.value = newFolderId;
   if (searchAcrossFolders.value) {
@@ -1342,7 +1390,9 @@ async function loadLocations() {
 
 // The list is the query, not a copy of it: a monitor write invalidates the
 // synthetics scope and these rows repaint with no wiring here.
-const monitors = computed<DisplayMonitor[]>(() => (monitorsList.data.value ?? []).map(mapMonitor));
+const monitors = computed<DisplayMonitor[]>(() =>
+  folderResolved.value ? (monitorsList.data.value ?? []).map(mapMonitor) : [],
+);
 
 // Enrich monitors with folder names from Vuex store
 const enrichedMonitors = computed(() => {
@@ -1727,7 +1777,7 @@ async function duplicateMonitor(m: any) {
   // The row's own folder, falling back to the folder being browsed. These are
   // the same value unless "search across folders" is on, in which case the copy
   // should land beside its original rather than jump to the active folder.
-  duplicateFolder.value = m.folderId || activeFolderId.value || "default";
+  duplicateFolder.value = m.folderId || activeFolderId.value;
   duplicateSource.value = null;
   showDuplicateDialog.value = true;
   try {

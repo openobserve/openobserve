@@ -78,7 +78,10 @@ export default function (store: any) {
 
   router.beforeEach((to: any, from: any, next: any) => {
     // Resolve the i18n titleKey per navigation (module-scope route tables would freeze the locale); `gt` works outside setup.
-    const titleKey = to.meta?.titleKeyByTab?.[to.query?.tab] ?? to.meta?.titleKey;
+    const titleKey =
+      to.meta?.titleKeyByTab?.[to.query?.tab] ??
+      to.meta?.titleKeyByFolder?.[to.query?.folder] ??
+      to.meta?.titleKey;
     const routeTitle = titleKey ? gt(titleKey) : to.meta?.title;
     if (routeTitle) {
       // The brand prefix is a product noun, never translated; the page name is.
