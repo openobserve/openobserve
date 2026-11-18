@@ -5128,6 +5128,7 @@
     "storageSize": "수집된 데이터",
     "compressedSize": "압축된 크기",
     "schemaHeader": "스트림 세부 정보",
+    "searchFieldOrIndexType": "필드 또는 인덱스 유형 검색",
     "indexTypeOptions": {
       "fullTextSearch": "전체 텍스트 검색",
       "secondaryIndex": "보조 인덱스",

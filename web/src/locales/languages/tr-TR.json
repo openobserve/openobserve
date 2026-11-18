@@ -5128,6 +5128,7 @@
     "storageSize": "Alınan Veriler",
     "compressedSize": "Sıkıştırılmış Boyut",
     "schemaHeader": "Akış Detayı",
+    "searchFieldOrIndexType": "Alan veya dizin türü ara",
     "indexTypeOptions": {
       "fullTextSearch": "Tam metin arama",
       "secondaryIndex": "İkincil dizin",

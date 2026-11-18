@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="filterField"
                           data-cy="schema-index-field-search-input"
                           class="no-border o2-search-input ms-auto"
-                          :placeholder="t('search.searchField')"
+                          :placeholder="t('logStream.searchFieldOrIndexType')"
                         />
                         <OButton
                           v-if="isSchemaUDSEnabled"
@@ -1130,10 +1130,6 @@ export default defineComponent({
       if (!filterField.value && activeTab.value !== "schemaFields") return rows;
 
       const searchTerm = filterField.value?.toLowerCase() || "";
-      const labelToValueMap: Record<string, string> = {};
-      streamIndexType.forEach(({ label, value }: any) => {
-        labelToValueMap[label.toLowerCase()] = value;
-      });
 
       return rows.filter((row: any) => {
         if (activeTab.value === "schemaFields") {
@@ -1141,9 +1137,7 @@ export default defineComponent({
         }
         if (!searchTerm) return true;
         if (row.name.toLowerCase().includes(searchTerm)) return true;
-        return (row.index_type || []).some(
-          (t: string) => t.toLowerCase().includes(searchTerm) || labelToValueMap[searchTerm] === t,
-        );
+        return indexTypeMatches(row.index_type, searchTerm);
       });
     });
 
@@ -1269,6 +1263,16 @@ export default defineComponent({
         value: "hashPartition_128",
       },
     ];
+    const indexTypeLabels = new Map(streamIndexType.map(({ label, value }) => [value, label]));
+
+    // Matches the label shown in the select (current locale) or the stored value.
+    const indexTypeMatches = (indexTypes: string[] | undefined, searchTerm: string) =>
+      (indexTypes || []).some(
+        (value) =>
+          value.toLowerCase().includes(searchTerm) ||
+          !!indexTypeLabels.get(value)?.toLowerCase().includes(searchTerm),
+      );
+
     const { getStream, getUpdatedSettings } = useStreams(t);
 
     onBeforeMount(() => {
@@ -1894,12 +1898,6 @@ export default defineComponent({
       var filtered: any[] = [];
       const searchTerm = field?.toLowerCase() || "";
 
-      // Map labels -> values for index types
-      const labelToValueMap: Record<string, string> = {};
-      streamIndexType.forEach(({ label, value }) => {
-        labelToValueMap[label.toLowerCase()] = value;
-      });
-
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         let match = false;
@@ -1914,16 +1912,8 @@ export default defineComponent({
               if (row.name.toLowerCase().includes(searchTerm)) {
                 match = true;
               }
-              // Match by index_type (convert search label to value)
-              else if (
-                row.index_type.some((t: string) => {
-                  // check if search is label
-                  return (
-                    t.toLowerCase().includes(searchTerm) || // direct match with stored value
-                    labelToValueMap[searchTerm] === t // label ? value match
-                  );
-                })
-              ) {
+              // Match by index_type
+              else if (indexTypeMatches(row.index_type, searchTerm)) {
                 match = true;
               }
             }
@@ -1937,11 +1927,7 @@ export default defineComponent({
               match = true;
             }
             // Match by index_type
-            else if (
-              row.index_type.some((t: string) => {
-                return t.toLowerCase().includes(searchTerm) || labelToValueMap[searchTerm] === t;
-              })
-            ) {
+            else if (indexTypeMatches(row.index_type, searchTerm)) {
               match = true;
             }
           }

@@ -5128,6 +5128,7 @@
     "storageSize": "Dati ingeriti",
     "compressedSize": "Dimensioni compresse",
     "schemaHeader": "Dettagli dello stream",
+    "searchFieldOrIndexType": "Cerca campo o tipo di indice",
     "indexTypeOptions": {
       "fullTextSearch": "Ricerca testo completo",
       "secondaryIndex": "Indice secondario",

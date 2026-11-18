@@ -5128,6 +5128,7 @@
     "storageSize": "取り込み済みデータサイズ",
     "compressedSize": "圧縮容量",
     "schemaHeader": "ストリーム詳細",
+    "searchFieldOrIndexType": "フィールドまたはインデックスタイプを検索",
     "indexTypeOptions": {
       "fullTextSearch": "全文検索",
       "secondaryIndex": "セカンダリインデックス",

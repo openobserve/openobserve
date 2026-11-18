@@ -5128,6 +5128,7 @@
     "storageSize": "Opgenomen gegevens",
     "compressedSize": "Gecomprimeerde grootte",
     "schemaHeader": "Details van de stream",
+    "searchFieldOrIndexType": "Zoek veld of indextype",
     "indexTypeOptions": {
       "fullTextSearch": "Volledige tekst zoeken",
       "secondaryIndex": "Secundaire index",
