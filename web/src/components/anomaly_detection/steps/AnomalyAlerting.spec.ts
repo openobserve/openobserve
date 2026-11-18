@@ -268,7 +268,6 @@ describe("AnomalyAlerting - setting rows", () => {
 describe("AnomalyAlerting - in the sectioned editor", () => {
   const anomalyCtx = alertTierContext({
     isRealTime: "anomaly",
-    aggregate: false,
     incidentsEnabled: false,
     oncallEnabled: false,
     suppressRepeatsEnabled: false,

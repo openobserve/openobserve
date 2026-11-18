@@ -68,7 +68,6 @@ export interface AlertSettingTierDef {
 export interface AlertTierContext {
   kind: AlertKind;
   shape: AlertQueryShape;
-  aggregate: boolean;
   incidentsEnabled: boolean;
   oncallEnabled: boolean;
   suppressRepeatsEnabled: boolean;
@@ -221,7 +220,6 @@ const filled = (list: unknown[] | undefined) => (list ?? []).some(has);
 export function alertTierContext(input: {
   isRealTime: string;
   queryType?: string;
-  aggregate: boolean;
   incidentsEnabled: boolean;
   oncallEnabled: boolean;
   suppressRepeatsEnabled: boolean;

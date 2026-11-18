@@ -30,7 +30,6 @@ import type { AlertSectionId } from "./alertFormSections";
 const ctx = (over: Partial<AlertTierContext> = {}): AlertTierContext => ({
   kind: "scheduled",
   shape: "filters",
-  aggregate: false,
   incidentsEnabled: false,
   oncallEnabled: false,
   suppressRepeatsEnabled: false,
@@ -94,7 +93,7 @@ describe("sectionTierView: the More options line per mockup screen", () => {
 describe("AlertTierLinks: the More options line names every unset rare setting", () => {
   it.each<[string, Partial<AlertTierContext>, AlertSettingId[]]>([
     ["filters", {}, []],
-    ["filters, aggregate, Must last set", { aggregate: true }, ["holdFor"]],
+    ["filters, Must last set", {}, ["holdFor"]],
     ["SQL", { shape: "sql" }, []],
     ["PromQL", { shape: "promql" }, []],
     ["real-time", { kind: "realtime" }, []],
@@ -246,7 +245,7 @@ describe("tier rules", () => {
   );
 
   it.each<[string, Partial<AlertTierContext>, AlertSectionId]>([
-    ["filters", { aggregate: true }, "condition"],
+    ["filters", {}, "condition"],
     ["composite", { kind: "composite", shape: "composite" }, "condition"],
     ["notify", ALL_ON, "notify"],
   ])(
@@ -280,9 +279,7 @@ describe("alertTierContext", () => {
     ["anomaly", undefined, { kind: "anomaly", shape: "anomaly" }],
     ["composite", "custom", { kind: "composite", shape: "composite" }],
   ])("is_real_time %s, type %s", (isRealTime, queryType, expected) => {
-    expect(alertTierContext({ isRealTime, queryType, aggregate: false, ...ALL_ON })).toMatchObject(
-      expected,
-    );
+    expect(alertTierContext({ isRealTime, queryType, ...ALL_ON })).toMatchObject(expected);
   });
 });
 

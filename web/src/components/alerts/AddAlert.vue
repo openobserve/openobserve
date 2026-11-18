@@ -2114,7 +2114,6 @@ export default defineComponent({
       alertTierContext({
         isRealTime: String(alertForm.formData.value.is_real_time),
         queryType: alertForm.formData.value.query_condition?.type,
-        aggregate: alertForm.isAggregationEnabled.value,
         incidentsEnabled: incidentsEnabled.value,
         oncallEnabled: store.state.zoConfig?.oncall_enabled === true,
         suppressRepeatsEnabled: config.isEnterprise === "true" || config.isCloud === "true",

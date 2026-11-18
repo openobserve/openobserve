@@ -1570,7 +1570,6 @@ describe("AnomalyDetectionConfig", () => {
 describe("AnomalyDetectionConfig — section 2 in the sectioned editor (E1)", () => {
   const anomalyCtx = alertTierContext({
     isRealTime: "anomaly",
-    aggregate: false,
     incidentsEnabled: false,
     oncallEnabled: false,
     suppressRepeatsEnabled: false,
