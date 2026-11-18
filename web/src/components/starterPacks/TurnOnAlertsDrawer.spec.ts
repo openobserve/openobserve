@@ -21,9 +21,9 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 import TurnOnAlertsDrawer from "./TurnOnAlertsDrawer.vue";
-import { fakeFlow } from "./starterPackTestFlow";
+import { fakeFlow, PACK } from "./starterPackTestFlow";
 
-const fake = vi.hoisted(() => ({ turn: null as any }));
+const fake = vi.hoisted(() => ({ turn: null as any, push: vi.fn(async () => {}) }));
 
 vi.mock("@/composables/starterPacks/useTurnOnAlerts", () => ({
   useTurnOnAlerts: () => fake.turn,
@@ -33,7 +33,7 @@ vi.mock("@/composables/query/readQuery", () => ({
     JSON.stringify(queryKey).includes("template") ? [{ name: "tpl" }] : [{ name: "pager" }],
   ),
 }));
-vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("vue-router", () => ({ useRouter: () => ({ push: fake.push }) }));
 
 const row = (id: string, severity: string, result: Record<string, unknown> | null) => ({
   id,
@@ -80,9 +80,9 @@ const turnFor = (rows: any[]) => {
   };
 };
 
-const render = async () => {
+const render = async (flow = fakeFlow()) => {
   const wrapper = mount(TurnOnAlertsDrawer, {
-    props: { flow: fakeFlow(), clusters: ["eu-1"], open: true },
+    props: { flow, clusters: ["eu-1"], open: true },
     attachTo: document.body,
     global: {
       plugins: [i18n, store],
@@ -136,6 +136,21 @@ describe("TurnOnAlertsDrawer", () => {
     const wrapper = await render();
     expect(wrapper.find('[data-test="turn-on-alerts-check-collector-link"]').exists()).toBe(true);
     expect(wrapper.text()).not.toContain("0 incidents");
+  });
+
+  it("sends the collector link to the pack's own ingestion guide", async () => {
+    fake.turn = turnFor([row("a", "critical", { ...result(0, 0), noData: true })]);
+    const hosts = fakeFlow({ pack: { ...PACK, id: "hosts", collectorRoute: "ingestFromLinux" } });
+    const wrapper = await render(hosts);
+    await wrapper.get('[data-test="turn-on-alerts-check-collector-link"]').trigger("click");
+    expect(fake.push).toHaveBeenCalledWith({
+      name: "ingestFromLinux",
+      query: { org_identifier: expect.anything() },
+    });
+    const none = fakeFlow({ pack: { ...PACK, collectorRoute: undefined } });
+    expect(
+      (await render(none)).find('[data-test="turn-on-alerts-check-collector-link"]').exists(),
+    ).toBe(false);
   });
 
   it("offers Retry on a row that could not be checked", async () => {

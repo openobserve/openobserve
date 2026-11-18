@@ -40,7 +40,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { readQuery } from "@/composables/query/readQuery";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
-import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
+import { KUBERNETES_PACK, STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
 import { packScopeValue } from "@/composables/starterPacks/packCopy";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
@@ -62,10 +62,11 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const org = String(route.query.org_identifier ?? store.state.selectedOrganization?.identifier);
-const pack = KUBERNETES_PACK;
+const pack = STARTER_PACKS.find(({ id }) => id === route.params.pack) ?? KUBERNETES_PACK;
+const title = t(pack.titleKey);
 const packsEnabled = STARTER_PACKS_ENABLED;
 const flow = useStarterPackFlow(org, pack);
-const matcher = useStarterPackMatcher(org);
+const matcher = useStarterPackMatcher(org, { pack });
 const turn = useTurnOnAlerts(org, flow);
 const health = usePackHealth(org);
 const updates = usePackUpdates(org, flow);
@@ -338,7 +339,7 @@ const muteContext = computed(() =>
           data-test="starter-pack-page-setup-btn"
           @click="setUp"
         >
-          {{ t("starterPacks.setUp") }}
+          {{ t("starterPacks.setUp", { title }) }}
         </OButton>
       </div>
       <template v-else>
@@ -356,7 +357,7 @@ const muteContext = computed(() =>
             )
           }}
         </OBanner>
-        <StarterPackHealthLine :org="org" />
+        <StarterPackHealthLine :org="org" :pack="pack" />
         <div class="grid grid-cols-3 gap-3 max-md:grid-cols-1" data-test="starter-pack-page-tiles">
           <div
             class="border-border-default rounded-default flex flex-col gap-1 border p-3"
@@ -484,7 +485,7 @@ const muteContext = computed(() =>
           dense
           data-test="starter-pack-page-off"
         >
-          {{ t("starterPacks.home.reminder", { count: offCount }, offCount) }}
+          {{ t("starterPacks.home.reminder", { count: offCount, title }, offCount) }}
         </OBanner>
         <div class="grid min-h-0 grid-cols-[minmax(0,1fr)_20rem] gap-3 max-lg:grid-cols-1">
           <div class="min-h-80" data-test="starter-pack-page-alerts-table">

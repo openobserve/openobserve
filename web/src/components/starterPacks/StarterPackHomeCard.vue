@@ -25,6 +25,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
+import type { StarterPack } from "@/composables/starterPacks/types";
 import { usePackDismissal, usePackHiddenForOrg } from "@/composables/starterPacks/packDismissal";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
@@ -33,13 +34,26 @@ import StarterPackInstallCard from "./StarterPackInstallCard.vue";
 import StarterPackHealthLine from "./StarterPackHealthLine.vue";
 import TurnOnAlertsDrawer from "./TurnOnAlertsDrawer.vue";
 
-const props = defineProps<{ org: string }>();
+const props = withDefaults(
+  defineProps<{
+    org: string;
+    pack?: StarterPack;
+    /** Off for every card after the first, so Home says no match only once. */
+    showEmpty?: boolean;
+  }>(),
+  { pack: () => KUBERNETES_PACK, showEmpty: true },
+);
+const emit = defineEmits<{ offered: [offered: boolean] }>();
 
 const { t } = useI18nTyped();
 const router = useRouter();
-const pack = KUBERNETES_PACK;
+const pack = props.pack;
+// Kubernetes keeps the original ids, so existing tests still find its card.
+const testId = (id: string) =>
+  pack === KUBERNETES_PACK ? id : id.replace("home-pack", `home-pack-${pack.id}`);
+const title = t(pack.titleKey);
 const flow = useStarterPackFlow(props.org, pack);
-const matcher = useStarterPackMatcher(props.org);
+const matcher = useStarterPackMatcher(props.org, { pack });
 const { dismissed, dismiss, restore } = usePackDismissal("home", props.org, pack.id);
 const orgHide = usePackHiddenForOrg(props.org, pack.id);
 const drawerOpen = ref(false);
@@ -96,7 +110,11 @@ const view = computed<CardView>(() => {
   if (flow.loadFailed.value || matcher.state.value === "error") return "error";
   if (matcher.state.value === "checking") return "loading";
   if (flow.forbidden.value) return "forbidden";
-  return matcher.state.value === "matched" ? "offer" : "empty";
+  if (matcher.state.value === "matched") return "offer";
+  return props.showEmpty ? "empty" : "hidden";
+});
+watch(view, (next) => emit("offered", next !== "empty" && next !== "hidden"), {
+  immediate: true,
 });
 const startSetup = async () => {
   drawerOpen.value = true;
@@ -127,11 +145,15 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
 </script>
 
 <template>
-  <div v-if="view !== 'hidden'" class="mt-2.5 mb-3 shrink-0" data-test="home-pack-section">
+  <div
+    v-if="view !== 'hidden'"
+    class="mt-2.5 mb-3 shrink-0"
+    :data-test="testId('home-pack-section')"
+  >
     <div
       v-if="view === 'loading'"
       class="border-border-default rounded-default flex flex-col gap-2 border p-3"
-      data-test="home-pack-card-skeleton"
+      :data-test="testId('home-pack-card-skeleton')"
     >
       <OSkeleton class="h-6 w-1/2" />
       <OSkeleton class="h-4 w-full" />
@@ -139,12 +161,12 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
     </div>
 
     <OBanner v-else-if="view === 'hiddenAdmin'" variant="default" dense inline-actions>
-      {{ t("starterPacks.home.hiddenForEveryone") }}
+      {{ t("starterPacks.home.hiddenForEveryone", { title }) }}
       <template #actions>
         <OButton
           variant="ghost"
           size="sm-action"
-          data-test="home-pack-card-show-all-btn"
+          :data-test="testId('home-pack-card-show-all-btn')"
           @click="setHidden(orgHide.show)"
         >
           {{ t("starterPacks.home.showForEveryone") }}
@@ -153,12 +175,12 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
     </OBanner>
 
     <OBanner v-else-if="view === 'dismissed'" variant="default" dense inline-actions>
-      {{ t("starterPacks.home.hidden") }}
+      {{ t("starterPacks.home.hidden", { title }) }}
       <template #actions>
         <OButton
           variant="ghost"
           size="sm-action"
-          data-test="home-pack-card-show-again-btn"
+          :data-test="testId('home-pack-card-show-again-btn')"
           @click="restore"
         >
           {{ t("starterPacks.home.showAgain") }}
@@ -166,7 +188,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
         <OButton
           variant="ghost-primary"
           size="sm-action"
-          data-test="home-pack-card-library-link"
+          :data-test="testId('home-pack-card-library-link')"
           @click="library"
         >
           {{ t("starterPacks.library") }}
@@ -185,7 +207,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
         <OButton
           variant="primary"
           size="sm-action"
-          data-test="home-pack-interrupted-btn"
+          :data-test="testId('home-pack-interrupted-btn')"
           @click="drawerOpen = true"
         >
           {{ t("starterPacks.progress.finish") }}
@@ -194,21 +216,27 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
     </OBanner>
 
     <div v-else-if="view === 'installed'" class="flex flex-col gap-3">
-      <StarterPackHealthLine :org="props.org" />
+      <StarterPackHealthLine :org="props.org" :pack="pack" />
       <OBanner
         v-if="flow.remindAlerts.value"
         variant="info"
         dense
         inline-actions
-        data-test="home-pack-reminder"
+        :data-test="testId('home-pack-reminder')"
       >
-        {{ t("starterPacks.home.reminder", { count: flow.alertsOff.value }, flow.alertsOff.value) }}
+        {{
+          t(
+            "starterPacks.home.reminder",
+            { count: flow.alertsOff.value, title },
+            flow.alertsOff.value,
+          )
+        }}
         <template #actions>
           <OButton
             v-if="flow.canManage.value"
             variant="ghost"
             size="sm-action"
-            data-test="home-pack-reminder-keep-off-btn"
+            :data-test="testId('home-pack-reminder-keep-off-btn')"
             @click="keepOff"
           >
             {{ t("starterPacks.home.keepOff") }}
@@ -216,7 +244,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
           <OButton
             variant="ghost"
             size="sm-action"
-            data-test="home-pack-reminder-dismiss-btn"
+            :data-test="testId('home-pack-reminder-dismiss-btn')"
             @click="dismiss"
           >
             {{ t("starterPacks.home.notNow") }}
@@ -224,7 +252,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
           <OButton
             variant="outline"
             size="sm-action"
-            data-test="home-pack-view-btn"
+            :data-test="testId('home-pack-view-btn')"
             @click="viewPack"
           >
             {{ t("starterPacks.home.viewPack") }}
@@ -232,7 +260,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
           <OButton
             variant="primary"
             size="sm-action"
-            data-test="home-pack-reminder-turn-on-btn"
+            :data-test="testId('home-pack-reminder-turn-on-btn')"
             @click="turnOnOpen = true"
           >
             {{ t("starterPacks.home.turnOn") }}
@@ -241,7 +269,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
       </OBanner>
       <div
         class="border-border-default rounded-default flex w-56 flex-col border p-3"
-        data-test="home-pack-alerts-on-tile"
+        :data-test="testId('home-pack-alerts-on-tile')"
       >
         <OText variant="meta">{{ t("starterPacks.home.alertsOnLabel") }}</OText>
         <strong class="text-lg">{{
@@ -259,7 +287,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
         <OButton
           variant="outline"
           size="sm-action"
-          data-test="home-pack-card-retry-btn"
+          :data-test="testId('home-pack-card-retry-btn')"
           @click="retryCheck"
         >
           {{ t("common.retry") }}
@@ -274,7 +302,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
           variant="outline"
           size="sm-action"
           icon-left="content-copy"
-          data-test="home-pack-card-copy-link-btn"
+          :data-test="testId('home-pack-card-copy-link-btn')"
           @click="copyLink"
         >
           {{ t("starterPacks.copyLink") }}
@@ -286,7 +314,8 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
       v-else-if="view === 'offer'"
       :flow="flow"
       :stream-count="matcher.streams.value.length"
-      test-id="home-pack-card"
+      :title="title"
+      :test-id="testId('home-pack-card')"
       dismissible
       @install="startSetup"
       @details="drawerOpen = true"
@@ -296,7 +325,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
         <OButton
           variant="ghost"
           size="sm-action"
-          data-test="home-pack-card-hide-all-btn"
+          :data-test="testId('home-pack-card-hide-all-btn')"
           @click="setHidden(orgHide.hide)"
         >
           {{ t("starterPacks.home.hideForEveryone") }}
@@ -310,7 +339,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
         <OButton
           variant="ghost-primary"
           size="sm-action"
-          data-test="home-pack-empty-library-link"
+          :data-test="testId('home-pack-empty-library-link')"
           @click="library"
         >
           {{ t("starterPacks.library") }}

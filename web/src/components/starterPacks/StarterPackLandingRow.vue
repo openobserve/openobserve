@@ -22,7 +22,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
+import { KUBERNETES_PACK, STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
 import { packScope } from "@/composables/starterPacks/packCopy";
 import { usePackDismissal } from "@/composables/starterPacks/packDismissal";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
@@ -30,13 +30,15 @@ import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPack
 import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
 import TurnOnAlertsDrawer from "./TurnOnAlertsDrawer.vue";
 
-const props = defineProps<{ org: string }>();
+const props = defineProps<{ org: string; packId?: string }>();
 
 const { t } = useI18nTyped();
 const router = useRouter();
-const flow = useStarterPackFlow(props.org, KUBERNETES_PACK);
-const matcher = useStarterPackMatcher(props.org);
-const { dismissed, dismiss } = usePackDismissal("landing", props.org, KUBERNETES_PACK.id);
+const pack = STARTER_PACKS.find(({ id }) => id === props.packId) ?? KUBERNETES_PACK;
+const title = t(pack.titleKey);
+const flow = useStarterPackFlow(props.org, pack);
+const matcher = useStarterPackMatcher(props.org, { pack });
+const { dismissed, dismiss } = usePackDismissal("landing", props.org, pack.id);
 
 const HOUR_US = 60 * 60 * 1_000_000;
 const turnOnOpen = ref(false);
@@ -69,13 +71,14 @@ const rowTest = computed(() => {
   return flow.alertsOn.value > 0 ? "kubernetes-pack-watching-row" : "kubernetes-pack-undo-row";
 });
 const message = computed(() => {
-  if (readOnly.value) return t("starterPacks.landing.readOnly", { count: off.value }, off.value);
+  if (readOnly.value)
+    return t("starterPacks.landing.readOnly", { count: off.value, title }, off.value);
   if (flow.alertsOn.value > 0) {
-    return t("starterPacks.landing.watching", { on: flow.alertsOn.value, off: off.value });
+    return t("starterPacks.landing.watching", { on: flow.alertsOn.value, off: off.value, title });
   }
   return t(
     "starterPacks.landing.installedBar",
-    { pack: t(KUBERNETES_PACK.titleKey), count: madeCount.value },
+    { pack: title, count: madeCount.value },
     madeCount.value,
   );
 });
@@ -179,7 +182,7 @@ const viewPack = () => router.push(flow.packRoute.value).catch(() => {});
     </template>
   </OBanner>
   <OText
-    v-if="visible && !resultText"
+    v-if="visible && !resultText && pack.clusterScoped"
     variant="meta"
     class="px-3 py-1"
     data-test="kubernetes-pack-scope"

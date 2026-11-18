@@ -56,16 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           daily-toggle
         />
         <OButton
-          v-if="packsEnabled"
-          variant="outline"
-          size="sm"
-          icon-left="hub"
-          data-test="alert-library-pack-link"
-          @click="openPack"
-        >
-          {{ t("starterPacks.page.title", { title: t(KUBERNETES_PACK.titleKey) }) }}
-        </OButton>
-        <OButton
           variant="outline"
           size="sm"
           icon-left="open-in-new"
@@ -443,7 +433,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
 import StarterPackFindMore from "@/components/starterPacks/StarterPackFindMore.vue";
 import StarterPackLibraryTab from "@/components/starterPacks/StarterPackLibraryTab.vue";
-import { KUBERNETES_PACK, STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
+import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
 import { ingestTimes, matchAlerts } from "@/composables/starterPacks/packMatchData";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -477,14 +467,6 @@ const libraryTab = ref<(typeof LIBRARY_TABS)[number]>("alerts");
 const onLibraryTabChange = (tab: string | number) => {
   libraryTab.value = tab as (typeof LIBRARY_TABS)[number];
 };
-const openPack = () =>
-  router
-    .push({
-      name: "starterPack",
-      params: { pack: KUBERNETES_PACK.id },
-      query: { org_identifier: store.state.selectedOrganization?.identifier },
-    })
-    .catch(() => {});
 
 const { manifest, isLoading, error, loadManifest, loadAlertFile, isReady } = useAlertLibrary();
 const packVerdicts = shallowRef<Map<string, boolean> | null>(null);

@@ -216,8 +216,9 @@ const destinationAdded = async () => {
   await readDestinations(true);
   addingDestination.value = false;
 };
+const collectorRoute = props.flow.pack.collectorRoute;
 const collector = () =>
-  router.push({ name: "ingestFromKubernetes", query: { org_identifier: org } }).catch(() => {});
+  router.push({ name: collectorRoute, query: { org_identifier: org } }).catch(() => {});
 const copyLink = () => copyToClipboard(props.flow.packLink(), t);
 
 watch(addingDestination, (adding) => adding && void readTemplates());
@@ -262,6 +263,7 @@ watch(open, (isOpen) => {
         <p data-test="turn-on-alerts-summary">
           {{ t("starterPacks.turnOn.noDataYet") }}
           <OButton
+            v-if="collectorRoute"
             variant="ghost-primary"
             size="sm-action"
             data-test="turn-on-alerts-check-collector-link"

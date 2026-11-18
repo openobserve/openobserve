@@ -111,6 +111,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="packsEnabled && activeHomeTab === 'overview'"
           :key="store.state.selectedOrganization?.identifier"
           :org="store.state.selectedOrganization?.identifier"
+          :show-empty="!hostsPackOffered"
+        />
+        <StarterPackHomeCard
+          v-if="packsEnabled && activeHomeTab === 'overview'"
+          :key="`hosts-${store.state.selectedOrganization?.identifier}`"
+          :org="store.state.selectedOrganization?.identifier"
+          :pack="HOSTS_PACK"
+          :show-empty="false"
+          @offered="hostsPackOffered = $event"
         />
         <StarterPackFindMore
           v-if="packsEnabled && activeHomeTab === 'overview'"
@@ -307,6 +316,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import analytics from "@/services/product_analytics";
 import StarterPackHomeCard from "@/components/starterPacks/StarterPackHomeCard.vue";
 import StarterPackFindMore from "@/components/starterPacks/StarterPackFindMore.vue";
+import { HOSTS_PACK } from "@/composables/starterPacks/hostsPack";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 
 export default defineComponent({
@@ -317,6 +327,8 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const firstDataNotice = inject(FIRST_DATA_NOTICE, null);
+    // Home says no pack matches only while the Hosts card offers nothing either.
+    const hostsPackOffered = ref(false);
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
@@ -656,6 +668,8 @@ export default defineComponent({
       onTabReorder,
       isEnterpriseOrCloud,
       packsEnabled: STARTER_PACKS_ENABLED,
+      HOSTS_PACK,
+      hostsPackOffered,
       homeChat,
       aiChatPayload,
       onSendToAiChat,

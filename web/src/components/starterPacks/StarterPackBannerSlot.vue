@@ -120,6 +120,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
     </template>
   </Teleport>
   <StarterPackInstallCard
+    :title="t(KUBERNETES_PACK.titleKey)"
     v-if="offering && !pending && !flow.interrupted.value && !flow.forbidden.value"
     :flow="flow"
     :stream-count="matcher.streams.value.length"
