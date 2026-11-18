@@ -4177,9 +4177,10 @@ fn anomaly_alert_body(
         fmt_alert_us(ctx.window_end_us)
     );
     match ctx.kind {
+        // A continuing absence stores only its first bucket, so the body names no end time.
         AnomalyAlertKind::Absence => format!(
-            "no data received in window {window}, although the stream's learned schedule \
-             expected data"
+            "No data for this detector's query since {}",
+            fmt_alert_clock(ctx.window_start_us)
         ),
         AnomalyAlertKind::PartialDrop => {
             let worst = ctx.worst_actual_value.unwrap_or(0.0);
@@ -4618,9 +4619,21 @@ fn alert_explore_link(
         &actx.anomaly_id,
         &actx.stream_type,
         target,
-        actx.window_end_us,
+        alert_link_end_us(actx),
         snapshot.as_ref(),
     )
+}
+
+/// An absence run window is its first empty bucket only, so its link runs to the firing run's end.
+#[cfg(feature = "enterprise")]
+fn alert_link_end_us(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> i64 {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    match actx.kind {
+        AnomalyAlertKind::Absence => actx.window_end_us.max(actx.judged_end_us),
+        _ => actx.window_end_us,
+    }
 }
 
 /// A recovery has no worst reading, so its link carries no snapshot; an absence carries no numbers.
@@ -4639,7 +4652,7 @@ fn alert_link_snapshot(
     let reading = |v: Option<f64>| v.filter(|_| readings);
     Some(AnomalyLinkSnapshot {
         start_us: actx.window_start_us,
-        end_us: actx.window_end_us,
+        end_us: alert_link_end_us(actx),
         kind: kind.to_string(),
         measure: anomaly_measure(target),
         actual: reading(actx.worst_actual_value),
@@ -8595,7 +8608,14 @@ mod tests {
         #[test]
         fn an_absence_alert_has_no_numeric_framing() {
             let msg = anomaly_alert_message(&ctx(AnomalyAlertKind::Absence), LINK);
-            assert!(msg.contains("no data received"), "{msg}");
+            assert!(
+                msg.contains("No data for this detector's query since "),
+                "{msg}"
+            );
+            assert!(
+                !msg.contains('\u{2013}'),
+                "an absence names no end time: {msg}"
+            );
             assert!(
                 !msg.contains('%'),
                 "absence has no honest percentage: {msg}"
@@ -9046,6 +9066,21 @@ mod tests {
             let to: i64 = get(&p, "to").unwrap().parse().unwrap();
             assert_eq!(to - from, 20 * MIN_US);
             assert_eq!(label, "View logs");
+        }
+
+        #[test]
+        fn an_absence_alert_link_runs_to_the_end_of_the_firing_run() {
+            let mut c = explore_ctx("logs", None, false);
+            c.kind = AnomalyAlertKind::Absence;
+            let fired = c.window_end_us + 9 * 60_000_000;
+            c.judged_end_us = fired;
+            let link = super::super::alert_explore_link(&c);
+            let (_, p) = pairs(&link.url);
+            assert_eq!(get(&p, "to"), Some(fired.to_string().as_str()));
+            assert_eq!(get(&p, "anomaly_end"), Some(fired.to_string().as_str()));
+            c.kind = AnomalyAlertKind::Value;
+            let (_, p) = pairs(&super::super::alert_explore_link(&c).url);
+            assert_eq!(get(&p, "to"), Some(c.window_end_us.to_string().as_str()));
         }
 
         #[test]
