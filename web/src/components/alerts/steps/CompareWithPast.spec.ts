@@ -535,4 +535,24 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
     ).toEqual(["15m", "45m"]);
     expect(renderedOffsets()).toEqual(["15", "45"]);
   });
+
+  it.each([
+    ["30s", "30", "m", ["minutes", "hours", "days", "weeks", "months"]],
+    ["1d", "1", "d", ["minute", "hour", "day", "week", "month"]],
+  ])(
+    "shows a saved %s as %s %s, in units that follow the number",
+    async (offSet, n, unit, labels) => {
+      const wrapper: VueWrapper<any> = mount(CompareWithPast, {
+        global: { plugins: [i18n] },
+        props: { multiTimeRange: [{ offSet, uuid: "u1" }], selectedTab: "sql" },
+      });
+      expect(
+        wrapper.find('[data-test="multi-time-range-offset-input"] input').element,
+      ).toHaveProperty("value", n);
+      expect(wrapper.vm.parseOffset(offSet).unit).toBe(unit);
+      expect(wrapper.vm.unitOptionsFor(Number(n)).map((o: { label: string }) => o.label)).toEqual(
+        labels,
+      );
+    },
+  );
 });

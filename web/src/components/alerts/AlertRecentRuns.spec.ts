@@ -57,11 +57,16 @@ describe("AlertRecentRuns", () => {
     expect(query.end_time - query.start_time).toBe(24 * 60 * 60 * 1_000_000);
   });
 
-  it("says so when there are no runs", async () => {
+  it.each([
+    [undefined, "No checks in the last 24 hours."],
+    [1, "No checks in the last 24 hours. It should check every minute: see Alert history."],
+  ])("says so when there are no checks (expected every %s min)", async (every, text) => {
     getHistory.mockResolvedValue({ hits: [] });
-    const wrapper = mount(AlertRecentRuns, { props: { alertId: "a1" } });
+    const wrapper = mount(AlertRecentRuns, {
+      props: { alertId: "a1", expectedEveryMinutes: every },
+    });
     await flushPromises();
-    expect(wrapper.find('[data-test="add-alert-recent-runs-empty"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-alert-recent-runs-empty"]').text()).toBe(text);
   });
 
   it("says so when the history cannot be read", async () => {

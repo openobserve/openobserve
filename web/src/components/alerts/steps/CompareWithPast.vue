@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="(picker, index) in localMultiTimeRange"
       :key="picker.uuid"
       :label="index === 0 ? t('alerts.plain.compareTitle') : noLabel"
+      :description="index === 0 ? t('alerts.form.compare.help') : undefined"
       fill
       data-test="add-alert-compare-window"
     >
@@ -49,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSelect
               class="w-30"
               :model-value="parseOffset(picker.offSet).unit"
-              :options="unitOptions"
+              :options="unitOptionsFor(parseOffset(picker.offSet).amount)"
               labelKey="label"
               valueKey="value"
               :searchable="false"
@@ -62,6 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
       </i18n-t>
+      <p
+        v-if="index === 0 && !hasFunction"
+        class="text-status-warning-text m-0 mt-1 text-xs"
+        data-test="add-alert-compare-no-function"
+      >
+        {{ t("alerts.form.compare.noFunction") }}
+      </p>
       <OButton
         v-if="index === localMultiTimeRange.length - 1"
         class="-ms-3.5 mt-2 self-start max-[85.5rem]:-ms-3"
@@ -163,6 +171,11 @@ export default defineComponent({
       type: String,
       default: "custom",
     },
+    /** Past rows are only compared by a function; without one they add to the count. */
+    hasFunction: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["update:multiTimeRange"],
   setup(props, { emit }) {
@@ -233,23 +246,23 @@ export default defineComponent({
       commit();
     };
 
+    // The server parses only h, d, w and M; anything else runs as minutes, so seconds are not offered.
     const UNIT_KEYS: Record<string, I18nKey> = {
-      s: "alerts.form.units.seconds",
-      m: "alerts.form.units.minutes",
-      h: "alerts.form.units.hours",
-      d: "alerts.form.units.days",
-      w: "alerts.form.units.weeks",
-      M: "alerts.form.units.months",
+      m: "alerts.form.compare.units.m",
+      h: "alerts.form.compare.units.h",
+      d: "alerts.form.compare.units.d",
+      w: "alerts.form.compare.units.w",
+      M: "alerts.form.compare.units.M",
     };
-    const unitOptions = computed(() =>
-      Object.entries(UNIT_KEYS).map(([value, key]) => ({ label: t(key), value })),
-    );
+    const unitOptionsFor = (amount: number) =>
+      Object.entries(UNIT_KEYS).map(([value, key]) => ({ label: t(key, amount), value }));
     const noLabel = raw("");
 
     // An offset is stored as a code such as "15m" or "1d".
     const parseOffset = (code: string) => {
       const match = String(code ?? "").match(/^(\d+)([smhdwM])$/);
-      return match ? { amount: Number(match[1]), unit: match[2] } : { amount: 1, unit: "d" };
+      if (!match) return { amount: 1, unit: "d" };
+      return { amount: Number(match[1]), unit: match[2] === "s" ? "m" : match[2] };
     };
     const setOffset = (index: number, amount: unknown, unit: string) => {
       const n = Math.max(1, Math.floor(Number(amount)) || 1);
@@ -265,7 +278,7 @@ export default defineComponent({
       localMultiTimeRange,
       addTimeShift,
       removeTimeShift,
-      unitOptions,
+      unitOptionsFor,
       noLabel,
       parseOffset,
       setOffset,

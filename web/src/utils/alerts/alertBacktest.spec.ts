@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import {
   backtestBucketMinutes,
+  backtestHintKey,
   backtestWindows,
   cronCheckTimes,
   windowedCountSql,
@@ -152,5 +153,20 @@ describe("backtestWindows", () => {
     });
     expect(result.hours.filter(Boolean)).toHaveLength(1);
     expect(result.hours[12]).toBe(true);
+  });
+});
+
+describe("backtestHintKey", () => {
+  it.each([
+    [0, 288, ">=", "alerts.sections.backtest.never"],
+    [0, 288, "<", "alerts.sections.backtest.neverRaise"],
+    [0, 288, "!=", "alerts.sections.backtest.neverCheck"],
+    [100, 288, ">", "alerts.sections.backtest.noisy"],
+    [100, 288, "<=", "alerts.sections.backtest.noisyLower"],
+    [100, 288, "=", "alerts.sections.backtest.noisyCheck"],
+    [10, 288, ">=", null],
+    [0, 0, ">=", null],
+  ])("%s of %s checks with %s advises %s", (alerts, total, operator, key) => {
+    expect(backtestHintKey(alerts, total, operator)).toBe(key);
   });
 });

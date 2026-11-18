@@ -26,6 +26,7 @@ import { alertHistoryQuery } from "@/services/alerts.queries";
 import { historyStatusOf } from "@/utils/alerts/ackState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import { everyWords } from "@/utils/alerts/alertCopy";
 
 interface HistoryRow {
   timestamp?: number;
@@ -41,8 +42,10 @@ const props = withDefaults(
     folderId?: string;
     /** How many runs to list. */
     limit?: number;
+    /** Minutes between checks of an enabled alert that should have checked in the last day. */
+    expectedEveryMinutes?: number;
   }>(),
-  { folderId: undefined, limit: 5 },
+  { folderId: undefined, limit: 5, expectedEveryMinutes: undefined },
 );
 
 const { t } = useI18nTyped();
@@ -104,10 +107,17 @@ const openRun = () =>
     </p>
     <p
       v-else-if="!historyQuery.isLoading.value && runs.length === 0"
-      class="text-text-secondary m-0 px-3 py-2 text-sm"
+      class="m-0 px-3 py-2 text-sm"
+      :class="expectedEveryMinutes ? 'text-status-warning-text' : 'text-text-secondary'"
       data-test="add-alert-recent-runs-empty"
     >
-      {{ t("alerts.editMode.recentRuns.empty") }}
+      {{
+        expectedEveryMinutes
+          ? t("alerts.editMode.recentRuns.emptyExpected", {
+              every: everyWords(expectedEveryMinutes, t),
+            })
+          : t("alerts.editMode.recentRuns.empty")
+      }}
     </p>
     <ol v-else class="m-0 flex list-none flex-col p-0">
       <li

@@ -220,7 +220,7 @@ const cronIssue = (
 ): string | null => {
   const cron = String(tc.cron ?? "").trim();
   if (!cron || isBlank(tc.timezone)) return t("alerts.queryConfig.cronExpressionTimezoneRequired");
-  if (cron.split(/\s+/).length !== 6) return t("common.invalidCronSixFields");
+  if (cron.split(/\s+/).length !== 6) return t("alerts.validation.cronSixFields");
   try {
     const seconds = getCronIntervalDifferenceInSeconds(cron);
     if (typeof seconds === "number" && seconds < minIntervalSecs) {
@@ -472,7 +472,11 @@ export const makeQueryConfigSchema = (t: Translator) =>
       };
       // Count family: SQL tab, or builder count mode.
       if (isSql || (isCustom && !isMeasure)) {
-        const msg = matrixIssue(tc.warning_threshold, tc.threshold, tc.operator);
+        // A warning count follows the same whole-number rule as the count it warns before.
+        const msg =
+          !isBlank(tc.warning_threshold) && !isCountLimit(tc.warning_threshold)
+            ? t("alerts.validation.limitWholeNumber")
+            : matrixIssue(tc.warning_threshold, tc.threshold, tc.operator);
         if (msg) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,

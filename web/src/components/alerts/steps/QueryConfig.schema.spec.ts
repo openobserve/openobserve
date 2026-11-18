@@ -283,7 +283,7 @@ describe("QueryConfig.schema — conditions tree", () => {
         cron("0 */10 * * * *", ""),
         t("alerts.queryConfig.cronExpressionTimezoneRequired"),
       ],
-      ["five fields", cron("0 9 * * 1-5"), t("common.invalidCronSixFields")],
+      ["five fields", cron("0 9 * * 1-5"), t("alerts.validation.cronSixFields")],
       ["an unparseable one", cron("a b c d e f"), t("alerts.queryConfig.invalidCronExpression")],
       [
         "one below the org floor",
@@ -706,16 +706,21 @@ describe("QueryConfig.schema — conditions tree", () => {
           "alerts.validation.warnNotWith",
           { comparison: t("alerts.sections.operators.ne") },
         ],
-      ])("a warning out of order for '%s' says how to fix it", (operator, warning, key, named) => {
-        const r = parse({
-          _meta: { tab: "sql" },
-          trigger_condition: { operator, threshold: 2500000000, warning_threshold: warning },
-        });
-        const issue = issuesOf(r).find(
-          (i: any) => i.path.join(".") === "trigger_condition.warning_threshold",
-        );
-        expect(issue.message).toBe(t(key, named));
-      });
+        [">=", -1, "alerts.validation.limitWholeNumber", {}],
+        ["<=", 2.5, "alerts.validation.limitWholeNumber", {}],
+      ])(
+        "a bad warning count for '%s' (%s) says how to fix it",
+        (operator, warning, key, named) => {
+          const r = parse({
+            _meta: { tab: "sql" },
+            trigger_condition: { operator, threshold: 2500000000, warning_threshold: warning },
+          });
+          const issue = issuesOf(r).find(
+            (i: any) => i.path.join(".") === "trigger_condition.warning_threshold",
+          );
+          expect(issue.message).toBe(t(key, named));
+        },
+      );
 
       it("count family: warning below critical passes (strings included)", () => {
         expect(

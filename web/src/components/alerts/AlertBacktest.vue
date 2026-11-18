@@ -33,6 +33,7 @@ import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
 import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
 import {
   backtestBucketMinutes,
+  backtestHintKey,
   backtestWindows,
   cronCheckTimes,
   windowedCountSql,
@@ -62,7 +63,6 @@ const HOURS = 24;
 const DEBOUNCE_MS = 700;
 // A day of a busy stream can scan for minutes; past this the answer is no longer worth the wait.
 const TIMEOUT_MS = 30_000;
-const NOISY_SHARE = 0.25;
 
 const { t } = useI18nTyped();
 const search = useAlertStreamQuery();
@@ -233,11 +233,8 @@ const resultText = computed(() =>
 );
 
 const hint = computed(() => {
-  if (result.value.total === 0) return null;
-  if (result.value.alerts === 0) return t("alerts.sections.backtest.never");
-  if (result.value.alerts / result.value.total > NOISY_SHARE)
-    return t("alerts.sections.backtest.noisy");
-  return null;
+  const key = backtestHintKey(result.value.alerts, result.value.total, props.operator);
+  return key ? t(key) : null;
 });
 </script>
 
