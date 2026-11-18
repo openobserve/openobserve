@@ -77,7 +77,6 @@ export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
     navKey: "alerts.sections.notify.nav",
     helpKey: "alerts.sections.notify.help",
     icon: "location-on",
-    optional: true,
   },
   {
     id: "schedule",

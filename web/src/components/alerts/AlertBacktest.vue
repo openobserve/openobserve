@@ -27,12 +27,14 @@ import {
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import AlertLinkNote from "./AlertLinkNote.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { isCountLimit } from "@/utils/alerts/alertReadBack";
-import { formatNumber } from "@/utils/alerts/alertCopy";
+import { durationWords, formatNumber } from "@/utils/alerts/alertCopy";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
 import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
 import { ALERT_TEST_RUN_KEY } from "@/composables/alerts/useAlertTestRun";
+import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
 import { testRunDay } from "@/utils/alerts/alertTestRun";
 import {
   backtestBucketMinutes,
@@ -245,20 +247,44 @@ const day = computed(() => {
 });
 // The server and the replay give the same three counts; only the source differs.
 const counts = computed(() => serverDay.value ?? result.value);
+const silence = computed(() => Number(props.triggerCondition?.silence) || 0);
 const volume = computed(() => {
   if (props.realTime)
-    return dailyVolume({ events: day.value.events ?? 0, fired: 0, alerts: 0 }, true);
+    return dailyVolume(
+      { events: day.value.events ?? 0, fired: 0, alerts: 0, hours: day.value.hours },
+      true,
+      silence.value,
+    );
   return dailyVolume({ ...counts.value, events: counts.value.events ?? 0 }, false);
 });
-const volumeText = computed(() =>
-  volume.value
+const plural = (key: "matchingEvents" | "notifications", count: number) =>
+  t(`alerts.sections.backtest.${key}`, { count: formatNumber(count) }, count);
+// Step 2 comes before the wait's own row, so the line says what the wait does instead of naming it.
+const volumeText = computed(() => {
+  const v = volume.value;
+  if (!v) return null;
+  if (!props.realTime)
+    return t("alerts.sections.backtest.firingChecks", { count: formatNumber(v.count) }, v.count);
+  const notifications = plural("notifications", v.notifications ?? v.count);
+  return silence.value > 0
+    ? t("alerts.sections.backtest.realtimeWait", {
+        events: plural("matchingEvents", v.count),
+        wait: durationWords(silence.value, t),
+        notifications,
+      })
+    : t("alerts.sections.backtest.realtimeEach", { notifications });
+});
+const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
+const waitAction = computed(() =>
+  formContext && volume.value
     ? t(
-        "alerts.sections.backtest.volume",
-        { count: formatNumber(volume.value.count) },
-        volume.value.count,
+        silence.value > 0
+          ? "alerts.sections.backtest.changeWait"
+          : "alerts.sections.backtest.addWait",
       )
     : null,
 );
+const openWait = () => formContext?.goToSection("notify");
 
 const resultText = computed(() => {
   if (props.realTime) return volumeText.value ?? t(emptyDayHintKey(filtered.value));
@@ -324,7 +350,16 @@ const hint = computed(() => {
         :class="realTime && volume?.noisy ? 'text-status-warning-text' : 'text-text-body'"
         data-test="add-alert-backtest-result"
       >
-        {{ resultText }}
+        <span data-test="add-alert-backtest-result-text">{{ resultText }}</span>
+        <OButton
+          v-if="realTime && waitAction"
+          variant="link"
+          class="ms-1"
+          data-test="add-alert-backtest-wait-action"
+          @click="openWait"
+        >
+          {{ waitAction }}
+        </OButton>
       </p>
       <div class="mt-2 grid grid-cols-24 gap-0.5" aria-hidden="true">
         <span
@@ -339,14 +374,15 @@ const hint = computed(() => {
         <span>{{ t("alerts.sections.backtest.dayAgo") }}</span>
         <span>{{ t("alerts.sections.timeline.now") }}</span>
       </div>
-      <p
+      <AlertLinkNote
         v-if="!realTime && volumeText"
-        class="m-0 mt-2 text-xs"
-        :class="volume?.noisy ? 'text-status-warning-text' : 'text-text-secondary'"
+        class="mt-2"
+        :text="volumeText"
+        :action="waitAction"
+        :warning="volume?.noisy"
         data-test="add-alert-backtest-volume"
-      >
-        {{ volumeText }}
-      </p>
+        @action="openWait"
+      />
       <p
         v-if="hint"
         class="text-text-secondary m-0 mt-2 text-xs"

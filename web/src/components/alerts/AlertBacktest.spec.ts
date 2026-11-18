@@ -25,6 +25,7 @@ import type { BacktestSignal } from "./alertSuggestions";
 import { ALERT_TEST_RUN_KEY, createAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import grouped from "@/test/fixtures/alerts/evaluate-grouped-fired.json";
 import AlertBacktest from "./AlertBacktest.vue";
+import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
 
 interface StreamHandlers {
   data: (payload: unknown, response: unknown) => void;
@@ -62,7 +63,7 @@ const TRIGGER = { frequency: 5, frequency_type: "minutes", silence: 0 };
 const mountBacktest = (
   query = SQL("default"),
   signal: Ref<BacktestSignal | null> = ref(null),
-  { testRun, ...extra }: Record<string, unknown> = {},
+  { testRun, formContext, ...extra }: Record<string, unknown> = {},
 ): VueWrapper =>
   mount(AlertBacktest, {
     props: {
@@ -79,6 +80,7 @@ const mountBacktest = (
       provide: {
         [ALERT_BACKTEST_SIGNAL_KEY]: signal,
         ...(testRun ? { [ALERT_TEST_RUN_KEY]: testRun } : {}),
+        ...(formContext ? { [ALERT_FORM_CONTEXT_KEY]: formContext } : {}),
       },
     },
   });
@@ -144,9 +146,15 @@ describe("AlertBacktest", () => {
     wrapper.unmount();
   });
 
-  it("real-time: counts the day's events by the hour and states the volume in amber", async () => {
+  it("real-time: counts the day's events by the hour, states what the wait lets through in amber, and opens the wait", async () => {
     const signal = ref<BacktestSignal | null>(null);
-    const wrapper = mountBacktest(SQL("k8s_events"), signal, { realTime: true, threshold: 0 });
+    const goToSection = vi.fn();
+    const wrapper = mountBacktest(SQL("k8s_events"), signal, {
+      realTime: true,
+      threshold: 0,
+      triggerCondition: { ...TRIGGER, silence: 10 },
+      formContext: { goToSection },
+    });
     await vi.advanceTimersByTimeAsync(700);
     const { sql, start_time, end_time } = calls[0].request.queryReq.query;
     expect(b64DecodeUnicode(sql)).toContain("histogram(_timestamp, '60 minute')");
@@ -155,10 +163,17 @@ describe("AlertBacktest", () => {
     respond(calls[0], [{ zo_sql_key: (NOW - 3_600_000) * 1000, zo_sql_val: 53_932 }]);
     await flushPromises();
     const result = wrapper.find('[data-test="add-alert-backtest-result"]');
-    expect(result.text()).toBe(
-      i18n.global.t("alerts.sections.backtest.volume", { count: "54,000" }, 54_000),
+    const tr = i18n.global.t;
+    expect(wrapper.find('[data-test="add-alert-backtest-result-text"]').text()).toBe(
+      tr("alerts.sections.backtest.realtimeWait", {
+        events: tr("alerts.sections.backtest.matchingEvents", { count: "54,000" }, 54_000),
+        wait: tr("alerts.sections.review.minutes", { count: 10 }, 10),
+        notifications: tr("alerts.sections.backtest.notifications", { count: "6" }, 6),
+      }),
     );
     expect(result.classes()).toContain("text-status-warning-text");
+    await wrapper.find('[data-test="add-alert-backtest-wait-action"]').trigger("click");
+    expect(goToSection).toHaveBeenCalledWith("notify");
     expect(wrapper.findAll('[data-test="add-alert-backtest-hour-fired"]')).toHaveLength(1);
     expect(signal.value).toBeNull();
     wrapper.unmount();

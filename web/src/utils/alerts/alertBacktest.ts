@@ -193,15 +193,24 @@ const aboutCount = (count: number) => {
   return Math.round(count / step) * step;
 };
 
-/** Notifications a day before Notify at most every, or null when the replay line already says it. */
+/**
+ * The day's volume: firing checks a scheduled alert's wait holds back (null when none are held), or a
+ * real-time alert's matching events and the most notifications its wait lets through.
+ */
 export function dailyVolume(
-  day: Pick<BacktestReplay, "events" | "fired" | "alerts">,
+  day: Pick<BacktestReplay, "events" | "fired" | "alerts"> & { hours?: boolean[] },
   realTime: boolean,
-): { count: number; noisy: boolean } | null {
+  silenceMinutes = 0,
+): { count: number; noisy: boolean; notifications?: number } | null {
   const count = realTime ? day.events : day.fired;
   if (count === 0 || (!realTime && count === day.alerts)) return null;
   // More than one a minute, the bar the read-back uses for a noisy real-time alert.
-  return { count: aboutCount(count), noisy: count > MAX_CHECKS };
+  const volume = { count: aboutCount(count), noisy: count > MAX_CHECKS };
+  if (!realTime) return volume;
+  // A wait starts at each notification, so an hour with events sends at most one per wait.
+  const busyHours = day.hours?.length ? day.hours.filter(Boolean).length : 24;
+  const cap = silenceMinutes > 0 ? busyHours * Math.ceil(60 / silenceMinutes) : count;
+  return { ...volume, notifications: aboutCount(Math.min(count, cap)) };
 }
 
 function replayChecks(

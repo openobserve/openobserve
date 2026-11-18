@@ -224,13 +224,34 @@ describe("dailyVolume", () => {
       name: "real-time: every event",
       day: { events: 53_932, fired: 0, alerts: 0 },
       realTime: true,
-      expected: { count: 54_000, noisy: true },
+      expected: { count: 54_000, noisy: true, notifications: 54_000 },
     },
     {
       name: "real-time: a quiet day",
       day: { events: 12, fired: 0, alerts: 0 },
       realTime: true,
-      expected: { count: 12, noisy: false },
+      expected: { count: 12, noisy: false, notifications: 12 },
+    },
+    {
+      name: "real-time with a 10-minute wait: at most six in each busy hour",
+      day: { events: 53_932, fired: 0, alerts: 0, hours: [true, false, true] },
+      realTime: true,
+      silence: 10,
+      expected: { count: 54_000, noisy: true, notifications: 12 },
+    },
+    {
+      name: "real-time with a wait: never more than the events",
+      day: { events: 3, fired: 0, alerts: 0, hours: [true, false] },
+      realTime: true,
+      silence: 10,
+      expected: { count: 3, noisy: false, notifications: 3 },
+    },
+    {
+      name: "real-time with a wait and no hours known: the whole day",
+      day: { events: 900, fired: 0, alerts: 0 },
+      realTime: true,
+      silence: 60,
+      expected: { count: 900, noisy: false, notifications: 24 },
     },
     {
       name: "real-time: nothing matched",
@@ -250,7 +271,7 @@ describe("dailyVolume", () => {
       realTime: false,
       expected: null,
     },
-  ])("$name", ({ day, realTime, expected }) => {
-    expect(dailyVolume(day, realTime)).toEqual(expected);
+  ])("$name", ({ day, realTime, silence, expected }) => {
+    expect(dailyVolume(day, realTime, silence)).toEqual(expected);
   });
 });
