@@ -234,6 +234,7 @@ export const packCatalogState = readonly(state);
 export const setPackCatalog = (raw: RawCatalog) => {
   if (!Array.isArray(raw?.packs)) throw new Error("starter packs catalog has no pack list");
   const built = raw.packs.map(buildPack).filter((pack): pack is StarterPack => pack !== null);
+  if (raw.packs.length > 0 && built.length === 0) throw new Error("no starter pack could be built");
   loaded.value = { version: raw.catalog_version, packs: built };
   state.value = "ready";
 };

@@ -126,4 +126,13 @@ describe("StarterPackCatalogGate", () => {
         .exists(),
     ).toBe(false);
   });
+
+  it("sends no request from Retry while it has no org", async () => {
+    fake.state.value = "error";
+    fake.load = vi.fn(async () => false);
+    const wrapper = await render(true, { org: undefined });
+    await wrapper.get('[data-test="starter-packs-unavailable"]').get("button").trigger("click");
+    await flushPromises();
+    expect(fake.load).not.toHaveBeenCalled();
+  });
 });

@@ -31,6 +31,10 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 
+const load = () => {
+  if (props.org) void loadPackCatalog(props.org);
+};
+
 // Content that reads a fixed pack in setup would throw if the served catalog dropped it.
 const ready = computed(
   () =>
@@ -38,13 +42,7 @@ const ready = computed(
     (!props.requires || [props.requires].flat().some((id) => !!packById(id))),
 );
 
-watch(
-  () => props.org,
-  (org) => {
-    if (org) void loadPackCatalog(org);
-  },
-  { immediate: true },
-);
+watch(() => props.org, load, { immediate: true });
 </script>
 
 <template>
@@ -58,6 +56,6 @@ watch(
     :action-label="t('alert_library.retry')"
     action-icon="refresh"
     data-test="starter-packs-unavailable"
-    @action="loadPackCatalog(org)"
+    @action="load"
   />
 </template>

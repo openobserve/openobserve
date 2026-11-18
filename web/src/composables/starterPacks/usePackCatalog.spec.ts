@@ -347,6 +347,22 @@ describe("usePackCatalog", () => {
       warn.mockRestore();
     });
 
+    it("marks a catalog with no buildable pack unavailable and retries on the next call", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      service.catalog.mockResolvedValueOnce({
+        data: { ...served, packs: [{ ...rawPack("hosts"), id: "redis" }] },
+      });
+      const fresh = await freshCatalog();
+      expect(await fresh.loadPackCatalog("default")).toBe(false);
+      expect(fresh.packCatalogState.value).toBe("error");
+      expect(fresh.packs()).toEqual([]);
+
+      service.catalog.mockResolvedValue({ data: served });
+      expect(await fresh.loadPackCatalog("default")).toBe(true);
+      expect(fresh.packs()).toHaveLength(9);
+      warn.mockRestore();
+    });
+
     it("marks a response with no pack list unavailable", async () => {
       service.catalog.mockResolvedValue({ data: { catalog_version: "v1" } });
       const fresh = await freshCatalog();
