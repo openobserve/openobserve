@@ -802,7 +802,9 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn an_on_call_sample_reads_its_level_from_its_priority_as_a_live_page_does() {
-        use crate::alerts::notifications::oncall::{OnCallNotification, on_call_context};
+        use o2_enterprise::enterprise::oncall::sender::OnCallNotification;
+
+        use crate::alerts::notifications::oncall::on_call_context;
         for priority in ["P1", "P2", "P3"] {
             let live = on_call_context(&OnCallNotification {
                 priority: priority.into(),
