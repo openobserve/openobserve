@@ -10147,6 +10147,25 @@ mod tests {
         }
 
         #[test]
+        fn a_quoted_or_qualified_timestamp_still_gets_the_group_by_check() {
+            for column in ["\"_timestamp\"", "logs._timestamp"] {
+                let select = format!(
+                    "SELECT histogram({column}, '5m') AS time_bucket, count(*) AS value FROM logs"
+                );
+                let offender = format!("{select} GROUP BY time_bucket, service");
+                let err = validate_custom_sql_grid(&offender, "5m", Some(&fields(&["service"])))
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("Remove 'service'"), "{column}: {err}");
+                let alone = format!("{select} GROUP BY time_bucket");
+                assert!(
+                    validate_custom_sql_grid(&alone, "5m", Some(&fields(&["service"]))).is_ok(),
+                    "{column}"
+                );
+            }
+        }
+
+        #[test]
         fn an_alias_that_a_stream_field_shadows_is_not_the_bucket() {
             let err = guard("GROUP BY time_bucket", &["time_bucket"])
                 .unwrap_err()

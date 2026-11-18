@@ -546,7 +546,7 @@ pub(super) fn custom_group_by_offender(
 ) -> Option<String> {
     let statement = single_statement(sql).ok()?;
     let select = statement_select(&statement)?;
-    let bucket = custom_bucket(select).ok()?;
+    let bucket = save_time_bucket(select)?;
     let (exprs, modifiers) = match &select.group_by {
         GroupByExpr::All(_) => return Some("ALL".to_string()),
         GroupByExpr::Expressions(exprs, modifiers) => (exprs, modifiers),
@@ -558,6 +558,32 @@ pub(super) fn custom_group_by_offender(
         .iter()
         .find(|expr| !matches!(is_bucket_key(expr, &bucket, Some(stream_fields)), Ok(true)))
         .map(ToString::to_string)
+}
+
+/// The first histogram column whatever its arguments' spelling, such as `"_timestamp"`;
+/// run time still holds the exact form.
+fn save_time_bucket(select: &Select) -> Option<CustomBucket<'_>> {
+    select
+        .projection
+        .iter()
+        .enumerate()
+        .find_map(|(position, item)| {
+            let (expr, alias) = match item {
+                SelectItem::ExprWithAlias { expr, alias } => (expr, alias.value.clone()),
+                SelectItem::UnnamedExpr(expr) => (expr, String::new()),
+                _ => return None,
+            };
+            let Expr::Function(function) = expr else {
+                return None;
+            };
+            function_name(&function.name).filter(|name| name == "histogram")?;
+            Some(CustomBucket {
+                position,
+                alias,
+                expr,
+                literal: "",
+            })
+        })
 }
 
 fn fallback_log_due(
