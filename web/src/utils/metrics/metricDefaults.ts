@@ -33,6 +33,7 @@ import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import { PromqlStepId } from "@/components/promql/types";
 import type { PromqlBuilderQuery, PromqlLabelMatcher, PromqlStep } from "@/components/promql/types";
 import { compileLabelFilters } from "@/components/promql/labelBoolean";
+import { INTERNAL_FIELDS } from "@/utils/metrics/metricFamily";
 
 /** A filter as callers pass it in: label/value plus an optional operator and OR group. */
 interface FilterInput {
@@ -1135,7 +1136,8 @@ function resolveTopkLabel(labels: string[] | undefined): string | null {
   const excluded = new Set(["le", "quantile"]);
   const eligible = labels
     .filter(
-      (l) => typeof l === "string" && !l.startsWith("__") && !l.startsWith("_") && !excluded.has(l),
+      (l) =>
+        typeof l === "string" && !l.startsWith("_") && !excluded.has(l) && !INTERNAL_FIELDS.has(l),
     )
     .sort();
   if (eligible.includes("instance")) return "instance";

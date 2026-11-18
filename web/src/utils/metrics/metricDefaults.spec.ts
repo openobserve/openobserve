@@ -664,7 +664,7 @@ describe("variants (PRD 6.3)", () => {
   it("picks the first non-internal label alphabetically when instance is absent", () => {
     const d = getMetricDefaults("foo_total", "counter", undefined, {
       rateWindow: W,
-      labels: ["zone", "cluster", "quantile"],
+      labels: ["zone", "cluster", "quantile", "aggregation_temporality", "is_monotonic"],
     });
     expect(d.variants.find((v: any) => v.id === "topk").queries[0].expr).toContain(
       "sum by (cluster)",
