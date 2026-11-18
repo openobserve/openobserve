@@ -1158,7 +1158,7 @@ describe("AnomalyDetectionConfig", () => {
       expect(label("anomaly-histogram-interval-value")).toBe("Bucket size");
       expect(label("anomaly-schedule-interval-value")).toBe("Check every");
       expect(label("anomaly-detection-window-value")).toBe("Look back over");
-      expect(label("anomaly-training-window")).toBe("Training window");
+      expect(label("anomaly-training-window")).toBe("Learn from");
     });
 
     it("names the custom-SQL detection resolution unit after its row", async () => {
@@ -1631,7 +1631,7 @@ describe("AnomalyDetectionConfig — section 2 in the sectioned editor (E1)", ()
     });
     await flushPromises();
     const line = w.find('[data-test="anomaly-schedule-line"]');
-    expect(line.text()).toContain("1 hour");
+    expect(line.text()).toContain("Every hour");
     expect(line.text()).toContain("3 hours");
     await w.find('[data-test="anomaly-schedule-line-change"]').trigger("click");
     expect(goToSection).toHaveBeenCalledWith("schedule");
