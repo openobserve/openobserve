@@ -22,6 +22,8 @@ import config from "@/aws-exports";
 import StarterPackDrawer from "@/components/starterPacks/StarterPackDrawer.vue";
 import StarterPackFindMore from "@/components/starterPacks/StarterPackFindMore.vue";
 import StarterPackHealthLine from "@/components/starterPacks/StarterPackHealthLine.vue";
+import StarterPackRepairChip from "@/components/starterPacks/StarterPackRepairChip.vue";
+import StarterPackUpdateDrawer from "@/components/starterPacks/StarterPackUpdateDrawer.vue";
 import StarterPackUndoDialog from "@/components/starterPacks/StarterPackUndoDialog.vue";
 import TurnOnAlertsDrawer from "@/components/starterPacks/TurnOnAlertsDrawer.vue";
 import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
@@ -43,6 +45,8 @@ import { packScopeValue } from "@/composables/starterPacks/packCopy";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
 import { usePackHealth } from "@/composables/starterPacks/usePackHealth";
+import { usePackUpdates } from "@/composables/starterPacks/usePackUpdates";
+import { alertStreams } from "@/composables/starterPacks/useRepairLater";
 import { useTurnOnAlerts, type TurnOnRow } from "@/composables/starterPacks/useTurnOnAlerts";
 import { queriesPerDay } from "@/composables/starterPacks/wouldFire";
 import { alertHistoryQuery } from "@/services/alerts.queries";
@@ -64,10 +68,12 @@ const flow = useStarterPackFlow(org, pack);
 const matcher = useStarterPackMatcher(org);
 const turn = useTurnOnAlerts(org, flow);
 const health = usePackHealth(org);
+const updates = usePackUpdates(org, flow);
 
 const turnOnOpen = ref(false);
 const setupOpen = ref(false);
 const removeOpen = ref(false);
+const updateOpen = ref(false);
 const muteRow = ref<TurnOnRow | null>(null);
 const editRow = ref<TurnOnRow | null>(null);
 const thresholdDraft = ref<string | number>("");
@@ -90,7 +96,18 @@ const installedOn = computed(() => {
   return at ? new Date(at / 1000).toLocaleString() : "";
 });
 const perDay = computed(() => queriesPerDay(onRows.value.map(({ alert }) => alert)));
-const streams = computed(() => [...new Set(rows.value.map((row) => row.alert.stream_name))]);
+// A repaired alert's query reads the new stream while its stream setting keeps the name it was created with.
+const readsOf = ({ alert }: TurnOnRow): string[] => {
+  const reads = packsEnabled ? [...alertStreams(alert)] : [];
+  return reads.length ? reads : [alert.stream_name];
+};
+const movedFrom = (row: TurnOnRow) => {
+  const reads = readsOf(row);
+  return reads.includes(row.alert.stream_name) ? null : reads.join(", ");
+};
+const isStale = (row: TurnOnRow) =>
+  readsOf(row).some((name) => health.staleStreams.value.has(name));
+const streams = computed(() => [...new Set(rows.value.flatMap(readsOf))]);
 const ITEM_KINDS = ["dashboard", "alert", "savedView"] as const;
 const itemGroups = computed(() =>
   ITEM_KINDS.map((kind) => ({
@@ -154,6 +171,7 @@ const refresh = async () => {
     return;
   }
   await turn.load({ count: false });
+  if (packsEnabled) void updates.check();
   await Promise.all([
     flow.loadPreview(),
     readFired(),
@@ -222,6 +240,12 @@ const muteContext = computed(() =>
   >
     <template #actions>
       <StarterPackFindMore v-if="packsEnabled" :org="org" @changed="flow.load()" />
+      <StarterPackRepairChip
+        v-if="packsEnabled && pageState === 'installed' && flow.canManage.value"
+        :org="org"
+        :scope="{ packId: pack.id }"
+        @repaired="refresh"
+      />
       <template v-if="pageState === 'installed' && flow.canManage.value">
         <OButton
           variant="ghost-destructive"
@@ -413,6 +437,47 @@ const muteContext = computed(() =>
             {{ t("starterPacks.page.repair", { from: raw(repair.from), to: raw(repair.to) }) }}
           </OText>
         </div>
+        <template v-if="packsEnabled && flow.canManage.value">
+          <OBanner
+            v-if="updates.available.value"
+            variant="info"
+            dense
+            inline-actions
+            data-test="starter-pack-page-update"
+          >
+            {{ t("starterPacks.update.available") }}
+            <template #actions>
+              <OButton
+                variant="outline"
+                size="sm-action"
+                data-test="starter-pack-page-update-btn"
+                @click="updateOpen = true"
+              >
+                {{ t("starterPacks.update.review") }}
+              </OButton>
+            </template>
+          </OBanner>
+          <OBanner
+            v-if="updates.needsDashboard.value"
+            variant="info"
+            dense
+            inline-actions
+            data-test="starter-pack-page-add-dashboard"
+          >
+            {{ t("starterPacks.page.addDashboard") }}
+            <template #actions>
+              <OButton
+                variant="primary"
+                size="sm-action"
+                :loading="updates.state.value === 'applying'"
+                data-test="starter-pack-page-add-dashboard-btn"
+                @click="updates.addDashboard()"
+              >
+                {{ t("starterPacks.page.addDashboardBtn") }}
+              </OButton>
+            </template>
+          </OBanner>
+        </template>
         <OBanner
           v-if="!onRows.length && offCount"
           variant="info"
@@ -430,18 +495,38 @@ const muteContext = computed(() =>
               :loading="turn.loadState.value === 'loading'"
             >
               <template #cell-name="{ row }">
-                <span class="flex items-center gap-2">
-                  {{ row.name }}
-                  <OBadge
-                    :variant="row.severity === 'critical' ? 'error-outline' : 'warning-outline'"
+                <span class="flex min-w-0 flex-col items-start gap-0.5">
+                  <span class="flex items-center gap-2">
+                    {{ row.name }}
+                    <OBadge
+                      :variant="row.severity === 'critical' ? 'error-outline' : 'warning-outline'"
+                    >
+                      {{ t(`starterPacks.severity.${row.severity as "critical" | "warning"}`) }}
+                    </OBadge>
+                  </span>
+                  <OText
+                    v-if="packsEnabled && movedFrom(row)"
+                    variant="meta"
+                    :title="
+                      t('starterPacks.page.readsInsteadTip', {
+                        stream: raw(movedFrom(row) ?? ''),
+                        name: raw(row.alert.stream_name),
+                      })
+                    "
+                    data-test="starter-pack-page-reads-instead"
                   >
-                    {{ t(`starterPacks.severity.${row.severity as "critical" | "warning"}`) }}
-                  </OBadge>
+                    {{
+                      t("starterPacks.page.readsInstead", {
+                        stream: raw(movedFrom(row) ?? ""),
+                        name: raw(row.alert.stream_name),
+                      })
+                    }}
+                  </OText>
                 </span>
               </template>
               <template #cell-state="{ row }">
                 <OBadge
-                  v-if="health.staleStreams.value.has(row.alert.stream_name)"
+                  v-if="isStale(row)"
                   variant="default"
                   data-test="starter-pack-page-no-data-tag"
                 >
@@ -508,6 +593,17 @@ const muteContext = computed(() =>
               <span>{{ t("starterPacks.page.date", { date: raw(installedOn) }) }}</span>
               <span>{{ t("starterPacks.page.queries", { count: perDay.toLocaleString() }) }}</span>
               <OText variant="meta">{{ t("starterPacks.page.scanNote") }}</OText>
+              <OButton
+                v-if="packsEnabled && flow.canManage.value && updates.canRevert.value"
+                class="self-start"
+                variant="ghost-primary"
+                size="sm-action"
+                :loading="updates.state.value === 'applying'"
+                data-test="starter-pack-page-revert-btn"
+                @click="updates.revert()"
+              >
+                {{ t("starterPacks.update.revert") }}
+              </OButton>
             </div>
             <div
               class="border-border-default rounded-default flex flex-col gap-1 border p-3"
@@ -544,6 +640,7 @@ const muteContext = computed(() =>
       @done="refresh"
     />
     <StarterPackDrawer v-model:open="setupOpen" :flow="flow" :clusters="matcher.clusters.value" />
+    <StarterPackUpdateDrawer v-if="packsEnabled" v-model:open="updateOpen" :updates="updates" />
     <StarterPackUndoDialog v-model:open="removeOpen" :flow="flow" mode="remove" @done="refresh" />
     <ODialog
       :open="!!editRow"

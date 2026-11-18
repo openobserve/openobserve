@@ -103,7 +103,7 @@ const promqlNeeds = (query: string): PanelNeeds => {
 export const queryNeeds = (query: string, type: "promql" | "sql"): PanelNeeds =>
   type === "promql" ? promqlNeeds(query) : sqlNeeds(query);
 
-const panelNeeds = (panel: Record<string, any>): PanelNeeds => {
+export const panelNeeds = (panel: Record<string, any>): PanelNeeds => {
   const needs: PanelNeeds = { streams: new Set(), fields: new Set(), variables: new Set() };
   for (const query of panel.queries ?? []) {
     const text = String(query.query ?? "");
