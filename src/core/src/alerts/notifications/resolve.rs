@@ -225,11 +225,11 @@ pub fn resolve_content(
     }
 }
 
-/// Appends Primary, then Detail unless it is blank or repeats `alert_url`. An authored link to
-/// `alert_url` drops and one to the Detail URL stands in for it, so each URL shows once.
+/// Appends Primary, then Detail unless it is blank or repeats `alert_url`. On an anomaly an
+/// authored link to `alert_url` drops; one to the Detail URL stands in for it.
 pub(crate) fn append_system_links(links: &mut Vec<Link>, ctx: &NotificationContext) {
     let primary_url = ctx.alert_url.trim();
-    if !primary_url.is_empty() {
+    if ctx.kind == NotificationKind::Anomaly && !primary_url.is_empty() {
         links.retain(|l| l.role != LinkRole::Authored || l.url.trim() != primary_url);
     }
     links.push(Link {
@@ -1431,7 +1431,8 @@ mod tests {
 
     #[test]
     fn an_authored_link_to_the_data_url_drops_and_the_others_stay() {
-        let ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        let mut ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        ctx.kind = NotificationKind::Anomaly;
         let data_url = format!(" {} ", ctx.alert_url);
         let r = resolve_content(
             &authored(&[
@@ -1450,6 +1451,28 @@ mod tests {
                 ("View logs", LinkRole::Primary),
                 ("Open alert", LinkRole::Detail),
             ]
+        );
+    }
+
+    #[test]
+    fn a_scheduled_alert_keeps_its_authored_link_to_the_data_url() {
+        let ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        assert_eq!(ctx.kind, NotificationKind::Alert);
+        let r = resolve_content(
+            &authored(&[("See the data", ctx.alert_url.as_str())]),
+            &ctx,
+            "slack",
+        );
+        let links: Vec<(&str, LinkRole)> =
+            r.links.iter().map(|l| (l.label.as_str(), l.role)).collect();
+        assert_eq!(
+            links,
+            [
+                ("See the data", LinkRole::Authored),
+                ("View logs", LinkRole::Primary),
+                ("Open alert", LinkRole::Detail),
+            ],
+            "as on main"
         );
     }
 
