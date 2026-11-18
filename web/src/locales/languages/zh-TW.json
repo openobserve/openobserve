@@ -20608,7 +20608,6 @@
       "pageOutOfRange": "頁碼超出範圍。請提供有效的頁碼。",
       "noMatchingService": "未找到匹配的關聯服務",
       "unableToRetrieveCorrelation": "無法檢索關聯數據",
-      "noMetricStreams": "未找到服務 \"{service}\" 的指標流",
       "correlationError": "關聯錯誤：{error}",
       "contentCopied": "內容已成功複製！",
       "noTraceIdForInspection": "沒有可檢查的追蹤 ID"

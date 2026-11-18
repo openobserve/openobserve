@@ -70,6 +70,13 @@ export interface CorrelationRequest {
   source_stream: string;
   source_type: string;
   available_dimensions: Record<string, string>;
+  /** Pick the record's own service from all its dimensions instead of the first match. */
+  resolve_from_source?: boolean;
+  /** Every semantic dimension of the record, untracked ones included; resolves its own service. */
+  source_dimensions?: Record<string, string>;
+  /** The drawer's window in microseconds; the record's spans are read over the last hour without it. */
+  start_time?: number;
+  end_time?: number;
 }
 
 export interface CorrelationResponse extends ServiceDisplayFields {

@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "رقم الصفحة خارج نطاق المعلومات. يرجى تقديم رقم صفحة صالح.",
       "noMatchingService": "لم يتم العثور على خدمة مطابقة للارتباط",
       "unableToRetrieveCorrelation": "غير قادر على استرجاع بيانات الارتباط",
-      "noMetricStreams": "لم يتم العثور على تدفقات مترية للخدمة \"{service}\"",
       "correlationError": "خطأ الارتباط: {error}",
       "contentCopied": "تم نسخ المحتوى بنجاح!",
       "noTraceIdForInspection": "لا يوجد معرف تتبع متاح للفحص"

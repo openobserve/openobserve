@@ -36,7 +36,7 @@
         @row-click="editRotation"
       >
         <template #toolbar>
-          <div class="flex w-full items-center justify-between gap-2">
+          <div class="flex flex-1 items-center justify-between gap-2">
             <span class="text-text-secondary text-sm">{{ t("oncall.scheduleHint") }}</span>
             <OButton
               variant="outline"

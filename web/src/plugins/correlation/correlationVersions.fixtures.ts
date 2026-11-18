@@ -97,10 +97,37 @@ function traceSchema(fields: string[]) {
   };
 }
 
+// The org's semantic groups and identity config, trimmed to the dimensions these specs carry.
+const groups = [
+  { id: "service", display: "Service", fields: ["service_name"] },
+  {
+    id: "k8s-cluster",
+    display: "K8s Cluster",
+    fields: ["service_k8s_cluster_name", "k8s_cluster_name", "k8s_cluster"],
+    is_workload_type: true,
+  },
+  {
+    id: "k8s-namespace",
+    display: "K8s Namespace",
+    fields: ["service_k8s_namespace_name", "k8s_namespace_name", "k8s_namespace"],
+    is_workload_type: true,
+  },
+  { id: "k8s-pod-name", display: "K8s Pod", fields: ["service_k8s_pod_name", "k8s_pod_name"] },
+  { id: "environment", display: "Environment", fields: ["deployment_environment"] },
+];
+const location = ["k8s-cluster", "k8s-namespace", "environment"];
+const identityConfig = {
+  sets: [{ id: "k8s", label: "Kubernetes", distinguish_by: location }],
+  tracked_alias_ids: [],
+};
+
 export const correlationFixtures = {
   golden,
   traceFields,
   traceSchema,
+  groups,
+  location,
+  identityConfig,
   scopes: [
     at("ingester", { kind: "k8s", k8s_cluster: "c1", k8s_namespace: "c1" }, "k8s:c1/c1", "prod"),
     at("ingester", { kind: "env", k8s_cluster: "", k8s_namespace: "" }, "env:dev", "dev"),
