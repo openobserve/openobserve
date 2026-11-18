@@ -2283,9 +2283,13 @@ export default defineComponent({
       // Metric/gauge series are always created by the converter
       // (they use renderItem, not data arrays), so check the raw Y value.
       if (type === "metric" || type === "gauge") {
-        const firstRow = data.value[0]?.[0];
-        const yAlias = panelSchema.value.queries[0].fields.y.map((it: any) => it.alias || []);
-        return yAlias.every((y: any) => getDataValue(firstRow, y) != null) ? "" : "No Data";
+        const queries = filteredPanelSchema.value.queries ?? [];
+        const hasValue = (filteredData.value ?? []).some((rows: any, i: number) => {
+          if (!queries[i]) return false;
+          const yAlias = (queries[i].fields?.y ?? []).map((it: any) => it.alias || []);
+          return yAlias.every((y: any) => getDataValue(rows?.[0], y) != null);
+        });
+        return hasValue ? "" : "No Data";
       }
 
       // For all other chart types (line, area, bar, scatter, heatmap, etc.),

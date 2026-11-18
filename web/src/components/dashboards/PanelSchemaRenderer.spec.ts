@@ -640,7 +640,7 @@ describe("PanelSchemaRenderer", () => {
     });
 
     describe("multi-query SQL panel (#16901)", () => {
-      const mountBar = async (data: any, hideSecond = false) => {
+      const mountBar = async (data: any, hiddenIndex = -1, type = "bar") => {
         vi.mocked(usePanelDataLoader).mockReturnValueOnce({
           data: ref(data),
           loading: ref(false),
@@ -658,12 +658,15 @@ describe("PanelSchemaRenderer", () => {
         wrapper = createWrapper({
           panelSchema: {
             ...defaultProps.panelSchema,
-            type: "bar",
-            queries: [query, { ...query, config: { ...query.config, hide: hideSecond } }],
+            type,
+            queries: [0, 1].map((i) => ({
+              ...query,
+              config: { ...query.config, hide: i === hiddenIndex },
+            })),
           },
         });
         await flushPromises();
-        wrapper.vm.panelData = { chartType: "bar", options: { series: [{ data: [1] }] } };
+        wrapper.vm.panelData = { chartType: type, options: { series: [{ data: [1] }] } };
         await flushPromises();
         return wrapper.vm.noData;
       };
@@ -682,7 +685,23 @@ describe("PanelSchemaRenderer", () => {
       });
 
       it("shows No Data when the only non-empty query is hidden", async () => {
-        expect(await mountBar([[], rows], true)).toBe("No Data");
+        expect(await mountBar([rows, []], 0)).toBe("No Data");
+      });
+
+      it("keeps the chart when a hidden query is the empty one", async () => {
+        expect(await mountBar([[], rows], 0)).toBe("");
+      });
+
+      it.each(["gauge", "metric"])(
+        "keeps a %s panel when only a later query has a value",
+        async (type) => {
+          const alias = defaultProps.panelSchema.queries[0].fields.y[0].alias;
+          expect(await mountBar([[], [{ [alias]: 645 }]], -1, type)).toBe("");
+        },
+      );
+
+      it("shows No Data for a gauge when no query has a value", async () => {
+        expect(await mountBar([[], []], -1, "gauge")).toBe("No Data");
       });
     });
 
