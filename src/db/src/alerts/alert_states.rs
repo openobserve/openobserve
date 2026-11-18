@@ -40,6 +40,7 @@ use o2_enterprise::enterprise::{
     common::config::get_config as get_o2_config,
     super_cluster::{self, queue::AlertStateMessage},
 };
+use sea_orm::DatabaseTransaction;
 
 /// One evaluation's durable record: the state row, its optional transition, and
 /// its optional availability-ledger interval (S-16).
@@ -66,6 +67,23 @@ pub async fn persist(update: &StateUpdate, ledger: Option<&EvalLedgerWrite>) -> 
         ledger: ledger.cloned(),
     })
     .await;
+
+    Ok(())
+}
+
+/// Writes `update` in `txn` and commits it; the write is published only once the commit succeeded.
+pub async fn persist_and_commit(txn: DatabaseTransaction, update: &StateUpdate) -> Result<()> {
+    infra::table::alert_states::persist_update_in_transaction(&txn, update).await?;
+    txn.commit().await?;
+
+    #[cfg(feature = "enterprise")]
+    if update.state.is_some() {
+        publish(AlertStateMessage::Persist {
+            update: update.clone(),
+            ledger: None,
+        })
+        .await;
+    }
 
     Ok(())
 }
