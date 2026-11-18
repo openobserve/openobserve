@@ -35,6 +35,8 @@ export interface FilterTokenProps {
   valueHint?: I18nText;
   /** Segments emit `select`; off for a token that only displays. */
   editable?: boolean;
+  /** Parts are reached with the arrow keys (`data-walk`) instead of being Tab stops. */
+  roving?: boolean;
   removable?: boolean;
   removeLabel?: I18nText;
   /** Prefix for `data-test`; segments are `-field`, `-operator`, `-value`, the dismiss `-remove`. */
@@ -42,7 +44,7 @@ export interface FilterTokenProps {
 }
 
 export interface FilterTokenEmits {
-  /** A segment was clicked; `element` is where its picker should open. */
-  (_e: "select", _part: FilterTokenPart, _element: HTMLElement): void;
+  /** A segment was clicked; `element` is where its picker should open, `event` carries modifiers such as Shift. */
+  (_e: "select", _part: FilterTokenPart, _element: HTMLElement, _event: MouseEvent): void;
   (_e: "remove"): void;
 }

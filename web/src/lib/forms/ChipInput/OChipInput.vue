@@ -32,6 +32,7 @@ import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from "reka-
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 import type {
   ChipInputEmits,
   ChipInputExpose,
@@ -55,6 +56,8 @@ const props = withDefaults(defineProps<ChipInputProps>(), {
   inlineCaret: false,
   resting: false,
   maxRows: undefined,
+  walkChips: false,
+  tabSwitch: false,
   dataTest: undefined,
 });
 const emit = defineEmits<ChipInputEmits>();
@@ -104,7 +107,10 @@ watch(
   [() => props.suggestions.map((s) => s.key).join("\u0000"), () => props.open],
   () => {
     navigated = false;
-    highlighted.value = props.autoHighlight && props.suggestions.length ? 0 : -1;
+    // A list opened to change something starts on what is chosen now.
+    const current = props.suggestions.findIndex((row) => row.selected);
+    if (current >= 0 && !props.multiple) highlighted.value = current;
+    else highlighted.value = props.autoHighlight && props.suggestions.length ? 0 : -1;
   },
   { immediate: true },
 );
@@ -420,12 +426,19 @@ function onCaretKey(event: KeyboardEvent): boolean {
   if (props.modelValue !== "" || event.altKey || event.metaKey || event.ctrlKey) return false;
   if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
     event.preventDefault();
-    emit("caret-move", event.key === "ArrowLeft" ? -1 : 1);
+    const step = event.key === "ArrowLeft" ? -1 : 1;
+    if (props.walkChips) emit("walk", step, caretRef.value!);
+    else emit("caret-move", step);
     return true;
   }
   if (event.key === "Delete") {
     event.preventDefault();
     emit("delete-empty");
+    return true;
+  }
+  if (props.walkChips && (event.key === "Home" || event.key === "End")) {
+    event.preventDefault();
+    emit("walk", event.key === "Home" ? "home" : "end", caretRef.value!);
     return true;
   }
   return false;
@@ -455,7 +468,7 @@ function onKeydown(event: KeyboardEvent) {
       focus();
       return;
     case "Backspace":
-      if (props.modelValue === "") {
+      if (props.modelValue === "" && !event.ctrlKey && !event.metaKey) {
         event.preventDefault();
         emit("backspace-empty");
       }
@@ -488,10 +501,118 @@ function onCaretKeydown(event: KeyboardEvent) {
     // Ctrl/Cmd+Enter is the page's run shortcut, so the field only commits what is typed and never runs twice.
     if (event.metaKey || event.ctrlKey) emit("apply");
     else emit("enter");
-  } else if (event.key === "Backspace" && !caretRef.value?.value) {
+  } else if (
+    event.key === "Backspace" &&
+    !caretRef.value?.value &&
+    !event.ctrlKey &&
+    !event.metaKey
+  ) {
     event.preventDefault();
     emit("backspace-empty");
   }
+}
+
+const HISTORY_KEYS: Record<string, "undo" | "redo" | "clear"> = {
+  z: "undo",
+  "shift+z": "redo",
+  y: "redo",
+  backspace: "clear",
+};
+
+// Typed text keeps the browser's own undo and word delete; otherwise these act on the chips.
+function historyAction(event: KeyboardEvent) {
+  const mod = isMacOS() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  if (!mod || event.altKey || (event.key.toLowerCase() === "y" && (isMacOS() || event.shiftKey)))
+    return null;
+  const typing = event.target instanceof HTMLInputElement && event.target.value !== "";
+  if (typing) return null;
+  const key = `${event.shiftKey ? "shift+" : ""}${event.key.toLowerCase()}`;
+  return HISTORY_KEYS[key] ?? null;
+}
+
+// The chips' own buttons sit in one row of stops with the caret, walked with the arrow keys.
+function chipStops(): HTMLElement[] {
+  return Array.from(
+    linesRef.value?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]):not([tabindex="-1"]), [role="button"][tabindex="0"], input',
+    ) ?? [],
+  );
+}
+
+const WALK_KEYS: Record<string, -1 | 1 | "home" | "end"> = {
+  ArrowLeft: -1,
+  ArrowRight: 1,
+  Home: "home",
+  End: "end",
+};
+
+// Walk mode: the parent knows the filter's shape, so it decides where each move and each typed key lands.
+function onWalkKey(event: KeyboardEvent, target: HTMLElement): boolean {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    focus();
+    return true;
+  }
+  if (event.key.length === 1 && event.key !== " ") {
+    event.preventDefault();
+    emit("type-at", target, event.key);
+    return true;
+  }
+  const move = WALK_KEYS[event.key];
+  if (move === undefined) return false;
+  event.preventDefault();
+  emit("walk", move, target);
+  return true;
+}
+
+function onChipKey(event: KeyboardEvent, target: HTMLElement): boolean {
+  if (event.key === "ArrowDown" && target.getAttribute("aria-haspopup")) {
+    event.preventDefault();
+    target.click();
+    return true;
+  }
+  if (props.walkChips) return onWalkKey(event, target);
+  const stops = chipStops();
+  const at = stops.indexOf(target);
+  if (at < 0) return false;
+  const next = {
+    ArrowLeft: stops[at - 1],
+    ArrowRight: stops[at + 1],
+    Home: stops[0],
+    End: caretRef.value ?? stops.at(-1),
+  }[event.key];
+  if (!next) return event.key === "ArrowLeft" || event.key === "ArrowRight";
+  event.preventDefault();
+  next.focus();
+  return true;
+}
+
+function onFieldKeydown(event: KeyboardEvent) {
+  if (event.isComposing || props.disabled || event.defaultPrevented) return;
+  const action = historyAction(event);
+  if (action) {
+    event.preventDefault();
+    // The page's own shortcut for the same keys must not run a second time.
+    event.stopPropagation();
+    emit("history", action);
+    return;
+  }
+  const target = event.target as HTMLElement;
+  if (target === caretRef.value || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.shiftKey && event.key.length !== 1) return;
+  if (linesRef.value?.contains(target)) onChipKey(event, target);
+}
+
+// Tab in the list's search box moves to the neighbouring part of what is being edited.
+function onSearchKeydown(event: KeyboardEvent) {
+  if (event.key === "Tab" && props.tabSwitch) {
+    event.preventDefault();
+    // The popover's focus trap would also take the Tab and move focus to its first button.
+    event.stopPropagation();
+    emit("tab", event.shiftKey ? -1 : 1);
+    return;
+  }
+  onKeydown(event);
 }
 
 function onInput(event: Event) {
@@ -560,6 +681,8 @@ function onFieldFocusOut() {
         ]"
         @pointerdown="onFieldPointerDown"
         @focusout="onFieldFocusOut"
+        @focusin="emit('engage')"
+        @keydown="onFieldKeydown"
       >
         <!-- The padding, cancelled by the margin, keeps chip focus rings clear of the scroll clip. -->
         <div
@@ -599,6 +722,7 @@ function onFieldFocusOut() {
         @interact-outside="onInteractOutside"
         @escape-key-down.prevent
       >
+        <slot name="header" />
         <div
           v-if="searchInList"
           class="border-select-content-border flex items-center gap-2 border-b px-2.5"
@@ -619,7 +743,7 @@ function onFieldFocusOut() {
             :data-test="testId('search')"
             class="text-text-body placeholder:text-text-secondary min-w-0 flex-1 border-0 bg-transparent py-1.5 text-xs outline-none"
             @input="onInput"
-            @keydown="onKeydown"
+            @keydown="onSearchKeydown"
           />
           <OSpinner v-if="loading" size="xs" />
         </div>

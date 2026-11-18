@@ -326,6 +326,7 @@ import Emergency from "~icons/material-symbols/emergency-outline";
 import Compress from "~icons/material-symbols/compress";
 import Pattern from "~icons/material-symbols/pattern";
 import CallMerge from "~icons/material-symbols/call-merge";
+import CallSplit from "~icons/material-symbols/call-split";
 import AutoGraph from "~icons/material-symbols/auto-graph";
 import PlayCircleFilled from "~icons/material-symbols/play-circle-outline";
 import Pets from "~icons/material-symbols/pets";
@@ -545,6 +546,7 @@ export const iconRegistry = {
   compress: Compress,
   pattern: Pattern,
   "call-merge": CallMerge,
+  "call-split": CallSplit,
   "auto-graph": AutoGraph,
   "play-circle-filled": PlayCircleFilled,
   pets: Pets,
