@@ -231,6 +231,30 @@ describe("SqlFilterBuilder", () => {
       expect(find("connector-1").text()).toBe("OR");
     });
 
+    it.each([
+      ["right after the bracket", async () => {}],
+      [
+        "with a half-built chip in it",
+        async () => {
+          await typeInBar("level");
+          await pressInBar("Enter");
+        },
+      ],
+    ])("drops a new empty group and its connector on Escape %s", async (_name, fill) => {
+      mountLive("level = 'error' OR level = 'warn'");
+      await find("input").trigger("click");
+      await flushPromises();
+      await typeInBar("(");
+      expect(find("group-2").exists()).toBe(true);
+      await fill();
+      await pressInBar("Escape");
+      expect(wrapper!.find('[data-test^="b-bar-group-"]').exists()).toBe(false);
+      expect(wrapper!.findAll('[data-test^="b-bar-connector-"]').map((c) => c.text())).toEqual([
+        "OR",
+      ]);
+      expect(emitted()).toEqual([]);
+    });
+
     it("boxes the OR run once a condition lands in a group started after it", async () => {
       mountLive("level = 'error' OR level = 'warn'");
       await find("input").trigger("click");

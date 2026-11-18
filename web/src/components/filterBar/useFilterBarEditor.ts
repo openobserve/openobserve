@@ -871,6 +871,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   function onEscape() {
     if (draft.value) reset();
+    // An empty group goes with its connector, as when the caret leaves it, so the row reads as before.
+    if (openGroupId.value && !targetGroup.value.items.length) closeGroup();
   }
 
   function editCondition(id: string, part: FilterBarStep) {
