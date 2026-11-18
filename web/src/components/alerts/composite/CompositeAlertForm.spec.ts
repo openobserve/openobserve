@@ -89,7 +89,7 @@ describe("CompositeAlertForm", () => {
     expect(alertsService.validateComposite).not.toHaveBeenCalled();
   });
 
-  it.each(["composite_cycle", "composite_too_deep", "child_not_accessible", "child_not_eligible"])(
+  it.each(["child_is_composite", "child_not_accessible", "child_not_eligible"])(
     "keeps save blocked for server error %s",
     async (code) => {
       vi.mocked(alertsService.validateComposite).mockResolvedValue({
