@@ -519,6 +519,7 @@ import {
   watch,
   type PropType,
   onMounted,
+  onBeforeUnmount,
   inject,
   type Ref,
   defineAsyncComponent,
@@ -530,7 +531,8 @@ import useTheme from "@/composables/useTheme";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { debounce } from "lodash-es";
-import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
+import { b64EncodeUnicode, generateTraceContext, getImageURL } from "@/utils/zincutils";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
@@ -551,7 +553,6 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   modelValue: {
@@ -919,74 +920,133 @@ const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
 };
 
 // Query execution
-const triggerQuery = async (fn = false) => {
-  try {
-    const queryReq = buildQueryPayload(
+interface StreamedRun {
+  hitsByQuery: any[][];
+  total: number | null;
+  functionError: string;
+}
+
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+let runTraceId = "";
+const stopRun = () => {
+  if (!runTraceId) return;
+  cancelStreamQueryBasedOnRequestId({
+    trace_id: runTraceId,
+    org_id: store.state.selectedOrganization.identifier,
+  });
+  runTraceId = "";
+};
+
+/** One run over `_search_stream` (`_search_multi_stream` for past windows); rejects with the server's error body. */
+const streamRun = (queryReq: any): Promise<StreamedRun> =>
+  new Promise((resolve, reject) => {
+    stopRun();
+    const traceId = generateTraceContext().traceId;
+    runTraceId = traceId;
+    const run: StreamedRun = { hitsByQuery: [], total: null, functionError: "" };
+    let queryIndex = 0;
+    fetchQueryDataWithHttpStream(
       {
-        sqlMode: true,
-        streamName: props.streamName,
+        queryReq,
+        type: "search",
+        traceId,
+        org_id: store.state.selectedOrganization.identifier,
+        pageType: props.streamType,
+        searchType: "ui",
       },
-      t,
-    );
-    queryReq.query.sql = localSqlQuery.value;
-    queryReq.query.size = 10;
-
-    const periodInMicroseconds = props.period * 60 * 1000000;
-    const endTime = new Date().getTime() * 1000; // ← Use 1000 to get microseconds
-    const startTime = endTime - periodInMicroseconds;
-
-    queryReq.query.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
-    queryReq.query.sql_mode = true;
-
-    const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, periodInMicroseconds);
-
-    if (multiWindowQueries.length > 0) {
-      // Multi-window: combine primary window + extra windows → _search_multi
-      queryReq.query.per_query_response = true;
-      const queryToSend = [
-        {
-          start_time: startTime,
-          end_time: endTime,
-          sql: queryReq.query.sql,
+      {
+        data: (_payload: unknown, response: any) => {
+          const results = response?.content?.results ?? {};
+          if (response?.type === "search_response_metadata") {
+            queryIndex = results.query_index ?? queryIndex;
+            if (results.function_error) run.functionError = String(results.function_error);
+            if (typeof results.total === "number") run.total = (run.total ?? 0) + results.total;
+            return;
+          }
+          if (response?.type !== "search_response_hits" || !Array.isArray(results.hits)) return;
+          const index = results.query_index ?? queryIndex;
+          run.hitsByQuery[index] = [...(run.hitsByQuery[index] ?? []), ...results.hits];
         },
-        ...multiWindowQueries,
-      ];
-      queryReq.query.sql = queryToSend;
+        error: (_payload: unknown, response: any) => {
+          if (runTraceId === traceId) runTraceId = "";
+          reject(response?.content ?? {});
+        },
+        complete: () => {
+          if (runTraceId === traceId) runTraceId = "";
+          resolve(run);
+        },
+      },
+    );
+  });
+
+onBeforeUnmount(stopRun);
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (!open) stopRun();
+  },
+);
+
+const runFailedText = (body: any) =>
+  t("alerts.queryEditor.runFailed", {
+    reason:
+      raw(body?.message || body?.error_detail || body?.error) || t("search.errorFetchingResults"),
+  });
+
+const triggerQuery = async (fn = false) => {
+  const queryReq = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: props.streamName,
+    },
+    t,
+  );
+  queryReq.query.sql = localSqlQuery.value;
+  queryReq.query.size = 10;
+
+  const periodInMicroseconds = props.period * 60 * 1000000;
+  const endTime = new Date().getTime() * 1000;
+  const startTime = endTime - periodInMicroseconds;
+
+  queryReq.query.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
+  queryReq.query.sql_mode = true;
+
+  const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, periodInMicroseconds);
+
+  if (multiWindowQueries.length > 0) {
+    queryReq.query.per_query_response = true;
+    queryReq.query.sql = [
+      {
+        start_time: startTime,
+        end_time: endTime,
+        sql: queryReq.query.sql,
+      },
+      ...multiWindowQueries,
+    ];
+  } else {
+    queryReq.query.start_time = startTime;
+    queryReq.query.end_time = endTime;
+  }
+
+  delete queryReq.aggs;
+
+  try {
+    const run = await streamRun(queryReq);
+    if (run.functionError) {
+      localSqlQueryErrorMsg.value = runFailedText({ message: run.functionError });
+      return;
+    }
+    const hits = multiWindowQueries.length > 0 ? run.hitsByQuery : (run.hitsByQuery[0] ?? []);
+    const count = hits.flat().length;
+    if (!count) return;
+    if (fn) {
+      outputFnEvents.value = JSON.stringify(hits, null, 2);
     } else {
-      // No multi-window: use normal _search API
-      queryReq.query.start_time = startTime;
-      queryReq.query.end_time = endTime;
+      outputEvents.value = JSON.stringify(hits, null, 2);
+      queryHitCount.value = multiWindowQueries.length > 0 ? count : (run.total ?? count);
     }
-
-    delete queryReq.aggs;
-
-    const res = await searchService.search({
-      org_identifier: store.state.selectedOrganization.identifier,
-      query: queryReq,
-      page_type: props.streamType,
-      validate: true,
-    });
-
-    if (res.data.hits.length > 0) {
-      if (fn) {
-        outputFnEvents.value = JSON.stringify(res.data.hits, null, 2);
-      } else {
-        outputEvents.value = JSON.stringify(res.data.hits, null, 2);
-        queryHitCount.value = res.data.total ?? res.data.hits.flat().length;
-      }
-    }
-  } catch (err: any) {
-    console.error("[QueryEditorDialog] ERROR in triggerQuery:", err);
-    console.error("[QueryEditorDialog] Error details:", {
-      message: err.message,
-      response: err.response,
-      stack: err.stack,
-    });
-    toast({
-      variant: "error",
-      message: err.response?.data?.message ?? t("search.errorFetchingResults"),
-      timeout: 1500,
-    });
+  } catch (body: unknown) {
+    localSqlQueryErrorMsg.value = runFailedText(body);
   }
 };
 
@@ -995,6 +1055,7 @@ const runSqlQuery = async () => {
   localSqlQueryErrorMsg.value = "";
   suppressPropError.value = true;
   queryHitCount.value = 0;
+  outputEvents.value = "";
 
   // Validate SQL query before running (checks for SELECT * and reserved words)
   const parserResult = getParser(localSqlQuery.value);
@@ -1020,6 +1081,8 @@ const runSqlQuery = async () => {
 
 const runTestFunction = async () => {
   runPromqlError.value = "";
+  localSqlQueryErrorMsg.value = "";
+  outputFnEvents.value = "";
   tempTestFunction.value = true;
   expandCombinedOutput.value = true;
   runFnQueryLoading.value = true;
