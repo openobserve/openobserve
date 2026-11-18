@@ -153,7 +153,9 @@
       "iam-users-15546-edit-dialog-cancel.spec.js",
       "query-management-sql-tooltip.spec.js",
       "signup-2795-signed-in-redirect.spec.js",
-      "login-2962-entry-payload.spec.js"
+      "login-2962-entry-payload.spec.js",
+      "home-16634-oss-overview-no-anomaly.spec.js",
+      "home-16699-pinned-dashboard-variable-refresh.spec.js"
     ],
     "disabled": []
   },
