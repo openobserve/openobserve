@@ -4134,14 +4134,17 @@ export default defineComponent({
         : leftFilter
           ? t("alerts.rowAction.pausedLeftFilter", params, 1)
           : t("alerts.rowAction.paused", params);
-      toast({
+      const close = toast({
         variant: "success",
         message,
         ...(undoable
           ? {
               action: {
                 label: t("alerts.rowAction.undo"),
-                handler: () => void setAlertState(row, !enabled, false),
+                handler: () => {
+                  close();
+                  void setAlertState(row, !enabled, false);
+                },
               },
             }
           : {}),
