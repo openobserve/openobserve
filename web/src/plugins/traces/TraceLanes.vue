@@ -129,7 +129,11 @@ import type { StreamInfo } from "@/services/service_streams";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
-import { buildSqlCondition, quoteSqlIdentifier } from "@/utils/telemetryCorrelation";
+import {
+  buildSqlCondition,
+  correlationWindow,
+  quoteSqlIdentifier,
+} from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
   resolveLogSeverity,
@@ -229,6 +233,7 @@ const correlate = (span: any, onFail: () => void) =>
     "traces",
     5,
     props.streamName,
+    correlationWindow(Math.floor(Number(span.start_time) / 1000)),
   )
     .then((result) => result?.correlationData ?? null)
     .catch(() => {

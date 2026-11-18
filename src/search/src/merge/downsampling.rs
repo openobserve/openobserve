@@ -409,7 +409,7 @@ mod tests {
 
         let rule = DownsamplingRule {
             rule: None,
-            function: Function::Avg,
+            function: Function::Sum,
             offset: 0,
             step: 300, // 5 minutes
         };
@@ -426,10 +426,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_downsampling_skips_stale_markers() {
-        use arrow::array::{AsArray, Float64Array, UInt64Array};
-        use arrow_schema::Schema;
+        use arrow::array::{Float64Array, UInt64Array};
         use config::meta::promql::{DownsamplingRule, Function};
-        use datafusion::{datasource::MemTable, prelude::SessionContext};
 
         let schema = Arc::new(Schema::new(vec![
             Field::new(HASH_LABEL, DataType::UInt64, false),
@@ -456,41 +454,103 @@ mod tests {
         for (function, expected) in [
             (Function::Last, 2.0),
             (Function::First, 1.0),
-            (Function::Avg, 1.5),
-            (Function::Count, 2.0),
+            (Function::Sum, 3.0),
+            (Function::Min, 1.0),
+            (Function::Max, 2.0),
         ] {
-            let ctx = SessionContext::new();
-            let table = MemTable::try_new(schema.clone(), vec![vec![batch.clone()]]).unwrap();
-            ctx.register_table("tbl", Arc::new(table)).unwrap();
             let rule = DownsamplingRule {
                 rule: None,
                 function: function.clone(),
                 offset: 0,
                 step: 300,
             };
-            let batches = ctx
-                .sql(&generate_downsampling_sql(&schema, &rule))
-                .await
-                .unwrap()
-                .collect()
-                .await
-                .unwrap();
-            let values: Vec<Option<f64>> = batches
-                .iter()
-                .flat_map(|batch| {
-                    let values = arrow::compute::cast(
-                        batch.column_by_name(VALUE_LABEL).unwrap(),
-                        &DataType::Float64,
-                    )
-                    .unwrap();
-                    values
-                        .as_primitive::<arrow::datatypes::Float64Type>()
-                        .iter()
-                        .collect::<Vec<_>>()
-                })
-                .collect();
+            let batches = run_downsampling(&rule, vec![batch.clone()]).await;
             // the bucket holding only a marker writes no row
-            assert_eq!(values, vec![Some(expected)], "{function:?}");
+            assert_eq!(values_of(&batches), vec![Some(expected)], "{function:?}");
         }
+    }
+
+    /// A downsampled hour is merged again on a job retry or late data; that
+    /// second pass must not change any value.
+    #[tokio::test]
+    async fn test_downsampling_is_reapplicable() {
+        use arrow::array::{Float64Array, UInt64Array};
+        use config::meta::promql::{DownsamplingRule, Function};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("instance", DataType::Utf8, true),
+        ]));
+        let second = 1_000_000;
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(UInt64Array::from(vec![1, 1, 1, 1, 1])),
+                Arc::new(Float64Array::from(vec![4.0, 1.0, 7.0, 2.0, 5.0])),
+                Arc::new(Int64Array::from(vec![
+                    0,
+                    60 * second,
+                    120 * second,
+                    300 * second,
+                    360 * second,
+                ])),
+                Arc::new(StringArray::from(vec!["a"; 5])),
+            ],
+        )
+        .unwrap();
+        for function in [
+            Function::Sum,
+            Function::Min,
+            Function::Max,
+            Function::Last,
+            Function::First,
+        ] {
+            let rule = DownsamplingRule {
+                rule: None,
+                function: function.clone(),
+                offset: 0,
+                step: 300,
+            };
+            let once = run_downsampling(&rule, vec![batch.clone()]).await;
+            let twice = run_downsampling(&rule, once.clone()).await;
+            assert_eq!(values_of(&once).len(), 2, "{function:?}");
+            assert_eq!(values_of(&twice), values_of(&once), "{function:?}");
+        }
+    }
+
+    async fn run_downsampling(
+        rule: &DownsamplingRule,
+        batches: Vec<RecordBatch>,
+    ) -> Vec<RecordBatch> {
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+
+        let schema = batches[0].schema();
+        let ctx = SessionContext::new();
+        let table = MemTable::try_new(schema.clone(), vec![batches]).unwrap();
+        ctx.register_table("tbl", Arc::new(table)).unwrap();
+        ctx.sql(&generate_downsampling_sql(&schema, rule))
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap()
+    }
+
+    fn values_of(batches: &[RecordBatch]) -> Vec<Option<f64>> {
+        use arrow::array::AsArray;
+
+        batches
+            .iter()
+            .flat_map(|batch| {
+                batch
+                    .column_by_name(VALUE_LABEL)
+                    .unwrap()
+                    .as_primitive::<arrow::datatypes::Float64Type>()
+                    .iter()
+                    .collect::<Vec<_>>()
+            })
+            .collect()
     }
 }

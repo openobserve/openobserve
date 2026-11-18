@@ -82,6 +82,8 @@ pub struct Sql {
     pub offset: i64,
     pub time_range: (i64, i64),
     pub group_by: Vec<String>,
+    /// One entry per ORDER BY key, named by the column, alias or ordinal target it sorts on,
+    /// else by its expression text. Empty only when the query has no ORDER BY.
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
     pub timezone: Option<String>,

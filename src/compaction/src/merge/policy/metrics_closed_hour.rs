@@ -52,7 +52,7 @@ enum MetricsIndexMergeScope {
 
 pub(super) async fn plan(
     files: Vec<FileKey>,
-    limits: &BatchLimits<'_>,
+    limits: &BatchLimits,
     schema: &Arc<Schema>,
     stream: &str,
 ) -> RoundPlan {
@@ -67,7 +67,7 @@ pub(super) async fn plan(
 /// The hash-ordered files: a pre-merge while over the merge-group cap, else the indexed merge.
 async fn plan_indexed_merge(
     mut files: Vec<FileKey>,
-    limits: &BatchLimits<'_>,
+    limits: &BatchLimits,
     schema: &Arc<Schema>,
     stream: &str,
 ) -> RoundPlan {

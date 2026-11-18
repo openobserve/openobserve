@@ -1895,12 +1895,25 @@ export default defineComponent({
         };
         correlationContext.value = context;
 
+        // Calculate time range: ±5 minutes from log timestamp
+        // context.timestamp is in microseconds - pass microseconds directly (like TracesAnalysisDashboard)
+        const timeWindowMicros = 5 * 60 * 1000000; // 5 minutes in microseconds
+        const startTimeMicros = context.timestamp - timeWindowMicros;
+        let endTimeMicros = context.timestamp + timeWindowMicros;
+
+        // Cap end time to current UTC time (never allow future timestamps)
+        const currentTimeMicros = Date.now() * 1000; // Current time in microseconds
+        if (endTimeMicros > currentTimeMicros) {
+          endTimeMicros = currentTimeMicros;
+        }
+
         // Fetch correlation data
         const result = await findRelatedTelemetry(
           context,
           "logs",
           5, // 5 minute time window
           searchObj.data.stream.selectedStream[0],
+          { start: startTimeMicros, end: endTimeMicros },
         );
 
         if (!result) {
@@ -1921,18 +1934,6 @@ export default defineComponent({
         }
 
         // Prepare props for the dashboard
-        // Calculate time range: ±5 minutes from log timestamp
-        // context.timestamp is in microseconds - pass microseconds directly (like TracesAnalysisDashboard)
-        const timeWindowMicros = 5 * 60 * 1000000; // 5 minutes in microseconds
-        const startTimeMicros = context.timestamp - timeWindowMicros;
-        let endTimeMicros = context.timestamp + timeWindowMicros;
-
-        // Cap end time to current UTC time (never allow future timestamps)
-        const currentTimeMicros = Date.now() * 1000; // Current time in microseconds
-        if (endTimeMicros > currentTimeMicros) {
-          endTimeMicros = currentTimeMicros;
-        }
-
         // Extract FTS fields from stream settings
         const ftsFields =
           searchObj.data.stream.selectedStreamFields
@@ -1992,20 +1993,6 @@ export default defineComponent({
             endTime: endTimeMicros,
           },
         };
-
-        // Show info notification if no metrics found (but don't prevent setting props)
-        if (
-          !result.correlationData.related_streams.metrics ||
-          result.correlationData.related_streams.metrics.length === 0
-        ) {
-          console.warn("[SearchResult] No metric streams found for correlation");
-          toast({
-            variant: "info",
-            message: t("logs.searchResult.noMetricStreams", {
-              service: result.correlationData.display_name || result.correlationData.service_name,
-            }),
-          });
-        }
 
         // For inline expanded logs, open the correlation dashboard as a dialog
         // For DetailTable drawer, the data is passed via props (tabs are already visible)

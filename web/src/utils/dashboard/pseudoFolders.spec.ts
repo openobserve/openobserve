@@ -14,20 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { mount } from "@vue/test-utils";
-import i18n from "@/locales";
-import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
-import CorrelationSourcePodVersion from "./CorrelationSourcePodVersion.vue";
+import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import { PUBLIC_LINKS_FOLDER_ID, isPseudoFolder } from "./pseudoFolders";
 
-describe("CorrelationSourcePodVersion", () => {
-  it("names the pod chip like every other Kubernetes dimension, not by its key", () => {
-    const wrapper = mount(CorrelationSourcePodVersion, {
-      props: { pod: "checkout-7f9", version: "1.2.0" },
-      global: { plugins: [i18n] },
-    });
-    const chips = wrapper.findAllComponents(ODimensionChip);
-    expect(chips[0].props("keyLabel")).toBe("K8s Pod");
-    expect(wrapper.text()).not.toContain("k8s-pod");
-    wrapper.unmount();
+describe("isPseudoFolder", () => {
+  it("is true for the Favorites and Public dashboards entries", () => {
+    expect(isPseudoFolder(FAVORITES_FOLDER_ID)).toBe(true);
+    expect(isPseudoFolder(PUBLIC_LINKS_FOLDER_ID)).toBe(true);
+  });
+
+  it("is false for real folders, the default folder included", () => {
+    expect(isPseudoFolder("default")).toBe(false);
+    expect(isPseudoFolder("7f3a9c")).toBe(false);
+    expect(isPseudoFolder("")).toBe(false);
   });
 });

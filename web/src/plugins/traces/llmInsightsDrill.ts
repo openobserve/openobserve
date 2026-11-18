@@ -24,6 +24,7 @@ import {
 } from "./config/llmInsightsPanels";
 import { ATTRIBUTION_COLUMNS, traceUsageSum } from "./llmAttribution";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { quoteStream } from "@/composables/firstEvent/confirmQuery";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 
 /** A clicked chart point: the series value and, on a time axis, the bucket start (µs). */
@@ -52,7 +53,7 @@ export function addSearchClause(search: string, clause: string): string {
 
 export function searchFilterSql(stream: string, search: string): string {
   const q = search.trim();
-  return q ? `trace_id IN (SELECT trace_id FROM "${stream}" WHERE (${q}))` : "";
+  return q ? `trace_id IN (SELECT trace_id FROM ${quoteStream(stream)} WHERE (${q}))` : "";
 }
 
 /** What a click selected: a series value, errored traces, or both, in a time range (µs). */
@@ -102,7 +103,7 @@ export function traceListSql(
     "FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') AS input,",
     `MAX(gen_ai_response_model) AS model, ${traceUsageSum("gen_ai_usage_cost")} AS cost,`,
     `${TRACE_ERROR_SPANS_SQL} AS error_spans`,
-    `FROM "${stream}"${agentParentsJoin(stream, hasParentSpan)}`,
+    `FROM ${quoteStream(stream)}${agentParentsJoin(stream, hasParentSpan)}`,
     scope ? `WHERE ${scope}` : "",
     "GROUP BY trace_id",
     having.length ? `HAVING ${having.join(" AND ")}` : "",

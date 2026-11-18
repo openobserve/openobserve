@@ -2647,6 +2647,7 @@ async fn query_service_discovery_key(
             labels,
             identity_config,
             semantic_groups,
+            None,
         )
         .await
         {
