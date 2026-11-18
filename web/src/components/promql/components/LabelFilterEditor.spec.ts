@@ -94,11 +94,11 @@ describe("LabelFilterEditor", () => {
       dashboardPanelData: panelData(),
       labels: [
         { label: "method", op: "=", value: "GET" },
-        { label: "path", op: "=~", value: "/api/.*" },
+        { label: "path", op: "=~", value: "/api/v[0-9]+" },
       ],
     });
     expect(wrapper!.find(`[data-test="${DT}-chip-method"]`).text()).toContain("GET");
-    expect(wrapper!.find(`[data-test="${DT}-chip-path"]`).text()).toContain("/api/.*");
+    expect(wrapper!.find(`[data-test="${DT}-chip-path"]`).text()).toContain("/api/v[0-9]+");
   });
 
   it("removing a matcher keeps the others as saved", async () => {

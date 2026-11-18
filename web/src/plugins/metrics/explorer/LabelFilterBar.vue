@@ -29,6 +29,8 @@ import { labelFilterKey, type LabelFilter } from "@/composables/metrics/useMetri
 import {
   emptyFilterGroup,
   escapePromRegexLiteral,
+  operatorOfPromMatcher,
+  promMatcherFor,
   splitPromRegexLiterals,
   type FilterCondition,
   type FilterField,
@@ -85,13 +87,15 @@ const fields = computed<FilterField[]>(() =>
 const toCondition = (filter: LabelFilter): FilterCondition => {
   const listOperator = LIST_OPERATOR[filter.operator ?? "="];
   const list = listOperator ? splitPromRegexLiterals(filter.value) : null;
+  const shaped = list ? null : operatorOfPromMatcher(filter.operator ?? "=", filter.value);
   return {
     kind: "condition",
     id: labelFilterKey(filter),
     connector: "AND",
     field: String(filter.label),
-    operator: list ? listOperator! : (TO_OPERATOR[filter.operator ?? "="] ?? "eq"),
-    values: list ?? [filter.value],
+    operator:
+      shaped?.operator ?? (list ? listOperator! : (TO_OPERATOR[filter.operator ?? "="] ?? "eq")),
+    values: shaped?.values ?? list ?? [filter.value],
   };
 };
 
@@ -153,6 +157,8 @@ const toLabelFilter = (condition: FilterCondition): LabelFilter | null => {
   if (!LABEL_NAME_RE.test(condition.field)) return null;
   const label = raw(condition.field);
   const [first = ""] = condition.values;
+  const shaped = promMatcherFor(condition.operator, escapePromRegexLiteral(first));
+  if (shaped) return { label, operator: shaped.op, value: shaped.value };
   switch (condition.operator) {
     case "neq":
       return { label, operator: "!=", value: first };
