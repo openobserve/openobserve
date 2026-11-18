@@ -252,7 +252,11 @@ const volume = computed(() => {
 });
 const volumeText = computed(() =>
   volume.value
-    ? t("alerts.guard.volume", { count: formatNumber(volume.value.count) }, volume.value.count)
+    ? t(
+        "alerts.sections.backtest.volume",
+        { count: formatNumber(volume.value.count) },
+        volume.value.count,
+      )
     : null,
 );
 

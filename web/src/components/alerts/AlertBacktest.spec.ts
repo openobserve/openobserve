@@ -155,7 +155,9 @@ describe("AlertBacktest", () => {
     respond(calls[0], [{ zo_sql_key: (NOW - 3_600_000) * 1000, zo_sql_val: 53_932 }]);
     await flushPromises();
     const result = wrapper.find('[data-test="add-alert-backtest-result"]');
-    expect(result.text()).toBe(i18n.global.t("alerts.guard.volume", { count: "54,000" }, 54_000));
+    expect(result.text()).toBe(
+      i18n.global.t("alerts.sections.backtest.volume", { count: "54,000" }, 54_000),
+    );
     expect(result.classes()).toContain("text-status-warning-text");
     expect(wrapper.findAll('[data-test="add-alert-backtest-hour-fired"]')).toHaveLength(1);
     expect(signal.value).toBeNull();
