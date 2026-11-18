@@ -1021,7 +1021,7 @@ export class AlertsPage {
     }
 
     /**
-     * Expect the rail's preview verdict ("Right now this would alert you: ..." / "Quiet right now: ...") to be visible
+     * Expect the rail's preview verdict ("Would alert now: ..." / "Quiet now: ...") to be visible
      */
     async expectEvaluationStatusIndicatorVisible() {
         await expect(this.page.locator(this.locators.alertStatusIndicator)).toBeVisible({ timeout: 15000 });

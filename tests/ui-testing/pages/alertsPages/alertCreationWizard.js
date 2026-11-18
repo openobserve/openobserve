@@ -447,7 +447,7 @@ export class AlertCreationWizard {
 
         // ==================== ALERT SETTINGS ====================
         // SQL tab: threshold row uses data-test="alert-trigger-operator-select" (not alert-threshold-operator-select)
-        // The visible "Alert if No. of events" row lives directly on the SQL query config panel.
+        // The visible threshold row lives directly on the SQL query config panel.
         // OSelect forwards data-test to an inner -trigger button; the wrapper div itself
         // is not clickable. Target the trigger so the popover actually opens.
         const thresholdOperatorSelect = this.page.locator('[data-test="alert-trigger-operator-select"]').first();
