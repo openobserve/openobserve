@@ -16,6 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="chartPanelRef" class="border-border-default relative flex h-full flex-col border">
+    <div class="flex shrink-0 justify-end px-2 pt-2">
+      <OSelect
+        v-model="previewRange"
+        :options="previewRangeOptions"
+        labelKey="label"
+        valueKey="value"
+        :searchable="false"
+        size="xs"
+        :aria-label="t('alerts.form.preview.range')"
+        data-test="alert-preview-range"
+      />
+    </div>
     <!-- Chart -->
     <div data-test="alert-preview-chart" class="preview-alert-chart min-h-0 flex-1 px-4 pb-4">
       <!-- Empty query placeholder -->
@@ -70,6 +82,7 @@ import { promRulePreviewQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { b64EncodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 let dashboardPanelData: any = null;
 
@@ -222,6 +235,49 @@ const evaluationStatus = ref<{
 const { t } = useI18nTyped();
 
 const store = useStore();
+
+type PreviewRange = "checks" | "12h" | "24h";
+const PREVIEW_RANGE_KEY = "o2_alert_preview_range";
+const PREVIEW_RANGE_MINUTES: Record<Exclude<PreviewRange, "checks">, number> = {
+  "12h": 720,
+  "24h": 1440,
+};
+const readPreviewRange = (): PreviewRange => {
+  try {
+    const saved = sessionStorage.getItem(PREVIEW_RANGE_KEY);
+    return saved === "12h" || saved === "24h" ? saved : "checks";
+  } catch {
+    return "checks";
+  }
+};
+// The range only changes what the preview shows; it is never part of the alert.
+const previewRange = ref<PreviewRange>(readPreviewRange());
+watch(previewRange, (range) => {
+  try {
+    sessionStorage.setItem(PREVIEW_RANGE_KEY, range);
+  } catch {
+    // Private windows refuse storage; the choice then lasts as long as the page.
+  }
+});
+// An org-wide preview range set by the admin replaces "the last 3 checks".
+const orgPreviewMinutes = (): number =>
+  Number(store.state.zoConfig?.alert_preview_timerange_minutes) || 0;
+const previewMinutes = (): number => {
+  if (previewRange.value !== "checks") return PREVIEW_RANGE_MINUTES[previewRange.value];
+  if (orgPreviewMinutes() > 0) return orgPreviewMinutes();
+  return Math.max(3 * (Number(props.formData.trigger_condition?.period) || 0), 5);
+};
+const previewRangeOptions = computed(() => [
+  {
+    label:
+      orgPreviewMinutes() > 0
+        ? t("alerts.form.preview.lastMinutes", { minutes: orgPreviewMinutes() })
+        : t("alerts.form.preview.checks"),
+    value: "checks",
+  },
+  { label: t("alerts.form.preview.hours12"), value: "12h" },
+  { label: t("alerts.form.preview.hours24"), value: "24h" },
+]);
 
 // Computed property to determine if histogram should be used
 // For SQL/custom with aggregations (GROUP BY), we should use histogram
@@ -1306,6 +1362,8 @@ const refreshRulePreview = async (at: number) => {
   }
 };
 
+let lastRunKey = "";
+
 const refreshData = () => {
   // Skip if there is no query to run (e.g. user switched to SQL/PromQL
   // without writing a query yet, or closed the editor with an empty query).
@@ -1319,26 +1377,31 @@ const refreshData = () => {
     return;
   }
 
-  const relativeTime = props.formData.trigger_condition.period;
+  const new_relative_time = previewMinutes();
+  // Every input the preview request depends on; asking again with the same ones fetches nothing new.
+  const runKey = JSON.stringify([
+    props.query,
+    props.selectedTab,
+    props.isAggregationEnabled,
+    props.isUsingBackendSql,
+    props.formData.stream_name,
+    props.formData.stream_type,
+    props.formData.query_condition?.vrl_function,
+    props.formData.query_condition?.promql_rule_mode,
+    props.formData.query_condition?.promql_condition,
+    props.formData.query_condition?.aggregation,
+    props.formData.trigger_condition?.threshold,
+    props.formData.trigger_condition?.operator,
+    props.formData._ui?.forecast,
+    new_relative_time,
+  ]);
+  if (runKey === lastRunKey) return;
+  lastRunKey = runKey;
 
   const endTime = new Date().getTime() * 1000;
   if (props.selectedTab === "promql" && props.formData.query_condition?.promql_rule_mode)
     void refreshRulePreview(endTime / 1_000_000);
   else rulePreviewGeneration++;
-
-  // Priority order for time range:
-  // 1. Use env variable ZO_ALERT_PREVIEW_TIMERANGE_MINUTES if set and > 0
-  // 2. Fall back to alert period
-  const previewTimerangeMinutes = store.state.zoConfig.alert_preview_timerange_minutes || 0;
-  let new_relative_time;
-
-  if (previewTimerangeMinutes > 0) {
-    // Use the configured preview timerange from env variable
-    new_relative_time = previewTimerangeMinutes;
-  } else {
-    // Fall back to using the alert period
-    new_relative_time = relativeTime;
-  }
 
   const startTime = endTime - new_relative_time * 60 * 1000000;
 
@@ -1572,6 +1635,8 @@ watch(
 );
 
 onBeforeUnmount(() => debouncedRefreshFromProps.cancel());
+
+watch(previewRange, () => refreshFromProps());
 
 // The lines follow the limit at once; the re-query a limit change starts may be throttled or slow.
 watch(

@@ -15668,6 +15668,13 @@
         "compositeNeeds": "Add 2 to 10 alerts and a Fire when expression to save.",
         "issuesIn": "Issues in {sections}"
       },
+      "preview": {
+        "range": "Preview range",
+        "checks": "Last 3 checks",
+        "lastMinutes": "Last {minutes} min",
+        "hours12": "Last 12 hours",
+        "hours24": "Last 24 hours"
+      },
       "anomaly": {
         "sensitivityAuto": "Auto",
         "learned": "· learned from your data",

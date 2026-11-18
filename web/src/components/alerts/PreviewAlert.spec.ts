@@ -2878,3 +2878,57 @@ describe("PreviewAlert - schema fetch failure logging", () => {
     expect(warn).not.toHaveBeenCalledWith("Failed to fetch query schema:", expect.anything());
   });
 });
+
+describe("PreviewAlert - one run per real change, over a chosen range", () => {
+  const timeOf = (w: VueWrapper<any>) =>
+    w.findComponent({ name: "PanelSchemaRenderer" }).props("selectedTimeObj");
+  const spanMinutes = (w: VueWrapper<any>) => {
+    const { start_time, end_time } = timeOf(w);
+    // The dashboard time object carries microseconds in its Date fields.
+    return Math.round((end_time.getTime() - start_time.getTime()) / 60_000_000);
+  };
+  afterEach(() => sessionStorage.clear());
+
+  it("asks again only when an input changed, never for a repeat request", async () => {
+    const w = await mountComp({ query: "SELECT * FROM logs", formData: baseFormData() });
+    w.vm.refreshData();
+    await flushPromises();
+    const first = timeOf(w);
+    w.vm.refreshData();
+    await flushPromises();
+    expect(timeOf(w)).toBe(first);
+    await w.setProps({ query: "SELECT * FROM logs WHERE level = 'error'" });
+    w.vm.refreshData();
+    await flushPromises();
+    expect(timeOf(w)).not.toBe(first);
+    w.unmount();
+  });
+
+  it.each([
+    [10, "checks", 30],
+    [1, "checks", 5],
+    [10, "12h", 720],
+    [10, "24h", 1440],
+  ])("a %s min check over %s previews %s min", async (period, range, minutes) => {
+    const formData = baseFormData();
+    formData.trigger_condition.period = period;
+    const w = await mountComp({ query: "SELECT * FROM logs", formData });
+    w.vm.previewRange = range;
+    w.vm.refreshData();
+    await flushPromises();
+    expect(spanMinutes(w)).toBe(minutes);
+    w.unmount();
+  });
+
+  it("remembers the range for the session, not in the alert", async () => {
+    const formData = baseFormData();
+    const w = await mountComp({ query: "SELECT * FROM logs", formData });
+    w.vm.previewRange = "24h";
+    await flushPromises();
+    w.unmount();
+    const again = await mountComp({ query: "SELECT * FROM logs", formData });
+    expect(again.vm.previewRange).toBe("24h");
+    expect(formData).toEqual(baseFormData());
+    again.unmount();
+  });
+});
