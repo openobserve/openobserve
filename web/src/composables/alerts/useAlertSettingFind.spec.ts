@@ -107,6 +107,35 @@ describe("useAlertSettingFind", () => {
     expect(reveal).not.toHaveBeenCalled();
   });
 
+  it("lists a setting another query mode offers, and switching to that mode reaches it", async () => {
+    const shown: string[] = [];
+    const tiers = fakeTiers((id) => shown.push(id));
+    const reveal = vi.fn();
+    const find = useAlertSettingFind({
+      t,
+      available: (id) => id !== "compareWithPast" && id !== "forecast",
+      tiers,
+      goToSection: vi.fn(),
+      reveal,
+    });
+    const tab = mountControl("query-mode-sql", "");
+    tab.addEventListener("click", () =>
+      mountControl("multi-time-range-alerts-add-btn", "<button />"),
+    );
+    find.query.value = "last week";
+    expect(find.items.value[0]?.context).toEqual([
+      "When to alert",
+      "Available in SQL",
+      "Switch to SQL",
+    ]);
+    find.query.value = "forecast";
+    expect(find.items.value.map((i) => i.id)).not.toContain("forecast");
+    await find.select("compareWithPast");
+    expect(tiers.reveal).toHaveBeenCalledWith("compareWithPast");
+    const control = document.querySelector('[data-test="multi-time-range-alerts-add-btn"]');
+    expect(reveal).toHaveBeenCalledWith(control);
+  });
+
   it("ignores unknown ids", async () => {
     const { find, goToSection } = setup();
     await find.select("nope");

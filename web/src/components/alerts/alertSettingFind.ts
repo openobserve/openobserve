@@ -81,7 +81,20 @@ export interface AlertFindEntry {
 export interface AlertFindMatch {
   entry: AlertFindEntry;
   score: number;
+  /** Set when the setting is offered only by another query mode, the one to switch to. */
+  needsMode?: AlertFindMode;
 }
+
+/** A query mode Find can switch to so a setting becomes reachable. */
+export type AlertFindMode = "sql" | "promql";
+
+/** Settings only one query mode offers; Find lists them from the other modes with the way there. */
+export const FIND_MODE_OF: Partial<Record<AlertFindId, AlertFindMode>> = {
+  compareWithPast: "sql",
+  vrl: "sql",
+  ruleExpression: "promql",
+  forecast: "promql",
+};
 
 const MORE: I18nKey = "alerts.find.groups.more";
 
@@ -199,6 +212,8 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
       "per",
       "one per",
       "split by",
+      "by",
+      "each",
       "simple",
       "aggregation",
     ],
@@ -210,7 +225,16 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
   {
     id: "compareWithPast",
     labelKey: "alerts.plain.compareTitle",
-    aliases: ["compare", "multi time range", "past", "previous", "baseline", "offset"],
+    aliases: [
+      "compare",
+      "multi time range",
+      "past",
+      "previous",
+      "baseline",
+      "offset",
+      "last week",
+      "yesterday",
+    ],
     section: "condition",
     tier: "more",
     groupKey: MORE,
@@ -703,20 +727,26 @@ export function matchScore(text: string, query: string): number {
   return parts.every((p) => words.some((w) => w.startsWith(p))) ? 30 : 0;
 }
 
-/** Ranked settings for the typed text; a label beats an equal alias match, then registry order. */
+/**
+ * Ranked settings for the typed text; a label beats an equal alias match, then registry order.
+ * A setting this alert lacks is still listed when `modeFor` names a mode that offers it, after equal matches.
+ */
 export function searchAlertSettings(
   query: string,
   t: TranslateFn,
   available: (id: AlertFindId) => boolean,
+  modeFor: (id: AlertFindId) => AlertFindMode | undefined = () => undefined,
 ): AlertFindMatch[] {
   if (!normalize(query)) return [];
   const matches: AlertFindMatch[] = [];
   for (const entry of ALERT_FIND_ENTRIES) {
-    if (!available(gatingSetting(entry) ?? entry.id)) continue;
+    const usable = available(gatingSetting(entry) ?? entry.id);
+    const needsMode = usable ? undefined : modeFor(entry.id);
+    if (!usable && !needsMode) continue;
     const label = matchScore(t(entry.labelKey), query);
     const alias = Math.max(0, ...entry.aliases.map((a) => matchScore(a, query) - 5));
     const score = Math.max(label, alias);
-    if (score > 0) matches.push({ entry, score });
+    if (score > 0) matches.push(needsMode ? { entry, score, needsMode } : { entry, score });
   }
-  return matches.sort((a, b) => b.score - a.score);
+  return matches.sort((a, b) => b.score - a.score || Number(!!a.needsMode) - Number(!!b.needsMode));
 }

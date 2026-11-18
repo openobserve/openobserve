@@ -14,15 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, nextTick, ref, type ComputedRef, type Ref } from "vue";
-import type { I18nText, TranslateFn } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { CommandSearchItem } from "@/lib/forms/CommandSearch/OCommandSearch.types";
 import { ALERT_SECTIONS, type AlertSectionId } from "@/components/alerts/alertFormSections";
 import {
   ALERT_FIND_ENTRIES,
+  FIND_MODE_OF,
   gatingSetting,
   searchAlertSettings,
   type AlertFindEntry,
   type AlertFindId,
+  type AlertFindMode,
 } from "@/components/alerts/alertSettingFind";
 import type { AlertSettingTiers } from "./useAlertSettingTiers";
 
@@ -37,11 +39,14 @@ export interface AlertSettingFind {
 const FOCUSABLE =
   'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), button:not([disabled]), [role="combobox"], [tabindex]:not([tabindex="-1"])';
 
+// Product names, the same in every language.
+const MODE_NAMES: Record<AlertFindMode, string> = { sql: "SQL", promql: "PromQL" };
+
 const onScreen = (el: Element): boolean => el.getClientRects().length > 0;
 
 /** The first of the entry's controls that is rendered and visible. */
 export function findControl(
-  entry: AlertFindEntry,
+  entry: Pick<AlertFindEntry, "targets">,
   root: ParentNode = document,
 ): HTMLElement | null {
   for (const id of entry.targets) {
@@ -74,16 +79,29 @@ export function useAlertSettingFind(opts: {
     return def ? t(def.navKey) : t("alerts.find.label");
   };
 
+  // The mode's tab is on screen only where this alert can switch to it (PromQL needs metrics).
+  const modeTab = (mode: AlertFindMode) => findControl({ targets: [`query-mode-${mode}`] });
+  const modeFor = (id: AlertFindId): AlertFindMode | undefined => {
+    const mode = FIND_MODE_OF[id];
+    return mode && modeTab(mode) ? mode : undefined;
+  };
+  const modeContext = (mode: AlertFindMode): I18nText[] => {
+    const name = raw(MODE_NAMES[mode]);
+    return [t("alerts.find.needsMode", { mode: name }), t("alerts.find.switchTo", { mode: name })];
+  };
+
   const items = computed<CommandSearchItem[]>(() =>
-    searchAlertSettings(query.value, t, opts.available).map(({ entry }) => ({
+    searchAlertSettings(query.value, t, opts.available, modeFor).map(({ entry, needsMode }) => ({
       id: entry.id,
       label: t(entry.labelKey),
       // Results name the step by its nav name; only More options adds a second place.
-      context: [
-        sectionTitle(entry.section),
-        ...(entry.groupKey === "alerts.find.groups.more" ? [t(entry.groupKey)] : []),
-        ...(entry.parentKey ? [t(entry.parentKey)] : []),
-      ],
+      context: needsMode
+        ? [sectionTitle(entry.section), ...modeContext(needsMode)]
+        : [
+            sectionTitle(entry.section),
+            ...(entry.groupKey === "alerts.find.groups.more" ? [t(entry.groupKey)] : []),
+            ...(entry.parentKey ? [t(entry.parentKey)] : []),
+          ],
     })),
   );
   const countText = computed(() =>
@@ -95,6 +113,12 @@ export function useAlertSettingFind(opts: {
     const entry = ALERT_FIND_ENTRIES.find((e) => e.id === id);
     if (!entry) return;
     const setting = gatingSetting(entry);
+    const mode = opts.available(setting ?? entry.id) ? undefined : modeFor(entry.id);
+    if (mode) {
+      modeTab(mode)?.click();
+      await nextTick();
+      await nextTick();
+    }
     // An entry that lands on its own "+ add" link leaves the adding to that link.
     const landsOnLink = entry.targets[0]?.startsWith("add-alert-add-");
     if (setting && !landsOnLink && !opts.tiers.isVisible(setting)) opts.tiers.reveal(setting);

@@ -247,7 +247,7 @@ export function tierAvailable(id: AlertSettingId, ctx: AlertTierContext): boolea
     case "generatedSql":
       return scheduled && ctx.shape === "filters" && ctx.generatedSql !== false;
     case "groupBy":
-      return scheduled && ctx.shape === "filters" && ctx.aggregate;
+      return scheduled && ctx.shape === "filters";
     case "vrl":
     case "compareWithPast":
       return scheduled && ctx.shape === "sql";

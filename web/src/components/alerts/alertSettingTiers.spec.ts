@@ -51,15 +51,9 @@ const SECTIONS: AlertSectionId[] = ["watch", "condition", "notify", "schedule", 
 
 describe("sectionTierView: the More options line per mockup screen", () => {
   it.each<[string, AlertSectionId, Partial<AlertTierContext>, AlertSettingId[]]>([
-    ["A2 filters", "condition", {}, ["holdFor", "generatedSql"]],
+    ["A2 filters, total events too", "condition", {}, ["holdFor", "generatedSql", "groupBy"]],
     ["B0/B1 SQL", "condition", { shape: "sql" }, ["holdFor", "compareWithPast", "vrl"]],
     ["DRY-C2 PromQL", "condition", { shape: "promql" }, ["holdFor", "ruleExpression"]],
-    [
-      "filters, aggregate",
-      "condition",
-      { aggregate: true },
-      ["holdFor", "generatedSql", "groupBy"],
-    ],
     ["A3 notify", "notify", ALL_ON, ["recovery", "keepFiring", "suppressRepeats", "oncall"]],
     ["A5 details", "details", {}, ["tags", "priority"]],
     [
