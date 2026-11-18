@@ -392,6 +392,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :stream-type="formData.stream_type"
                 />
               </div>
+              <AlertIntentStart
+                v-if="showsIntentStart"
+                :stream-type="formData.stream_type"
+                :stream-name="formData.stream_name"
+                :columns="originalStreamFields"
+                :metric-streams="schemaList"
+                :period-minutes="Number(formData.trigger_condition.period) || 10"
+                :anomaly-available="isAnomalyDetectionEnabled && !anomalyLicenseLocked"
+                :org-alert-count="orgAlertCount"
+                :show-library="showsLibraryLink"
+                :active="appliedIntent?.fill?.intent ?? null"
+                data-snap-stop
+                @apply="applyIntent"
+                @use-suggestion="applySuggestion"
+                @scratch="startFromScratch"
+                @open-alert="openExistingAlert"
+                @browse-library="goToAlertLibrary"
+              />
             </AlertFormSection>
 
             <AlertFormSection
@@ -409,6 +427,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-alert-watch-summary"
                 >
                   <span>{{ watchSummary }}</span>
+                  <OTag
+                    v-if="appliedIntent"
+                    variant="default-soft"
+                    size="xs"
+                    :label="t('alerts.intent.fromIntent', { intent: appliedIntent.label })"
+                    data-test="add-alert-watch-summary-intent"
+                  />
                   <OButton
                     variant="link"
                     data-test="add-alert-watch-summary-change"
@@ -1189,7 +1214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { raw } from "@/types/i18n";
+import { raw, type I18nText } from "@/types/i18n";
 import { getIntlLocale } from "@/locales";
 import {
   defineComponent,
@@ -1223,6 +1248,7 @@ import {
   useAlertForm,
   defaultAlertValue,
   isSixFieldCron,
+  seedFormFromPrefill,
   type AlertFormEmit,
 } from "@/composables/useAlertForm";
 import { useAlertEditorDraft } from "@/composables/alerts/useAlertEditorDraft";
@@ -1260,6 +1286,10 @@ import OChoiceCards from "@/lib/forms/ChoiceCards/OChoiceCards.vue";
 import type { ChoiceCardOption } from "@/lib/forms/ChoiceCards/OChoiceCards.types";
 import AlertSampleEvents from "./AlertSampleEvents.vue";
 import AlertStreamOption from "./AlertStreamOption.vue";
+import AlertIntentStart from "./AlertIntentStart.vue";
+import type { IntentFill } from "@/utils/alerts/alertIntents";
+import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
+import { buildPrefillFromSuggestion } from "@/utils/alerts/prefill/fromLibrary";
 import AlertMetricLabels from "./AlertMetricLabels.vue";
 import {
   insertLabelIntoPromql,
@@ -1335,7 +1365,7 @@ import AlertUnsavedChanges from "./AlertUnsavedChanges.vue";
 import AlertRecentRuns from "./AlertRecentRuns.vue";
 import { useAlertEditHeader } from "@/composables/alerts/useAlertEditHeader";
 import { useAlertUnsavedChanges } from "@/composables/alerts/useAlertUnsavedChanges";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, get } from "lodash-es";
 import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
 import { useOnCallSetup } from "@/composables/useOnCallSetup";
 import { getFoldersListByType } from "@/utils/commons";
@@ -1431,6 +1461,7 @@ export default defineComponent({
     OChoiceCards,
     AlertSampleEvents,
     AlertStreamOption,
+    AlertIntentStart,
     AlertMetricLabels,
     AlertCheckTimeline,
     AlertBacktest,
@@ -2452,12 +2483,149 @@ export default defineComponent({
       );
     };
 
+    // ── Intent start (section 1): a chip or a ready-made card fills sections 2–4, nothing is saved ──
+    const showsIntentStart = computed(
+      () =>
+        !isEditing.value &&
+        !isCompositeMode.value &&
+        !!alertForm.formData.value.stream_name &&
+        !alertForm.isLoadingPrefill.value,
+    );
+    // Folds the cards from 10 alerts; the folder list is a floor until the org's lists have loaded.
+    const orgAlertCount = computed<number | undefined>(() => {
+      const byFolder = store.state.organizationData?.allAlertsListByFolderId ?? {};
+      const org = Object.values(byFolder).reduce<number>(
+        (sum, list) => sum + (Array.isArray(list) ? list.length : 0),
+        0,
+      );
+      const folder = folderAlerts.data.value?.length;
+      if (!org && folder === undefined) return undefined;
+      return Math.max(org, folder ?? 0);
+    });
+    const appliedIntent = ref<{ fill: IntentFill | null; label: I18nText } | null>(null);
+    let intentBaseline: any = null;
+    const intentPaths = new Set<string>();
+    const LIBRARY_ATTRIBUTES = new Set(["library_id", "library_hash"]);
+
+    // Undoes only what the last intent wrote, so edits elsewhere in the form stay.
+    const restoreIntent = () => {
+      if (!intentBaseline || !appliedIntent.value) return;
+      if (appliedIntent.value.fill) {
+        intentPaths.forEach((path) => alertForm.setF(path, cloneDeep(get(intentBaseline, path))));
+      } else {
+        const now = alertForm.formData.value;
+        alertForm.resetForm({
+          ...cloneDeep(intentBaseline),
+          destinations: now.destinations,
+          context_attributes: (now.context_attributes ?? []).filter(
+            (a: { key?: string }) => !LIBRARY_ATTRIBUTES.has(a.key ?? ""),
+          ),
+        });
+      }
+      intentPaths.clear();
+      appliedIntent.value = null;
+    };
+    const holdBaseline = () => {
+      if (!appliedIntent.value) intentBaseline = cloneDeep(alertForm.formData.value);
+    };
+
+    const applyIntent = async ({ fill, label }: { fill: IntentFill; label: I18nText }) => {
+      holdBaseline();
+      restoreIntent();
+      if (String(alertForm.formData.value.is_real_time) !== fill.howItChecks) {
+        intentPaths.add("is_real_time");
+        intentPaths.add("query_condition.type");
+        onAlertTypeChange(fill.howItChecks);
+      }
+      Object.entries(fill.values).forEach(([path, value]) => {
+        intentPaths.add(path);
+        alertForm.setF(path, cloneDeep(value));
+      });
+      if (fill.anomaly) Object.assign(alertForm.anomalyConfig.value, fill.anomaly);
+      if (fill.vrl) alertForm.showVrlFunction.value = true;
+      alertForm.isAggregationEnabled.value = fill.aggregation;
+      const aggregation = fill.values["query_condition.aggregation"] as {
+        function?: string;
+      } | null;
+      await nextTick();
+      // The builder keeps its measure picker in its own state, which a write to the form leaves behind.
+      const builder = alertForm.step2Ref.value as { selectedFunction?: string } | null;
+      if (builder && fill.values["query_condition.type"] === "custom") {
+        builder.selectedFunction =
+          fill.aggregation && aggregation?.function ? aggregation.function : "total_events";
+      }
+      appliedIntent.value = { fill, label };
+    };
+
+    const applySuggestion = async (suggestion: LibrarySuggestion) => {
+      holdBaseline();
+      restoreIntent();
+      const prefill = buildPrefillFromSuggestion(suggestion);
+      const data = cloneDeep(alertForm.formData.value);
+      const seeded = seedFormFromPrefill(data, prefill, {
+        sql: prefill.sql ?? "",
+        floorMinutes: Math.max(
+          1,
+          Math.ceil((Number(store.state.zoConfig?.min_auto_refresh_interval) || 0) / 60),
+        ),
+      });
+      // Provenance the saved alert carries, the way one-click install stamps it.
+      data.context_attributes = [
+        ...(data.context_attributes ?? []).filter(
+          (a: { key?: string; value?: string }) =>
+            !LIBRARY_ATTRIBUTES.has(a.key ?? "") && !!(a.key || a.value),
+        ),
+        { id: getUUID(), key: "library_id", value: suggestion.id },
+        ...(suggestion.library?.content_hash
+          ? [{ id: getUUID(), key: "library_hash", value: suggestion.library.content_hash }]
+          : []),
+      ];
+      alertForm.resetForm(data);
+      if (seeded.aggregation) alertForm.isAggregationEnabled.value = true;
+      if (seeded.vrl) alertForm.showVrlFunction.value = true;
+      appliedIntent.value = { fill: null, label: raw(prefill.sourceLabel) };
+      goToSection("condition");
+    };
+
+    const startFromScratch = () => {
+      restoreIntent();
+      goToSection("condition");
+    };
+
+    const openExistingAlert = (alert: AlreadySetUp) =>
+      alertForm.router.push({
+        name: "alertList",
+        query: {
+          alert_id: alert.alert_id,
+          action: "update",
+          name: alert.name,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+
+    // A new stream or type starts the intents over; what an intent wrote stays as ordinary values.
+    watch(
+      () => `${alertForm.formData.value.stream_type}/${alertForm.formData.value.stream_name}`,
+      () => {
+        appliedIntent.value = null;
+        intentBaseline = null;
+        intentPaths.clear();
+      },
+    );
+
     return {
       raw,
       siemDetectionId,
       openInSecurity,
       streamPickerOptions,
       onMetricLabelInsert,
+      showsIntentStart,
+      orgAlertCount,
+      appliedIntent,
+      applyIntent,
+      applySuggestion,
+      startFromScratch,
+      openExistingAlert,
       ...alertForm,
       alertDraft: alertEditorDraft.draft,
       calibrationHandoff,
@@ -2532,6 +2700,7 @@ export default defineComponent({
       onNameFocus,
       onNameEnter,
       anomalyLockedReason,
+      anomalyLicenseLocked,
       activeFolderName,
       goBackToAlertsList,
       onStreamTypeChange,
