@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-templates-list-table"
           :data="visibleRows"
           :columns="columns"
+          :column-visibility="columnVisibility"
           row-key="name"
           :loading="loading"
           :forbidden="forbidden"
@@ -442,6 +443,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -537,6 +539,13 @@ const columns: OTableColumnDef[] = [
     meta: { align: "center", actionCount: 4 },
   },
 ];
+// Below md the two 200px columns took the row and cut each name to a few letters.
+// An explicit map, not undefined, so the columns come back when the viewport grows.
+const { isMobile } = useBreakpoint();
+const columnVisibility = computed(() => ({
+  applies_to: !isMobile.value,
+  used_by: !isMobile.value,
+}));
 const showTemplateEditor = ref(false);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);
