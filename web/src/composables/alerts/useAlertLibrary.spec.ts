@@ -964,6 +964,18 @@ describe("suggestionArea", () => {
     expect(area.state).toBe(state);
     expect(area.cards.map((c) => c.kind)).toEqual(Array(cards).fill("library"));
   });
+
+  it("lists every match once the form asked for all of them", async () => {
+    const { suggestionArea } = await import("./useAlertLibrary");
+    const one = (suggestionsLogs as unknown as LibrarySuggestResponse).suggestions.find(
+      (s) => s.kind === "library",
+    )!;
+    const many = Array.from({ length: 7 }, (_, i) => ({ ...one, id: `lib/${i}` }));
+    const data = { ...suggestionsLogs, suggestions: many } as unknown as LibrarySuggestResponse;
+    const input = { pending: false, error: null, data };
+    expect(suggestionArea(input, "enabled").cards).toHaveLength(4);
+    expect(suggestionArea(input, "enabled", Infinity).cards).toHaveLength(7);
+  });
 });
 
 describe("cardFit", () => {

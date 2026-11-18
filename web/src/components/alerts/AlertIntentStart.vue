@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ headerText }}
           <OButton
-            v-if="area.state === 'ready'"
+            v-if="area.state === 'ready' && !showAll"
             variant="link"
             size="xs"
             data-test="add-alert-suggestions-toggle"
@@ -232,8 +232,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="link"
         size="xs"
         class="self-start"
+        :loading="showAll && allSuggestions.isFetching.value"
         data-test="add-alert-suggestions-see-all"
-        @click="emit('browse-library')"
+        @click="showAll = true"
         >{{ t("alerts.librarySuggest.seeAll", { count: formatNumber(area.total) }) }}</OButton
       >
     </template>
@@ -261,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -350,6 +351,7 @@ const emit = defineEmits<{
   (e: "use-suggestion", suggestion: LibrarySuggestion): void;
   (e: "scratch"): void;
   (e: "open-alert", alert: AlreadySetUp): void;
+  /** Kept until the host stops listening; "See all" now lists every match in place. */
   (e: "browse-library"): void;
   /** The sentence's window is the alert's look back. */
   (e: "update:period", minutes: number | ""): void;
@@ -363,6 +365,8 @@ const anomalyAccess = useAnomalyLibraryAccess();
 // Anomaly histograms bucket by 5 minutes unless changed in section 2.
 const ANOMALY_BUCKET_MINUTES = 5;
 const FAMILY_CAP = 5;
+// The server's own ceiling on library matches per request.
+const ALL_SUGGESTIONS = 50;
 const NO_GROUP = "__none__";
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
@@ -771,17 +775,57 @@ const suggestions = useQuery(
     enabled: props.showLibrary && !!props.streamName && !!org.value,
   })),
 );
-const area = computed(() =>
-  suggestionArea(
+// "See all" lists every match here, so the form is never left for the library.
+const showAll = ref(false);
+const allSuggestions = useQuery(
+  computed(() => ({
+    ...librarySuggestionsQuery(org.value, {
+      stream_type: props.streamType as "logs" | "metrics" | "traces",
+      stream_name: props.streamName,
+      limit: ALL_SUGGESTIONS,
+    }),
+    enabled: showAll.value && props.showLibrary && !!props.streamName && !!org.value,
+  })),
+);
+watch(
+  () => props.streamName,
+  () => (showAll.value = false),
+);
+const area = computed(() => {
+  const all = showAll.value ? allSuggestions.data.value : undefined;
+  return suggestionArea(
     {
-      pending: suggestions.isPending.value,
-      error: suggestions.error.value,
-      data: suggestions.data.value,
+      pending: !all && suggestions.isPending.value,
+      error: all ? null : suggestions.error.value,
+      data: all ?? suggestions.data.value,
     },
     anomalyAccess.value,
-  ),
-);
+    all ? Infinity : undefined,
+  );
+});
 const folded = ref(cardsFolded(props.orgAlertCount));
+// Cards that land after the user has started on the form stay folded in their header line, so nothing moves.
+let actedWhileLoading = false;
+const markActed = () => (actedWhileLoading = true);
+const stopWatchingActs = () => {
+  document.removeEventListener("pointerdown", markActed, true);
+  document.removeEventListener("keydown", markActed, true);
+};
+watch(
+  () => area.value.state,
+  (state, before) => {
+    if (state === "loading") {
+      actedWhileLoading = false;
+      document.addEventListener("pointerdown", markActed, true);
+      document.addEventListener("keydown", markActed, true);
+      return;
+    }
+    stopWatchingActs();
+    if (before === "loading" && state === "ready" && actedWhileLoading) folded.value = true;
+  },
+  { immediate: true },
+);
+onBeforeUnmount(stopWatchingActs);
 watch(
   () => props.orgAlertCount,
   (count, before) => {

@@ -342,6 +342,7 @@ export const SUGGESTION_CARDS = 4;
 export function suggestionArea(
   input: { pending: boolean; error: unknown; data: LibrarySuggestResponse | undefined },
   access: AnomalyLibraryAccess,
+  cap = SUGGESTION_CARDS,
 ): { state: SuggestionAreaState; cards: LibrarySuggestion[]; total: number } {
   const status = (input.error as { response?: { status?: number } } | null)?.response?.status;
   if (input.error) return { state: status === 404 ? "absent" : "failed", cards: [], total: 0 };
@@ -350,7 +351,7 @@ export function suggestionArea(
   const shown = input.data.suggestions.filter(
     (s) => s.kind === "library" && (!s.enterprise || access === "enabled"),
   );
-  const cards = shown.slice(0, SUGGESTION_CARDS);
+  const cards = shown.slice(0, cap);
   const total = Math.max(input.data.counts.total, shown.length);
   return { state: cards.length ? "ready" : "none", cards, total };
 }
