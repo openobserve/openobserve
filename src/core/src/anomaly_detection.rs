@@ -10244,6 +10244,22 @@ mod tests {
         }
 
         #[test]
+        fn unquoted_names_match_in_any_case_and_quoted_ones_exactly() {
+            let check = |alias: &str, group_by: &str| {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '5m') AS {alias}, count(*) AS value FROM logs \
+                     GROUP BY {group_by}"
+                );
+                validate_custom_sql_grid(&sql, "5m", Some(&fields(&["service"])))
+            };
+            assert!(check("TIME_BUCKET", "time_bucket").is_ok());
+            assert!(check("time_bucket", "Time_Bucket").is_ok());
+            assert!(check("\"time_bucket\"", "time_bucket").is_ok());
+            assert!(check("\"TIME_BUCKET\"", "TIME_BUCKET").is_err());
+            assert!(check("\"TIME_BUCKET\"", "\"TIME_BUCKET\"").is_ok());
+        }
+
+        #[test]
         fn an_alias_that_a_stream_field_shadows_is_not_the_bucket() {
             let err = guard("GROUP BY time_bucket", &["time_bucket"])
                 .unwrap_err()

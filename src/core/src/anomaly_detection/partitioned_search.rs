@@ -30,7 +30,7 @@ use o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint;
 use search::sql::visitor::histogram_interval::validate_and_adjust_histogram_interval;
 use sqlparser::{
     ast::{
-        BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr,
+        BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr, Ident,
         ObjectNamePart, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement, TableFactor,
         Value, visit_expressions,
     },
@@ -566,8 +566,24 @@ fn select_group_by_offender(select: &Select, stream_fields: &HashSet<String>) ->
     }
     exprs
         .iter()
-        .find(|expr| !matches!(is_bucket_key(expr, &bucket, Some(stream_fields)), Ok(true)))
+        .find(|expr| !matches!(save_bucket_key(expr, &bucket, stream_fields), Ok(true)))
         .map(ToString::to_string)
+}
+
+/// The engine folds unquoted names to lower case, so `TIME_BUCKET` names `time_bucket`.
+fn save_bucket_key(
+    expr: &Expr,
+    bucket: &CustomBucket<'_>,
+    stream_fields: &HashSet<String>,
+) -> Result<bool, String> {
+    match expr {
+        Expr::Identifier(ident) if ident.quote_style.is_none() => is_bucket_key(
+            &Expr::Identifier(Ident::new(ident.value.to_ascii_lowercase())),
+            bucket,
+            Some(stream_fields),
+        ),
+        other => is_bucket_key(other, bucket, Some(stream_fields)),
+    }
 }
 
 /// With no bucket in this SELECT, its GROUP BY can be the bucket only when it has one key.
@@ -604,6 +620,9 @@ fn save_time_bucket(select: &Select) -> Option<CustomBucket<'_>> {
         .enumerate()
         .find_map(|(position, item)| {
             let (expr, alias) = match item {
+                SelectItem::ExprWithAlias { expr, alias } if alias.quote_style.is_none() => {
+                    (expr, alias.value.to_ascii_lowercase())
+                }
                 SelectItem::ExprWithAlias { expr, alias } => (expr, alias.value.clone()),
                 SelectItem::UnnamedExpr(expr) => (expr, String::new()),
                 _ => return None,
