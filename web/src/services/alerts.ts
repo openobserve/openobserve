@@ -32,6 +32,10 @@ import type {
   UnackAlertRequest,
   UnackAlertResponse,
 } from "@/ts/interfaces/alert";
+import type {
+  EvaluateAlertRequest,
+  EvaluateAlertResponse,
+} from "@/utils/alerts/alertEvaluate.types";
 
 const alertPath = (org: string, alertId: string) =>
   `/api/v2/${org}/alerts/${encodeURIComponent(alertId)}`;
@@ -369,6 +373,12 @@ const alerts = {
         return res;
       });
   },
+  // Dry run of an unsaved alert: the server searches as the caller, writes and sends nothing.
+  evaluate: (org: string, body: EvaluateAlertRequest, folder?: string, signal?: AbortSignal) =>
+    http().post<EvaluateAlertResponse>(`/api/v2/${encodeURIComponent(org)}/alerts/evaluate`, body, {
+      ...inFolder(folder),
+      signal,
+    }),
   generate_sql: (org_identifier: string, data: any) => {
     return http().post(`/api/v2/${org_identifier}/alerts/generate_sql`, data);
   },

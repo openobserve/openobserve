@@ -353,6 +353,21 @@ describe("alerts service", () => {
     });
   });
 
+  describe("evaluate", () => {
+    it("posts the unsaved alert to the dry run in its folder", async () => {
+      const body = { alert: { stream_name: "app" } } as any;
+      const signal = new AbortController().signal;
+      mockHttpInstance.post.mockResolvedValue({ data: {} });
+
+      await alerts.evaluate("org 1", body, "f1", signal);
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/v2/org%201/alerts/evaluate", body, {
+        params: { folder: "f1" },
+        signal,
+      });
+    });
+  });
+
   describe("create_by_alert_id", () => {
     it("should make POST request with folder_id when provided", async () => {
       const params = {
