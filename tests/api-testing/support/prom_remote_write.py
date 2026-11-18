@@ -27,18 +27,56 @@ def _field(number: int, wire_type: int, payload: bytes) -> bytes:
     return key + payload
 
 
+def _zigzag(n: int) -> int:
+    return (n << 1) ^ (n >> 63)
+
+
+def exemplar(value: float, ms: int, labels: dict[str, str] | None = None) -> bytes:
+    """A prometheus.Exemplar message."""
+    body = b"".join(
+        _field(1, 2, _field(1, 2, k.encode()) + _field(2, 2, v.encode())) for k, v in sorted((labels or {}).items())
+    )
+    return body + _field(2, 1, struct.pack("<d", value)) + _field(3, 0, _varint(ms))
+
+
+def native_histogram(count: int, total: float, ms: int, bucket_counts: list[int]) -> bytes:
+    """A schema-0 integer prometheus.Histogram whose positive buckets start at index 0."""
+    deltas, prev = b"", 0
+    for c in bucket_counts:
+        deltas += _varint(_zigzag(c - prev))
+        prev = c
+    span = _field(1, 0, _varint(0)) + _field(2, 0, _varint(len(bucket_counts)))
+    return (
+        _field(1, 0, _varint(count))
+        + _field(3, 1, struct.pack("<d", total))
+        + _field(11, 2, span)
+        + _field(12, 2, deltas)
+        + _field(15, 0, _varint(ms))
+    )
+
+
+def timeseries(
+    labels: dict[str, str],
+    samples: list[tuple[int, float]] = (),
+    exemplars: list[bytes] = (),
+    histograms: list[bytes] = (),
+) -> bytes:
+    """One prometheus.TimeSeries; `exemplars`/`histograms` are encoded messages from the builders above."""
+    ts = b""
+    for name, value in sorted(labels.items()):
+        ts += _field(1, 2, _field(1, 2, name.encode()) + _field(2, 2, value.encode()))
+    for ms, value in samples:
+        ts += _field(2, 2, _field(1, 1, struct.pack("<d", value)) + _field(2, 0, _varint(ms)))
+    for ex in exemplars:
+        ts += _field(3, 2, ex)
+    for h in histograms:
+        ts += _field(4, 2, h)
+    return _field(1, 2, ts)
+
+
 def write_request(series: list[tuple[dict[str, str], list[tuple[int, float]]]]) -> bytes:
     """A prometheus.WriteRequest: `series` is [(labels dict, [(ms, value)])]."""
-    body = b""
-    for labels, samples in series:
-        ts = b""
-        for name, value in sorted(labels.items()):
-            ts += _field(1, 2, _field(1, 2, name.encode()) + _field(2, 2, value.encode()))
-        for ms, value in samples:
-            sample = _field(1, 1, struct.pack("<d", value)) + _field(2, 0, _varint(ms))
-            ts += _field(2, 2, sample)
-        body += _field(1, 2, ts)
-    return body
+    return b"".join(timeseries(labels, samples) for labels, samples in series)
 
 
 def snappy(data: bytes) -> bytes:
