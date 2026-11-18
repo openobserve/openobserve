@@ -31,10 +31,9 @@ import {
 } from "./alertTestRun";
 
 const t = i18n.global.t as unknown as TranslateFn;
-const report = (r: unknown, unit?: string) =>
+const report = (r: unknown) =>
   testRunReport(r as EvaluateAlertResponse, {
     t,
-    unit,
     timeZone: "UTC",
     nowMs: (r as EvaluateAlertResponse).end / 1000,
   });
@@ -48,7 +47,6 @@ describe("testRunReport", () => {
       {
         summary:
           "Over the last 24 hours this would have fired 2 times (09:20 and 09:50), for checkout and cart.",
-        now: "Right now: quiet (18 vs 50).",
         held: "1 more firing was held by Notify at most every.",
       },
     ],
@@ -57,7 +55,6 @@ describe("testRunReport", () => {
       noSeries,
       {
         summary: "Over the last 24 hours this would not have fired.",
-        now: "Right now: no data in the last 5 minutes.",
         noSeries: "The query matched no series; http_server_duration_count has 3 series.",
       },
     ],
@@ -67,7 +64,6 @@ describe("testRunReport", () => {
       {
         summary: "Over the last 24 hours this would not have fired.",
         pendingOnly: "It matched in 1 check, but not for as long as Must last.",
-        now: "Right now: no data in the last 10 minutes.",
         errors: "1 check failed: Search timed out",
         truncated: "Tested the latest 3 checks only.",
       },
@@ -84,11 +80,16 @@ describe("testRunReport", () => {
     expect([shown.errors.tone, shown.truncated.tone]).toEqual(["error", "warning"]);
   });
 
-  it("lists every group that fired with its checks", () => {
-    const { groups, groupsMore } = report(grouped);
+  it.each([
+    [">=", "above the threshold"],
+    ["<", "below the threshold"],
+    ["=", "matched the condition"],
+  ])("lists every group that fired with its checks, for %s", (operator, side) => {
+    const r = { ...grouped, checks: grouped.checks.map((c) => ({ ...c, operator })) };
+    const { groups, groupsMore } = report(r);
     expect(groups.map((g) => `${g.label}: ${g.text}`)).toEqual([
-      "checkout: over the limit in 2 checks",
-      "cart: over the limit in 1 check",
+      `checkout: ${side} in 2 checks`,
+      `cart: ${side} in 1 check`,
     ]);
     expect(groupsMore).toBe(0);
   });

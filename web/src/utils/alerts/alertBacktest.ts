@@ -15,6 +15,7 @@
 
 import CronExpressionParser from "cron-parser";
 import type { I18nKey } from "@/types/i18n";
+import { thresholdSide } from "./alertCopy";
 
 const HOUR_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60_000;
@@ -24,9 +25,9 @@ const MAX_CHECKS = 24 * 60;
 const NOISY_SHARE = 0.25;
 
 // Which way the threshold should move depends on the comparison; exactly / not exactly have no direction.
-const HINT_KEYS: Record<"up" | "down" | "none", { never: I18nKey; noisy: I18nKey }> = {
-  up: { never: "alerts.sections.backtest.never", noisy: "alerts.sections.backtest.noisy" },
-  down: {
+const HINT_KEYS: Record<"above" | "below" | "none", { never: I18nKey; noisy: I18nKey }> = {
+  above: { never: "alerts.sections.backtest.never", noisy: "alerts.sections.backtest.noisy" },
+  below: {
     never: "alerts.sections.backtest.neverRaise",
     noisy: "alerts.sections.backtest.noisyLower",
   },
@@ -244,11 +245,7 @@ export function backtestHintKey(
   if (total === 0) return null;
   // No event to count means the threshold is not what kept it quiet (or noisy).
   if (day.events === 0) return emptyDayHintKey(day.filtered !== false);
-  const direction = [">=", ">"].includes(operator)
-    ? "up"
-    : ["<=", "<"].includes(operator)
-      ? "down"
-      : "none";
+  const direction = thresholdSide(operator) ?? "none";
   if (alerts === 0) return HINT_KEYS[direction].never;
   return alerts / total > NOISY_SHARE ? HINT_KEYS[direction].noisy : null;
 }

@@ -15,15 +15,10 @@
 
 import { getIntlLocale } from "@/locales";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import { durationText, formatNumber, joinList, valueWithUnit } from "./alertCopy";
+import { formatNumber, joinList, thresholdSide, valueWithUnit } from "./alertCopy";
 import { alertConditionsPayload } from "./alertConditionsLoad";
 import { getAlertPayload, type PayloadContext, type PayloadFormData } from "./alertPayload";
-import type {
-  EvaluateAlertBody,
-  EvaluateAlertResponse,
-  EvaluateCheck,
-  EvaluateCheckState,
-} from "./alertEvaluate.types";
+import type { EvaluateAlertBody, EvaluateAlertResponse } from "./alertEvaluate.types";
 
 const HOUR_MICROS = 3_600_000_000;
 const DAY_HOURS = 24;
@@ -33,10 +28,10 @@ const SHOWN_GROUPS = 5;
 const RECORD_STAMPS = ["createdAt", "updatedAt", "lastTriggeredAt", "lastEditedBy", "owner"];
 // What a dry run ignores, so editing them keeps an answer current.
 const NOT_EVALUATED = ["name", "description", "destinations", "template", "folder_id", "tags"];
-const NOW_KEYS: Record<EvaluateCheckState, { compared: I18nKey; bare: I18nKey }> = {
-  quiet: { compared: "alerts.testRun.nowQuiet", bare: "alerts.testRun.nowQuietBare" },
-  pending: { compared: "alerts.testRun.nowPending", bare: "alerts.testRun.nowPendingBare" },
-  firing: { compared: "alerts.testRun.nowFiring", bare: "alerts.testRun.nowFiringBare" },
+const GROUP_CHECKS_KEYS: Record<"above" | "below" | "none", I18nKey> = {
+  above: "alerts.testRun.groupChecksAbove",
+  below: "alerts.testRun.groupChecksBelow",
+  none: "alerts.testRun.groupChecksMatched",
 };
 
 export type TestRunTone = "body" | "secondary" | "warning" | "error";
@@ -130,8 +125,6 @@ const listWithMore = (items: I18nText[], total: number, t: TranslateFn): I18nTex
 
 export interface TestRunReportOptions {
   t: TranslateFn;
-  /** Unit of the compared value: a metricDefaults id, or "microseconds" for span duration. */
-  unit?: string | null;
   timeZone?: string;
   nowMs: number;
 }
@@ -165,26 +158,6 @@ function summaryLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRun
   };
 }
 
-function nowLine(check: EvaluateCheck | undefined, o: TestRunReportOptions): TestRunLine | null {
-  const { t } = o;
-  if (!check || check.error) return null;
-  if (check.state === "quiet" && check.reason === "no_data") {
-    const seconds = Math.round((check.window_end - check.window_start) / 1_000_000);
-    return {
-      id: "now",
-      text: t("alerts.testRun.nowNoData", { window: durationText(seconds, t) }),
-      tone: "secondary",
-    };
-  }
-  const keys = NOW_KEYS[check.state];
-  if (check.value === null || check.threshold === null)
-    return { id: "now", text: t(keys.bare), tone: "secondary" };
-  const shown = testValueText(check.value, o.unit, t);
-  const value = check.value_is_lower_bound ? t("alerts.verdict.atLeast", { value: shown }) : shown;
-  const threshold = testValueText(check.threshold, o.unit, t);
-  return { id: "now", text: t(keys.compared, { value, threshold }), tone: "secondary" };
-}
-
 function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn): TestRunLine | null {
   const metrics = r.diagnostics?.metrics ?? [];
   const latest = r.checks[r.checks.length - 1];
@@ -211,7 +184,7 @@ function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn): TestRunLine | n
   };
 }
 
-/** The lines Test it shows for one dry run: what would have fired, right now, and why not. */
+/** The lines Test it shows for one dry run: what would have fired over the day, and why not. */
 export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunReport {
   const { t } = o;
   const s = r.summary;
@@ -225,8 +198,6 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
   const answered = r.checks.filter((c) => !c.error);
   if (r.query_type !== "promql" && answered.length && answered.every((c) => c.reason === "no_data"))
     lines.push({ id: "matchedNothing", text: t("alerts.guard.matchedNothing"), tone: "secondary" });
-  const now = nowLine(r.checks[r.checks.length - 1], o);
-  if (now) lines.push(now);
   const held = r.checks.filter((c) => c.held_by === "notify_at_most_every").length;
   if (held)
     lines.push({
@@ -253,9 +224,10 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
       text: t("alerts.testRun.truncated", { count: formatNumber(s.checks) }),
       tone: "warning",
     });
+  const groupChecks = GROUP_CHECKS_KEYS[thresholdSide(r.checks[0]?.operator) ?? "none"];
   const groups = s.groups_fired.slice(0, SHOWN_GROUPS).map((g) => ({
     label: groupLabel(g.labels, g.key),
-    text: t("alerts.testRun.groupChecks", { count: formatNumber(g.checks) }, g.checks),
+    text: t(groupChecks, { count: formatNumber(g.checks) }, g.checks),
   }));
   const groupsMore = Math.max(
     0,

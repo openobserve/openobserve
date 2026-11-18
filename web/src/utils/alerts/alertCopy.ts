@@ -70,6 +70,14 @@ export function dataNoun(
   return t(NOUN_BY_STREAM[streamType ?? ""] ?? "alerts.verdict.events", count);
 }
 
+/** The side of the threshold an operator alerts on; "=" and "!=" have none. */
+export const thresholdSide = (operator: string | undefined): "above" | "below" | null =>
+  operator === ">=" || operator === ">"
+    ? "above"
+    : operator === "<=" || operator === "<"
+      ? "below"
+      : null;
+
 /** A number as the reader's locale writes it; anything that is not a number is shown as typed. */
 export const formatNumber = (value: unknown): I18nText => {
   const n = typeof value === "number" ? value : Number(value);
