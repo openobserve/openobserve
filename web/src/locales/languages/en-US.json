@@ -12105,7 +12105,7 @@
       "nextStep": "Next step",
       "optional": {
         "title": "Optional",
-        "help": "Skip these unless you need them. The defaults work for most alerts."
+        "help": "Defaults work for most alerts"
       },
       "backtest": {
         "label": "Last 24 hours",
@@ -12121,10 +12121,10 @@
       },
       "filtersMode": "Filters",
       "typeHelp": {
-        "scheduled": "Looks at recent data on a timer. The right choice for most alerts.",
-        "realtime": "Checks each event the moment it arrives, so any match alerts you.",
-        "anomaly": "Learns what is normal and alerts you when values look unusual.",
-        "composite": "Alerts you when a combination of your other alerts is firing."
+        "scheduled": "Checks recent data on a timer",
+        "realtime": "Checks each event as it arrives",
+        "anomaly": "Learns normal, alerts on unusual",
+        "composite": "Combines other alerts"
       },
       "operators": {
         "gte": "at least",
@@ -12137,7 +12137,7 @@
       "next": "Next: {title}",
       "back": "Back: {title}",
       "needsFix": "{count} issue | {count} issues",
-      "howItChecks": "How it checks",
+      "howItChecks": "Type",
       "everyMinutes": "Every {count} min",
       "everyHours": "Every {count} h",
       "onCron": "On a cron schedule",
@@ -12162,7 +12162,7 @@
       },
       "samples": {
         "label": "Recent events",
-        "help": "The latest events, so you can check this is the right stream",
+        "help": "Check it is the right stream",
         "loading": "Loading recent events…",
         "empty": "Nothing in the last hour. You can still alert on this stream.",
         "failed": "Could not load recent events."
@@ -12255,20 +12255,21 @@
         "name": "Name",
         "folder": "Folder",
         "unnamed": "Add a name",
-        "autoName": "Suggested from your settings. It updates as you change them, until you type your own.",
+        "autoName": "Suggested; type to replace",
         "useSuggestion": "Use suggested name: {name}"
       },
       "rows": {
+        "query": "Query",
         "streamTypeLabel": "Type of data",
         "streamType": "Logs, metrics or traces",
         "streamLabel": "Stream",
         "stream": "The data this alert reads",
-        "whichEvents": "Which events count?",
+        "whichEvents": "Events",
         "whichEventsAll": "Every event in this stream counts. Add a filter to narrow it down.",
         "whichEventsFiltered": "Only events that match these filters count.",
-        "whichEventsSql": "Write a query. The rows it returns are what the alert looks at.",
-        "whichEventsPromql": "Write a PromQL query. The value it returns is what the alert looks at.",
-        "rowTemplate": "How each matching row reads in the message",
+        "whichEventsSql": "Each returned row counts",
+        "whichEventsPromql": "The value it returns is checked",
+        "rowTemplate": "How each row reads",
         "descriptionPlaceholder": "Optional. What should someone do when this fires?",
         "name": "Shown in the alert list and in notifications"
       }
@@ -13752,7 +13753,7 @@
       "referenceWindow": "Reference Window",
       "timeFrame": "Time Frame",
       "timeFrameTooltip": "Time range for your query.",
-      "comparingText": "Comparing current window query result with query result from previous {offset}.",
+      "comparingText": "the same window {offset} earlier",
       "addComparisonWindow": "Add Comparison Window",
       "comparisonDisabledTooltip": "Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.",
       "secondCount": "{n} Second | {n} Seconds",
@@ -13776,7 +13777,7 @@
       "periodTooltip": "Period for which the query should run. e.g. 10 minutes means that whenever the query will run it will use the last 10 minutes of data.",
       "timezoneWarning": "Warning: The displayed timezone is approximate. Verify and select the correct timezone manually.",
       "destinationsTooltip": "Select one or more destinations to send alert notifications.",
-      "noDestinationNote": "Optional. The alert still runs and records its history, but no destination is notified.",
+      "noDestinationNote": "Optional. Without one, it only records history",
       "sendsToStatus": "Sends to {targets} each time the alert fires.",
       "oncallTeamTarget": "an on-call team",
       "lockedWorkflowFallback": "Locked workflow",
@@ -13871,7 +13872,7 @@
         "rows": "All matching rows, formatted by the row template"
       },
       "notifyOnRecovery": "Notify on recovery",
-      "notifyOnRecoveryNeedsDestination": "Needs a destination. Add one to send a message when this alert stops firing.",
+      "notifyOnRecoveryNeedsDestination": "Needs a destination first",
       "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
       "notifyOnRecoveryTemplateHint": "Destinations that reuse your template must include {'{'}alert_status{'}'}, or the recovery message will look like a new alert.",
       "recoveryDestinations": "Recovery destination",
@@ -13920,14 +13921,14 @@
     "queryConfig": {
       "aggregationFunction": "Aggregation function",
       "sectionTitle": "Conditions",
-      "openFullEditor": "Open Full Editor",
+      "openFullEditor": "Open full editor",
       "groupByTooltip": "Group results by these fields — alert triggers per unique combination",
       "havingGroups": "Having groups",
       "havingGroupsTooltip": "Minimum number of groups that must satisfy the condition above to trigger the alert.",
       "addGroupByField": "Add group by field",
       "noFunctions": "No functions",
       "writeQueryHint": "Write a query to get started",
-      "sqlEditorHint": "Use open full editor to run and validate",
+      "sqlEditorHint": "Run it in the full editor to check it",
       "checkEvery": "Check every",
       "pendingPeriod": "Hold for",
       "cronExpressionPlaceholder": "0 0 9 * * 1-5",
@@ -13938,7 +13939,7 @@
       "vrlEditor": "VRL Editor",
       "showVrlEditor": "Show VRL editor",
       "hideVrlEditor": "Hide VRL editor",
-      "vrlToggle": "VRL function",
+      "vrlToggle": "VRL",
       "alertIfValueIsTooltip": "Alert when the PromQL expression evaluates to this condition for a time series. Example: >= 100 triggers when the result is 100 or more.",
       "sqlHavingClauseWarning": "Having clause in query will apply before the filters of alert if condition",
       "havingSeriesTooltip": "Minimum number of time series that must satisfy the condition above to trigger the alert.",
@@ -14385,10 +14386,10 @@
     "tagsTooltip": "Labels for filtering and grouping alerts, e.g. prod or service:checkout. Lowercased automatically; must start with a letter.",
     "criticalIf": "Critical if",
     "warningIf": "Warning if",
-    "addWarning": "Add warning",
+    "addWarning": "Warning",
     "removeWarning": "Remove warning",
     "optional": "optional",
-    "promqlExamples": "Examples:",
+    "promqlExamples": "Try:",
     "promqlSampleDisabled": "Clear the editor to insert an example",
     "asOf": "as of",
     "configuration": "Configuration",
@@ -14488,8 +14489,8 @@
     "forecast": {
       "modeThreshold": "Threshold",
       "modeForecast": "Forecast",
-      "expression": "Expression to forecast",
-      "alertWhen": "Alert when it",
+      "expression": "PromQL",
+      "alertWhen": "Forecast",
       "rises": "rises to",
       "falls": "falls to",
       "threshold": "Threshold",
@@ -15302,31 +15303,29 @@
       "incident": "Incident"
     },
     "plain": {
-      "notifyMeWhen": "Notify me when",
+      "notifyMeWhen": "Alert when",
       "whereFilters": "where {count} filter | where {count} filters",
-      "is": "is",
-      "inTheLast": "in the last {n} min",
-      "warnWhen": "…warn me when it is",
+      "inTheLast": "in the last minute | in the last {n} minutes",
       "groupedBy": "…grouped by",
       "groupsCount": "…when the number of groups is",
       "seriesCount": "…when the number of series is",
-      "queryReturns": "Notify me when the query returns",
+      "queryReturns": "Alert when",
       "rowsInTheLast": "rows in the last {n} min",
       "theColumn": "the column",
-      "valueIs": "Notify me when the value is",
+      "valueIs": "Alert when",
       "forAtLeast": "Must last at least",
       "openIncident": "Open an incident",
-      "notifyOnRecovery": "Tell them when it recovers",
+      "notifyOnRecovery": "Recovery message",
       "keepFiringFor": "Keep firing after it clears",
       "messageTemplate": "Message template",
       "variables": "Variables",
       "addVariable": "Add a variable",
       "rowTemplate": "Row template",
       "lookBack": "Look back over",
-      "compareTitle": "Compare with the past",
+      "compareTitle": "Compare with",
       "compareThisCheck": "This check",
       "compareRuns": "Runs",
-      "compareAddWindow": "Add a past window",
+      "compareAddWindow": "Past window",
       "rename": "Rename",
       "limitLine": "limit",
       "warnLine": "warn"
@@ -15342,7 +15341,7 @@
         "keepFiring": "Keep firing after it clears",
         "priority": "Priority",
         "tags": "Tags",
-        "generatedSql": "Show generated SQL",
+        "generatedSql": "Generated SQL",
         "vrl": "Transform results with VRL",
         "ruleExpression": "Treat the query as a rule expression",
         "anomalyDirection": "Only alert on spikes, or only on drops",
@@ -15363,7 +15362,7 @@
       },
       "add": {
         "warning": "Add warning",
-        "forecast": "or forecast instead of a fixed limit",
+        "forecast": "Forecast instead",
         "anomalySql": "Write SQL instead",
         "anomalyRetrain": "Retrain every",
         "compositeExpression": "Write the expression yourself",
@@ -15565,6 +15564,10 @@
       "open": "Edit in Security"
     },
     "form": {
+      "warning": {
+        "label": "Warning",
+        "placeholder": "No warning"
+      },
       "showAll": "Show all settings",
       "change": "Change",
       "notNow": "Not now",
@@ -15574,12 +15577,13 @@
       "rowTemplateType": "Row template format",
       "messageRowHelp": "Defaults work for most alerts",
       "watch": {
-        "library": "Or {link} in the Alert Library.",
+        "library": "Or {link}",
         "libraryLink": "start from a template",
         "summary": "{type} · {stream} · {how}",
         "locked": "Can't change after the alert is created"
       },
       "filter": {
+        "label": "Filters",
         "where": "Where",
         "and": "and",
         "or": "or",
@@ -15587,23 +15591,26 @@
         "toggleConnector": "{connector}: switch between and and or"
       },
       "group": {
-        "sqlUngrouped": "One alert for all rows, or one per row?",
-        "promqlUngrouped": "One alert for all series, or one per series?",
-        "grouped": "One alert, or one per {label}?",
-        "groupedMany": "One alert, or one per group?",
-        "sqlOne": "One alert, when the query returns",
+        "sqlUngrouped": "Alerts",
+        "promqlUngrouped": "Alerts",
+        "grouped": "Alerts",
+        "groupedMany": "Alerts",
+        "sqlOne": "One, when",
         "rows": "rows",
         "eachOf": "One per {labels}, when",
         "eachOfPlain": "One per {labels}",
-        "promqlOne": "One alert, when at least",
-        "promqlOneTail": "series crosses the limit",
-        "builderOne": "One alert, when at least",
+        "promqlOne": "One, when at least",
+        "promqlOneTail": "series cross the limit",
+        "builderOne": "One, when at least",
         "builderOneTail": "groups cross the limit",
         "lookBack": "Each check looks at the last {minutes} min",
         "row": "row",
         "series": "series"
       },
       "editor": {
+        "savedFunction": "Saved function",
+        "vrl": "VRL",
+        "sql": "SQL",
         "showAll": "Show all {count} lines",
         "tabOutHint": "Esc then Tab to leave the editor"
       },
@@ -15616,12 +15623,17 @@
         "custom": "Custom"
       },
       "remind": {
-        "label": "Remind at most every",
+        "label": "Repeat every",
         "help": "Quiet time between repeats"
       },
       "units": {
-        "min": "min",
-        "h": "h",
+        "months": "months",
+        "weeks": "weeks",
+        "days": "days",
+        "hours": "hours",
+        "minutes": "minutes",
+        "min": "minutes",
+        "h": "hours",
         "seconds": "seconds"
       },
       "keepFiring": {
@@ -15641,7 +15653,7 @@
       "schedule": {
         "lookingAt": "looking at the last",
         "lookingAtRow": "Looking at the last",
-        "cronRow": "Run on cron",
+        "cronRow": "Cron",
         "cronHint": "Second, minute, hour, day of month, month, day of week",
         "cronIn": "in",
         "overlap": "Each check looks at the last {period} min, so checks overlap by {minutes} min.",
@@ -15691,10 +15703,10 @@
       },
       "holdFor": {
         "label": "Must last",
-        "sentence": "Only alert if it lasts at least"
+        "sentence": "at least"
       },
       "compare": {
-        "addWindow": "Add another past window"
+        "addWindow": "Past window"
       },
       "forecast": {
         "sentence": "{direction} {threshold} within {horizon}, based on the last {window}"

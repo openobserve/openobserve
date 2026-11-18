@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSettingRow
                 v-if="tierShows('template')"
                 :label="t('alerts.plain.messageTemplate')"
-                :class="denseRow"
                 fill
                 ><div class="flex items-center gap-2">
                   <OFormSelect
@@ -89,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSettingRow
                 v-if="tierShows('rowTemplate')"
                 :label="t('alerts.plain.rowTemplate')"
-                :class="denseRow"
                 :description="t('alerts.sections.rows.rowTemplate')"
                 fill
               >
@@ -136,11 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </OSettingRow>
 
-              <OSettingRow
-                v-if="tierShows('variables')"
-                :label="t('alerts.plain.variables')"
-                :class="denseRow"
-                fill
+              <OSettingRow v-if="tierShows('variables')" :label="t('alerts.plain.variables')" fill
                 ><div class="flex items-start gap-2">
                   <div class="flex flex-col items-start gap-1">
                     <template v-if="!variableRows.length">
@@ -257,7 +251,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="(oncallEnabled && tierShows('oncall')) || oncallTeamLocked"
                 :label="t('alerts.oncallTeam')"
                 :info="oncallTeamLocked ? undefined : t('alerts.oncallTeamTooltip')"
-                :class="denseRow"
                 fill
               >
                 <div class="flex items-center gap-2">
@@ -588,11 +581,9 @@ export default defineComponent({
     };
 
     // Section 3 stacks up to ten rows, so its rows sit closer than a bare row's default.
-    const denseRow = computed(() => (props.sectionTargets ? "py-1!" : ""));
 
     return {
       tierShows,
-      denseRow,
       descriptionFocused,
       removeDescription,
       raw,

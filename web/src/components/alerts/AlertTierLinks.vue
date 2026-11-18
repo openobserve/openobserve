@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import type { AlertSectionId } from "./alertFormSections";
 import type { AlertSectionTierView, AlertSettingId } from "./alertSettingTiers";
 
@@ -41,22 +42,20 @@ const messageLinks = computed(() => links.value.filter((d) => d.row === "message
 const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
 </script>
 
+<!-- A row like any other: "+ add" links and More options start at the control column, Show fewer takes More options' slot. -->
 <template>
   <div
     v-if="links.length || view.more.length"
     class="flex flex-col"
     :data-test="`add-alert-section-${section}-tiers`"
   >
-    <div
+    <OSettingRow
       v-if="messageLinks.length"
-      class="flex flex-col gap-0.5 py-1"
+      :label="t('alerts.form.messageRow')"
+      :description="t('alerts.form.messageRowHelp')"
       :data-test="`add-alert-section-${section}-row-message`"
     >
-      <p class="m-0 flex flex-wrap items-baseline gap-x-2">
-        <span class="text-text-heading text-sm font-medium">{{ t("alerts.form.messageRow") }}</span>
-        <span class="text-text-secondary text-xs">{{ t("alerts.form.messageRowHelp") }}</span>
-      </p>
-      <div class="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+      <div class="-ms-3.5 flex flex-wrap items-center gap-x-1 max-[85.5rem]:-ms-3">
         <OButton
           v-for="item in messageLinks"
           :key="item.id"
@@ -69,27 +68,28 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
           {{ t(item.nameKey) }}
         </OButton>
       </div>
-    </div>
-    <div
+    </OSettingRow>
+    <OSettingRow
       v-if="ownLinks.length || view.more.length"
-      class="flex flex-wrap items-center gap-x-1 gap-y-0.5 py-1"
+      :label="t('alerts.sections.optional.title')"
+      :description="t('alerts.sections.optional.help')"
+      fill
+      data-test="add-alert-optional-heading"
     >
-      <OButton
-        v-for="item in ownLinks"
-        :key="item.id"
-        variant="ghost-primary"
-        size="sm"
-        icon-left="add"
-        :data-test="`add-alert-add-${item.id}`"
-        @click="emit('add', item.id)"
-      >
-        {{ t(item.nameKey) }}
-      </OButton>
-      <div
-        v-if="view.more.length"
-        class="flex min-w-0 flex-1 basis-60 flex-wrap items-baseline gap-x-2 gap-y-0.5"
-      >
+      <div class="-ms-3.5 flex flex-wrap items-center gap-x-1 max-[85.5rem]:-ms-3">
         <OButton
+          v-for="item in ownLinks"
+          :key="item.id"
+          variant="ghost-primary"
+          size="sm"
+          icon-left="add"
+          :data-test="`add-alert-add-${item.id}`"
+          @click="emit('add', item.id)"
+        >
+          {{ t(item.nameKey) }}
+        </OButton>
+        <OButton
+          v-if="view.more.length"
           class="shrink-0"
           variant="ghost-primary"
           size="sm"
@@ -104,11 +104,9 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
               : t("alerts.form.moreOptions", { count: view.more.length })
           }}
         </OButton>
-        <span
-          v-if="!view.expanded"
-          class="text-text-secondary min-w-0 flex-1 text-xs whitespace-normal"
-          :data-test="`add-alert-section-${section}-more-names`"
-        >
+      </div>
+      <template v-if="view.more.length && !view.expanded" #note>
+        <span class="whitespace-normal" :data-test="`add-alert-section-${section}-more-names`">
           <template v-for="(item, index) in view.more" :key="item.id"
             ><template v-if="index">{{ SEP }}</template
             >{{ t(item.nameKey)
@@ -117,7 +115,7 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
             ></template
           >
         </span>
-      </div>
-    </div>
+      </template>
+    </OSettingRow>
   </div>
 </template>

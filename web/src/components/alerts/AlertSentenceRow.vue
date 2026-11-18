@@ -44,30 +44,28 @@ const noLabel = raw("");
     fill
     :data-test="props.dataTest"
   >
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <div class="text-text-body min-w-0 flex-1 text-sm whitespace-normal">
-        <slot />
-      </div>
-      <div v-if="props.changeable || props.removable" class="flex shrink-0 items-center gap-1">
-        <OButton
-          v-if="props.changeable"
-          variant="ghost-primary"
-          size="sm"
-          :data-test="`${props.dataTest}-change`"
-          @click="emit('change')"
-        >
-          {{ t("alerts.form.change") }}
-        </OButton>
-        <OButton
-          v-if="props.removable"
-          variant="ghost-primary"
-          size="sm"
-          :data-test="`${props.dataTest}-remove`"
-          @click="emit('remove')"
-        >
-          {{ t("common.remove") }}
-        </OButton>
-      </div>
+    <div class="text-text-body min-w-0 text-sm whitespace-normal">
+      <slot />
     </div>
+    <template v-if="props.changeable || props.removable" #actions>
+      <OButton
+        v-if="props.changeable"
+        variant="ghost-primary"
+        size="sm"
+        :data-test="`${props.dataTest}-change`"
+        @click="emit('change')"
+      >
+        {{ t("alerts.form.change") }}
+      </OButton>
+      <OButton
+        v-if="props.removable"
+        variant="ghost-primary"
+        size="sm"
+        :data-test="`${props.dataTest}-remove`"
+        @click="emit('remove')"
+      >
+        {{ t("common.remove") }}
+      </OButton>
+    </template>
   </OSettingRow>
 </template>

@@ -539,18 +539,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
-                <AlertSuggestionLine section="condition" anchor="end" />
-                <div
-                  :ref="(el) => setSectionTarget('narrowPreview', el)"
-                  class="empty:hidden"
-                  data-test="add-alert-narrow-preview"
-                />
-              </div>
-              <template #optional>
-                <!-- Every optional condition setting is scheduled-only, so a real-time step would show an empty heading. -->
-                <AlertOptionalHeading
-                  v-if="!isAnomalyMode && !isCompositeMode && formData.is_real_time === 'false'"
-                />
                 <div
                   v-show="!isAnomalyMode"
                   :ref="(el) => setSectionTarget('settingsHold', el)"
@@ -572,6 +560,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:multiTimeRange="updateMultiTimeRange"
                   />
                 </div>
+                <AlertSuggestionLine section="condition" anchor="end" />
+                <div
+                  :ref="(el) => setSectionTarget('narrowPreview', el)"
+                  class="empty:hidden"
+                  data-test="add-alert-narrow-preview"
+                />
+              </div>
+              <template #optional>
                 <AlertTierLinks
                   section="condition"
                   :view="tiers.view('condition')"
@@ -703,7 +699,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSettingRow
                   v-if="beingUpdated || anomalyEditMode"
                   :label="t('alerts.sections.details.name')"
-                  class="py-1!"
                   fill
                   data-snap-stop
                 >
@@ -718,7 +713,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   :label="t('alerts.sections.details.name')"
                   :description="t('alerts.sections.rows.name')"
-                  class="py-1!"
                   fill
                   data-snap-stop
                 >
@@ -768,7 +762,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OSettingRow>
                 <OSettingRow
                   :label="t('alerts.sections.details.folder')"
-                  class="py-1!"
                   fill
                   data-test="add-alert-details-folder-row"
                   data-snap-stop
@@ -820,6 +813,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
+                <div
+                  v-show="!isAnomalyMode"
+                  :ref="(el) => setSectionTarget('advancedDetails', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
                 <AlertSuggestionLine section="details" anchor="end" />
                 <section
                   class="border-border-default bg-surface-base rounded-surface mt-1 flex flex-col overflow-hidden border"
@@ -863,13 +862,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </section>
               </div>
               <template #optional>
-                <AlertOptionalHeading v-if="!isAnomalyMode" />
-                <div
-                  v-show="!isAnomalyMode"
-                  :ref="(el) => setSectionTarget('advancedDetails', el)"
-                  class="empty:hidden [&>*]:py-1!"
-                  data-snap-stop
-                />
                 <div v-show="!isAnomalyMode" data-snap-stop>
                   <Advanced
                     :section-targets="sectionTargets"
@@ -896,7 +888,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <AlertTierLinks
                   section="details"
-                  class="[&>*]:py-0!"
                   :view="tiers.view('details')"
                   @add="onTierAdd"
                   @toggle="tiers.toggle('details')"
@@ -1216,7 +1207,6 @@ import AlertCheckTimeline from "./AlertCheckTimeline.vue";
 import AlertBacktest from "./AlertBacktest.vue";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import { getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval } from "@/utils/queryUtils";
-import AlertOptionalHeading from "./AlertOptionalHeading.vue";
 import OCommandSearch from "@/lib/forms/CommandSearch/OCommandSearch.vue";
 import {
   isAnomalyFindId,
@@ -1370,7 +1360,6 @@ export default defineComponent({
     AlertSampleEvents,
     AlertCheckTimeline,
     AlertBacktest,
-    AlertOptionalHeading,
     OCommandSearch,
     AlertFormSection,
     AlertTierLinks,

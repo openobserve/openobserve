@@ -19,7 +19,10 @@ import { computed, provide } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
+import {
+  SETTING_ROW_BARE_KEY,
+  SETTING_ROW_GRID_KEY,
+} from "@/lib/core/SettingRow/OSettingRow.types";
 import { ALERT_SECTIONS, type AlertSectionDef, type AlertSectionId } from "./alertFormSections";
 
 const props = withDefaults(
@@ -62,6 +65,7 @@ const nextLabel = computed(() =>
 
 // The key also tells nested steps to drop their own card; the body restores the S4 rule and padding.
 provide(SETTING_ROW_BARE_KEY, true);
+provide(SETTING_ROW_GRID_KEY, true);
 </script>
 
 <!-- The header band is the sticky header (data-snap-sticky), so a stuck card shows one header, never two. -->
@@ -132,7 +136,7 @@ provide(SETTING_ROW_BARE_KEY, true);
         </div>
       </header>
       <div
-        class="[&_[data-o-setting-row]]:border-border-default -mt-px flex flex-col px-4 pb-2 [&_[data-o-setting-row]]:border-t [&_[data-o-setting-row]]:py-3"
+        class="[&_[data-o-setting-row]]:border-border-default -mt-px flex flex-col px-4 pb-2 [&_[data-o-setting-row]]:border-t [&_[data-o-setting-row]]:py-2"
         data-section-body
       >
         <slot />
