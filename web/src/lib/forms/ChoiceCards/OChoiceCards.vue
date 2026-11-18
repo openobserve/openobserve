@@ -31,7 +31,7 @@ const onUpdate = (value: AcceptableValue) => emit("update:modelValue", String(va
       :value="option.value"
       :disabled="option.disabled"
       :data-test="option.dataTest"
-      class="group border-border-default rounded-default hover:bg-surface-subtle data-[state=checked]:border-accent data-[state=checked]:ring-accent focus-visible:ring-accent/40 flex cursor-pointer items-start gap-2 border p-3 text-start focus-visible:ring-2 focus-visible:outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-60 data-[state=checked]:ring-1"
+      class="group border-border-default rounded-default data-[state=unchecked]:hover:bg-surface-subtle data-[state=checked]:bg-surface-accent-active data-[state=checked]:border-accent data-[state=checked]:ring-accent focus-visible:ring-accent/40 flex cursor-pointer items-start gap-2 border p-3 text-start focus-visible:ring-2 focus-visible:outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-60 data-[state=checked]:ring-1"
     >
       <OIcon
         v-if="option.icon"
