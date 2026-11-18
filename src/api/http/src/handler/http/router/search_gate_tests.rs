@@ -22,7 +22,7 @@ use super::*;
 
 /// Every route `search_routes_with` registers, as (method, template, handler).
 #[rustfmt::skip]
-const GATED: [(&str, &str, &str); 50] = [
+const GATED: [(&str, &str, &str); 51] = [
     ("POST", "/{org_id}/_search_multi", "search::multi_streams::search_multi"),
     ("POST", "/{org_id}/_search_multi_stream", "search::multi_streams::search_multi_stream"),
     ("POST", "/{org_id}/_search_partition_multi", "search::multi_streams::_search_partition_multi"),
@@ -32,6 +32,7 @@ const GATED: [(&str, &str, &str); 50] = [
     ("POST", "/v2/{org_id}/downtimes/resources", "downtimes::downtime_resources"),
     ("POST", "/v2/{org_id}/downtimes/values", "downtimes::downtime_values"),
     ("PATCH", "/v2/{org_id}/alerts/{alert_id}/trigger", "alerts::trigger_alert"),
+    ("POST", "/v2/{org_id}/alerts/evaluate", "alerts::evaluate::evaluate_alert"),
     ("PATCH", "/v2/{org_id}/alerts/{alert_id}/retrain", "alerts::retrain_alert"),
     ("GET", "/{org_id}/db_monitoring/databases", "db_monitoring::handler::get_dbm_databases"),
     ("GET", "/{org_id}/db_monitoring/queries", "db_monitoring::handler::get_dbm_queries"),
@@ -278,7 +279,7 @@ const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchServic
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 82] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 83] = [
     ("api/management/src/request/alert_calibration/digests.rs", "search_at", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
@@ -324,6 +325,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 82] = [
     ("core/src/ai_chat.rs", "search_window", Caller::Operational),
     ("core/src/alerts/alert_calibration/mod.rs", "search", Caller::Background("calibration runs")),
     ("core/src/alerts/auto_investigate_decisions.rs", "query", Caller::Exempt("the org's own auto-investigate decision log from the meta org; its route stays open")),
+    ("core/src/alerts/dry_run.rs", "count_series", Caller::Helper("alert dry run; its evaluate route is in the gated group")),
     ("core/src/alerts/mod.rs", "evaluate_scheduled", Caller::Background("alert evaluation")),
     ("core/src/alerts/mod.rs", "run_alert_count_query", Caller::Background("alert evaluation")),
     ("core/src/alerts/notifications/chart/mod.rs", "fetch_anomaly_rows", Caller::Background("notification charts")),

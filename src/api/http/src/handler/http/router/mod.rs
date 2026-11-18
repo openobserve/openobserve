@@ -2487,6 +2487,7 @@ fn search_routes_with(llm_eval: bool) -> Router {
         .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
         // A manual trigger of an anomaly alert runs detection now, and a retrain trains now.
         .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
+        .route("/v2/{org_id}/alerts/evaluate", post(alerts::evaluate::evaluate_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
 
         // Both builds register these so OSS answers 403, not 404; OFGA keys on this path segment.
