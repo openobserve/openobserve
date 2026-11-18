@@ -52,7 +52,7 @@ test.describe('Database Monitoring: one Databases row per server (#16278)', () =
     await dbm.navigate('overview');
     await dbm.expectDatabasesRowCount(2);
     expect(await dbm.databasesRowsFor(MULTI), 'the three-schema server must be one row').toBe(1);
-    await dbm.expectSchemaCountText(/3/);
+    await dbm.expectSchemaCountText(/\b3\b/);
 
     await dbm.navigate('overview', { query: { namespace: 'billing' } });
     await dbm.expectDatabasesRowCount(1);

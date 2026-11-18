@@ -13,7 +13,7 @@ const CLUSTER = 'e2e-16778-prod';
 const SIX_HOURS_US = 6 * 60 * 60 * 1000 * 1000;
 
 test.describe('Kubernetes cluster picker and date presets (#16682)', () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'default' });
 
   test.beforeAll(async ({ request }) => {
     const id = generateHexId(6);

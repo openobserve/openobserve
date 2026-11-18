@@ -33,7 +33,9 @@ test.describe('Leaving Traces mid-load (#15543)', () => {
     await page.waitForURL((url) => isLogsPath(url.href), { timeout: 15000 });
     // release() returns once Traces has every held response, so a late write is already queued; 3 s with no route change means none came.
     await expect(page.waitForURL((url) => !isLogsPath(url.href), { timeout: 3000 }), 'the late Traces write must not take the user back').rejects.toThrow();
-    const afterLogs = visited.slice(visited.findIndex(isLogsPath));
+    const firstLogs = visited.findIndex(isLogsPath);
+    expect(firstLogs, 'the Logs navigation must be recorded').toBeGreaterThanOrEqual(0);
+    const afterLogs = visited.slice(firstLogs);
     expect(afterLogs.filter((url) => !isLogsPath(url)), 'no route change away from Logs once Logs was reached').toEqual([]);
     await expect(page, 'Traces query state must not leak into the Logs URL').not.toHaveURL(/[?&]stream_type=traces/);
   });
