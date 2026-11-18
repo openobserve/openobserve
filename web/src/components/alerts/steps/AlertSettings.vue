@@ -49,19 +49,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="periodFieldRef"
             v-bind="periodWrapper"
           >
-            <div class="flex w-fit flex-col gap-1" :class="periodInline ? '' : 'me-2'">
-              <div class="flex items-center gap-2">
+            <div class="flex w-fit max-w-full flex-col gap-1" :class="periodInline ? '' : 'pe-2'">
+              <div class="flex flex-wrap items-center gap-2">
                 <span v-if="periodInline" class="text-text-body text-sm">{{
                   t("alerts.form.schedule.lookingAt")
                 }}</span>
-                <div class="flex items-center gap-2">
-                  <div>
+                <div class="flex min-w-0 items-center gap-2">
+                  <div class="min-w-0">
                     <OFormInput
                       :aria-label="t('alerts.form.names.lookBack')"
                       name="trigger_condition.period"
                       type="number"
                       fit-content
-                      class="max-w-32! min-w-16"
                       min="1"
                       :debounce="300"
                       data-test="alert-settings-period-input"
@@ -131,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col gap-1">
                 <div class="flex flex-wrap items-center gap-2">
                   <span>{{ t("alerts.form.holdFor.sentence") }}</span>
-                  <div class="flex items-center gap-2">
+                  <div class="flex min-w-0 items-center gap-2">
                     <component :is="formField" v-if="formField" name="_ui.pendingPeriod">
                       <template #default="{ field }">
                         <OInput
@@ -139,7 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           type="number"
                           min="0"
                           fit-content
-                          class="max-w-32! min-w-16"
                           :model-value="holdAmount(field.state.value)"
                           :placeholder="t('common.off')"
                           :error="fieldInvalid(field)"
@@ -220,16 +218,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             fill
           >
-            <div class="me-2 flex w-fit flex-col gap-1">
+            <div class="flex w-fit max-w-full flex-col gap-1 pe-2">
               <div class="flex items-center gap-2">
-                <div>
+                <div class="min-w-0">
                   <component :is="formField" v-if="formField" name="trigger_condition.silence">
                     <template #default="{ field }">
                       <OInput
                         :aria-label="t('alerts.form.remind.label')"
                         type="number"
                         fit-content
-                        class="max-w-32! min-w-16"
                         min="0"
                         :debounce="isScheduled ? 300 : undefined"
                         :model-value="silence.amount"
@@ -441,14 +438,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="flex flex-col gap-1">
                   <div class="flex flex-wrap items-center gap-2">
-                    <div>
+                    <div class="min-w-0">
                       <component :is="formField" v-if="formField" name="keep_firing_for">
                         <template #default="{ field }">
                           <OInput
                             :aria-label="t('alerts.alertSettings.keepFiringFor')"
                             type="number"
                             fit-content
-                            class="max-w-32! min-w-16"
                             min="0"
                             :debounce="300"
                             :model-value="keepFiring.amount"
@@ -948,7 +944,7 @@ export default defineComponent({
     const periodInline = computed(() => !!props.sectionTargets?.settingsSchedule && !isCron.value);
     const periodWrapper = computed(() =>
       periodInline.value
-        ? { class: "flex", "data-test": "alert-settings-period-inline" }
+        ? { class: "flex min-w-0", "data-test": "alert-settings-period-inline" }
         : {
             label: t("alerts.form.schedule.lookingAtRow"),
             required: true,

@@ -96,8 +96,8 @@ export interface InputProps {
    */
   width?: FieldWidth;
   /**
-   * Sizes the field to its value or placeholder, up to `field-width-sm`; set the floor with a
-   * `min-w-*` class. Takes the place of `width`.
+   * Sizes the field to its value or placeholder, from a 4rem floor up to its container's width.
+   * Takes the place of `width`.
    */
   fitContent?: boolean;
   /**

@@ -123,7 +123,8 @@ watch(canReveal, (allowed) => {
 
 // ── Width ──────────────────────────────────────────────────────────────────
 const fieldWidthClass = computed(() => {
-  if (props.fitContent && !isTextarea.value) return "w-fit max-w-field-width-sm shrink-0";
+  // max-w-full caps the field at its container, so a long value grows the field instead of scrolling inside it.
+  if (props.fitContent && !isTextarea.value) return "w-fit min-w-16 max-w-full";
   switch (props.width) {
     case "xs":
       return "w-field-width-xs";

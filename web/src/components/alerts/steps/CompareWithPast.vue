@@ -36,12 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-body flex flex-wrap items-center gap-2 text-sm"
       >
         <template #offset>
-          <span class="flex items-center gap-2">
+          <span class="flex min-w-0 items-center gap-2">
             <OInput
               type="number"
               min="1"
               fit-content
-              class="max-w-32! min-w-16"
               :model-value="parseOffset(picker.offSet).amount"
               :aria-label="t('alerts.plain.compareTitle')"
               data-test="multi-time-range-offset-input"

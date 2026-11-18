@@ -44,14 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #threshold>
-          <span class="inline-flex">
+          <span class="inline-flex min-w-0">
             <label :for="thresholdId" class="sr-only">{{ t("alerts.forecast.threshold") }}</label>
             <OFormInput
               :id="thresholdId"
               name="_ui.forecast.T"
               type="number"
               fit-content
-              class="max-w-32! min-w-16"
               :placeholder="t('alerts.form.forecast.thresholdPlaceholder')"
               :debounce="300"
               data-test="alert-forecast-threshold"
@@ -59,14 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #horizon>
-          <span class="inline-flex" data-test="alert-forecast-horizon-group">
+          <span class="inline-flex min-w-0" data-test="alert-forecast-horizon-group">
             <label :for="horizonId" class="sr-only">{{ t("alerts.forecast.horizonLabel") }}</label>
             <OFormInput
               :id="horizonId"
               name="_ui.forecast.H"
               type="number"
               fit-content
-              class="max-w-32! min-w-16"
               :debounce="300"
               data-test="alert-forecast-horizon"
             >

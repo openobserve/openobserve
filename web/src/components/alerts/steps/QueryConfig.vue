@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- COUNT mode severity rows -->
                         <template v-if="selectedFunction === 'total_events'">
-                          <div class="flex flex-wrap items-start gap-2">
+                          <div class="flex min-w-0 flex-wrap items-start gap-2">
                             <OFormSelect
                               :aria-label="t('alerts.form.names.comparison')"
                               name="trigger_condition.operator"
@@ -199,13 +199,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @update:model-value="onTriggerOperatorChange"
                             />
                             <!-- Message hangs under the threshold field it describes. -->
-                            <div class="flex flex-col gap-1">
+                            <div class="flex min-w-0 flex-col gap-1">
                               <OFormInput
                                 :aria-label="t('alerts.alertIfNoOfEvents')"
                                 name="trigger_condition.threshold"
                                 type="number"
                                 fit-content
-                                class="max-w-32! min-w-16"
                                 data-test="alert-trigger-threshold-input"
                                 @blur="restoreDefaultThreshold"
                                 min="1"
@@ -247,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- MEASURE mode severity rows -->
                         <template v-else>
-                          <div class="flex flex-wrap items-start gap-2">
+                          <div class="flex min-w-0 flex-wrap items-start gap-2">
                             <OFormSelect
                               :aria-label="t('alerts.form.names.comparison')"
                               name="query_condition.aggregation.having.operator"
@@ -258,14 +257,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @update:model-value="onConditionOperatorChange"
                             />
                             <!-- Message hangs under the value field it describes. -->
-                            <div class="flex flex-col gap-1">
+                            <div class="flex min-w-0 flex-col gap-1">
                               <OFormInput
                                 v-if="isSpanDuration"
                                 :aria-label="t('alerts.alertIfNoOfEvents')"
                                 name="_ui.durationValue"
                                 type="number"
                                 fit-content
-                                class="max-w-32! min-w-16"
                                 :placeholder="t('alerts.placeholders.value')"
                                 data-test="alert-duration-value-input"
                                 @update:model-value="onDurationValueChange($event)"
@@ -279,7 +277,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 name="query_condition.aggregation.having.value"
                                 type="number"
                                 fit-content
-                                class="max-w-32! min-w-16"
                                 :placeholder="t('alerts.placeholders.value')"
                                 @update:model-value="onConditionValueChange($event)"
                               >
@@ -526,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- Count mode severity rows -->
                         <template v-if="selectedFunction === 'total_events'">
-                          <div class="flex flex-wrap items-start gap-2">
+                          <div class="flex min-w-0 flex-wrap items-start gap-2">
                             <OFormSelect
                               :aria-label="t('alerts.form.names.comparison')"
                               name="trigger_condition.operator"
@@ -536,13 +533,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @update:model-value="onTriggerOperatorChange"
                             />
                             <!-- Message hangs under the threshold field it describes. -->
-                            <div class="flex flex-col gap-1">
+                            <div class="flex min-w-0 flex-col gap-1">
                               <OFormInput
                                 :aria-label="t('alerts.alertIfNoOfEvents')"
                                 name="trigger_condition.threshold"
                                 type="number"
                                 fit-content
-                                class="max-w-32! min-w-16"
                                 @update:model-value="onTriggerThresholdChange($event)"
                               >
                                 <template #error />
@@ -581,7 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- Measure mode severity rows -->
                         <template v-else>
-                          <div class="flex flex-wrap items-start gap-2">
+                          <div class="flex min-w-0 flex-wrap items-start gap-2">
                             <OFormSelect
                               :aria-label="t('alerts.form.names.comparison')"
                               name="query_condition.aggregation.having.operator"
@@ -591,13 +587,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @update:model-value="onConditionOperatorChange"
                             />
                             <!-- Message hangs under the value field it describes. -->
-                            <div class="flex flex-col gap-1">
+                            <div class="flex min-w-0 flex-col gap-1">
                               <OFormInput
                                 :aria-label="t('alerts.alertIfNoOfEvents')"
                                 name="query_condition.aggregation.having.value"
                                 type="number"
                                 fit-content
-                                class="max-w-32! min-w-16"
                                 :placeholder="t('alerts.placeholders.value')"
                                 @update:model-value="onConditionValueChange($event)"
                               >
@@ -798,13 +793,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :data-test="countTestIds.operator"
                             @update:model-value="onTriggerOperatorChange"
                           />
-                          <div class="flex flex-col gap-1">
+                          <div class="flex min-w-0 flex-col gap-1">
                             <OFormInput
                               :aria-label="t('alerts.alertIfNoOfEvents')"
                               name="trigger_condition.threshold"
                               type="number"
                               fit-content
-                              class="max-w-32! min-w-16"
                               min="1"
                               :data-test="countTestIds.threshold"
                               @update:model-value="onTriggerThresholdChange($event)"
@@ -825,13 +819,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                         <template v-else>
                           <span class="leading-8.5">{{ t("alerts.form.group.whenAtLeast") }}</span>
-                          <div class="flex flex-col gap-1">
+                          <div class="flex min-w-0 flex-col gap-1">
                             <OFormInput
                               :aria-label="t('alerts.form.group.countNameGroups')"
                               name="trigger_condition.threshold"
                               type="number"
                               fit-content
-                              class="max-w-32! min-w-16"
                               min="1"
                               :data-test="countTestIds.threshold"
                               @update:model-value="onTriggerThresholdChange($event)"
@@ -1324,13 +1317,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="alert-trigger-operator-select"
                             @update:model-value="onTriggerOperatorChange"
                           />
-                          <div class="flex flex-col gap-1">
+                          <div class="flex min-w-0 flex-col gap-1">
                             <OFormInput
                               :aria-label="t('alerts.alertIfNoOfEvents')"
                               name="trigger_condition.threshold"
                               type="number"
                               fit-content
-                              class="max-w-32! min-w-16"
                               min="1"
                               data-test="alert-trigger-threshold-input"
                               @update:model-value="onTriggerThresholdChange($event)"
@@ -1394,7 +1386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   :data-test="countTestIds.operator"
                                   @update:model-value="onTriggerOperatorChange"
                                 />
-                                <div class="flex flex-col gap-1">
+                                <div class="flex min-w-0 flex-col gap-1">
                                   <OFormInput
                                     :aria-label="
                                       localTab === 'promql'
@@ -1404,7 +1396,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     name="trigger_condition.threshold"
                                     type="number"
                                     fit-content
-                                    class="max-w-32! min-w-16"
                                     min="1"
                                     :data-test="countTestIds.threshold"
                                     @update:model-value="onTriggerThresholdChange($event)"
@@ -1431,13 +1422,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <span class="leading-8.5">{{
                                   t("alerts.form.group.whenAtLeast")
                                 }}</span>
-                                <div class="flex flex-col gap-1">
+                                <div class="flex min-w-0 flex-col gap-1">
                                   <OFormInput
                                     :aria-label="t('alerts.form.group.countNameSeries')"
                                     name="trigger_condition.threshold"
                                     type="number"
                                     fit-content
-                                    class="max-w-32! min-w-16"
                                     min="1"
                                     :data-test="countTestIds.threshold"
                                     @update:model-value="onTriggerThresholdChange($event)"
@@ -1484,13 +1474,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 data-test="alert-sql-agg-operator-select"
                                 @update:model-value="onConditionOperatorChange"
                               />
-                              <div class="flex flex-col gap-1">
+                              <div class="flex min-w-0 flex-col gap-1">
                                 <OFormInput
                                   :aria-label="t('alerts.alertIfNoOfEvents')"
                                   name="query_condition.aggregation.having.value"
                                   type="number"
                                   fit-content
-                                  class="max-w-32! min-w-16"
                                   data-test="alert-sql-agg-value-input"
                                   :placeholder="t('alerts.placeholders.value')"
                                   @update:model-value="onConditionValueChange($event)"
@@ -1616,13 +1605,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @update:model-value="onPromqlOperatorChange"
                             />
                             <!-- Message hangs under the value field it describes. -->
-                            <div class="flex flex-col gap-1">
+                            <div class="flex min-w-0 flex-col gap-1">
                               <OFormInput
                                 :aria-label="t('alerts.alertIfValueIs')"
                                 name="query_condition.promql_condition.value"
                                 type="number"
                                 fit-content
-                                class="max-w-32! min-w-16"
                                 data-test="alert-threshold-value-input"
                                 :debounce="300"
                                 @update:model-value="onPromqlValueChange"
@@ -1692,7 +1680,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-check-every-input"
               type="number"
               fit-content
-              class="max-w-32! min-w-16"
               min="1"
               @update:model-value="onCheckEveryChange($event)"
               @blur="restoreDefaultFrequency"

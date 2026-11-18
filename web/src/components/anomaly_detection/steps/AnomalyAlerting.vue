@@ -213,13 +213,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="anomaly-window-sentence"
               >
                 <template #fire>
-                  <span class="inline-flex items-center gap-0.5">
+                  <span class="inline-flex min-w-0 items-center gap-0.5">
                     <OInput
                       v-model="configModel.alert_window_fire_pct"
                       type="number"
                       :model-modifiers="{ number: true }"
                       fit-content
-                      class="max-w-32! min-w-16"
                       :aria-label="t('alerts.anomaly.windowFirePct')"
                       :placeholder="raw('100')"
                       :error="!!windowShareErrors.fire"
@@ -233,7 +232,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     type="number"
                     :model-modifiers="{ number: true }"
                     fit-content
-                    class="max-w-32! min-w-16"
                     :aria-label="t('alerts.anomaly.windowBuckets')"
                     :placeholder="raw('1')"
                     :error="!!windowShareErrors.buckets"
@@ -252,7 +250,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     type="number"
                     :model-modifiers="{ number: true }"
                     fit-content
-                    class="max-w-32! min-w-16"
                     :aria-label="t('alerts.anomaly.windowRecoverPct')"
                     :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
                     :error="!!windowShareErrors.recover"

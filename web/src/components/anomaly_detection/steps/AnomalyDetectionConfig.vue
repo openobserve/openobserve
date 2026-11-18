@@ -230,14 +230,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ raw("value") }}</code
                 >
               </div>
-              <div class="flex items-start gap-2">
+              <div class="flex min-w-0 items-start gap-2">
                 <span class="flex min-h-8.5 items-center">{{ t("alerts.form.anomaly.per") }}</span>
                 <OFormInput
                   name="histogram_interval_value"
                   type="number"
                   min="1"
                   fit-content
-                  class="max-w-32! min-w-16"
                   :aria-label="t('alerts.anomaly.detectionResolution')"
                   data-test="anomaly-histogram-interval-value"
                 >
@@ -283,7 +282,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 min="1"
                 fit-content
-                class="max-w-32! min-w-16"
                 :aria-label="t('alerts.anomaly.checkEvery')"
                 data-test="anomaly-schedule-interval-value"
               >
@@ -321,7 +319,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 min="1"
                 fit-content
-                class="max-w-32! min-w-16"
                 :aria-label="t('alerts.anomaly.lookBackWindow')"
                 data-test="anomaly-detection-window-value"
               >
@@ -377,7 +374,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('alerts.trainingWindow')"
                 data-test="anomaly-training-window"
                 fit-content
-                class="max-w-32! min-w-16"
               />
               <span>{{ t("alerts.form.units.days") }}</span>
             </div>
@@ -478,7 +474,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :model-modifiers="{ number: true }"
                     :aria-label="t('alerts.anomaly.budgetLabel')"
                     fit-content
-                    class="max-w-32! min-w-16"
                     data-test="anomaly-budget-count"
                   >
                     <template #error />
@@ -546,7 +541,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         sensitivityError ? 'anomaly-manual-level-error' : undefined
                       "
                       fit-content
-                      class="max-w-32! min-w-16"
                       data-test="anomaly-sensitivity-level"
                     >
                       <template #error />
