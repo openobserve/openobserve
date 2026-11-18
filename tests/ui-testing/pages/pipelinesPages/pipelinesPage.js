@@ -131,6 +131,8 @@ export class PipelinesPage {
         this.e2eAutomateOption = page.locator(
           '[data-test="input-node-stream-name-select-option"][data-test-value="e2e_automate"]'
         );
+        this.streamNameOption = (name) =>
+          page.locator(`[data-test="input-node-stream-name-select-option"][data-test-value="${name}"]`);
         this.inputNodeStreamSaveButton = page.locator(
           '[data-test="input-node-stream-drawer"] [data-test="o-drawer-primary-btn"]'
         );
@@ -799,6 +801,14 @@ export class PipelinesPage {
         await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
             .waitFor({ state: 'hidden', timeout: 5000 })
             .catch(() => {});
+    }
+
+    async expectStreamNameOptionVisible(streamName, timeout = 15000) {
+        await expect(this.streamNameOption(streamName).first()).toBeVisible({ timeout });
+    }
+
+    async expectStreamNameOptionCount(streamName, count, timeout = 10000) {
+        await expect(this.streamNameOption(streamName)).toHaveCount(count, { timeout });
     }
 
     async saveInputNodeStream() {
