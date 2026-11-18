@@ -56,13 +56,17 @@ pub fn is_streaming_aggregate(
     (ts_column.is_none() || is_ranked_histogram) && is_cachable_aggs && feature_query_streaming_aggs
 }
 
+/// Whether the leading ORDER BY is not the time column, so time slices cannot be concatenated.
+pub fn is_ranked_by_non_ts_column(sql: &Sql, ts_column: Option<&str>) -> bool {
+    ts_column.is_some_and(|ts| {
+        is_ranked_by_non_timestamp(&normalize_ts_order_by(&sql.order_by, ts, &sql.aliases), ts)
+    })
+}
+
 /// A histogram whose leading ORDER BY is not its time column: its top-N is only right after
 /// every slice is merged, which the aggregation cache does and the result cache cannot.
 pub fn is_ranked_histogram(sql: &Sql, ts_column: Option<&str>) -> bool {
-    sql.histogram_interval.is_some()
-        && ts_column.is_some_and(|ts| {
-            is_ranked_by_non_timestamp(&normalize_ts_order_by(&sql.order_by, ts, &sql.aliases), ts)
-        })
+    sql.histogram_interval.is_some() && is_ranked_by_non_ts_column(sql, ts_column)
 }
 
 /// Prepare streaming aggregate execution: discover cache, generate partition strategy,
