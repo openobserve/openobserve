@@ -15670,7 +15670,7 @@
       },
       "preview": {
         "range": "Preview range",
-        "checks": "Last 3 checks",
+        "checks": "Last check | Last {count} checks",
         "lastMinutes": "Last {minutes} min",
         "hours12": "Last 12 hours",
         "hours24": "Last 24 hours"

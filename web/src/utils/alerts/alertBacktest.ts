@@ -103,7 +103,7 @@ export function cronCheckTimes(
 }
 
 // A histogram key is either microseconds or an ISO time the server writes in UTC without a zone.
-const keyToMs = (key: unknown): number | null => {
+export const keyToMs = (key: unknown): number | null => {
   if (typeof key === "number") return key > 1e14 ? key / 1000 : key;
   if (typeof key !== "string" || !key) return null;
   const parsed = Date.parse(/(Z|[+-]\d\d:?\d\d)$/.test(key) ? key : `${key}Z`);

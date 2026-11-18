@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         valueKey="value"
         :searchable="false"
         size="xs"
+        width="sm"
         :aria-label="t('alerts.form.preview.range')"
         data-test="alert-preview-range"
       />
@@ -68,6 +69,7 @@ import {
 } from "vue";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
+import { keyToMs } from "@/utils/alerts/alertBacktest";
 import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import {
   cleanAggregationQuery,
@@ -262,17 +264,20 @@ watch(previewRange, (range) => {
 // An org-wide preview range set by the admin replaces "the last 3 checks".
 const orgPreviewMinutes = (): number =>
   Number(store.state.zoConfig?.alert_preview_timerange_minutes) || 0;
+// A SQL verdict counts the rows the query returns, which only one window can give.
+const previewChecks = computed(() => (props.selectedTab === "sql" ? 1 : 3));
+const alertWindowMinutes = (): number => Number(props.formData.trigger_condition?.period) || 0;
 const previewMinutes = (): number => {
   if (previewRange.value !== "checks") return PREVIEW_RANGE_MINUTES[previewRange.value];
   if (orgPreviewMinutes() > 0) return orgPreviewMinutes();
-  return Math.max(3 * (Number(props.formData.trigger_condition?.period) || 0), 5);
+  return Math.max(previewChecks.value * alertWindowMinutes(), 5);
 };
 const previewRangeOptions = computed(() => [
   {
     label:
       orgPreviewMinutes() > 0
         ? t("alerts.form.preview.lastMinutes", { minutes: orgPreviewMinutes() })
-        : t("alerts.form.preview.checks"),
+        : t("alerts.form.preview.checks", { count: previewChecks.value }, previewChecks.value),
     value: "checks",
   },
   { label: t("alerts.form.preview.hours12"), value: "12h" },
@@ -659,6 +664,10 @@ const handleChartDataUpdate = (resultMetaData: any) => {
   // stale promql_condition around after the user switches modes.
   // (This makes the `selectedTab === "promql"` arm of the chain below dead code.)
   if (props.selectedTab === "promql") return;
+  if (props.selectedTab === "sql" && previewMinutes() > alertWindowMinutes()) {
+    evaluationStatus.value = null;
+    return;
+  }
 
   // resultMetaData structure from usePanelDataLoader:
   // resultMetaData[queryIndex] is an array of metadata objects from streaming partitions
@@ -716,7 +725,7 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           const allHits: any[] = [];
           for (const partition of firstQueryMetadata) {
             if (Array.isArray(partition?.hits)) {
-              allHits.push(...partition.hits);
+              allHits.push(...partition.hits.filter(inVerdictWindow));
             }
           }
 
@@ -867,7 +876,7 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           for (const partition of firstQueryMetadata) {
             if (Array.isArray(partition?.hits)) {
               for (const hit of partition.hits) {
-                if (hit.zo_sql_num !== undefined) {
+                if (hit.zo_sql_num !== undefined && inVerdictWindow(hit)) {
                   resultCount += hit.zo_sql_num;
                 }
               }
@@ -1363,6 +1372,12 @@ const refreshRulePreview = async (at: number) => {
 };
 
 let lastRunKey = "";
+// The chart may cover several checks, but the verdict judges the latest window only.
+let verdictWindowStartMs = 0;
+const inVerdictWindow = (hit: { zo_sql_key?: unknown }): boolean => {
+  const at = keyToMs(hit?.zo_sql_key);
+  return at === null || at >= verdictWindowStartMs;
+};
 
 const refreshData = () => {
   // Skip if there is no query to run (e.g. user switched to SQL/PromQL
@@ -1404,6 +1419,8 @@ const refreshData = () => {
   else rulePreviewGeneration++;
 
   const startTime = endTime - new_relative_time * 60 * 1000000;
+  verdictWindowStartMs =
+    endTime / 1000 - (Number(props.formData.trigger_condition?.period) || 0) * 60_000;
 
   dashboardPanelData.meta.dateTime = {
     start_time: new Date(startTime),

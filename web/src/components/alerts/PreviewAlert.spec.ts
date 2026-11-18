@@ -2905,18 +2905,44 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
   });
 
   it.each([
-    [10, "checks", 30],
-    [1, "checks", 5],
-    [10, "12h", 720],
-    [10, "24h", 1440],
-  ])("a %s min check over %s previews %s min", async (period, range, minutes) => {
+    ["custom", 10, "checks", 30],
+    ["custom", 1, "checks", 5],
+    ["sql", 10, "checks", 10],
+    ["custom", 10, "12h", 720],
+    ["custom", 10, "24h", 1440],
+  ])("a %s alert checking %s min over %s previews %s min", async (tab, period, range, minutes) => {
     const formData = baseFormData();
     formData.trigger_condition.period = period;
-    const w = await mountComp({ query: "SELECT * FROM logs", formData });
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: tab, formData });
     w.vm.previewRange = range;
     w.vm.refreshData();
     await flushPromises();
     expect(spanMinutes(w)).toBe(minutes);
+    w.unmount();
+  });
+
+  it("judges the verdict on the alert's own window, however wide the chart is", async () => {
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "custom",
+      isAggregationEnabled: false,
+      formData: baseFormData(),
+    });
+    w.vm.previewRange = "24h";
+    w.vm.refreshData();
+    await flushPromises();
+    const at = (minutesAgo: number) => (Date.now() - minutesAgo * 60_000) * 1000;
+    await emitResultMetadata(w, [
+      [
+        {
+          hits: [
+            { zo_sql_key: at(600), zo_sql_num: 90 },
+            { zo_sql_key: at(4), zo_sql_num: 3 },
+          ],
+        },
+      ],
+    ]);
+    expect(w.vm.evaluationStatus?.count).toBe(3);
     w.unmount();
   });
 
