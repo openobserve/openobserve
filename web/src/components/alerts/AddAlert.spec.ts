@@ -353,6 +353,21 @@ describe("AddAlert (OForm owner)", () => {
         }),
       );
     });
+    // The host leaves after a save; a reset first would flash a blank alert of another type.
+    it("keeps the saved real-time alert on screen until the host leaves", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("is_real_time", "true");
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect(wrapper.emitted("update:list")).toBeTruthy();
+      expect(form.state.values).toMatchObject({ name: "test_alert", is_real_time: "true" });
+    });
   });
 
   // The pre-save gates that are NOT schema rules — re-homed from the old

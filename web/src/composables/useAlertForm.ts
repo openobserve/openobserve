@@ -2778,7 +2778,6 @@ export function useAlertForm(
     if (sqlCheck === "blocked") return false;
 
     const payload = getAlertPayload();
-    // Read before the save: resetForm in .then clears the form the payload came from.
     const sendsNowhere = !hasDeliveryTarget(payload);
 
     const dismiss = toast({
@@ -2808,7 +2807,6 @@ export function useAlertForm(
       const request = callAlert
         .then((res: { data: any }) => {
           invalidateSiemDetections();
-          resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
           dismiss();
@@ -2850,7 +2848,6 @@ export function useAlertForm(
       const request = callAlert
         .then((res: { data: any }) => {
           invalidateSiemDetections();
-          resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
           dismiss();
