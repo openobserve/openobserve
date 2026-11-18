@@ -837,25 +837,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <AlertSuggestionLine section="details" anchor="end" />
                 <AlertTierLinks
                   section="details"
+                  class="[&>*]:py-0!"
                   :view="tiers.view('details')"
                   @add="onTierAdd"
                   @toggle="tiers.toggle('details')"
                 />
                 <section
-                  class="border-border-default bg-surface-base rounded-surface mt-3 flex flex-col overflow-hidden border"
+                  class="border-border-default bg-surface-base rounded-surface mt-2 flex flex-col overflow-hidden border"
                   aria-labelledby="add-alert-review-title"
                   data-test="add-alert-review"
                 >
                   <h3
                     id="add-alert-review-title"
-                    class="text-text-heading m-0 px-3.5 pt-2.5 pb-1.5 text-sm font-semibold"
+                    class="text-text-heading m-0 px-3.5 pt-2 pb-1 text-sm font-semibold"
                   >
                     {{ t("alerts.sections.review.title") }}
                   </h3>
                   <div
                     v-for="(line, index) in reviewLines"
                     :key="line.id"
-                    class="text-compact flex min-w-0 items-center gap-3 px-3.5 py-1.75"
+                    class="text-compact flex min-w-0 items-center gap-3 px-3.5 py-1.5"
                     :class="{ 'border-border-subtle border-t': index > 0 }"
                   >
                     <i18n-t
