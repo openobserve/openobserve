@@ -18,7 +18,6 @@ import "@/locales";
 import { gt } from "@/types/i18n";
 import type { AutoObserveCoverage, AutoObserveSuggestion } from "@/services/autoobserve";
 import { toCoverageSource, toRequests, toSuggestionRows } from "./liveAdapter";
-import { streamLearningList } from "./LiveCoverageLearning";
 import { detectorsOf } from "../aoTypes";
 import { KIND_LOOK } from "../v2/changes";
 
@@ -375,9 +374,9 @@ describe("toCoverageSource", () => {
       { state: "watched", label: "Watched" },
       { state: "gap", label: "Coverage gap" },
     ]);
-    expect(
-      String(streamLearningList(gt, EAST, source.rows[0].identity!.streams, 14, now)?.summary),
-    ).toBe("Learning until Nov 17 · young (logs)");
+    expect(source.rows[0].identity?.streams).toEqual([
+      expect.objectContaining({ name: "young", learning_until: later }),
+    ]);
     expect(source.totals).toMatchObject({
       total: 4,
       gaps: 2,
