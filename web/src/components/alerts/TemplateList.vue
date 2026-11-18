@@ -92,8 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="visibleRows"
           :columns="columns"
           :column-visibility="columnVisibility"
-          table-id="alert-templates"
-          :persist-columns="true"
           row-key="name"
           :loading="loading"
           :forbidden="forbidden"
@@ -162,6 +160,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
+            <OTableColumnToggle
+              :columns="columns"
+              :column-visibility="columnVisibility"
+              :default-column-visibility="responsiveColumns"
+              data-test="template-list-column-toggle"
+              @update:column-visibility="setColumnVisibility"
+            />
             <ORefreshButton
               layout="inline"
               variant="outline"
@@ -445,6 +450,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -543,12 +549,28 @@ const columns: OTableColumnDef[] = [
 ];
 // Below md the two 200px columns took the row and cut each name to a few letters.
 // An explicit map, not undefined, so the columns come back when the viewport grows.
-// The column chooser (persist-columns) lets a user show either column again; that choice wins.
 const { isMobile } = useBreakpoint();
-const columnVisibility = computed(() => ({
+const responsiveColumns = computed<Record<string, boolean>>(() => ({
   applies_to: !isMobile.value,
   used_by: !isMobile.value,
 }));
+// Only the columns the user changed in the chooser, so a choice on one viewport
+// does not freeze the other column's default on the other viewport.
+const columnOverrides = ref<Record<string, boolean>>({});
+const columnVisibility = computed(() => ({
+  ...responsiveColumns.value,
+  ...columnOverrides.value,
+}));
+// A changed column back at its viewport default drops its override (this is also how Reset clears).
+const setColumnVisibility = (next: Record<string, boolean>) => {
+  const overrides = { ...columnOverrides.value };
+  for (const [id, visible] of Object.entries(next)) {
+    if (visible === (columnVisibility.value[id] ?? true)) continue;
+    if (visible === (responsiveColumns.value[id] ?? true)) delete overrides[id];
+    else overrides[id] = visible;
+  }
+  columnOverrides.value = overrides;
+};
 const showTemplateEditor = ref(false);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);

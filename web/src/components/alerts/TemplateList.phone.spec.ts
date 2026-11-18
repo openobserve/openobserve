@@ -52,7 +52,6 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
   };
 
   afterEach(() => {
-    localStorage.clear();
     wrapper?.unmount();
     wrapper = undefined;
     mdUpRef.value = true;
@@ -70,21 +69,67 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
     expect(shown).not.toContain("Used by");
   });
 
+  const toggle = () => wrapper!.findComponent({ name: "OTableColumnToggle" });
+  const choose = async (visibility: Record<string, boolean>) => {
+    toggle().vm.$emit("update:columnVisibility", visibility);
+    await flushPromises();
+  };
+  const resize = async (desktop: boolean) => {
+    mdUpRef.value = desktop;
+    await nextTick();
+    await flushPromises();
+  };
+
   it("lets a phone user show a hidden column again from the column chooser", async () => {
     mdUpRef.value = false;
     await mountList();
 
-    const toggle = wrapper!.findComponent({ name: "OTableColumnToggle" });
-    expect(toggle.exists()).toBe(true);
-    expect(toggle.props("columns").map((c: { id: string }) => c.id)).toEqual(
-      expect.arrayContaining(["applies_to", "used_by"]),
-    );
-    toggle.vm.$emit("update:columnVisibility", { applies_to: true, used_by: false });
-    await flushPromises();
+    expect(toggle().exists()).toBe(true);
+    expect(
+      toggle()
+        .props("columns")
+        .map((c: { id: string }) => c.id),
+    ).toEqual(expect.arrayContaining(["applies_to", "used_by"]));
+    await choose({ applies_to: true, used_by: false });
 
     const shown = headers(wrapper!);
     expect(shown).toContain("Applies to");
     expect(shown).not.toContain("Used by");
+  });
+
+  it("keeps a phone choice from hiding the untouched column on desktop", async () => {
+    mdUpRef.value = false;
+    await mountList();
+    await choose({ applies_to: true, used_by: false });
+
+    await resize(true);
+    expect(headers(wrapper!)).toEqual(expect.arrayContaining(["Applies to", "Used by"]));
+  });
+
+  it("keeps a desktop hide from showing the untouched column on a phone", async () => {
+    await mountList();
+    await choose({ applies_to: false, used_by: true });
+    expect(headers(wrapper!)).not.toContain("Applies to");
+
+    await resize(false);
+    const shown = headers(wrapper!);
+    expect(shown).not.toContain("Applies to");
+    expect(shown).not.toContain("Used by");
+  });
+
+  it("returns to the viewport defaults on Reset", async () => {
+    mdUpRef.value = false;
+    await mountList();
+    await choose({ applies_to: true, used_by: true });
+    expect(toggle().props("defaultColumnVisibility")).toEqual({
+      applies_to: false,
+      used_by: false,
+    });
+
+    await choose({ applies_to: false, used_by: false });
+    expect(headers(wrapper!)).not.toContain("Applies to");
+    await resize(true);
+    expect(headers(wrapper!)).toEqual(expect.arrayContaining(["Applies to", "Used by"]));
   });
 
   it("shows both columns again when the viewport grows to md", async () => {
