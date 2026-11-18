@@ -13,7 +13,8 @@ on:
   merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
+  # A label that changes nothing here only mirrors results, so it must neither replace nor queue behind a real run.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci"]'), github.event.label.name)) && '-mirror' || '' }}
   # Only a new commit cancels: a cancelled same-SHA run leaves a failed required summary that a newer run cannot clear.
   cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.action == 'synchronize' }}
 
@@ -35,7 +36,8 @@ env:
 jobs:
   check_changes:
     # Runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests only (see docs/ci).
-    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) }}
+    # Other labels change nothing here, so they skip every paid job and api_tests_summary mirrors the last real result.
+    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) && !(contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci"]'), github.event.label.name)) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -520,11 +522,28 @@ jobs:
 
   api_tests_summary:
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
+      checks: read
+      actions: read
     needs: [check_changes, build_api_binary, api_integration_tests, api_query_agent_tests, api_alerts_pending_tests]
     if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
+    env:
+      LABEL_NOISE: ${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci"]'), github.event.label.name)) }}
     steps:
+      - name: Check out the mirror action
+        if: env.LABEL_NOISE == 'true'
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/actions/mirror-check-result
+          persist-credentials: false
+      - name: Mirror the last real result
+        if: env.LABEL_NOISE == 'true'
+        uses: ./.github/actions/mirror-check-result
+        with:
+          check-name: api_tests_summary
       - name: Check test results
+        if: env.LABEL_NOISE != 'true'
         run: |
           # 1. check_changes must have succeeded.
           if [ "${{ needs.check_changes.result }}" != "success" ]; then
@@ -558,7 +577,7 @@ jobs:
   report_to_openobserve:
     name: Report run metrics to OpenObserve
     needs: [check_changes, api_integration_tests, api_query_agent_tests, api_alerts_pending_tests]
-    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
+    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) && !(contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci"]'), github.event.label.name))
     runs-on: ubuntu-latest
     permissions:
       actions: read
