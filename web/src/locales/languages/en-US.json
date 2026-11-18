@@ -15250,24 +15250,66 @@
       "fromClusters": "from {clusters}",
       "moreStreams": "+{count} stream | +{count} streams",
       "moreStreamsLabel": "More matched streams",
-      "setUp": "Set up {title}",
       "setUpShort": "Set up",
       "findOther": "Find packs for other data",
       "interrupted": "{title} setup stopped partway · {made} of {total} done",
       "silentNoIncidents": "No incidents · {count} {title} alert is silent | No incidents · {count} {title} alerts are silent",
       "silentTitle": "{count} {title} alert is silent | {count} {title} alerts are silent",
       "silentSub": "They show what would fire but notify no one. Turn them on to get notified.",
-      "stripTitle": "Ready-made content for your data",
-      "stripMeta": "{count} starter pack fits streams you already send · undo any setup for 24 hours | {count} starter packs fit streams you already send · undo any setup for 24 hours",
-      "fits": "Fits {stream}",
       "askAdmin": "Ask an admin",
       "copyLink": "Copy link",
       "askAdminLine": "Starter packs fit your data. Ask an admin to add them.",
-      "findOtherSub": "Nginx, PostgreSQL, AWS and more in the Starter Packs library.",
-      "browse": "Browse starter packs",
       "streamCount": "{count} stream | {count} streams",
       "ingestedToday": "{size} today",
-      "openStreams": "Open streams"
+      "openStreams": "Open streams",
+      "heroTitle": "Your data is arriving. Turn it into monitoring.",
+      "heroSub": "Pick a starter pack below. It creates dashboards, alerts and saved views that fit your streams.",
+      "reviewSetUp": "Review and set up",
+      "reviewSetUpLabel": "Review and set up {title}",
+      "bestStart": "Best place to start",
+      "cards": {
+        "andMore": "{list} and {count} more",
+        "panels": "{count} panel | {count} panels",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} for {clusters}. | {title}: {panels} for {clusters} clusters.",
+            "fallback": "{title}: every node, pod and workload."
+          },
+          "alerts": {
+            "template": "{alert_names}. Fire for every cluster ({clusters}). Off until you turn them on.",
+            "fallback": "{alert_names}. Fire for every cluster. Off until you turn them on.",
+            "plain": "Fire for every cluster. Off until you turn them on."
+          },
+          "savedViews": {
+            "template": "Kubernetes events: every event in {stream}, one click from Logs.",
+            "fallback": "Kubernetes events, one click from Logs."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "Host Metrics: CPU, memory and disk for each host."
+          },
+          "alerts": {
+            "template": "{alert_names}. Fire for every host. Off until you turn them on.",
+            "fallback": "Fire for every host. Off until you turn them on."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} for your data.",
+            "fallback": "{title}, built for your streams."
+          },
+          "alerts": {
+            "template": "{alert_names}. Fire across all your matching data. Off until you turn them on.",
+            "fallback": "Fire across all your matching data. Off until you turn them on."
+          },
+          "savedViews": {
+            "template": "{stream} in Logs, one click away.",
+            "fallback": "One click from Logs."
+          }
+        }
+      },
+      "previewFailed": "Couldn't load what this pack sets up. Review it to try again."
     },
     "whatGetsCreated": {
       "subtitle": "{title} starter pack",
@@ -15310,7 +15352,6 @@
       "reasonNeedsPlan": "{name}: needs the Enterprise plan",
       "source": "From the Library at {host}. The pack built into this version works offline.",
       "sourceOffline": "{host} can't be reached. Using the pack built into this version, which works offline.",
-      "summary": "{count} item. You can undo the setup for 24 hours. | {count} items. You can undo the setup for 24 hours.",
       "nothingToCreate": "You already have every item in this pack",
       "openKubernetes": "Open Kubernetes",
       "openDashboard": "Open dashboard",
@@ -15325,7 +15366,9 @@
       "setUp": "Set up",
       "allExist": "You already have all {count} items in this pack. Existing alerts keep their settings.",
       "continue": "Continue",
-      "alertsMeta": "{count} · {critical} critical · {warning} warning"
+      "alertsMeta": "{count} · {critical} critical · {warning} warning",
+      "setUpCount": "Set up {count} item | Set up {count} items",
+      "undoNote": "You can undo this for 24 hours"
     },
     "progress": {
       "title": "Setting up {title} monitoring",

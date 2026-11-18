@@ -560,8 +560,11 @@ const openLabel = computed(() =>
       : "starterPacks.libraryTabs.openPack",
   ),
 );
-const summaryLine = computed(() =>
-  t("starterPacks.drawer.summary", { count: picked.value }, picked.value),
+// The count waits for the plan, so the button never reads a zero it has not counted.
+const setUpLabel = computed(() =>
+  flow.previewState.value === "ready"
+    ? t("starterPacks.drawer.setUpCount", { count: picked.value }, picked.value)
+    : t("starterPacks.drawer.setUp"),
 );
 
 const ensurePreview = () => {
@@ -1176,7 +1179,7 @@ watch(open, (isOpen) => {
           variant="meta"
           class="truncate"
           data-test="starter-pack-drawer-summary"
-          >{{ summaryLine }}</OText
+          >{{ t("starterPacks.drawer.undoNote") }}</OText
         >
         <span class="flex-1" />
         <OButton
@@ -1224,7 +1227,7 @@ watch(open, (isOpen) => {
           data-test="starter-pack-drawer-submit-btn"
           @click="startSetup"
         >
-          {{ t("starterPacks.drawer.setUp") }}
+          {{ setUpLabel }}
         </OButton>
       </div>
     </template>

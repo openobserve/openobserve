@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { onBeforeUnmount } from "vue";
+import { computed, onBeforeUnmount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -23,7 +23,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { StarterPack } from "@/composables/starterPacks/types";
 import { useHomePacks, type HomePacks } from "@/composables/starterPacks/useHomePacks";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
 import StarterPackHomeRow from "./StarterPackHomeRow.vue";
 import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
@@ -37,21 +37,74 @@ const { t } = useI18nTyped();
 const home = useHomePacks(props.org, props.packs);
 emit("ready", home);
 onBeforeUnmount(() => emit("ready", null));
+// The badge belongs on a row the user can start, never on an Ask an admin row.
+const firstOffer = computed(() =>
+  home.offered.value.findIndex((item) => item.view.value === "offer"),
+);
 </script>
 
 <template>
   <div class="mt-2.5 mb-3 flex shrink-0 flex-col gap-3 empty:hidden" data-test="home-pack-section">
-    <OText v-if="home.labelShown.value" variant="section" data-test="home-pack-label">{{
+    <div
+      v-if="home.offerShown.value"
+      class="bg-surface-panel border-border-default rounded-surface flex items-center gap-4 border p-4"
+      data-test="home-pack-hero"
+    >
+      <span
+        class="relative flex size-11 shrink-0 items-center justify-center"
+        data-test="home-pack-hero-icon"
+      >
+        <span
+          class="pack-hero-ring border-status-success-text pointer-events-none absolute inset-0 rounded-full border-2 opacity-0"
+          aria-hidden="true"
+        />
+        <span
+          class="pack-hero-ring pack-hero-ring-late border-status-success-text pointer-events-none absolute inset-0 rounded-full border-2 opacity-0"
+          aria-hidden="true"
+        />
+        <span
+          class="bg-icon-chip-success-bg text-icon-chip-success-text rounded-default relative flex size-11 items-center justify-center"
+        >
+          <OIcon name="sensors" size="md" />
+        </span>
+      </span>
+      <div class="flex min-w-0 flex-col gap-1">
+        <OText variant="section" as="div" data-test="home-pack-label">{{
+          t("starterPacks.home.label")
+        }}</OText>
+        <h2 class="text-text-heading text-base font-semibold">
+          {{ t("starterPacks.home.heroTitle") }}
+        </h2>
+        <OText variant="meta" wrap>{{ t("starterPacks.home.heroSub") }}</OText>
+      </div>
+    </div>
+    <OText v-else-if="home.labelShown.value" variant="section" data-test="home-pack-label">{{
       t("starterPacks.home.label")
     }}</OText>
     <div
       v-if="home.loading.value"
-      class="border-border-default rounded-surface flex flex-col gap-2 border p-4"
+      class="border-border-default rounded-surface flex flex-col overflow-hidden border"
       data-test="home-pack-card-skeleton"
     >
-      <OSkeleton class="h-6 w-1/2" />
-      <OSkeleton class="h-4 w-full" />
-      <OSkeleton class="h-8 w-1/3" />
+      <div class="border-border-subtle flex items-center gap-3 border-b px-4 py-3">
+        <OSkeleton class="size-8 shrink-0" />
+        <div class="flex flex-1 flex-col gap-1.5">
+          <OSkeleton class="h-4 w-1/4" />
+          <OSkeleton class="h-3 w-1/6" />
+        </div>
+        <OSkeleton class="h-8 w-36 shrink-0" />
+      </div>
+      <div class="flex max-md:flex-col">
+        <div
+          class="border-border-subtle flex w-60 shrink-0 flex-col gap-2 border-e px-4 py-3 max-md:w-full max-md:border-e-0 max-md:border-b"
+        >
+          <OSkeleton class="h-4 w-3/4" />
+          <OSkeleton class="h-4 w-2/3" />
+        </div>
+        <div class="grid flex-1 grid-cols-3 gap-3 p-3 max-sm:grid-cols-1">
+          <OSkeleton v-for="n in 3" :key="n" class="h-16 w-full" />
+        </div>
+      </div>
     </div>
 
     <template v-for="item in home.notices.value" :key="item.pack.id">
@@ -168,48 +221,25 @@ onBeforeUnmount(() => emit("ready", null));
       </template>
     </OBanner>
 
-    <section v-if="home.showSection.value" class="flex flex-col gap-2" data-test="home-pack-offer">
-      <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1" data-test="home-pack-offer-header">
-        <h2 class="text-text-heading text-base font-semibold">
-          {{ t("starterPacks.home.stripTitle") }}
-        </h2>
-        <OText variant="meta">
-          {{ raw("·") }}
-          {{
-            t(
-              "starterPacks.home.stripMeta",
-              { count: home.offered.value.length },
-              home.offered.value.length,
-            )
-          }}
-        </OText>
+    <section v-if="home.showSection.value" class="flex flex-col gap-3" data-test="home-pack-offer">
+      <div class="flex flex-col gap-3" data-test="home-pack-offer-rows">
+        <StarterPackHomeRow
+          v-for="(item, index) in home.offered.value"
+          :key="item.pack.id"
+          :item="item"
+          :first="index === firstOffer"
+        />
       </div>
-
-      <div
-        class="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-md:grid-cols-1"
-        data-test="home-pack-offer-rows"
-      >
-        <StarterPackHomeRow v-for="item in home.offered.value" :key="item.pack.id" :item="item" />
-        <div
-          class="border-border-default rounded-surface flex min-w-0 flex-col items-start justify-center gap-2.5 border border-dashed p-3.5"
-          data-test="home-pack-find-other"
+      <div class="flex justify-end" data-test="home-pack-find-other">
+        <OButton
+          variant="ghost-primary"
+          size="sm"
+          icon-right="chevron-right"
+          data-test="home-pack-find-other-browse-btn"
+          @click="home.library"
         >
-          <div class="text-text-secondary flex items-center gap-2">
-            <OIcon name="manage-search" size="sm" class="shrink-0" />
-            <OText variant="body-strong" class="text-text-heading">{{
-              t("starterPacks.home.findOther")
-            }}</OText>
-          </div>
-          <OText variant="meta">{{ t("starterPacks.home.findOtherSub") }}</OText>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="home-pack-find-other-browse-btn"
-            @click="home.library"
-          >
-            {{ t("starterPacks.home.browse") }}
-          </OButton>
-        </div>
+          {{ t("starterPacks.home.findOther") }}
+        </OButton>
       </div>
     </section>
 
@@ -230,3 +260,27 @@ onBeforeUnmount(() => emit("ready", null));
     </template>
   </div>
 </template>
+
+<style scoped>
+/* keep(keyframes): scoped rewrites the keyframe name, so the rings' animation and its keyframes stay together */
+@media (prefers-reduced-motion: no-preference) {
+  .pack-hero-ring {
+    animation: pack-hero-ring 2.4s ease-out infinite;
+  }
+
+  .pack-hero-ring-late {
+    animation-delay: 1.2s;
+  }
+}
+
+@keyframes pack-hero-ring {
+  from {
+    opacity: 0.3;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+</style>

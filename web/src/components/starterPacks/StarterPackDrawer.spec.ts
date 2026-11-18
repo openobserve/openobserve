@@ -138,10 +138,11 @@ describe("StarterPackDrawer", () => {
     expect(wrapper.get('[data-test="starter-pack-drawer-note"]').text()).toBe(
       "Kubernetes starter pack · built for staging-eu-1",
     );
-    expect(submit(wrapper).text()).toBe("Set up");
+    expect(submit(wrapper).text()).toBe("Set up 4 items");
     expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
-      "4 items. You can undo the setup for 24 hours.",
+      "You can undo this for 24 hours",
     );
+    expect(wrapper.text().match(/24 hours/g)).toHaveLength(1);
     expect(wrapper.text()).toContain("Kubernetes pack");
     expect(has(wrapper, "starter-pack-drawer-stepper")).toBe(true);
     expect(wrapper.get('[data-test="starter-pack-drawer-reach-line"]').text()).toContain(
@@ -179,8 +180,9 @@ describe("StarterPackDrawer", () => {
   it("leaves an unticked row out of the install and drops the count", async () => {
     const flow = ready();
     const wrapper = await shown(flow);
+    expect(submit(wrapper).text()).toBe("Set up 4 items");
     await rowChecks(wrapper, "alert")[0].trigger("click");
-    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toContain("3 items");
+    expect(submit(wrapper).text()).toBe("Set up 3 items");
     await submit(wrapper).trigger("click");
     await flushPromises();
     expect(flow.install).toHaveBeenCalledWith(undefined, {
@@ -217,7 +219,7 @@ describe("StarterPackDrawer", () => {
       "false",
       "false",
     ]);
-    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toContain("2 items");
+    expect(submit(wrapper).text()).toBe("Set up 2 items");
   });
 
   it("disables setup when nothing is ticked", async () => {
@@ -225,6 +227,7 @@ describe("StarterPackDrawer", () => {
     for (const id of ["dashboard", "alert", "savedView"]) {
       await groupCheck(wrapper, id).trigger("click");
     }
+    expect(submit(wrapper).text()).toBe("Set up 0 items");
     expect(submit(wrapper).attributes("disabled")).toBeDefined();
   });
 
@@ -515,6 +518,7 @@ describe("StarterPackDrawer", () => {
       "Checking which items fit your data",
     );
     expect(submit(wrapper).attributes("disabled")).toBeDefined();
+    expect(submit(wrapper).text()).toBe("Set up");
   });
 
   it("loads the preview on open and offers Retry when it fails", async () => {
