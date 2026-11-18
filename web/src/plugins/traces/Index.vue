@@ -320,7 +320,11 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
-import { tracesRunIsStaged, tracesSearchRunSignature } from "./tracesSearchBar.utils";
+import {
+  tracesQueryNotRun,
+  tracesRunIsStaged,
+  tracesSearchRunSignature,
+} from "./tracesSearchBar.utils";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import analytics from "@/services/product_analytics";
@@ -2725,7 +2729,10 @@ const tracesShortcuts = [
   },
   {
     id: "tracesCopyUrl",
-    handler: () => copyTracesUrl(t),
+    // The shortcut copies without the Share button, so it applies the button's gate itself.
+    handler: () => {
+      if (!tracesQueryNotRun(searchObj)) copyTracesUrl(t);
+    },
   },
   {
     id: "tracesNextRow",

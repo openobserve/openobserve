@@ -1531,6 +1531,54 @@ describe("SearchBar", () => {
     });
   });
 
+  describe("share link of an unrun query", () => {
+    const shareBtn = () => wrapper.find('[data-test="logs-search-bar-share-link-btn"]');
+    const markRun = () => {
+      searchObjInstance.meta.lastRunSignature = tracesSearchRunSignature(searchObjInstance);
+    };
+    const mountWithShare = () =>
+      mount(SearchBar, {
+        attachTo: "#app",
+        props: { fieldValues: {}, isLoading: false },
+        global: { plugins: [store, router], stubs: { ...sharedStubs, ShareButton: false } },
+      });
+
+    beforeEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, web_url: "http://localhost" };
+    });
+
+    afterEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, web_url: "" };
+    });
+
+    it("disables Share with the Logs reason once a builder chip waits for Run", async () => {
+      markRun();
+      wrapper = mountWithShare();
+      await flushPromises();
+      expect(shareBtn().attributes("aria-disabled")).toBeUndefined();
+
+      expect((wrapper.vm as any).onFilterBuilderQuery("operation_name = 'POST /checkout'")).toBe(
+        false,
+      );
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBe("true");
+      expect(shareBtn().text()).toContain("search.autoRunPersistNeedsRun");
+
+      markRun();
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBeUndefined();
+    });
+
+    it("disables Share before the first run", async () => {
+      wrapper = mountWithShare();
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBe("true");
+    });
+  });
+
   describe("toolbar collapse stages", () => {
     let widthSpy: ReturnType<typeof mockToolbarWidth>;
     const { isPinned, togglePin } = useToolbarPins("traces");

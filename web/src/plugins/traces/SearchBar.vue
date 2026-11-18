@@ -447,6 +447,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="icon-md"
             shortcut-id="tracesCopyUrl"
+            :disabled="!!shareReason"
+            :tooltip="shareReason || undefined"
           />
           <ODropdown side="bottom" align="end">
             <template #trigger>
@@ -811,6 +813,7 @@ import {
 } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
+  tracesQueryNotRun,
   tracesRunIsStaged,
   tracesToolbarLayout,
   TRACES_TOOLBAR_WIDTHS,
@@ -960,6 +963,10 @@ export default defineComponent({
       if (typeof applied !== "string") return false;
       return String(searchObj.data.editorValue ?? "").trim() !== applied.trim();
     });
+    // The URL already carries the staged edit, so a link before Run would share a query nobody ran.
+    const shareReason = computed(() =>
+      tracesQueryNotRun(searchObj) ? t("search.autoRunPersistNeedsRun") : null,
+    );
     const recentListActive = ref(false);
     const { enabled: recentSearchesEnabled } = useRecentSearches();
     const recentList = useRecentSearchesList("traces", recentListActive);
@@ -1818,6 +1825,7 @@ export default defineComponent({
       onErrorOnlyToggle,
       updateNewDateTime,
       tracesShareURL,
+      shareReason,
       config,
       applyFilters,
       removeFilterByField,

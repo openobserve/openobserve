@@ -27,6 +27,7 @@ import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
 import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 import analytics from "@/services/product_analytics";
 import queryHistory from "@/services/query_history";
 import type { QueryHistoryEntry } from "@/services/query_history";
@@ -233,7 +234,7 @@ vi.mock("@/composables/useTraces", () => ({
     getUrlQueryParams: vi.fn(() => ({})),
     applyUrlListState: mockApplyUrlListState,
     syncUrlViewState: mockSyncUrlViewState,
-    copyTracesUrl: vi.fn(),
+    copyTracesUrl: mockCopyTracesUrl,
     formatTracesMetaData: vi.fn((hits) => hits),
     setServiceColors: mockSetServiceColors,
     loadLocalLogFilterField: mockLoadLocalLogFilterField,
@@ -287,8 +288,9 @@ const { createdTracesParsers, trackTracesParser } = vi.hoisted(() => {
 });
 
 // Hoisted so tests can assert resetSearchObj was called by the component lifecycle.
-const { mockResetSearchObj } = vi.hoisted(() => ({
+const { mockResetSearchObj, mockCopyTracesUrl } = vi.hoisted(() => ({
   mockResetSearchObj: vi.fn(),
+  mockCopyTracesUrl: vi.fn(),
 }));
 
 // Hoisted so tests can control what restoreTracesStream returns.
@@ -897,6 +899,43 @@ describe("Index.vue (Main Traces Page)", () => {
       await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled(), {
         timeout: 3000,
       });
+    });
+  });
+
+  describe("Copy link shortcut", () => {
+    const pressCopyLink = async () => {
+      const modifier = isMacOS() ? { metaKey: true } : { ctrlKey: true };
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "c", shiftKey: true, ...modifier }));
+      await flushPromises();
+    };
+
+    it("copies the link only while the shown results come from the current query", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.meta.lastRunSignature = tracesSearchRunSignature(mockSearchObj as any);
+      mockCopyTracesUrl.mockClear();
+
+      await pressCopyLink();
+      expect(mockCopyTracesUrl).toHaveBeenCalledTimes(1);
+
+      mockSearchObj.data.editorValue = "operation_name = 'POST /checkout'";
+      await pressCopyLink();
+      expect(mockCopyTracesUrl).toHaveBeenCalledTimes(1);
+      mockSearchObj.meta.lastRunSignature = null;
     });
   });
 
