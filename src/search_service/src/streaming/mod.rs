@@ -225,7 +225,11 @@ pub async fn process_search_stream_request(
     }
     // Disable caching when pattern extraction is requested since patterns are generated
     // dynamically from search results and cannot be cached
-    let use_cache = req.use_cache && !extract_patterns;
+    let cache_mode = if extract_patterns {
+        search_cache::CacheMode::Bypass
+    } else {
+        search_cache::CacheMode::from_request(&req)
+    };
     if extract_patterns && req.use_cache {
         log::info!("[HTTP2_STREAM trace_id {trace_id}] Disabling cache for pattern extraction");
     }
@@ -280,7 +284,7 @@ pub async fn process_search_stream_request(
                     &org_id,
                     stream_type,
                     &mut req,
-                    use_cache,
+                    cache_mode,
                 )
                 .instrument(search_span.clone())
                 .await

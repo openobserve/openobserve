@@ -105,6 +105,13 @@ export class GroupsPage {
     async isRowChecked(prefix, id) {
         return (await this.rowCheckbox(prefix, id).getAttribute('aria-checked')) === 'true';
     }
+    /** The Selected view's empty state when the group holds none of the org's entries. */
+    noneSelectedState(prefix) {
+        return this.page.locator(`[data-test="iam-${prefix}-selection-none-selected"]`);
+    }
+    noneSelectedDescription(prefix) {
+        return this.noneSelectedState(prefix).getByText(/are selected here\. Switch to All to select one\./);
+    }
     rowsIn(prefix) {
         return this.selectionTable(prefix).locator('tbody tr');
     }

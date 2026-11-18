@@ -159,6 +159,8 @@ const FleetInstallPage = require("./fleetPages/fleetInstallPage.js");
 const FleetConfigPage = require("./fleetPages/fleetConfigPage.js");
 const FleetRolloutPage = require("./fleetPages/fleetRolloutPage.js");
 const FleetSeed = require("./fleetPages/fleetSeed.js");
+const SecurityPage = require("./securityPages/securityPage.js");
+const SecuritySeed = require("./securityPages/securitySeed.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
@@ -287,6 +289,10 @@ class PageManager {
     this.fleetConfigPage = new FleetConfigPage(page);
     this.fleetRolloutPage = new FleetRolloutPage(page);
     this.fleetSeed = new FleetSeed(page);
+
+    // ===== SECURITY PAGE OBJECTS =====
+    this.securityPage = new SecurityPage(page);
+    this.securitySeed = new SecuritySeed(page);
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
