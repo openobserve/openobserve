@@ -27,10 +27,10 @@ const queryConfigSchema = makeQueryConfigSchema(t);
 const CONDITION_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
 const THRESHOLD_REQUIRED_MESSAGE = t("alerts.validation.limitWholeNumber");
 const FREQUENCY_REQUIRED_MESSAGE = t("alerts.validation.frequencyPositive");
-const CONDITION_VALUE_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
+const CONDITION_VALUE_REQUIRED_MESSAGE = t("alerts.guard.thresholdRequired", { example: "90" });
 const AGGREGATION_COLUMN_REQUIRED_MESSAGE = t("alerts.validation.aggregationColumnRequired");
 const PROMQL_OPERATOR_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
-const PROMQL_VALUE_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
+const PROMQL_VALUE_REQUIRED_MESSAGE = t("alerts.guard.thresholdRequired", { example: "90" });
 
 // Builders matching the V2 shapes the condition builder writes.
 const leaf = (overrides: Record<string, unknown> = {}) => ({

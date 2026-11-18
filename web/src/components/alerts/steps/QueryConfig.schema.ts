@@ -208,6 +208,9 @@ export interface QueryConfigMeta {
   minAutoRefreshInterval: number;
 }
 
+// Value thresholds open empty, so their message shows a typical one.
+const THRESHOLD_EXAMPLE = "90";
+
 /** True when the RAW input value is empty (unset). Shared by the number checks
  *  so "" / null / undefined always count as "not provided". */
 const isBlank = (v: unknown): boolean => v === undefined || v === null || v === "";
@@ -543,7 +546,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["query_condition", "promql_condition", "value"],
-            message: t("alerts.validation.fieldRequired"),
+            message: t("alerts.guard.thresholdRequired", { example: THRESHOLD_EXAMPLE }),
           });
         }
         refineForecast(ctx, (val._ui as Record<string, any> | undefined)?.forecast, t);
@@ -583,7 +586,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["query_condition", "aggregation", "having", "value"],
-            message: t("alerts.validation.fieldRequired"),
+            message: t("alerts.guard.thresholdRequired", { example: THRESHOLD_EXAMPLE }),
           });
         }
         // Group-by rows — PARITY with pre-migration AlertSettings.validate()

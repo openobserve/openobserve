@@ -72,7 +72,7 @@ export interface AlertTierContext {
   incidentsEnabled: boolean;
   oncallEnabled: boolean;
   suppressRepeatsEnabled: boolean;
-  /** False until a stream gives the builder a query to show. */
+  /** False until a stream gives the builder a query to show, and fields to group by. */
   generatedSql?: boolean;
 }
 
@@ -245,9 +245,8 @@ export function tierAvailable(id: AlertSettingId, ctx: AlertTierContext): boolea
   const scheduled = ctx.kind === "scheduled";
   switch (id) {
     case "generatedSql":
-      return scheduled && ctx.shape === "filters" && ctx.generatedSql !== false;
     case "groupBy":
-      return scheduled && ctx.shape === "filters";
+      return scheduled && ctx.shape === "filters" && ctx.generatedSql !== false;
     case "vrl":
     case "compareWithPast":
       return scheduled && ctx.shape === "sql";

@@ -238,9 +238,12 @@ describe("tier rules", () => {
     expect(tierApplies(id, c, values)).toBe(false);
   });
 
-  it("lists Generated SQL only once the builder has a query to show", () => {
-    expect(tierAvailable("generatedSql", ctx({ generatedSql: false }))).toBe(false);
-  });
+  it.each<AlertSettingId>(["generatedSql", "groupBy"])(
+    "lists %s only once a stream gives the builder a query",
+    (id) => {
+      expect(tierAvailable(id, ctx({ generatedSql: false }))).toBe(false);
+    },
+  );
 
   it.each<[string, Partial<AlertTierContext>, AlertSectionId]>([
     ["filters", { aggregate: true }, "condition"],
