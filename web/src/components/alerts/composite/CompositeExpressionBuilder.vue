@@ -16,6 +16,7 @@ import {
   type CompositeChildOption,
   letterFor,
   letteredToRaw,
+  operatorsToWords,
   rawToLettered,
   validateExpression,
 } from "./expression";
@@ -76,6 +77,11 @@ const onLetteredInput = (value: string | number): void => {
   emit("update:modelValue", letteredToRaw(next, props.selectedChildren));
 };
 
+// Display only: the stored form keeps the symbols the user typed.
+const showOperatorsAsWords = (): void => {
+  letteredInput.value = operatorsToWords(letteredInput.value);
+};
+
 const appendToken = (token: string): void => {
   const separator = letteredInput.value.trim() ? " " : "";
   onLetteredInput(`${letteredInput.value}${separator}${token}`);
@@ -110,6 +116,7 @@ onMounted(maybeApplyDefault);
       :placeholder="t('alerts.composite.expressionExample', { example: raw('A AND (B OR C)') })"
       data-test="alerts-composite-expression-input"
       @update:model-value="onLetteredInput"
+      @blur="showOperatorsAsWords"
     />
 
     <div

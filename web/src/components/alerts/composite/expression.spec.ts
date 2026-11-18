@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   childOptionsFrom,
   letteredToRaw,
+  operatorsToWords,
   rawToLettered,
   removeExpressionOperand,
 } from "./expression";
@@ -65,6 +66,14 @@ describe("lettered <-> raw expression", () => {
     ["{id-c} AND B", "{id-c} && {id-b}"],
   ])("translates %s back to the stored form", (lettered, stored) => {
     expect(letteredToRaw(lettered, children)).toBe(stored);
+  });
+
+  it.each([
+    ["A && (B || C)", "A AND (B OR C)"],
+    ["A&&!B", "A AND NOT B"],
+    ["(!A) || B AND C", "(NOT A) OR B AND C"],
+  ])("shows typed symbols in %s as words", (typed, words) => {
+    expect(operatorsToWords(typed)).toBe(words);
   });
 
   it("leaves unknown letters untouched for validation to reject", () => {

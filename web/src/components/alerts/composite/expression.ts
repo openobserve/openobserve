@@ -158,6 +158,12 @@ const WORD_OPERATORS: Record<string, string> = { and: "&&", or: "||", not: "!" }
 /** The word users read and type for a stored operator symbol. */
 export const operatorWord = (symbol: string): string => OPERATOR_WORDS[symbol] ?? symbol;
 
+/** Typed `&&`, `||` and `!` in a lettered expression, shown as the words the Insert buttons write. */
+export const operatorsToWords = (lettered: string): string =>
+  lettered
+    .replace(/\s*(&&|\|\|)\s*/g, (_, symbol: string) => ` ${operatorWord(symbol)} `)
+    .replace(/!\s*/g, `${operatorWord("!")} `);
+
 export type ExpressionToken =
   | { kind: "operand"; id: string }
   | { kind: "operator"; text: string }

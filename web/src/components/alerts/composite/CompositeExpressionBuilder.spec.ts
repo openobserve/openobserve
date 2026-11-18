@@ -78,6 +78,13 @@ describe("CompositeExpressionBuilder", () => {
     await input.setValue("A AND ");
     await wrapper.setProps({ modelValue: "{id-a} && " });
     expect((input.element as HTMLInputElement).value).toBe("A AND ");
+
+    await input.setValue("A&&!B");
+    const emits = wrapper.emitted("update:modelValue")?.length;
+    await input.trigger("blur");
+    expect((input.element as HTMLInputElement).value).toBe("A AND NOT B");
+    expect(wrapper.emitted("update:modelValue")).toHaveLength(emits ?? 0);
+    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toBe("{id-a}&&!{id-b}");
   });
 
   it("places an operand via its letter chip without disturbing a custom expression", async () => {
