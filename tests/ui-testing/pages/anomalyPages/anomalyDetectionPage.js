@@ -1053,8 +1053,8 @@ class AnomalyDetectionPage {
     }
 
     /** A base64 URL parameter of the current page as SQL; the server encodes `+/=` as `-_.`. */
-    urlQueryParamSql(key) {
-        const value = new URL(this.page.url()).searchParams.get(key);
+    urlQueryParamSql(key, url = new URL(this.page.url())) {
+        const value = url.searchParams.get(key);
         if (!value) return '';
         const b64 = value.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
         return Buffer.from(b64, 'base64').toString('utf8');
@@ -1062,13 +1062,13 @@ class AnomalyDetectionPage {
 
     /** Clicks the Logs banner's "Show raw rows" / "Show aggregate" and waits for the query swap. */
     async switchLogsOriginView() {
+        // Read the query before the click: the swap can land before a later read, which then never differs.
         const before = this.urlQueryParamSql('query');
         await this.getOriginBannerPartLocator('logs', 'switch-view').click();
-        await this.page.waitForFunction(
-            (prev) => new URL(window.location.href).searchParams.get('anomaly_alt_query') !== null
-                && new URL(window.location.href).searchParams.get('query') !== prev,
-            new URL(this.page.url()).searchParams.get('query'),
-            { timeout: 20000 },
+        await this.page.waitForURL(
+            (url) => url.searchParams.get('anomaly_alt_query') !== null
+                && this.urlQueryParamSql('query', url) !== before,
+            { timeout: 20000, waitUntil: 'commit' },
         );
         return before;
     }
