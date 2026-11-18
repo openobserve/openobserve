@@ -315,14 +315,22 @@ impl Visitor for SqlNames {
 mod tests {
     use super::*;
 
+    /// (query, metrics, name patterns, hard labels, soft labels).
+    type PromCase<'a> = (
+        &'a str,
+        &'a [&'a str],
+        &'a [&'a str],
+        &'a [&'a str],
+        &'a [&'a str],
+    );
+
     fn set(items: &[&str]) -> BTreeSet<String> {
         items.iter().map(|s| s.to_string()).collect()
     }
 
     #[test]
     fn promql_needs_by_syntax() {
-        // (query, metrics, patterns, hard, soft)
-        let cases: &[(&str, &[&str], &[&str], &[&str], &[&str])] = &[
+        let cases: &[PromCase] = &[
             ("up == 0", &["up"], &[], &[], &[]),
             (
                 r#"sum by (instance) (rate(http_errors_total{code=~"5.."}[5m])) / on (instance) group_left (job) sum by (instance) (rate(http_requests_total[5m]))"#,

@@ -234,6 +234,13 @@ mod tests {
     use super::*;
     use crate::alerts::library::index::ManifestEntry;
 
+    /// (entry, stream, expected (fit, swap, missing)).
+    type Case<'a> = (
+        &'a IndexedEntry,
+        StreamFacts,
+        Option<(Fit, bool, Vec<&'a str>)>,
+    );
+
     fn promql(id: &str, stream: &str, query: &str) -> IndexedEntry {
         let entry = ManifestEntry {
             id: id.into(),
@@ -300,8 +307,7 @@ mod tests {
         );
         let metrics = &["errors_total", "requests_total"];
         let logs = StreamType::Logs;
-        // (entry, facts, expected (fit, swap, missing))
-        let cases: Vec<(&IndexedEntry, StreamFacts, Option<(Fit, bool, Vec<&str>)>)> = vec![
+        let cases: Vec<Case> = vec![
             // a ratio is offered on its denominator too, labels decide the confidence
             (
                 &ratio,

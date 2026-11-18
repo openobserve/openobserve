@@ -682,7 +682,7 @@ fn simulate(
     for (time, result) in results {
         let decision = simulation.step(*time, result.as_ref().ok());
         for key in decision.fired_groups.iter() {
-            if let Some(r) = result.as_ref().ok() {
+            if let Ok(r) = result.as_ref() {
                 let labels = group_labels_for(r, key);
                 fired_by_group.entry(key.clone()).or_insert((labels, 0)).1 += 1;
             }
