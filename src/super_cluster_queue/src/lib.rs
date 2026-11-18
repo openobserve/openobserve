@@ -66,11 +66,11 @@ mod user;
 
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    AlertStatesQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue,
-    EvalDatasetsQueue, EvalExperimentsQueue, EvalJobsQueue, EvalPlaygroundSnapshotsQueue,
-    EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, Message,
-    MessageType, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
-    SearchJobsQueue, StatusPagesQueue, SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
+    AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue, EvalDatasetsQueue,
+    EvalExperimentsQueue, EvalJobsQueue, EvalPlaygroundSnapshotsQueue, EvalProvidersQueue,
+    EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, Message, MessageType, MetaQueue,
+    OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, StatusPagesQueue,
+    SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
 };
 
 fn parse_eval_key(
@@ -167,16 +167,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_alert_ack_msg: alert_acks::process,
         on_alert_composite_msg: alert_composites::process,
     };
-    // Run state has its own topic so its volume cannot push definitions out of `alert`.
-    let alert_states_queue = AlertStatesQueue {
-        on_alert_state_msg: alert_states::process,
-        on_scheduler_msg: scheduler::process,
-    };
     // On-call rides the scheduler topic with the triggers it belongs to, so a
     // response record always lands before the escalation timer that names it.
     let scheduler_queue = SchedulerQueue {
         on_scheduler_msg: scheduler::process,
         on_oncall_msg: oncall::process,
+        on_alert_state_msg: alert_states::process,
     };
     let search_jobs_queue = SearchJobsQueue {
         on_search_job_msg: search_job::process,
@@ -245,7 +241,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(meta_queue),
         Box::new(schema_queue),
         Box::new(alerts_queue),
-        Box::new(alert_states_queue),
         Box::new(search_jobs_queue),
         Box::new(dashboards_queue),
         Box::new(pipelines_queue),
