@@ -68,6 +68,13 @@
       "category": "api_integration_tests"
     },
     {
+      "label": "ingest_window_48h",
+      "_comment": "Seeds rows up to 47 h old; OSS runs with this window already, but ENT's workflow env allows only 5 h.",
+      "target": "tests/regression/test_result_cache_histogram_reuse.py tests/regression/test_histogram_origin_grid_partitions.py",
+      "server_env": "ZO_INGEST_ALLOWED_UPTO=48",
+      "category": "api_integration_tests"
+    },
+    {
       "label": "uds_enabled",
       "_comment": "openobserve#16307 only reproduces once a user-defined schema is saved, which needs the flag on.",
       "target": "tests/regression/test_uds_late_required_columns.py",
