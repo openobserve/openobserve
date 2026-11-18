@@ -573,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else-if="drillDownShowsDashboard"
                 embedded
                 :streamName="searchObj.data.stream.selectedStream[0]"
-                streamType="logs"
+                :streamType="searchObj.data.stream.streamType || 'logs'"
                 :timeRange="drillDownTimeRange"
                 :rateFilter="drillDownRateFilter"
                 :baseFilter="drillDownBaseFilter"

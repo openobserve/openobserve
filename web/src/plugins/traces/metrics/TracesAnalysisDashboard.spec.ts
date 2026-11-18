@@ -713,6 +713,16 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
     expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
   });
 
+  it("keeps insights search type for a non-logs stream in the drill down page", async () => {
+    wrapper.unmount();
+    wrapper = mountComponent({ embedded: true, streamType: "traces", analysisType: "volume" });
+    await flushPromises();
+
+    expect(wrapper.findComponent('[data-test="render-dashboard-charts"]').props("searchType")).toBe(
+      "insights",
+    );
+  });
+
   it("does not leak drawer-only attributes onto the page root", () => {
     const page = wrapper.find('[data-test="traces-analysis-dashboard-page"]');
     expect(page.attributes("width")).toBeUndefined();

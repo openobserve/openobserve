@@ -267,7 +267,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :allowAlertCreation="false"
                   :simplifiedPanelView="true"
                   :hideAddPanel="true"
-                  :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
+                  :searchType="
+                    props.embedded || props.streamType === 'logs' ? 'insights' : 'dashboards'
+                  "
                   @onDeletePanel="handlePanelDelete"
                   class="trace-analysis-dashboards p-[0.4rem]"
                 />

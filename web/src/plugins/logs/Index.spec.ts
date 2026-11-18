@@ -1669,8 +1669,10 @@ describe("Logs Index", async () => {
       selectedStream = ["app_logs"],
       errorMsg = "",
       filterErrMsg = "",
+      streamType = "logs",
     } = {}) => {
       const { searchObj } = wrapper.vm;
+      searchObj.data.stream.streamType = streamType;
       searchObj.loadingStream = false;
       searchObj.data.stream.streamLists = [{ label: "app_logs", value: "app_logs" }];
       searchObj.data.stream.selectedStream = selectedStream;
@@ -1702,6 +1704,21 @@ describe("Logs Index", async () => {
         logSamples: hits,
         analysisType: "volume",
       });
+    });
+
+    it.each(["traces", "metrics"])(
+      "passes the %s stream type to the dashboard instead of logs",
+      async (streamType) => {
+        await enterDrillDown({ streamType });
+
+        expect(dashboard().props("streamType")).toBe(streamType);
+      },
+    );
+
+    it("falls back to logs when the stream type is empty", async () => {
+      await enterDrillDown({ streamType: "" });
+
+      expect(dashboard().props("streamType")).toBe("logs");
     });
 
     it("hides the search results section while active", async () => {
