@@ -893,7 +893,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     profile="alert"
                     :model-value="inputData.conditions"
                     :fields="conditionFields"
-                    :load-values="conditionValueLoader"
+                    :load-values="conditionDiscovery.loadValues"
+                    :value-label="conditionDiscovery.valueLabel"
+                    :value-hint="conditionDiscovery.valueHint"
+                    :field-detail="conditionDiscovery.fieldDetail"
+                    :value-empty-text="conditionDiscovery.valueEmptyText"
                     :add-labels="{
                       add: t('alerts.form.filter.add'),
                       addBelow: t('alerts.form.filter.addBelow'),
@@ -1862,7 +1866,7 @@ import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
 import AlertFilterSentence from "@/components/alerts/AlertFilterSentence.vue";
 import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
 import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
-import { streamValuesLoader } from "@/components/filterBar/streamValues";
+import { useFilterDiscovery } from "@/composables/alerts/useStreamDiscovery";
 import {
   findNode,
   replaceNode,
@@ -3804,13 +3808,12 @@ export default defineComponent({
         })),
     );
 
-    const conditionValueLoader = computed(() =>
-      streamValuesLoader({
-        org: store.state.selectedOrganization?.identifier,
-        streamType: props.streamType,
-        streamName: props.streamName,
-      }),
-    );
+    const conditionDiscovery = useFilterDiscovery(() => {
+      const org = store.state.selectedOrganization?.identifier;
+      return org && props.streamType && props.streamName
+        ? { org, streamType: props.streamType, streamName: props.streamName }
+        : null;
+    }, t);
 
     const onConditionsChange = (next: unknown) => {
       setFV("query_condition.conditions", next);
@@ -4480,7 +4483,7 @@ export default defineComponent({
       conditionsBuilderRef,
       conditionsValid,
       conditionFields,
-      conditionValueLoader,
+      conditionDiscovery,
       onConditionsChange,
       showConditionsError,
       filtersFolded,
