@@ -634,6 +634,17 @@ describe("TracesAnalysisDashboard", () => {
       );
     });
 
+    it("explains how to proceed in the no-dimensions state, with an illustration", async () => {
+      wrapper.vm.handlePanelDelete("panel-service");
+      await flushPromises();
+      wrapper.vm.handlePanelDelete("panel-status");
+      await flushPromises();
+
+      const empty = wrapper.find('[data-test="traces-analysis-dashboard-no-dimensions"]');
+      expect(empty.text()).toContain("Tick a dimension on the left to compare its values");
+      expect(empty.find("svg").exists()).toBe(true);
+    });
+
     it("brings the dashboard back when a dimension is ticked after removing them all", async () => {
       wrapper.vm.handlePanelDelete("panel-service");
       await flushPromises();

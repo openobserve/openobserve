@@ -6611,6 +6611,7 @@
     "dashboardTitleVolume": "Volume Insights",
     "dimensionsSelected": "Dimensions selected",
     "noDimensionsSelected": "Select a dimension to analyze",
+    "noDimensionsSelectedDesc": "Tick a dimension on the left to compare its values",
     "durationLabel": "Duration:",
     "failedToLoad": "Failed to load analysis",
     "panelDescErrorComparison": "Error percentage comparison for dimension: {dimension}. Higher Selected bars indicate this dimension value has more errors in the error spike period.",

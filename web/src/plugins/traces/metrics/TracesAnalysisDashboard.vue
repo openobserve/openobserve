@@ -253,8 +253,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OEmptyState
                   v-else-if="selectedDimensions.length === 0"
                   size="hero"
-                  icon="bar-chart"
+                  illustration="wave-bars"
+                  :hide-action="true"
                   :title="t('latencyInsights.noDimensionsSelected')"
+                  :description="t('latencyInsights.noDimensionsSelectedDesc')"
                   data-test="traces-analysis-dashboard-no-dimensions"
                 />
 
