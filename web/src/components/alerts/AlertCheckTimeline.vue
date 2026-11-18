@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { durationWords } from "@/utils/alerts/alertCopy";
 import { scheduleOverlap, type ScheduleOverlapKind } from "@/utils/alerts/scheduleOverlap";
 
 const props = defineProps<{
@@ -36,9 +37,9 @@ const TICKS = 5;
 const STEP = WIDTH / TICKS;
 const NOW_X = WIDTH - STEP / 2;
 const CAPTION: Record<ScheduleOverlapKind, I18nKey> = {
-  overlap: "alerts.form.schedule.overlap",
-  equal: "alerts.form.schedule.equal",
-  gaps: "alerts.form.schedule.gaps",
+  overlap: "alerts.form.schedule.overlapWords",
+  equal: "alerts.form.schedule.equalWords",
+  gaps: "alerts.form.schedule.gapsWords",
 };
 
 const { t } = useI18nTyped();
@@ -60,6 +61,12 @@ const bandStart = computed(() =>
   Math.max(0, NOW_X - (props.period / Math.max(props.frequency, 1)) * STEP),
 );
 const overlap = computed(() => scheduleOverlap(props.period, props.frequency));
+const caption = computed(() =>
+  t(CAPTION[overlap.value.kind], {
+    period: durationWords(props.period, t),
+    minutes: durationWords(overlap.value.minutes, t),
+  }),
+);
 </script>
 
 <template>
@@ -94,9 +101,7 @@ const overlap = computed(() => scheduleOverlap(props.period, props.frequency));
     </div>
     <p class="text-text-body m-0 mt-2 text-sm" data-test="add-alert-check-timeline-caption">
       {{
-        forecastWindow
-          ? t("alerts.form.schedule.forecast", { window: forecastWindow })
-          : t(CAPTION[overlap.kind], { period, minutes: overlap.minutes })
+        forecastWindow ? t("alerts.form.schedule.forecast", { window: forecastWindow }) : caption
       }}
     </p>
   </OSettingRow>

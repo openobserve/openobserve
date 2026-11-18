@@ -13,14 +13,22 @@ const mountTimeline = (frequency: number, period: number) =>
 
 describe("AlertCheckTimeline", () => {
   it.each([
-    [10, 30, "overlap", 20],
-    [10, 10, "equal", 0],
-    [10, 5, "gaps", 5],
-  ] as const)("every %i min looking at %i min reads as %s", (frequency, period, kind, minutes) => {
+    [10, 30, "Each check looks at the last 30 minutes, so checks overlap by 20 minutes."],
+    [10, 11, "Each check looks at the last 11 minutes, so checks overlap by 1 minute."],
+    [60, 120, "Each check looks at the last 2 hours, so checks overlap by 1 hour."],
+    [
+      1,
+      1,
+      "Each check looks at the last 1 minute, the same as the time between checks: no gaps, no overlap.",
+    ],
+    [
+      10,
+      5,
+      "Each check looks at the last 5 minutes, so there are gaps of 5 minutes between checks.",
+    ],
+  ] as const)("every %i min looking at %i min reads %j", (frequency, period, caption) => {
     const wrapper = mountTimeline(frequency, period);
-    expect(wrapper.get('[data-test="add-alert-check-timeline-caption"]').text()).toBe(
-      i18n.global.t(`alerts.form.schedule.${kind}`, { period, minutes }),
-    );
+    expect(wrapper.get('[data-test="add-alert-check-timeline-caption"]').text()).toBe(caption);
     expect(wrapper.text()).toContain(i18n.global.t("alerts.sections.timeline.now"));
   });
 
