@@ -13,6 +13,7 @@ import {
   removeFieldCondition,
   isRequiredCondition,
   dropDanglingConnectors,
+  removeRequiredCondition,
 } from "./filterUtils";
 
 // ---------------------------------------------------------------------------
@@ -938,4 +939,44 @@ describe("dropDanglingConnectors — tidying a filter after a condition is cut o
       "msg = '( )' -- and (\nAND b = 1",
     );
   });
+});
+
+describe("removeRequiredCondition — turning errors-only off", () => {
+  const off = (query: string) => removeRequiredCondition(query, "span_status", "'ERROR'");
+
+  it.each([
+    [
+      "the condition errors-only ANDed onto an OR filter",
+      "(service_name='a' OR span_status='ERROR') and span_status = 'ERROR'",
+      "service_name='a' OR span_status='ERROR'",
+    ],
+    ["an ANDed condition", "service_name='a' and span_status = 'ERROR'", "service_name='a'"],
+    ["the only condition", "span_status = 'ERROR'", ""],
+    [
+      "a condition inside an ANDed group",
+      "(a = '1' and span_status = 'ERROR') and b = 2",
+      "(a = '1') and b = 2",
+    ],
+    [
+      "only the top-level one, keeping the user's under an OR",
+      "span_status='ERROR' AND service_name='c' AND (h='500' OR span_status='ERROR')",
+      "service_name='c' AND (h='500' OR span_status='ERROR')",
+    ],
+  ])("removes %s", (_name, query, expected) => {
+    expect(off(query)).toBe(expected);
+  });
+
+  it("leaves a filter that does not require it untouched", () => {
+    expect(off("service_name='a' OR span_status='ERROR'")).toBe(
+      "service_name='a' OR span_status='ERROR'",
+    );
+    expect(off("span_status = 'UNSET'")).toBe("span_status = 'UNSET'");
+  });
+
+  it.each(["service_name='a' OR span_status='ERROR'", "service_name='a' AND duration > 10", ""])(
+    "undoes mergeFilterTerm for %j",
+    (original) => {
+      expect(off(mergeFilterTerm("span_status = 'ERROR'", original))).toBe(original);
+    },
+  );
 });

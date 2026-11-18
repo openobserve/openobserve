@@ -152,6 +152,15 @@ export const mergePendingFilters = (pending: string, baseQuery: string): string 
   return terms.reduce((query, term) => mergeFilterTerm(term, query), baseQuery);
 };
 
+const isEqualityOn = (term: string, field: string, value: string): boolean => {
+  const condition = parseSimpleCondition(term);
+  return (
+    condition?.field === field.toLowerCase() &&
+    condition.operator === "=" &&
+    condition.value === value
+  );
+};
+
 /** True when every row the filter returns meets `field = value`: the condition is ANDed at the top, not under an OR. */
 export const isRequiredCondition = (query: string, field: string, value: string): boolean => {
   const where = query.trim();
@@ -159,13 +168,37 @@ export const isRequiredCondition = (query: string, field: string, value: string)
   return splitTopLevel(where, "and").some((term) => {
     const group = /^\(([\s\S]*)\)$/.exec(term);
     if (group) return isRequiredCondition(group[1], field, value);
-    const condition = parseSimpleCondition(term);
-    return (
-      condition?.field === field.toLowerCase() &&
-      condition.operator === "=" &&
-      condition.value === value
-    );
+    return isEqualityOn(term, field, value);
   });
+};
+
+/** Cuts out the `field = value` conditions isRequiredCondition finds, keeping any under an OR and the rest of the text as written. */
+export const removeRequiredCondition = (query: string, field: string, value: string): string => {
+  if (splitTopLevel(query, "or").length > 1) return query;
+  let result = query;
+  let from = 0;
+  const terms = splitTopLevel(query, "and").map((text) => {
+    const start = query.indexOf(text, from);
+    from = start + text.length;
+    return { text, start };
+  });
+  // Last to first, so each cut leaves the earlier offsets valid.
+  for (const { text, start } of terms.reverse()) {
+    const group = /^\(([\s\S]*)\)$/.exec(text);
+    const inner = group ? removeRequiredCondition(group[1], field, value) : null;
+    let replacement: string | null = null;
+    if (group && inner !== group[1]) replacement = inner!.trim() ? `(${inner})` : "";
+    else if (!group && isEqualityOn(text, field, value)) replacement = "";
+    if (replacement === null) continue;
+    result = result.slice(0, start) + replacement + result.slice(start + text.length);
+  }
+  if (result === query) return query;
+  const tidy = dropDanglingConnectors(result);
+  // Errors-only bracketed an OR filter to AND onto it; once that is gone, so are the brackets.
+  const lone = /^\(([\s\S]*)\)$/.exec(tidy);
+  return lone && splitTopLevel(tidy, "and").length === 1 && splitTopLevel(lone[1], "or").length > 1
+    ? lone[1]
+    : tidy;
 };
 
 // String literals, quoted names and comments, which may hold a lone `and`, `or` or bracket.

@@ -1168,7 +1168,6 @@ describe("Index.vue (Main Traces Page)", () => {
               setup() {
                 return {
                   applyFilters: mockApplyFiltersAppend,
-                  removeFilterByField: vi.fn(),
                   setEditorValue: vi.fn(),
                 };
               },
@@ -2196,7 +2195,6 @@ describe("Index.vue (Main Traces Page)", () => {
   describe("Metrics Filters Integration", () => {
     // Spies for SearchBar ref methods exposed via stub
     const mockApplyFilters = vi.fn();
-    const mockRemoveFilterByField = vi.fn();
     const mockSetEditorValue = vi.fn();
 
     function mountWithSearchBarStub() {
@@ -2211,7 +2209,6 @@ describe("Index.vue (Main Traces Page)", () => {
               setup() {
                 return {
                   applyFilters: mockApplyFilters,
-                  removeFilterByField: mockRemoveFilterByField,
                   setEditorValue: mockSetEditorValue,
                 };
               },
@@ -2228,7 +2225,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
     beforeEach(() => {
       mockApplyFilters.mockReset();
-      mockRemoveFilterByField.mockReset();
       mockSetEditorValue.mockReset();
       mockSearchObj.data.editorValue = "";
       mockSearchObj.meta.metricsRangeFilters.clear();
@@ -2349,15 +2345,21 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSetEditorValue).toHaveBeenLastCalledWith(expected);
     });
 
-    it("should call removeFilterByField when error only toggle is turned off", async () => {
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
+    it.each(["service_name='a' OR span_status='ERROR'", "service_name='a'", ""])(
+      "turning errors-only on then off gives back %j",
+      async (original) => {
+        mockSearchObj.data.editorValue = original;
+        wrapper = mountWithSearchBarStub();
+        await flushPromises();
 
-      wrapper.vm.onErrorOnlyToggled(false);
-      await flushPromises();
+        wrapper.vm.onErrorOnlyToggled(true);
+        wrapper.vm.onErrorOnlyToggled(false);
+        await flushPromises();
 
-      expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
-    });
+        expect(mockSearchObj.data.editorValue).toBe(original);
+        expect(mockSetEditorValue).toHaveBeenLastCalledWith(original);
+      },
+    );
   });
 
   describe("Splitter Behavior", () => {
