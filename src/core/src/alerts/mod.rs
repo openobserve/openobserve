@@ -53,6 +53,7 @@ pub mod derived_streams;
 pub mod destination_usage;
 pub mod destinations;
 pub mod downtimes;
+pub mod dry_run;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
 pub mod incident_title;
