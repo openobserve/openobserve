@@ -105,23 +105,24 @@ pub(crate) fn limit_body(
 fn same_spec(a: &str, b: &str) -> bool {
     let value = |body: &str| {
         let mut spec = ContentSpec::parse(body).ok()?;
-        // JavaScript `trim` also removes U+FEFF, which Rust does not count as whitespace.
-        spec.body = spec
-            .body
-            .trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}')
-            .to_string();
+        spec.body = editor_trim(&spec.body).to_string();
         serde_json::to_value(spec).ok()
     };
     matches!((value(a), value(b)), (Some(a), Some(b)) if a == b)
 }
 
-/// The body limit on a draft spec, measured as the editor saves it: JSON with two-space indents,
-/// with no keys for absent optional values.
+/// The body limit on a draft spec, measured as the editor saves it: the body text trimmed, JSON
+/// with two-space indents, and no keys for absent optional values.
 pub fn check_spec_size(spec: &ContentSpec) -> Result<(), TemplateError> {
     // A spec serializes to JSON infallibly; on a failure fall back to the body text alone.
     let size = serde_json::to_value(spec)
         .map(|mut value| {
             drop_nulls(&mut value);
+            if let Some(body) = value.get_mut("body")
+                && let Some(text) = body.as_str()
+            {
+                *body = serde_json::Value::String(editor_trim(text).to_string());
+            }
             value
         })
         .and_then(|value| serde_json::to_vec_pretty(&value))
@@ -133,6 +134,12 @@ pub fn check_spec_size(spec: &ContentSpec) -> Result<(), TemplateError> {
         size,
         max: BODY_MAX_BYTES,
     })
+}
+
+/// The body text as the editor saves it. JavaScript `trim` also removes U+FEFF, which Rust does
+/// not count as whitespace.
+fn editor_trim(body: &str) -> &str {
+    body.trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}')
 }
 
 /// Removes object keys whose value is null, at every depth.
@@ -1614,6 +1621,13 @@ mod tests {
         drop_nulls(&mut with_nulls);
         assert!(serde_json::to_vec_pretty(&with_nulls).unwrap().len() < BODY_MAX_BYTES);
         assert!(check_spec_size(&many_fields).is_ok());
+        // Trailing blank lines are not measured: the editor trims them on save.
+        let padded_body = ContentSpec {
+            title: "t".into(),
+            body: format!("{}{}", "b".repeat(1_048_000), "\n".repeat(400)),
+            ..Default::default()
+        };
+        assert!(check_spec_size(&padded_body).is_ok());
         assert!(matches!(
             check_spec_size(&large),
             Err(TemplateError::BodyTooLarge { .. })
