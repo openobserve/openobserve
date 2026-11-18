@@ -110,7 +110,7 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
         <span class="whitespace-normal" :data-test="`add-alert-section-${section}-more-names`">
           <template v-for="(item, index) in view.more" :key="item.id"
             ><template v-if="index">{{ SEP }}</template
-            >{{ t(item.nameKey) }}</template
+            >{{ t(item.noteKey ?? item.nameKey) }}</template
           >
         </span>
       </template>

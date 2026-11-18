@@ -9,6 +9,7 @@ import {
   VALUE_COUNT_SIZE,
   clearValueCounts,
   filterNotSeenText,
+  dataSpanDays,
   insertLabelIntoPromql,
   isIngestArtifact,
   loadValueCounts,
@@ -369,6 +370,17 @@ describe("recentActivity", () => {
     expect(stream).toHaveBeenCalledTimes(1);
     const { query } = stream.mock.calls[0][0].queryReq;
     expect(query.end_time - query.start_time).toBe(HOUR_US);
+  });
+});
+
+describe("dataSpanDays", () => {
+  it.each([
+    ["no stats", undefined, undefined],
+    ["no first event", { doc_time_min: 0 }, undefined],
+    ["half a day", { doc_time_min: NOW - DAY_US / 2 }, 0],
+    ["three and a half days", { doc_time_min: NOW - 3.5 * DAY_US }, 3],
+  ])("%s → %s", (_name, stats, days) => {
+    expect(dataSpanDays(stats, NOW)).toBe(days);
   });
 });
 

@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex flex-col gap-2">
               <i18n-t
-                keypath="alerts.form.anomaly.windowFire"
+                keypath="alerts.form.anomaly.windowFireWords"
                 :plural="windowBucketCount"
                 tag="div"
                 class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-2 text-sm"
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </i18n-t>
               <i18n-t
-                keypath="alerts.form.anomaly.windowRecover"
+                keypath="alerts.form.anomaly.windowRecoverWords"
                 tag="div"
                 class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-2 text-sm"
               >
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :model-modifiers="{ number: true }"
                     fit-content
                     :aria-label="t('alerts.anomaly.windowRecoverPct')"
-                    :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
+                    :placeholder="raw(String(config.alert_window_fire_pct || 100))"
                     :error="!!windowShareErrors.recover"
                     data-test="anomaly-window-recover-pct"
                   />

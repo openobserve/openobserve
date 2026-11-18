@@ -61,6 +61,8 @@ export interface AlertSettingTierDef {
   section: AlertSectionId;
   tier: AlertSettingTier;
   nameKey: I18nKey;
+  /** The More options note's name, where the bare name would read as a state already set. */
+  noteKey?: I18nKey;
   /** The owning step renders its "+ name" link beside the control it extends. */
   inline?: boolean;
   row?: "message";
@@ -165,7 +167,9 @@ export const ALERT_SETTING_TIERS: readonly AlertSettingTierDef[] = [
   tierDef("keepFiring", "notify", "smart", "alerts.tiers.names.keepFiring"),
   tierDef("suppressRepeats", "notify", "more", "alerts.tiers.names.suppressRepeats"),
   tierDef("oncall", "notify", "smart", "alerts.tiers.names.oncall"),
-  tierDef("anomalyRecordOnly", "notify", "more", "alerts.tiers.names.anomalyRecordOnly"),
+  tierDef("anomalyRecordOnly", "notify", "more", "alerts.tiers.names.anomalyRecordOnly", {
+    noteKey: "alerts.tiers.notes.anomalyRecordOnly",
+  }),
   tierDef("createsIncident", "notify", "add", "alerts.tiers.add.createsIncident"),
   tierDef("template", "notify", "add", "alerts.tiers.add.template", { row: "message" }),
   tierDef("rowTemplate", "notify", "add", "alerts.tiers.add.rowTemplate", { row: "message" }),

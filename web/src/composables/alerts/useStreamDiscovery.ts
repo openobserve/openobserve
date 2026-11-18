@@ -106,6 +106,15 @@ export interface ValueCountContext {
 /** A column the JSON flattener made from a number's internal wrapper, not a field anyone sent. */
 export const isIngestArtifact = (name: string): boolean => name.includes("__serde_json__private__");
 
+/** Whole days since the stream's first event, from its stats; undefined when they hold none. */
+export function dataSpanDays(
+  stats: DiscoveryStream["stats"] | undefined,
+  nowUs: number,
+): number | undefined {
+  const first = Number(stats?.doc_time_min ?? 0);
+  return first > 0 ? Math.max(0, Math.floor((nowUs - first) / DAY_US)) : undefined;
+}
+
 /** When a stream last received data and how much, from the stats its list row already carries. */
 export function streamFreshness(
   stats: DiscoveryStream["stats"] | undefined,

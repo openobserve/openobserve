@@ -239,8 +239,8 @@ describe("AnomalyAlerting - setting rows", () => {
 
   it("puts the fire and recover inputs on two clause lines, each named for screen readers", async () => {
     const w = await mountComp({ config: makeConfig({ alert_window_buckets: 1 }) });
-    expect(w.find('[data-test="anomaly-window-sentence"]').text()).toContain("bucket");
-    expect(w.find('[data-test="anomaly-window-sentence"]').text()).not.toContain("buckets");
+    expect(w.find('[data-test="anomaly-window-sentence"]').text()).toContain("measure");
+    expect(w.find('[data-test="anomaly-window-sentence"]').text()).not.toContain("measures");
     const inputs = w.find('[data-test="anomaly-window-share-row"]').findAll("input");
     expect(inputs.map((i) => i.attributes("aria-label"))).toEqual([
       i18n.global.t("alerts.anomaly.windowFirePct"),

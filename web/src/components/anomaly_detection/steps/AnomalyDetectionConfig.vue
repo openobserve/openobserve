@@ -378,10 +378,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("alerts.form.units.days") }}</span>
             </div>
             <div
-              class="text-text-secondary mt-1 text-xs"
+              class="mt-1 text-xs"
+              :class="
+                streamDays !== undefined && streamDays < minTrainingDays
+                  ? 'text-status-warning-text'
+                  : 'text-text-secondary'
+              "
               data-test="anomaly-training-window-floor-hint"
             >
-              {{ t("alerts.form.anomaly.trainingFloor", { days: minTrainingDays }) }}
+              {{
+                streamDays === undefined
+                  ? t("alerts.form.anomaly.trainingFloor", { days: minTrainingDays })
+                  : t(
+                      "alerts.form.anomaly.trainingHave",
+                      { days: minTrainingDays, count: streamDays },
+                      streamDays,
+                    )
+              }}
             </div>
             <div v-if="!tierShows('anomalyRetrain')">
               <OButton
@@ -619,7 +632,7 @@ import { useStore } from "vuex";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
-import { isIngestArtifact } from "@/composables/alerts/useStreamDiscovery";
+import { dataSpanDays, isIngestArtifact } from "@/composables/alerts/useStreamDiscovery";
 import { dataNoun, durationText, everyDuration, everyWords } from "@/utils/alerts/alertCopy";
 import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
 import QueryEditor from "@/components/QueryEditor.vue";
@@ -1113,6 +1126,8 @@ export default defineComponent({
     const numericStreamFields = ref<string[]>([]); // only numeric types for avg/sum/min/max/pXX
     const filteredStreamFields = ref<string[]>([]);
     const filterFields = ref<FilterField[]>([]);
+    // How many days of data the stream holds, so the training floor can say whether it is met.
+    const streamDays = ref<number | undefined>(undefined);
     const filteredDetectionFields = ref<string[]>([]);
     const loadingFields = ref(false);
 
@@ -1143,6 +1158,7 @@ export default defineComponent({
       autoCompleteData.value.streamType = String(streamType ?? "");
       autoCompleteData.value.streamName = String(streamName ?? "");
 
+      streamDays.value = undefined;
       if (!streamName || !streamType) {
         allStreamFields.value = [];
         updateFieldKeywords([]);
@@ -1157,6 +1173,7 @@ export default defineComponent({
         const schema = await queryClient.fetchQuery(
           streamSchemaQuery(store.state.selectedOrganization.identifier, streamName, streamType),
         );
+        streamDays.value = dataSpanDays(schema.stats, Date.now() * 1000);
         const fieldsArray = (
           schema.uds_schema && schema.uds_schema.length > 0
             ? schema.uds_schema
@@ -1380,6 +1397,7 @@ export default defineComponent({
       sensitivityError,
       sensitivityTooltip,
       minTrainingDays: ANOMALY_MIN_TRAINING_DAYS,
+      streamDays,
       onCustomSqlChange,
       tierShows,
       tiers,
