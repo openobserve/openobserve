@@ -54,6 +54,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @error="onPreviewError"
         @loading-state-change="onPreviewLoading"
       />
+      <QueryErrorState
+        v-if="!awaitsQuery && shownChartError"
+        class="bg-surface-base absolute inset-0 overflow-y-auto"
+        size="block"
+        :error-msg="shownChartError.message"
+        :title="shownChartError.title"
+        :query="query"
+      >
+        <template #actions />
+      </QueryErrorState>
     </div>
   </div>
 </template>
@@ -87,6 +97,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { b64EncodeUnicode, generateTraceContext, smartDecodeVrlFunction } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 let dashboardPanelData: any = null;
@@ -224,6 +235,8 @@ onBeforeMount(() => {
   dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
   dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
   dashboardPanelData.data.queries[0].customQuery = true;
+  // The preview draws its own error state; the renderer's is the dashboards' neutral one.
+  dashboardPanelData.data.error_config = { custom_error_handeling: true };
 });
 
 const chartPanelRef = ref(null);
@@ -257,6 +270,14 @@ const onPreviewLoading = (loading: boolean) => {
   previewLoading = loading;
   if (!loading) settledPreviewError.value = previewError.value;
 };
+// Only a 4xx message is about the query; anything else says the data could not be loaded.
+const shownChartError = computed(() => {
+  const error = settledPreviewError.value;
+  if (!error?.message) return null;
+  return String(error.code ?? "").startsWith("4")
+    ? { message: error.message, title: undefined }
+    : { message: "", title: t("common.errorLoadingData") };
+});
 
 const store = useStore();
 

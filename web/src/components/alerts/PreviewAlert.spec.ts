@@ -737,6 +737,27 @@ describe("PreviewAlert - watcher behavior", () => {
     w.unmount();
   });
 
+  it.each([
+    [400, "Search field not found: nosuchcol", true],
+    [503, "upstream connect error", false],
+  ])(
+    "a %s from the chart shows the error state, naming the server message only for a 4xx",
+    async (code, message, named) => {
+      const w = await mountComp({ query: "SELECT nosuchcol FROM logs", selectedTab: "sql" });
+      await flushPromises();
+      const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
+      expect(renderer.props("panelSchema").error_config?.custom_error_handeling).toBe(true);
+      expect(w.find('[data-test="query-error-state"]').exists()).toBe(false);
+
+      renderer.vm.$emit("error", { message, code });
+      await nextTick();
+      const shown = w.find('[data-test="query-error-state"]');
+      expect(shown.exists()).toBe(true);
+      expect(shown.text().includes("nosuchcol") || shown.text().includes(message)).toBe(named);
+      w.unmount();
+    },
+  );
+
   it("chartData is defined after prop update", async () => {
     const w = await mountComp({
       query: "SELECT * FROM logs",
