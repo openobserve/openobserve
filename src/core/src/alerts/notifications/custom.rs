@@ -105,16 +105,22 @@ pub(crate) fn apply_custom_template_plain(
             v.to_string()
         }
     };
+    // D20: only an anomaly send owns `{chart_url}`; another kind keeps the literal token.
+    let charted;
+    let tpl = if ctx.kind == NotificationKind::Anomaly {
+        charted = tpl.replace(
+            "{chart_url}",
+            &esc(ctx.chart_url.as_deref().unwrap_or_default()),
+        );
+        charted.as_str()
+    } else {
+        tpl
+    };
     let mut resp = tpl
         // Newer tokens run first so a value inserted below is never re-scanned for them.
         .replace("{alert_url_label}", &esc(&ctx.alert_url_label))
         .replace("{alert_detail_url}", &esc(&ctx.alert_detail_url))
         .replace("{alert_detail_label}", &esc(&ctx.alert_detail_label))
-        // D20: set only for an anomaly send, and empty with no chart or a local base.
-        .replace(
-            "{chart_url}",
-            &esc(ctx.chart_url.as_deref().unwrap_or_default()),
-        )
         .replace("{notification_kind}", ctx.kind.as_str())
         .replace("{notification_event}", ctx.event.as_str())
         .replace("{notification_kind_label}", ctx.kind.label())
@@ -1172,6 +1178,7 @@ mod golden {
         let tpl = r#"{"text":"{alert_name}","image":"{chart_url}"}"#;
         let ctx = NotificationContext {
             alert_name: "spike".into(),
+            kind: NotificationKind::Anomaly,
             chart_url: Some("https://o2/api/v2/o/alerts/charts/render?d=a&s=b".into()),
             ..Default::default()
         };
@@ -1181,11 +1188,28 @@ mod golden {
         );
         let none = NotificationContext {
             alert_name: "spike".into(),
+            kind: NotificationKind::Anomaly,
             ..Default::default()
         };
         assert_eq!(
             apply_custom_template(tpl, &none, false),
             r#"{"text":"spike","image":""}"#
+        );
+    }
+
+    #[test]
+    fn chart_url_stays_literal_outside_an_anomaly_send() {
+        let tpl = r#"{"text":"{alert_name}","image":"{chart_url}"}"#;
+        let ctx = NotificationContext {
+            alert_name: "cpu".into(),
+            kind: NotificationKind::Alert,
+            chart_url: Some("https://o2/api/v2/o/alerts/charts/render?d=a&s=b".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            apply_custom_template(tpl, &ctx, false),
+            r#"{"text":"cpu","image":"{chart_url}"}"#,
+            "a scheduled alert keeps the token as before D20"
         );
     }
 }
