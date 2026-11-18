@@ -1,5 +1,5 @@
 {
-  "revision": 4,
+  "revision": 3,
   "destinations": [
     {
       "id": "slack",
@@ -203,7 +203,7 @@
       },
       "template": {
         "name": "prebuilt_opsgenie",
-        "body": "{\n  \"message\": \"OpenObserve [{alert_status}]: {alert_name}\",\n  \"alias\": \"{alert_name}_{stream_name}\",\n  \"description\": \"Alert triggered from OpenObserve\",\n  \"priority\": \"{credential_priority}\",\n  \"details\": {\n    \"alert_name\": \"{alert_name}\",\n    \"stream_name\": \"{stream_name}\",\n    \"stream_type\": \"{stream_type}\",\n    \"alert_count\": \"{alert_count}\",\n    \"alert_threshold\": \"{alert_operator} {alert_threshold}\",\n    \"alert_time\": \"{alert_trigger_time_str}\",\n    \"alert_url\": \"{alert_url}\"\n  },\n  \"source\": \"OpenObserve\",\n  \"tags\": [\"openobserve\", \"{stream_type}\"]\n}"
+        "body": "{\n  \"message\": \"OpenObserve [{alert_status}]: {alert_name}\",\n  \"description\": \"Alert triggered from OpenObserve\",\n  \"priority\": \"{credential_priority}\",\n  \"details\": {\n    \"alert_name\": \"{alert_name}\",\n    \"stream_name\": \"{stream_name}\",\n    \"stream_type\": \"{stream_type}\",\n    \"alert_count\": \"{alert_count}\",\n    \"alert_threshold\": \"{alert_operator} {alert_threshold}\",\n    \"alert_time\": \"{alert_trigger_time_str}\",\n    \"alert_url\": \"{alert_url}\"\n  },\n  \"source\": \"OpenObserve\",\n  \"tags\": [\"openobserve\", \"{stream_type}\"]\n}"
       },
       "credential_fields": [
         {

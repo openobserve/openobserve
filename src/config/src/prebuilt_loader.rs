@@ -246,6 +246,26 @@ pub fn is_legacy_builtin_body(name: &str, body: &str) -> bool {
         .any(|(n, b)| *n == name && *b == body)
 }
 
+/// Replaces `body` with the shipped body when it is the old fallback's one-line body for template
+/// `name`. Every stored row goes through this on read, so a row an old node or a lagging replica
+/// still holds is sent with the shipped body. Returns true when it changed `body`.
+pub fn upgrade_legacy_body(name: &str, body: &mut String) -> bool {
+    if !is_legacy_builtin_body(name, body) {
+        return false;
+    }
+    let Some(shipped) = name
+        .strip_prefix(PREBUILT_TEMPLATE_PREFIX)
+        .and_then(get_prebuilt_template)
+    else {
+        return false;
+    };
+    if shipped.body == *body {
+        return false;
+    }
+    *body = shipped.body;
+    true
+}
+
 /// Built-in config: the embedded copy of the shipped JSON.
 fn load_builtin_config() -> PrebuiltDestinationsConfig {
     serde_json::from_str(EMBEDDED_CONFIG)
@@ -681,6 +701,38 @@ mod tests {
     }
 
     #[test]
+    fn legacy_bodies_upgrade_and_other_bodies_stay() {
+        let mut slack = r#"{"text": "[{alert_status}] {alert_name}"}"#.to_string();
+        assert!(upgrade_legacy_body("prebuilt_slack", &mut slack));
+        assert!(slack.contains("\"blocks\""), "{slack}");
+
+        let mut teams =
+            r#"{"@type": "MessageCard", "text": "[{alert_status}] {alert_name}"}"#.to_string();
+        assert!(upgrade_legacy_body("prebuilt_teams", &mut teams));
+        assert_eq!(teams, get_prebuilt_template("msteams").unwrap().body);
+
+        let mut email = "<h2>[{alert_status}] {alert_name}</h2>".to_string();
+        assert!(upgrade_legacy_body("prebuilt_email", &mut email));
+        assert_ne!(email, "<h2>[{alert_status}] {alert_name}</h2>");
+
+        let mut edited = r#"{"text": "custom {alert_status}"}"#.to_string();
+        assert!(!upgrade_legacy_body("prebuilt_slack", &mut edited));
+        let mut other_name = r#"{"text": "[{alert_status}] {alert_name}"}"#.to_string();
+        assert!(!upgrade_legacy_body("my_slack", &mut other_name));
+        assert_eq!(other_name, r#"{"text": "[{alert_status}] {alert_name}"}"#);
+
+        let mut shipped = get_prebuilt_template("slack").unwrap().body;
+        assert!(!upgrade_legacy_body("prebuilt_slack", &mut shipped));
+    }
+
+    #[test]
+    fn opsgenie_body_leaves_the_alias_to_the_episode_stamp() {
+        let body = get_prebuilt_template("opsgenie").unwrap().body;
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(v.get("alias").is_none(), "{body}");
+    }
+
+    #[test]
     fn teams_alias_resolves_to_the_msteams_template() {
         let teams = get_prebuilt_template("teams").unwrap();
         assert_eq!(teams.body, get_prebuilt_template("msteams").unwrap().body);
@@ -696,7 +748,6 @@ mod tests {
             serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
         let builtin = load_builtin_config();
         assert_eq!(builtin.revision, file.revision);
-        assert!(builtin.revision >= 4, "the reseed needs a revision past 3");
         assert_eq!(
             serde_json::to_value(&builtin.destinations).unwrap(),
             serde_json::to_value(&file.destinations).unwrap()

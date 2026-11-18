@@ -712,17 +712,6 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
         Err(e) => log::error!("[TEMPLATES] retiring the old default templates failed: {e}"),
     }
 
-    // A destination made from a prebuilt card saves its own org copy, and that copy shadows the
-    // DEFAULT_ORG row, so the reseed above never reaches it. Every boot, so a copy an old node
-    // saves during a rolling upgrade also converges.
-    match refresh_legacy_org_copies().await {
-        Ok(0) => {}
-        Ok(n) => log::info!("[TEMPLATES] refreshed {n} org copies of prebuilt templates"),
-        Err(e) => {
-            log::error!("[TEMPLATES] refreshing org copies of prebuilt templates failed: {e}")
-        }
-    }
-
     // Record the newly-applied revision so future startups don't re-overwrite
     // already-converged templates. Only advance forward, never downgrade.
     if shipped_rev > applied_rev {
@@ -758,45 +747,6 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
     );
 
     Ok(())
-}
-
-/// The shipped prebuilt template for `existing`, when `existing` is an org copy that still holds
-/// the one-line body of the old built-in fallback. Any other body is left alone.
-fn refreshed_org_copy(org_id: &str, existing: &Template) -> Option<Template> {
-    use config::prebuilt_loader::{
-        PREBUILT_TEMPLATE_PREFIX, get_prebuilt_template, is_legacy_builtin_body,
-    };
-    if org_id == DEFAULT_ORG || !is_legacy_builtin_body(&existing.name, &existing.body) {
-        return None;
-    }
-    let shipped = get_prebuilt_template(existing.name.strip_prefix(PREBUILT_TEMPLATE_PREFIX)?)?;
-    if shipped.body == existing.body {
-        return None;
-    }
-    // Only the body: an email subject the root user changed stays as it is.
-    Some(Template {
-        body: shipped.body,
-        ..existing.clone()
-    })
-}
-
-/// Rewrites org copies of prebuilt templates that still hold the old one-line body; returns the
-/// count.
-async fn refresh_legacy_org_copies() -> Result<usize, anyhow::Error> {
-    let mut refreshed = 0;
-    for (org_id, existing) in infra::table::templates::list_all().await? {
-        let Some(template) = refreshed_org_copy(&org_id, &existing) else {
-            continue;
-        };
-        match db::alerts::templates::set(template).await {
-            Ok(_) => refreshed += 1,
-            Err(e) => log::error!(
-                "[TEMPLATES] failed to refresh '{}' in org {org_id}: {e}",
-                existing.name
-            ),
-        }
-    }
-    Ok(refreshed)
 }
 
 /// Owners whose template tuple a delete removes; a legacy tuple a live org shares stays.
@@ -1358,77 +1308,6 @@ mod tests {
                 .collect();
             assert_eq!(shapes, [("org:acme", "owningOrg", "template:tpl_acme")]);
         }
-    }
-
-    fn org_copy(org: &str, name: &str, body: &str) -> Template {
-        let mut t = config::prebuilt_loader::get_prebuilt_template("slack").unwrap();
-        t.org_id = org.to_string();
-        t.name = name.to_string();
-        t.body = body.to_string();
-        t
-    }
-
-    #[test]
-    fn legacy_slack_org_copy_gets_the_shipped_blocks_body() {
-        let old = org_copy(
-            "acme",
-            "prebuilt_slack",
-            r#"{"text": "[{alert_status}] {alert_name}"}"#,
-        );
-        let new = refreshed_org_copy("acme", &old).expect("legacy body is refreshed");
-        assert!(new.body.contains("\"blocks\""), "{}", new.body);
-        assert!(new.body.contains("{alert_url}"));
-        assert_eq!(new.org_id, "acme");
-        assert_eq!(new.name, "prebuilt_slack");
-        assert_eq!(new.id, old.id);
-    }
-
-    #[test]
-    fn edited_or_default_org_copies_are_left_alone() {
-        let edited = org_copy(
-            "acme",
-            "prebuilt_slack",
-            r#"{"text": "custom {alert_status}"}"#,
-        );
-        assert!(refreshed_org_copy("acme", &edited).is_none());
-        let other = org_copy(
-            "acme",
-            "my_slack",
-            r#"{"text": "[{alert_status}] {alert_name}"}"#,
-        );
-        assert!(refreshed_org_copy("acme", &other).is_none());
-        let shared = org_copy(
-            DEFAULT_ORG,
-            "prebuilt_slack",
-            r#"{"text": "[{alert_status}] {alert_name}"}"#,
-        );
-        assert!(refreshed_org_copy(DEFAULT_ORG, &shared).is_none());
-    }
-
-    #[test]
-    fn teams_alias_copy_is_refreshed_and_email_subject_is_kept() {
-        let teams = org_copy(
-            "acme",
-            "prebuilt_teams",
-            r#"{"@type": "MessageCard", "text": "[{alert_status}] {alert_name}"}"#,
-        );
-        let new = refreshed_org_copy("acme", &teams).expect("teams alias is refreshed");
-        assert_ne!(new.body, teams.body);
-
-        let mut email = config::prebuilt_loader::get_prebuilt_template("email").unwrap();
-        email.org_id = "acme".to_string();
-        email.body = "<h2>[{alert_status}] {alert_name}</h2>".to_string();
-        email.template_type = TemplateType::Email {
-            title: "Custom subject".to_string(),
-        };
-        let new = refreshed_org_copy("acme", &email).expect("legacy email body is refreshed");
-        assert_ne!(new.body, email.body);
-        assert_eq!(
-            new.template_type,
-            TemplateType::Email {
-                title: "Custom subject".to_string()
-            }
-        );
     }
 
     #[test]

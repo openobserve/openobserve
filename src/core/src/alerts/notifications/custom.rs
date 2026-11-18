@@ -28,9 +28,30 @@ use super::context::NotificationContext;
 
 /// Render `tpl` against `ctx`. Pure: no I/O, no clock, no DB.
 pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: bool) -> String {
+    render_custom(tpl, ctx, is_email, false)
+}
+
+/// Render a stored Custom template. A system prebuilt body also escapes alert values, so an alert
+/// named `cpu "high"` still sends valid JSON; a user's alert template keeps its raw insert.
+pub fn apply_template_body(
+    template: &config::meta::destinations::Template,
+    ctx: &NotificationContext,
+    is_email: bool,
+) -> String {
+    let prebuilt = config::prebuilt_loader::is_prebuilt_template_name(&template.name);
+    render_custom(&template.body, ctx, is_email, prebuilt)
+}
+
+fn render_custom(
+    tpl: &str,
+    ctx: &NotificationContext,
+    is_email: bool,
+    escape_alert: bool,
+) -> String {
     // Another kind's names and text are free (a downtime "deploy" <db>), so a JSON body escapes
     // them as it escapes attributes; plain text such as an SNS message gets them as written.
-    let json_body = ctx.kind != NotificationKind::Alert && !is_email && looks_like_json(tpl);
+    let json_body =
+        (ctx.kind != NotificationKind::Alert || escape_alert) && !is_email && looks_like_json(tpl);
     let prepared = super::modifiers::prepare_modifiers(
         tpl,
         |field| {

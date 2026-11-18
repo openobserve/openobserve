@@ -50,13 +50,17 @@ impl TryFrom<Model> for Template {
         };
         let id = svix_ksuid::Ksuid::from_str(&value.id)
             .map_err(|e| TemplateError::ConvertingId(e.to_string()))?;
+        // A row saved from the old one-line prebuilt fallback reads as the shipped body, on every
+        // path: cache seed, watch reload, a lagging replica, an old node's late write.
+        let mut body = value.body;
+        config::prebuilt_loader::upgrade_legacy_body(&value.name, &mut body);
         Ok(Self {
             id: Some(id),
             org_id: value.org,
             name: value.name,
             is_default: value.is_default,
             template_type,
-            body: value.body,
+            body,
             kind: TemplateKind::from(value.kind.as_str()),
             applies_to: applies_to_from_column(&value.applies_to),
         })
