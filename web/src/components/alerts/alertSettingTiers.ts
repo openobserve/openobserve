@@ -60,7 +60,6 @@ export interface AlertSettingTierDef {
   section: AlertSectionId;
   tier: AlertSettingTier;
   nameKey: I18nKey;
-  defaultHintKey?: I18nKey;
   /** The owning step renders its "+ name" link beside the control it extends. */
   inline?: boolean;
   row?: "message";
@@ -141,25 +140,16 @@ export const ALERT_SETTING_TIERS: readonly AlertSettingTierDef[] = [
   tierDef("compareWithPast", "condition", "more", "alerts.tiers.names.compareWithPast"),
   tierDef("vrl", "condition", "more", "alerts.tiers.names.vrl"),
   tierDef("ruleExpression", "condition", "smart", "alerts.tiers.names.ruleExpression"),
-  tierDef("anomalyDirection", "condition", "smart", "alerts.tiers.names.anomalyDirection", {
-    defaultHintKey: "alerts.tiers.defaults.anomalyDirection",
-  }),
-  tierDef("anomalyWindow", "condition", "more", "alerts.tiers.names.anomalyWindow", {
-    defaultHintKey: "alerts.tiers.defaults.anomalyWindow",
-  }),
+  tierDef("anomalyDirection", "condition", "smart", "alerts.tiers.names.anomalyDirection"),
+  tierDef("anomalyWindow", "condition", "more", "alerts.tiers.names.anomalyWindow"),
   tierDef("anomalySqlPreview", "condition", "more", "alerts.tiers.names.anomalySqlPreview"),
   tierDef(
     "compositeWarningCounts",
     "condition",
     "more",
     "alerts.tiers.names.compositeWarningCounts",
-    {
-      defaultHintKey: "alerts.tiers.defaults.compositeWarningCounts",
-    },
   ),
-  tierDef("compositeStalePolicy", "condition", "more", "alerts.tiers.names.compositeStalePolicy", {
-    defaultHintKey: "alerts.tiers.defaults.compositeStalePolicy",
-  }),
+  tierDef("compositeStalePolicy", "condition", "more", "alerts.tiers.names.compositeStalePolicy"),
   tierDef("warning", "condition", "add", "alerts.tiers.add.warning", { inline: true }),
   tierDef("forecast", "condition", "add", "alerts.tiers.add.forecast", { inline: true }),
   tierDef("anomalySql", "condition", "add", "alerts.tiers.add.anomalySql", { inline: true }),

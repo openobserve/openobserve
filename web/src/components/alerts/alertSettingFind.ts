@@ -303,7 +303,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
   },
   {
     id: "keepFiring",
-    labelKey: "alerts.plain.keepFiringFor",
+    labelKey: "alerts.form.keepFiring.label",
     aliases: ["keep firing", "keep firing for", "flapping"],
     section: "notify",
     tier: "smart",
@@ -349,7 +349,16 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
   {
     id: "cooldown",
     labelKey: "alerts.form.remind.label",
-    aliases: ["cooldown", "silence", "silence notification", "throttle", "snooze", "at most once"],
+    aliases: [
+      "cooldown",
+      "repeat every",
+      "remind",
+      "silence",
+      "silence notification",
+      "throttle",
+      "snooze",
+      "at most once",
+    ],
     section: "notify",
     tier: "shown",
     groupKey: "alerts.find.groups.destinations",

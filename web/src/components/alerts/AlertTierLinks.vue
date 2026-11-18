@@ -35,7 +35,6 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const SEP = raw(" · ");
 // Only the anomaly window hint has values, and a listed setting always holds its default.
-const HINT_DEFAULTS = { fire: 100, buckets: 1 };
 
 const links = computed(() => props.view.addLinks.filter((d) => !d.inline));
 const messageLinks = computed(() => links.value.filter((d) => d.row === "message"));
@@ -52,7 +51,6 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
     <OSettingRow
       v-if="messageLinks.length"
       :label="t('alerts.form.messageRow')"
-      :description="t('alerts.form.messageRowHelp')"
       :data-test="`add-alert-section-${section}-row-message`"
     >
       <div class="-ms-3.5 flex flex-wrap items-center gap-x-1 max-[85.5rem]:-ms-3">
@@ -109,10 +107,7 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
         <span class="whitespace-normal" :data-test="`add-alert-section-${section}-more-names`">
           <template v-for="(item, index) in view.more" :key="item.id"
             ><template v-if="index">{{ SEP }}</template
-            >{{ t(item.nameKey)
-            }}<template v-if="item.defaultHintKey"
-              >{{ " " }}{{ t(item.defaultHintKey, HINT_DEFAULTS) }}</template
-            ></template
+            >{{ t(item.nameKey) }}</template
           >
         </span>
       </template>

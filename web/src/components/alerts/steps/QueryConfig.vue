@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >{{ t("alerts.conditionOf") }}</span
                             >
                             <OFormSelect
-                              :aria-label="t('alerts.column')"
+                              :aria-label="t('alerts.form.names.field')"
                               name="query_condition.aggregation.having.column"
                               :options="numericColumns"
                               searchable
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template v-if="selectedFunction === 'total_events'">
                           <div class="flex flex-wrap items-start gap-2">
                             <OFormSelect
-                              :aria-label="t('common.operator')"
+                              :aria-label="t('alerts.form.names.comparison')"
                               name="trigger_condition.operator"
                               :options="plainOperators"
                               class="w-32!"
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template v-else>
                           <div class="flex flex-wrap items-start gap-2">
                             <OFormSelect
-                              :aria-label="t('common.operator')"
+                              :aria-label="t('alerts.form.names.comparison')"
                               name="query_condition.aggregation.having.operator"
                               :options="plainOperators"
                               :searchable="false"
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <!-- Message hangs under the value field it describes. -->
                             <div class="flex flex-col gap-1">
                               <OFormInput
-                                :aria-label="t('common.value')"
+                                :aria-label="t('alerts.alertIfNoOfEvents')"
                                 name="query_condition.aggregation.having.value"
                                 type="number"
                                 fit-content
@@ -327,13 +327,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @change="groupByEditing = true"
                       @remove="clearGroupBy"
                     >
-                      {{ raw(groupLabelsText(groupByLabels, locale)) }}
+                      {{ raw(groupLabelsText(shownGroupLabels(groupByLabels), locale)) }}
                     </AlertSentenceRow>
                     <OSettingRow
                       v-else-if="selectedFunction !== 'total_events' && tierShows('groupBy')"
                       data-test="alert-group-by-row"
                       :label="t('alerts.plain.groupedBy')"
-                      :description="t('alerts.queryConfig.groupByTooltip')"
+                      :description="
+                        streamType === 'metrics'
+                          ? t('alerts.queryConfig.groupByHelpLabels')
+                          : t('alerts.queryConfig.groupByTooltip')
+                      "
                       fill
                     >
                       <div class="flex flex-wrap items-center gap-2">
@@ -342,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OFormSelect
                               :aria-label="t('alerts.groupBy')"
                               :name="`logGroupBy[${index}]`"
-                              :options="columns"
+                              :options="groupByOptions"
                               searchable
                               :placeholder="t('alerts.placeholders.selectColumn')"
                               :data-test="`alert-group-by-select-${index}`"
@@ -407,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div class="relative inline-flex">
                               <OFormSelect
                                 name="query_condition.aggregation.having.column"
-                                :aria-label="t('alerts.column')"
+                                :aria-label="t('alerts.form.names.field')"
                                 :options="columns"
                                 searchable
                                 :placeholder="t('alerts.placeholders.selectColumn')"
@@ -460,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template v-if="selectedFunction === 'total_events'">
                           <div class="flex flex-wrap items-start gap-2">
                             <OFormSelect
-                              :aria-label="t('common.operator')"
+                              :aria-label="t('alerts.form.names.comparison')"
                               name="trigger_condition.operator"
                               :options="plainOperators"
                               :searchable="false"
@@ -515,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template v-else>
                           <div class="flex flex-wrap items-start gap-2">
                             <OFormSelect
-                              :aria-label="t('common.operator')"
+                              :aria-label="t('alerts.form.names.comparison')"
                               name="query_condition.aggregation.having.operator"
                               :options="plainOperators"
                               :searchable="false"
@@ -525,7 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <!-- Message hangs under the value field it describes. -->
                             <div class="flex flex-col gap-1">
                               <OFormInput
-                                :aria-label="t('common.value')"
+                                :aria-label="t('alerts.alertIfNoOfEvents')"
                                 name="query_condition.aggregation.having.value"
                                 type="number"
                                 fit-content
@@ -597,7 +601,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @change="groupByEditing = true"
                       @remove="clearGroupBy"
                     >
-                      {{ raw(groupLabelsText(groupByLabels, locale)) }}
+                      {{ raw(groupLabelsText(shownGroupLabels(groupByLabels), locale)) }}
                     </AlertSentenceRow>
                     <OSettingRow
                       v-else-if="
@@ -606,7 +610,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tierShows('groupBy')
                       "
                       :label="t('alerts.plain.groupedBy')"
-                      :description="t('alerts.queryConfig.groupByTooltip')"
+                      :description="
+                        streamType === 'metrics'
+                          ? t('alerts.queryConfig.groupByHelpLabels')
+                          : t('alerts.queryConfig.groupByTooltip')
+                      "
                       fill
                     >
                       <div class="flex flex-wrap items-center gap-2">
@@ -615,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OFormSelect
                               :aria-label="t('alerts.groupBy')"
                               :name="`query_condition.aggregation.group_by[${index}]`"
-                              :options="columns"
+                              :options="groupByOptions"
                               searchable
                               :placeholder="t('alerts.placeholders.selectColumn')"
                               class="w-50!"
@@ -682,7 +690,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template v-if="countOperatorShown">
                           <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
                           <OFormSelect
-                            :aria-label="t('common.operator')"
+                            :aria-label="t('alerts.form.names.comparison')"
                             name="trigger_condition.operator"
                             :options="plainOperators"
                             :searchable="false"
@@ -719,7 +727,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span class="leading-8.5">{{ t("alerts.form.group.whenAtLeast") }}</span>
                           <div class="flex flex-col gap-1">
                             <OFormInput
-                              :aria-label="t('alerts.alertIfNoOfEvents')"
+                              :aria-label="t('alerts.form.group.countNameGroups')"
                               name="trigger_condition.threshold"
                               type="number"
                               fit-content
@@ -741,7 +749,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </div>
                           <span class="leading-8.5">{{
-                            t("alerts.form.group.builderOneTail")
+                            t("alerts.form.group.builderOneTail", thresholdPlural)
                           }}</span>
                         </template>
                       </div>
@@ -764,6 +772,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="sectionTargets ? t('alerts.form.filter.label') : undefined"
                 :group="filterSentenceGroup"
                 :stream-name="streamName"
+                :stream-type="streamType"
                 :dialect="filterDialect"
                 data-test="add-alert-filter-sentence"
                 @add="openFilters"
@@ -785,6 +794,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :model-value="inputData.conditions"
                     :fields="conditionFields"
                     :load-values="conditionValueLoader"
+                    :add-labels="{
+                      add: t('alerts.form.filter.add'),
+                      addBelow: t('alerts.form.filter.addBelow'),
+                    }"
                     data-test="alert-conditions"
                     @update:model-value="onConditionsChange"
                     @update:valid="conditionsValid = $event"
@@ -894,7 +907,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="alert-vrl-toggle"
                           @update:model-value="onVrlSwitch"
                         >
-                          <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" />
+                          <OTooltip :content="t('alerts.form.editor.vrlHelp')" />
                         </OSwitch>
                       </div>
                     </div>
@@ -1024,7 +1037,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="alert-vrl-toggle"
                           @update:model-value="onVrlSwitch"
                         >
-                          <OTooltip :content="t('alerts.queryConfig.hideVrlEditor')" />
+                          <OTooltip :content="t('alerts.form.editor.vrlHelp')" />
                         </OSwitch>
                       </div>
                     </div>
@@ -1167,7 +1180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-text-body flex flex-wrap items-start gap-x-1 gap-y-1 text-sm"
                         >
                           <OFormSelect
-                            :aria-label="t('common.operator')"
+                            :aria-label="t('alerts.form.names.comparison')"
                             name="trigger_condition.operator"
                             :options="plainOperators"
                             :searchable="false"
@@ -1237,7 +1250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <template v-if="localTab === 'sql' || countOperatorShown">
                                 <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
                                 <OFormSelect
-                                  :aria-label="t('common.operator')"
+                                  :aria-label="t('alerts.form.names.comparison')"
                                   name="trigger_condition.operator"
                                   :options="plainOperators"
                                   :searchable="false"
@@ -1247,7 +1260,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 />
                                 <div class="flex flex-col gap-1">
                                   <OFormInput
-                                    :aria-label="t('alerts.alertIfNoOfEvents')"
+                                    :aria-label="
+                                      localTab === 'promql'
+                                        ? t('alerts.form.group.countNameSeries')
+                                        : t('alerts.alertIfNoOfEvents')
+                                    "
                                     name="trigger_condition.threshold"
                                     type="number"
                                     fit-content
@@ -1280,7 +1297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 }}</span>
                                 <div class="flex flex-col gap-1">
                                   <OFormInput
-                                    :aria-label="t('alerts.alertIfNoOfEvents')"
+                                    :aria-label="t('alerts.form.group.countNameSeries')"
                                     name="trigger_condition.threshold"
                                     type="number"
                                     fit-content
@@ -1302,7 +1319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </div>
                                 </div>
                                 <span class="leading-8.5">{{
-                                  t("alerts.form.group.promqlOneTail")
+                                  t("alerts.form.group.promqlOneTail", thresholdPlural)
                                 }}</span>
                               </template>
                             </div>
@@ -1313,7 +1330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
                               <OFormSelect
-                                :aria-label="t('alerts.column')"
+                                :aria-label="t('alerts.form.names.field')"
                                 name="query_condition.aggregation.having.column"
                                 :options="sqlAggColumnOptions"
                                 searchable
@@ -1323,7 +1340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 @update:model-value="onLogMeasureColumnChange($event)"
                               />
                               <OFormSelect
-                                :aria-label="t('common.operator')"
+                                :aria-label="t('alerts.form.names.comparison')"
                                 name="query_condition.aggregation.having.operator"
                                 :options="plainOperators"
                                 :searchable="false"
@@ -1333,7 +1350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               />
                               <div class="flex flex-col gap-1">
                                 <OFormInput
-                                  :aria-label="t('common.value')"
+                                  :aria-label="t('alerts.alertIfNoOfEvents')"
                                   name="query_condition.aggregation.having.value"
                                   type="number"
                                   fit-content
@@ -1753,6 +1770,8 @@ import {
 import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
 import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
+import { dataNoun } from "@/utils/alerts/alertCopy";
+import { groupByChoices } from "@/utils/alerts/alertQueryBuilder";
 
 /** Group labels as prose in the reader's language ("service, region and pod"). */
 function groupLabelsText(labels: string[], locale: string): string {
@@ -2294,14 +2313,15 @@ export default defineComponent({
       localIsAggregationEnabled.value = false;
     }
 
+    const countedNoun = computed(() => dataNoun(props.streamType, "custom", 2, t));
     // Log function options — count (default) and measure functions.
     // computed() (not a module/setup const) so the labels + tooltips re-resolve
     // if the locale changes; the `value`s are payload identifiers and stay literal.
     const logFunctionOptions = computed(() => [
       {
-        label: t("alerts.queryConfig.functions.totalEvents"),
+        label: t("alerts.queryConfig.functions.totalEvents", { noun: countedNoun.value }),
         value: "total_events",
-        tooltip: t("alerts.queryConfig.functionTooltips.totalEvents"),
+        tooltip: t("alerts.queryConfig.functionTooltips.totalEvents", { noun: countedNoun.value }),
       },
       {
         label: t("alerts.queryConfig.functions.count"),
@@ -2814,6 +2834,18 @@ export default defineComponent({
     const hasMetricGroupByFields = computed(
       () => metricGroupByStore.value.filter((f: string) => f?.trim()).length > 0,
     );
+    // "1 group crosses", "2 groups cross": the sentence follows the count typed beside it.
+    const thresholdPlural = computed(() => (Number(triggerThreshold.value) === 1 ? 1 : 2));
+    const shownGroupLabels = (labels: string[]): string[] =>
+      labels.map((label) => (label === "__hash__" ? t("alerts.form.group.series") : label));
+    const groupByOptions = computed(() =>
+      groupByChoices(props.columns ?? [], {
+        streamType: props.streamType,
+        selected: [...(logGroupByStore.value ?? []), ...(metricGroupByStore.value ?? [])],
+        seriesLabel: t("alerts.form.group.seriesOption"),
+        timestamp: store.state.zoConfig?.timestamp_column || "_timestamp",
+      }),
+    );
     const groupByLabels = computed(() =>
       (isEventBased.value ? logGroupByStore.value : metricGroupByStore.value).filter((f: string) =>
         f?.trim(),
@@ -2888,7 +2920,7 @@ export default defineComponent({
     const groupEachLabel = computed(() => {
       const q = groupQuestion.value;
       const labels = q.grouped
-        ? raw(groupLabelsText(q.labels, locale.value))
+        ? raw(groupLabelsText(shownGroupLabels(q.labels), locale.value))
         : q.noun === "series"
           ? t("alerts.form.group.series")
           : t("alerts.form.group.row");
@@ -4082,6 +4114,9 @@ export default defineComponent({
     // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
     return {
+      thresholdPlural,
+      shownGroupLabels,
+      groupByOptions,
       raw,
       t,
       store,

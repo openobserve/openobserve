@@ -223,26 +223,33 @@ const helpOpen = ref(false);
 
 const kindLabel = computed(() => t(kindLabelKey(props.kind)));
 
-const suffix = (tpl: PickerTemplate) => {
-  if (tpl.kind === "content") return "";
-  if (tpl.type === "email") return ` ${t("alerts.templateOverride.emailOnly")}`;
-  if (tpl.type === "sns") return ` ${t("alerts.templateOverride.snsOnly")}`;
-  return ` ${t("alerts.templateOverride.webhookOnly")}`;
-};
+// Templates that only fit one destination kind sit under a heading that says so, not a per-row suffix.
+const TYPE_HEADINGS = {
+  webhook: "alerts.templateOverride.groupWebhook",
+  email: "alerts.templateOverride.groupEmail",
+  sns: "alerts.templateOverride.groupSns",
+} as const;
 
 const options = computed<SelectOption[]>(() => {
   const content = templates.value.filter((tpl) => tpl.kind === "content");
   const custom = templates.value.filter((tpl) => tpl.kind !== "content");
+  const typeOf = (tpl: PickerTemplate) =>
+    tpl.type === "email" || tpl.type === "sns" ? tpl.type : "webhook";
   const group = (label: string, list: PickerTemplate[]): SelectOption[] =>
     list.length
       ? [
           { label: raw(label), value: `__header_${label}`, header: true },
-          ...list.map((tpl) => ({ label: raw(`${tpl.name}${suffix(tpl)}`), value: tpl.name })),
+          ...list.map((tpl) => ({ label: raw(tpl.name), value: tpl.name })),
         ]
       : [];
   return [
     ...group(t("alerts.templateOverride.groupContent"), content),
-    ...group(t("alerts.templateOverride.groupCustom"), custom),
+    ...(Object.keys(TYPE_HEADINGS) as (keyof typeof TYPE_HEADINGS)[]).flatMap((type) =>
+      group(
+        t(TYPE_HEADINGS[type]),
+        custom.filter((tpl) => typeOf(tpl) === type),
+      ),
+    ),
   ];
 });
 

@@ -71,16 +71,17 @@ export function useAlertSettingFind(opts: {
   const query = ref("");
   const sectionTitle = (id: AlertSectionId): I18nText => {
     const def = ALERT_SECTIONS.find((s) => s.id === id);
-    return def ? t(def.titleKey) : t("alerts.find.label");
+    return def ? t(def.navKey) : t("alerts.find.label");
   };
 
   const items = computed<CommandSearchItem[]>(() =>
     searchAlertSettings(query.value, t, opts.available).map(({ entry }) => ({
       id: entry.id,
       label: t(entry.labelKey),
+      // Results name the step by its nav name; only More options adds a second place.
       context: [
         sectionTitle(entry.section),
-        t(entry.groupKey),
+        ...(entry.groupKey === "alerts.find.groups.more" ? [t(entry.groupKey)] : []),
         ...(entry.parentKey ? [t(entry.parentKey)] : []),
       ],
     })),

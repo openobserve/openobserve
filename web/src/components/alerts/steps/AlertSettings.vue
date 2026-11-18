@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center gap-2">
                   <div>
                     <OFormInput
-                      :aria-label="t('alerts.period')"
+                      :aria-label="t('alerts.form.names.lookBack')"
                       name="trigger_condition.period"
                       type="number"
                       fit-content
@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="tierShows('holdFor')"
             ref="pendingPeriodFieldRef"
             :label="t('alerts.form.holdFor.label')"
+            :description="t('alerts.form.holdFor.help')"
             data-test="add-alert-hold-for-row"
             removable
             @remove="removeHoldFor"
@@ -186,7 +187,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @refresh="$emit('refresh:destinations')"
           />
 
-          <OSettingRow ref="silenceFieldRef" :label="t('alerts.form.remind.label')" fill>
+          <OSettingRow
+            ref="silenceFieldRef"
+            :label="t('alerts.form.remind.label')"
+            :description="t('alerts.form.remind.help')"
+            fill
+          >
             <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center gap-2">
                 <div>
@@ -252,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSettingRow
               v-else
               :label="t('alerts.plain.openIncident')"
-              :info="t('alerts.alertSettings.createsIncidentTooltip')"
+              :description="t('alerts.alertSettings.createsIncidentHelp')"
               fill
             >
               <OFormSwitch

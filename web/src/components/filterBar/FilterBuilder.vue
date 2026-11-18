@@ -130,6 +130,7 @@ defineExpose<FilterBuilderExpose>({ focus, validate });
       :issues="shownIssues"
       :fields-loading="fieldsLoading"
       :placeholder="placeholder"
+      :add-labels="addLabels"
       :disabled="disabled"
       :size="size"
       :appearance="appearance"

@@ -1275,7 +1275,7 @@ describe("IncidentList.vue", () => {
       expect(chips.map((c) => c.props("dimKey"))).toEqual(["autoobserve_finding", "stream_name"]);
       expect(more.text()).toContain("+2 more");
       expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe(
-        "StreamType=logsenv=prod",
+        "Streamtype=logsenv=prod",
       );
     });
 
@@ -1301,7 +1301,7 @@ describe("IncidentList.vue", () => {
       expect(chips.map((c) => c.props("tooltip"))).toEqual([false, false]);
       expect(more.text()).toContain("+1 more");
       expect(more.find('[data-test="o-tooltip"]').text().replace(/\s+/g, "")).toBe(
-        "StreamType=logs",
+        "Streamtype=logs",
       );
       const shown = [
         ...chips.map((c) => c.html()),

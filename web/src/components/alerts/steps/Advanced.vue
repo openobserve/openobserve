@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="advanced-template-info-btn"
                     variant="ghost-primary"
                     size="icon-circle-sm"
-                    :title="t('alerts.alertSettings.helpLearnMore')"
+                    :title="t('alerts.alertSettings.learnAboutTemplates')"
                     @click="openHelp('template')"
                   >
                     <OIcon name="help" size="sm" /> </OButton></template
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-alert-row-input-info-btn"
                     variant="ghost-primary"
                     size="icon-circle-sm"
-                    :title="t('alerts.alertSettings.helpLearnMore')"
+                    :title="t('alerts.alertSettings.learnAboutRowTemplates')"
                     @click="openHelp('rowTemplate')"
                   >
                     <OIcon name="help" size="sm" /> </OButton></template
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="advanced-variables-info-btn"
                     variant="ghost-primary"
                     size="icon-circle-sm"
-                    :title="t('alerts.alertSettings.helpLearnMore')"
+                    :title="t('alerts.alertSettings.learnAboutVariables')"
                     @click="openHelp('variables')"
                   >
                     <OIcon name="help" size="sm" /> </OButton></template

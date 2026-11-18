@@ -287,7 +287,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     await nextTick();
 
     expect(parentForm.state.isValid).toBe(false);
-    expect(host.text()).toContain("Period should be greater than 0");
+    expect(host.text()).toContain("Look back must be at least 1 minute.");
   });
 
   it("period change CASCADES: emits update:trigger with synced silence/frequency/cron", () => {

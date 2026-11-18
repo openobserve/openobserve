@@ -21,10 +21,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import type { FilterGroup } from "@/utils/query/filterBar";
 import { describeFilterNode, filterSentenceParts } from "@/utils/alerts/filterSentence";
+import { dataNoun } from "@/utils/alerts/alertCopy";
 
 const props = defineProps<{
   group: FilterGroup;
   streamName: string;
+  /** Names what the stream holds: events, samples or spans. */
+  streamType?: string;
   dialect: string;
   dataTest: string;
   /** Renders as a setting row, with Change and Remove in its actions column. */
@@ -49,6 +52,7 @@ const parts = computed(() =>
   filterSentenceParts(props.group, (n) => describeFilterNode(n, props.dialect, t)),
 );
 const empty = computed(() => !parts.value.some((p) => p.kind === "condition"));
+const noun = computed(() => dataNoun(props.streamType, "custom", 2, t));
 const connectorWord = (connector: "AND" | "OR") =>
   connector === "OR" ? t("alerts.form.filter.or") : t("alerts.form.filter.and");
 
@@ -79,7 +83,9 @@ const SentenceActions = () => [actionButton("change"), actionButton("remove")];
     >
       <template v-if="empty">
         <span class="text-text-body">{{
-          t("alerts.form.filter.allEvents", { stream: raw(props.streamName) })
+          props.streamName
+            ? t("alerts.form.filter.allEvents", { noun, stream: raw(props.streamName) })
+            : t("alerts.form.filter.allEventsNoStream", { noun })
         }}</span>
         <OButton
           variant="ghost-primary"

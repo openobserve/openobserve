@@ -21,6 +21,7 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
+import { dataNoun } from "@/utils/alerts/alertCopy";
 
 const props = defineProps<{
   streamName: string;
@@ -32,6 +33,7 @@ const WINDOW_US = 60 * 60 * 1000 * 1000;
 const MESSAGE_FIELDS = ["message", "msg", "log", "body"];
 
 const { t } = useI18nTyped();
+const noun = computed(() => dataNoun(props.streamType, "custom", 2, t));
 const store = useStore();
 const query = useAlertStreamQuery();
 
@@ -67,7 +69,7 @@ watch(
 
 <template>
   <OSettingRow
-    :label="t('alerts.sections.samples.label')"
+    :label="t('alerts.sections.samples.label', { noun })"
     :description="t('alerts.sections.samples.help')"
     fill
     wide
@@ -86,12 +88,12 @@ watch(
     </ul>
     <p v-else class="text-text-secondary m-0 pt-2 text-xs" data-test="add-alert-sample-status">
       <template v-if="query.state.value === 'failed'">{{
-        t("alerts.sections.samples.failed")
+        t("alerts.sections.samples.failed", { noun })
       }}</template>
       <template v-else-if="query.state.value === 'ready'">{{
         t("alerts.sections.samples.empty")
       }}</template>
-      <template v-else>{{ t("alerts.sections.samples.loading") }}</template>
+      <template v-else>{{ t("alerts.sections.samples.loading", { noun }) }}</template>
     </p>
   </OSettingRow>
 </template>

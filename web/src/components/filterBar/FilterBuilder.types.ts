@@ -16,7 +16,7 @@
 import type { I18nText } from "@/types/i18n";
 import type { FilterField } from "@/utils/query/filterBar";
 import type { FilterIssue, FilterLayout, FilterProfileName } from "./filterProfiles";
-import type { FilterValueLabel } from "./QueryFilterBar.types";
+import type { FilterAddLabels, FilterValueLabel } from "./QueryFilterBar.types";
 
 export interface FilterBuilderProps {
   /** Which page's rules apply: operators, layout, depth, connectors, limits and the saved format. */
@@ -36,6 +36,8 @@ export interface FilterBuilderProps {
   layout?: FilterLayout;
   fieldsLoading?: boolean;
   placeholder?: I18nText;
+  /** Replaces "Add condition" / "Add condition below" where a host calls a line something else. */
+  addLabels?: FilterAddLabels;
   disabled?: boolean;
   size?: "sm" | "md";
   /** `plain` blends the bar into the editor surface it sits in. */

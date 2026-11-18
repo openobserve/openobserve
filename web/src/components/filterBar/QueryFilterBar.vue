@@ -423,6 +423,7 @@ const draftOperator = computed(() => {
     <template #default="{ caret }">
       <div v-if="vertical" ref="rowsRef" class="flex w-full min-w-min flex-col gap-1.5">
         <FilterBarRows
+          :add-labels="addLabels"
           :items="modelValue.items"
           :group-id="modelValue.id"
           :connector-mode="config.connectors"

@@ -189,9 +189,10 @@ describe("TemplateOverridePicker", () => {
     expect(options.map((o) => [String(o.label), !!o.header])).toEqual([
       ["Content", true],
       ["card", false],
-      ["Custom", true],
-      ["hook (webhook only)", false],
-      ["mail (email only)", false],
+      ["Webhook destinations only", true],
+      ["hook", false],
+      ["Email destinations only", true],
+      ["mail", false],
     ]);
   });
 

@@ -35,6 +35,11 @@ import type {
 export type FilterBarExtraRow = Omit<ChipInputSuggestion, "section" | "selected">;
 
 /** A stored value's display name; the value itself is still what is saved and shown in the chip. */
+export interface FilterAddLabels {
+  add: I18nText;
+  addBelow: I18nText;
+}
+
 export interface FilterValueLabel {
   label: string;
   /** Secondary text on the value row's end edge. */
@@ -74,6 +79,8 @@ export interface QueryFilterBarProps {
   valueLabel?: (field: string, value: string) => FilterValueLabel | undefined;
   fieldsLoading?: boolean;
   placeholder?: I18nText;
+  /** Replaces "Add condition" / "Add condition below" where a host calls a line something else. */
+  addLabels?: FilterAddLabels;
   disabled?: boolean;
   size?: "sm" | "md";
   /** `plain` blends the bar into the editor surface it replaces. */
@@ -145,6 +152,7 @@ export interface FilterBarRowsProps extends FilterBarNodesProps {
   nextConnector?: FilterConnector;
   /** Groups drawn as one summary line instead of their lines. */
   foldedIds?: Set<string>;
+  addLabels?: FilterAddLabels;
 }
 
 export interface FilterBarRowsEmits extends FilterBarNodesEmits {

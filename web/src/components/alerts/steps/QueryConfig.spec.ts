@@ -341,7 +341,7 @@ describe("QueryConfig.vue", () => {
   describe("Operator wording", () => {
     it("echoes a count warning row's operator in the same words as its select", () => {
       expect(wrapper.vm.operatorLabel(">=")).toBe("at least");
-      expect(wrapper.vm.operatorLabel("<")).toBe("fewer than");
+      expect(wrapper.vm.operatorLabel("<")).toBe("less than");
       expect(wrapper.vm.operatorLabel("~=")).toBe("~=");
     });
   });

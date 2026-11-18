@@ -55,17 +55,17 @@ describe("useAlertSettingFind", () => {
     document.body.innerHTML = "";
   });
 
-  it("lists ranked results with section question and group", () => {
+  it("lists ranked results under the step's nav name, and More options when folded there", () => {
     const { find } = setup();
     find.query.value = "flapping";
     expect(find.items.value[0]).toEqual({
       id: "keepFiring",
-      label: "Keep firing after it clears",
-      context: ["Who should hear about it?", "More options"],
+      label: "Keep firing for",
+      context: ["Who to tell", "More options"],
     });
     find.query.value = "recovery destination";
     expect(find.items.value[0]?.context).toEqual([
-      "Who should hear about it?",
+      "Who to tell",
       "More options",
       "Recovery message",
     ]);
