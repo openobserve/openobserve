@@ -2077,6 +2077,8 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_user_outside_the_org_reads_no_type_org_wide() {
+        // with OpenFGA off a member gets every type, so only the member lookup can empty this
+        assert!(!o2_openfga::config::get_config().enabled);
         let wanted = [StreamType::Logs, StreamType::Metrics];
         let types = OpenFgaStreamChecker
             .org_wide_readable("issue3592-nobody@example.com", "issue3592_org", &wanted)
