@@ -66,11 +66,11 @@ mod user;
 
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue, EvalDatasetsQueue,
-    EvalExperimentsQueue, EvalJobsQueue, EvalPlaygroundSnapshotsQueue, EvalProvidersQueue,
-    EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, Message, MessageType, MetaQueue,
-    OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, StatusPagesQueue,
-    SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
+    AlertStatesQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue,
+    EvalDatasetsQueue, EvalExperimentsQueue, EvalJobsQueue, EvalPlaygroundSnapshotsQueue,
+    EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, Message,
+    MessageType, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
+    SearchJobsQueue, StatusPagesQueue, SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
 };
 
 fn parse_eval_key(
@@ -121,6 +121,14 @@ async fn service_identity_msg(msg: Message) -> infra::errors::Result<()> {
     .await
 }
 
+/// The JSON payload of a message whose type carries one struct; no payload is an error.
+pub(crate) fn payload<T: serde::de::DeserializeOwned>(msg: &Message) -> infra::errors::Result<T> {
+    let value = msg.value.as_ref().ok_or_else(|| {
+        infra::errors::Error::Message(format!("no payload in message {}", msg.key))
+    })?;
+    Ok(config::utils::json::from_slice(value)?)
+}
+
 /// Creates a super cluster queue for each super cluster topic and begins
 /// polling messages from each queue in a separate thread.
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -158,6 +166,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_downtime_msg: downtimes::process,
         on_alert_ack_msg: alert_acks::process,
         on_alert_composite_msg: alert_composites::process,
+    };
+    // Run state has its own topic so its volume cannot push definitions out of `alert`.
+    let alert_states_queue = AlertStatesQueue {
+        on_alert_state_msg: alert_states::process,
+        on_scheduler_msg: scheduler::process,
     };
     // On-call rides the scheduler topic with the triggers it belongs to, so a
     // response record always lands before the escalation timer that names it.
@@ -232,6 +245,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(meta_queue),
         Box::new(schema_queue),
         Box::new(alerts_queue),
+        Box::new(alert_states_queue),
         Box::new(search_jobs_queue),
         Box::new(dashboards_queue),
         Box::new(pipelines_queue),
