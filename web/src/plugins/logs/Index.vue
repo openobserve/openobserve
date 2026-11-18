@@ -497,6 +497,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="searchObj.data.stream.selectedStream[0] ?? null"
                 @update:model-value="onDrillDownStreamChange"
               />
+              <span
+                class="text-text-heading ms-3 shrink-0 text-sm font-semibold"
+                data-test="logs-drill-down-stream-row-title"
+              >
+                {{ t("volumeInsights.title") }}
+              </span>
             </div>
             <div class="min-h-0 flex-1">
               <!-- Same no-stream / error / no-events states as the results pane. -->
@@ -614,6 +620,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 preset="no-query-applied"
                 size="hero"
+                :title="t('search.drillDownRunTitle')"
+                :description="t('search.drillDownRunDescription')"
                 data-test="logs-drill-down-apply-search-text"
                 @action="() => searchBarRef?.handleRunQueryFn?.()"
               />

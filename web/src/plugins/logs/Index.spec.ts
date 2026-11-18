@@ -1810,6 +1810,22 @@ describe("Logs Index", async () => {
       expect(streamSelect().attributes("data-test-selected-value")).toBe("");
     });
 
+    it("shows the Insights title beside the stream select when there is no dashboard", async () => {
+      await enterDrillDown({ withHits: false, searchApplied: true });
+
+      const row = wrapper.find('[data-test="logs-drill-down-stream-row"]');
+      expect(row.find('[data-test="logs-drilldown-stream-select-trigger"]').exists()).toBe(true);
+      expect(row.text()).toContain("Insights");
+    });
+
+    it("says what Drill down needs when no query has run yet", async () => {
+      await enterDrillDown({ withHits: false, searchApplied: false });
+
+      const empty = wrapper.find('[data-test="logs-drill-down-apply-search-text"]');
+      expect(empty.text()).toContain("Run a query to start Drill down");
+      expect(empty.text()).toContain("Drill down compares dimension values");
+    });
+
     it("routes a stream picked in drill down through the stream-change path", async () => {
       await enterDrillDown();
       streamChangeCalls.length = 0;

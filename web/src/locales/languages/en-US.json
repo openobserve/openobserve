@@ -1642,6 +1642,8 @@
     "enableSqlModeOrSelectSingleStream": "Please enable SQL mode to use timechart",
     "drillDown": "Drill down",
     "drillDownUnavailableInSqlMode": "Drill down is not available in SQL mode",
+    "drillDownRunTitle": "Run a query to start Drill down",
+    "drillDownRunDescription": "Drill down compares dimension values across the events of your search. Run a query to load them.",
     "patternsLogsOnly": "Patterns are available for logs streams only",
     "buildQuery": "Visualize",
     "nlpModeDisabledForVisualization": "Natural Language mode cannot be disabled while on timechart with multiple streams",
