@@ -397,7 +397,7 @@ describe("Open the service where its data is (T2-7)", () => {
   type To = { name?: string; path?: string; query: Record<string, string> };
   it("opens Traces on the same scope the charts read, namespace included", () => {
     const to = serviceRoute(row([TRACES]), "demo-org", 1_000_000, {
-      traces: { service_name: "svc-a", service_k8s_namespace_name: "ns-b" },
+      traces: { filters: { service_name: "svc-a", service_k8s_namespace_name: "ns-b" } },
     }) as To;
     expect(to.name).toBe("traces");
     const where = b64DecodeUnicode(to.query.query) ?? "";
@@ -407,7 +407,7 @@ describe("Open the service where its data is (T2-7)", () => {
 
   it("opens Logs for a service that sends only logs", () => {
     const to = serviceRoute(row([LOGS]), "demo-org", 1_000_000, {
-      logs: { service_name: "svc-ingest-e" },
+      logs: { filters: { service_name: "svc-ingest-e" } },
     }) as To;
     expect(to.path).toBe("/logs");
     expect(to.query.stream).toBe("ingest_c");

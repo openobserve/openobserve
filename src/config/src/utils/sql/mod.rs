@@ -26,7 +26,7 @@ mod where_fragment;
 pub use complex_query::{is_complex_query, is_complex_query_stmt};
 pub use eligible_for_histogram::is_eligible_for_histogram;
 pub use explain_query::is_explain_query;
-pub use group_by_query::is_group_by_query;
+pub use group_by_query::{group_by_columns, is_group_by_query};
 pub use simple_aggregate_query::is_simple_aggregate_query;
 pub use timestamp_selected::is_timestamp_selected;
 pub use visitors::TimestampVisitor;

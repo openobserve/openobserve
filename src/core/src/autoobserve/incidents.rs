@@ -504,6 +504,8 @@ mod tests {
             correlation_reason: Some("alert_id".into()),
             created_at: 11,
             resolved_at: None,
+            labels: None,
+            severity: None,
         }
     }
 

@@ -167,6 +167,42 @@ pub fn q_edge_exists(client: &str, server: &str, range_secs: i64) -> Result<Stri
     ))
 }
 
+/// Every edge with traffic in the range per environment and trace stream, where names repeat.
+pub fn q_edge_pairs(range_secs: i64) -> String {
+    format!(
+        "sum by ({LABEL_AGENT_ENV}, {LABEL_TRACE_STREAM}, client, server) \
+         (increase({M_REQUEST_TOTAL}[{range_secs}s]))"
+    )
+}
+
+/// Failed requests on one `[env, stream, client, server]` edge; values escaped like
+/// [q_edge_exists], and an empty one matches a series without the label.
+pub fn q_edge_failures(edge: [&str; 4], range_secs: i64) -> Result<String, String> {
+    let [env, stream, client, server] = edge;
+    let matcher = format!(
+        "{},{},{},{}",
+        label_eq(LABEL_AGENT_ENV, env)?,
+        label_eq(LABEL_TRACE_STREAM, stream)?,
+        label_eq("client", client)?,
+        label_eq("server", server)?
+    );
+    Ok(format!(
+        "sum(increase({}[{range_secs}s]))",
+        selector(M_REQUEST_FAILED_TOTAL, &matcher)
+    ))
+}
+
+/// The `[env, stream, client, server]` edges of a [q_edge_pairs] result that carried traffic.
+pub fn edge_pairs_from(rows: &[InstantValue]) -> Vec<[String; 4]> {
+    rows.iter()
+        .filter(|r| count(r.sample.value) > 0.0)
+        .map(|r| {
+            [LABEL_AGENT_ENV, LABEL_TRACE_STREAM, "client", "server"].map(|l| r.labels.get_value(l))
+        })
+        .filter(|[_, _, client, server]| !client.is_empty() && !server.is_empty())
+        .collect()
+}
+
 /// On-call blast radius: every client that called `server` within the range.
 pub fn q_callers(server: &str, range_secs: i64) -> Result<String, String> {
     Ok(format!(
@@ -652,7 +688,7 @@ fn drawn(id: &EdgeIdentity) -> bool {
 }
 
 /// A counter value; the engine yields NaN for an empty range, which is "no requests".
-pub(super) fn count(v: f64) -> f64 {
+pub(crate) fn count(v: f64) -> f64 {
     if v.is_finite() { v } else { 0.0 }
 }
 

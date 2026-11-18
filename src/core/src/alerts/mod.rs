@@ -60,6 +60,8 @@ pub mod incident_title;
 pub mod incidents;
 pub mod lifecycle;
 #[cfg(feature = "enterprise")]
+pub mod membership_provider;
+#[cfg(feature = "enterprise")]
 pub mod mute;
 pub mod notifications;
 mod prom_rule;
