@@ -3339,6 +3339,38 @@ describe("PreviewAlert - a wide range asks the latest window alone for the verdi
     },
   );
 
+  it.each([
+    ["has no data", [], "warn"],
+    ["has data", [{ zo_sql_num: 3 }], "note"],
+  ])(
+    "a compare alert whose past window %s says so instead of judging this window alone",
+    async (_, hits, note) => {
+      const formData: any = baseFormData();
+      formData.query_condition.multi_time_range = [{ offSet: "1w" }];
+      formData.query_condition.vrl_function = btoa("#ResultArray#\n.");
+      const w = await mountComp({
+        query: "SELECT count(*) AS events FROM logs WHERE level = 'error'",
+        selectedTab: "sql",
+        formData,
+      });
+      w.vm.refreshData();
+      await flushPromises();
+      const [call] = streaming.calls;
+      const { start_time, end_time } = call.data.queryReq.query;
+      const weekMicros = 7 * 24 * 60 * 60_000_000;
+      expect(Date.now() * 1000 - end_time).toBeGreaterThanOrEqual(weekMicros);
+      expect(end_time - start_time).toBe(10 * 60_000_000);
+      await emitResultMetadata(w, [[{ total: 0, hits: [] }]]);
+      answer(call, [{ hits }]);
+      await flushPromises();
+      expect(w.vm.evaluationStatus).toMatchObject({ note });
+      // Its function reads rows of the past windows, which the chart's one search has not got.
+      const panel = w.findComponent({ name: "PanelSchemaRenderer" });
+      expect(panel.props("panelSchema").queries[0].vrlFunctionQuery).toBeNull();
+      w.unmount();
+    },
+  );
+
   it("drops a superseded answer, and the verdict when the search fails", async () => {
     const w = await mountRange("sql", "24h");
     const [stale] = streaming.calls;

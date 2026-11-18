@@ -184,6 +184,8 @@ import {
   getDefaultDashboardPanelData,
   withHistogramMinutes,
 } from "@/utils/alerts/aggregationPreviewQuery";
+import { comparisonOffsetText, comparisonWindows } from "@/utils/alerts/previewCompare";
+import { getIntlLocale } from "@/locales";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { cloneDeep, debounce } from "lodash-es";
 import { useStore } from "vuex";
@@ -324,7 +326,8 @@ const applyThresholds = (): void => {
 
 // Helper function to get decoded VRL function
 const getDecodedVrlFunction = (): string | null => {
-  if (!props.formData.query_condition?.vrl_function) {
+  // A compare alert's function reads the past windows' rows, which the preview's one search lacks.
+  if (!props.formData.query_condition?.vrl_function || comparisons.value.length) {
     return null;
   }
   // Use smart decoder to handle both single and double-encoded VRL
@@ -366,6 +369,8 @@ const evaluationStatus = ref<{
   grouped?: boolean;
   value?: number;
   windowMinutes?: number;
+  /** The preview cannot judge this alert, so the reason is said as it is, in this tone. */
+  note?: "note" | "warn";
 } | null>(null);
 const { t } = useI18nTyped();
 // The renderer's last run outcome; an empty message means it answered. Results it emits after
@@ -1921,6 +1926,7 @@ const refreshData = () => {
 
   const endTime = new Date().getTime() * 1000;
   runVerdictSearch(endTime);
+  void checkBaselines(endTime);
   if (props.selectedTab === "promql" && props.formData.query_condition?.promql_rule_mode)
     void refreshRulePreview(endTime / 1_000_000);
   else rulePreviewGeneration++;
@@ -2158,6 +2164,106 @@ const runVerdictSearch = (endMicros: number) => {
   );
 };
 
+// A compare alert's rows depend on its past windows, which the preview's one search never reads.
+const comparisons = computed(() =>
+  props.selectedTab === "sql"
+    ? comparisonWindows(props.formData.query_condition?.multi_time_range)
+    : [],
+);
+const compareStatus = ref<NonNullable<typeof evaluationStatus.value> | null>(null);
+let compareGeneration = 0;
+let compareTraceIds: string[] = [];
+const cancelBaselineSearches = () => {
+  compareGeneration++;
+  for (const trace_id of compareTraceIds)
+    streaming.cancelStreamQueryBasedOnRequestId({
+      trace_id,
+      org_id: store.state.selectedOrganization?.identifier,
+    });
+  compareTraceIds = [];
+};
+/** Rows the query matches between the two times, or null when the search fails. */
+const countRows = (sql: string, startMicros: number, endMicros: number) =>
+  new Promise<number | null>((resolve) => {
+    const traceId = generateTraceContext().traceId;
+    compareTraceIds.push(traceId);
+    let total = 0;
+    streaming.fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          query: {
+            sql: b64EncodeUnicode(sql),
+            start_time: startMicros,
+            end_time: endMicros,
+            size: -1,
+          },
+          encoding: "base64",
+        },
+        type: "search",
+        traceId,
+        org_id: store.state.selectedOrganization?.identifier,
+        pageType: props.formData.stream_type,
+        searchType: "UI",
+        meta: {},
+      },
+      {
+        data: (_request: unknown, response: any) => {
+          if (response?.type !== "search_response_hits") return;
+          for (const hit of response?.content?.results?.hits ?? [])
+            total += Number(hit?.zo_sql_num) || 0;
+        },
+        error: () => resolve(null),
+        complete: () => resolve(total),
+      },
+    );
+  });
+const checkBaselines = async (endMicros: number) => {
+  cancelBaselineSearches();
+  const mine = compareGeneration;
+  compareStatus.value = null;
+  const windows = comparisons.value;
+  if (!windows.length || !props.query) return;
+  const period = alertWindowMinutes();
+  const offset = (shown: typeof windows) => comparisonOffsetText(shown, getIntlLocale());
+  const note = {
+    wouldTrigger: false,
+    reason: t("alerts.form.preview.compareNote", { offset: offset(windows) }),
+    note: "note" as const,
+  };
+  const count = buildCountChartQuery(props.query);
+  if (!count || period <= 0) {
+    compareStatus.value = note;
+    return;
+  }
+  const sql = withHistogramMinutes(count, period);
+  const totals = await Promise.all(
+    windows.map((window) =>
+      countRows(
+        sql,
+        endMicros - (window.minutes + period) * 60_000_000,
+        endMicros - window.minutes * 60_000_000,
+      ),
+    ),
+  );
+  if (mine !== compareGeneration) return;
+  compareTraceIds = [];
+  const empty = windows.filter((_, i) => totals[i] === 0);
+  compareStatus.value = empty.length
+    ? {
+        wouldTrigger: false,
+        reason: t("alerts.form.preview.compareNoBaseline", { offset: offset(empty) }),
+        note: "warn",
+      }
+    : note;
+};
+watch(
+  () => JSON.stringify(comparisons.value),
+  () => {
+    lastRunKey = "";
+    refreshFromProps();
+  },
+);
+
 let lastRefreshTime = 0;
 
 const refreshDataOnce = () => {
@@ -2249,6 +2355,7 @@ watch(
 onBeforeUnmount(() => {
   debouncedRefreshFromProps.cancel();
   cancelVerdictSearch();
+  cancelBaselineSearches();
 });
 
 // A range pick is the user's own request, so the 200 ms echo guard must not swallow it.
@@ -2306,6 +2413,7 @@ const refreshDataFromParent = () => {
 // Every verdict is counted against the limit, so a limit that needs fixing has none to give.
 const shownEvaluationStatus = computed(() => {
   const threshold = props.formData.trigger_condition?.threshold;
+  if (comparisons.value.length) return compareStatus.value;
   return threshold !== undefined && !isPreviewCountLimit(threshold) ? null : evaluationStatus.value;
 });
 

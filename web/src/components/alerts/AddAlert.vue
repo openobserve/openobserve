@@ -2146,6 +2146,7 @@ export default defineComponent({
       }
       // The save check is stricter than the preview run, so its error also leaves nothing to judge.
       if (!status || fd.is_real_time !== "false" || sqlCheckFailed.value) return null;
+      if (status.note) return { text: status.reason, tone: status.note };
       // An empty value threshold leaves nothing to judge; a measured value still helps pick one.
       const noThreshold = alertForm.valueThresholdMissing.value;
       if (noThreshold && status.value === undefined) return null;
