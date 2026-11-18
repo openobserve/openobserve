@@ -46,6 +46,15 @@ use crate::{
     service::anomaly_detection as anomaly_service,
 };
 
+/// Query of the explore endpoint; a point link sends one bucket as start and end with pad 0.
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct ExploreQuery {
+    pub start: Option<i64>,
+    pub end: Option<i64>,
+    pub pad: Option<u8>,
+    pub model_version: Option<i64>,
+}
+
 /// Anomaly detection can be turned off at runtime via O2_ANOMALY_DETECTION_DISABLED.
 /// When off, every endpoint in this module returns 403. Returns the short-circuit
 /// response to bail with, or `None` when the feature is live.
@@ -910,15 +919,6 @@ pub struct FilterRequest {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct HistoryQuery {
     pub limit: Option<i64>,
-}
-
-/// Query of the explore endpoint; a point link sends one bucket as start and end with pad 0.
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct ExploreQuery {
-    pub start: Option<i64>,
-    pub end: Option<i64>,
-    pub pad: Option<u8>,
-    pub model_version: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
