@@ -128,8 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost-primary"
             size="icon-circle-sm"
-            :title="t('alerts.alertSettings.helpLearnMore')"
-            :aria-label="t('alerts.alertSettings.helpLearnMore')"
+            :title="t('alerts.alertSettings.learnAboutTemplates')"
+            :aria-label="t('alerts.alertSettings.learnAboutTemplates')"
             data-test="template-override-help-btn"
             @click="templatePickerRef?.openHelp()"
           >
@@ -151,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSettingRow
         v-else-if="tierShows('anomalyRecordOnly')"
         :label="t('alerts.tiers.names.anomalyRecordOnly')"
+        :description="t('alerts.anomaly.recordOnlyHelp')"
         data-test="anomaly-notifications-row"
         fill
       >
@@ -205,17 +206,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="anomaly-window-sentence"
             >
               <template #fire>
-                <OInput
-                  v-model="configModel.alert_window_fire_pct"
-                  type="number"
-                  :model-modifiers="{ number: true }"
-                  fit-content
-                  class="max-w-32! min-w-16"
-                  :aria-label="t('alerts.anomaly.windowFirePct')"
-                  :placeholder="raw('100')"
-                  :error="!!windowShareErrors.fire"
-                  data-test="anomaly-window-fire-pct"
-                />
+                <span class="inline-flex items-center gap-0.5">
+                  <OInput
+                    v-model="configModel.alert_window_fire_pct"
+                    type="number"
+                    :model-modifiers="{ number: true }"
+                    fit-content
+                    class="max-w-32! min-w-16"
+                    :aria-label="t('alerts.anomaly.windowFirePct')"
+                    :placeholder="raw('100')"
+                    :error="!!windowShareErrors.fire"
+                    data-test="anomaly-window-fire-pct"
+                  />{{ raw("%") }}</span
+                >
               </template>
               <template #buckets>
                 <OInput
@@ -279,7 +282,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :searchable="false"
             clearable
             width="sm"
-            :placeholder="t('alerts.priorityUnset')"
+            :placeholder="
+              store.state.zoConfig?.oncall_enabled === true
+                ? t('alerts.priorityUnsetPagesAs')
+                : t('alerts.priorityUnset')
+            "
             :aria-label="t('alerts.priority')"
             data-test="anomaly-priority-select"
           />
@@ -424,7 +431,7 @@ export default defineComponent({
     // One name reads better than "1 destination"; more than one is a count.
     const destinationStatus = computed(() => {
       const ids = props.config.alert_destination_ids;
-      if (ids.length === 0) return t("alerts.alertSettings.noDestinationNote");
+      if (ids.length === 0) return t("alerts.anomaly.noDestinationNote");
       const targets =
         ids.length === 1
           ? ids[0]

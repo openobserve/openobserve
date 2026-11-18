@@ -246,7 +246,7 @@ const PINNED_COPY: Record<string, { tooltip: string; budgetTooltip: string; hint
   },
   "en-US": {
     tooltip:
-      "Each bucket is compared with a band of expected ± level × σ, where σ is the typical spread for that hour. A bucket outside the band is flagged as anomalous. A wider band (higher level) sends fewer alerts; a narrower one sends more. Changes apply without retraining.",
+      "Aggressive alerts on smaller changes; Conservative only on large ones. Auto picks a level from your data. Changes apply without retraining.",
     budgetTooltip:
       "The maximum number of alerts this configuration may deliver, enforced at delivery. Detection still scores every bucket; once the budget is spent, further alerts are suppressed until it refills.",
     hint: "A bucket is flagged when it falls outside expected ± {k}σ.",
@@ -400,11 +400,15 @@ describe("anomaly sensitivity locale parity", () => {
   });
 
   // The control sets k directly, so its tooltip speaks in σ and quotes no percentile preset.
-  it.each(ALL_LOCALES)("%s describes the band in σ, not a training percentile", (_name, locale) => {
-    const tooltip = String(at(locale, "alerts.anomaly.sensitivityTooltip"));
-    expect(tooltip).toContain("σ");
-    expect(tooltip).not.toMatch(/(?<!\d)9[579](?!\d)/);
-  });
+  // en-US names the tier picker's own levels instead; other locales still explain the band.
+  it.each(ALL_LOCALES.filter(([name]) => name !== "en-US"))(
+    "%s describes the band in σ, not a training percentile",
+    (_name, locale) => {
+      const tooltip = String(at(locale, "alerts.anomaly.sensitivityTooltip"));
+      expect(tooltip).toContain("σ");
+      expect(tooltip).not.toMatch(/(?<!\d)9[579](?!\d)/);
+    },
+  );
 
   it("en-US no longer says scores outside the range are ignored", () => {
     const tooltip = String(at(en, "alerts.anomaly.sensitivityTooltip")).toLowerCase();
@@ -428,11 +432,12 @@ describe("anomaly sensitivity locale parity", () => {
     }
   });
 
-  it("en-US ties a wider band to fewer alerts and states it needs no retrain", () => {
-    const tooltip = String(at(en, "alerts.anomaly.sensitivityTooltip")).toLowerCase();
-    expect(tooltip).toContain("wider band");
-    expect(tooltip).toContain("fewer alerts");
-    expect(tooltip).toContain("without retraining");
+  it("en-US ties each named level to how much it alerts on and states it needs no retrain", () => {
+    const tooltip = String(at(en, "alerts.anomaly.sensitivityTooltip"));
+    for (const key of ["sensitivityAggressive", "sensitivityConservative", "sensitivityAuto"]) {
+      expect(tooltip).toContain(String(at(en, `alerts.anomaly.${key}`)));
+    }
+    expect(tooltip.toLowerCase()).toContain("without retraining");
   });
 
   // A threshold sweep found recall flat across p90-p97, so lowering flags more, it detects no more.
@@ -530,11 +535,10 @@ describe("anomaly sensitivity locale parity", () => {
   // Anomalies are marked in score space by a trained model, so they cannot appear
   // on the config-time value preview. The caption has to send the reader somewhere
   // REAL — pinned against the rendered label, not a phrase no screen shows.
-  it("en-US points the preview reader at a destination the app actually renders", () => {
+  it("en-US promises marks after training without sending the reader to a missing place", () => {
     const caption = String(at(en, "alerts.anomaly.previewCaption")).toLowerCase();
     expect(caption).toContain("training");
-    const destination = String(at(en, "alerts.anomaly.detectionCharts")).toLowerCase();
-    expect(destination.length).toBeGreaterThan(0);
-    expect(caption).toContain(destination);
+    // It names no place at all now, so it cannot name one the app does not render.
+    expect(caption).not.toMatch(/\bsee\b/);
   });
 });

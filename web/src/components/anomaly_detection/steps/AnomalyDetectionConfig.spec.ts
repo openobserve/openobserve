@@ -1151,15 +1151,11 @@ describe("AnomalyDetectionConfig", () => {
         label("anomaly-schedule-interval-unit"),
         label("anomaly-detection-window-unit"),
       ];
-      expect(units).toEqual([
-        "Detection resolution unit",
-        "Check every unit",
-        "Look back over unit",
-      ]);
+      expect(units).toEqual(["Bucket size unit", "Check every unit", "Look back over unit"]);
       expect(new Set(units).size).toBe(units.length);
 
-      expect(label("anomaly-detection-function")).toBe("Detection function");
-      expect(label("anomaly-histogram-interval-value")).toBe("Detection resolution");
+      expect(label("anomaly-detection-function")).toBe("Measure");
+      expect(label("anomaly-histogram-interval-value")).toBe("Bucket size");
       expect(label("anomaly-schedule-interval-value")).toBe("Check every");
       expect(label("anomaly-detection-window-value")).toBe("Look back over");
       expect(label("anomaly-training-window")).toBe("Training window");
@@ -1173,7 +1169,7 @@ describe("AnomalyDetectionConfig", () => {
           .find('[data-test="anomaly-histogram-interval-unit"]')
           .find("[aria-label]")
           .attributes("aria-label"),
-      ).toBe("Detection resolution unit");
+      ).toBe("Bucket size unit");
     });
 
     it("exposes no mark-line or series-max machinery", async () => {

@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('alerts.form.filter.label')"
           :group="filterGroup"
           :stream-name="config.stream_name || ''"
+          :stream-type="config.stream_type"
           dialect="sql"
           data-test="add-alert-filter-sentence"
           @add="openFilters"
@@ -74,7 +75,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :fields="filterFields"
             :fields-loading="loadingFields"
             :load-values="loadFilterValues"
-            :placeholder="config.stream_name ? undefined : t('alerts.anomaly.selectStreamFirst')"
+            :placeholder="
+              config.stream_name
+                ? t('alerts.form.filter.placeholder')
+                : t('alerts.anomaly.selectStreamFirst')
+            "
+            :add-labels="{
+              add: t('alerts.form.filter.add'),
+              addBelow: t('alerts.form.filter.addBelow'),
+            }"
             data-test="anomaly-filter-builder"
             @update:model-value="onFiltersChange"
           />
@@ -167,7 +176,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSettingRow
             :label="t('alerts.form.anomaly.measure')"
-            :info="t('alerts.anomaly.detectionFunctionTooltip')"
+            :info="
+              t('alerts.anomaly.detectionFunctionTooltip', {
+                noun: dataNoun(config.stream_type, 'custom', 2, t),
+              })
+            "
             fill
             data-test="anomaly-measure-row"
           >
@@ -433,7 +446,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             :label="t('alerts.sensitivity')"
             :info="sensitivityTooltip"
-            required
             fill
             data-test="anomaly-sensitivity-row"
           >
@@ -610,6 +622,7 @@ import { useStore } from "vuex";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { dataNoun } from "@/utils/alerts/alertCopy";
 import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
 import QueryEditor from "@/components/QueryEditor.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1289,6 +1302,7 @@ export default defineComponent({
     };
 
     return {
+      dataNoun,
       raw,
       t,
       store,
