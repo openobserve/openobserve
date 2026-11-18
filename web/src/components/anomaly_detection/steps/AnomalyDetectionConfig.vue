@@ -266,8 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSettingRow
             :label="t('alerts.anomaly.checkEvery')"
-            :info="t('alerts.anomaly.checkEveryTooltip')"
-            required
+            :description="t('alerts.anomaly.checkEveryTooltip')"
             fill
             data-test="anomaly-check-every-row"
           >
@@ -305,7 +304,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSettingRow
             :label="t('alerts.anomaly.lookBackWindow')"
             :info="t('alerts.anomaly.lookBackWindowTooltip')"
-            required
             fill
             data-test="anomaly-look-back-row"
           >
@@ -400,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSettingRow
             v-if="tierShows('anomalyRetrain')"
             :label="t('alerts.anomaly.retrainEvery')"
-            :info="t('alerts.anomaly.retrainEveryTooltip')"
+            :description="t('alerts.anomaly.retrainEveryTooltip')"
             fill
             data-test="anomaly-retrain-every-row"
           >

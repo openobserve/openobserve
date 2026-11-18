@@ -2170,6 +2170,8 @@ export default defineComponent({
       if (isCompositeMode.value) return alertForm.t("alerts.sections.condition.helpComposite");
       if (alertForm.isAnomalyMode.value)
         return alertForm.t("alerts.sections.condition.helpAnomaly");
+      if (alertForm.formData.value.is_real_time === "true")
+        return alertForm.t("alerts.sections.condition.helpRealtime");
       return alertForm.t("alerts.sections.condition.help");
     });
 

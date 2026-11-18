@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSettingRow
           v-if="tierShows('anomalyDirection')"
           :label="t('alerts.tiers.names.anomalyDirection')"
-          :info="t('alerts.anomaly.alertDirectionTooltip')"
+          :description="t('alerts.anomaly.alertDirectionTooltip')"
           data-test="anomaly-alert-direction-row"
           fill
         >

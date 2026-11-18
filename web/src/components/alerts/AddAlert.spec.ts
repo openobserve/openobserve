@@ -1742,6 +1742,18 @@ describe("AddAlert (OForm owner)", () => {
       );
     });
 
+    it.each([
+      ["false", "alerts.sections.condition.help"],
+      ["true", "alerts.sections.condition.helpRealtime"],
+      ["composite", "alerts.sections.condition.helpComposite"],
+    ])("step 2's help fits a %s alert, with no count for real time", async (mode, key) => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("is_real_time", mode);
+      await flushPromises();
+      expect(wrapper.vm.conditionHelp).toBe(i18n.global.t(key));
+    });
+
     it("describes the whole alert in one line in the rail once a stream is picked", async () => {
       wrapper = mountAlert();
       await flushPromises();
