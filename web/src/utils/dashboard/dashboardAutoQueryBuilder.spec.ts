@@ -1805,6 +1805,16 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toBe("str_match_ignore_case(message, 'ERROR')");
     });
 
+    it("writes Not Starts With and Not Ends With as NOT LIKE", () => {
+      const build = (operator: string) =>
+        buildCondition(
+          { type: "condition", operator, column: { field: "status" }, value: "te'st" },
+          mockDashboardPanelData,
+        );
+      expect(build("Not Starts With")).toBe("status NOT LIKE 'te''st%'");
+      expect(build("Not Ends With")).toBe("status NOT LIKE '%te''st'");
+    });
+
     it("should build condition with re_match operator", () => {
       const condition = {
         type: "condition",
@@ -1815,7 +1825,7 @@ describe("dashboardAutoQueryBuilder", () => {
         value: "^error",
       };
       const result = buildCondition(condition, mockDashboardPanelData);
-      expect(result).toBe("re_match(message, '^error')");
+      expect(result).toBe("regexp_like(message, '^error')");
     });
 
     it("should build condition with re_not_match operator", () => {
@@ -1828,7 +1838,7 @@ describe("dashboardAutoQueryBuilder", () => {
         value: "^debug",
       };
       const result = buildCondition(condition, mockDashboardPanelData);
-      expect(result).toBe("re_not_match(message, '^debug')");
+      expect(result).toBe("NOT regexp_like(message, '^debug')");
     });
 
     it("should build list type condition", () => {

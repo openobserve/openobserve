@@ -21,15 +21,19 @@ import {
   type FilterGroup,
   type FilterNode,
   type FilterOperatorId,
+  type FilterRawNode,
 } from "@/utils/query/filterBar";
 
-type TokenKind = "ident" | "string" | "number" | "op" | "lparen" | "rparen" | "comma";
+type TokenKind = "ident" | "string" | "number" | "op" | "lparen" | "rparen" | "comma" | "other";
 
 interface Token {
   kind: TokenKind;
   text: string;
   /** A double-quoted identifier, which is never a keyword, function or boolean. */
   quoted?: boolean;
+  /** Offsets in the source, so a part the bar cannot draw keeps its text as typed. */
+  start: number;
+  end: number;
 }
 
 const COMPARISON: Record<string, FilterOperatorId> = {
@@ -48,6 +52,7 @@ const FUNCTION_OPERATORS: Record<string, FilterOperatorId> = {
   str_match_ignore_case: "contains_ci",
   re_match: "regex",
   re_not_match: "not_regex",
+  regexp_like: "regex",
 };
 
 const TOKEN_PATTERN =
@@ -55,26 +60,40 @@ const TOKEN_PATTERN =
 
 const WHITESPACE = /\s*/y;
 
-const tokenize = (text: string): Token[] | null => {
+// Lenient: an unknown character is one `other` token, and an unclosed quote runs to the end.
+const tokenize = (text: string, lenient = false): Token[] | null => {
   const tokens: Token[] = [];
   TOKEN_PATTERN.lastIndex = 0;
   while (TOKEN_PATTERN.lastIndex < text.length) {
     WHITESPACE.lastIndex = TOKEN_PATTERN.lastIndex;
     WHITESPACE.exec(text);
-    if (WHITESPACE.lastIndex >= text.length) break;
+    const start = WHITESPACE.lastIndex;
+    if (start >= text.length) break;
     const match = TOKEN_PATTERN.exec(text);
-    if (!match) return null;
+    if (!match) {
+      if (!lenient) return null;
+      const end = /['"]/.test(text[start]) ? text.length : start + 1;
+      tokens.push({ kind: "other", text: text.slice(start, end), start, end });
+      TOKEN_PATTERN.lastIndex = end;
+      continue;
+    }
+    const at = { start, end: TOKEN_PATTERN.lastIndex };
     const [, str, quoted, num, op, lparen, rparen, comma, ident] = match;
     if (str !== undefined)
-      tokens.push({ kind: "string", text: str.slice(1, -1).replace(/''/g, "'") });
+      tokens.push({ kind: "string", text: str.slice(1, -1).replace(/''/g, "'"), ...at });
     else if (quoted !== undefined)
-      tokens.push({ kind: "ident", text: quoted.slice(1, -1).replace(/""/g, '"'), quoted: true });
-    else if (num !== undefined) tokens.push({ kind: "number", text: num });
-    else if (op !== undefined) tokens.push({ kind: "op", text: op });
-    else if (lparen !== undefined) tokens.push({ kind: "lparen", text: "(" });
-    else if (rparen !== undefined) tokens.push({ kind: "rparen", text: ")" });
-    else if (comma !== undefined) tokens.push({ kind: "comma", text: "," });
-    else tokens.push({ kind: "ident", text: ident });
+      tokens.push({
+        kind: "ident",
+        text: quoted.slice(1, -1).replace(/""/g, '"'),
+        quoted: true,
+        ...at,
+      });
+    else if (num !== undefined) tokens.push({ kind: "number", text: num, ...at });
+    else if (op !== undefined) tokens.push({ kind: "op", text: op, ...at });
+    else if (lparen !== undefined) tokens.push({ kind: "lparen", text: "(", ...at });
+    else if (rparen !== undefined) tokens.push({ kind: "rparen", text: ")", ...at });
+    else if (comma !== undefined) tokens.push({ kind: "comma", text: ",", ...at });
+    else tokens.push({ kind: "ident", text: ident, ...at });
   }
   return tokens;
 };
@@ -100,15 +119,27 @@ const likeParts = (text: string): { starts: boolean; ends: boolean; inner: strin
 class Parser {
   private pos = 0;
 
-  constructor(private readonly tokens: Token[]) {}
+  /** With `source`, a part the bar cannot draw becomes a locked node instead of failing the whole parse. */
+  constructor(
+    private readonly tokens: Token[],
+    private readonly source?: string,
+  ) {}
 
   parse(): FilterGroup | null {
     const root = emptyFilterGroup();
     if (!this.tokens.length) return root;
     const items = this.expression();
-    if (!items || this.pos !== this.tokens.length) return null;
-    root.items = items;
+    if (items && this.pos === this.tokens.length) {
+      root.items = items;
+      return root;
+    }
+    if (this.source === undefined) return null;
+    root.items = [this.locked("AND", this.source)];
     return root;
+  }
+
+  private locked(connector: FilterConnector, sql: string): FilterRawNode {
+    return { kind: "raw", id: newFilterId(), connector, label: sql, sql };
   }
 
   private peek(offset = 0): Token | undefined {
@@ -136,15 +167,51 @@ class Parser {
   }
 
   private term(connector: FilterConnector): FilterNode | null {
+    const start = this.pos;
+    const node = this.drawnTerm(connector);
+    if (this.source === undefined) return node;
+    const next = this.peek();
+    const ends = !next || next.kind === "rparen" || this.keyword("AND") || this.keyword("OR");
+    if (node && ends) return node;
+    this.pos = start;
+    return this.lockedTerm(connector);
+  }
+
+  private drawnTerm(connector: FilterConnector): FilterNode | null {
     if (this.peek()?.kind === "lparen") {
       this.pos++;
       const items = this.expression();
       if (!items || this.peek()?.kind !== "rparen") return null;
       this.pos++;
-      if (items.length === 1 && items[0].kind === "condition") return { ...items[0], connector };
+      if (items.length === 1 && items[0].kind !== "group") return { ...items[0], connector };
       return { kind: "group", id: newFilterId(), connector, items };
     }
     return this.predicate(connector);
+  }
+
+  // Runs to the next AND / OR at its own depth; BETWEEN's AND and a CASE … END stay inside the part.
+  private lockedTerm(connector: FilterConnector): FilterRawNode | null {
+    const start = this.pos;
+    let depth = 0;
+    let cases = 0;
+    let between = false;
+    for (let token = this.peek(); token; token = this.peek()) {
+      const top = depth === 0 && cases === 0;
+      if (top && token.kind === "rparen") break;
+      const joins = this.keyword("AND") || this.keyword("OR");
+      if (top && joins && this.pos > start) {
+        if (!between || !this.keyword("AND")) break;
+        between = false;
+      } else if (top && this.keyword("BETWEEN")) between = true;
+      if (token.kind === "lparen") depth++;
+      else if (token.kind === "rparen") depth--;
+      else if (this.keyword("CASE")) cases++;
+      else if (this.keyword("END") && cases) cases--;
+      this.pos++;
+    }
+    if (this.pos === start) return null;
+    const sql = this.source!.slice(this.tokens[start].start, this.tokens[this.pos - 1].end);
+    return this.locked(connector, sql);
   }
 
   private value(): string | null {
@@ -235,6 +302,11 @@ class Parser {
   private predicate(connector: FilterConnector): FilterCondition | null {
     const head = this.peek();
     if (head?.kind !== "ident") return null;
+    if (this.keyword("NOT") && this.peek(1)?.text.toLowerCase() === "regexp_like") {
+      this.pos++;
+      const match = this.functionPredicate(connector);
+      return match && { ...match, operator: "not_regex" };
+    }
     if (this.peek(1)?.kind === "lparen")
       return head.quoted ? null : this.functionPredicate(connector);
     this.pos++;
@@ -283,6 +355,12 @@ class Parser {
 export const parseSqlFilter = (text: string): FilterGroup | null => {
   const tokens = tokenize(text.trim());
   return tokens ? new Parser(tokens).parse() : null;
+};
+
+/** Never fails: each part the bar cannot draw becomes a locked chip holding its SQL as typed. */
+export const parseSqlFilterLocking = (text: string): FilterGroup => {
+  const source = text.trim();
+  return new Parser(tokenize(source, true) ?? [], source).parse() ?? emptyFilterGroup();
 };
 
 const SHORTHAND_PATTERN = /^\s*([A-Za-z_@][\w.@-]*)\s*(!=|>=|<=|=~|!~|=|>|<|:)\s*(.+?)\s*$/;

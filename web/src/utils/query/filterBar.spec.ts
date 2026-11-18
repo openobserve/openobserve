@@ -18,7 +18,6 @@ import {
   applyPromMatchers,
   filterTreeToPromMatchers,
   filterTreeToSql,
-  operatorsFor,
   toFilterFieldType,
   type FilterCondition,
   type FilterField,
@@ -56,28 +55,6 @@ describe("toFilterFieldType", () => {
     expect(toFilterFieldType("UInt32")).toBe("number");
     expect(toFilterFieldType("Boolean")).toBe("boolean");
     expect(toFilterFieldType(undefined)).toBe("string");
-  });
-});
-
-describe("operatorsFor", () => {
-  it("offers comparisons only for numbers and text matching only for strings", () => {
-    const numberOps = operatorsFor("number", "sql").map((op) => op.id);
-    const stringOps = operatorsFor("string", "sql").map((op) => op.id);
-    expect(numberOps).toContain("gt");
-    expect(numberOps).not.toContain("contains");
-    expect(stringOps).toContain("contains");
-    expect(stringOps).not.toContain("gt");
-  });
-
-  it("limits PromQL to label matchers", () => {
-    expect(operatorsFor("number", "promql").map((op) => op.id)).toEqual([
-      "eq",
-      "neq",
-      "regex",
-      "not_regex",
-      "in",
-      "not_in",
-    ]);
   });
 });
 
@@ -127,8 +104,8 @@ describe("filterTreeToSql", () => {
     expect(sql("not_contains")).toBe("level NOT LIKE '%x%'");
     expect(sql("starts_with")).toBe("level LIKE 'x%'");
     expect(sql("ends_with")).toBe("level LIKE '%x'");
-    expect(sql("regex")).toBe("re_match(level, 'x')");
-    expect(sql("not_regex")).toBe("re_not_match(level, 'x')");
+    expect(sql("regex")).toBe("regexp_like(level, 'x')");
+    expect(sql("not_regex")).toBe("NOT regexp_like(level, 'x')");
     expect(sql("in", ["a", "b"])).toBe("level IN ('a', 'b')");
     expect(sql("not_in", ["a"])).toBe("level NOT IN ('a')");
     expect(sql("is_null", [])).toBe("level IS NULL");

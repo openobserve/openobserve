@@ -503,8 +503,16 @@ const emptyLiteralFlag = (condition: any) =>
     ? { emptyLiteral: true }
     : {};
 
+const REGEX_FUNCTIONS = new Set(["re_match", "regexp_like"]);
+
 function parseCondition(condition: any) {
   try {
+    const negated = condition.type === "unary_expr" && condition.operator === "NOT";
+    const negatedName = negated ? condition.expr?.name?.name?.[0]?.value?.toLowerCase() : "";
+    if (negated && condition.expr?.type === "function" && REGEX_FUNCTIONS.has(negatedName)) {
+      const inner: any = parseCondition(condition.expr);
+      return { ...inner, operator: "re_not_match" };
+    }
     if (condition.type === "binary_expr") {
       if (condition.operator == "OR" || condition.operator == "AND") {
         const left: any = parseCondition(condition.left);
@@ -708,18 +716,22 @@ function parseCondition(condition: any) {
           };
         }
       } else if (condition?.operator == "NOT LIKE") {
-        // right value may have % at the beginning or end or both
-        // so we need to remove it
-        const value = condition?.right?.value?.replace(/^%/, "").replace(/%$/, "");
+        const pattern: string = condition?.right?.value ?? "";
+        const leading = pattern.startsWith("%");
+        const trailing = pattern.endsWith("%");
+        const value = pattern.replace(/^%/, "").replace(/%$/, "");
         const columnObj = {
           field: condition?.left?.column?.expr?.value,
           streamAlias: condition?.left?.table || null,
         };
+        let operator = "Not Contains";
+        if (trailing && !leading) operator = "Not Starts With";
+        else if (leading && !trailing) operator = "Not Ends With";
         return {
           type: "condition",
           values: [],
           column: columnObj,
-          operator: "Not Contains",
+          operator,
           value: `${value}`,
           logicalOperator: "AND",
           filterType: "condition",
@@ -734,6 +746,7 @@ function parseCondition(condition: any) {
         "str_match_ignore_case",
         "re_match",
         "re_not_match",
+        "regexp_like",
       ];
 
       // function without field name and with value
@@ -748,7 +761,7 @@ function parseCondition(condition: any) {
           type: "condition",
           values: [],
           column: columnObj,
-          operator: conditionName,
+          operator: conditionName === "regexp_like" ? "re_match" : conditionName,
           value: condition?.args?.value[1]?.value ?? "",
           logicalOperator: "AND",
           filterType: "condition",

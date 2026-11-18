@@ -233,28 +233,6 @@ export const OPERATORS: Record<FilterOperatorId, FilterOperatorDef> = {
   },
 };
 
-const SQL_OPERATORS: Record<FilterFieldType, FilterOperatorId[]> = {
-  string: [
-    "eq",
-    "neq",
-    "contains",
-    "contains_ci",
-    "not_contains",
-    "starts_with",
-    "ends_with",
-    "in",
-    "not_in",
-    "regex",
-    "not_regex",
-    "is_null",
-    "is_not_null",
-  ],
-  number: ["eq", "neq", "gt", "gte", "lt", "lte", "in", "not_in", "is_null", "is_not_null"],
-  boolean: ["eq", "neq", "is_null", "is_not_null"],
-};
-
-const PROMQL_OPERATORS: FilterOperatorId[] = ["eq", "neq", "regex", "not_regex", "in", "not_in"];
-
 const NUMERIC_TYPES = new Set([
   "int8",
   "int16",
@@ -286,9 +264,6 @@ export const toFilterFieldType = (schemaType: string | undefined): FilterFieldTy
   if (NUMERIC_TYPES.has(normalized)) return "number";
   return "string";
 };
-
-export const operatorsFor = (type: FilterFieldType, dialect: FilterDialect): FilterOperatorDef[] =>
-  (dialect === "promql" ? PROMQL_OPERATORS : SQL_OPERATORS[type]).map((id) => OPERATORS[id]);
 
 export const newFilterId = (): string => `f${Date.now().toString(36)}${(idCounter++).toString(36)}`;
 
@@ -372,10 +347,11 @@ const conditionToSql = (condition: FilterCondition, fieldTypes: Map<string, Filt
       const list = condition.values.map((value) => sqlValue(value, type)).join(", ");
       return `${column} ${condition.operator === "in" ? "IN" : "NOT IN"} (${list})`;
     }
+    // Not re_match: that UDF strips escapes such as `\b`, so the pattern would not mean what was typed.
     case "regex":
-      return `re_match(${column}, ${sqlLiteral(first)})`;
+      return `regexp_like(${column}, ${sqlLiteral(first)})`;
     case "not_regex":
-      return `re_not_match(${column}, ${sqlLiteral(first)})`;
+      return `NOT regexp_like(${column}, ${sqlLiteral(first)})`;
     case "is_null":
       return sqlIsNull(column);
     case "is_not_null":
@@ -443,9 +419,73 @@ export const splitPromRegexLiterals = (pattern: string): string[] | null => {
   return parts.length > 1 ? parts : null;
 };
 
+/** The literal an escaped regex stands for, as escapePromRegexLiteral writes it; null when it has live syntax. */
+export const unescapePromRegexLiteral = (pattern: string): string | null => {
+  let literal = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const char = pattern[i];
+    if (char === "\\") {
+      const next = pattern[++i];
+      if (next === undefined || !PROM_REGEX_META.includes(next)) return null;
+      literal += next;
+    } else if (PROM_REGEX_META.includes(char)) {
+      return null;
+    } else {
+      literal += char;
+    }
+  }
+  return literal;
+};
+
+type PromMatchOp = "=" | "!=" | "=~" | "!~";
+
+// PromQL anchors every regex, so a text operator is the literal with `.*` on the open sides.
+const PROM_TEXT_SHAPES: Partial<
+  Record<FilterOperatorId, { op: PromMatchOp; head: string; tail: string }>
+> = {
+  contains_ci: { op: "=~", head: "(?i).*", tail: ".*" },
+  contains: { op: "=~", head: ".*", tail: ".*" },
+  not_contains: { op: "!~", head: ".*", tail: ".*" },
+  starts_with: { op: "=~", head: "", tail: ".*" },
+  not_starts_with: { op: "!~", head: "", tail: ".*" },
+  ends_with: { op: "=~", head: ".*", tail: "" },
+  not_ends_with: { op: "!~", head: ".*", tail: "" },
+};
+
+/** A text or blank-check operator as a PromQL matcher; `literal` arrives already escaped for a regex. */
+export const promMatcherFor = (
+  operator: FilterOperatorId,
+  literal: string,
+): { op: PromMatchOp; value: string } | null => {
+  if (operator === "is_empty") return { op: "=", value: "" };
+  if (operator === "is_not_empty") return { op: "!=", value: "" };
+  const shape = PROM_TEXT_SHAPES[operator];
+  return shape ? { op: shape.op, value: `${shape.head}${literal}${shape.tail}` } : null;
+};
+
+/** The operator promMatcherFor wrote this matcher for, with its value; null for any other matcher. */
+export const operatorOfPromMatcher = (
+  op: string,
+  pattern: string,
+  unescape: (text: string) => string | null = unescapePromRegexLiteral,
+): { operator: FilterOperatorId; values: string[] } | null => {
+  if (pattern === "" && (op === "=" || op === "!=")) {
+    return { operator: op === "=" ? "is_empty" : "is_not_empty", values: [] };
+  }
+  for (const [operator, shape] of Object.entries(PROM_TEXT_SHAPES)) {
+    if (shape.op !== op || pattern.length <= shape.head.length + shape.tail.length) continue;
+    if (!pattern.startsWith(shape.head) || !pattern.endsWith(shape.tail)) continue;
+    const value = unescape(pattern.slice(shape.head.length, pattern.length - shape.tail.length));
+    if (value !== null) return { operator: operator as FilterOperatorId, values: [value] };
+  }
+  return null;
+};
+
 const conditionToPromMatcher = (condition: FilterCondition): string => {
   const [first = ""] = condition.values;
   const label = condition.field;
+  const shaped = promMatcherFor(condition.operator, escapePromRegexLiteral(first));
+  if (shaped) return `${label}${shaped.op}"${escapePromValue(shaped.value)}"`;
   switch (condition.operator) {
     case "neq":
       return `${label}!="${escapePromValue(first)}"`;

@@ -245,6 +245,14 @@ describe("useTextHighlighter", () => {
       expect(highlight("WARN warn", "re_match(log, '(?i)warn')")).toEqual(["WARN", "warn"]);
     });
 
+    it("highlights regexp_like like re_match, and skips its NOT form", () => {
+      expect(highlight("code=500 code=404", "regexp_like(log, 'code=5\\d\\d')")).toEqual([
+        "code=500",
+      ]);
+      expect(highlight("error", "NOT regexp_like(log, 'error')")).toEqual([]);
+      expect(highlight("error", "level = 'x' AND not  regexp_like(log, 'error')")).toEqual([]);
+    });
+
     it("should not highlight re_not_match patterns", () => {
       expect(textHighlighter.extractHighlightPatterns("re_not_match(log, 'error')")).toEqual([]);
       expect(highlight("error", "re_not_match(log, 'error')")).toEqual([]);
