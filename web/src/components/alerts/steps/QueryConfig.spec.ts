@@ -2781,6 +2781,23 @@ describe("QueryConfig.vue", () => {
       expect(guard.text()).toBe(
         "instance isn't a label of node_cpu_seconds_total. Its labels: k8s_node_name, cpu, and mode.",
       );
+      await hostForm().handleSubmit();
+      await flushPromises();
+      expect(hostForm().state.isValid).toBe(false);
+      const errors = hostForm().state.fieldMeta["query_condition.promql"]?.errors ?? [];
+      expect(errors.map((e: any) => e?.message ?? e)).toContain(guard.text());
+      expect(host.find('[data-test="add-alert-query-required-error"]').exists()).toBe(false);
+    });
+
+    it("the query's help line names the metric the query reads", async () => {
+      streamFixtures.node_cpu_seconds_total = { schema: [{ name: "value" }] };
+      const query = "node_cpu_seconds_total";
+      remount(
+        { ...promqlProps(query), promqlStreamNote: "Reads node_cpu_seconds_total, from the query" },
+        metricPromqlForm(query),
+      );
+      await flushPromises();
+      expect(host.text()).toContain("Reads node_cpu_seconds_total, from the query");
     });
 
     it.each([

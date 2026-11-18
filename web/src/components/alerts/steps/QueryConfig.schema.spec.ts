@@ -320,6 +320,18 @@ describe("QueryConfig.schema — conditions tree", () => {
       expect(queryPaths).toEqual(path ? [path] : []);
     });
 
+    it("blocks save on a PromQL by-label the metric lacks, with the guard's own message", () => {
+      const issue = "instance isn't a label of node_cpu_seconds_total.";
+      const promql = { tab: "promql" as const, isEventBased: false, promqlLabelIssue: issue };
+      const query_condition = { promql_condition: { operator: ">", value: 90 } };
+      const found = (r: any) =>
+        r.success
+          ? undefined
+          : r.error.issues.find((i: any) => i.path.join(".") === "query_condition.promql");
+      expect(found(parse({ query_condition, _meta: promql }))?.message).toBe(issue);
+      expect(found(parse({ query_condition, _meta: { ...promql, tab: "sql" } }))).toBeUndefined();
+    });
+
     // ── Org min-frequency floor (R5 RESTORE) ────────────────────────────────
     // Pre-migration AlertSettings.validateFrequency compared the STORED minutes
     // against ceil(min_auto_refresh_interval / 60) and blocked save.

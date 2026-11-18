@@ -180,9 +180,10 @@ export type ConditionsTree = z.infer<typeof conditionGroupNodeSchema>;
 //      frequency ≥ 1   → alerts.validation.frequencyPositive
 //      org min-freq    → alerts.validation.minimumFrequency ({minutes} = the
 //                        ceil(min_auto_refresh_interval / 60) floor)
-//      "value is"      → alerts.validation.fieldRequired
+//      "value is"      → alerts.guard.thresholdRequired
 //      promql operator → alerts.validation.fieldRequired
-//      promql value    → alerts.validation.fieldRequired
+//      promql value    → alerts.guard.thresholdRequired
+//      promql by-label → the label guard's own message (_meta.promqlLabelIssue)
 //      blank group-by  → alerts.validation.fieldRequired (per offending row;
 //                        an EMPTY group_by is VALID)
 
@@ -199,6 +200,8 @@ export interface QueryConfigMeta {
   hasConditions: boolean;
   /** The condition builder's own verdict, which also covers rules the tree walker cannot see (list sizes). */
   conditionsValid?: boolean;
+  /** Why the PromQL query groups by a label its metric lacks; the label list loads async, so the component judges it. */
+  promqlLabelIssue?: string;
   hasGroupBy: boolean;
   aggregationEnabled: boolean;
   /** Org floor for the evaluation frequency, in SECONDS — raw
@@ -443,6 +446,12 @@ export const makeQueryConfigSchema = (t: Translator) =>
           code: z.ZodIssueCode.custom,
           path: ["query_condition", meta.tab],
           message: t(isSql ? "alerts.messages.sqlQueryEmpty" : "alerts.messages.promqlQueryEmpty"),
+        });
+      } else if (isPromql && meta.promqlLabelIssue) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["query_condition", "promql"],
+          message: meta.promqlLabelIssue,
         });
       }
 

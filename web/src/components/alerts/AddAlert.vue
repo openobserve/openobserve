@@ -448,6 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :sqlQueryErrorMsg="sqlQueryErrorMsg"
                   :sqlAggColumnOptions="sqlAggColumnOptions"
                   :sqlQueryHasHaving="sqlQueryHasHaving"
+                  :promqlStreamNote="promqlStreamNote"
                   :isAggregationEnabled="isAggregationEnabled"
                   :beingUpdated="beingUpdated"
                   :isSeeding="isLoadingPrefill"

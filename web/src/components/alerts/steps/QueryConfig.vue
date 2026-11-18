@@ -1255,14 +1255,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                v-if="localTab === 'promql' && queryRequiredError"
+                v-if="localTab === 'promql' && promqlEditorError"
                 role="alert"
                 tabindex="-1"
                 class="text-status-error-text flex items-center gap-2 text-xs outline-none"
                 data-test="add-alert-query-required-error"
               >
                 <OIcon class="shrink-0" name="error-outline" size="xs" />
-                <span class="min-w-0 break-words">{{ queryRequiredError }}</span>
+                <span class="min-w-0 break-words">{{ promqlEditorError }}</span>
               </div>
 
               <OBanner
@@ -1914,6 +1914,7 @@ import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions"
 import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
 import { dataNoun, joinListMore } from "@/utils/alerts/alertCopy";
+import { isSpanDurationMeasure, UNIT_KEEPING_FUNCTIONS } from "@/utils/alerts/alertReadBack";
 import { alwaysOneRow, oneRowMeetsLimit } from "@/utils/alerts/alertSqlUtils";
 import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
 import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
@@ -1942,21 +1943,7 @@ const withoutBlankRows = (group: FilterGroup): FilterGroup => ({
 const EDITOR_FOLD_LINES = 5;
 
 // Span duration is microseconds by the traces contract, whatever unit the user types it in.
-const TRACE_DURATION_FIELD = "duration";
 const MICROS_PER: Record<string, number> = { ns: 0.001, us: 1, ms: 1000, s: 1_000_000 };
-// Functions whose result keeps the measured field's unit.
-const UNIT_KEEPING_FUNCTIONS = new Set([
-  "avg",
-  "min",
-  "max",
-  "sum",
-  "median",
-  "p50",
-  "p75",
-  "p90",
-  "p95",
-  "p99",
-]);
 // A PromQL query that rates, counts or does arithmetic no longer reads in its metric's unit.
 const PROMQL_UNIT_CHANGERS =
   /\b(?:rate|irate|increase|delta|idelta|deriv|predict_linear|count|count_over_time|changes|resets|absent|absent_over_time|stddev|stdvar|histogram_quantile|time|timestamp|scalar|vector)\s*\(|[-*/+%^]/i;
@@ -2069,6 +2056,11 @@ export default defineComponent({
     sqlQueryHasHaving: {
       type: Boolean,
       default: false,
+    },
+    /** Which metric the PromQL query reads, said in the query's help line. */
+    promqlStreamNote: {
+      type: String as PropType<I18nText | "">,
+      default: "",
     },
     isAggregationEnabled: {
       type: Boolean,
@@ -2568,12 +2560,8 @@ export default defineComponent({
     // A new alert's first measure opens with no value: the event-count default is no value threshold.
     let measureSeedPending = isEventBasedInit && !props.isAggregationEnabled;
 
-    const isSpanDuration = computed(
-      () =>
-        props.streamType === "traces" &&
-        selectedFunction.value !== "total_events" &&
-        UNIT_KEEPING_FUNCTIONS.has(selectedFunction.value) &&
-        logMeasureColumn.value === TRACE_DURATION_FIELD,
+    const isSpanDuration = computed(() =>
+      isSpanDurationMeasure(props.streamType, selectedFunction.value, logMeasureColumn.value),
     );
     const durationUnit = ref("ms");
     const durationUnitOptions = computed(() =>
@@ -2925,6 +2913,12 @@ export default defineComponent({
         ? t("alerts.guard.labelMissing", { ...names, labels: joinListMore(issue.labels, t) })
         : t("alerts.guard.labelMissingNone", names);
     });
+    // The section's help line already says the label guard, so the editor does not repeat it.
+    const promqlEditorError = computed(() =>
+      props.sectionTargets && queryRequiredError.value === promqlLabelIssue.value
+        ? ""
+        : queryRequiredError.value,
+    );
     const unitSuffix = (metric: string | undefined) => {
       const unit = normalizeDeclaredUnit(metric ? metricInfo.value[metric]?.unit : undefined);
       const suffixes: Record<string, I18nText> = {
@@ -3710,7 +3704,8 @@ export default defineComponent({
     });
     const whichEventsHelp = computed(() => {
       if (localTab.value === "sql") return t("alerts.sections.rows.whichEventsSql");
-      if (localTab.value === "promql") return t("alerts.sections.rows.whichEventsPromql");
+      if (localTab.value === "promql")
+        return props.promqlStreamNote || t("alerts.sections.rows.whichEventsPromql");
       return leafFilterCount.value > 0
         ? t("alerts.sections.rows.whichEventsFiltered")
         : t("alerts.sections.rows.whichEventsAll");
@@ -4425,6 +4420,7 @@ export default defineComponent({
         frequencyMode: frequencyMode.value,
         hasConditions: !!props.inputData.conditions?.conditions?.length,
         conditionsValid: conditionsValid.value,
+        promqlLabelIssue: promqlLabelIssue.value || undefined,
         hasGroupBy: isEventBased.value ? hasLogGroupByFields.value : hasMetricGroupByFields.value,
         aggregationEnabled: localIsAggregationEnabled.value,
         // SECONDS, raw from zoConfig — the schema derives ceil(secs/60) itself.
@@ -4441,6 +4437,7 @@ export default defineComponent({
         frequencyMode,
         () => props.inputData.conditions,
         conditionsValid,
+        promqlLabelIssue,
         localIsAggregationEnabled,
         hasLogGroupByFields,
         hasMetricGroupByFields,
@@ -4576,6 +4573,7 @@ export default defineComponent({
       cronTimezone,
       cronError,
       queryRequiredError,
+      promqlEditorError,
       cronDescription,
       thresholdError,
       warningThresholdError,
