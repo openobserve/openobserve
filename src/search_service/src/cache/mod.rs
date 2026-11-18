@@ -1703,6 +1703,81 @@ mod tests {
             .remove(&format!("{org_id}/logs/t"));
     }
 
+    #[tokio::test]
+    async fn test_prepare_skips_queries_without_time_column() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "no_time_column_eligibility";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_id}/logs/t"),
+            SchemaCache::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("k", DataType::Utf8, true),
+            ])),
+        );
+        let cases = [
+            (
+                "SELECT k, max(_timestamp) AS _timestamp, count(*) AS c FROM t GROUP BY k",
+                "",
+            ),
+            (
+                "SELECT max(_timestamp) AS _timestamp, count(*) AS c FROM t",
+                "",
+            ),
+            (
+                "SELECT k AS _timestamp, count(*) AS c FROM t GROUP BY k ORDER BY _timestamp DESC",
+                "",
+            ),
+            (
+                "SELECT s._timestamp AS _timestamp, s.c FROM (SELECT max(_timestamp) AS _timestamp, count(*) AS c FROM t) s ORDER BY _timestamp DESC",
+                "",
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM t GROUP BY ts",
+                "ts",
+            ),
+        ];
+        for (sql, ts_column) in cases {
+            for use_cache in [false, true] {
+                let mut req = search::Request {
+                    query: search::Query {
+                        sql: sql.to_string(),
+                        start_time: 1_735_689_600_000_000,
+                        end_time: 1_735_776_000_000_000,
+                        size: 100,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let (prepared, should_exec_query) = prepare_cache_response(
+                    "no_time_column_eligibility",
+                    org_id,
+                    StreamType::Logs,
+                    &mut req,
+                    use_cache,
+                )
+                .await
+                .unwrap();
+                let case = format!("sql={sql}, use_cache={use_cache}");
+                let eligible = !ts_column.is_empty();
+                assert!(should_exec_query, "{case}");
+                assert_eq!(prepared.ts_column, ts_column, "{case}");
+                assert_eq!(!prepared.file_path.is_empty(), eligible, "{case}");
+                assert_eq!(
+                    prepared.cache_query_response,
+                    eligible && use_cache,
+                    "{case}"
+                );
+                assert!(prepared.cached_response.is_empty(), "{case}");
+            }
+        }
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .remove(&format!("{org_id}/logs/t"));
+    }
+
     #[test]
     fn test_cache_mode_from_request() {
         let cases = [
