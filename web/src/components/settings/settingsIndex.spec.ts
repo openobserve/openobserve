@@ -361,14 +361,14 @@ describe("SettingsIndex.vue", () => {
       mockRouter.currentRoute.value.name = "settings";
     });
 
-    it("AC-12.5 puts an Integrations group holding Slack right after Destinations", () => {
+    it("AC-12.5 puts an Integrations group holding Slack and AI Toolsets right after Destinations", () => {
       config.isEnterprise = "true";
       mockRouter.currentRoute.value.name = "general";
       wrapper = createWrapper(slackConfig(true));
       const labels = wrapper.vm.sectionGroups.map((g: any) => g.label);
       expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
       const group = wrapper.vm.sectionGroups.find((g: any) => g.label === "Integrations");
-      expect(group.items.map((i: any) => i.key)).toEqual(["slack"]);
+      expect(group.items.map((i: any) => i.key)).toEqual(["slack", "ai_toolsets"]);
       expect(group.items[0].icon).toMatch(/^img:.*slack/);
     });
 
