@@ -832,6 +832,33 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(mockSearchObj.data.editorValue).toBe("");
     });
+    it("clears a stale editor filter when the route has a stream and no query", async () => {
+      routerCurrentRouteSpy.mockReturnValue(
+        ref({
+          query: { stream: "default", period: "2h" },
+          name: "traces",
+          path: "/traces",
+        }) as typeof router.currentRoute,
+      );
+      mockSearchObj.data.editorValue = "service_name='x'";
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("");
+    });
+
+    it("keeps the editor when the route has no stream (bare menu link)", async () => {
+      routerCurrentRouteSpy.mockReturnValue(
+        ref({ query: {}, name: "traces", path: "/traces" }) as typeof router.currentRoute,
+      );
+      mockSearchObj.data.editorValue = "service_name='x'";
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("service_name='x'");
+    });
   });
 
   describe("Auto Run off (#14760)", () => {
