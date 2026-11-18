@@ -6745,32 +6745,11 @@ async fn handle_backfill_triggers(
 
                 // Initiate deletion for all streams
                 let mut deletion_job_ids = Vec::new();
-                let mut failed = false;
-                let mut error_msg = String::new();
-
                 // refuse before any deletion is queued: a queued deletion is not taken back
-                for stream in destination_streams.iter() {
-                    if let Err(e) = crate::alerts::backfill::delete_covers_daily_days(
-                        &trigger.org,
-                        stream,
-                        config.start_time,
-                        config.end_time,
-                    )
-                    .await
-                    {
-                        error_msg = format!(
-                            "Failed to initiate deletion for stream {}/{}: {}",
-                            stream.stream_type, stream.stream_name, e
-                        );
-                        log::error!(
-                            "[BACKFILL trace_id {trace_id}] [org_id: {org_id}] [job_id: {}] {}",
-                            job_id,
-                            error_msg
-                        );
-                        failed = true;
-                        break;
-                    }
-                }
+                let (start, end) = (config.start_time, config.end_time);
+                let refused = refused_deletion(&org_id, &destination_streams, start, end).await;
+                let mut failed = refused.is_some();
+                let mut error_msg = refused.unwrap_or_default();
 
                 for (idx, stream) in destination_streams.iter().enumerate() {
                     if failed {
@@ -7622,6 +7601,29 @@ fn get_destination_stream_from_pipeline(
 }
 
 /// Helper function to initiate stream deletion
+/// The reason the first destination that cannot be deleted safely is refused, if any.
+async fn refused_deletion(
+    org_id: &str,
+    streams: &[StreamParams],
+    start_time: i64,
+    end_time: i64,
+) -> Option<String> {
+    for stream in streams {
+        if let Err(e) =
+            crate::alerts::backfill::delete_covers_daily_days(org_id, stream, start_time, end_time)
+                .await
+        {
+            let msg = format!(
+                "Failed to initiate deletion for stream {}/{}: {e}",
+                stream.stream_type, stream.stream_name
+            );
+            log::error!("[BACKFILL] [org_id: {org_id}] {msg}");
+            return Some(msg);
+        }
+    }
+    None
+}
+
 async fn initiate_stream_deletion(
     org_id: &str,
     stream: &StreamParams,
