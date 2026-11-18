@@ -2,6 +2,17 @@
  * Static content for the O2 Assistant home-tab welcome screen.
  */
 
+import type { I18nKey } from "@/types/i18n";
+
+/** A card that opens a page instead of asking the assistant, worded as the Overview's card for that page. */
+export interface CapabilityCardPage {
+  route: "addAlert";
+  titleKey: I18nKey;
+  descriptionKey: I18nKey;
+  /** License feature the page needs; while it is locked the card asks the assistant. */
+  feature: string;
+}
+
 export interface CapabilityCard {
   /** i18n key — under aiAssistant.capabilities.<id>.{title,description,prompt} */
   id: "query" | "incident" | "dashboard" | "alert";
@@ -11,6 +22,7 @@ export interface CapabilityCard {
   iconColorClass: string;
   /** Tailwind tinted background class for the icon chip */
   iconBgClass: string;
+  page?: CapabilityCardPage;
 }
 
 export const CAPABILITY_CARDS: CapabilityCard[] = [
@@ -37,6 +49,12 @@ export const CAPABILITY_CARDS: CapabilityCard[] = [
     icon: "notifications",
     iconColorClass: "text-[#EF4444]",
     iconBgClass: "bg-[#EF4444]/10",
+    page: {
+      route: "addAlert",
+      titleKey: "overview.notMonitoredAlert",
+      descriptionKey: "overview.notMonitoredAlertDesc",
+      feature: "alerts",
+    },
   },
 ];
 

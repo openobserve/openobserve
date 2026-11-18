@@ -936,8 +936,8 @@ describe("AlertList - row actions", () => {
           return { data: { code: 200 } };
         });
       const wrapper: any = await mountAlertList({ renderTable: false });
+      wrapper.vm.stateFilters = ["firing"];
       await flushPromises();
-      expect(wrapper.vm.stateFilters).toEqual(["firing"]);
       if (allFolders) {
         wrapper.vm.searchAcrossFolders = true;
         await flushPromises();
@@ -2307,8 +2307,8 @@ describe("AlertList - filters from the Overview links", () => {
     expect(wrapper.vm.stateFilters).toEqual([state]);
   });
 
-  it("opens on the Firing tile unless ?state picks the tiles, the all-states value meaning none", async () => {
-    expect((await withQuery({})).vm.stateFilters).toEqual(["firing"]);
+  it("opens on every alert unless ?state picks the tiles, the all-states value meaning none", async () => {
+    expect((await withQuery({})).vm.stateFilters).toEqual([]);
     expect((await withQuery({ state: "paused,error" })).vm.stateFilters).toEqual([
       "paused",
       "error",
@@ -2431,7 +2431,7 @@ describe("AlertList - filters from the Overview links", () => {
       alertsSvc.listByFolderId.mockResolvedValue({
         data: { list: [makeAlert(93)], status_unavailable: true },
       });
-      const wrapper = await withQuery({});
+      const wrapper = await withQuery({ state: "firing" });
       expect(wrapper.find('[data-test="alert-list-create-template-text"]').exists()).toBe(false);
       const errorState = wrapper
         .findAllComponents({ name: "OEmptyState" })
@@ -2470,7 +2470,7 @@ describe("AlertList - filters from the Overview links", () => {
     alertsSvc.listByFolderId.mockImplementation(async (...args: any[]) => ({
       data: { list: alertsDB.filter((a) => !args[6] || a.folder_id === args[6]) },
     }));
-    const wrapper = await withQuery({});
+    const wrapper = await withQuery({ state: "firing" });
     expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(true);
 
     alertsSvc.listByFolderId.mockRejectedValueOnce({ response: { status: 500 } });
@@ -2649,7 +2649,7 @@ describe("AlertList - view state restoration", () => {
     const wrapper: any = await mountAlertList();
     await flushPromises();
 
-    expect(wrapper.vm.stateFilters).toEqual(["firing"]);
+    expect(wrapper.vm.stateFilters).toEqual([]);
     expect(wrapper.vm.sortBy).toBe("name");
     expect(wrapper.vm.sortOrder).toBe("desc");
     expect(wrapper.vm.pageSize).toBe(50);
@@ -4586,7 +4586,8 @@ describe("AlertList - first run and the alert library", () => {
   it("names an empty Firing tile by scope, shows all alerts from it, and keeps first run for an empty folder", async () => {
     router.currentRoute.value.query = {};
     const wrapper = await mountList();
-    expect(wrapper.vm.stateFilters).toEqual(["firing"]);
+    wrapper.vm.stateFilters = ["firing"];
+    await flushPromises();
     expect(emptyState(wrapper).attributes("data-test")).toBe("alert-list-empty-no-firing");
     expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
     const folderTitle = emptyState(wrapper).props("title");
@@ -4618,6 +4619,7 @@ describe("AlertList - first run and the alert library", () => {
       data: { list: alertsDB.filter((a: any) => args[8] !== "scheduled" || !a.is_real_time) },
     }));
     const wrapper: any = await mountAlertList({ renderTable: false });
+    wrapper.vm.stateFilters = ["firing"];
     await flushPromises();
     expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-2"]);
 

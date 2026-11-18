@@ -2156,10 +2156,8 @@ export default defineComponent({
     // Tiles toggle states in and out (OR'd); the tile counts stay scope totals, only the rows filter.
     const urlQuery = router.currentRoute.value.query;
     const urlStates = readFilterKeys(urlQuery.state, isAlertStateKey);
-    // A fresh visit opens on what is firing; any `?state=` link, the all-states value included, picks the tiles instead.
-    const stateFilters = ref<AlertStateKey[]>(
-      urlQuery.state === undefined ? ["firing"] : urlStates,
-    );
+    // A fresh visit lists every alert, so one just created is in view; a `?state=` link picks the tiles.
+    const stateFilters = ref<AlertStateKey[]>(urlQuery.state === undefined ? [] : urlStates);
     // URL-only: the saved state never carries it.
     const levelFilter = ref<AlertLevelFilter | null>(
       parseQueryChoice(urlQuery.level, ALERT_LEVEL_FILTERS),
@@ -2614,8 +2612,7 @@ export default defineComponent({
       ([state, allFolders]) => {
         const route = router.currentRoute.value;
         if ((state === undefined && allFolders === undefined) || route.name !== "alertList") return;
-        stateFilters.value =
-          state === undefined ? ["firing"] : readFilterKeys(state, isAlertStateKey);
+        stateFilters.value = state === undefined ? [] : readFilterKeys(state, isAlertStateKey);
         levelFilter.value = parseQueryChoice(route.query.level, ALERT_LEVEL_FILTERS);
         // Same as a fresh mount: the link's scope, and no search left over to hide the linked rows.
         searchAcrossFolders.value = route.query.all_folders === ALERT_LIST_ALL_FOLDERS;
