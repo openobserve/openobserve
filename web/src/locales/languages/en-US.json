@@ -15990,7 +15990,8 @@
       "starterRareValue": "Any {noun} where {field} is {value}",
       "starterMoreThanUsual": "More than usual {noun} with {field} = {value}",
       "starterPercentile": "{field} p95 above its usual level",
-      "starterPerGroup": "Per {group}: {starter}"
+      "starterPerGroup": "Per {group}: {starter}",
+      "missingFields": "Needs {fields}, which this stream doesn't have"
     },
     "testRun": {
       "action": "Test it",
