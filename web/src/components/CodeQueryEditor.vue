@@ -1673,10 +1673,7 @@ export default defineComponent({
                 catalog: [...config.keywords(), ...config.suggestions()].map(objectEntry),
               })
             : [];
-        const fields = [
-          ...(context.hasOpenQuote ? [] : [...allFields, ...subquery, ...functions]),
-          ...filled,
-        ];
+        const fields = context.hasOpenQuote ? [] : [...allFields, ...subquery, ...functions];
         if (!resolver || typedIsColumn || unknownField) return fields;
 
         const outcome = await awaitValues(config, token, (options) =>
@@ -1686,7 +1683,7 @@ export default defineComponent({
         if (outcome === "nolookup") return fields;
         const shape = { highlighted, inQuote: context.hasOpenQuote };
         if (outcome === "loading") {
-          return withStatus(config, "loading", context.field, position, filled, shape);
+          return withStatus(config, "loading", context.field, position, [], shape);
         }
         if (outcome === "failed" || !outcome.length) {
           const status = outcome === "failed" ? "failed" : "empty";
@@ -1709,7 +1706,9 @@ export default defineComponent({
           pattern: context.operator === "like",
           typed: context.typed,
         });
-        return [...values, ...fields, ...capRow(context.field, outcome.length, position)];
+        // Only under a matching value: alone they would take Enter, which must close an open quote.
+        const withFilled = values.length ? [...fields, ...filled] : fields;
+        return [...values, ...withFilled, ...capRow(context.field, outcome.length, position)];
       };
 
       const promqlValueEntries = async (
