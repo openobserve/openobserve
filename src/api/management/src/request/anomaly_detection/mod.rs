@@ -21,17 +21,21 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use config::meta::triggers::TriggerModule;
 use openobserve_api_common::extractors::Headers;
 pub use openobserve_core::anomaly_detection::{
     CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
 };
-use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_folder_write_permissions;
 #[cfg(feature = "enterprise")]
 use openobserve_core::background_access::{
     anomaly_sources, anomaly_update_sources, guard_loaded, guard_write, rbac_enforced,
     runnable_anomaly_sources,
+};
+use openobserve_core::{
+    anomaly_detection::explore_state::{self, ExploreResponse},
+    auth::UserEmail,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -204,6 +208,229 @@ pub async fn get_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> R
                 .into_response()
         }
     }
+}
+
+/// State, readings and the explore link of a detector, for its page and its alerts
+#[utoipa::path(
+    get,
+    path = "/{org_id}/anomaly_detection/{config_id}/explore",
+    context_path = "/api",
+    tag = "Anomaly Detection",
+    operation_id = "GetAnomalyExplore",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("config_id" = String, Path, description = "Anomaly config identifier"),
+        ("start" = Option<i64>, Query, description = "Window start in microseconds; send with end"),
+        ("end" = Option<i64>, Query, description = "Window end in microseconds; send with start"),
+        ("pad" = Option<u8>, Query, description = "0 opens the window with no lead-in buckets"),
+        ("model_version" = Option<i64>, Query, description = "Model the caller's data was loaded with"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ExploreResponse),
+        (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+        (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
+        (status = 409, description = "Model version changed", content_type = "application/json", body = MetaHttpResponse),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Get the state, readings and explore link of an anomaly detector", "category": "anomaly_detection"})),
+        ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "get"}))
+    )
+)]
+#[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
+pub async fn get_explore(
+    Path((org_id, anomaly_id)): Path<(String, String)>,
+    Query(query): Query<ExploreQuery>,
+) -> Response {
+    if let Some(resp) = disabled_response() {
+        return resp;
+    }
+    let requested = match requested_window(&query) {
+        Ok(requested) => requested,
+        Err(msg) => {
+            return MetaHttpResponse::error(StatusCode::BAD_REQUEST.as_u16(), msg).into_response();
+        }
+    };
+    let db = infra::db::get_orm_client_rw().await;
+    let detector =
+        match infra::table::anomaly_detection::config::get_by_id(db, &org_id, &anomaly_id).await {
+            Ok(Some(detector)) => detector,
+            Ok(None) => {
+                return MetaHttpResponse::error(
+                    StatusCode::NOT_FOUND.as_u16(),
+                    format!("Anomaly config not found: {anomaly_id}"),
+                )
+                .into_response();
+            }
+            Err(e) => return explore_error(e),
+        };
+    let model_version =
+        explore_state::served_model_version(detector.is_trained, detector.current_model_version);
+    if explore_state::is_stale_model(query.model_version, model_version) {
+        return MetaHttpResponse::error(
+            StatusCode::CONFLICT.as_u16(),
+            format!("Anomaly model changed: current model_version is {model_version}"),
+        )
+        .into_response();
+    }
+    match explore_response(&org_id, &detector, model_version, requested, query.pad).await {
+        Ok(resp) => MetaHttpResponse::json(resp),
+        Err(e) => explore_error(e),
+    }
+}
+
+fn explore_error(e: impl std::fmt::Display) -> Response {
+    tracing::error!("Failed to build the anomaly explore response: {e}");
+    MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+        .into_response()
+}
+
+/// Both bounds or neither, in order. [pure]
+fn requested_window(query: &ExploreQuery) -> Result<Option<(i64, i64)>, String> {
+    match (query.start, query.end) {
+        (None, None) => Ok(None),
+        (Some(start), Some(end)) if start < end => Ok(Some((start, end))),
+        (Some(_), Some(_)) => Err("start must be before end".to_string()),
+        _ => Err("start and end must be sent together".to_string()),
+    }
+}
+
+/// The lead-in of an explore link: none for `pad=0`, else the 3 buckets of `explore_target`.
+fn explore_target(
+    detector: &infra::table::entity::anomaly_detection_config::Model,
+    start_us: i64,
+    pad: Option<u8>,
+) -> Option<o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget> {
+    use o2_enterprise::enterprise::anomaly_detection::query_builder;
+    if pad == Some(0) {
+        query_builder::explore_target_with_lead(detector, start_us, 0)
+    } else {
+        query_builder::explore_target(detector, start_us)
+    }
+}
+
+async fn explore_response(
+    org_id: &str,
+    detector: &infra::table::entity::anomaly_detection_config::Model,
+    model_version: i64,
+    requested: Option<(i64, i64)>,
+    pad: Option<u8>,
+) -> anyhow::Result<ExploreResponse> {
+    let anomaly_id = detector.anomaly_id.as_str();
+    let bucket_us = o2_enterprise::enterprise::anomaly_detection::absence::interval_to_micros(
+        &detector.histogram_interval,
+    )
+    .unwrap_or(0);
+    let now_us = config::utils::time::now_micros();
+    let range = explore_state::read_range(now_us, bucket_us);
+    let buckets = if detector.is_trained {
+        explore_state::read_buckets(org_id, anomaly_id, model_version, range).await?
+    } else {
+        vec![]
+    };
+    let last_detection_run =
+        db::scheduler::get(org_id, TriggerModule::AnomalyDetection, anomaly_id)
+            .await
+            .ok()
+            .and_then(|trigger| trigger.start_time);
+    // The trigger also fires while untrained, so only a moved cursor or a point counts as a run.
+    let has_run = detector.last_processed_timestamp.is_some() || !buckets.is_empty();
+    let decision =
+        explore_state::decide(&buckets, bucket_us, range.0, has_run, detector.is_trained);
+
+    let (start_us, end_us) = explore_state::link_window(
+        requested,
+        decision.window.as_ref(),
+        detector.last_processed_timestamp,
+        bucket_us,
+        now_us,
+    );
+    let target = explore_target(
+        detector,
+        start_us,
+        if requested.is_some() { pad } else { None },
+    );
+    let measure = target
+        .as_ref()
+        .map(|t| anomaly_service::anomaly_measure(t, bucket_us / 1_000_000))
+        .unwrap_or_default();
+    let snapshot = match (requested, &decision.window, &decision.summary) {
+        (Some(_), ..) => Some(explore_state::bucket_snapshot(
+            explore_state::bucket_at(&buckets, start_us, bucket_us),
+            start_us,
+            end_us,
+            &measure,
+        )),
+        (None, Some(window), Some(summary)) => {
+            Some(explore_state::summary_snapshot(window, summary, &measure))
+        }
+        _ => None,
+    };
+    let link = target
+        .as_ref()
+        .map(|t| {
+            anomaly_service::anomaly_explore_link(
+                org_id,
+                anomaly_id,
+                &detector.stream_type,
+                t,
+                end_us,
+                snapshot.as_ref(),
+            )
+        })
+        .unwrap_or_default();
+
+    let freshness = explore_state::freshness(
+        is_peer_cluster().await,
+        last_detection_run,
+        detector.last_processed_timestamp,
+        bucket_us,
+        now_us,
+    );
+    Ok(ExploreResponse {
+        target: if link.target.is_empty() {
+            explore_state::link_target(&detector.stream_type).to_string()
+        } else {
+            link.target
+        },
+        url: link.url,
+        label: link.label,
+        filter_applied: link.filter_applied,
+        name: detector.name.clone(),
+        measure,
+        stream: target
+            .as_ref()
+            .map(|t| t.stream.clone())
+            .unwrap_or_else(|| detector.stream_name.clone()),
+        filter: target.as_ref().and_then(|t| t.filter.clone()),
+        state: decision.state,
+        state_source: "buckets".to_string(),
+        summary: decision.summary,
+        model_version,
+        last_detection_run: freshness.last_detection_run,
+        cursor_us: freshness.cursor_us,
+        no_new_data_since_us: freshness.no_new_data_since_us,
+        window: decision.window,
+        explore_start_us: target.as_ref().map_or(start_us, |t| t.start_us),
+    })
+}
+
+/// Only the job cluster runs the scheduler, so other members of a super cluster hide run state.
+async fn is_peer_cluster() -> bool {
+    let super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+    if !super_cluster {
+        return false;
+    }
+    let job_cluster = o2_enterprise::enterprise::super_cluster::kv::scheduler::get_job_cluster()
+        .await
+        .ok();
+    explore_state::is_peer_cluster(true, job_cluster.as_deref(), &config::get_cluster_name())
 }
 
 #[cfg(feature = "enterprise")]
@@ -685,6 +912,15 @@ pub struct HistoryQuery {
     pub limit: Option<i64>,
 }
 
+/// Query of the explore endpoint; a point link sends one bucket as start and end with pad 0.
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct ExploreQuery {
+    pub start: Option<i64>,
+    pub end: Option<i64>,
+    pub pad: Option<u8>,
+    pub model_version: Option<i64>,
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AnomalyConfigResponse {
     // The config row is returned flat, with every column as a top-level key
@@ -704,7 +940,7 @@ pub struct DeleteResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::{create_folder, resolve_owner, visible_configs};
+    use super::{ExploreQuery, create_folder, requested_window, resolve_owner, visible_configs};
 
     #[test]
     fn test_list_keeps_only_the_configs_the_caller_may_list() {
@@ -870,5 +1106,19 @@ mod tests {
             assert_ne!(status, StatusCode::FORBIDDEN);
             assert!(message.contains("disabled"), "{message}");
         }
+    }
+
+    #[test]
+    fn test_explore_window_needs_both_bounds_in_order() {
+        let q = |start, end| ExploreQuery {
+            start,
+            end,
+            ..Default::default()
+        };
+        assert_eq!(requested_window(&q(None, None)), Ok(None));
+        assert_eq!(requested_window(&q(Some(1), Some(2))), Ok(Some((1, 2))));
+        assert!(requested_window(&q(Some(2), Some(2))).is_err());
+        assert!(requested_window(&q(Some(1), None)).is_err());
+        assert!(requested_window(&q(None, Some(2))).is_err());
     }
 }
