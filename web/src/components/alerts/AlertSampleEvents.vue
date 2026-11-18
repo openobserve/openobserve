@@ -20,6 +20,7 @@ import { useStore } from "vuex";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
@@ -102,7 +103,9 @@ watch(
                 :class="open ? 'rotate-90' : ''"
               />
               <span class="text-text-secondary shrink-0">{{ raw(row.time) }}</span>
-              <span class="text-text-body min-w-0 truncate font-mono">{{ raw(row.text) }}</span>
+              <OTruncatedText class="text-text-body min-w-0 font-mono" :tooltip="false">{{
+                raw(row.text)
+              }}</OTruncatedText>
               <span class="sr-only">{{
                 open ? t("alerts.discovery.sampleCollapse") : t("alerts.discovery.sampleExpand")
               }}</span>
@@ -119,7 +122,7 @@ watch(
             >
               <dt class="text-text-secondary min-w-0 break-all">{{ raw(field.key) }}</dt>
               <dd class="text-text-body m-0 min-w-0 font-mono break-all">
-                {{ raw(field.value) }}
+                <OTruncatedText :lines="3">{{ raw(field.value) }}</OTruncatedText>
               </dd>
             </div>
           </dl>
