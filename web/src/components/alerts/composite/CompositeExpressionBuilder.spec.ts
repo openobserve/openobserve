@@ -5,8 +5,8 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
 
 import CompositeExpressionBuilder from "./CompositeExpressionBuilder.vue";
 import i18n from "@/locales";
@@ -157,5 +157,12 @@ describe("CompositeExpressionBuilder", () => {
     await wrapper.find('[data-test="add-alert-add-compositeExpression"]').trigger("click");
     expect(raw().exists()).toBe(true);
     expect(wrapper.find('[data-test="add-alert-add-compositeExpression"]').exists()).toBe(false);
+    // A focused textarea below the scroller's edge brings itself back into view.
+    const field = raw().find("textarea");
+    const reveal = vi.fn();
+    (field.element as HTMLElement).scrollIntoView = reveal;
+    await field.trigger("focusin");
+    await flushPromises();
+    expect(reveal).toHaveBeenCalledWith({ block: "nearest" });
   });
 });

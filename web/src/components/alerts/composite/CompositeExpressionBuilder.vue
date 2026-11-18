@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -39,6 +39,12 @@ const emit = defineEmits<{
   (event: "update:modelValue", value: string): void;
   (event: "validation", value: ReturnType<typeof validateExpression>): void;
 }>();
+
+// The form scroller can leave a focused field below its edge, so bring it back.
+const revealFocused = async (event: FocusEvent) => {
+  await nextTick();
+  (event.target as HTMLElement | null)?.scrollIntoView?.({ block: "nearest" });
+};
 
 const { t } = useI18nTyped();
 let autoExpressionApplied = false;
@@ -233,6 +239,7 @@ onMounted(maybeApplyDefault);
         data-test="alerts-composite-expression-advanced"
         :rows="3"
         class="font-mono"
+        @focusin="revealFocused"
         @update:model-value="emit('update:modelValue', $event)"
       />
     </div>
