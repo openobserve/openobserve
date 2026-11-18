@@ -1911,7 +1911,8 @@ import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
 import { dataNoun, joinListMore } from "@/utils/alerts/alertCopy";
 import { alwaysOneRow, oneRowMeetsLimit } from "@/utils/alerts/alertSqlUtils";
-import { missingByLabel, promqlByLabels, promqlMetricNames } from "@/utils/alerts/promqlLabels";
+import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
+import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
 import { normalizeDeclaredUnit } from "@/utils/metrics/metricDefaults";
 import { groupByChoices } from "@/utils/alerts/alertQueryBuilder";
 
@@ -1935,28 +1936,6 @@ const withoutBlankRows = (group: FilterGroup): FilterGroup => ({
 });
 
 const EDITOR_FOLD_LINES = 5;
-
-/** The columns a SQL query groups by, in order; the first GROUP BY wins. */
-function sqlGroupByLabels(sql: string): string[] {
-  const clause = /\bgroup\s+by\s+([\s\S]*?)(?=\s+(?:having|order\s+by|limit|qualify)\b|;|$)/i.exec(
-    sql,
-  );
-  if (!clause) return [];
-  const parts: string[] = [];
-  let depth = 0;
-  let current = "";
-  for (const ch of clause[1]) {
-    if (ch === "(") depth++;
-    if (ch === ")") depth--;
-    if (ch === "," && depth === 0) {
-      parts.push(current);
-      current = "";
-    } else current += ch;
-  }
-  parts.push(current);
-  const labels = parts.map((p) => p.trim().replace(/^["'`](.*)["'`]$/, "$1")).filter(Boolean);
-  return [...new Set(labels)];
-}
 
 // Span duration is microseconds by the traces contract, whatever unit the user types it in.
 const TRACE_DURATION_FIELD = "duration";

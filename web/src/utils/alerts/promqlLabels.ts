@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { promqlByLabels } from "./queryGroupLabels";
+
 const KEYWORDS = new Set([
   "by",
   "without",
@@ -41,19 +43,6 @@ export interface MissingByLabel {
 
 const withoutStrings = (query: string): string =>
   query.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`/g, '""');
-
-/** Every label a PromQL query aggregates `by`, across all its `by (...)` clauses. */
-export function promqlByLabels(query: string): string[] {
-  const labels = new Set<string>();
-  for (const match of withoutStrings(query ?? "").matchAll(/\bby\s*\(([^)]*)\)/gi)) {
-    match[1]
-      .split(",")
-      .map((label) => label.trim())
-      .filter(Boolean)
-      .forEach((label) => labels.add(label));
-  }
-  return [...labels];
-}
 
 /** The metric names a PromQL query reads, in order of first use. */
 export function promqlMetricNames(query: string): string[] {
