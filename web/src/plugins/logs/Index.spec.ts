@@ -26,6 +26,8 @@ vi.mock("@/stores", async () => {
 import router from "@/test/unit/helpers/router";
 import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import { queryClient } from "@/composables/query/queryClient";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 
 // Mock CSS.supports for test environment
 Object.defineProperty(global, "CSS", {
@@ -636,6 +638,48 @@ describe("Logs Index", async () => {
       expect(searchObj.data.missingStreamMessage).toContain('"no_k"');
       // The SQL run clears the banner, so the toggle also says it once in a toast.
       expect(infoToasts).toContain(searchObj.data.missingStreamMessage);
+    });
+
+    it("writes each arm with the field normal mode maps the filter to in that stream", async () => {
+      const { searchObj } = wrapper.vm;
+      const groupsKey = serviceStreamKeys.semanticGroups(
+        store.state.selectedOrganization.identifier,
+      );
+      queryClient.setQueryData(groupsKey, [
+        {
+          id: "k8s-namespace",
+          display: "Namespace",
+          fields: ["k8s_namespace_name", "service_k8s_namespace_name"],
+        },
+      ]);
+      try {
+        searchObj.data.streamResults = {
+          list: [
+            { name: "ns_a", schema: [{ name: "k8s_namespace_name", type: "Utf8" }], settings: {} },
+            {
+              name: "ns_b",
+              schema: [{ name: "service_k8s_namespace_name", type: "Utf8" }],
+              settings: {},
+            },
+          ],
+        };
+        searchObj.data.stream.selectedStream = ["ns_a", "ns_b"];
+        searchObj.data.stream.selectedStreamFields = [
+          { name: "k8s_namespace_name", streams: ["ns_a"] },
+          { name: "service_k8s_namespace_name", streams: ["ns_b"] },
+        ];
+        searchObj.data.stream.interestingFieldList = [];
+        searchObj.meta.quickMode = false;
+        searchObj.data.query = "k8s_namespace_name='x'";
+
+        await wrapper.vm.setQuery(true);
+
+        const [armA, armB] = searchObj.data.query.split(" UNION ALL BY NAME ");
+        expect(armA).toBe(`SELECT * FROM "ns_a" WHERE k8s_namespace_name = 'x'`);
+        expect(armB).toMatch(/^SELECT \* FROM "ns_b" WHERE "?service_k8s_namespace_name"? = 'x'$/);
+      } finally {
+        queryClient.removeQueries({ queryKey: groupsKey });
+      }
     });
   });
 

@@ -992,7 +992,7 @@ export default defineComponent({
       buildWebSocketPayload,
       buildSearch,
       initializeSearchConnection,
-      validateFilterForMultiStream,
+      resolveFilterForStreams,
     } = useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
@@ -1954,11 +1954,11 @@ export default defineComponent({
 
             searchObj.data.query = "";
             const streams = searchObj.data.stream.selectedStream;
-            // Normal mode skips a stream that lacks a filter field, so its SQL leaves that arm out too.
-            const missing =
-              streams.length > 1 && validateFilterForMultiStream(currentQuery)
-                ? searchObj.data.stream.missingStreamMultiStreamFilter
-                : [];
+            // Normal mode skips a stream that lacks a filter field and maps a semantic-group field per
+            // stream, so the SQL leaves that arm out and writes the mapped field.
+            const resolved = streams.length > 1 ? resolveFilterForStreams(currentQuery) : null;
+            const usable = resolved?.errors.length === 0 ? resolved : null;
+            const missing = usable?.excluded.map((entry) => entry.stream) ?? [];
             const skipped = missing.length < streams.length ? missing : [];
             if (skipped.length) showInfoNotification(searchObj.data.missingStreamMessage);
             let arms = 0;
@@ -1972,7 +1972,12 @@ export default defineComponent({
                   ? "\nUNION ALL BY NAME "
                   : " UNION ALL BY NAME ";
               }
-              const armWhere = textWhere ? `WHERE ${textWhere[index]}` : whereClause;
+              const rewrite = usable?.armRewrites.get(stream);
+              const armWhere = textWhere
+                ? `WHERE ${textWhere[index]}`
+                : rewrite
+                  ? `WHERE ${rewrite}`
+                  : whereClause;
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${armWhere}`;
             });
 
