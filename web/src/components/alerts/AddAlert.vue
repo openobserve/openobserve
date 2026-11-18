@@ -250,7 +250,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </aside>
 
-        <div class="flex min-h-0 min-w-0 flex-1 flex-col max-lg:flex-none">
+        <div
+          class="flex min-h-0 min-w-0 shrink grow basis-5xl flex-col max-lg:flex-none lg:max-w-5xl"
+        >
           <div
             class="border-border-default flex shrink-0 items-center justify-end border-b px-4 py-2"
             data-test="add-alert-show-all-bar"
@@ -901,7 +903,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <aside
-          class="border-border-default w-83 shrink-0 flex-col overflow-y-auto border-s p-3 max-lg:w-auto max-lg:border-s-0 max-lg:border-t"
+          class="border-border-default w-83 shrink-0 flex-col overflow-y-auto border-s p-3 max-lg:w-auto max-lg:border-s-0 max-lg:border-t lg:grow"
           :class="railInCondition ? 'hidden' : 'flex'"
           data-test="add-alert-rail"
         >
