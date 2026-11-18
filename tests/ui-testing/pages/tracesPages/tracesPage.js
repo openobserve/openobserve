@@ -312,16 +312,22 @@ export class TracesPage {
     let release;
     const gate = new Promise((resolve) => { release = resolve; });
     const held = [];
+    const delivered = [];
     const pattern = /\/api\/[^/]+\/streams(\?|\/[^/]+\/schema|$)/;
     await this.page.route(pattern, async (route) => {
       held.push(route.request().url());
+      let done;
+      delivered.push(new Promise((resolve) => { done = resolve; }));
       await gate;
-      await route.continue().catch(() => {});
+      // fetch + fulfill, so release() resolves only once the page has every held response.
+      await route.fetch().then((response) => route.fulfill({ response })).catch(() => {});
+      done();
     });
     return {
       held,
       release: async () => {
         release();
+        await Promise.all(delivered);
         await this.page.unroute(pattern);
       },
     };

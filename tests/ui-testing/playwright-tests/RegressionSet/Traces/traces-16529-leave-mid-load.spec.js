@@ -24,13 +24,17 @@ test.describe('Leaving Traces mid-load (#15543)', () => {
     await pm.tracesPage.navigateToTraces();
     await expect.poll(() => hold.held.length, { timeout: 15000, message: 'Precondition: Traces must be waiting on its stream list' }).toBeGreaterThan(0);
 
+    const visited = [];
+    page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) visited.push(frame.url()); });
+    // One click, released at once: a retry or a wait for /logs lets the navigation finish before the late write, and the race never happens.
     await pm.tracesPage.clickLogsMenuItem();
     await hold.release();
 
     await page.waitForURL((url) => isLogsPath(url.href), { timeout: 15000 });
-    // The late write lands a moment after the held responses resolve, so the route must still be Logs once Traces has had time to finish.
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await expect.poll(() => isLogsPath(page.url()), { timeout: 5000, intervals: [1000, 1000, 1000, 1000, 1000], message: 'the late Traces write must not take the user back' }).toBe(true);
+    // release() returns once Traces has every held response, so a late write is already queued; 3 s with no route change means none came.
+    await expect(page.waitForURL((url) => !isLogsPath(url.href), { timeout: 3000 }), 'the late Traces write must not take the user back').rejects.toThrow();
+    const afterLogs = visited.slice(visited.findIndex(isLogsPath));
+    expect(afterLogs.filter((url) => !isLogsPath(url)), 'no route change away from Logs once Logs was reached').toEqual([]);
     await expect(page, 'Traces query state must not leak into the Logs URL').not.toHaveURL(/[?&]stream_type=traces/);
   });
 });
