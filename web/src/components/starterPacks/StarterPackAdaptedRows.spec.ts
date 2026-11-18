@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { ref, shallowRef } from "vue";
 
 import i18n from "@/locales";
@@ -42,14 +42,7 @@ const render = (flow: ReturnType<typeof flowWith>, readonly = false) =>
     props: { flow: flow as any, readonly },
     global: {
       plugins: [i18n],
-      stubs: {
-        ODialog: {
-          props: ["open", "title"],
-          template:
-            '<div v-if="open"><span data-test="stub-dialog-title">{{ title }}</span><slot /></div>',
-        },
-        OIcon: true,
-      },
+      stubs: { OIcon: true },
     },
   });
 type Wrapper = ReturnType<typeof render>;
@@ -160,26 +153,64 @@ describe("StarterPackAdaptedRows", () => {
     expect(more.text()).toBe("Show 2 more");
     await more.trigger("click");
     expect(wrapper.findAll('[data-test="starter-pack-adapted-field"]')).toHaveLength(5);
+    await wrapper.get('[data-test="starter-pack-adapted-fields-hide-btn"]').trigger("click");
+    expect(wrapper.findAll('[data-test="starter-pack-adapted-field"]')).toHaveLength(3);
+    expect(wrapper.find('[data-test="starter-pack-adapted-fields-show-btn"]').exists()).toBe(true);
     const version = wrapper.get('[data-test="starter-pack-adapted-flavour"]');
     expect(version.text()).toBe("VersionOpenTelemetry");
     expect(version.find("button").exists()).toBe(false);
   });
 
-  it("opens the repair dialog from Change on a stream and on a field", async () => {
+  it("opens the repair form in place under the row it was changed from", async () => {
     const flow = flowWith({
       questions: [answeredWith({ to: "kube_pod_info" })],
       bindings: [binding("k8s_cluster", "cluster_name")],
     });
     const wrapper = render(flow);
-    expect(has(wrapper, "starter-pack-repair-dialog")).toBe(false);
+    expect(has(wrapper, "starter-pack-repair-form")).toBe(false);
     await wrapper.get('[data-test="starter-pack-adapted-change-btn"]').trigger("click");
-    expect(has(wrapper, "starter-pack-repair-dialog")).toBe(true);
-    const other = render(flow);
-    await other.get('[data-test="starter-pack-adapted-field-change-btn"]').trigger("click");
-    expect(has(other, "starter-pack-repair-dialog")).toBe(true);
+    const stream = wrapper.get('[data-test="starter-pack-adapted-stream"]');
+    expect(stream.element.nextElementSibling?.getAttribute("data-test")).toBe(
+      "starter-pack-repair-form",
+    );
+    await wrapper.get('[data-test="starter-pack-adapted-field-change-btn"]').trigger("click");
+    expect(wrapper.findAll('[data-test="starter-pack-repair-form"]')).toHaveLength(1);
+    const field = wrapper.get('[data-test="starter-pack-adapted-field"]');
+    expect(field.element.nextElementSibling?.getAttribute("data-test")).toBe(
+      "starter-pack-repair-form",
+    );
+    expect(has(wrapper, "starter-pack-repair-field-select")).toBe(true);
   });
 
-  it("titles the repair dialog with the same words as the row it opens from", async () => {
+  it("scrolls the opened form into view so its buttons are reachable", async () => {
+    const original = Element.prototype.scrollIntoView;
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = original;
+    });
+    const wrapper = render(flowWith({ bindings: [binding("k8s_cluster", "cluster_name")] }));
+    await wrapper.get('[data-test="starter-pack-adapted-field-change-btn"]').trigger("click");
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+    expect(scroll.mock.instances[0]).toBe(
+      wrapper.get('[data-test="starter-pack-repair-form"]').element,
+    );
+  });
+
+  it("closes the form on Cancel and on a second Change", async () => {
+    const flow = flowWith({ bindings: [binding("k8s_cluster", "cluster_name")] });
+    const wrapper = render(flow);
+    const change = wrapper.get('[data-test="starter-pack-adapted-field-change-btn"]');
+    await change.trigger("click");
+    await wrapper.get('[data-test="starter-pack-repair-cancel-btn"]').trigger("click");
+    expect(has(wrapper, "starter-pack-repair-form")).toBe(false);
+    await change.trigger("click");
+    await change.trigger("click");
+    expect(has(wrapper, "starter-pack-repair-form")).toBe(false);
+    expect(flow.chooseField).not.toHaveBeenCalled();
+  });
+
+  it("titles the repair form with the same words as the row it opens from", async () => {
     const flow = flowWith({
       questions: [
         { want: "kube_node_status_allocatable", kind: "confirm", candidates: [] },
@@ -192,7 +223,7 @@ describe("StarterPackAdaptedRows", () => {
       await wrapper
         .findAll('[data-test="starter-pack-adapted-choose-btn"]')
         [index].trigger("click");
-      titles.push(wrapper.get('[data-test="stub-dialog-title"]').text());
+      titles.push(wrapper.get('[data-test="starter-pack-repair-title"]').text());
     }
     expect(titles).toEqual([
       "0 streams look like kube_node_status_allocatable",

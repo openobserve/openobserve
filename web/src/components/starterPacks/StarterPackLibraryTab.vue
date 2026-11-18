@@ -23,38 +23,45 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import StarterPackParseDialog from "@/components/starterPacks/StarterPackParseDialog.vue";
+import StarterPackUndoDialog from "@/components/starterPacks/StarterPackUndoDialog.vue";
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
 import { matchPack, readOrgStreams } from "@/composables/starterPacks/packMatchData";
 import { findRawNginxLogs, type RawLogNotice } from "@/composables/starterPacks/rawLogs";
-import type { PackInstallRecord, StarterPack } from "@/composables/starterPacks/types";
+import type {
+  PackInstallRecord,
+  PackItemKind,
+  StarterPack,
+} from "@/composables/starterPacks/types";
 import { useInstallRecords } from "@/composables/starterPacks/useInstallRecords";
 import { useNginxParse, type ParsePreview } from "@/composables/starterPacks/useNginxParse";
+import { usePackUpdates } from "@/composables/starterPacks/usePackUpdates";
 import { isOrgAdmin, useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStreamValues } from "@/composables/starterPacks/useStreamValues";
+import { copyToClipboard } from "@/utils/clipboard";
+import { getImageURL } from "@/utils/zincutils";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
-type Facet = "ready" | "installed" | "all";
+type Facet = "ready" | "missing" | "installed" | "all";
 
 interface LibraryRow {
   id: string;
-  packId: string;
+  pack: StarterPack;
   title: I18nText;
-  description: I18nText;
   ready: boolean;
+  matched: number;
+  total: number;
   record: PackInstallRecord | null;
 }
 
-const props = defineProps<{ org: string; view: "packs" | "dashboards" }>();
+const props = defineProps<{ org: string }>();
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -67,8 +74,10 @@ const { readValues } = useStreamValues(props.org);
 const rows = ref<LibraryRow[]>([]);
 const state = ref<"loading" | "ready" | "error">("loading");
 const facet = ref<Facet>("all");
-const search = ref("");
 const flows = new Map(STARTER_PACKS.map((pack) => [pack.id, useStarterPackFlow(props.org, pack)]));
+const updates = new Map(
+  STARTER_PACKS.map((pack) => [pack.id, usePackUpdates(props.org, flows.get(pack.id)!)]),
+);
 const drawerPackId = ref<string | null>(null);
 const drawerFlow = computed(() => (drawerPackId.value ? flows.get(drawerPackId.value) : undefined));
 const rawLogs = ref<RawLogNotice[]>([]);
@@ -78,6 +87,9 @@ const parseOpen = ref(false);
 const undoing = ref<PackInstallRecord | null>(null);
 const undoOpen = ref(false);
 const undoFailed = ref(false);
+const undoPackId = ref<string | null>(null);
+const undoSetupOpen = ref(false);
+const undoPackFlow = computed(() => (undoPackId.value ? flows.get(undoPackId.value) : undefined));
 
 const isAdmin = computed(() => isOrgAdmin(store.state));
 const repairStream = (record: PackInstallRecord) => record.items[0]?.stream ?? "";
@@ -88,148 +100,222 @@ const unrepaired = computed(() => {
 
 const count = (test: (row: LibraryRow) => boolean) => rows.value.filter(test).length;
 const isReadyRow = (row: LibraryRow) => row.ready;
+const isMissingRow = (row: LibraryRow) => !row.ready;
 const isInstalledRow = (row: LibraryRow) => row.record !== null;
+const FACET_TESTS: Record<Facet, (row: LibraryRow) => boolean> = {
+  ready: isReadyRow,
+  missing: isMissingRow,
+  installed: isInstalledRow,
+  all: () => true,
+};
 
-const chips = computed(() => [
-  { key: "ready", label: t("starterPacks.libraryTabs.chipFits", { count: count(isReadyRow) }) },
+const statItems = computed<StatItem[]>(() => [
+  {
+    key: "ready",
+    label: t("alert_library.statReady"),
+    value: count(isReadyRow),
+    icon: "check-circle",
+    tone: "success",
+    max: rows.value.length,
+    dataTest: "library-tab-stat-ready",
+  },
+  {
+    key: "missing",
+    label: t("alert_library.statNeedsData"),
+    value: count(isMissingRow),
+    icon: "sensors-off",
+    tone: "warning",
+    max: rows.value.length,
+    dataTest: "library-tab-stat-missing",
+  },
   {
     key: "installed",
-    label: t("starterPacks.libraryTabs.chipInstalled", { count: count(isInstalledRow) }),
+    label: t("starterPacks.libraryTabs.statInstalled"),
+    value: count(isInstalledRow),
+    icon: "check-circle-outline",
+    tone: "neutral",
+    max: rows.value.length,
+    dataTest: "library-tab-stat-installed",
   },
-  { key: "all", label: t("starterPacks.libraryTabs.chipAll", { count: rows.value.length }) },
+  // Never highlighted as a filter: it is the way out of one.
+  {
+    key: "all",
+    label: t("alert_library.statAll"),
+    value: rows.value.length,
+    icon: "widgets",
+    tone: "neutral",
+    dataTest: "library-tab-stat-all",
+  },
 ]);
 
-const visibleRows = computed(() => {
-  const term = search.value.trim().toLowerCase();
-  const found = term
-    ? rows.value.filter((row) => `${row.title} ${row.description}`.toLowerCase().includes(term))
-    : rows.value;
-  if (facet.value === "ready") return found.filter(isReadyRow);
-  if (facet.value === "installed") return found.filter(isInstalledRow);
-  return found;
-});
-const sections = computed(() =>
-  [
-    {
-      key: "fits",
-      title: t("starterPacks.libraryTabs.sectionFits"),
-      rows: visibleRows.value.filter(isReadyRow),
-    },
-    {
-      key: "missing",
-      title: t("starterPacks.libraryTabs.sectionMissing"),
-      rows: visibleRows.value.filter((row) => !row.ready),
-    },
-  ].filter((section) => section.rows.length),
-);
-
-const onChip = (key: unknown) => {
-  facet.value = (key as Facet) ?? "all";
+const onStatSelect = (key: string) => {
+  const next = key as Facet;
+  facet.value = next === "all" || facet.value === next ? "all" : next;
 };
+
+// Ready packs first, so the list opens on what can be set up now.
+const visibleRows = computed(() =>
+  rows.value.filter(FACET_TESTS[facet.value]).sort((a, b) => Number(b.ready) - Number(a.ready)),
+);
 
 const packItems = (record: PackInstallRecord) =>
   record.items.filter(({ kind }) => kind !== "folder");
-const madeCount = (record: PackInstallRecord) =>
-  packItems(record).filter(({ status }) => status === "created" || status === "existing").length;
+const isMade = ({ status }: PackInstallRecord["items"][number]) =>
+  status === "created" || status === "existing";
+const madeCount = (record: PackInstallRecord) => packItems(record).filter(isMade).length;
 const failedCount = (record: PackInstallRecord) =>
   packItems(record).filter(({ status }) => status === "failed").length;
-const stateBadge = (record: PackInstallRecord) => {
-  const failed = failedCount(record);
-  if (failed > 0) {
-    return {
-      variant: "error-soft" as const,
-      icon: "error",
-      label: t("starterPacks.libraryTabs.stateFailed", { count: failed }, failed),
-    };
-  }
-  if (record.status !== "complete") {
-    return {
-      variant: "warning-soft" as const,
-      icon: undefined,
-      label: t("starterPacks.libraryTabs.stateSettingUp"),
-    };
-  }
-  return {
-    variant: "success-soft" as const,
-    icon: undefined,
-    label: t("starterPacks.libraryTabs.statInstalled"),
-  };
-};
-const packTitles = computed(() => rows.value.map(({ title }) => title).join(", "));
-const openDashboard = (packId: string) => void flows.get(packId)?.land();
-const seeIncluded = (packId: string) => {
-  drawerPackId.value = packId;
-};
-const install = async (packId: string) => {
-  const flow = flows.get(packId);
-  if (!flow) return;
-  drawerPackId.value = packId;
-  if (await flow.install()) {
-    drawerPackId.value = null;
-    await flow.land();
-  }
-};
 
-const installedLine = (record: PackInstallRecord) => {
+const flowOf = (row: LibraryRow) => flows.get(row.pack.id)!;
+// The flow tracks one install, so its live state belongs only to that install's card.
+const isFlowRecord = (row: LibraryRow) =>
+  !!row.record && flowOf(row).record.value?.installId === row.record.installId;
+// A stored "installing" status may be a setup that died, so only a live run reads as busy.
+const isSettingUp = (row: LibraryRow) =>
+  flowOf(row).running.value && (!row.record || isFlowRecord(row));
+const alertsOff = (row: LibraryRow) => (isFlowRecord(row) ? flowOf(row).alertsOff.value : 0);
+const updateAvailable = (row: LibraryRow) =>
+  isFlowRecord(row) && !!updates.get(row.pack.id)?.available.value;
+const isComplete = (record: PackInstallRecord) =>
+  record.status === "complete" && failedCount(record) === 0;
+// Without the license the pack page explains what still gets created, so Set up waits there.
+const needsLicense = (row: LibraryRow) => !!row.pack.nativeView && !flowOf(row).licensed.value;
+const canUndoSetup = (row: LibraryRow) =>
+  !!row.record &&
+  isComplete(row.record) &&
+  isFlowRecord(row) &&
+  !flowOf(row).running.value &&
+  flowOf(row).canUndo.value;
+
+const shortDate = (us: number) =>
+  new Date(us / 1000).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+const installedLine = (record: PackInstallRecord): I18nText => {
   const date = raw(
-    record.installedAt
-      ? new Date(record.installedAt / 1000).toLocaleString()
-      : t("starterPacks.libraryTabs.unknownDate"),
+    record.installedAt ? shortDate(record.installedAt) : t("starterPacks.libraryTabs.unknownDate"),
   );
   return record.installedBy
     ? t("starterPacks.libraryTabs.installedBy", { who: raw(record.installedBy), date })
     : t("starterPacks.libraryTabs.installedByUnknown", { date });
 };
 
-const openPack = (packId: string) =>
+const join = (parts: I18nText[]) => raw(parts.join(" · "));
+
+const madeOfKind = (record: PackInstallRecord, kind: PackItemKind) =>
+  packItems(record).filter((item) => item.kind === kind && isMade(item)).length;
+
+const countsLine = (row: LibraryRow): I18nText => {
+  const flow = flowOf(row);
+  const made = row.record && !isSettingUp(row) ? row.record : null;
+  const parts: Array<[string, number]> = made
+    ? [
+        ["starterPacks.findMore.countDashboards", madeOfKind(made, "dashboard")],
+        ["starterPacks.countAlerts", madeOfKind(made, "alert")],
+        ["starterPacks.countViews", madeOfKind(made, "savedView")],
+      ]
+    : [
+        ["starterPacks.findMore.countDashboards", flow.dashboardCount.value],
+        ["starterPacks.countAlerts", flow.alertCount.value],
+        ["starterPacks.countViews", flow.viewCount.value],
+      ];
+  return join(
+    parts
+      .filter(([, value]) => value > 0)
+      .map(([key, value]) => t(key as "starterPacks.countAlerts", { count: value }, value)),
+  );
+};
+
+const installedMeta = (row: LibraryRow, record: PackInstallRecord): I18nText => {
+  if (isSettingUp(row)) {
+    return t("starterPacks.libraryTabs.settingUpMeta", {
+      made: madeCount(record),
+      total: packItems(record).length,
+    });
+  }
+  if (updateAvailable(row)) return t("starterPacks.libraryTabs.updateAvailable");
+  const parts = [installedLine(record)];
+  if (!isComplete(record)) {
+    parts.push(t("starterPacks.libraryTabs.statusIncomplete"));
+  } else if (alertsOff(row) > 0) {
+    parts.push(t("starterPacks.libraryTabs.alertsOff", { count: alertsOff(row) }, alertsOff(row)));
+  }
+  return join(parts);
+};
+
+const metaLine = (row: LibraryRow): I18nText => {
+  if (row.record) return installedMeta(row, row.record);
+  const live = flowOf(row).record.value;
+  if (isSettingUp(row)) {
+    return live
+      ? t("starterPacks.libraryTabs.settingUpMeta", {
+          made: madeCount(live),
+          total: packItems(live).length,
+        })
+      : t("starterPacks.libraryTabs.settingUpPlain");
+  }
+  const title = raw(row.title);
+  if (!row.ready) return t("starterPacks.libraryTabs.needsData", { title });
+  const parts = [
+    needsLicense(row)
+      ? t("starterPacks.libraryTabs.viewNeedsLicense", { title })
+      : t("starterPacks.libraryTabs.fits", { matched: row.matched, total: row.total }),
+  ];
+  if (!isAdmin.value) parts.push(t("starterPacks.libraryTabs.adminsOnly"));
+  return join(parts);
+};
+
+const openPack = (row: LibraryRow, query: Record<string, string> = {}) =>
   router
     .push({
       name: "starterPack",
-      params: { pack: packId },
-      query: { org_identifier: props.org },
+      params: { pack: row.pack.id },
+      query: { org_identifier: props.org, ...query },
     })
     .catch(() => {});
 
-const packRows = (pack: StarterPack, ready: boolean, live: PackInstallRecord[]): LibraryRow[] => {
-  const base = {
-    packId: pack.id,
-    title: t(pack.titleKey),
-    description: t(pack.descriptionKey),
-    ready,
-  };
-  // One row per install: the Installed filter owes every installer and date, not only the newest.
+// The pack page owns the Turn on drawer and opens it from this query.
+const turnOn = (row: LibraryRow) => openPack(row, { turnOn: "1" });
+
+const ingestionGuide = (row: LibraryRow) =>
+  router
+    .push({ name: row.pack.collectorRoute ?? "ingestion", query: { org_identifier: props.org } })
+    .catch(() => {});
+
+const seeIncluded = (row: LibraryRow) => {
+  drawerPackId.value = row.pack.id;
+};
+
+const install = async (row: LibraryRow) => {
+  const flow = flowOf(row);
+  drawerPackId.value = row.pack.id;
+  if (await flow.install()) {
+    drawerPackId.value = null;
+    await flow.land();
+  }
+};
+
+const retry = async (row: LibraryRow) => {
+  await flowOf(row).install();
+  await load();
+};
+
+const askUndoSetup = (row: LibraryRow) => {
+  undoPackId.value = row.pack.id;
+  undoSetupOpen.value = true;
+};
+
+const copyLink = (row: LibraryRow) => copyToClipboard(flowOf(row).packLink(), t);
+
+const packRows = (
+  pack: StarterPack,
+  match: { ready: boolean; matched: number; total: number },
+  live: PackInstallRecord[],
+): LibraryRow[] => {
+  const base = { pack, title: t(pack.titleKey), ...match };
+  // One card per install: the Installed filter owes every installer and date, not only the newest.
   if (!live.length) return [{ ...base, id: pack.id, record: null }];
   return live.map((record) => ({ ...base, id: record.installId, record }));
 };
-
-const dashboardRows = (
-  pack: StarterPack,
-  ready: Map<string, boolean>,
-  live: PackInstallRecord[],
-): LibraryRow[] =>
-  pack.dashboards.flatMap((dashboard): LibraryRow[] => {
-    const base = {
-      id: `${pack.id}/${dashboard.id}`,
-      packId: pack.id,
-      title: raw(dashboard.title),
-      description: t(pack.titleKey),
-      ready: ready.get(dashboard.id) ?? false,
-    };
-    const holders = live.filter(({ items }) =>
-      items.some(
-        ({ kind, itemId, status }) =>
-          kind === "dashboard" &&
-          itemId === dashboard.id &&
-          (status === "created" || status === "existing"),
-      ),
-    );
-    if (!holders.length) return [{ ...base, record: null }];
-    return holders.map((record) => ({
-      ...base,
-      id: `${base.id}/${record.installId}`,
-      record,
-    }));
-  });
 
 // A failed read only hides the notice, since it offers nothing to act on.
 let rawLogRun = 0;
@@ -279,11 +365,19 @@ const confirmUndo = async () => {
   repairs.value = await parser.active().catch(() => repairs.value);
 };
 
-const load = async () => {
-  state.value = "loading";
+// Alerts-off counts and updates are extras on a card; a failed read leaves the card as it is.
+const loadInstallState = async (pack: StarterPack) => {
+  const flow = flows.get(pack.id)!;
+  await flow.load();
+  if (flow.installed.value) await updates.get(pack.id)!.check();
+};
+
+// A quiet reload keeps the cards on screen, so the filter, scroll and a running setup stay put.
+const load = async ({ quiet = false }: { quiet?: boolean } = {}) => {
+  if (!quiet || state.value !== "ready") state.value = "loading";
   try {
     const streams = await readOrgStreams(props.org);
-    if (props.view === "packs") void loadRawLogs(streams.logs ?? new Map());
+    void loadRawLogs(streams.logs ?? new Map());
     const built = await Promise.all(
       STARTER_PACKS.map(async (pack) => {
         const [match, installs] = await Promise.all([
@@ -292,12 +386,18 @@ const load = async () => {
         ]);
         const live = installs.filter(({ status }) => status !== "removed");
         // Without a preview the flow counts every manifest item, not what install would create.
-        if (props.view === "packs" && match.ready && !live.length) {
-          void flows.get(pack.id)?.loadPreview();
-        }
-        return props.view === "packs"
-          ? packRows(pack, match.ready, live)
-          : dashboardRows(pack, match.dashboards, live);
+        if (match.ready && !live.length) void flows.get(pack.id)?.loadPreview();
+        if (live.length) void loadInstallState(pack).catch(() => {});
+        const verdicts = [...match.alerts.values(), ...match.dashboards.values()];
+        return packRows(
+          pack,
+          {
+            ready: match.ready,
+            matched: verdicts.filter(Boolean).length,
+            total: verdicts.length,
+          },
+          live,
+        );
       }),
     );
     rows.value = built.flat();
@@ -308,6 +408,7 @@ const load = async () => {
 };
 
 onMounted(() => void load());
+defineExpose({ refresh: () => load({ quiet: true }) });
 </script>
 
 <template>
@@ -321,224 +422,278 @@ onMounted(() => void load());
       :action-label="t('alert_library.retry')"
       action-icon="refresh"
       data-test="library-tab-error"
-      @action="load"
+      @action="load()"
     />
-    <template v-else>
-      <div class="flex flex-wrap items-center gap-2">
-        <OSearchInput
-          v-model="search"
-          class="min-w-48 flex-1"
-          :placeholder="t('starterPacks.libraryTabs.search')"
-          data-test="library-tab-search"
-        />
-        <OToggleGroup
-          :model-value="facet"
-          data-test="library-tab-chips"
-          @update:model-value="onChip"
-        >
-          <OToggleGroupItem
-            v-for="chip in chips"
-            :key="chip.key"
-            :value="chip.key"
-            size="sm"
-            :data-test="`library-tab-chip-${chip.key}`"
-          >
-            {{ chip.label }}
-          </OToggleGroupItem>
-        </OToggleGroup>
-      </div>
-      <div
-        v-if="state === 'loading'"
-        class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
-        data-test="library-tab-loading"
+    <div
+      v-else-if="state === 'loading'"
+      class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+      data-test="library-tab-loading"
+    >
+      <OCard
+        v-for="index in 3"
+        :key="index"
+        variant="outlined"
+        class="rounded-surface flex flex-col gap-2 p-3"
       >
+        <OSkeleton type="text" class="w-1/2" />
+        <OSkeleton type="text" class="w-3/4" />
+        <OSkeleton type="text" class="w-2/3" />
+      </OCard>
+    </div>
+    <template v-else>
+      <OStatStrip
+        :items="statItems"
+        selectable
+        :tray="false"
+        :selected-key="facet"
+        default-key="all"
+        data-test="library-tab-strip"
+        @select="onStatSelect"
+      />
+      <OEmptyState
+        v-if="visibleRows.length === 0"
+        size="block"
+        class="py-8"
+        illustration="no-results"
+        variant="no-results"
+        :title="t('starterPacks.libraryTabs.emptyTitle')"
+        :description="
+          facet === 'installed'
+            ? t('starterPacks.libraryTabs.emptyInstalled')
+            : t('starterPacks.libraryTabs.emptyFilter')
+        "
+        data-test="library-tab-empty"
+      />
+      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3" data-test="library-tab-grid">
         <OCard
-          v-for="index in 3"
-          :key="index"
+          v-for="row in visibleRows"
+          :key="row.id"
           variant="outlined"
           class="rounded-surface flex flex-col gap-2 p-3"
+          :data-test="`library-tab-row-${row.id}`"
         >
-          <OSkeleton type="text" class="w-1/2" />
-          <OSkeleton type="text" class="w-3/4" />
-          <OSkeleton type="text" class="w-2/3" />
-        </OCard>
-      </div>
-      <template v-else>
-        <OBanner
-          v-for="notice in unrepaired"
-          :key="notice.stream"
-          variant="default"
-          dense
-          inline-actions
-          :content="t('starterPacks.libraryTabs.rawLogs', { stream: raw(notice.stream) })"
-          :data-test="`library-tab-raw-log-${notice.stream}`"
-        >
-          <template v-if="isAdmin" #actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              :data-test="`library-tab-parse-${notice.stream}`"
-              @click="openParse(notice)"
+          <div class="flex items-center justify-between gap-2">
+            <span class="flex min-w-0 items-center gap-2">
+              <img
+                v-if="row.pack.logo"
+                :src="getImageURL(row.pack.logo)"
+                class="size-4 shrink-0 object-contain"
+                alt=""
+              />
+              <OIcon v-else name="inventory-2" size="sm" class="text-text-secondary" />
+              <OText class="text-text-heading truncate font-medium">{{ row.title }}</OText>
+            </span>
+            <OBadge
+              :variant="row.ready ? 'success-soft' : 'warning-soft'"
+              :data-test="`library-tab-state-${row.id}`"
             >
-              {{ t("starterPacks.libraryTabs.parse") }}
-            </OButton>
-          </template>
-        </OBanner>
-        <OBanner
-          v-for="record in repairs"
-          :key="record.installId"
-          :variant="record.status === 'complete' ? 'default' : 'warning'"
-          dense
-          inline-actions
-          :content="
-            t(
-              record.status === 'complete'
-                ? 'starterPacks.libraryTabs.parsing'
-                : 'starterPacks.libraryTabs.parsingIncomplete',
-              { stream: raw(repairStream(record)) },
-            )
-          "
-          :data-test="`library-tab-parsing-${repairStream(record)}`"
-        >
-          <template v-if="isAdmin" #actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              :data-test="`library-tab-parse-undo-${repairStream(record)}`"
-              @click="openUndo(record)"
-            >
-              {{ t("starterPacks.parse.undo") }}
-            </OButton>
-          </template>
-        </OBanner>
-        <OEmptyState
-          v-if="visibleRows.length === 0 && search.trim()"
-          size="block"
-          class="py-8"
-          illustration="no-results"
-          variant="no-results"
-          :title="t('starterPacks.libraryTabs.noMatchTitle', { search: raw(search.trim()) })"
-          :description="t('starterPacks.libraryTabs.noMatchBody', { packs: raw(packTitles) })"
-          :action-label="t('starterPacks.libraryTabs.clearSearch')"
-          action-icon="close"
-          data-test="library-tab-empty"
-          @action="search = ''"
-        />
-        <OEmptyState
-          v-else-if="visibleRows.length === 0"
-          size="block"
-          class="py-8"
-          illustration="no-results"
-          variant="no-results"
-          :title="t('starterPacks.libraryTabs.emptyTitle')"
-          :description="
-            facet === 'installed'
-              ? t('starterPacks.libraryTabs.emptyInstalled')
-              : t('starterPacks.libraryTabs.emptyFilter')
-          "
-          data-test="library-tab-empty"
-        />
-        <section
-          v-for="section in sections"
-          :key="section.key"
-          class="flex flex-col gap-2"
-          :data-test="`library-tab-section-${section.key}`"
-        >
-          <OText class="text-text-heading font-medium">{{ section.title }}</OText>
-          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <OCard
-              v-for="row in section.rows"
-              :key="row.id"
-              variant="outlined"
-              class="rounded-surface flex flex-col gap-2 p-3"
-              :data-test="`library-tab-row-${row.id}`"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <span class="flex min-w-0 items-center gap-2">
-                  <OIcon name="hub" size="sm" class="text-text-secondary" />
-                  <OText class="text-text-heading truncate font-medium">{{ row.title }}</OText>
-                </span>
-                <OBadge
-                  v-if="row.record"
-                  :variant="stateBadge(row.record).variant"
-                  :icon="stateBadge(row.record).icon"
-                  :data-test="`library-tab-state-${row.id}`"
-                >
-                  {{ stateBadge(row.record).label }}
-                </OBadge>
-              </div>
-              <OText class="text-text-body text-sm">{{ row.description }}</OText>
-              <OText v-if="row.record" variant="meta">
-                <span v-if="view === 'packs'" :data-test="`library-tab-items-${row.id}`"
-                  >{{
-                    t("starterPacks.libraryTabs.itemsInstalled", {
-                      made: madeCount(row.record),
-                      total: packItems(row.record).length,
-                    })
-                  }}<template v-if="failedCount(row.record)"
-                    >{{ raw(" · ")
-                    }}{{
-                      t(
-                        "starterPacks.libraryTabs.itemsFailed",
-                        { count: failedCount(row.record) },
-                        failedCount(row.record),
-                      )
-                    }}</template
-                  >{{ raw(" · ") }}</span
-                ><span :data-test="`library-tab-installed-${row.id}`"
-                  >{{ installedLine(row.record)
-                  }}<template v-if="row.record.status !== 'complete'"
-                    >{{ raw(" · ") }}{{ t("starterPacks.libraryTabs.statusIncomplete") }}</template
-                  ></span
-                >
-              </OText>
-              <div class="mt-auto flex flex-wrap items-center gap-2">
-                <template v-if="view === 'dashboards' || row.record">
-                  <OButton
-                    variant="outline"
-                    size="sm"
-                    :data-test="`library-tab-open-${row.id}`"
-                    @click="openPack(row.packId)"
-                  >
-                    {{
-                      view === "packs"
-                        ? t("starterPacks.libraryTabs.openPack")
-                        : t("starterPacks.libraryTabs.open")
-                    }}
-                  </OButton>
-                  <OButton
-                    v-if="view === 'packs'"
-                    variant="ghost-primary"
-                    size="sm"
-                    :data-test="`library-tab-open-dashboard-${row.id}`"
-                    @click="openDashboard(row.packId)"
-                  >
-                    {{ t("starterPacks.libraryTabs.openDashboard") }}
-                  </OButton>
-                </template>
-                <template v-else>
-                  <OButton
-                    variant="primary"
-                    size="sm"
-                    :data-test="`library-tab-install-${row.id}`"
-                    @click="install(row.packId)"
-                  >
-                    {{ t("starterPacks.libraryTabs.setUpPack", { title: raw(row.title) }) }}
-                  </OButton>
-                  <OButton
-                    variant="ghost-primary"
-                    size="sm"
-                    :data-test="`library-tab-see-${row.id}`"
-                    @click="seeIncluded(row.packId)"
-                  >
-                    {{ t("starterPacks.libraryTabs.whatGetsCreated") }}
-                  </OButton>
-                </template>
-              </div>
-            </OCard>
+              {{ row.ready ? t("alert_library.statReady") : t("alert_library.statNeedsData") }}
+            </OBadge>
           </div>
-        </section>
-      </template>
+          <OText
+            v-if="countsLine(row)"
+            class="text-text-body text-sm"
+            :data-test="`library-tab-counts-${row.id}`"
+            >{{ countsLine(row) }}</OText
+          >
+          <OText variant="meta" :data-test="`library-tab-meta-${row.id}`">{{
+            metaLine(row)
+          }}</OText>
+          <div class="mt-auto flex min-w-0 items-center gap-2">
+            <template v-if="isSettingUp(row)">
+              <OButton variant="primary" size="sm" loading disabled>
+                {{ t("starterPacks.libraryTabs.settingUpBtn") }}
+              </OButton>
+            </template>
+            <template v-else-if="row.record || !row.ready">
+              <OButton
+                variant="outline"
+                size="sm"
+                :data-test="`library-tab-open-${row.id}`"
+                @click="openPack(row)"
+              >
+                {{ t("starterPacks.libraryTabs.openPack") }}
+              </OButton>
+              <OButton
+                v-if="!row.record"
+                variant="ghost-primary"
+                size="sm"
+                :data-test="`library-tab-guide-${row.id}`"
+                @click="ingestionGuide(row)"
+              >
+                {{ t("starterPacks.libraryTabs.ingestionGuide") }}
+              </OButton>
+              <OButton
+                v-else-if="failedCount(row.record) > 0 && flowOf(row).canManage.value"
+                variant="ghost-primary"
+                size="sm"
+                :data-test="`library-tab-retry-${row.id}`"
+                @click="retry(row)"
+              >
+                {{
+                  t(
+                    "starterPacks.libraryTabs.retryItems",
+                    { count: failedCount(row.record) },
+                    failedCount(row.record),
+                  )
+                }}
+              </OButton>
+              <OButton
+                v-else-if="updateAvailable(row)"
+                variant="ghost-primary"
+                size="sm"
+                :data-test="`library-tab-review-update-${row.id}`"
+                @click="openPack(row)"
+              >
+                {{ t("starterPacks.libraryTabs.reviewUpdate") }}
+              </OButton>
+              <OButton
+                v-else-if="
+                  isComplete(row.record) && alertsOff(row) > 0 && flowOf(row).canManage.value
+                "
+                variant="ghost-primary"
+                size="sm"
+                :data-test="`library-tab-turn-on-${row.id}`"
+                @click="turnOn(row)"
+              >
+                {{
+                  t(
+                    "starterPacks.libraryTabs.turnOnAlerts",
+                    { count: alertsOff(row) },
+                    alertsOff(row),
+                  )
+                }}
+              </OButton>
+              <OButton
+                v-else-if="canUndoSetup(row)"
+                variant="ghost-primary"
+                size="sm"
+                :data-test="`library-tab-undo-${row.id}`"
+                @click="askUndoSetup(row)"
+              >
+                {{ t("starterPacks.libraryTabs.undoSetup") }}
+              </OButton>
+            </template>
+            <OButton
+              v-else-if="!isAdmin"
+              variant="outline"
+              size="sm"
+              icon-left="content-copy"
+              :data-test="`library-tab-copy-link-${row.id}`"
+              @click="copyLink(row)"
+            >
+              {{ t("starterPacks.copyLink") }}
+            </OButton>
+            <template v-else-if="needsLicense(row)">
+              <OButton
+                variant="outline"
+                size="sm"
+                :data-test="`library-tab-open-${row.id}`"
+                @click="openPack(row)"
+              >
+                {{ t("starterPacks.libraryTabs.openPack") }}
+              </OButton>
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                class="shrink-0"
+                :data-test="`library-tab-see-${row.id}`"
+                @click="seeIncluded(row)"
+              >
+                {{ t("starterPacks.libraryTabs.whatGetsCreated") }}
+              </OButton>
+            </template>
+            <template v-else>
+              <OButton
+                variant="primary"
+                size="sm"
+                class="min-w-0"
+                :title="t('starterPacks.libraryTabs.setUpPack', { title: raw(row.title) })"
+                :data-test="`library-tab-install-${row.id}`"
+                @click="install(row)"
+              >
+                <span class="truncate">{{
+                  t("starterPacks.libraryTabs.setUpPack", { title: raw(row.title) })
+                }}</span>
+              </OButton>
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                class="shrink-0"
+                :data-test="`library-tab-see-${row.id}`"
+                @click="seeIncluded(row)"
+              >
+                {{ t("starterPacks.libraryTabs.whatGetsCreated") }}
+              </OButton>
+            </template>
+          </div>
+        </OCard>
+        <template v-if="facet === 'all'">
+          <OCard
+            v-for="notice in unrepaired"
+            :key="notice.stream"
+            variant="outlined"
+            class="rounded-surface flex flex-col gap-2 p-3"
+            :data-test="`library-tab-raw-log-${notice.stream}`"
+          >
+            <span class="flex min-w-0 items-center gap-2">
+              <OIcon name="inventory-2" size="sm" class="text-text-secondary" />
+              <OText class="text-text-heading truncate font-medium">{{
+                t("starterPacks.libraryTabs.nginxLogs")
+              }}</OText>
+            </span>
+            <OText variant="meta">{{
+              t("starterPacks.libraryTabs.rawLogs", { stream: raw(notice.stream) })
+            }}</OText>
+            <div v-if="isAdmin" class="mt-auto flex flex-wrap items-center gap-2">
+              <OButton
+                variant="outline"
+                size="sm"
+                :data-test="`library-tab-parse-${notice.stream}`"
+                @click="openParse(notice)"
+              >
+                {{ t("starterPacks.libraryTabs.parse") }}
+              </OButton>
+            </div>
+          </OCard>
+          <OCard
+            v-for="record in repairs"
+            :key="record.installId"
+            variant="outlined"
+            class="rounded-surface flex flex-col gap-2 p-3"
+            :data-test="`library-tab-parsing-${repairStream(record)}`"
+          >
+            <span class="flex min-w-0 items-center gap-2">
+              <OIcon name="inventory-2" size="sm" class="text-text-secondary" />
+              <OText class="text-text-heading truncate font-medium">{{
+                t("starterPacks.libraryTabs.nginxLogs")
+              }}</OText>
+            </span>
+            <OText
+              variant="meta"
+              :class="record.status === 'complete' ? '' : 'text-text-warning'"
+              >{{
+                t(
+                  record.status === "complete"
+                    ? "starterPacks.libraryTabs.parsing"
+                    : "starterPacks.libraryTabs.parsingIncomplete",
+                  { stream: raw(repairStream(record)) },
+                )
+              }}</OText
+            >
+            <div v-if="isAdmin" class="mt-auto flex flex-wrap items-center gap-2">
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                :data-test="`library-tab-parse-undo-${repairStream(record)}`"
+                @click="openUndo(record)"
+              >
+                {{ t("starterPacks.parse.undo") }}
+              </OButton>
+            </div>
+          </OCard>
+        </template>
+      </div>
     </template>
     <StarterPackDrawer
       v-if="drawerFlow"
@@ -546,6 +701,14 @@ onMounted(() => void load());
       :flow="drawerFlow"
       :clusters="[]"
       @update:open="drawerPackId = null"
+      @done="load({ quiet: true })"
+    />
+    <StarterPackUndoDialog
+      v-if="undoPackFlow"
+      v-model:open="undoSetupOpen"
+      :flow="undoPackFlow"
+      mode="undo"
+      @done="load()"
     />
     <StarterPackParseDialog
       v-if="parsing"

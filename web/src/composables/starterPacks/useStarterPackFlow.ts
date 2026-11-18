@@ -195,6 +195,11 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   };
 
   const nameOf = (itemId: string) => preview.value?.names[itemId] ?? itemId;
+  /** The library title of an installed alert, or its saved name until the preview has loaded. */
+  const alertTitle = (alertId: string, fallback: string) => {
+    const item = record.value?.items.find(({ kind, id }) => kind === "alert" && id === alertId);
+    return (item && preview.value?.names[item.itemId]) || fallback;
+  };
 
   const planned = (kind: PackRecordItem["kind"]) =>
     (preview.value?.items ?? []).filter((item) => item.kind === kind && item.status !== "existing");
@@ -227,12 +232,12 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     () => record.value?.items.find(isOpenable) ?? preview.value?.items.find(isOpenable),
   );
 
-  /** The pack's first dashboard, so the user sees the installed data at once. */
+  /** The pack's first dashboard, or its page when it made none, so the user sees the result at once. */
   const land = async () => {
     const query: Record<string, string> = { org_identifier: org };
     const item = dashboardItem.value;
     if (!item?.id) {
-      await router.push({ name: "dashboards", query }).catch(() => {});
+      await router.push(packRoute.value).catch(() => {});
       return;
     }
     query.dashboard = item.id;
@@ -314,6 +319,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
 
   return {
     alertCount,
+    alertTitle,
     alertsOff,
     alertsOn,
     alertsRoute,
@@ -324,6 +330,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     chooseField,
     chooseStream,
     dashboardCount,
+    dashboardItem,
     enabledAlertIds,
     failed,
     forbidden,

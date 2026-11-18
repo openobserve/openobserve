@@ -84,7 +84,7 @@ const isSilent = (alert: PackAlert, since: number) =>
   !alert.destinations?.length &&
   (alert.last_triggered_at ?? 0) >= since;
 
-// A pack counts as covered only once one of its alerts is on, since pack alerts install silent.
+// A pack with alerts counts as covered only once one is on, since pack alerts install silent.
 const gapOf = async (
   pack: StarterPack,
   force: boolean,
@@ -100,7 +100,10 @@ const gapOf = async (
   const since = Date.now() * 1000 - WEEK_US;
   const quiet = alerts.filter((alert) => isSilent(alert, since)).length;
   return {
-    gap: alerts.some((alert) => alert.enabled) ? null : { pack, installed: true },
+    gap:
+      alerts.length === 0 || alerts.some((alert) => alert.enabled)
+        ? null
+        : { pack, installed: true },
     silent: quiet,
   };
 };
@@ -236,6 +239,7 @@ const open = (pack: StarterPack) =>
       :flow="drawerFlow"
       :clusters="[]"
       @update:open="drawerPackId = null"
+      @done="loadGaps(true)"
     />
   </div>
 </template>

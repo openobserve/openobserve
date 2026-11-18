@@ -117,6 +117,14 @@ describe("StarterPackCoverageLine", () => {
     );
   });
 
+  it("shows no row for an installed pack whose install made no alerts", async () => {
+    fake.ready = { kubernetes: true };
+    fake.installs = { kubernetes: [{ status: "complete" }] };
+    fake.alerts = { kubernetes: [] };
+    const wrapper = await mountLine();
+    expect(wrapper.find('[data-test="starter-pack-coverage-row-kubernetes"]').exists()).toBe(false);
+  });
+
   it("warns when pack alerts fired this week with no destination", async () => {
     fake.ready = { kubernetes: true };
     fake.installs = { kubernetes: [{ status: "complete" }] };

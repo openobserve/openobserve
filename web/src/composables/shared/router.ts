@@ -209,6 +209,7 @@ const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinatio
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
 const StarterPackPage = () => import("@/views/AlertLibrary/StarterPackPage.vue");
+const StarterPacksPage = () => import("@/views/StarterPacks/StarterPacksPage.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
@@ -1080,10 +1081,19 @@ const useRoutes = () => {
     ...(STARTER_PACKS_ENABLED
       ? [
           {
-            path: "alert-library/packs/:pack",
+            path: "starter-packs",
+            name: "starterPacks",
+            component: StarterPacksPage,
+            meta: { titleKey: "menu.starterPacks", licenseFeature: "alerts" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "starter-packs/:pack",
             name: "starterPack",
             component: StarterPackPage,
-            meta: { titleKey: "alert_library.header", licenseFeature: "alerts" },
+            meta: { titleKey: "menu.starterPacks", licenseFeature: "alerts" },
             beforeEnter(to: any, from: any, next: any) {
               routeGuard(to, from, next);
             },
