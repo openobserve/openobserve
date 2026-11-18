@@ -5128,6 +5128,7 @@
     "storageSize": "Принятые данные",
     "compressedSize": "Сжатый размер",
     "schemaHeader": "Детали потока",
+    "searchFieldOrIndexType": "Поиск поля или типа индекса",
     "indexTypeOptions": {
       "fullTextSearch": "Полнотекстовый поиск",
       "secondaryIndex": "Вторичный индекс",

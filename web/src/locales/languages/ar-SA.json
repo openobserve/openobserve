@@ -5128,6 +5128,7 @@
     "storageSize": "البيانات المستوعدة",
     "compressedSize": "الحجم المضغوط",
     "schemaHeader": "تفاصيل التدفق",
+    "searchFieldOrIndexType": "البحث عن حقل أو نوع فهرس",
     "indexTypeOptions": {
       "fullTextSearch": "البحث الكامل",
       "secondaryIndex": "المؤشر الثانوي",

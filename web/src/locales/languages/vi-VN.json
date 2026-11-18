@@ -5128,6 +5128,7 @@
     "storageSize": "Dữ liệu đã nhập",
     "compressedSize": "Kích thước nén",
     "schemaHeader": "Chi tiết stream",
+    "searchFieldOrIndexType": "Tìm trường hoặc loại chỉ mục",
     "indexTypeOptions": {
       "fullTextSearch": "Tìm kiếm toàn văn",
       "secondaryIndex": "Chỉ mục phụ",

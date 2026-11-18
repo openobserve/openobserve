@@ -5128,6 +5128,7 @@
     "storageSize": "采集数据",
     "compressedSize": "实际存储",
     "schemaHeader": "数据流详情",
+    "searchFieldOrIndexType": "搜索字段或索引类型",
     "indexTypeOptions": {
       "fullTextSearch": "全文搜索",
       "secondaryIndex": "二级索引",
