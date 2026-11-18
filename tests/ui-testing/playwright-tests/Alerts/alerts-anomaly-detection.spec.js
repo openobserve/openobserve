@@ -900,6 +900,34 @@ test.describe('Anomaly Detection', () => {
         await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible({ timeout: 20000 });
       });
 
+      // D18: Logs opens the detector's aggregate per bucket; the banner switches to the raw rows and back.
+      test('the Logs link opens the aggregate and the banner switches to raw rows and back', {
+        tag: ['@anomaly', '@P1', '@functional', '@all'],
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'aggregate');
+        await pm.anomalyDetectionPage.openDetail(name);
+        await pm.anomalyDetectionPage.waitForSummaryStrip();
+        await pm.anomalyDetectionPage.openDataFromSummaryStrip('/logs');
+
+        const banner = pm.anomalyDetectionPage;
+        await expect(banner.getOriginBannerLocator('logs')).toBeVisible({ timeout: 20000 });
+        expect(banner.urlQueryParamSql('query')).toMatch(/^SELECT histogram\(_timestamp, '[^']+'\) AS time_bucket, .+ AS value/);
+        const toggle = banner.getOriginBannerPartLocator('logs', 'switch-view');
+        await expect(toggle).toHaveText('Show raw rows');
+
+        await banner.switchLogsOriginView();
+        expect(banner.urlQueryParamSql('query')).toMatch(/^SELECT \* FROM "/);
+        await expect(toggle).toHaveText('Show aggregate', { timeout: 20000 });
+        await expect(banner.getOriginBannerLocator('logs')).toBeVisible();
+
+        // After a refresh the switch still works from the rebuilt URL.
+        await page.reload();
+        await expect(toggle).toHaveText('Show aggregate', { timeout: 30000 });
+        await banner.switchLogsOriginView();
+        expect(banner.urlQueryParamSql('query')).toMatch(/AS time_bucket/);
+        await expect(toggle).toHaveText('Show raw rows', { timeout: 20000 });
+      });
+
       test('closing the Logs banner frees its slot and drops its URL parameters', {
         tag: ['@anomaly', '@P2', '@functional', '@all'],
       }, async ({ page }) => {

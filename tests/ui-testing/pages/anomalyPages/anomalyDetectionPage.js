@@ -1038,9 +1038,30 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.originBanner(page));
     }
 
-    /** @param {'logs'|'traces'|'metrics'} page @param {'title'|'values'|'back'|'close'|'filter-not-applied'} part */
+    /** @param {'logs'|'traces'|'metrics'} page @param {'title'|'values'|'back'|'close'|'filter-not-applied'|'switch-view'} part */
     getOriginBannerPartLocator(page, part) {
         return this.page.locator(this.selectors.originBannerPart(page, part));
+    }
+
+    /** A base64 URL parameter of the current page as SQL; the server encodes `+/=` as `-_.`. */
+    urlQueryParamSql(key) {
+        const value = new URL(this.page.url()).searchParams.get(key);
+        if (!value) return '';
+        const b64 = value.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
+        return Buffer.from(b64, 'base64').toString('utf8');
+    }
+
+    /** Clicks the Logs banner's "Show raw rows" / "Show aggregate" and waits for the query swap. */
+    async switchLogsOriginView() {
+        const before = this.urlQueryParamSql('query');
+        await this.getOriginBannerPartLocator('logs', 'switch-view').click();
+        await this.page.waitForFunction(
+            (prev) => new URL(window.location.href).searchParams.get('anomaly_alt_query') !== null
+                && new URL(window.location.href).searchParams.get('query') !== prev,
+            new URL(this.page.url()).searchParams.get('query'),
+            { timeout: 20000 },
+        );
+        return before;
     }
 
     // Cleanup
