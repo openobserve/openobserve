@@ -931,6 +931,8 @@ test.describe('Anomaly Detection', () => {
         await expect(pm.anomalyDetectionPage.getOriginBannerPartLocator('metrics', 'title')).toContainText(name);
         // The /metrics guard folds the editor parameters into one blob and must keep the banner's.
         expect(bannerParams(page.url())).toContain('from_anomaly');
+        // AC1.4: the seeded SQL and axes run, and the line chart draws.
+        await pm.metricsExplorerPage.expectChartDrawn();
       });
     });
   });
