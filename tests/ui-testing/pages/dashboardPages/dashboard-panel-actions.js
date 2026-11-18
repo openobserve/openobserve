@@ -682,13 +682,6 @@ export default class DashboardactionPage {
     );
   }
 
-  async getChartXAxisType() {
-    return this.page
-      .locator('[data-test="chart-renderer"]')
-      .first()
-      .evaluate((host) => host.__vueParentComponent?.setupState?.chart?.getOption()?.xAxis?.[0]?.type ?? null);
-  }
-
   /**
    * Verify that actual data is plotted on the chart canvas.
    * Checks two things:

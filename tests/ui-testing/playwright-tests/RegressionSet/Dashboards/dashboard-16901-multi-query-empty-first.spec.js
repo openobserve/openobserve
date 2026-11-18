@@ -31,7 +31,7 @@ test.describe("Dashboard multi-query panel with an empty query", () => {
     await page.waitForLoadState("networkidle");
     await expect(actions.getNoDataLocator()).toBeHidden();
     await actions.verifyChartHasData(expect);
-    await expect.poll(() => actions.getChartXAxisType()).toBe("time");
+    await expect.poll(async () => (await actions.getChartOptionSnapshots())[0]?.xAxis[0]?.type).toBe("time");
     testLogger.info("Chart stayed rendered with empty first query");
 
     await actions.savePanel();

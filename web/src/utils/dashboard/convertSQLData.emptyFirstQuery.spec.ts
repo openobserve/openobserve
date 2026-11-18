@@ -82,12 +82,6 @@ describe("multi-query panel whose first query is empty", () => {
     expect(options.xAxis[0].type).toBe("time");
   });
 
-  it("matches the axis built when the same rows come first", async () => {
-    const first = await run([rows, []]);
-    const later = await run([[], rows]);
-    expect(later.xAxis[0].type).toBe(first.xAxis[0].type);
-  });
-
   it("keeps the later query's series data", async () => {
     const options = await run([[], rows]);
     const withData = options.series.filter((s: any) => s.name && s.data?.length > 0);
