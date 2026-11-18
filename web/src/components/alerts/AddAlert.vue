@@ -2524,6 +2524,9 @@ export default defineComponent({
       }
       intentPaths.clear();
       appliedIntent.value = null;
+      // The ready-made query's check result belongs to it, not to the restored builder.
+      alertForm.sqlQueryErrorMsg.value = "";
+      void nextTick(() => alertForm.previewAlertRef.value?.refreshData?.());
     };
     const holdBaseline = () => {
       if (!appliedIntent.value) intentBaseline = cloneDeep(alertForm.formData.value);

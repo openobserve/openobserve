@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :name="suggestion.fit === 'fits' ? 'check-circle' : 'help-outline'"
         size="xs"
         class="shrink-0"
-        :class="suggestion.fit === 'fits' ? 'text-success' : 'text-text-secondary'"
+        :class="suggestion.fit === 'fits' ? 'text-status-positive' : 'text-text-secondary'"
       />
       <OTruncatedText class="min-w-0" data-test="add-alert-suggestion-card-why">{{
         whyLine

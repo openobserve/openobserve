@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="m-0 min-w-0 text-xs"
           :class="
             area.state === 'unavailable' || area.state === 'failed'
-              ? 'text-warning'
+              ? 'text-status-warning-text'
               : 'text-text-secondary'
           "
           :role="area.state === 'loading' ? 'status' : undefined"
