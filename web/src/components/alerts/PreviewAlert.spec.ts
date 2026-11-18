@@ -2921,6 +2921,25 @@ describe("PreviewAlert - debounced props refresh", () => {
     w.unmount();
   });
 
+  it("draws a first query typed into an empty editor once, never the last mode's chart", async () => {
+    const builder =
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "logs"';
+    const w = await mountComp({ query: builder });
+    await vi.advanceTimersByTimeAsync(2000);
+    await w.setProps({ selectedTab: "sql", query: "" });
+    await w.setProps({ query: "SELECT a FROM logs" });
+    const drawn = () =>
+      w.findComponent({ name: "PanelSchemaRenderer" }).exists()
+        ? w.findComponent({ name: "PanelSchemaRenderer" }).props("panelSchema")?.queries?.[0]?.query
+        : null;
+    expect(drawn()).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(800);
+    await flushPromises();
+    expect(drawn()).toBe("SELECT a FROM logs");
+    w.unmount();
+  });
+
   it("drops a pending refresh on unmount", async () => {
     const w = await mountSqlSettled();
 

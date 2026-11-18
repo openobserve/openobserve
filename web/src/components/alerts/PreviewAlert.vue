@@ -30,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <!-- Chart -->
-    <div data-test="alert-preview-chart" class="preview-alert-chart min-h-0 flex-1 px-4 pb-4">
+    <div
+      data-test="alert-preview-chart"
+      class="preview-alert-chart relative min-h-0 flex-1 px-4 pb-4"
+    >
       <!-- Empty query placeholder -->
-      <div
-        v-if="!query && (selectedTab === 'sql' || selectedTab === 'promql')"
-        class="flex h-full flex-col items-center justify-center gap-2"
-      >
+      <div v-if="awaitsQuery" class="flex h-full flex-col items-center justify-center gap-2">
         <OIcon name="edit" size="xl" class="opacity-20" />
         <span class="text-text-secondary text-sm">{{ t("alerts.writeQueryToSeePreview") }}</span>
       </div>
@@ -228,7 +228,7 @@ onBeforeMount(() => {
 
 const chartPanelRef = ref(null);
 const panelRendererRef = ref(null);
-const chartData = ref({});
+const chartData = ref<Record<string, any> | null>({});
 const selectedTimeObj = ref({});
 const evaluationStatus = ref<{
   wouldTrigger: boolean;
@@ -314,6 +314,21 @@ const previewRangeOptions = computed(() => [
   { label: t("alerts.form.preview.hours12"), value: "12h" },
   { label: t("alerts.form.preview.hours24"), value: "24h" },
 ]);
+
+const writesOwnQuery = computed(
+  () => props.selectedTab === "sql" || props.selectedTab === "promql",
+);
+// The renderer remounts after the prompt, so a chart kept from the last query would run that query first.
+watch(
+  () => writesOwnQuery.value && !props.query,
+  (empty) => {
+    if (!empty) return;
+    chartData.value = null;
+    previewError.value = null;
+    settledPreviewError.value = null;
+  },
+);
+const awaitsQuery = computed(() => writesOwnQuery.value && (!props.query || !chartData.value));
 
 // Computed property to determine if histogram should be used
 // For SQL/custom with aggregations (GROUP BY), we should use histogram
