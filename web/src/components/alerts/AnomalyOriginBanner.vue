@@ -15,14 +15,7 @@
 
 <!-- Logs, Traces and Metrics opened from an anomaly link; the values come from the link, so they stay the alert's. -->
 <template>
-  <OBanner
-    v-if="link"
-    variant="info"
-    icon="insights"
-    dense
-    inline-actions
-    :data-test="dataTest"
-  >
+  <OBanner v-if="link" variant="info" icon="insights" dense inline-actions :data-test="dataTest">
     <div class="flex min-w-0 flex-col gap-0.5">
       <span class="text-text-heading text-sm font-semibold" :data-test="`${dataTest}-title`">
         {{ title }}

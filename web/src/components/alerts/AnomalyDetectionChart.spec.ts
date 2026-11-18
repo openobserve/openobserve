@@ -562,24 +562,32 @@ describe("AnomalyDetectionChart", () => {
       wrapper = await mountChart({ ...ANOMALY, is_trained: true, current_model_version: 0 });
       expect(explore).toHaveBeenCalledTimes(1);
       expect(explore.mock.calls[0][2]).toEqual({});
-      expect(
-        wrapper.find('[data-test="alerts-anomalysummarystrip-state-none"]').text(),
-      ).toBe("No anomalies in the last 7 days");
+      expect(wrapper.find('[data-test="alerts-anomalysummarystrip-state-none"]').text()).toBe(
+        "No anomalies in the last 7 days",
+      );
     });
 
     it("keeps the chart when the endpoint fails, and Retry reads it again", async () => {
       explore.mockRejectedValue({ response: { status: 500 } });
       wrapper = await mountChart();
-      expect(wrapper.find('[data-test="alerts-anomalysummarystrip-error"]').exists()).toBe(true);
+      // A 5xx is retried twice with backoff before the strip shows the error.
+      await vi.waitFor(
+        () =>
+          expect(wrapper!.find('[data-test="alerts-anomalysummarystrip-error"]').exists()).toBe(
+            true,
+          ),
+        { timeout: 8000, interval: 100 },
+      );
       expect(wrapper.find('[data-test="alerts-anomalydetectionchart-metric-chart"]').exists()).toBe(
         true,
       );
+      const before = explore.mock.calls.length;
       exploreReturns();
       await wrapper.find('[data-test="alerts-anomalysummarystrip-retry"]').trigger("click");
       await settle();
-      expect(explore).toHaveBeenCalledTimes(2);
+      expect(explore).toHaveBeenCalledTimes(before + 1);
       expect(wrapper.find('[data-test="alerts-anomalysummarystrip-error"]').exists()).toBe(false);
-    });
+    }, 15000);
 
     it("re-reads the strip when the chart range changes", async () => {
       wrapper = await mountChart();

@@ -21,13 +21,7 @@ import { anomalyIntervalMs, formatReading } from "@/utils/alerts/anomalyBandChar
 const STALE_INTERVALS = 3;
 
 export type AnomalyStripState =
-  | "ongoing"
-  | "back_in_range"
-  | "paused"
-  | "no_recent_runs"
-  | "no_new_data"
-  | "learning"
-  | "none";
+  "ongoing" | "back_in_range" | "paused" | "no_recent_runs" | "no_new_data" | "learning" | "none";
 
 export interface AnomalyStripView {
   state: AnomalyStripState;
@@ -98,9 +92,7 @@ export function anomalyStripView(
   if (!config.enabled) return { ...base, state: "paused" };
   if (res.state === "ongoing") {
     const incomplete =
-      win !== null &&
-      config.scheduleMs !== null &&
-      nowUs - win.end_us < config.scheduleMs * 1000;
+      win !== null && config.scheduleMs !== null && nowUs - win.end_us < config.scheduleMs * 1000;
     return { ...base, state: "ongoing", incomplete, summary };
   }
   if (noRecentRuns) return { ...base, state: "no_recent_runs" };

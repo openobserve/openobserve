@@ -206,11 +206,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
 import { anomalyExploreQuery } from "@/services/anomaly_detection.queries";
 import type { AnomalyExploreResponse } from "@/types/anomalyExplore";
-import {
-  formatUtcHm,
-  openAppUrl,
-  pageModelVersion,
-} from "@/utils/alerts/anomalyExploreView";
+import { formatUtcHm, openAppUrl, pageModelVersion } from "@/utils/alerts/anomalyExploreView";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { chartColor } from "@/utils/chartTheme";
 import { getDefaultDashboardPanelData } from "@/utils/alerts/aggregationPreviewQuery";
