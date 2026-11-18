@@ -1995,6 +1995,8 @@ describe("confirm jobs in uptime", () => {
         "GROUP BY CASE WHEN run_id IS NULL OR run_id = '' THEN execution_id ELSE run_id END, location, device, engine, environment",
       );
       expect(sql).toContain("environment = 'prod'");
+      // A row without trigger_type (older probes) counts as an original row.
+      expect(sql).toContain("WHEN (trigger_type IS NULL OR trigger_type != 'confirm') AND status");
       // Environment stays in the slot key when the chart does not split, so a run that tested
       // two environments counts one result for each.
       const unsplit = buildSlotUptimeSql("m", "1 minute", fields)!;

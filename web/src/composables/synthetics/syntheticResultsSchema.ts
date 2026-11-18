@@ -1843,6 +1843,8 @@ export function buildSlotUptimeSql(
   const up = `${F.status} IN ('${STATUS_VALUES.passed}', '${STATUS_VALUES.warning}')`;
   const tested = `${F.status} != '${STATUS_VALUES.error}'`;
   const confirm = `trigger_type = 'confirm'`;
+  // Older probes wrote no trigger_type, and `NOT (NULL = 'confirm')` is NULL, so name NULL here.
+  const original = `(trigger_type IS NULL OR trigger_type != 'confirm')`;
   return `SELECT bucket_us${envCol},
   SUM(CASE WHEN conf_tested = 1 THEN conf_up ELSE orig_up END) as slot_up,
   SUM(CASE WHEN conf_tested = 1 OR orig_tested = 1 THEN 1 ELSE 0 END) as slot_measured
@@ -1850,8 +1852,8 @@ FROM (
   SELECT MIN(${F.timestamp}) - MIN(${F.timestamp}) % ${stepUs} as bucket_us${envCol},
     MAX(CASE WHEN ${confirm} AND ${tested} THEN 1 ELSE 0 END) as conf_tested,
     MAX(CASE WHEN ${confirm} AND ${up} THEN 1 ELSE 0 END) as conf_up,
-    MAX(CASE WHEN NOT (${confirm}) AND ${tested} THEN 1 ELSE 0 END) as orig_tested,
-    MAX(CASE WHEN NOT (${confirm}) AND ${up} THEN 1 ELSE 0 END) as orig_up
+    MAX(CASE WHEN ${original} AND ${tested} THEN 1 ELSE 0 END) as orig_tested,
+    MAX(CASE WHEN ${original} AND ${up} THEN 1 ELSE 0 END) as orig_up
   FROM ${TABLE}
   WHERE ${F.monitorId} = '${id}'${environmentPredicate(environment)}
   GROUP BY CASE WHEN run_id IS NULL OR run_id = '' THEN ${F.executionId} ELSE run_id END${keyCols}
