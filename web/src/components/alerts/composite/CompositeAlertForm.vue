@@ -80,16 +80,8 @@ const stalePolicyOptions = computed(() => [
   { label: t("alerts.composite.treatStaleFalse"), value: "treat_as_false" },
   { label: t("alerts.composite.treatStaleTrue"), value: "treat_as_true" },
 ]);
-const stalePolicyHelp = computed(() => {
-  switch (draft.value.composite_condition.stale_child_policy) {
-    case "treat_as_false":
-      return t("alerts.form.composite.staleFalse");
-    case "treat_as_true":
-      return t("alerts.form.composite.staleTrue");
-    default:
-      return t("alerts.form.composite.staleLastState");
-  }
-});
+// Each option names what it does, so the help says what "stale" means instead.
+const stalePolicyHelp = computed(() => t("alerts.form.composite.staleLastState"));
 
 const updateCondition = (patch: Partial<CompositeAlertDraft["composite_condition"]>): void => {
   emit("update:modelValue", {

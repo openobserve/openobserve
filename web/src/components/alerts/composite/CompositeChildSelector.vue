@@ -9,7 +9,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { type CompositeChildOption, letterFor } from "./expression";
 
 const props = withDefaults(
@@ -30,6 +30,17 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+// The form names alert types the way its type picker does, not the alert list's short names.
+const TYPE_NAMES: Record<string, I18nKey> = {
+  scheduled: "alerts.sections.onSchedule",
+  realtime: "alerts.sections.asItHappens",
+  anomalydetection: "alerts.sections.whenUnusual",
+  composite: "alerts.sections.whenCombined",
+};
+const typeName = (type: string) => {
+  const key = TYPE_NAMES[type.toLowerCase().replace(/[\s_-]/g, "")];
+  return key ? t(key) : undefined;
+};
 
 const byId = computed(() => new Map(props.options.map((option) => [option.alert_id, option])));
 const count = computed(() => props.modelValue.length);
@@ -136,6 +147,7 @@ const childLink = (child: CompositeChildOption): string =>
           v-if="byId.get(id)?.alert_type"
           type="alertType"
           :value="byId.get(id)!.alert_type!"
+          :label="typeName(byId.get(id)!.alert_type!)"
           size="xs"
           :data-test="`alerts-composite-child-type-${id}`"
         />

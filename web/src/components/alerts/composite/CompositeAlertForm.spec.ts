@@ -173,7 +173,7 @@ describe("CompositeAlertForm", () => {
       wrapper.find('[data-test="alerts-composite-stale-policy"]').attributes("data-value"),
     ).toBe("use_last_state");
     expect(wrapper.find('[data-test="alerts-composite-stale-policy-help"]').text()).toMatch(
-      /last.*state/i,
+      /missed several checks/i,
     );
   });
 

@@ -131,7 +131,7 @@ describe("CompositeAlertDetail", () => {
     const wrapper = mountDetail(makeDetail());
 
     expect(wrapper.find('[data-test="alerts-composite-detail-stale-policy"]').text()).toMatch(
-      /use.*last.*state/i,
+      /keep.*last.*state/i,
     );
   });
 
