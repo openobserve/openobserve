@@ -142,10 +142,10 @@ fn draft_len(spec: &ContentSpec) -> usize {
         .map_or(spec.body.len(), |json| json.len())
 }
 
-/// The body text as the editor saves it. JavaScript `trim` also removes U+FEFF, which Rust does
-/// not count as whitespace.
+/// The body text as the editor saves it. JavaScript `trim` removes Rust's whitespace except
+/// U+0085, and also removes U+FEFF.
 fn editor_trim(body: &str) -> &str {
-    body.trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}')
+    body.trim_matches(|c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}')
 }
 
 pub async fn save(
@@ -1619,6 +1619,8 @@ mod tests {
             ..Default::default()
         };
         assert!(check_spec_size(&padded_body).is_ok());
+        // JavaScript `trim` keeps U+0085 and removes U+FEFF.
+        assert_eq!(editor_trim("\u{85}b\u{feff} \n"), "\u{85}b");
         assert!(matches!(
             check_spec_size(&large),
             Err(TemplateError::BodyTooLarge { .. })
