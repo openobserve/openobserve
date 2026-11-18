@@ -199,69 +199,6 @@ pub fn decide(
     }
 }
 
-/// The readings of a run, by the kind of its newest bucket; an absence has no numbers.
-fn run_summary(run: &[ExploreBucket]) -> ExploreSummary {
-    let Some(newest) = run.last() else {
-        return ExploreSummary::default();
-    };
-    let kind = newest.kind();
-    match kind {
-        "absence" => ExploreSummary {
-            kind: kind.to_string(),
-            ..Default::default()
-        },
-        "partial_drop" => ExploreSummary {
-            kind: kind.to_string(),
-            actual: newest.value,
-            expected: newest.expected,
-            change_percent: change_percent(newest.value, newest.expected),
-            ..Default::default()
-        },
-        _ => {
-            let worst = run
-                .iter()
-                .filter(|b| b.kind() == "value" && b.value.is_some())
-                .fold(None::<&ExploreBucket>, |worst, b| match worst {
-                    Some(w) if w.excess() > b.excess() => Some(w),
-                    _ => Some(b),
-                })
-                .unwrap_or(newest);
-            bucket_summary(worst)
-        }
-    }
-}
-
-/// The readings of one bucket, with only the numbers its kind may show.
-fn bucket_summary(bucket: &ExploreBucket) -> ExploreSummary {
-    let kind = bucket.kind();
-    let (actual, expected) = match kind {
-        "absence" => (None, None),
-        _ => (bucket.value, bucket.expected),
-    };
-    let (lower, upper) = match kind {
-        "value" => (bucket.lower, bucket.upper),
-        _ => (None, None),
-    };
-    ExploreSummary {
-        kind: kind.to_string(),
-        actual,
-        expected,
-        expected_lower: lower,
-        expected_upper: upper,
-        change_percent: change_percent(actual, expected),
-        ..Default::default()
-    }
-}
-
-fn change_percent(actual: Option<f64>, expected: Option<f64>) -> Option<f64> {
-    match (actual, expected) {
-        (Some(a), Some(e)) if e != 0.0 && a.is_finite() && e.is_finite() => {
-            Some((a - e) / e.abs() * 100.0)
-        }
-        _ => None,
-    }
-}
-
 /// The model version the page and the endpoint compare; an untrained detector has none.
 pub fn served_model_version(is_trained: bool, current_model_version: i64) -> i64 {
     if is_trained { current_model_version } else { 0 }
@@ -511,6 +448,69 @@ pub async fn read_buckets(
         .await
         .map_err(|e| anyhow::anyhow!("reading {ANOMALY_STREAM} failed: {e}"))?;
     Ok(parse_buckets(&resp.hits))
+}
+
+/// The readings of a run, by the kind of its newest bucket; an absence has no numbers.
+fn run_summary(run: &[ExploreBucket]) -> ExploreSummary {
+    let Some(newest) = run.last() else {
+        return ExploreSummary::default();
+    };
+    let kind = newest.kind();
+    match kind {
+        "absence" => ExploreSummary {
+            kind: kind.to_string(),
+            ..Default::default()
+        },
+        "partial_drop" => ExploreSummary {
+            kind: kind.to_string(),
+            actual: newest.value,
+            expected: newest.expected,
+            change_percent: change_percent(newest.value, newest.expected),
+            ..Default::default()
+        },
+        _ => {
+            let worst = run
+                .iter()
+                .filter(|b| b.kind() == "value" && b.value.is_some())
+                .fold(None::<&ExploreBucket>, |worst, b| match worst {
+                    Some(w) if w.excess() > b.excess() => Some(w),
+                    _ => Some(b),
+                })
+                .unwrap_or(newest);
+            bucket_summary(worst)
+        }
+    }
+}
+
+/// The readings of one bucket, with only the numbers its kind may show.
+fn bucket_summary(bucket: &ExploreBucket) -> ExploreSummary {
+    let kind = bucket.kind();
+    let (actual, expected) = match kind {
+        "absence" => (None, None),
+        _ => (bucket.value, bucket.expected),
+    };
+    let (lower, upper) = match kind {
+        "value" => (bucket.lower, bucket.upper),
+        _ => (None, None),
+    };
+    ExploreSummary {
+        kind: kind.to_string(),
+        actual,
+        expected,
+        expected_lower: lower,
+        expected_upper: upper,
+        change_percent: change_percent(actual, expected),
+        ..Default::default()
+    }
+}
+
+fn change_percent(actual: Option<f64>, expected: Option<f64>) -> Option<f64> {
+    match (actual, expected) {
+        (Some(a), Some(e)) if e != 0.0 && a.is_finite() && e.is_finite() => {
+            Some((a - e) / e.abs() * 100.0)
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]

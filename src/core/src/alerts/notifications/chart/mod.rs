@@ -67,6 +67,74 @@ static ANOMALY_CHARTS: LazyLock<Mutex<HashMap<AnomalyChartKey, CachedChart>>> =
 /// with genuinely no material pays one cheap lookup per chart attempt.
 static SIGNING_KEY: OnceCell<Vec<u8>> = OnceCell::const_new();
 
+/// One bucket of an anomaly chart: a stored judgment or a point of the current run.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnomalySeriesPoint {
+    pub ts_us: i64,
+    pub value: f64,
+    pub lower: Option<f64>,
+    pub upper: Option<f64>,
+    pub is_anomaly: bool,
+    pub is_absence: bool,
+    pub is_partial_drop: bool,
+}
+
+/// Inputs of one anomaly chart, built once per run and shared by its destinations.
+pub struct AnomalyChartRequest<'a> {
+    pub org_id: &'a str,
+    pub anomaly_id: &'a str,
+    pub anomaly_name: &'a str,
+    pub stream_name: &'a str,
+    /// History reads only points of this model; None reads every model.
+    pub model_version: Option<i64>,
+    /// Data time of the fire; the chart ends here, not at wall-clock now.
+    pub window_end_us: i64,
+    pub judged_end_us: i64,
+    pub bucket_seconds: i64,
+    /// The run's scored points, which can be not yet searchable.
+    pub current: &'a [AnomalySeriesPoint],
+}
+
+type AnomalyChartKey = (String, String, i64, i64);
+
+struct CachedChart {
+    built_at: Instant,
+    url: String,
+    payload: ChartPayload,
+}
+
+/// Optional `_anomalies` columns: a query naming a column the stream never saw fails whole.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+struct AnomalyColumns {
+    values: bool,
+    bounds: bool,
+    absence: bool,
+    partial_drop: bool,
+    judged_end: bool,
+    model_version: bool,
+}
+
+impl AnomalyColumns {
+    fn from_schema(schema: &arrow_schema::Schema) -> Self {
+        let has = |name: &str| schema.field_with_name(name).is_ok();
+        Self {
+            values: has("actual_value") && has("is_anomaly") && has("created_at"),
+            bounds: has("expected_lower") && has("expected_upper"),
+            absence: has("is_absence"),
+            partial_drop: has("is_partial_drop"),
+            judged_end: has("judged_end_us"),
+            model_version: has("model_version"),
+        }
+    }
+}
+
+/// A stored bucket judgment with the query end of the run that wrote it (None before the field).
+#[derive(Debug, Clone, PartialEq)]
+struct StoredPoint {
+    point: AnomalySeriesPoint,
+    judged_end_us: Option<i64>,
+}
+
 pub async fn signing_key() -> Option<&'static [u8]> {
     SIGNING_KEY
         .get_or_try_init(|| async {
@@ -231,74 +299,6 @@ pub struct ChartRequest<'a> {
     pub current_value: Option<f64>,
     pub crit_threshold: Option<f64>,
     pub warn_threshold: Option<f64>,
-}
-
-/// One bucket of an anomaly chart: a stored judgment or a point of the current run.
-#[derive(Debug, Clone, PartialEq)]
-pub struct AnomalySeriesPoint {
-    pub ts_us: i64,
-    pub value: f64,
-    pub lower: Option<f64>,
-    pub upper: Option<f64>,
-    pub is_anomaly: bool,
-    pub is_absence: bool,
-    pub is_partial_drop: bool,
-}
-
-/// Inputs of one anomaly chart, built once per run and shared by its destinations.
-pub struct AnomalyChartRequest<'a> {
-    pub org_id: &'a str,
-    pub anomaly_id: &'a str,
-    pub anomaly_name: &'a str,
-    pub stream_name: &'a str,
-    /// History reads only points of this model; None reads every model.
-    pub model_version: Option<i64>,
-    /// Data time of the fire; the chart ends here, not at wall-clock now.
-    pub window_end_us: i64,
-    pub judged_end_us: i64,
-    pub bucket_seconds: i64,
-    /// The run's scored points, which can be not yet searchable.
-    pub current: &'a [AnomalySeriesPoint],
-}
-
-type AnomalyChartKey = (String, String, i64, i64);
-
-struct CachedChart {
-    built_at: Instant,
-    url: String,
-    payload: ChartPayload,
-}
-
-/// Optional `_anomalies` columns: a query naming a column the stream never saw fails whole.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-struct AnomalyColumns {
-    values: bool,
-    bounds: bool,
-    absence: bool,
-    partial_drop: bool,
-    judged_end: bool,
-    model_version: bool,
-}
-
-impl AnomalyColumns {
-    fn from_schema(schema: &arrow_schema::Schema) -> Self {
-        let has = |name: &str| schema.field_with_name(name).is_ok();
-        Self {
-            values: has("actual_value") && has("is_anomaly") && has("created_at"),
-            bounds: has("expected_lower") && has("expected_upper"),
-            absence: has("is_absence"),
-            partial_drop: has("is_partial_drop"),
-            judged_end: has("judged_end_us"),
-            model_version: has("model_version"),
-        }
-    }
-}
-
-/// A stored bucket judgment with the query end of the run that wrote it (None before the field).
-#[derive(Debug, Clone, PartialEq)]
-struct StoredPoint {
-    point: AnomalySeriesPoint,
-    judged_end_us: Option<i64>,
 }
 
 /// Alert ids are KSUIDs and org ids allow `_`/`-`; both are interpolated into SQL, so
