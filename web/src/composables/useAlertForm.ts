@@ -536,6 +536,8 @@ export type AlertFormValues = PayloadFormData & {
 export interface AlertFormHooks {
   /** Bring a section into view when a save gate stops on a field inside it. */
   showSection?: (id: AlertSectionId) => void;
+  /** Scroll a focused error's control into view the host's way; without it the control is centred. */
+  revealControl?: (el: HTMLElement) => void;
 }
 
 export function useAlertForm(
@@ -1648,8 +1650,13 @@ export function useAlertForm(
           'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup], [data-inline-edit-trigger]',
         );
         if (control) {
-          control.focus();
-          control.scrollIntoView({ behavior: "smooth", block: "center" });
+          if (hooks.revealControl) {
+            control.focus({ preventScroll: true });
+            hooks.revealControl(control);
+          } else {
+            control.focus();
+            control.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
           return true;
         }
         node = node.parentElement;
