@@ -98,9 +98,10 @@ pub(crate) fn check_body_size(
     })
 }
 
-/// `body` is a stored oversized content spec saved again with other JSON formatting: the same
-/// values, and no longer than the stored row or the spec printed with two-space indents. The size
-/// bound stops unknown fields, which the parse drops, from growing the row.
+/// `body` is a stored oversized content spec saved again as the editor saves it: the same spec
+/// values, printed with two-space indents, unknown keys kept and default keys filled in. The size
+/// bound (the stored JSON printed that way, plus one default spec) stops unknown fields, which the
+/// parse drops from the compare, from growing the row.
 fn reformatted(stored: &str, body: &str) -> bool {
     if stored.len() <= BODY_MAX_BYTES {
         return false;
@@ -112,14 +113,18 @@ fn reformatted(stored: &str, body: &str) -> bool {
     else {
         return false;
     };
-    let pretty = serde_json::to_string_pretty(&new).map_or(0, |s| s.len());
-    old_value == new_value && body.len() <= stored.len().max(pretty)
+    let pretty_len =
+        |value: &serde_json::Value| serde_json::to_string_pretty(value).map_or(0, |s| s.len());
+    let stored_pretty =
+        serde_json::from_str::<serde_json::Value>(stored).map_or(0, |v| pretty_len(&v));
+    let defaults = serde_json::to_value(ContentSpec::default()).map_or(0, |v| pretty_len(&v));
+    old_value == new_value && body.len() <= stored.len().max(stored_pretty) + defaults
 }
 
-/// The body limit on a draft spec, measured as the JSON a save of the spec stores.
+/// The body limit on a draft spec, measured as the editor saves it: JSON with two-space indents.
 pub fn check_spec_size(spec: &ContentSpec) -> Result<(), TemplateError> {
     // A spec serializes to JSON infallibly; on a failure fall back to the body text alone.
-    let size = serde_json::to_vec(spec).map_or(spec.body.len(), |json| json.len());
+    let size = serde_json::to_vec_pretty(spec).map_or(spec.body.len(), |json| json.len());
     if size <= BODY_MAX_BYTES {
         return Ok(());
     }
@@ -1540,6 +1545,18 @@ mod tests {
         );
         assert!(ContentSpec::parse(&padded_large).is_ok());
         assert!(check_body_size(&padded_large, Some(&compact), true).is_err());
+
+        // An old compact row with an unknown key and missing default keys: the editor keeps the
+        // key, fills the defaults and saves it pretty. That still counts as unchanged.
+        let legacy = format!(
+            "{{\"title\":\"t\",\"body\":\"{}\",\"future\":true}}",
+            "b".repeat(BODY_MAX_BYTES)
+        );
+        let mut resaved = serde_json::to_value(ContentSpec::parse(&legacy).unwrap()).unwrap();
+        resaved["future"] = serde_json::Value::Bool(true);
+        let resaved = serde_json::to_string_pretty(&resaved).unwrap();
+        assert!(resaved.len() > legacy.len());
+        assert!(check_body_size(&resaved, Some(&legacy), true).is_ok());
     }
 
     #[test]
