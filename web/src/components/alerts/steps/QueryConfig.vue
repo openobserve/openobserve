@@ -1562,6 +1562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-primary"
                 size="sm"
                 icon-left="add"
+                class="-ms-3.5 max-[85.5rem]:-ms-3"
                 data-test="add-alert-add-cron"
                 @click="useCronSchedule"
               >
