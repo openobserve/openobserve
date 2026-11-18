@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { reactive } from "vue";
-import { flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { gt } from "@/types/i18n";
@@ -32,6 +32,8 @@ vi.mock("vue-router", async (importOriginal) => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useRoute: () => ({ query: routeQuery }),
 }));
+// A tab left mounted follows the shared route query, so every later query change re-renders it.
+enableAutoUnmount(afterEach);
 
 const HexMapStub = {
   name: "CoverageHexMap",
@@ -523,18 +525,24 @@ describe("AutoObserveCoverageTab in live mode", () => {
     });
 
     it("keeps a picked grouping across a filter change, and Automatic chooses again", async () => {
-      const wrapper = mountTab(live(FLEET));
+      // 16 names in two clusters: 32 rows, just past the flat limit, so names fold.
+      const fleet = coverage(
+        Array.from({ length: 32 }, (_, i) =>
+          busy(`svc${i % 16}`, "none", i, `c${Math.floor(i / 16)}`),
+        ),
+      );
+      const wrapper = mountTab(live(fleet));
       const choose = (option: string) =>
         wrapper.find(`[data-test="autoobserve-coverage-group-pick-${option}"]`).trigger("click");
       await choose("none");
-      expect(shown(wrapper)).toHaveLength(80);
+      expect(shown(wrapper)).toHaveLength(32);
       wrapper
         .findComponent('[data-test="autoobserve-coverage-filter"]')
         .vm.$emit("update:modelValue", "all");
       await flushPromises();
-      expect(shown(wrapper)).toHaveLength(80);
+      expect(shown(wrapper)).toHaveLength(32);
       await choose("auto");
-      expect(shown(wrapper)).toHaveLength(40);
+      expect(shown(wrapper)).toHaveLength(16);
     });
 
     it("opens a group hex's group in the table when Needs action alone would leave it flat", async () => {
@@ -754,8 +762,6 @@ describe("AutoObserveCoverageTab in live mode", () => {
       await flushPromises();
       expect(text("autoobserve-coverage-legend-watched")).toContain("1,200");
       expect(text("autoobserve-coverage-map-more")).toContain("1,005");
-      // Mounted tabs follow the shared route query, so a 1,205-row tab left behind slows every later test.
-      wrapper.unmount();
     });
 
     it("groups by place and leaves services with no place as rows of their own", () => {
