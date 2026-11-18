@@ -688,14 +688,30 @@ export const nodePath = (root: FilterGroup, id: string, prefix = ""): string | n
 export const conditionValueLabel = (condition: FilterCondition): string =>
   OPERATORS[condition.operator].arity === "none" ? "" : condition.values.join(", ");
 
-/** Field-list rows as the bar needs them; stream header rows and duplicates across streams are dropped. */
+const mixedTypeFields = (schemas: { name?: string; type?: string }[][]): Set<string> => {
+  const types = new Map<string, FilterFieldType>();
+  const mixed = new Set<string>();
+  for (const { name, type } of schemas.flat()) {
+    if (!name) continue;
+    const kind = toFilterFieldType(type);
+    if ((types.get(name) ?? kind) !== kind) mixed.add(name);
+    types.set(name, kind);
+  }
+  return mixed;
+};
+
+/** Field-list rows as the bar needs them; a field the selected `streamSchemas` type differently is text. */
 export const toFilterFields = (
   rows: { name?: string; dataType?: string; type?: string; label?: boolean }[],
+  streamSchemas: { name?: string; type?: string }[][] = [],
 ): FilterField[] => {
+  // The merged row carries one stream's type; a number literal fails to cast on the stream holding text.
+  const mixed = mixedTypeFields(streamSchemas);
   const seen = new Map<string, FilterField>();
   for (const row of rows) {
     if (!row?.name || row.label || seen.has(row.name)) continue;
-    seen.set(row.name, { name: row.name, type: toFilterFieldType(row.dataType ?? row.type) });
+    const type = mixed.has(row.name) ? "string" : toFilterFieldType(row.dataType ?? row.type);
+    seen.set(row.name, { name: row.name, type });
   }
   return [...seen.values()];
 };

@@ -2380,7 +2380,14 @@ export default defineComponent({
     const openAiFromBuilder = () =>
       (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
     const filterBuilderFields = computed(() =>
-      toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
+      toFilterFields(
+        searchObj.data.stream.selectedStreamFields ?? [],
+        (searchObj.data.streamResults?.list ?? [])
+          .filter((stream: { name: string }) =>
+            searchObj.data.stream.selectedStream.includes(stream.name),
+          )
+          .map((stream: { schema?: { name: string; type: string }[] }) => stream.schema ?? []),
+      ),
     );
     // match_all fails on any selected stream that has no full-text search field.
     const streamsSearchFullText = computed(() => {
