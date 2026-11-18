@@ -997,7 +997,6 @@ export default defineComponent({
         ]
       : [];
     onBeforeUnmount(() => unregister.forEach((off) => off()));
-    // Section 3 stacks up to ten rows, so its rows sit closer than a bare row's default.
 
     return {
       tierShows,

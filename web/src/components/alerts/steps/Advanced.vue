@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="descriptionFocused && '[&_textarea]:field-sizing-content'"
-                @focusin="descriptionFocused = true"
+                @focusin="onDescriptionFocus"
                 @focusout="descriptionFocused = false"
               >
                 <OFormTextarea
@@ -324,7 +324,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, inject, onMounted, type PropType, type Ref } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  inject,
+  nextTick,
+  onMounted,
+  type PropType,
+  type Ref,
+} from "vue";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
@@ -577,16 +586,21 @@ export default defineComponent({
     const tierShows = useTierVisibility();
     const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
     const descriptionFocused = ref(false);
+    // The box grows on focus, after the browser scrolled it into view.
+    const onDescriptionFocus = async (event: FocusEvent) => {
+      descriptionFocused.value = true;
+      await nextTick();
+      (event.target as HTMLElement | null)?.scrollIntoView?.({ block: "nearest" });
+    };
     const removeDescription = () => {
       form.setFieldValue("description", "");
       tiers?.conceal("description");
     };
 
-    // Section 3 stacks up to ten rows, so its rows sit closer than a bare row's default.
-
     return {
       tierShows,
       descriptionFocused,
+      onDescriptionFocus,
       removeDescription,
       raw,
       priorityOptions,
