@@ -110,6 +110,11 @@ pub(crate) fn apply_custom_template_plain(
         .replace("{alert_url_label}", &esc(&ctx.alert_url_label))
         .replace("{alert_detail_url}", &esc(&ctx.alert_detail_url))
         .replace("{alert_detail_label}", &esc(&ctx.alert_detail_label))
+        // D20: set only for an anomaly send, and empty with no chart or a local base.
+        .replace(
+            "{chart_url}",
+            &esc(ctx.chart_url.as_deref().unwrap_or_default()),
+        )
         .replace("{notification_kind}", ctx.kind.as_str())
         .replace("{notification_event}", ctx.event.as_str())
         .replace("{notification_kind_label}", ctx.kind.label())
@@ -1159,6 +1164,28 @@ mod golden {
         assert_eq!(
             rendered,
             "View logs https://o2/s/1 Open alert https://o2/web/alerts/detail/a1"
+        );
+    }
+
+    #[test]
+    fn chart_url_is_substituted_and_empty_without_a_chart() {
+        let tpl = r#"{"text":"{alert_name}","image":"{chart_url}"}"#;
+        let ctx = NotificationContext {
+            alert_name: "spike".into(),
+            chart_url: Some("https://o2/api/v2/o/alerts/charts/render?d=a&s=b".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            apply_custom_template(tpl, &ctx, false),
+            r#"{"text":"spike","image":"https://o2/api/v2/o/alerts/charts/render?d=a&s=b"}"#
+        );
+        let none = NotificationContext {
+            alert_name: "spike".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            apply_custom_template(tpl, &none, false),
+            r#"{"text":"spike","image":""}"#
         );
     }
 }

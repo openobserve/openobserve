@@ -25,7 +25,7 @@ use super::{
     context::{NotificationContext, build_row_columns},
 };
 
-pub const ANOMALY_VARIABLES: [&str; 22] = [
+pub const ANOMALY_VARIABLES: [&str; 23] = [
     "anomaly_id",
     "anomaly_name",
     "anomaly_kind",
@@ -48,6 +48,7 @@ pub const ANOMALY_VARIABLES: [&str; 22] = [
     "window_start",
     "window_end",
     "anomaly_url",
+    "chart_url",
 ];
 
 pub const INCIDENT_VARIABLES: [&str; 6] = [

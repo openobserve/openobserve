@@ -443,6 +443,45 @@ pub async fn build_chart_url(org_id: &str, p: &ChartPayload) -> Option<String> {
     ))
 }
 
+/// D20 rule 12: no receiver can load an image from this `ZO_WEB_URL`, so URL sends drop it.
+pub fn web_url_is_local() -> bool {
+    base_is_local(&config::get_config().common.web_url)
+}
+
+/// A host name gets no check; a base with no host counts as local. [pure]
+pub fn base_is_local(base: &str) -> bool {
+    use std::net::IpAddr;
+    let Ok(url) = url::Url::parse(base.trim()) else {
+        return true;
+    };
+    let ip = match url.host() {
+        None => return true,
+        Some(url::Host::Domain(d)) => {
+            let d = d.trim_end_matches('.').to_ascii_lowercase();
+            return d == "localhost" || d.ends_with(".localhost");
+        }
+        Some(url::Host::Ipv4(v4)) => IpAddr::V4(v4),
+        Some(url::Host::Ipv6(v6)) => v6.to_ipv4_mapped().map_or(IpAddr::V6(v6), IpAddr::V4),
+    };
+    match ip {
+        IpAddr::V4(v4) => {
+            let o = v4.octets();
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || (o[0] == 100 && (o[1] & 0xc0) == 64)
+        }
+        IpAddr::V6(v6) => {
+            let s = v6.segments()[0];
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || (s & 0xfe00) == 0xfc00
+                || (s & 0xffc0) == 0xfe80
+        }
+    }
+}
+
 /// Send-time render (email CID / discord upload): bounded by the same
 /// per-node semaphore as fetch-side renders; at capacity the send proceeds
 /// chartless.
@@ -1172,5 +1211,36 @@ mod tests {
             a.unwrap().is_some() && b.unwrap().is_some(),
             "the second send waits"
         );
+    }
+
+    #[test]
+    fn a_local_or_private_base_has_no_reachable_image() {
+        for base in [
+            "http://localhost:5080",
+            "http://app.localhost",
+            "http://127.0.0.1:5080/",
+            "http://10.2.3.4",
+            "http://172.20.0.1",
+            "https://192.168.1.10",
+            "http://169.254.1.1",
+            "http://100.64.0.1",
+            "http://0.0.0.0:5080",
+            "http://[::1]:5080",
+            "http://[fd00::1]",
+            "http://[fe80::1]",
+            "http://[::ffff:10.0.0.1]",
+            "",
+            "not a url",
+        ] {
+            assert!(base_is_local(base), "{base}");
+        }
+        for base in [
+            "https://o2.acme.com",
+            "http://o2-internal.svc.cluster.local:5080",
+            "http://8.8.8.8",
+            "http://[2001:4860::8888]",
+        ] {
+            assert!(!base_is_local(base), "{base}");
+        }
     }
 }

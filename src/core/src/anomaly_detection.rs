@@ -4498,6 +4498,8 @@ fn anomaly_alert_payload(
         "link": link,
         "message": message,
         "timestamp": chrono::Utc::now().to_rfc3339(),
+        // D20 rule 7: set by the chart attach, and empty with no reachable chart.
+        "chart_url": "",
     })
 }
 
@@ -4570,23 +4572,35 @@ pub async fn send_anomaly_alert(
     anomaly_send_outcome(result, &actx.anomaly_id)
 }
 
-/// D5: the compiled default, or a template with the chart on, gets the chart. The bytes go
-/// only to the channels that carry them in the send, as the scheduled alert does.
+/// D20: each Content template, and a custom one with `{chart_url}`, gets the chart. The bytes
+/// go only to the channels that carry them, and a local base drops the URL (rule 12).
 #[cfg(feature = "enterprise")]
 async fn attach_anomaly_chart(
     actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
     resolved: &crate::alerts::notifications::notify::Resolved,
     ctx: &mut crate::alerts::notifications::NotificationContext,
 ) {
-    use config::meta::destinations::DestinationType;
-
-    use crate::alerts::notifications::{ChannelFormat, chart, derive_channel_format};
+    use crate::alerts::notifications::chart;
     if !template_wants_anomaly_chart(&resolved.effective) {
         log::debug!(
-            "[ALERT_CHART] anomaly {} template has the chart off",
+            "[ALERT_CHART] anomaly {} template has no chart",
             actx.anomaly_id
         );
         chart::chart_event("template_off");
+        return;
+    }
+    let (wants_url, wants_png) = anomaly_chart_use(
+        &resolved.effective.template.kind,
+        &resolved.destination_type,
+        chart::web_url_is_local(),
+    );
+    if !wants_url && !wants_png {
+        log::info!(
+            "[ALERT_CHART] anomaly {} sends without a chart: ZO_WEB_URL is a local or private \
+             address that the receiver cannot load",
+            actx.anomaly_id
+        );
+        chart::chart_event("local_base");
         return;
     }
     let current: Vec<chart::AnomalySeriesPoint> = actx
@@ -4616,16 +4630,9 @@ async fn attach_anomaly_chart(
     let Some((url, payload)) = chart::build_anomaly_chart(&req).await else {
         return;
     };
-    let needs_png = matches!(
-        resolved.destination_type,
-        DestinationType::Email(_) | DestinationType::SlackApp(_)
-    ) || matches!(
-        derive_channel_format(&resolved.destination_type),
-        ChannelFormat::Discord
-    );
-    ctx.chart_url = Some(url);
+    set_anomaly_chart_url(ctx, wants_url.then_some(url));
     // Several detectors fire on one tick, so an anomaly send waits briefly for a render permit.
-    ctx.chart_png = if needs_png {
+    ctx.chart_png = if wants_png {
         chart::render_png_waiting(&payload)
             .await
             .map(std::sync::Arc::new)
@@ -4634,23 +4641,60 @@ async fn attach_anomaly_chart(
     };
 }
 
-/// The compiled default (also as its seeded copy) charts though its flag is off (D5).
+/// `(url, png)` a send takes of a built chart; on a local base only a byte destination of a
+/// Content template keeps it (rule 12).
+#[cfg(feature = "enterprise")]
+fn anomaly_chart_use(
+    kind: &config::meta::destinations::TemplateKind,
+    destination: &config::meta::destinations::DestinationType,
+    local_base: bool,
+) -> (bool, bool) {
+    use config::meta::destinations::{DestinationType, TemplateKind};
+
+    use crate::alerts::notifications::{ChannelFormat, derive_channel_format};
+    let slack_app = matches!(destination, DestinationType::SlackApp(_));
+    let bytes = slack_app
+        || matches!(destination, DestinationType::Email(_))
+        || matches!(derive_channel_format(destination), ChannelFormat::Discord);
+    match kind {
+        TemplateKind::Content if bytes => (true, true),
+        // A custom body carries the chart as a link, except on the Slack app, which uploads it.
+        _ => (!local_base, slack_app),
+    }
+}
+
+/// The chart URL of the send, also in the `chart_url` field of the legacy webhook body.
+#[cfg(feature = "enterprise")]
+fn set_anomaly_chart_url(
+    ctx: &mut crate::alerts::notifications::NotificationContext,
+    url: Option<String>,
+) {
+    if let Some(url) = url.clone()
+        && let Some(legacy) = ctx.legacy_payload.take()
+    {
+        ctx.legacy_payload = Some(crate::alerts::notifications::LegacyPayload::new(
+            move || {
+                let mut body = legacy.build();
+                body["chart_url"] = serde_json::Value::from(url.as_str());
+                body
+            },
+        ));
+    }
+    ctx.chart_url = url;
+}
+
+/// Each Content template charts, whatever `chart.enabled` says; a custom one only with
+/// `{chart_url}` in its body (D20 rules 2 and 3).
 #[cfg(feature = "enterprise")]
 fn template_wants_anomaly_chart(
     effective: &crate::alerts::notifications::org_default::EffectiveTemplate,
 ) -> bool {
     use config::meta::destinations::TemplateKind;
-
-    use crate::alerts::notifications::{
-        default_template::DEFAULT_CONTENT_TEMPLATE_NAME, org_default::TemplateSource,
-    };
     let template = &effective.template;
-    if template.kind != TemplateKind::Content {
-        return false;
+    match template.kind {
+        TemplateKind::Content => true,
+        TemplateKind::Custom => template.body.contains("{chart_url}"),
     }
-    effective.source == TemplateSource::Compiled
-        || template.name == DEFAULT_CONTENT_TEMPLATE_NAME
-        || db::alerts::templates::get_parsed_content(template).is_ok_and(|spec| spec.chart.enabled)
 }
 
 /// Unsendable destinations (missing, pipeline, no org member recipient) skip as `Ok(false)`.
@@ -9696,8 +9740,9 @@ mod tests {
             );
         }
 
+        /// AC1.32 and AC1.21: the chart flag of a Content template no longer gates an anomaly.
         #[test]
-        fn only_the_default_or_a_chart_template_gets_the_anomaly_chart() {
+        fn each_content_template_and_a_custom_one_with_chart_url_gets_the_anomaly_chart() {
             use config::meta::destinations::{Template, TemplateKind, TemplateType};
 
             use crate::alerts::notifications::org_default::{
@@ -9713,14 +9758,6 @@ mod tests {
                 compiled_fallback("org"),
                 TemplateSource::Compiled
             )));
-            assert!(
-                wants(&effective(
-                    compiled_fallback("org"),
-                    TemplateSource::Destination
-                )),
-                "the seeded copy of the default"
-            );
-            // The parsed-spec cache is keyed by name, so each body gets its own.
             let content = |enabled: bool| {
                 let mut spec =
                     crate::alerts::notifications::default_template::compiled_default_content();
@@ -9734,12 +9771,80 @@ mod tests {
                 }
             };
             assert!(wants(&effective(content(true), TemplateSource::Explicit)));
-            assert!(!wants(&effective(content(false), TemplateSource::Explicit)));
-            let custom = Template {
+            assert!(
+                wants(&effective(content(false), TemplateSource::Explicit)),
+                "chart.enabled is the switch of scheduled alerts only"
+            );
+            let custom = |body: &str| Template {
                 kind: TemplateKind::Custom,
+                body: body.to_string(),
                 ..content(true)
             };
-            assert!(!wants(&effective(custom, TemplateSource::Destination)));
+            assert!(!wants(&effective(
+                custom(r#"{"text":"{alert_name}"}"#),
+                TemplateSource::Destination
+            )));
+            assert!(wants(&effective(
+                custom(r#"{"text":"{alert_name}","image":"{chart_url}"}"#),
+                TemplateSource::Destination
+            )));
+        }
+
+        /// AC1.33: a local base drops the URL on URL transports; bytes destinations keep it.
+        #[test]
+        fn a_local_base_drops_the_chart_url_of_url_transports_only() {
+            use config::meta::destinations::{DestinationType, TemplateKind};
+            let chart_use = super::super::anomaly_chart_use;
+            let email = DestinationType::Email(Default::default());
+            let app = DestinationType::SlackApp(Default::default());
+            let url_sends = [
+                http("slack", None),
+                http("teams", None),
+                http("pagerduty", None),
+                http("", None),
+            ];
+            for dest in &url_sends {
+                let c = TemplateKind::Content;
+                assert_eq!(chart_use(&c, dest, false), (true, false), "{dest:?}");
+                assert_eq!(chart_use(&c, dest, true), (false, false), "{dest:?}");
+            }
+            for dest in [&email, &app, &http("discord", None)] {
+                let c = TemplateKind::Content;
+                assert_eq!(chart_use(&c, dest, false), (true, true), "{dest:?}");
+                assert_eq!(chart_use(&c, dest, true), (true, true), "{dest:?}");
+            }
+            let custom = TemplateKind::Custom;
+            for dest in [&email, &http("discord", None), &http("slack", None)] {
+                assert_eq!(chart_use(&custom, dest, false), (true, false), "{dest:?}");
+                assert_eq!(chart_use(&custom, dest, true), (false, false), "{dest:?}");
+            }
+            assert_eq!(
+                chart_use(&custom, &app, true),
+                (false, true),
+                "the Slack app uploads the bytes of a custom template"
+            );
+        }
+
+        /// AC1.32 rule 7: the default webhook body carries `chart_url`, empty with no chart.
+        #[test]
+        fn the_legacy_webhook_body_carries_the_chart_url() {
+            use crate::alerts::notifications::notify::{Route, route};
+            let c = ctx(AnomalyAlertKind::Value);
+            let legacy = |n: &crate::alerts::notifications::NotificationContext| {
+                let Route::Legacy(body) = route(&resolved_for(http("", None)), n).unwrap() else {
+                    panic!("expected the legacy body");
+                };
+                body
+            };
+            let mut n = super::super::anomaly_notification_context(&c);
+            super::super::set_anomaly_chart_url(&mut n, None);
+            assert_eq!(legacy(&n)["chart_url"], "");
+            assert_eq!(n.chart_url, None);
+            let url = "https://o2.example/api/v2/org/alerts/charts/render?d=a&s=b";
+            super::super::set_anomaly_chart_url(&mut n, Some(url.to_string()));
+            assert_eq!(legacy(&n)["chart_url"], url);
+            assert_eq!(n.chart_url.as_deref(), Some(url));
+            assert_eq!(legacy(&n)["alert_type"], "anomaly_detection");
         }
 
         fn attr_of(
