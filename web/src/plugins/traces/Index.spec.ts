@@ -2236,6 +2236,16 @@ describe("Index.vue (Main Traces Page)", () => {
       delete store.state.zoConfig.auto_query_enabled;
     });
 
+    it.each([
+      ["one branch of an OR", "service_name='a' OR span_status='ERROR'", false],
+      ["a top-level AND condition", "service_name='a' AND span_status='ERROR'", true],
+    ])("shows errors-only as on for %s: %s", async (_name, filter, on) => {
+      mockSearchObj.data.editorValue = filter;
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+      expect(wrapper.vm.showErrorOnly).toBe(on);
+    });
+
     it("should grow the query pane with the filter builder and shrink it back", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();

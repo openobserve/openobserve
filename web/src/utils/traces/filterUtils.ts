@@ -152,6 +152,44 @@ export const mergePendingFilters = (pending: string, baseQuery: string): string 
   return terms.reduce((query, term) => mergeFilterTerm(term, query), baseQuery);
 };
 
+/** True when every row the filter returns meets `field = value`: the condition is ANDed at the top, not under an OR. */
+export const isRequiredCondition = (query: string, field: string, value: string): boolean => {
+  const where = query.trim();
+  if (splitTopLevel(where, "or").length > 1) return false;
+  return splitTopLevel(where, "and").some((term) => {
+    const group = /^\(([\s\S]*)\)$/.exec(term);
+    if (group) return isRequiredCondition(group[1], field, value);
+    const condition = parseSimpleCondition(term);
+    return (
+      condition?.field === field.toLowerCase() &&
+      condition.operator === "=" &&
+      condition.value === value
+    );
+  });
+};
+
+// String literals, quoted names and comments, which may hold a lone `and`, `or` or bracket.
+const OPAQUE_SQL = /'(?:[^']|'')*'|"(?:[^"]|"")*"|--[^\n]*|\/\*[\s\S]*?\*\//g;
+
+/** Removes the `and`/`or` connectors and empty brackets that cutting a condition out of a filter leaves behind. */
+export const dropDanglingConnectors = (query: string): string => {
+  const opaque: string[] = [];
+  let text = query.replace(OPAQUE_SQL, (part) => `\uE000${opaque.push(part) - 1}\uE000`);
+  let before: string;
+  do {
+    before = text;
+    text = text
+      .replace(/(^|[^\w\uE000])\(\s*\)/g, "$1")
+      .replace(/\(\s*(?:and|or)\b\s*/gi, "(")
+      .replace(/\s*\b(?:and|or)\s*\)/gi, ")")
+      // The cut condition was ANDed to one side, so where an AND meets an OR the OR is the one that stays.
+      .replace(/\b(and|or)\s+(and|or)\b/gi, (_m, a: string, b: string) => (/^or$/i.test(b) ? b : a))
+      .replace(/^\s*(?:and|or)\b\s*/i, "")
+      .replace(/\s*\b(?:and|or)\s*$/i, "");
+  } while (text !== before);
+  return text.trim().replace(/\uE000(\d+)\uE000/g, (_m, index: string) => opaque[Number(index)]);
+};
+
 /**
  * Builds a SQL filter term from a field, value, and operator.
  * Handles null values and escapes single quotes.

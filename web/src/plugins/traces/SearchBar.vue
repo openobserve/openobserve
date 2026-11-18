@@ -814,6 +814,7 @@ import {
   applyFilterTerm,
   replaceExistingFieldCondition,
   removeFieldCondition,
+  dropDanglingConnectors,
 } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
@@ -1349,11 +1350,8 @@ export default defineComponent({
       // The whole editor value is the where clause — never split it on "|", the
       // split is quote-unaware and would corrupt match_all('text | error').
       const value = searchObj.data.editorValue as string;
-      const newValue = replaceExistingFieldCondition(value, fieldName, "")
-        .replace(/\s*\band\b\s*$/i, "")
-        .replace(/^\s*\band\b\s*/i, "")
-        .replace(/\s+and\s+and\s+/gi, " and ")
-        .trim();
+      const cut = replaceExistingFieldCondition(value, fieldName, "");
+      const newValue = cut === null ? value : dropDanglingConnectors(cut);
       searchObj.data.editorValue = newValue;
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(newValue);
       if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {

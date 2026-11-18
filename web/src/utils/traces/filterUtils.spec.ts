@@ -11,6 +11,8 @@ import {
   mergeFilterTerm,
   mergePendingFilters,
   removeFieldCondition,
+  isRequiredCondition,
+  dropDanglingConnectors,
 } from "./filterUtils";
 
 // ---------------------------------------------------------------------------
@@ -889,5 +891,46 @@ describe("removeFieldCondition with AND inside a quoted value (issue 11966)", ()
   it("removes only the target condition and keeps a quoted ' and ' intact", () => {
     expect(removeFieldCondition("a = 'x and y' AND b = '1'", "b")).toBe("a = 'x and y'");
     expect(removeFieldCondition("a = 'x and y' AND b = '1'", "a")).toBe("b = '1'");
+  });
+});
+
+describe("isRequiredCondition — a condition every returned row meets", () => {
+  it.each([
+    ["alone", "span_status = 'ERROR'", true],
+    ["ANDed with another condition", "service_name='a' AND span_status='ERROR'", true],
+    ["inside an ANDed group", "(a = '1' and span_status = 'ERROR') and b = 2", true],
+    ["one branch of an OR", "service_name='a' OR span_status='ERROR'", false],
+    ["one branch of a bracketed OR", "(service_name='a' OR span_status='ERROR')", false],
+    ["inside an OR that is ANDed", "service_name='c' AND (h='500' OR span_status='ERROR')", false],
+    ["ANDed before an OR, which binds looser", "span_status='ERROR' AND a='1' OR b='2'", false],
+    ["negated", "span_status != 'ERROR'", false],
+    ["another value", "span_status = 'UNSET'", false],
+    ["only quoted text", "msg = 'span_status = ''ERROR'''", false],
+  ])("%s", (_name, query, expected) => {
+    expect(isRequiredCondition(query, "span_status", "'ERROR'")).toBe(expected);
+  });
+});
+
+describe("dropDanglingConnectors — tidying a filter after a condition is cut out", () => {
+  it.each([
+    ["a trailing OR", "service_name='a' OR ", "service_name='a'"],
+    ["a leading AND", " and service_name='a'", "service_name='a'"],
+    ["an OR left inside brackets", "(service_name='a' OR )", "(service_name='a')"],
+    ["an empty group", "service_name='c' AND ( )", "service_name='c'"],
+    ["two ANDs that met", "a = '1' and  and b = '2'", "a = '1' and b = '2'"],
+    ["an AND that met an OR", "a = '1' and  OR b = '2'", "a = '1' OR b = '2'"],
+    ["an OR that met an AND", "a = '1' or  and b = '2'", "a = '1' or b = '2'"],
+    ["nothing left", " AND ", ""],
+  ])("drops %s", (_name, query, expected) => {
+    expect(dropDanglingConnectors(query)).toBe(expected);
+  });
+
+  it("leaves quoted text, comments and call parentheses alone", () => {
+    expect(dropDanglingConnectors("msg = 'a or ' AND t > now()")).toBe(
+      "msg = 'a or ' AND t > now()",
+    );
+    expect(dropDanglingConnectors("msg = '( )' -- and (\nAND b = 1")).toBe(
+      "msg = '( )' -- and (\nAND b = 1",
+    );
   });
 });

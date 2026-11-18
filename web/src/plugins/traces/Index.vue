@@ -344,6 +344,7 @@ import {
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { isRequiredCondition } from "@/utils/traces/filterUtils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -2344,8 +2345,9 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
   return result;
 });
 
-const showErrorOnly = computed(
-  () => activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false,
+// Errors-only means every result is an error, so a span_status = 'ERROR' under an OR does not count.
+const showErrorOnly = computed(() =>
+  isRequiredCondition(searchObj.data.editorValue ?? "", "span_status", "'ERROR'"),
 );
 
 const searchData = (record = true) => {
