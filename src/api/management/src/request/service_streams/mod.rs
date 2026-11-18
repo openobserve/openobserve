@@ -776,7 +776,7 @@ fn without_o2_streams(
     (kept > 0 || dropped == 0).then_some(record)
 }
 
-/// `correlate` once, with the one location service whose spans carry the record's own dimensions.
+/// `correlate` once, from the record's own dimensions when the caller asks for it.
 #[cfg(feature = "enterprise")]
 async fn correlate_record(
     org_id: &str,
@@ -785,144 +785,25 @@ async fn correlate_record(
     identity_config: &config::meta::correlation::ServiceIdentityConfig,
     semantic_groups: &[config::meta::correlation::FieldAlias],
 ) -> anyhow::Result<Option<config::meta::service_streams::CorrelationResponse>> {
-    use o2_enterprise::enterprise::service_streams::{SourceIdentity, storage::correlate};
+    use o2_enterprise::enterprise::service_streams::storage::correlate;
     use openobserve_core::service_identity::signals::record_services::{
-        SERVICE_DIMENSION, has_instance_dims,
+        Reader, Spans, correlate_from_source, window,
     };
     let dims = &req.available_dimensions;
     if !req.resolve_from_source {
         return correlate(org_id, dims, identity_config, semantic_groups, None).await;
     }
-    let record_dims = req.record_dims();
-    // Only service_optional orgs rank by the source, so only they read spans.
-    let spans_vote = identity_config.service_optional
-        && has_instance_dims(record_dims, identity_config, semantic_groups);
-    let candidate_services = if spans_vote {
-        span_candidate(org_id, user_id, req, identity_config, semantic_groups)
-            .await
-            .into_iter()
-            .collect()
-    } else {
-        Vec::new()
-    };
-    let source = SourceIdentity {
-        candidate_services,
-        service: record_dims
-            .get(SERVICE_DIMENSION)
-            .map(|value| value.trim())
-            .filter(|value| !value.is_empty())
-            .map(String::from),
-        dims: record_dims.clone(),
-    };
-    correlate(
+    let now = config::utils::time::now_micros();
+    correlate_from_source(
         org_id,
+        Reader::User(user_id),
         dims,
+        req.record_dims(),
+        Spans::Window(window(req.start_time, req.end_time, now)),
         identity_config,
         semantic_groups,
-        Some(&source),
     )
     .await
-}
-
-/// The location's service that the spans the user may read vote for; a failure gives none.
-#[cfg(feature = "enterprise")]
-async fn span_candidate(
-    org_id: &str,
-    user_id: &str,
-    req: &CorrelationRequest,
-    identity_config: &config::meta::correlation::ServiceIdentityConfig,
-    semantic_groups: &[config::meta::correlation::FieldAlias],
-) -> Option<String> {
-    use o2_enterprise::enterprise::service_streams::storage::location_candidates;
-    use openobserve_core::service_identity::signals::record_services::{
-        Scope, service_for_record, window,
-    };
-    // The span vote runs a search, so a refused search leaves correlate its other ranks.
-    search_service::check_org_search_allowed(org_id).ok()?;
-    let dims = &req.available_dimensions;
-    let started = std::time::Instant::now();
-    let located = location_candidates(org_id, dims, identity_config, semantic_groups)
-        .await
-        .inspect_err(|e| log::warn!("[correlation] location candidates failed org={org_id}: {e}"))
-        .ok()?;
-    // One candidate needs no vote: correlate names it anyway.
-    if located.len() < 2 {
-        return None;
-    }
-    let names: Vec<String> = located.iter().map(|c| c.service.clone()).collect();
-    let wanted = located.iter().flat_map(|c| c.trace_streams.iter().cloned());
-    let readable = readable_trace_streams(org_id, user_id, wanted.collect()).await;
-    let streams = searchable_trace_streams(
-        located.iter().map(|c| c.trace_streams.as_slice()),
-        |stream| readable.contains(stream),
-    );
-    // Spans the caller may not read must not name the service, even indirectly.
-    if streams.is_empty() {
-        return None;
-    }
-    let scope = Scope {
-        org: org_id,
-        streams: &streams,
-        window: window(
-            req.start_time,
-            req.end_time,
-            config::utils::time::now_micros(),
-        ),
-    };
-    let found = service_for_record(
-        &scope,
-        req.record_dims(),
-        identity_config,
-        semantic_groups,
-        &names,
-    )
-    .await;
-    log::debug!(
-        "[correlation] span vote org={org_id} candidates={} streams={} found={found:?} took={:?}",
-        names.len(),
-        streams.len(),
-        started.elapsed()
-    );
-    found
-}
-
-/// The trace `streams` the user may read, by the per-stream check the search path applies.
-#[cfg(feature = "enterprise")]
-async fn readable_trace_streams(
-    org_id: &str,
-    user_id: &str,
-    streams: Vec<String>,
-) -> std::collections::HashSet<String> {
-    use config::meta::service_streams::{RelatedStreams, StreamInfo};
-    let related = RelatedStreams {
-        logs: vec![],
-        traces: streams.into_iter().map(StreamInfo::new).collect(),
-        metrics: vec![],
-        profiles: vec![],
-    };
-    let checker = openobserve_core::authz::active_checker();
-    openobserve_core::authz::readable_related_streams(checker.as_ref(), user_id, org_id, related)
-        .await
-        .traces
-        .into_iter()
-        .map(|info| info.stream_name)
-        .collect()
-}
-
-/// Each distinct candidate trace stream `may_read` keeps, sorted so equal sets look up alike.
-#[cfg(any(feature = "enterprise", test))]
-fn searchable_trace_streams<'a>(
-    candidate_streams: impl IntoIterator<Item = &'a [String]>,
-    may_read: impl Fn(&str) -> bool,
-) -> Vec<String> {
-    candidate_streams
-        .into_iter()
-        .flatten()
-        .filter(|stream| may_read(stream))
-        .cloned()
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
-        .collect()
 }
 
 #[cfg(test)]
@@ -1392,21 +1273,5 @@ mod tests {
         assert_eq!(mixed.logs_streams, serde_json::json!(["shop_logs"]));
         assert_eq!(mixed.traces_streams, serde_json::json!(["default"]));
         assert!(super::without_o2_streams(record(none.clone(), none.clone(), none)).is_some());
-    }
-
-    #[test]
-    fn only_trace_streams_the_caller_may_read_reach_the_span_lookup() {
-        let shop = vec!["shop".to_string(), "shared".to_string()];
-        let billing = vec!["billing_secret".to_string(), "shared".to_string()];
-        let candidates = [shop.as_slice(), billing.as_slice()];
-        assert_eq!(
-            super::searchable_trace_streams(candidates, |stream| stream != "billing_secret"),
-            vec!["shared".to_string(), "shop".to_string()],
-            "an unreadable stream is dropped before the lookup"
-        );
-        assert!(
-            super::searchable_trace_streams(candidates, |_| false).is_empty(),
-            "a caller who may read none gives the lookup no streams"
-        );
     }
 }

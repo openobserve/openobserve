@@ -33,7 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     preserveAspectRatio="none"
     role="img"
     :aria-label="ariaLabel"
-    :class="['w-full', sizeClass, toneClass]"
+    :class="['w-full', sizeClass, series ? undefined : toneClass]"
+    :style="series ? seriesSwatchColor(series) : undefined"
     :data-test="dataTest ? `${dataTest}-sparkline` : undefined"
   >
     <template v-if="shape === 'bar'">
@@ -74,6 +75,8 @@ import { computed } from "vue";
 
 import type { SparklinePoint, SparklineProps } from "./OSparkline.types";
 
+const seriesSwatchColor = (series: number) => ({ color: `var(--color-chart-series-${series})` });
+
 const props = withDefaults(defineProps<SparklineProps>(), {
   points: () => [],
   shape: "area",
@@ -94,6 +97,7 @@ const PAD = STROKE;
 const sizeClasses: Record<NonNullable<SparklineProps["size"]>, string> = {
   xs: "h-5",
   sm: "h-8",
+  md: "h-16",
 };
 
 // Matches OCoverageMeter's tone map, so a sparkline and the coverage read-out

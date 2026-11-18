@@ -892,6 +892,7 @@ import {
   buildChipDimensionsFromFilters,
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
+import { buildStreamFilterCondition } from "@/utils/telemetryCorrelation";
 import { serviceNamesSql } from "@/utils/serviceCount";
 import {
   escapeSingleQuotes,
@@ -3069,7 +3070,7 @@ export default defineComponent({
           // Build filter from the stream's resolved field names
           const filters: Record<string, string> = firstLogStream.filters || {};
           const filterParts = Object.entries(filters)
-            .map(([field, value]) => `${field}='${escapeSingleQuotes(value)}'`)
+            .map(([field, value]) => buildStreamFilterCondition(firstLogStream, field, value))
             .join(" AND ");
           if (filterParts) {
             filterQuery = filterParts;

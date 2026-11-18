@@ -23,7 +23,11 @@ import serviceStreamsApi, {
   type CorrelationResponse,
   type StreamInfo,
 } from "./service_streams";
-import { filterDimensionsForCorrelation } from "@/utils/telemetryCorrelation";
+import {
+  extractSemanticDimensions,
+  filterDimensionsForCorrelation,
+} from "@/utils/telemetryCorrelation";
+import { loadSemanticGroups } from "@/utils/semanticGroupsCache";
 import {
   loadIdentityConfig,
   clearIdentityConfigCache,
@@ -766,7 +770,27 @@ export interface IncidentCorrelatedStreams {
   metricStreams: StreamInfo[];
   traceStreams: StreamInfo[];
   correlationData: CorrelationResponse | null;
+  /** Set when the incident and its firings carry nothing correlation can locate it by. */
+  emptyReason?: "no_service_dimensions";
 }
+
+/** What the drawer knows about an incident's firings when it asks for related telemetry. */
+export interface IncidentCorrelationFirings {
+  triggers: IncidentAlert[];
+  /** Microseconds, the drawer's padded incident window. */
+  window: { startTime: number; endTime: number };
+}
+
+/** Every firing's labels as one record; the first firing with a non-blank value gives it. */
+const firingLabels = (triggers: IncidentAlert[]): Record<string, string> => {
+  const labels: Record<string, string> = {};
+  for (const trigger of triggers) {
+    for (const [key, value] of Object.entries(trigger.labels ?? {})) {
+      if (!(key in labels) && value.trim()) labels[key] = value;
+    }
+  }
+  return labels;
+};
 
 const LIVE_EVENTS: Record<RcaLiveEvent["event"], true> = {
   rca: true,
@@ -1042,50 +1066,76 @@ const incidents = {
    * @param incident The incident with group_values
    * @param t Translator, threaded from the calling component — the only
    *   user-facing string here is the "unknown service" fallback name.
+   * @param firings The firings whose labels name the incident's own service, and the window
    * @returns Correlated streams grouped by type
    */
   getCorrelatedStreams: async (
     org_identifier: string,
     incident: Incident,
     t: TranslateFn,
+    firings: IncidentCorrelationFirings,
   ): Promise<IncidentCorrelatedStreams> => {
     const allDimensions = incident.group_values ?? {};
+    const labels = firingLabels(firings.triggers);
+    const labelDimensions = Object.keys(labels).length
+      ? extractSemanticDimensions(
+          { timestamp: 0, fields: labels },
+          await loadSemanticGroups(org_identifier),
+        )
+      : {};
+    // The incident's own dimensions outrank any one firing's labels when naming its service.
+    const sourceDimensions = { ...labelDimensions, ...allDimensions };
 
     // Load identity config to filter dimensions (with caching)
-    let filteredDimensions = allDimensions;
+    let locate = (dims: Record<string, string>) => dims;
+    let locateByService = locate;
     try {
       const identityConfig = await loadIdentityConfig(org_identifier);
 
       // Filter dimensions to only include disambiguation fields
-      filteredDimensions = filterDimensionsForCorrelation(allDimensions, identityConfig);
+      locate = (dims) => filterDimensionsForCorrelation(dims, identityConfig);
+      // A service alone locates an incident, though a service-optional location leaves it out.
+      locateByService = (dims) =>
+        filterDimensionsForCorrelation(dims, { ...identityConfig, service_optional: false });
     } catch (err) {
       console.warn(
         "[incidents] Failed to load identity config for dimension filtering, using all dimensions:",
         err,
       );
     }
+    const location =
+      [locate(allDimensions), locate(labelDimensions), locateByService(sourceDimensions)].find(
+        (dims) => Object.keys(dims).length,
+      ) ?? {};
+
+    const uncorrelated = (emptyReason?: IncidentCorrelatedStreams["emptyReason"]) => ({
+      serviceName: t("traces.unknownService"),
+      matchedDimensions: {},
+      additionalDimensions: allDimensions,
+      logStreams: [],
+      metricStreams: [],
+      traceStreams: [],
+      correlationData: null,
+      ...(emptyReason && { emptyReason }),
+    });
+    // Correlate finds nothing without a location, so the drawer says why instead of asking.
+    if (!Object.keys(location).length) return uncorrelated("no_service_dimensions");
 
     const request: CorrelationRequest = {
       source_stream: "",
       source_type: "incident",
-      available_dimensions: filteredDimensions,
+      available_dimensions: location,
+      source_dimensions: sourceDimensions,
+      resolve_from_source: true,
+      start_time: firings.window.startTime,
+      end_time: Math.min(firings.window.endTime, Date.now() * 1000),
     };
 
     const response = await serviceStreamsApi.correlate(org_identifier, request);
     const correlationData = response.data;
 
     // Handle null response when no service is found
-    if (!correlationData) {
-      return {
-        serviceName: t("traces.unknownService"),
-        matchedDimensions: {},
-        additionalDimensions: allDimensions,
-        logStreams: [],
-        metricStreams: [],
-        traceStreams: [],
-        correlationData: null,
-      };
-    }
+    if (!correlationData) return uncorrelated();
 
     return {
       serviceName: correlationData.service_name,

@@ -28,6 +28,7 @@ import type {
 } from "@/components/autoobserve/unfold.types";
 import { getIntlLocale } from "@/locales";
 import { formatTimestampInTimezone } from "@/utils/date";
+import { relativeTimeText } from "@/lib/core/Table/cells/relativeTime";
 import { resolveBrowserTimezone } from "@/utils/timezone";
 import { getCronIntervalInMinutes } from "@/utils/queryUtils";
 import { isErrorOutcome } from "@/utils/alerts/runOutcome";
@@ -191,14 +192,19 @@ export const incidentZone = (timezone?: string) =>
   "UTC";
 const dateTime = (zone: string, us: number, format = "MMM D, HH:mm:ss") =>
   formatTimestampInTimezone(us, format, zone);
-/** "HH:mm", dated when it falls on a later day than `since`. */
-const clock = (zone: string, us: number, since = us) => {
-  const sameDay = dateTime(zone, us, "YYYY-MM-DD") === dateTime(zone, since, "YYYY-MM-DD");
+export const incidentTime = (zone: string, us: number) => dateTime(zone, us, "YYYY-MM-DD HH:mm");
+export const incidentRangeEnd = (zone: string, first: number, last: number) =>
+  dateTime(zone, first, "YYYY-MM-DD") === dateTime(zone, last, "YYYY-MM-DD")
+    ? dateTime(zone, last, "HH:mm")
+    : incidentTime(zone, last);
+/** "2 hours ago" on the header's server clock, which ticks once a minute, so a newer moment never reads "in 20 seconds". */
+export const incidentAge = (us: number, nowUs: number) =>
+  relativeTimeText(us / 1000, Math.max(us, nowUs) / 1000);
+const tickTime = (zone: string, us: number, now: number) => {
+  const sameDay = dateTime(zone, us, "YYYY-MM-DD") === dateTime(zone, now, "YYYY-MM-DD");
   return dateTime(zone, us, sameDay ? "HH:mm" : "MMM D, HH:mm");
 };
 const minuteOf = (us: number) => Math.floor(us / MINUTE_US);
-/** "HH:mm" today, else "MMM D, HH:mm". */
-export const incidentTime = (zone: string, us: number, now: number) => clock(zone, us, now);
 
 // Spreading a data array into Math.max/min throws RangeError past ~100,000 items.
 export const maxOf = (values: readonly number[], initial = -Infinity) =>
@@ -236,7 +242,7 @@ export function unfoldDuration(t: TranslateFn, us: number): I18nText {
 }
 
 // Service discovery reports "unknown" when it found none; that lane falls back to the stream.
-const isNamedService = (service: string) => !!service.trim() && service.trim() !== "unknown";
+export const isNamedService = (service: string) => !!service.trim() && service.trim() !== "unknown";
 
 const laneOf = (
   t: TranslateFn,
@@ -319,26 +325,27 @@ const bucketsOf = (times: number[], from: number, to: number, minutes = STRIP_BU
   return counts;
 };
 
-const histogramBucket = (time: Clock) =>
-  HISTOGRAM_BUCKET_SIZES.find(
-    (b) => Math.ceil((time.end - time.start) / (b.minutes * MINUTE_US)) <= HISTOGRAM_BUCKETS,
-  ) ?? HISTOGRAM_BUCKET_SIZES[HISTOGRAM_BUCKET_SIZES.length - 1];
+export const histogramBucketFor = (spanUs: number, limit = HISTOGRAM_BUCKETS) =>
+  HISTOGRAM_BUCKET_SIZES.find((b) => Math.ceil(spanUs / (b.minutes * MINUTE_US)) <= limit) ??
+  HISTOGRAM_BUCKET_SIZES[HISTOGRAM_BUCKET_SIZES.length - 1];
+
+const histogramBucket = (time: Clock) => histogramBucketFor(time.end - time.start);
 
 const histogramOf = (t: TranslateFn, run: AlertRun, time: Clock): UnfoldHistogram => {
   const bucket = histogramBucket(time);
   const { zone } = time;
   const to = time.open
-    ? t("alerts.incidents.unfold.nowAt", { time: dateTime(zone, time.end, "MMM D, HH:mm") })
-    : raw(dateTime(zone, time.end, "MMM D, HH:mm"));
+    ? t("alerts.incidents.unfold.nowAt", { time: dateTime(zone, time.end, "YYYY-MM-DD HH:mm") })
+    : raw(dateTime(zone, time.end, "YYYY-MM-DD HH:mm"));
   // A range of days or more reads by date; a shorter one by time, dated when not today.
   const byDate = time.end - time.start >= 4 * DAY_US;
   const tick = (us: number) =>
-    byDate ? dateTime(zone, us, "MMM D") : incidentTime(zone, us, time.now);
+    byDate ? dateTime(zone, us, "MMM D") : tickTime(zone, us, time.now);
   return {
     points: bucketsOf(run.times, time.start, time.end, bucket.minutes),
     caption: t("alerts.incidents.unfold.histogramCaption", {
       bucket: t(bucket.label),
-      from: dateTime(zone, time.start, "MMM D, HH:mm"),
+      from: dateTime(zone, time.start, "YYYY-MM-DD HH:mm"),
       to,
     }),
     ticks: [
@@ -357,14 +364,18 @@ const GROUPED_BY: Partial<Record<IncidentAlert["correlation_reason"], I18nKey>> 
   secondary_match: "alerts.incidents.unfold.grouped.relatedLabels",
 };
 
-// The range's end drops what its start already says: a same-day end is a time, a past day a date.
-const untilOf = (run: AlertRun, time: Clock) => {
-  const last = run.times[run.times.length - 1];
-  if (run.times.length === 1) return undefined;
-  const day = (us: number) => dateTime(time.zone, us, "YYYY-MM-DD");
-  const sameDay = day(last) === day(run.times[0]) || day(last) === day(time.now);
-  return dateTime(time.zone, last, sameDay ? "HH:mm" : "MMM D");
-};
+const untilOf = (run: AlertRun, time: Clock) =>
+  run.times.length > 1
+    ? incidentRangeEnd(time.zone, run.times[0], run.times[run.times.length - 1])
+    : undefined;
+
+const agoOf = (t: TranslateFn, run: AlertRun, time: Clock) =>
+  run.times.length > 1
+    ? t("alerts.incidents.unfold.agoRange", {
+        first: incidentAge(run.times[0], time.now),
+        last: incidentAge(run.times[run.times.length - 1], time.now),
+      })
+    : raw(incidentAge(run.times[0], time.now));
 
 /** Minutes between checks; a cron alert's from its schedule, else its frequency. */
 const checkMinutes = (row: IncidentAlertRow) => {
@@ -545,10 +556,7 @@ const summaryOf = (
     count,
     first: run.times[0],
     last: run.times[count - 1],
-    times:
-      count <= CHIP_LIMIT
-        ? run.times.map((at) => incidentTime(time.zone, at, time.now))
-        : undefined,
+    times: count <= CHIP_LIMIT ? run.times.map((at) => incidentTime(time.zone, at)) : undefined,
     ...(count > 1 && { medianInterval: median(intervals), longestGap: maxOf(intervals) }),
     ...(count > CHIP_LIMIT && { histogram: histogramOf(t, run, time) }),
     groupedBy: reason ? t(reason) : undefined,
@@ -574,8 +582,9 @@ const alertCard = (
     id: `alert-${run.id}`,
     kind: "alert",
     lane: run.lane,
-    at: incidentTime(time.zone, run.times[0], time.now),
+    at: incidentTime(time.zone, run.times[0]),
     until: untilOf(run, time),
+    ago: agoOf(t, run, time),
     minute: minuteOf(run.times[0]),
     title: raw(run.name),
     detail: count === 1 ? t("alerts.incidents.unfold.firedOnce") : undefined,
@@ -790,7 +799,8 @@ const teamCards = (
       kind: "outcome",
       outcome: "acknowledged",
       lane: null,
-      at: incidentTime(time.zone, ackAt, time.now),
+      at: incidentTime(time.zone, ackAt),
+      ago: raw(incidentAge(ackAt, time.now)),
       minute: minuteOf(ackAt),
       title: t("alerts.incidents.unfold.acknowledged"),
       detail: ackEvent
@@ -809,7 +819,8 @@ const teamCards = (
       kind: "outcome",
       outcome: "resolved",
       lane: null,
-      at: incidentTime(time.zone, resolvedAt, time.now),
+      at: incidentTime(time.zone, resolvedAt),
+      ago: raw(incidentAge(resolvedAt, time.now)),
       minute: minuteOf(resolvedAt),
       title: t("autoobserve.unfold.outcome.resolved"),
       detail: byLine(t, resolveEvent?.data?.user_id, input.events !== undefined),
@@ -829,7 +840,7 @@ const teamCards = (
       title: t("alerts.incidents.unfold.open"),
       detail: ackAt
         ? t("alerts.incidents.unfold.openSince", {
-            time: incidentTime(time.zone, time.start, time.now),
+            time: incidentTime(time.zone, time.start),
           })
         : t("alerts.incidents.unfold.notAcknowledged"),
       tone: "team",

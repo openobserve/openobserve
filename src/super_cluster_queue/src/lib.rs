@@ -96,10 +96,11 @@ fn parse_eval_key(
     }
 }
 
-/// The `incidents` key carries two payloads; byte 94 is the unmute an older region skips.
+/// The `incidents` key carries three payloads; older regions skip bytes 94 and 103.
 async fn incident_msg(msg: Message) -> infra::errors::Result<()> {
     match msg.message_type {
         MessageType::IncidentUnmute => incidents::process_unmute(msg).await,
+        MessageType::IncidentMembership => incidents::process_membership(msg).await,
         _ => incidents::process(msg).await,
     }
 }

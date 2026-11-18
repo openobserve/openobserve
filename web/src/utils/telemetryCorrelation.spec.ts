@@ -20,6 +20,7 @@ import {
   quoteSqlIdentifier,
   quoteSqlLiteral,
   buildSqlCondition,
+  buildStreamFilterCondition,
   applyFilterOverlay,
   applyDimensionEditsToFilters,
   mergeSubjectOverrides,
@@ -340,6 +341,36 @@ describe("telemetryCorrelation", () => {
 
     it("always quotes identifiers, including ones with special characters", () => {
       expect(buildSqlCondition("k8s-pod.name", "web-1")).toBe("\"k8s-pod.name\" = 'web-1'");
+    });
+
+    it.each([
+      ["no alias, unchanged", {}, "namespace", "kube", `"namespace" = 'kube'`],
+      [
+        "each alias the stream holds",
+        { filter_aliases: { namespace: ["k8s_namespace_name"] } },
+        "namespace",
+        "kube",
+        `("namespace" = 'kube' OR "k8s_namespace_name" = 'kube')`,
+      ],
+      [
+        "the filter field when an edit landed on one of its aliases",
+        { filter_aliases: { namespace: ["k8s_namespace_name"] } },
+        "k8s_namespace_name",
+        "kube",
+        `("k8s_namespace_name" = 'kube' OR "namespace" = 'kube')`,
+      ],
+      [
+        "each alias under the filter's spellings",
+        {
+          filter_aliases: { service_name: ["service"] },
+          filter_spellings: { service_name: ["checkout", "checkout.service"] },
+        },
+        "service_name",
+        "checkout",
+        `(lower(trim("service_name")) IN ('checkout', 'checkout.service') OR lower(trim("service")) IN ('checkout', 'checkout.service'))`,
+      ],
+    ])("matches a stream filter on %s", (_, stream, field, value, sql) => {
+      expect(buildStreamFilterCondition(stream, field, value)).toBe(sql);
     });
 
     it("coerces non-string inputs before escaping", () => {

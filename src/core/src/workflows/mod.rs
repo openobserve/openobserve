@@ -63,6 +63,20 @@ pub struct WorkflowTrigger {
     pub metadata: HashMap<String, Value>,
     pub run_id: String,
     pub origin_cluster: String,
+    /// The alert an incident event is about; the run is skipped once a move took it out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_alert_id: Option<String>,
+}
+
+/// One trigger to send; `member_alert_id` skips the run once that alert has left the incident.
+pub struct TriggerRequest<'a> {
+    pub trace_id: &'a str,
+    pub org_id: &'a str,
+    pub source_id: String,
+    pub trigger_type: WorkflowTriggerType,
+    pub workflow_id: &'a str,
+    pub metadata: HashMap<String, Value>,
+    pub member_alert_id: Option<String>,
 }
 
 /// The two run flags travel together; separate bool params would push `test_workflow` past
@@ -1118,6 +1132,31 @@ pub async fn send_workflow_trigger(
     metadata: HashMap<String, Value>,
     data: &[Value],
 ) -> Result<String, anyhow::Error> {
+    let request = TriggerRequest {
+        trace_id,
+        org_id,
+        source_id,
+        trigger_type,
+        workflow_id,
+        metadata,
+        member_alert_id: None,
+    };
+    send_member_workflow_trigger(request, data).await
+}
+
+pub async fn send_member_workflow_trigger(
+    request: TriggerRequest<'_>,
+    data: &[Value],
+) -> Result<String, anyhow::Error> {
+    let TriggerRequest {
+        trace_id,
+        org_id,
+        source_id,
+        trigger_type,
+        workflow_id,
+        metadata,
+        member_alert_id,
+    } = request;
     if !get_o2_config().common.workflows_enabled {
         return Ok(String::new());
     }
@@ -1151,6 +1190,7 @@ pub async fn send_workflow_trigger(
         metadata,
         run_id: run_id.clone(),
         origin_cluster: config::get_cluster_name(),
+        member_alert_id,
     };
     runtime::send_workflow_trigger(trigger).await?;
     log::info!("successfully sent workflow trigger for trace id {trace_id} run id {run_id}");
@@ -1244,6 +1284,15 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
                 return;
             }
         }
+    }
+
+    if !trigger_still_applies(&trigger).await {
+        log::info!(
+            "workflow trigger {} for incident {} skipped: its alert moved out",
+            trigger.trace_id,
+            trigger.source_id
+        );
+        return;
     }
 
     let run_id = trigger.run_id.clone();
@@ -1344,6 +1393,27 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
     }
 
     log::info!("[workflow_trigger {trace_id}] run id {run_id} completed execution");
+}
+
+/// Read on the primary when the run starts; another region's copy may lag the join, so only the
+/// region that recorded the event decides, and a failed read runs it as before.
+pub async fn trigger_still_applies(trigger: &WorkflowTrigger) -> bool {
+    let Some(alert_id) = trigger.member_alert_id.as_deref() else {
+        return true;
+    };
+    if trigger.origin_cluster != config::get_cluster_name() {
+        return true;
+    }
+    match infra::table::alert_incidents::has_member(&trigger.source_id, alert_id).await {
+        Ok(member) => member,
+        Err(e) => {
+            log::warn!(
+                "membership of {alert_id} in incident {} not read, running: {e}",
+                trigger.source_id
+            );
+            true
+        }
+    }
 }
 
 pub async fn get_data_for_run(

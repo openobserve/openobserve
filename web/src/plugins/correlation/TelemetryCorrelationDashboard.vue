@@ -1091,7 +1091,7 @@ import type { StreamInfo } from "@/services/service_streams";
 import { enrichStreamsWithOverlap } from "@/utils/streamTimeOverlap";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
-  buildSqlCondition,
+  buildStreamFilterCondition,
   buildFieldToGroupIdMap,
   applyDimensionEditsToFilters,
   quoteSqlLiteral,
@@ -2909,9 +2909,7 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
   const filterParts: string[] = [];
   if (traceStreamInfo.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(
-        buildSqlCondition(fieldName, value, traceStreamInfo.filter_spellings?.[fieldName]),
-      );
+      filterParts.push(buildStreamFilterCondition(traceStreamInfo, fieldName, value));
     }
   }
   const filter = withVersionFilter(filterParts);
@@ -3037,9 +3035,7 @@ const openTracesPage = () => {
 
   if (traceStreamInfo?.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(
-        buildSqlCondition(fieldName, value, traceStreamInfo.filter_spellings?.[fieldName]),
-      );
+      filterParts.push(buildStreamFilterCondition(traceStreamInfo, fieldName, value));
     }
   }
 

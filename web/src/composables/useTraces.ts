@@ -23,7 +23,11 @@ import type { TranslateFn } from "@/types/i18n";
 import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
-import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
+import {
+  buildFieldToGroupIdMap,
+  filterAliasFields,
+  quoteSqlLiteral,
+} from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { isLeavingRoute } from "@/utils/pendingNavigation";
@@ -672,11 +676,15 @@ const useTraces = () => {
     const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
 
     const groupIdFor = (field: string) => fieldToGroupId.get(field.toLowerCase()) ?? field;
-    const setCondition = (field: string, value: string) =>
+    const setCondition = (field: string, value: string, aliases?: Record<string, string[]>) => {
+      const matches = filterAliasFields(field, aliases).map(
+        (f) => `${quoteSqlIdentifierIfNeeded(f)} = ${quoteSqlLiteral(value)}`,
+      );
       conditions.set(
         groupIdFor(field),
-        `${quoteSqlIdentifierIfNeeded(field)} = ${quoteSqlLiteral(value)}`,
+        matches.length > 1 ? `(${matches.join(" or ")})` : matches[0],
       );
+    };
 
     // A trace id alone pins the logs; dimension or span filters would drop rows lacking them.
     if (traceId) {
@@ -688,7 +696,7 @@ const useTraces = () => {
           if (!value || value === SELECT_ALL_VALUE || field.startsWith("_")) continue;
           // First stream to claim a group wins.
           if (conditions.has(groupIdFor(field))) continue;
-          setCondition(field, String(value));
+          setCondition(field, String(value), streamInfo.filter_aliases);
         }
       }
       if (spanId) setCondition(getSpanIdField(), spanId);
