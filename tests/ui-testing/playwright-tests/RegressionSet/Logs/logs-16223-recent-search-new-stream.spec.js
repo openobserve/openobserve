@@ -10,14 +10,6 @@ const RID = Math.random().toString(36).slice(2, 7);
 const NEW_STREAM = `e2e_16223_${RID}`;
 const MARKER = `restored-16223-${RID}`;
 
-const runInFlight = '[data-test="logs-search-bar-refresh-btn"][class*="bg-cancel-query-bg"]';
-const runPending = '[data-test="logs-search-bar-refresh-btn"][data-run-pending="true"]';
-const recentButton = '[data-test="logs-search-bar-recent-searches-btn"]';
-const drawer = '[data-test="recent-searches-drawer"]';
-const drawerSearch = '[data-test="recent-searches-search"] input';
-const drawerRows = '[data-test^="recent-searches-drawer-row-"]';
-const resultRows = '[data-test="logs-search-result-logs-table"] tbody tr';
-
 const logsUrl = (stream) =>
   `/web/logs?org_identifier=${ORG}&stream=${stream}&stream_type=logs&period=15m` +
   '&refresh=0&sql_mode=false&quick_mode=false&show_histogram=false';
@@ -45,33 +37,26 @@ test.describe('Recent search restores a stream created after the list was cached
 
     // A second tab loads after the stream exists; only a search the user edits and runs is recorded.
     const other = await context.newPage();
+    const otherPm = new PageManager(other);
     await other.goto(logsUrl(NEW_STREAM));
-    await expect(other.locator(resultRows).first()).toBeVisible({ timeout: 60000 });
-    await expect(other.locator(runInFlight)).toHaveCount(0, { timeout: 60000 });
-    // The query input is remembered per browser, so switch the filter builder back to the editor when it shows.
-    const builderToggle = other.locator('[data-test="logs-search-bar-filter-builder-toggle"]');
-    if ((await builderToggle.getAttribute('aria-pressed').catch(() => null)) === 'true') await builderToggle.click();
-    await new PageManager(other).logsPage.fillQueryEditor("level='info'");
-    await expect(other.locator(runPending)).toBeVisible({ timeout: 10000 });
+    await otherPm.logsPage.waitForSearchResultRows(60000);
+    await otherPm.logsPage.expectNoQueryInFlight(60000);
+    await otherPm.logsPage.ensureQueryEditorMode();
+    await otherPm.logsPage.fillQueryEditor("level='info'");
     const recorded = other.waitForResponse(
       (r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/query_history') && r.ok(),
       { timeout: 60000 },
     );
-    await other.locator(runPending).click();
+    await otherPm.logsPage.runPendingQuery();
     await recorded;
     await other.close();
 
-    await page.locator(recentButton).click();
-    await expect(page.locator(drawer)).toBeVisible({ timeout: 15000 });
-    await page.locator(drawer).locator(drawerSearch).fill(NEW_STREAM);
-    // The search re-renders the list when its answer lands, and a click on a row it replaces is lost.
-    await expect(page.locator(drawer).locator(drawerRows)).toHaveCount(1, { timeout: 15000 });
-    const row = page.locator(drawer).locator(drawerRows).filter({ hasText: NEW_STREAM });
-    await expect(row).toBeVisible();
-    await row.click();
+    await pm.logsPage.openRecentSearchesDrawer();
+    await pm.logsPage.filterRecentSearches(NEW_STREAM, 1);
+    await pm.logsPage.clickRecentSearchRow(NEW_STREAM);
 
-    await expect(page.locator(resultRows).filter({ hasText: MARKER }).first(), 'the restored search runs on the new stream').toBeVisible({ timeout: 60000 });
-    await expect(page.getByText('streams were not found')).toHaveCount(0);
+    // The pre-fix restore threw "streams were not found" before searching, so the marker rows are the proof.
+    await pm.logsPage.expectResultRowWithText(MARKER);
     expect(new URL(page.url()).searchParams.get('stream')).toBe(NEW_STREAM);
   });
 });

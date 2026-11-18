@@ -57,13 +57,11 @@ test.describe('Pipeline stream node keeps the selected stream type (#16318)', ()
     hold.release();
     await logsList;
 
-    const option = (name) =>
-      page.locator(`[data-test="input-node-stream-name-select-option"][data-test-value="${name}"]`);
     await pm.pipelinesPage.enterStreamName(traceStream);
-    await expect(option(traceStream).first(), 'the traces stream is offered').toBeVisible({ timeout: 15000 });
+    await pm.pipelinesPage.expectStreamNameOptionVisible(traceStream);
     await pm.pipelinesPage.enterStreamName(LOGS_STREAM);
     // The traces row leaving proves the search filter ran, so the next count is not read too early.
-    await expect(option(traceStream)).toHaveCount(0, { timeout: 10000 });
-    await expect(option(LOGS_STREAM), 'a logs stream must not be offered for traces').toHaveCount(0);
+    await pm.pipelinesPage.expectStreamNameOptionCount(traceStream, 0);
+    await pm.pipelinesPage.expectStreamNameOptionCount(LOGS_STREAM, 0);
   });
 });

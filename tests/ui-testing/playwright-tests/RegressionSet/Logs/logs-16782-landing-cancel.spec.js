@@ -7,11 +7,6 @@ const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 const ORG = getOrgIdentifier() || 'default';
 const STREAM = `e2e_16782_${Math.random().toString(36).slice(2, 7)}`;
 
-const runButton = '[data-test="logs-search-bar-refresh-btn"]';
-const runInFlight = '[data-test="logs-search-bar-refresh-btn"][class*="bg-cancel-query-bg"]';
-const rows = '[data-test="logs-search-result-logs-table"] tbody tr';
-const noQueryApplied = '[data-test="logs-search-apply-search-text"]';
-
 const logsUrl = () =>
   `/web/logs?org_identifier=${ORG}&stream=${STREAM}&stream_type=logs&period=15m` +
   '&refresh=0&sql_mode=false&quick_mode=false&show_histogram=true';
@@ -52,32 +47,32 @@ test.describe('Logs landing search after Cancel (#16782)', () => {
   test('Cancel while the stream list loads: no landing search, and Run query sends one', {
     tag: ['@bug-16782', '@P2', '@regression', '@logsRegression'],
   }, async ({ page }) => {
+    const pm = new PageManager(page);
     const hold = await holdStreamList(page);
     const searches = trackSearches(page);
     await page.goto(logsUrl());
 
     await expect.poll(hold.held, { timeout: 30000, message: 'the logs stream list was never requested' }).toBeGreaterThan(0);
-    await expect(page.locator(runInFlight)).toBeVisible({ timeout: 30000 });
-    await page.locator(runInFlight).click();
-    await expect(page.locator(runInFlight)).toHaveCount(0, { timeout: 10000 });
+    await pm.logsPage.expectQueryInFlight();
+    await pm.logsPage.cancelInFlightQuery();
 
     const listLoaded = page.waitForResponse((r) => /\/streams\?/.test(r.url()) && r.url().includes('type=logs'), { timeout: 30000 });
     hold.release();
     await listLoaded;
     await page.unroute(/\/api\/[^/]+\/streams\?/);
-    await new PageManager(page).logsPage.waitForStreamFieldsLoaded('level');
+    await pm.logsPage.waitForStreamFieldsLoaded('level');
 
     // A skipped landing run ends on the no-query-applied state; the broken build searched instead, with a 0 ms landing debounce.
     await expect.poll(async () => {
       if (searches.hits().length) return 'searched';
-      return (await page.locator(noQueryApplied).isVisible()) ? 'idle' : 'loading';
+      return (await pm.logsPage.isNoQueryAppliedVisible()) ? 'idle' : 'loading';
     }, { timeout: 15000, message: 'after Cancel the landing run must end idle without a search' }).toBe('idle');
     expect(searches.hits(), 'no search may start after Cancel').toHaveLength(0);
-    await expect(page.locator(runInFlight)).toHaveCount(0);
+    await pm.logsPage.expectNoQueryInFlight();
 
     testLogger.info('Run query sends exactly one search and shows the rows');
-    await page.locator(runButton).click();
-    await expect(page.locator(rows).first()).toBeVisible({ timeout: 60000 });
+    await pm.logsPage.clickRefreshButton();
+    await pm.logsPage.waitForSearchResultRows(60000);
     expect(searches.hits()).toHaveLength(1);
   });
 });
