@@ -135,6 +135,9 @@ class AnomalyDetectionPage {
             summaryStrip: '[data-test="alerts-anomalysummarystrip"]',
             summaryStripLoading: '[data-test="alerts-anomalysummarystrip-loading"]',
             summaryStripOpen: '[data-test="alerts-anomalysummarystrip-open"]',
+            summaryStripChip: '[data-test="alerts-anomalysummarystrip-chip"]',
+            summaryStripMessage: '[data-test="alerts-anomalysummarystrip-message"]',
+            summaryStripReadings: '[data-test="alerts-anomalysummarystrip-readings"]',
             // One banner component on Logs, Traces and Metrics, told apart by the page's own prefix.
             originBanner: (page) => `[data-test="${page}-anomaly-origin-banner"]`,
             originBannerPart: (page, part) => `[data-test="${page}-anomaly-origin-banner-${part}"]`,
@@ -1002,6 +1005,20 @@ class AnomalyDetectionPage {
     async waitForSummaryStrip() {
         await this.getSummaryStripLocator().waitFor({ state: 'visible', timeout: 20000 });
         await expect(this.page.locator(this.selectors.summaryStripLoading)).toHaveCount(0, { timeout: 30000 });
+    }
+
+    /** The state chip: Ongoing, Back in range, In range, Learning, Paused, No new data or No recent runs. */
+    getSummaryStripChipLocator() {
+        return this.page.locator(this.selectors.summaryStripChip);
+    }
+
+    /** The one sentence of a state with no readings, such as "No anomalies in the last 7 days". */
+    getSummaryStripMessageLocator() {
+        return this.page.locator(this.selectors.summaryStripMessage);
+    }
+
+    getSummaryStripReadingsLocator() {
+        return this.page.locator(this.selectors.summaryStripReadings);
     }
 
     getSummaryStripOpenLocator() {

@@ -29,7 +29,10 @@ export interface AnomalyStripView {
   /** The 7-day search reached the first bucket of the model, so the true start is earlier. */
   startedBefore: boolean;
   sinceUs: number | null;
+  /** Null when the window is clipped, because the true start is not known. */
   lastedMs: number | null;
+  /** Ongoing only: from the start to the window end, so it moves only when the strip reloads. */
+  ongoingMs: number | null;
   lastRunUs: number | null;
   /** Set for the "No new data" state and for the gray second line under Ongoing. */
   noNewDataSinceUs: number | null;
@@ -84,12 +87,15 @@ export function anomalyStripView(
     newestEndUs !== null &&
     config.scheduleMs !== null &&
     nowUs - newestEndUs < config.scheduleMs * 1000;
+  const clipped = !!win?.clipped;
   const base: AnomalyStripView = {
     state: "none",
     startedUs,
-    startedBefore: !!win?.clipped,
+    startedBefore: clipped,
     sinceUs,
-    lastedMs: sinceUs !== null && startedUs !== null ? (sinceUs - startedUs) / 1000 : null,
+    lastedMs:
+      !clipped && sinceUs !== null && startedUs !== null ? (sinceUs - startedUs) / 1000 : null,
+    ongoingMs: null,
     lastRunUs: res.last_detection_run,
     noNewDataSinceUs: noNewData ? res.no_new_data_since_us : null,
     incomplete,
@@ -98,7 +104,11 @@ export function anomalyStripView(
   if (!config.enabled) return { ...base, state: "paused" };
   // Rule 10: while untrained the strip says Learning, whatever the run freshness.
   if (!config.isTrained) return { ...base, state: "learning" };
-  if (res.state === "ongoing") return { ...base, state: "ongoing", summary };
+  if (res.state === "ongoing") {
+    const ongoingMs =
+      !clipped && win !== null && startedUs !== null ? (win.end_us - startedUs) / 1000 : null;
+    return { ...base, state: "ongoing", summary, ongoingMs };
+  }
   if (noRecentRuns) return { ...base, state: "no_recent_runs" };
   if (noNewData) return { ...base, state: "no_new_data" };
   // A peer cluster sends no run time, and there the strip shows no stale state.
@@ -114,9 +124,33 @@ export function formatUtcHm(us: number): string {
   return new Date(us / 1000).toISOString().slice(11, 16);
 }
 
+const localDay = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+/**
+ * Strip and popover time in the zone of the chart axis: the chart sets no zone, so ECharts
+ * draws the axis in the browser zone. A time on another day than `refUs` also shows the date.
+ */
+export function formatAnomalyTime(us: number, refUs: number): string {
+  const d = new Date(us / 1000);
+  const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  if (localDay(d) === localDay(new Date(refUs / 1000))) return hm;
+  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${hm}`;
+}
+
+/** "2026-11-16 18:00" in UTC, for the tooltip of a strip or popover time; the copy appends "UTC". */
+export function formatAnomalyTimeUtc(us: number): string {
+  return new Date(us / 1000).toISOString().slice(0, 16).replace("T", " ");
+}
+
 /** Two decimals from 1 up, as the alert copy writes them; smaller values keep their digits. */
 export function formatAnomalyNumber(value: number): string {
   return Math.abs(value) >= 1 ? formatReading(value, 2) : formatReading(value);
+}
+
+/** The arrow before a signed change; none for no change. */
+export function changeArrow(percent: number): string {
+  if (percent > 0) return "▲";
+  return percent < 0 ? "▼" : "";
 }
 
 export function formatChangePercent(percent: number): string {

@@ -562,7 +562,10 @@ describe("AnomalyDetectionChart", () => {
       wrapper = await mountChart({ ...ANOMALY, is_trained: true, current_model_version: 0 });
       expect(explore).toHaveBeenCalledTimes(1);
       expect(explore.mock.calls[0][2]).toEqual({});
-      expect(wrapper.find('[data-test="alerts-anomalysummarystrip-state-none"]').text()).toBe(
+      expect(wrapper.find('[data-test="alerts-anomalysummarystrip-state-none"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="alerts-anomalysummarystrip-message"]').text()).toBe(
         "No anomalies in the last 7 days",
       );
     });

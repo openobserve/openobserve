@@ -32,7 +32,7 @@
         class="text-text-heading text-sm font-semibold"
         data-test="alerts-anomalypointpopover-range"
       >
-        {{ rangeText }}
+        {{ range.text }}<OTooltip :content="range.utc" />
       </span>
       <dl class="flex flex-col gap-1 text-sm">
         <div v-if="actual !== null" class="flex justify-between gap-3">
@@ -74,9 +74,12 @@ import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { AnomalyBandRow } from "@/utils/alerts/anomalyBandChart";
 import {
   formatAnomalyNumber,
+  formatAnomalyTime,
+  formatAnomalyTimeUtc,
   formatChangePercent,
   formatUtcHm,
 } from "@/utils/alerts/anomalyExploreView";
@@ -100,12 +103,21 @@ const { t } = useI18nTyped();
 
 const actual = computed(() => props.row?.value ?? props.row?.flagged ?? null);
 
-const rangeText = computed<I18nText>(() => {
+const range = computed<{ text: I18nText; utc: I18nText }>(() => {
   const row = props.row;
-  if (!row) return raw("");
-  const start = formatUtcHm(row.tsMs * 1000);
-  const end = formatUtcHm((row.tsMs + (props.bucketMs ?? 0)) * 1000);
-  return t("alerts.anomaly.pointRange", { start, end });
+  if (!row) return { text: raw(""), utc: raw("") };
+  const startUs = row.tsMs * 1000;
+  const endUs = (row.tsMs + (props.bucketMs ?? 0)) * 1000;
+  return {
+    text: t("alerts.anomaly.pointRange", {
+      start: formatAnomalyTime(startUs, Date.now() * 1000),
+      end: formatAnomalyTime(endUs, startUs),
+    }),
+    utc: t("alerts.anomaly.pointRangeUtc", {
+      start: formatAnomalyTimeUtc(startUs),
+      end: formatUtcHm(endUs),
+    }),
+  };
 });
 
 const expectedText = computed(() => {

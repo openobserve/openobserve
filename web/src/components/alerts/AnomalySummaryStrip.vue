@@ -24,11 +24,11 @@
       class="flex w-full items-center gap-4"
       data-test="alerts-anomalysummarystrip-loading"
     >
-      <div class="flex w-48 flex-col gap-2">
+      <div class="flex w-52 flex-col gap-2">
         <OSkeleton type="text" class="w-3/4" />
         <OSkeleton type="text" class="w-1/2" />
       </div>
-      <OSkeleton type="rect" class="h-8 w-60 max-md:hidden" />
+      <OSkeleton type="rect" class="h-8 w-64 max-md:hidden" />
       <OSkeleton type="rect" class="ms-auto h-8 w-24" />
     </div>
 
@@ -48,53 +48,97 @@
     </template>
 
     <template v-else>
-      <div class="flex min-w-0 flex-col gap-0.5">
+      <div
+        class="flex max-w-96 min-w-52 shrink-0 flex-col gap-1 max-md:min-w-0 max-md:shrink"
+        :data-test="`alerts-anomalysummarystrip-state-${view.state}`"
+      >
+        <div class="flex items-center gap-2 text-sm whitespace-nowrap">
+          <OBadge
+            :variant="chip.variant"
+            :dot="view.state === 'ongoing'"
+            data-test="alerts-anomalysummarystrip-chip"
+          >
+            {{ chip.label }}
+          </OBadge>
+          <span
+            v-if="fact"
+            class="text-text-heading font-semibold"
+            data-test="alerts-anomalysummarystrip-fact"
+          >
+            {{ fact.text }}<OTooltip v-if="fact.utc" :content="fact.utc" />
+          </span>
+          <span
+            v-if="secondary"
+            class="text-text-secondary text-xs"
+            data-test="alerts-anomalysummarystrip-secondary"
+          >
+            {{ secondary.text }}<OTooltip v-if="secondary.utc" :content="secondary.utc" />
+          </span>
+        </div>
         <span
-          class="text-sm font-semibold"
-          :class="view.state === 'ongoing' ? 'text-status-error-text' : 'text-text-heading'"
-          :data-test="`alerts-anomalysummarystrip-state-${view.state}`"
-        >
-          {{ title }}
-        </span>
-        <span
-          v-if="view.noNewDataSinceUs !== null && view.state === 'ongoing'"
-          class="text-text-secondary text-xs"
+          v-if="noNewDataLine"
+          class="text-status-warning-text text-xs"
           data-test="alerts-anomalysummarystrip-nonewdata"
         >
-          {{ t("alerts.anomaly.stripNoNewData", { time: formatUtcHm(view.noNewDataSinceUs) }) }}
+          {{ noNewDataLine.text }}<OTooltip v-if="noNewDataLine.utc" :content="noNewDataLine.utc" />
         </span>
+        <OTruncatedText
+          v-else-if="measureLine"
+          class="text-text-secondary text-xs"
+          data-test="alerts-anomalysummarystrip-measure"
+          >{{ measureLine }}</OTruncatedText
+        >
       </div>
 
-      <span
-        v-if="absenceText"
-        class="text-text-body text-sm"
-        data-test="alerts-anomalysummarystrip-absence"
+      <div
+        class="border-border-subtle flex min-w-0 flex-1 items-center self-stretch border-s ps-4 max-md:basis-full max-md:border-s-0 max-md:ps-0"
+        data-test="alerts-anomalysummarystrip-middle"
       >
-        {{ absenceText }}
-      </span>
-      <dl
-        v-else-if="readings.length"
-        class="flex items-center gap-4 max-md:flex-wrap"
-        data-test="alerts-anomalysummarystrip-readings"
-      >
-        <div
-          v-for="reading in readings"
-          :key="reading.key"
-          class="flex flex-col"
-          :data-test="`alerts-anomalysummarystrip-${reading.key}`"
+        <dl
+          v-if="readings.length"
+          class="flex items-center max-md:flex-wrap max-md:gap-y-2"
+          data-test="alerts-anomalysummarystrip-readings"
         >
-          <dt class="text-text-secondary text-xs">{{ reading.label }}</dt>
-          <dd class="text-text-heading text-sm font-semibold">{{ reading.value }}</dd>
-        </div>
-      </dl>
-
-      <span
-        v-if="view.incomplete"
-        class="text-status-warning-text text-xs"
-        data-test="alerts-anomalysummarystrip-incomplete"
-      >
-        {{ t("alerts.anomaly.stripIncomplete") }}
-      </span>
+          <div
+            v-for="(reading, index) in readings"
+            :key="reading.key"
+            class="flex flex-col gap-0.5"
+            :class="index < readings.length - 1 ? 'border-border-subtle me-4 border-e pe-4' : ''"
+            :data-test="`alerts-anomalysummarystrip-${reading.key}`"
+          >
+            <dt class="text-text-secondary text-2xs flex items-center gap-1.5 whitespace-nowrap">
+              {{ reading.label }}
+              <span
+                v-if="reading.incomplete"
+                class="text-status-warning-text"
+                data-test="alerts-anomalysummarystrip-incomplete"
+                >{{ t("alerts.anomaly.stripIncompleteShort") }}</span
+              >
+            </dt>
+            <dd
+              class="text-lg leading-6 font-semibold whitespace-nowrap tabular-nums"
+              :class="reading.error ? 'text-status-error-text' : 'text-text-heading'"
+              data-test="alerts-anomalysummarystrip-value"
+            >
+              {{ reading.value }}
+            </dd>
+          </div>
+        </dl>
+        <span
+          v-else-if="message"
+          class="text-text-heading text-sm"
+          data-test="alerts-anomalysummarystrip-message"
+        >
+          {{ message.text }}<OTooltip v-if="message.utc" :content="message.utc" />
+        </span>
+        <span
+          v-if="view.incomplete && !actualShown"
+          class="text-status-warning-text ms-3.5 text-xs whitespace-nowrap"
+          data-test="alerts-anomalysummarystrip-incomplete"
+        >
+          {{ t("alerts.anomaly.stripIncomplete") }}
+        </span>
+      </div>
 
       <div class="ms-auto flex shrink-0 items-center gap-2">
         <OButton
@@ -114,15 +158,21 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { AnomalyExploreResponse } from "@/types/anomalyExplore";
 import {
   anomalyStripView,
+  changeArrow,
   durationParts,
   formatAnomalyNumber,
+  formatAnomalyTime,
+  formatAnomalyTimeUtc,
   formatChangePercent,
-  formatUtcHm,
   stripConfigOf,
 } from "@/utils/alerts/anomalyExploreView";
 
@@ -141,99 +191,201 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
+/** A text that may carry a time; `utc` is that time for the tooltip. */
+interface TimedText {
+  text: I18nText;
+  utc: I18nText | null;
+}
+
 const view = computed(() =>
   props.response
     ? anomalyStripView(props.response, stripConfigOf(props.config), props.nowUs)
     : null,
 );
 
+const time = (us: number) => formatAnomalyTime(us, props.nowUs);
+const utc = (us: number) => t("alerts.anomaly.stripTimeUtc", { time: formatAnomalyTimeUtc(us) });
+
 const duration = (ms: number | null): I18nText | null => {
   const parts = ms === null ? null : durationParts(ms);
   if (!parts) return null;
-  return parts.h > 0
-    ? t("alerts.anomaly.stripDurationHm", parts)
-    : t("alerts.anomaly.stripDurationM", { m: parts.m });
+  if (parts.h === 0) return t("alerts.anomaly.stripDurationM", { m: parts.m });
+  return parts.m === 0
+    ? t("alerts.anomaly.stripDurationH", { h: parts.h })
+    : t("alerts.anomaly.stripDurationHm", parts);
 };
 
-const title = computed<I18nText>(() => {
-  const v = view.value;
-  if (!v) return raw("");
-  switch (v.state) {
+const since = (us: number): TimedText => ({
+  text: t("alerts.anomaly.stripSince", { time: time(us) }),
+  utc: utc(us),
+});
+
+const chip = computed<{ label: I18nText; variant: BadgeVariant }>(() => {
+  switch (view.value?.state) {
     case "ongoing":
-      if (v.startedUs === null) return t("alerts.anomaly.stripOngoing");
-      return v.startedBefore
-        ? t("alerts.anomaly.stripOngoingBefore", { time: formatUtcHm(v.startedUs) })
-        : t("alerts.anomaly.stripOngoingSince", { time: formatUtcHm(v.startedUs) });
-    case "back_in_range": {
-      if (v.sinceUs === null) return t("alerts.anomaly.stripBackInRange");
-      const lasted = duration(v.lastedMs);
-      const time = formatUtcHm(v.sinceUs);
-      return lasted
-        ? t("alerts.anomaly.stripBackInRangeLasted", { time, duration: lasted })
-        : t("alerts.anomaly.stripBackInRangeSince", { time });
-    }
-    case "paused":
-      return t("alerts.anomaly.stripPaused");
-    case "no_recent_runs":
-      return v.lastRunUs === null
-        ? t("alerts.anomaly.stripNoRecentRuns")
-        : t("alerts.anomaly.stripNoRecentRunsAt", { time: formatUtcHm(v.lastRunUs) });
+      return { label: t("alerts.anomaly.stripOngoing"), variant: "error-soft" };
+    case "back_in_range":
+      return { label: t("alerts.anomaly.stripBackInRange"), variant: "default-soft" };
     case "no_new_data":
-      return t("alerts.anomaly.stripNoNewData", { time: formatUtcHm(v.noNewDataSinceUs ?? 0) });
+      return { label: t("alerts.anomaly.stripNoNewDataChip"), variant: "warning-soft" };
+    case "no_recent_runs":
+      return { label: t("alerts.anomaly.stripNoRecentRuns"), variant: "warning-soft" };
     case "learning":
-      return t("alerts.anomaly.stripLearning");
+      return { label: t("alerts.anomaly.stripLearningChip"), variant: "default-soft" };
+    case "paused":
+      return { label: t("alerts.anomaly.stripPausedChip"), variant: "default-soft" };
     default:
-      return t("alerts.anomaly.stripNoAnomalies");
+      return { label: t("alerts.anomaly.stripInRange"), variant: "default-soft" };
   }
 });
 
-const absenceText = computed<I18nText | null>(() => {
-  const s = view.value?.summary;
-  if (!s || s.kind !== "absence" || view.value?.state !== "ongoing") return null;
-  // since_us is when this absence began; the episode can start earlier with high values.
-  const since = s.since_us ?? s.started_us ?? view.value.startedUs;
-  const stream = raw(props.response?.stream ?? "");
-  return since === null
-    ? t("alerts.anomaly.stripAbsence", { stream })
-    : t("alerts.anomaly.stripAbsenceSince", { stream, time: formatUtcHm(since) });
+/** Line 1: the main fact after the chip, then one secondary fact. */
+const facts = computed<{ fact: TimedText | null; secondary: TimedText | null }>(() => {
+  const v = view.value;
+  const none = { fact: null, secondary: null };
+  if (!v) return none;
+  switch (v.state) {
+    case "ongoing": {
+      if (v.startedUs === null) return none;
+      if (v.startedBefore) {
+        const text = t("alerts.anomaly.stripStartedBefore", { time: time(v.startedUs) });
+        return { fact: { text, utc: utc(v.startedUs) }, secondary: null };
+      }
+      const lasting = duration(v.ongoingMs);
+      if (!lasting) return { fact: since(v.startedUs), secondary: null };
+      const text = t("alerts.anomaly.stripFor", { duration: lasting });
+      return { fact: { text, utc: null }, secondary: since(v.startedUs) };
+    }
+    case "back_in_range": {
+      if (v.sinceUs === null) return none;
+      const lasted = duration(v.lastedMs);
+      return {
+        fact: since(v.sinceUs),
+        secondary: lasted
+          ? { text: t("alerts.anomaly.stripLasted", { duration: lasted }), utc: null }
+          : null,
+      };
+    }
+    case "no_new_data":
+      return v.noNewDataSinceUs === null
+        ? none
+        : { fact: since(v.noNewDataSinceUs), secondary: null };
+    case "no_recent_runs":
+      if (v.lastRunUs === null) return none;
+      return {
+        fact: {
+          text: t("alerts.anomaly.stripLastRun", { time: time(v.lastRunUs) }),
+          utc: utc(v.lastRunUs),
+        },
+        secondary: null,
+      };
+    default:
+      return none;
+  }
+});
+const fact = computed(() => facts.value.fact);
+const secondary = computed(() => facts.value.secondary);
+
+const isAbsence = computed(
+  () => view.value?.state === "ongoing" && view.value.summary?.kind === "absence",
+);
+
+/** An absence already states its time, so only a value or a drop takes this line. */
+const noNewDataLine = computed<TimedText | null>(() => {
+  const v = view.value;
+  if (!v || v.state !== "ongoing" || v.noNewDataSinceUs === null || isAbsence.value) return null;
+  return {
+    text: t("alerts.anomaly.stripNoNewData", { time: time(v.noNewDataSinceUs) }),
+    utc: utc(v.noNewDataSinceUs),
+  };
 });
 
-const readings = computed(() => {
+const measureLine = computed<I18nText | null>(() => {
+  const res = props.response;
+  if (!res) return null;
+  if (!res.measure) return res.stream ? raw(res.stream) : null;
+  if (!res.stream) return raw(res.measure);
+  return t("alerts.anomaly.stripMeasure", { measure: raw(res.measure), stream: raw(res.stream) });
+});
+
+/** The one sentence of a state with no readings. */
+const message = computed<TimedText | null>(() => {
+  const v = view.value;
+  if (!v) return null;
+  switch (v.state) {
+    case "ongoing": {
+      if (!isAbsence.value) return null;
+      // since_us is when this absence began; the episode can start earlier with high values.
+      const at = v.summary?.since_us ?? v.summary?.started_us ?? v.startedUs;
+      return at === null
+        ? { text: t("alerts.anomaly.stripAbsence"), utc: null }
+        : { text: t("alerts.anomaly.stripAbsenceSince", { time: time(at) }), utc: utc(at) };
+    }
+    case "no_new_data":
+      return { text: t("alerts.anomaly.stripNoNewDataText"), utc: null };
+    case "no_recent_runs":
+      return { text: t("alerts.anomaly.stripNoRecentRunsText"), utc: null };
+    case "learning":
+      return { text: t("alerts.anomaly.stripLearning"), utc: null };
+    case "paused":
+      return { text: t("alerts.anomaly.stripPaused"), utc: null };
+    case "none":
+      return { text: t("alerts.anomaly.stripNoAnomalies"), utc: null };
+    default:
+      return null;
+  }
+});
+
+interface Reading {
+  key: "actual" | "expected" | "change";
+  label: I18nText;
+  value: string;
+  error: boolean;
+  incomplete: boolean;
+}
+
+const readings = computed<Reading[]>(() => {
   const v = view.value;
   const s = v?.summary;
   if (!v || !s || s.kind === "absence") return [];
-  const out: Array<{ key: string; label: I18nText; value: string }> = [];
+  const ongoing = v.state === "ongoing";
+  const out: Reading[] = [];
   if (s.actual !== null) {
     out.push({
       key: "actual",
-      label:
-        v.state === "back_in_range"
-          ? t("alerts.anomaly.stripPeak")
-          : t("alerts.anomaly.stripActual"),
+      label: ongoing ? t("alerts.anomaly.stripActual") : t("alerts.anomaly.stripWorst"),
       value: formatAnomalyNumber(s.actual),
+      error: ongoing,
+      incomplete: ongoing && v.incomplete,
     });
   }
-  if (v.state === "back_in_range") return out;
+  const expected = (value: string): Reading => ({
+    key: "expected",
+    label: t("alerts.anomaly.stripExpected"),
+    value,
+    error: false,
+    incomplete: false,
+  });
   if (s.kind === "value" && s.expected_lower !== null && s.expected_upper !== null) {
-    out.push({
-      key: "expected",
-      label: t("alerts.anomaly.stripExpected"),
-      value: `${formatAnomalyNumber(s.expected_lower)}-${formatAnomalyNumber(s.expected_upper)}`,
-    });
+    out.push(
+      expected(
+        `${formatAnomalyNumber(s.expected_lower)} – ${formatAnomalyNumber(s.expected_upper)}`,
+      ),
+    );
   } else if (s.expected !== null) {
-    out.push({
-      key: "expected",
-      label: t("alerts.anomaly.stripExpected"),
-      value: formatAnomalyNumber(s.expected),
-    });
+    out.push(expected(formatAnomalyNumber(s.expected)));
   }
   if (s.change_percent !== null) {
     out.push({
       key: "change",
       label: t("alerts.anomaly.stripChange"),
-      value: formatChangePercent(s.change_percent),
+      value: `${changeArrow(s.change_percent)} ${formatChangePercent(s.change_percent)}`.trim(),
+      error: ongoing,
+      incomplete: false,
     });
   }
   return out;
 });
+
+const actualShown = computed(() => readings.value.some((r) => r.incomplete));
 </script>

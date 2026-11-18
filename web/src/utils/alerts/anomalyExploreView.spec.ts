@@ -18,7 +18,10 @@ import type { AnomalyExploreResponse } from "@/types/anomalyExplore";
 import {
   anomalyStripView,
   durationParts,
+  changeArrow,
   formatAnomalyNumber,
+  formatAnomalyTime,
+  formatAnomalyTimeUtc,
   formatChangePercent,
   formatUtcHm,
   openAppUrl,
@@ -90,6 +93,12 @@ describe("anomalyStripView", () => {
       NOW,
     );
     expect(view.startedBefore).toBe(true);
+    expect(view.ongoingMs).toBeNull();
+  });
+
+  it("counts the Ongoing duration from the start to the window end", () => {
+    const view = anomalyStripView(ongoing, CONFIG, NOW);
+    expect(view.ongoingMs).toBe((ongoing.window!.end_us - view.startedUs!) / 1000);
   });
 
   it("puts Ongoing before No new data, and keeps No new data as the second line", () => {
@@ -182,6 +191,21 @@ describe("anomalyStripView", () => {
     );
     expect(view.state).toBe("back_in_range");
     expect(view.lastedMs).toBe(225 * 60_000);
+    expect(view.ongoingMs).toBeNull();
+  });
+
+  it("has no lasted for Back in range when the window is clipped, as the start is not known", () => {
+    const view = anomalyStripView(
+      response({
+        state: "back_in_range",
+        summary: { ...ongoing.summary!, since_us: NOW - 75 * MIN },
+        window: { start_us: NOW - 300 * MIN, end_us: NOW - 75 * MIN, clipped: true },
+      }),
+      CONFIG,
+      NOW,
+    );
+    expect(view.sinceUs).toBe(NOW - 75 * MIN);
+    expect(view.lastedMs).toBeNull();
   });
 
   it("shows No anomalies when the endpoint has none", () => {
@@ -225,6 +249,34 @@ describe("stripConfigOf", () => {
 describe("formatters", () => {
   it("formats times to the minute in UTC", () => {
     expect(formatUtcHm(Date.parse("2026-11-16T18:00:00Z") * 1000)).toBe("18:00");
+  });
+
+  it("writes strip times in the browser zone, as the chart axis does (AC1.31)", () => {
+    const us = Date.parse("2026-11-16T18:00:00Z") * 1000;
+    const prev = process.env.TZ;
+    process.env.TZ = "Asia/Kolkata";
+    try {
+      const axis = new Date(us / 1000);
+      const axisHm = `${String(axis.getHours()).padStart(2, "0")}:${String(axis.getMinutes()).padStart(2, "0")}`;
+      expect(axisHm).toBe("23:30");
+      expect(formatAnomalyTime(us, us)).toBe(axisHm);
+      expect(formatAnomalyTimeUtc(us)).toBe("2026-11-16 18:00");
+    } finally {
+      process.env.TZ = prev;
+    }
+  });
+
+  it("adds the date to a time on another day than the reference", () => {
+    const us = Date.parse("2026-11-15T18:00:00Z") * 1000;
+    expect(formatAnomalyTime(us, us + 60 * MIN)).toBe("18:00");
+    expect(formatAnomalyTime(us, us + 24 * 60 * MIN)).toMatch(/15/);
+    expect(formatAnomalyTime(us, us + 24 * 60 * MIN)).toMatch(/18:00$/);
+  });
+
+  it("puts an arrow for the direction of a change", () => {
+    expect(changeArrow(49.8)).toBe("▲");
+    expect(changeArrow(-60)).toBe("▼");
+    expect(changeArrow(0)).toBe("");
   });
 
   it("writes readings with two decimals and the change with a sign", () => {
