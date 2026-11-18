@@ -372,7 +372,7 @@ const hint = computed(() => {
       </div>
       <div class="text-text-secondary mt-1 flex justify-between text-xs">
         <span>{{ t("alerts.sections.backtest.dayAgo") }}</span>
-        <span>{{ t("alerts.sections.timeline.now") }}</span>
+        <span>{{ t("alerts.sections.backtest.lastHour") }}</span>
       </div>
       <AlertLinkNote
         v-if="!realTime && volumeText"
