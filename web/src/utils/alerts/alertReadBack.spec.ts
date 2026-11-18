@@ -216,6 +216,11 @@ describe("previewVerdictSentence", () => {
     stream_type: "traces",
     trigger_condition: { ...alert().trigger_condition, threshold: 100000000 },
   });
+  const promql = (promql_condition: { operator: string; value: number } | null) =>
+    alert({
+      query_condition: { type: "promql", promql_condition },
+      trigger_condition: { ...alert().trigger_condition, threshold: 1, period: 5 },
+    });
   it.each([
     [
       "a firing event count",
@@ -272,6 +277,20 @@ describe("previewVerdictSentence", () => {
       alert(),
       {},
       "Quiet now: 1 group is over the threshold (needs 3).",
+    ],
+    [
+      "PromQL series against the value threshold, not the series count",
+      { wouldTrigger: false, reason: "", count: 0 },
+      promql({ operator: ">=", value: 80 }),
+      {},
+      "Quiet now: 0 series in the last 5 minutes (threshold 80).",
+    ],
+    [
+      "PromQL rule mode against the series count",
+      { wouldTrigger: false, reason: "", count: 0 },
+      promql(null),
+      {},
+      "Quiet now: 0 series in the last 5 minutes (threshold 1).",
     ],
     [
       "nothing counted",

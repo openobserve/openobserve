@@ -313,7 +313,12 @@ export function previewVerdictSentence(
       reason: verdict.reason,
     });
   }
-  const limit = limitText(tc.operator, tc.threshold ?? 0);
+  // A PromQL count is of series past the value limit; the trigger threshold only says how many series it takes.
+  const pc = qc.type === "promql" ? qc.promql_condition : null;
+  const limit =
+    pc && pc.value !== undefined && pc.value !== null && pc.value !== ""
+      ? limitText(pc.operator, pc.value)
+      : limitText(tc.operator, tc.threshold ?? 0);
   const count = previewCountText(verdict.count, verdict.atLeast, t);
   if (verdict.grouped) {
     if (verdict.wouldTrigger) {
