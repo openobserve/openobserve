@@ -205,16 +205,7 @@ pub fn generate_optimal_partitions(
     }
 }
 
-/// Groups consecutive cache entries with the same interval into cached partitions
-///
-/// # Preconditions
-/// - `cache_entries` must be sorted by `start_time` (ascending)
-/// - This is guaranteed by `discover_cache_for_query()` which sorts entries before returning
-///
-/// # Behavior
-/// - Creates separate partitions when interval changes
-/// - Creates separate partitions when there's a time gap between entries
-/// - Assumes entries are non-overlapping (guaranteed by cache write logic)
+/// Discovery supplies sorted, disjoint ranges so grouping preserves non-overlapping partitions.
 fn group_cache_entries_into_partitions(cache_entries: Vec<CacheEntry>) -> Vec<CachedPartition> {
     if cache_entries.is_empty() {
         return vec![];
