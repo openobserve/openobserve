@@ -12094,7 +12094,10 @@
       "pausedLeftFilter": "{name} paused. No longer matches filter | {count} alerts paused. No longer match filter",
       "resumedLeftFilter": "{name} resumed. No longer matches filter | {count} alerts resumed. No longer match filter",
       "bulkPauseFailed": "{failed} of {total} alert couldn't be paused | {failed} of {total} alerts couldn't be paused",
-      "bulkResumeFailed": "{failed} of {total} alert couldn't be resumed | {failed} of {total} alerts couldn't be resumed"
+      "bulkResumeFailed": "{failed} of {total} alert couldn't be resumed | {failed} of {total} alerts couldn't be resumed",
+      "paused": "{name} paused",
+      "resumed": "{name} resumed",
+      "undo": "Undo"
     },
     "sections": {
       "navLabel": "Alert sections",
@@ -15543,7 +15546,9 @@
         "failed": "Couldn't load recent checks.",
         "openRun": "Open check",
         "note": "Shows the outcome of each check.",
-        "emptyExpected": "No checks in the last 24 hours. It should check every {every}: see Alert history."
+        "emptyExpected": "No checks in the last 24 hours. It should check every {every}: see Alert history.",
+        "firstDue": "No checks yet. The first is due by {time}.",
+        "emptySinceSave": "No checks since it was saved at {time}. It should check every {every}: see Alert history."
       },
       "enabled": "Alert enabled"
     },
