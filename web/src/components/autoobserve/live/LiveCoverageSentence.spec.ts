@@ -77,9 +77,14 @@ describe("coverageVerdict (0, 1, a few, many)", () => {
       ["oneWhere(shipping; prod · default)", "others(1)", "shipping"],
     ],
     [
-      "one gap beside a learning service: learning is not watched",
+      "one gap beside a service not yet watched: no others-watched claim",
       [svc("shipping", "gap", 5), svc("b", "learning", 9)],
-      ["one(shipping)", "learning(1)", "shipping"],
+      ["one(shipping)", "", "shipping"],
+    ],
+    [
+      "no gap but one not yet watched: the state sentence stays",
+      [svc("a", "watched", 9), svc("b", "learning", 1)],
+      null,
     ],
     [
       "a few, busiest first, named",

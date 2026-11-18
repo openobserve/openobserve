@@ -64,11 +64,10 @@ export const coverageVerdict = (
   const n = gaps.length;
   const stateCount = (state: string) => rows.filter((r) => r.status?.state === state).length;
   const partial = stateCount("partial");
-  const learning = stateCount("learning");
   const watched = stateCount("watched");
   const unknown = gaps.filter((r) => r.traffic == null).length;
   if (!n) {
-    if (partial || learning) return null;
+    if (watched < rows.length) return null;
     return {
       text: t(
         "autoobserve.coverageLive.verdict.allWatched",
@@ -82,13 +81,6 @@ export const coverageVerdict = (
   const subParts = [
     partial
       ? t("autoobserve.coverageLive.verdict.partly", { count: countText(locale, partial) }, partial)
-      : "",
-    learning
-      ? t(
-          "autoobserve.coverageLive.sentence.learning",
-          { count: countText(locale, learning) },
-          learning,
-        )
       : "",
     n === 1 && watched && watched === rows.length - 1
       ? t("autoobserve.coverageLive.verdict.others", { count: countText(locale, watched) }, watched)

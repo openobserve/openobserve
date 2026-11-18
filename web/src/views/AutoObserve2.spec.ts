@@ -411,12 +411,16 @@ describe("AutoObserve2 coverage page verdict", () => {
     await vi.advanceTimersByTimeAsync(400);
     const held = wrapper.findAll('[data-test="autoobserve2-coverage-sentence-skeleton"]').length;
     const ready = (Date.now() + 5 * 86_400_000) * 1000;
-    // Gaps and learning services together, so the verdict renders with its longest sub-line.
-    const rows = Array.from({ length: 30 }, (_, i) => ({
-      ...svc(i, false),
-      traffic_per_hour: i % 3 ? 100 - i : null,
-      streams: [{ type: "logs", name: `logs_${i}`, learning_until: i % 2 ? ready : null }],
-    }));
+    // Gaps, partly watched services and learning streams, so the verdict renders its longest sub-line.
+    const rows = Array.from({ length: 30 }, (_, i) => {
+      const row = svc(i, false);
+      if (i % 2) row.cells.errors = { ...row.cells.errors, state: "covered" };
+      return {
+        ...row,
+        traffic_per_hour: i % 3 ? 100 - i : null,
+        streams: [{ type: "logs", name: `logs_${i}`, learning_until: i % 2 ? ready : null }],
+      };
+    });
     resolve({
       data: { view: "strict", pass_at: null, refreshed_at: null, quality: null, classes: [], rows },
     });
@@ -426,10 +430,11 @@ describe("AutoObserve2 coverage page verdict", () => {
     const sentence = line(wrapper, "sentence");
     for (const part of [
       gt("autoobserve.coverageLive.verdict.share", { count: "15", top: "10", share: "100%" }),
-      gt("autoobserve.coverageLive.sentence.learning", { count: "15" }, 15),
+      gt("autoobserve.coverageLive.verdict.partly", { count: "15" }, 15),
       gt("autoobserve.coverageLive.verdict.unknown", { count: "5" }, 5),
     ])
       expect(sentence.text()).toContain(String(part));
+    expect(sentence.text()).toMatch(/\b15 streams\b/);
     expect(sentence.findComponent(OTruncatedText).props("lines")).toBe(held);
   });
 
