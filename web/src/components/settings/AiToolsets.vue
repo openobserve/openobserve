@@ -110,6 +110,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :saved-at="toolsetDrafts.savedAt(row.id)"
                 :data-test="`ai-toolsets-${row.name}-draft-dot`"
               />
+              <span v-if="row.rename_needed" class="relative inline-flex">
+                <OBadge
+                  variant="warning-outline"
+                  size="sm"
+                  :data-test="`ai-toolsets-${row.name}-rename-needed`"
+                >
+                  {{ t("aiToolset.renameNeeded") }}
+                </OBadge>
+                <OTooltip :max-width="'25rem'" :content="t('aiToolset.renameNeededHint')" />
+              </span>
             </div>
           </template>
 
@@ -151,6 +161,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -180,6 +192,8 @@ export default defineComponent({
     OButton,
     ORefreshButton,
     OTag,
+    OBadge,
+    OTooltip,
     OSearchInput,
     OTable,
     ONameLinkCell,
@@ -209,6 +223,7 @@ export default defineComponent({
         name: item.name,
         kind: item.kind,
         description: item.description || "",
+        rename_needed: !!item.rename_needed,
       })),
     );
     const showAddDialog = ref(false);

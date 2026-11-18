@@ -413,10 +413,10 @@ export default defineComponent({
     const { t } = useI18nTyped();
 
     // Co-located Zod schema (factory keeps the messages i18n-driven).
-    const addAiToolsetSchema = makeAddAiToolsetSchema(t);
-
     const editingId = ref<string | null>(null);
     const isEditing = ref(false);
+
+    const addAiToolsetSchema = makeAddAiToolsetSchema(t, () => isEditing.value);
 
     const kindOptions = [
       { label: t("aiToolset.kindMcp"), value: "mcp" },
@@ -462,7 +462,8 @@ export default defineComponent({
           });
         return {
           command: value.cli.command ?? "",
-          ...(allowed.length ? { allowed_subcommands: allowed } : {}),
+          // An omitted key keeps the stored allowlist on update, so an emptied one is sent as null.
+          allowed_subcommands: allowed.length ? allowed : null,
           timeout_seconds: Number(value.cli.timeout_seconds),
           max_output_bytes: Number(value.cli.max_output_bytes),
           requires_confirmation: value.cli.requires_confirmation ?? false,

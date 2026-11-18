@@ -142,7 +142,7 @@ describe("AddAiToolset", () => {
     it("saves an mcp toolset when name + url are valid", async () => {
       wrapper = createWrapper();
       const form = getForm();
-      form.setFieldValue("name", "valid_name-1");
+      form.setFieldValue("name", "valid-name-1");
       form.setFieldValue("mcp.url", "https://api.example.com/mcp/");
       await flushPromises();
 
@@ -153,7 +153,7 @@ describe("AddAiToolset", () => {
       expect(aiToolsetsService.create).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({
-          name: "valid_name-1",
+          name: "valid-name-1",
           kind: "mcp",
           data: expect.objectContaining({
             url: "https://api.example.com/mcp/",
@@ -179,10 +179,10 @@ describe("AddAiToolset", () => {
       expect(aiToolsetsService.create).not.toHaveBeenCalled();
     });
 
-    it("does not save when the name exceeds 256 characters", async () => {
+    it("does not save when the name exceeds 64 characters", async () => {
       wrapper = createWrapper();
       const form = getForm();
-      form.setFieldValue("name", "a".repeat(257));
+      form.setFieldValue("name", "a".repeat(65));
       form.setFieldValue("mcp.url", "https://x.test/mcp");
       await flushPromises();
 
@@ -502,6 +502,31 @@ describe("AddAiToolset", () => {
         }),
       );
       expect(aiToolsetsService.create).not.toHaveBeenCalled();
+    });
+
+    it("sends a cleared CLI allowlist as null so the server's merge drops it", async () => {
+      mockQuery = { action: "edit", id: "tool-2" };
+      vi.mocked(aiToolsetsService.get).mockResolvedValue({
+        data: {
+          id: "tool-2",
+          name: "kubectl",
+          kind: "cli",
+          description: "",
+          data: { command: "kubectl", allowed_subcommands: ["get", "describe"] },
+        },
+      } as any);
+
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(getForm().state.values.cli.allowed_subcommands_raw).toBe("get, describe");
+      getForm().setFieldValue("cli.allowed_subcommands_raw", "");
+      await flushPromises();
+
+      await getForm().handleSubmit();
+      await flushPromises();
+
+      const [, , body] = vi.mocked(aiToolsetsService.update).mock.calls.at(-1)!;
+      expect(body.data).toHaveProperty("allowed_subcommands", null);
     });
   });
 });

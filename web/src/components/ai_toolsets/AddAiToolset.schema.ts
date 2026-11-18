@@ -13,8 +13,9 @@
 
 import { z } from "zod";
 
-// Name char rule: letters, digits, hyphen, underscore.
-export const aiToolsetNameRegex = /^[a-zA-Z0-9_-]+$/;
+// The server's create rule: the name the agent sees, so normalization never changes it.
+export const aiToolsetNameRegex = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export const AI_TOOLSET_NAME_MAX = 64;
 
 // One row of a key/value secret list (mcp headers, cli env vars). All fields are
 // free-form and optional (a blank starter row is valid — only non-empty rows are
@@ -34,15 +35,15 @@ export const credFileRowSchema = z.object({
   value: z.string().optional(),
 });
 
-export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
+// Saved toolsets keep legacy names (names are immutable), so the name rule only gates a create.
+export const makeAddAiToolsetSchema = (
+  t: (_key: string) => string,
+  isEditing: () => boolean = () => false,
+) =>
   z
     .object({
       // ── Always validated ────────────────────────────────────────────────
-      name: z
-        .string()
-        .min(1, t("aiToolset.nameRequired"))
-        .regex(aiToolsetNameRegex, t("aiToolset.nameInvalid"))
-        .max(256, t("aiToolset.nameTooLong")),
+      name: z.string().min(1, t("aiToolset.nameRequired")),
       kind: z.string().min(1, t("aiToolset.kindRequired")),
       description: z.string().optional(),
 
@@ -76,6 +77,22 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
       }),
     })
     .superRefine((val, ctx) => {
+      if (!isEditing() && val.name) {
+        if (!aiToolsetNameRegex.test(val.name)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["name"],
+            message: t("aiToolset.nameInvalid"),
+          });
+        }
+        if (val.name.length > AI_TOOLSET_NAME_MAX) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["name"],
+            message: t("aiToolset.nameTooLong"),
+          });
+        }
+      }
       // mcp.url required when kind === "mcp". Bare empty check (NO trim): a
       // whitespace-only url is accepted. (Note the asymmetry: skill.content below
       // DOES trim; url/command do not.)

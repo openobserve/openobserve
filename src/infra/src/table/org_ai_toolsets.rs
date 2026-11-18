@@ -20,8 +20,8 @@
 //! org's per-org DEK via [`cipher::get_dek`].
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder,
-    QuerySelect, Set, SqlErr,
+    ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set,
+    SqlErr, TransactionTrait, sea_query::Expr,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -110,46 +110,36 @@ pub async fn add(mut entry: OrgToolset) -> Result<(), errors::Error> {
     if entry.id.is_empty() {
         entry.id = Ksuid::new(None, None).to_string();
     }
+    let encrypted_data = encrypt_entry_data(&entry).await?;
+    insert_with(get_orm_client_rw().await, entry, encrypted_data).await
+}
 
-    let encrypted_data = if let Some(ref plaintext) = entry.data {
-        let dek = cipher::get_dek(&entry.org).await?;
-        Some(encrypt_data(&dek, plaintext)?)
-    } else {
-        None
-    };
-
-    let record = ActiveModel {
-        id: Set(entry.id),
-        org: Set(entry.org),
-        name: Set(entry.name),
-        kind: Set(entry.kind),
-        description: Set(entry.description),
-        data: Set(encrypted_data),
-        created_by: Set(entry.created_by),
-        created_at: Set(entry.created_at),
-        updated_at: Set(entry.updated_at),
-    };
-
-    let client = get_orm_client_rw().await;
-    match Entity::insert(record).exec(client).await {
-        Ok(_) => {}
-        Err(e) => match e.sql_err() {
-            Some(SqlErr::UniqueConstraintViolation(_)) => {
-                return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
-            }
-            _ => return Err(e.into()),
-        },
-    }
-    Ok(())
+/// Inserts `entry` in one primary transaction that runs `clash` on the org's names before and after
+/// the insert; on a clash nothing is committed and the clashing name is returned.
+pub async fn add_checked(
+    entry: OrgToolset,
+    clash: impl FnMut(&[String]) -> Option<String>,
+) -> Result<Option<String>, errors::Error> {
+    let encrypted_data = encrypt_entry_data(&entry).await?;
+    add_checked_with(get_orm_client_rw().await, entry, encrypted_data, clash).await
 }
 
 /// Fetch a toolset by its KSUID `id`. Returns the record with plaintext `data`.
 pub async fn get(org: &str, id: &str) -> Result<Option<OrgToolset>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    get_with(get_orm_client_ro().await, org, id).await
+}
+
+/// [`get`] on the given connection; writers pass the primary so they never act on a lagging
+/// replica.
+pub async fn get_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+) -> Result<Option<OrgToolset>, errors::Error> {
     let row = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Id.eq(id))
-        .one(client)
+        .one(conn)
         .await
         .map_err(|e| errors::DbError::SeaORMError(e.to_string()))?;
 
@@ -231,31 +221,40 @@ pub async fn list_with<C: ConnectionTrait>(
         .collect()
 }
 
-/// Update an existing toolset. The caller supplies plaintext `data`; this
-/// function re-encrypts it with the org's DEK before persisting.
-pub async fn update(entry: OrgToolset) -> Result<(), errors::Error> {
-    let encrypted_data = if let Some(ref plaintext) = entry.data {
-        let dek = cipher::get_dek(&entry.org).await?;
-        Some(encrypt_data(&dek, plaintext)?)
-    } else {
-        None
-    };
+/// Raw names of every toolset in the org; reads no `data`, so nothing is decrypted.
+pub async fn list_names(org: &str) -> Result<Vec<String>, errors::Error> {
+    list_names_with(get_orm_client_ro().await, org).await
+}
 
-    let record = ActiveModel {
-        id: Set(entry.id),
-        org: Set(entry.org),
-        name: Set(entry.name),
-        kind: Set(entry.kind),
-        description: Set(entry.description),
-        data: Set(encrypted_data),
-        created_by: Set(entry.created_by),
-        created_at: Set(entry.created_at),
-        updated_at: Set(entry.updated_at),
-    };
+/// [`list_names`] on the given connection; a uniqueness check passes the primary.
+pub async fn list_names_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+) -> Result<Vec<String>, errors::Error> {
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Name)
+        .filter(Column::Org.eq(org))
+        .into_tuple::<String>()
+        .all(conn)
+        .await?;
+    Ok(names)
+}
 
-    let client = get_orm_client_rw().await;
-    record.update(client).await?;
-    Ok(())
+/// Writes `entry`'s description, plaintext `data` and `updated_at` only if the row still has
+/// `read_updated_at`; `false` means another update landed since it was read.
+pub async fn update_if_unchanged(
+    entry: OrgToolset,
+    read_updated_at: i64,
+) -> Result<bool, errors::Error> {
+    let encrypted_data = encrypt_entry_data(&entry).await?;
+    write_if_unchanged(
+        get_orm_client_rw().await,
+        &entry,
+        encrypted_data,
+        read_updated_at,
+    )
+    .await
 }
 
 /// Delete a toolset by its KSUID `id`.
@@ -278,10 +277,89 @@ pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+async fn encrypt_entry_data(entry: &OrgToolset) -> Result<Option<String>, errors::Error> {
+    match entry.data.as_deref() {
+        Some(plaintext) => Ok(Some(encrypt_data(
+            &cipher::get_dek(&entry.org).await?,
+            plaintext,
+        )?)),
+        None => Ok(None),
+    }
+}
+
+async fn insert_with<C: ConnectionTrait>(
+    conn: &C,
+    entry: OrgToolset,
+    encrypted_data: Option<String>,
+) -> Result<(), errors::Error> {
+    let record = ActiveModel {
+        id: Set(entry.id),
+        org: Set(entry.org),
+        name: Set(entry.name),
+        kind: Set(entry.kind),
+        description: Set(entry.description),
+        data: Set(encrypted_data),
+        created_by: Set(entry.created_by),
+        created_at: Set(entry.created_at),
+        updated_at: Set(entry.updated_at),
+    };
+    match Entity::insert(record).exec(conn).await {
+        Ok(_) => Ok(()),
+        Err(e) => match e.sql_err() {
+            Some(SqlErr::UniqueConstraintViolation(_)) => {
+                Err(errors::Error::DbError(errors::DbError::UniqueViolation))
+            }
+            _ => Err(e.into()),
+        },
+    }
+}
+
+// The second check runs after the insert so a row committed by a writer that skips the check
+// (an older node mid-rollout) between the first check and the insert is caught before commit.
+async fn add_checked_with<C: TransactionTrait>(
+    conn: &C,
+    entry: OrgToolset,
+    encrypted_data: Option<String>,
+    mut clash: impl FnMut(&[String]) -> Option<String>,
+) -> Result<Option<String>, errors::Error> {
+    let org = entry.org.clone();
+    let txn = conn.begin().await?;
+    if let Some(name) = clash(&list_names_with(&txn, &org).await?) {
+        txn.rollback().await?;
+        return Ok(Some(name));
+    }
+    insert_with(&txn, entry, encrypted_data).await?;
+    if let Some(name) = clash(&list_names_with(&txn, &org).await?) {
+        txn.rollback().await?;
+        return Ok(Some(name));
+    }
+    txn.commit().await?;
+    Ok(None)
+}
+
+async fn write_if_unchanged<C: ConnectionTrait>(
+    conn: &C,
+    entry: &OrgToolset,
+    encrypted_data: Option<String>,
+    read_updated_at: i64,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
+        .col_expr(Column::Description, Expr::value(entry.description.clone()))
+        .col_expr(Column::Data, Expr::value(encrypted_data))
+        .col_expr(Column::UpdatedAt, Expr::value(entry.updated_at))
+        .filter(Column::Org.eq(&entry.org))
+        .filter(Column::Id.eq(&entry.id))
+        .filter(Column::UpdatedAt.eq(read_updated_at))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected == 1)
+}
+
 #[cfg(test)]
 mod tests {
     use base64::{Engine, prelude::BASE64_STANDARD};
     use config::utils::rand::random_bytes;
+    use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, Schema};
 
     use super::*;
 
@@ -291,8 +369,6 @@ mod tests {
 
     #[tokio::test]
     async fn list_with_an_out_of_range_limit_does_not_panic() {
-        use sea_orm::{Database, Schema};
-
         let db = Database::connect("sqlite::memory:").await.unwrap();
         let backend = db.get_database_backend();
         let stmt = Schema::new(backend).create_table_from_entity(Entity);
@@ -375,5 +451,131 @@ mod tests {
         let encrypted = encrypt_data(&dek, "").unwrap();
         let decrypted = decrypt_data(&dek, &encrypted).unwrap();
         assert_eq!(decrypted, "");
+    }
+
+    async fn db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        db
+    }
+
+    async fn insert(db: &DatabaseConnection, id: &str, name: &str, org: &str) {
+        ActiveModel {
+            id: Set(id.to_string()),
+            org: Set(org.to_string()),
+            name: Set(name.to_string()),
+            kind: Set("mcp".to_string()),
+            description: Set(None),
+            data: Set(Some("v0".to_string())),
+            created_by: Set("u".to_string()),
+            created_at: Set(1),
+            updated_at: Set(1),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    fn entry(description: &str, updated_at: i64) -> OrgToolset {
+        OrgToolset {
+            id: "t1".to_string(),
+            org: "org".to_string(),
+            name: "datadog-prod".to_string(),
+            kind: "mcp".to_string(),
+            description: Some(description.to_string()),
+            data: None,
+            created_by: "u".to_string(),
+            created_at: 1,
+            updated_at,
+        }
+    }
+
+    #[tokio::test]
+    async fn two_updates_from_the_same_read_only_the_first_lands() {
+        let db = db().await;
+        insert(&db, "t1", "datadog-prod", "org").await;
+
+        let rotated = entry("rotated", 2);
+        let rotate = write_if_unchanged(&db, &rotated, Some("new-key".into()), 1).await;
+        assert!(rotate.unwrap());
+        let timeout = entry("timeout", 3);
+        let timeout_only = write_if_unchanged(&db, &timeout, Some("old-key".into()), 1).await;
+        assert!(!timeout_only.unwrap());
+
+        let row = Entity::find_by_id("t1").one(&db).await.unwrap().unwrap();
+        assert_eq!(row.data.as_deref(), Some("new-key"));
+        assert_eq!(row.description.as_deref(), Some("rotated"));
+        assert_eq!(row.updated_at, 2);
+        assert_eq!(row.name, "datadog-prod");
+    }
+
+    #[tokio::test]
+    async fn list_names_reads_only_the_org_s_names() {
+        let db = db().await;
+        insert(&db, "t1", "Datadog Prod", "org").await;
+        insert(&db, "t2", "github", "org").await;
+        insert(&db, "t3", "other", "org2").await;
+
+        let mut names = list_names_with(&db, "org").await.unwrap();
+        names.sort();
+        assert_eq!(names, ["Datadog Prod", "github"]);
+    }
+
+    fn new_entry(id: &str, name: &str) -> OrgToolset {
+        OrgToolset {
+            id: id.to_string(),
+            name: name.to_string(),
+            ..entry("", 1)
+        }
+    }
+
+    fn clash_with(name: &'static str) -> impl FnMut(&[String]) -> Option<String> {
+        move |names| names.iter().find(|n| n.as_str() == name).cloned()
+    }
+
+    #[tokio::test]
+    async fn add_checked_inserts_nothing_when_the_first_check_clashes() {
+        let db = db().await;
+        insert(&db, "t1", "Datadog Prod", "org").await;
+
+        let clash = add_checked_with(
+            &db,
+            new_entry("t2", "datadog-prod"),
+            None,
+            clash_with("Datadog Prod"),
+        );
+        assert_eq!(clash.await.unwrap().as_deref(), Some("Datadog Prod"));
+        assert!(Entity::find_by_id("t2").one(&db).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn add_checked_rolls_back_when_the_second_check_clashes() {
+        let db = db().await;
+        let mut calls = 0;
+        let late_clash = |_: &[String]| {
+            calls += 1;
+            (calls == 2).then(|| "Datadog Prod".to_string())
+        };
+
+        let clash = add_checked_with(&db, new_entry("t2", "datadog-prod"), None, late_clash);
+        assert_eq!(clash.await.unwrap().as_deref(), Some("Datadog Prod"));
+        assert!(Entity::find_by_id("t2").one(&db).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn add_checked_commits_and_its_second_check_sees_the_new_row() {
+        let db = db().await;
+        let mut seen = Vec::new();
+        let record = |names: &[String]| {
+            seen.push(names.to_vec());
+            None
+        };
+
+        let clash = add_checked_with(&db, new_entry("t2", "datadog-prod"), None, record);
+        assert!(clash.await.unwrap().is_none());
+        assert_eq!(seen, [vec![], vec!["datadog-prod".to_string()]]);
+        assert!(Entity::find_by_id("t2").one(&db).await.unwrap().is_some());
     }
 }
