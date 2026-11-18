@@ -903,9 +903,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="bg-surface-base border-border-default rounded-surface flex shrink-0 flex-col overflow-hidden border"
               >
                 <div
-                  class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2 select-none"
+                  class="border-border-default flex h-10 shrink-0 items-center gap-2 border-b px-3 select-none"
                 >
                   <span class="text-sm font-medium">{{ t("alerts.preview") }}</span>
+                  <div
+                    :ref="(el) => setSectionTarget('previewRange', el)"
+                    class="ms-auto flex items-center"
+                    data-test="add-alert-preview-range-slot"
+                  />
                 </div>
                 <div class="h-60 min-h-0">
                   <AnomalyDataPreview v-if="isAnomalyMode" :config="anomalyConfig" />
@@ -930,6 +935,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :isUsingBackendSql="isUsingBackendSql"
                       :isEditorOpen="isEditorOpen"
                       :previewDateTime="previewDateTimeValue"
+                      :range-target="sectionTargets.previewRange ?? null"
                       labelled-limit
                       @schema-updated="handleSqlSchemaUpdated"
                     />

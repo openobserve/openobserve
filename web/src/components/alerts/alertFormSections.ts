@@ -35,6 +35,7 @@ export type AlertSectionSlot =
   | "anomalyConditionMore"
   | "anomalySchedule"
   | "compositeCondition"
+  | "previewRange"
   | "compositePreview"
   | "anomalyDetails"
   | "narrowPreview";

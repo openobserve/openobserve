@@ -306,9 +306,7 @@ describe("AddAlert — a prefill seeds the form", () => {
       wrapper = await openWithPrefill(sqlEntry(), sqlFile());
       const config = previewConfig(wrapper);
 
-      expect(config.mark_line).toEqual([
-        expect.objectContaining({ name: "limit", value: "1", show_label: true }),
-      ]);
+      expect(config.mark_line).toEqual([expect.objectContaining({ name: "limit", value: "1" })]);
       expect(config.y_axis_max).toBeGreaterThan(1);
     });
   });
@@ -352,11 +350,8 @@ describe("AddAlert — a prefill seeds the form", () => {
       wrapper = await openWithPrefill(promqlEntry(), promqlFile());
       const config = previewConfig(wrapper);
 
-      expect(config.mark_line).toEqual([
-        expect.objectContaining({ name: "limit", value: "2", show_label: true }),
-      ]);
+      expect(config.mark_line).toEqual([expect.objectContaining({ name: "limit", value: "2" })]);
       expect(config.y_axis_max).toBeGreaterThan(2);
-      expect(config.y_axis_min).toBeLessThan(2);
     });
   });
 });

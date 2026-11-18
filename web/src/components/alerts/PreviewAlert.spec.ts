@@ -417,9 +417,8 @@ describe("PreviewAlert - refreshData method", () => {
     await nextTick();
 
     const config = w.vm.chartData.config;
-    expect(config.mark_line).toEqual([expect.objectContaining({ name: "Critical", value: "5" })]);
+    expect(config.mark_line).toEqual([expect.objectContaining({ value: "5" })]);
     expect(config.y_axis_max).toBeGreaterThan(5);
-    expect(config.y_axis_min).toBeLessThan(5);
     w.unmount();
   });
 
@@ -450,18 +449,22 @@ describe("PreviewAlert - refreshData method", () => {
     w.unmount();
   });
 
-  it("widens the y-axis for the PromQL threshold too", async () => {
+  // The renderer takes min(y_axis_min, data min), so a floor above 0 would start the axis at the data.
+  it.each([
+    [2, undefined],
+    [-2, -3],
+  ])("keeps a PromQL limit of %s on screen with the axis floor at %s", async (limit, floor) => {
     const formData = baseFormData() as any;
-    formData.query_condition.promql_condition = { column: "value", operator: "=", value: 2 };
+    formData.query_condition.promql_condition = { column: "value", operator: "=", value: limit };
     const w = await mountComp({ query: "up", selectedTab: "promql", formData });
 
     w.vm.refreshData();
     await nextTick();
 
     const config = w.vm.chartData.config;
-    expect(config.mark_line).toEqual([expect.objectContaining({ name: "Critical", value: "2" })]);
-    expect(config.y_axis_max).toBeGreaterThan(2);
-    expect(config.y_axis_min).toBeLessThan(2);
+    expect(config.mark_line).toEqual([expect.objectContaining({ value: String(limit) })]);
+    expect(config.y_axis_max).toBeGreaterThan(limit);
+    expect(config.y_axis_min).toBe(floor);
     w.unmount();
   });
 
@@ -3121,6 +3124,19 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
     w.unmount();
   });
 
+  it.each([
+    ["custom", 10, "30m"],
+    ["custom", 60, "3h"],
+    ["custom", 1, "5m"],
+    ["sql", 10, "10m"],
+  ])("names a %s alert's default range from its %s min window", async (tab, period, label) => {
+    const formData = baseFormData();
+    formData.trigger_condition.period = period;
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: tab, formData });
+    expect(w.find('[data-test="alert-preview-range-checks"]').text()).toBe(label);
+    w.unmount();
+  });
+
   it("remembers the range for the session, not in the alert", async () => {
     const formData = baseFormData();
     const w = await mountComp({ query: "SELECT * FROM logs", formData });
@@ -3174,6 +3190,19 @@ describe("PreviewAlert - a wide range asks the latest window alone for the verdi
     w.unmount();
   });
 
+  it("a click on 12h draws 12 hours and adds the one verdict search", async () => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: "custom" });
+    await flushPromises();
+    await w.find('[data-test="alert-preview-range-12h"]').trigger("click");
+    await flushPromises();
+    const { start_time, end_time } = w
+      .findComponent({ name: "PanelSchemaRenderer" })
+      .props("selectedTimeObj");
+    expect((end_time.getTime() - start_time.getTime()) / 60_000_000).toBe(720);
+    expect(streaming.calls).toHaveLength(1);
+    w.unmount();
+  });
+
   it.each([
     ["builder", "custom", [{ hits: [{ zo_sql_num: 4 }, { zo_sql_num: 3 }] }], 7, true],
     ["SQL", "sql", [{ total: 2 }], 2, false],
@@ -3208,6 +3237,45 @@ describe("PreviewAlert - a wide range asks the latest window alone for the verdi
     await nextTick();
     expect(w.vm.evaluationStatus).toBeNull();
     expect((w.vm.$.exposed as any).queryFailed.value).toBe(true);
+    w.unmount();
+  });
+});
+
+describe("PreviewAlert - a chart with many series", () => {
+  const series = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      name: `pod-${i}`,
+      data: [
+        [1, i],
+        [2, i],
+      ],
+    }));
+
+  it.each([
+    [1, undefined, null],
+    [3, undefined, "3"],
+    [100, { shown: 100, total: 1064 }, "1,064"],
+  ])("%s series (cap %o) draw no legend and count line %s", async (n, seriesLimit, note) => {
+    const w = await mountComp({ query: "SELECT * FROM logs" });
+    w.vm.refreshData();
+    await flushPromises();
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: { series: [...series(n), { data: [[1, null]] }] },
+      extras: { seriesLimit },
+    });
+    await nextTick();
+    expect(w.vm.chartData.config.show_legends).toBe(false);
+    const line = w.find('[data-test="alert-preview-series-count"]');
+    expect(line.exists() ? line.text() : null).toEqual(note ? expect.stringContaining(note) : null);
+    w.unmount();
+  });
+
+  it("names the limit under the chart instead of on its line", async () => {
+    const w = await mountComp({ query: "SELECT * FROM logs", labelledLimit: true });
+    w.vm.refreshData();
+    await flushPromises();
+    expect(w.vm.chartData.config.mark_line.map((l: any) => l.show_label)).toEqual([false]);
+    expect(w.find('[data-test="alert-preview-limit-key"]').text()).toContain("5");
     w.unmount();
   });
 });

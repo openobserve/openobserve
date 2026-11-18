@@ -15675,10 +15675,13 @@
       },
       "preview": {
         "range": "Preview range",
-        "checks": "Last check | Last {count} checks",
         "lastMinutes": "Last {minutes} min",
         "hours12": "Last 12 hours",
-        "hours24": "Last 24 hours"
+        "hours24": "Last 24 hours",
+        "checksSpan": "Last check ({minutes} min) | Last {count} checks ({minutes} min)",
+        "seriesShown": "{shown} of {total} series",
+        "limitKey": "Limit {value}",
+        "warningKey": "Warning {value}"
       },
       "anomaly": {
         "sensitivityAuto": "Auto",

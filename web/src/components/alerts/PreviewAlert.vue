@@ -15,24 +15,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="chartPanelRef" class="border-border-default relative flex h-full flex-col border">
-    <div class="flex shrink-0 justify-end px-2 pt-2">
-      <OSelect
-        v-model="previewRange"
-        :options="previewRangeOptions"
-        labelKey="label"
-        valueKey="value"
-        :searchable="false"
-        size="xs"
-        width="sm"
-        :aria-label="t('alerts.form.preview.range')"
-        data-test="alert-preview-range"
-      />
-    </div>
+  <div
+    ref="chartPanelRef"
+    class="relative flex h-full flex-col"
+    :class="rangeTarget === undefined && 'border-border-default border'"
+  >
+    <Teleport v-if="rangeTarget !== null" :to="rangeTarget ?? 'body'" :disabled="!rangeTarget">
+      <div :class="rangeTarget ? 'contents' : 'flex shrink-0 justify-end px-2 pt-2'">
+        <OToggleGroup
+          :model-value="shownRange"
+          :aria-label="t('alerts.form.preview.range')"
+          data-test="alert-preview-range"
+          @update:model-value="onRangePick"
+        >
+          <OToggleGroupItem
+            v-for="option in previewRangeOptions"
+            :key="option.value"
+            :value="option.value"
+            size="xs"
+            :tooltip="option.tooltip"
+            :aria-label="option.tooltip"
+            :data-test="`alert-preview-range-${option.value}`"
+          >
+            {{ option.label }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </div>
+    </Teleport>
     <!-- Chart -->
     <div
       data-test="alert-preview-chart"
-      class="preview-alert-chart relative min-h-0 flex-1 px-4 pb-4"
+      class="preview-alert-chart relative min-h-0 flex-1 px-4"
+      :class="showChartKey ? 'pb-1' : 'pb-4'"
     >
       <!-- Empty query placeholder -->
       <div v-if="awaitsQuery" class="flex h-full flex-col items-center justify-center gap-2">
@@ -65,6 +79,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #actions />
       </QueryErrorState>
     </div>
+    <div
+      v-if="showChartKey"
+      class="text-text-secondary flex h-5 shrink-0 items-center gap-3 px-4 pb-1 text-xs"
+      data-test="alert-preview-key"
+    >
+      <span
+        v-for="limit in limitKeys"
+        :key="limit.level"
+        class="inline-flex items-center gap-1.5"
+        :data-test="
+          limit.level === 'critical' ? 'alert-preview-limit-key' : 'alert-preview-warning-key'
+        "
+      >
+        <span
+          aria-hidden="true"
+          class="w-4 border-t-2 border-dashed"
+          :class="
+            limit.level === 'critical' ? 'border-status-error-text' : 'border-status-warning-text'
+          "
+        />
+        {{ limit.label }}
+      </span>
+      <span v-if="seriesCountText" class="ms-auto" data-test="alert-preview-series-count">
+        {{ seriesCountText }}
+      </span>
+    </div>
   </div>
 </template>
 
@@ -78,6 +118,7 @@ import {
   reactive,
   onBeforeMount,
   onBeforeUnmount,
+  type PropType,
 } from "vue";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
@@ -98,7 +139,8 @@ import { b64EncodeUnicode, generateTraceContext, smartDecodeVrlFunction } from "
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
 let dashboardPanelData: any = null;
 
@@ -127,10 +169,15 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  // Opt-in: names the limit lines on the chart.
+  // Opt-in: names the limit lines in a key under the chart.
   labelledLimit: {
     type: Boolean,
     default: false,
+  },
+  // Where the range buttons go: unset keeps them above the chart, null waits for the host's element.
+  rangeTarget: {
+    type: Object as PropType<HTMLElement | null>,
+    default: undefined,
   },
 });
 
@@ -197,13 +244,15 @@ const currentLimits = (): [unknown, unknown] => {
  */
 const applyThresholds = (): void => {
   const [critical, warning] = currentLimits();
-  const markLines = buildThresholdMarkLines(
-    critical,
-    warning,
-    props.labelledLimit
-      ? { critical: t("alerts.plain.limitLine"), warning: t("alerts.plain.warnLine") }
-      : undefined,
-  );
+  drawnLimits.value = [
+    ...(hasLimitValue(critical) ? [{ level: "critical" as const, value: critical }] : []),
+    ...(hasLimitValue(warning) ? [{ level: "warning" as const, value: warning }] : []),
+  ];
+  // A label on the line sits over the series it crosses; the key under the chart names it instead.
+  const markLines = buildThresholdMarkLines(critical, warning, {
+    critical: t("alerts.plain.limitLine"),
+    warning: t("alerts.plain.warnLine"),
+  }).map((line) => ({ ...line, show_label: false }));
   const bounds = thresholdAxisBounds(markLines);
   dashboardPanelData.data.config.mark_line = markLines;
   dashboardPanelData.data.config.y_axis_min = bounds.y_axis_min;
@@ -232,6 +281,8 @@ onBeforeMount(() => {
     props.selectedTab === "sql" && props.formData.query_condition?.vrl_function ? true : false;
   // Give y-axis labels enough room so they don't collide with the chart
   dashboardPanelData.data.config.unit = "numbers";
+  // At the panel's width a legend pages from three series; the key counts them, the tooltip names them.
+  dashboardPanelData.data.config.show_legends = false;
   dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
   dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
   dashboardPanelData.data.queries[0].customQuery = true;
@@ -311,11 +362,12 @@ const orgPreviewMinutes = (): number =>
 // A SQL verdict counts the rows the query returns, which only one window can give.
 const previewChecks = computed(() => (props.selectedTab === "sql" ? 1 : 3));
 const alertWindowMinutes = (): number => Number(props.formData.trigger_condition?.period) || 0;
-const previewMinutes = (): number => {
-  if (previewRange.value !== "checks") return PREVIEW_RANGE_MINUTES[previewRange.value];
+const previewMinutesFor = (range: PreviewRange): number => {
+  if (range !== "checks") return PREVIEW_RANGE_MINUTES[range];
   if (orgPreviewMinutes() > 0) return orgPreviewMinutes();
   return Math.max(previewChecks.value * alertWindowMinutes(), 5);
 };
+const previewMinutes = (): number => previewMinutesFor(shownRange.value);
 // A wider range cannot give the latest window's count (SQL counts rows, wide buckets straddle it),
 // so the verdict then comes from one extra search over that window alone.
 const verdictNeedsOwnSearch = (): boolean => {
@@ -323,19 +375,84 @@ const verdictNeedsOwnSearch = (): boolean => {
   if (alertWindowMinutes() <= 0) return false;
   return props.selectedTab === "sql"
     ? previewMinutes() > alertWindowMinutes()
-    : previewRange.value !== "checks";
+    : shownRange.value !== "checks";
 };
-const previewRangeOptions = computed(() => [
-  {
-    label:
-      orgPreviewMinutes() > 0
-        ? t("alerts.form.preview.lastMinutes", { minutes: orgPreviewMinutes() })
-        : t("alerts.form.preview.checks", { count: previewChecks.value }, previewChecks.value),
-    value: "checks",
-  },
-  { label: t("alerts.form.preview.hours12"), value: "12h" },
-  { label: t("alerts.form.preview.hours24"), value: "24h" },
-]);
+// Hours, never days, so the default reads on the same scale as 12h and 24h.
+const compactDuration = (minutes: number): I18nText => {
+  if (minutes % 60 === 0) return t("common.hrCompact", { count: minutes / 60 });
+  return t("common.minCompact", { count: minutes });
+};
+const defaultRangeTooltip = (minutes: number): I18nText => {
+  const checks = previewChecks.value;
+  if (orgPreviewMinutes() > 0 || checks * alertWindowMinutes() !== minutes)
+    return t("alerts.form.preview.lastMinutes", { minutes });
+  return t("alerts.form.preview.checksSpan", { count: checks, minutes }, checks);
+};
+// A fixed range as long as the default would repeat it as a second button, so it is left out.
+const previewRangeOptions = computed(() => {
+  const defaultMinutes = previewMinutesFor("checks");
+  return [
+    {
+      value: "checks" as PreviewRange,
+      label: compactDuration(defaultMinutes),
+      tooltip: defaultRangeTooltip(defaultMinutes),
+    },
+    {
+      value: "12h" as PreviewRange,
+      label: compactDuration(720),
+      tooltip: t("alerts.form.preview.hours12"),
+    },
+    {
+      value: "24h" as PreviewRange,
+      label: compactDuration(1440),
+      tooltip: t("alerts.form.preview.hours24"),
+    },
+  ].filter(
+    (option) =>
+      option.value === "checks" ||
+      PREVIEW_RANGE_MINUTES[option.value as "12h" | "24h"] !== defaultMinutes,
+  );
+});
+const shownRange = computed<PreviewRange>(() =>
+  previewRangeOptions.value.some((option) => option.value === previewRange.value)
+    ? previewRange.value
+    : "checks",
+);
+const onRangePick = (value: unknown) => {
+  if (value === "checks" || value === "12h" || value === "24h") previewRange.value = value;
+};
+
+const drawnSeries = ref<{ shown: number; total: number } | null>(null);
+const seriesCountText = computed((): I18nText | null => {
+  const drawn = drawnSeries.value;
+  if (!drawn || drawn.total <= 1) return null;
+  if (drawn.total > drawn.shown)
+    return t("alerts.form.preview.seriesShown", {
+      shown: drawn.shown.toLocaleString(),
+      total: drawn.total.toLocaleString(),
+    });
+  return t("alerts.sections.condition.series", { count: drawn.shown.toLocaleString() });
+});
+const showChartKey = computed(
+  () => !!chartData.value && !awaitsQuery.value && !shownChartError.value,
+);
+const drawnLimits = ref<{ level: "critical" | "warning"; value: unknown }[]>([]);
+const limitKeys = computed(() =>
+  props.labelledLimit
+    ? drawnLimits.value.map(({ level, value }) => {
+        const shown = Number.isFinite(Number(value))
+          ? Number(value).toLocaleString()
+          : String(value);
+        return {
+          level,
+          label:
+            level === "critical"
+              ? t("alerts.form.preview.limitKey", { value: shown })
+              : t("alerts.form.preview.warningKey", { value: shown }),
+        };
+      })
+    : [],
+);
 
 const writesOwnQuery = computed(
   () => props.selectedTab === "sql" || props.selectedTab === "promql",
@@ -1402,10 +1519,21 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   });
 };
 
-// Handle series data update event (PromQL only — every other mode is evaluated
-// from partition metadata in handleChartDataUpdate)
+const chartDataSeries = (seriesData: any): any[] =>
+  (Array.isArray(seriesData?.options?.series) ? seriesData.options.series : []).filter((s: any) => {
+    const hasData = Array.isArray(s?.data);
+    const hasMultiplePoints = hasData && s.data.length > 1;
+    const hasName = s?.name !== undefined && s?.name !== null;
+    return (hasName || hasMultiplePoints) && hasData;
+  });
+
+// Counts the drawn series in every mode; judges the verdict for PromQL only (every other mode is
+// evaluated from partition metadata in handleChartDataUpdate).
 const handleSeriesDataUpdate = (seriesData: any) => {
   if (previewError.value?.message) return;
+  const named = chartDataSeries(seriesData).length;
+  const limit = seriesData?.extras?.seriesLimit;
+  drawnSeries.value = { shown: named, total: Math.max(Number(limit?.total) || 0, named) };
   if (!props.formData.trigger_condition) return;
   if (props.selectedTab !== "promql") return;
 
@@ -1417,9 +1545,6 @@ const handleSeriesDataUpdate = (seriesData: any) => {
     // makes: on a zero-result completion with a chart already on screen it
     // returns without reassigning panelData (:1204), so the deep watch never
     // fires and this handler is not called at all.)
-    const emittedSeries: any[] = Array.isArray(seriesData?.options?.series)
-      ? seriesData.options.series
-      : [];
 
     // Drop entries that carry no data. DEFENCE IN DEPTH, not load-bearing:
     // besides the markLine attached to each data series
@@ -1431,14 +1556,7 @@ const handleSeriesDataUpdate = (seriesData: any) => {
     // verdict against either producer today. It is kept as the cheaper barrier,
     // and because it does not depend on that point staying null: a nameless
     // one-point series carrying a real NUMBER would be classified without it.
-    const dataSeries = emittedSeries.filter((s: any) => {
-      const hasData = Array.isArray(s?.data);
-      const hasMultiplePoints = hasData && s.data.length > 1;
-      const hasName = s?.name !== undefined && s?.name !== null;
-      return (hasName || hasMultiplePoints) && hasData;
-    });
-
-    evaluatePromqlSeries(dataSeries);
+    evaluatePromqlSeries(chartDataSeries(seriesData));
   } catch (error) {
     console.error("[PreviewAlert] Error processing series data:", error);
   }
@@ -1849,7 +1967,11 @@ onBeforeUnmount(() => {
   cancelVerdictSearch();
 });
 
-watch(previewRange, () => refreshFromProps());
+// A range pick is the user's own request, so the 200 ms echo guard must not swallow it.
+watch(previewRange, () => {
+  lastRefreshTime = 0;
+  refreshFromProps();
+});
 
 // The lines follow the limit at once; the re-query a limit change starts may be throttled or slow.
 watch(
