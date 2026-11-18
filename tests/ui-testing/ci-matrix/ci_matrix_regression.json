@@ -255,7 +255,8 @@
       "rum-2725-cdn-replay-recording.spec.js",
       "rum-3072-performance-deep-links.spec.js",
       "rum-2811-widen-range-picker-label.spec.js",
-      "rum-2924-overview-cards-narrow-viewport.spec.js"
+      "rum-2924-overview-cards-narrow-viewport.spec.js",
+      "rum-16460-pretty-mobile-sourcemaps.spec.js"
     ],
     "disabled": [],
     "ingest_allowed_upto": "1440",
