@@ -200,6 +200,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('✓ Selected stream: e2e_automate');
 
     // Add a condition
+    await pm.alertsPage.openFilterBuilder();
     const addConditionBtn = pm.alertsPage.getAddConditionButtonLocator();
     if (await addConditionBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await addConditionBtn.click();
@@ -347,6 +348,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('Selected stream: logs / e2e_automate');
 
     // Add a condition so the inline query editor renders
+    await pm.alertsPage.openFilterBuilder();
     const addConditionBtn = pm.alertsPage.getAddConditionButtonLocator();
     await expect(addConditionBtn, 'Add Condition button should be visible').toBeVisible({ timeout: 5000 });
     await addConditionBtn.click();

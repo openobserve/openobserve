@@ -125,10 +125,12 @@ export class AlertSaveQueryModePage {
   }
 
   async selectRealtime() {
+    await goToAlertSection(this.page, 'watch');
     await this.page.locator(this.locators.realtimeTab).click();
   }
 
   async selectScheduled() {
+    await goToAlertSection(this.page, 'watch');
     await this.page.locator(this.locators.scheduledTab).click();
   }
 
@@ -279,8 +281,14 @@ export class AlertSaveQueryModePage {
     await expect(this.page.locator(this.locators.submit)).toBeHidden({ timeout: 30000 });
   }
 
+  /** On edit section 1 is locked, so the stream shows only in its summary. */
   async expectStreamName(streamName) {
-    await expect(this.page.locator(this.locators.streamTrigger)).toHaveText(streamName, { timeout: 20000 });
+    const trigger = this.page.locator(this.locators.streamTrigger);
+    if (await trigger.count()) {
+      await expect(trigger).toHaveText(streamName, { timeout: 20000 });
+      return;
+    }
+    await expect(this.page.locator(this.locators.watchSummary)).toContainText(`· ${streamName} ·`, { timeout: 20000 });
   }
 
   async expectThreshold(value) {

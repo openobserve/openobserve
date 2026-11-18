@@ -25,6 +25,7 @@ import {
     expandAlertSettingGroups,
     fillAlertName,
     goToAlertSection,
+    openAlertFilterBuilder,
     openAlertSectionForTab,
     pickAlertDestination,
     revealAlertSetting,
@@ -441,6 +442,11 @@ export class AlertsPage {
     }
 
     /** Add Condition button (bare locator, no .first()). */
+    /** The condition filter builder stays folded behind its sentence until opened. */
+    async openFilterBuilder() {
+        await openAlertFilterBuilder(this.page);
+    }
+
     getAddConditionButtonLocator() {
         return this.page.locator(this.locators.addConditionButton);
     }
