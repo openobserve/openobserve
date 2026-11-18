@@ -504,9 +504,16 @@ pub fn get_cache_file_path(file_path: &str, file_name: &str) -> String {
     format!("{STREAMING_AGGS_CACHE_DIR}/{file_path}/{file_name}")
 }
 
-pub fn get_aggregation_cache_key_from_request(req: &SearchPartitionRequest) -> u64 {
+pub fn get_aggregation_cache_key_from_request(
+    req: &SearchPartitionRequest,
+    histogram_interval: Option<i64>,
+) -> u64 {
     // Keep UTC entries separate from caches written before timezone eligibility was enforced.
     let mut hash_body = vec!["aggregation-v2".to_string(), req.sql.clone()];
+    // `histogram(_timestamp)` buckets by the time range, so equal SQL can hold different buckets.
+    if let Some(interval) = histogram_interval {
+        hash_body.push(format!("histogram_interval={interval}"));
+    }
     if let Some(vrl_function) = &req.query_fn {
         hash_body.push(vrl_function.to_string());
     }
@@ -533,13 +540,33 @@ mod tests {
             "end_time": 2,
         }))
         .unwrap();
-        let utc = get_aggregation_cache_key_from_request(&req);
-        assert_eq!(utc, get_aggregation_cache_key_from_request(&req));
+        let utc = get_aggregation_cache_key_from_request(&req, None);
+        assert_eq!(utc, get_aggregation_cache_key_from_request(&req, None));
         assert_ne!(
             utc,
             config::utils::hash::sum64(&req.sql),
             "legacy key must not match"
         );
+    }
+
+    #[test]
+    fn aggregation_cache_key_separates_histogram_intervals() {
+        let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
+            "sql": "SELECT histogram(_timestamp) AS ts, count(*) AS c FROM t GROUP BY ts ORDER BY c DESC",
+            "start_time": 1,
+            "end_time": 2,
+        }))
+        .unwrap();
+        let minute = get_aggregation_cache_key_from_request(&req, Some(60));
+        assert_eq!(
+            minute,
+            get_aggregation_cache_key_from_request(&req, Some(60))
+        );
+        assert_ne!(
+            minute,
+            get_aggregation_cache_key_from_request(&req, Some(30))
+        );
+        assert_ne!(minute, get_aggregation_cache_key_from_request(&req, None));
     }
 
     #[test]
