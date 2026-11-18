@@ -342,6 +342,12 @@ describe("polling", () => {
     ],
     ["a failed run owes no step", owed({}, { run_id: "r-failed", state: "failed" }), NOW, false],
     [
+      "a re-analysis ended while the last run's step is still shown",
+      owed({ next_step: view("ready", "r-old") }, { run_id: "r-new", state: "completed" }),
+      NOW,
+      true,
+    ],
+    [
       "an ended run whose step is shown",
       owed({ next_step: view("ready", "r-shown") }, { run_id: "r-shown", state: "completed" }),
       NOW,

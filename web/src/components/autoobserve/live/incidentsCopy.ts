@@ -435,7 +435,8 @@ const runEndSeenMs = new Map<string, number>();
 const awaitsStep = (item: AutoObserveIncidentItem, nowMs: number): boolean => {
   const run = item.investigation;
   const view = item.context?.next_step;
-  if (!run.run_id || run.state !== "completed" || !view || view.state === "ready") return false;
+  if (!run.run_id || run.state !== "completed" || !view) return false;
+  // A ready step from an earlier run still waits for this run's step.
   if (view.step.run_id === run.run_id) return false;
   const seen = runEndSeenMs.get(run.run_id) ?? nowMs;
   runEndSeenMs.set(run.run_id, seen);
