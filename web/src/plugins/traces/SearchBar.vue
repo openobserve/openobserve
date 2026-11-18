@@ -808,7 +808,7 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { valuesWindowFor } from "@/composables/fieldValueStore";
+import { pageValuesWindow } from "@/composables/fieldValueStore";
 import useStreams from "@/composables/useStreams";
 import {
   applyFilterTerm,
@@ -831,6 +831,7 @@ import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
 import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
+import { getConsumableRelativeTime } from "@/utils/date";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import savedViewsService from "@/services/saved_views";
@@ -1067,11 +1068,11 @@ export default defineComponent({
       setValuesTimeRange,
     } = useSqlSuggestions();
 
-    const pageValuesWindow = () =>
-      valuesWindowFor(searchObj.data.datetime ?? {}, Date.now() * 1000);
-    setValuesTimeRange(pageValuesWindow);
+    const currentValuesWindow = () =>
+      pageValuesWindow(searchObj.data.datetime ?? {}, getConsumableRelativeTime);
+    setValuesTimeRange(currentValuesWindow);
     // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
-    const valuesWindow = computed(pageValuesWindow);
+    const valuesWindow = computed(currentValuesWindow);
 
     const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
       useFilterBuilderPreference("o2.traces.queryInput");

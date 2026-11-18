@@ -1867,8 +1867,9 @@ import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
 import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
+import { getConsumableRelativeTime } from "@/utils/date";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { valuesWindowFor } from "@/composables/fieldValueStore";
+import { pageValuesWindow } from "@/composables/fieldValueStore";
 import { json2csv } from "json-2-csv";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
 import {
@@ -2570,11 +2571,11 @@ export default defineComponent({
       setValuesTimeRange,
     } = useSqlSuggestions();
 
-    const pageValuesWindow = () =>
-      valuesWindowFor(searchObj.data.datetime ?? {}, Date.now() * 1000);
-    setValuesTimeRange(pageValuesWindow);
+    const currentValuesWindow = () =>
+      pageValuesWindow(searchObj.data.datetime ?? {}, getConsumableRelativeTime);
+    setValuesTimeRange(currentValuesWindow);
     // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
-    const valuesWindow = computed(pageValuesWindow);
+    const valuesWindow = computed(currentValuesWindow);
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = Number(item.value);
