@@ -331,7 +331,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 82] = [
     ("core/src/alerts/prom_rule.rs", "evaluate", Caller::Background("alert evaluation of PromQL rules")),
     ("core/src/alerts/scheduler/query_optimization_recommendation.rs", "search", Caller::Background("query recommendation analysis")),
     ("core/src/anomaly_detection.rs", "execute_anomaly_query", Caller::Background("anomaly detection runs")),
-    ("core/src/anomaly_detection/explore_state.rs", "read_buckets", Caller::Exempt("the detector's own scored points for its explore state; its route stays open")),
+    ("core/src/anomaly_detection/explore_state.rs", "search_hits", Caller::Exempt("the detector's own scored points for its explore state; its route stays open")),
     ("core/src/anomaly_detection/partitioned_search.rs", "plan", Caller::Background("anomaly detection runs")),
     ("core/src/anomaly_detection/partitioned_search.rs", "search", Caller::Background("anomaly detection runs")),
     ("core/src/autoobserve/ports.rs", "promql", Caller::Background("AutoObserve engine runs")),
