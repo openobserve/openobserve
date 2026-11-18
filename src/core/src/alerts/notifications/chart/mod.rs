@@ -612,9 +612,21 @@ fn anomaly_series_sql(
         ("is_partial_drop", "partial_drop_value"),
     ] {
         if flags.contains(&flag) {
-            select.push(format!(
-                "max(CASE WHEN {flag} IS TRUE THEN actual_value END) AS {alias}"
-            ));
+            // The latest event row of the bucket, with its own query end for the merge.
+            let event = format!("CASE WHEN {flag} IS TRUE THEN 1 ELSE 0 END");
+            let mut by = vec![event.clone()];
+            if cols.judged_end {
+                by.push("judged_end_us ASC NULLS FIRST".to_string());
+            }
+            by.push("created_at".to_string());
+            let by = by.join(", ");
+            let of = |col: &str| {
+                format!("CASE WHEN max({event}) = 1 THEN last_value({col} ORDER BY {by}) END")
+            };
+            select.push(format!("{} AS {alias}", of("actual_value")));
+            if cols.judged_end {
+                select.push(format!("{} AS {alias}_judged", of("judged_end_us")));
+            }
         }
     }
     let model = match model_version {
@@ -664,6 +676,11 @@ fn parse_series_hits(hits: &[serde_json::Value]) -> Vec<StoredPoint> {
                 judged_end_us,
             });
         }
+        let judged_of = |alias: &str| {
+            hit.get(format!("{alias}_judged").as_str())
+                .and_then(|v| v.as_i64())
+                .or(judged_end_us)
+        };
         if let Some(value) = num(hit, "absence_value") {
             let point = AnomalySeriesPoint {
                 value,
@@ -673,7 +690,7 @@ fn parse_series_hits(hits: &[serde_json::Value]) -> Vec<StoredPoint> {
             };
             out.push(StoredPoint {
                 point,
-                judged_end_us,
+                judged_end_us: judged_of("absence_value"),
             });
         }
         if let Some(value) = num(hit, "partial_drop_value") {
@@ -685,7 +702,7 @@ fn parse_series_hits(hits: &[serde_json::Value]) -> Vec<StoredPoint> {
             };
             out.push(StoredPoint {
                 point,
-                judged_end_us,
+                judged_end_us: judged_of("partial_drop_value"),
             });
         }
     }
@@ -870,11 +887,12 @@ mod tests {
         );
         assert!(sql.contains(" AS lower") && sql.contains(" AS upper"));
         assert!(sql.contains(" AS judged_end"));
-        assert!(
-            sql.contains(
-                "max(CASE WHEN is_absence IS TRUE THEN actual_value END) AS absence_value"
-            )
-        );
+        assert!(sql.contains(
+            "CASE WHEN max(CASE WHEN is_partial_drop IS TRUE THEN 1 ELSE 0 END) = 1 THEN \
+             last_value(actual_value ORDER BY CASE WHEN is_partial_drop IS TRUE THEN 1 ELSE 0 \
+             END, judged_end_us ASC NULLS FIRST, created_at) END AS partial_drop_value"
+        ));
+        assert!(sql.contains(" AS absence_value_judged"));
         assert!(sql.ends_with("GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"));
     }
 
@@ -927,6 +945,21 @@ mod tests {
         assert_eq!(rows[0].judged_end_us, Some(T0 + B));
         assert!(rows[1].point.is_absence && rows[1].point.is_anomaly);
         assert_eq!(rows[1].judged_end_us, None);
+    }
+
+    #[test]
+    fn an_event_point_keeps_its_own_query_end() {
+        let hits = vec![serde_json::json!({
+            "zo_sql_key": T0, "value": 100.0, "flagged": 0, "judged_end": T0 + 3 * B,
+            "partial_drop_value": 20.0, "partial_drop_value_judged": T0 + 2 * B
+        })];
+        let rows = parse_series_hits(&hits);
+        assert_eq!(rows[0].judged_end_us, Some(T0 + 3 * B));
+        assert!(rows[1].point.is_partial_drop);
+        assert_eq!(
+            (rows[1].point.value, rows[1].judged_end_us),
+            (20.0, Some(T0 + 2 * B))
+        );
     }
 
     #[test]
