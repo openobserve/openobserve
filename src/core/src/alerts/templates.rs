@@ -76,16 +76,36 @@ pub(crate) fn ownership_of(saved: &Template) -> (&str, Authz) {
     (&saved.org_id, Authz::new(&saved.name))
 }
 
-/// Refuses a body over [`BODY_MAX_BYTES`] unless it equals the stored body, so an older large row
-/// keeps saving edits to its other fields (o2-enterprise#3431 B14).
-pub(crate) fn check_body_size(body: &str, existing: Option<&str>) -> Result<(), TemplateError> {
-    if body.len() <= BODY_MAX_BYTES || existing == Some(body) {
+/// Refuses a body over [`BODY_MAX_BYTES`] unless it is the stored body, so an older large row
+/// keeps saving edits to its other fields (o2-enterprise#3431 B14). A content body counts as
+/// unchanged when it parses to the same spec, because the editor re-formats the JSON on every save.
+pub(crate) fn check_body_size(
+    body: &str,
+    existing: Option<&str>,
+    content: bool,
+) -> Result<(), TemplateError> {
+    if body.len() <= BODY_MAX_BYTES {
+        return Ok(());
+    }
+    if let Some(stored) = existing
+        && (stored == body || (content && same_spec(stored, body)))
+    {
         return Ok(());
     }
     Err(TemplateError::BodyTooLarge {
         size: body.len(),
         max: BODY_MAX_BYTES,
     })
+}
+
+/// Both bodies parse as content specs and hold the same values, whatever their JSON formatting.
+fn same_spec(a: &str, b: &str) -> bool {
+    let value = |body: &str| {
+        ContentSpec::parse(body)
+            .ok()
+            .and_then(|spec| serde_json::to_value(spec).ok())
+    };
+    matches!((value(a), value(b)), (Some(a), Some(b)) if a == b)
 }
 
 /// The body limit on a draft spec, measured as the JSON a save of the spec stores.
@@ -158,11 +178,14 @@ pub async fn save(
         }
     };
 
-    // Before the content parse below, so an oversized draft is not parsed.
-    check_body_size(&template.body, existing.as_ref().map(|e| e.body.as_str()))?;
-
     let existing_kind = existing.as_ref().map(|e| e.kind);
     template.kind = resolve_kind(requested_kind, existing_kind, create);
+    // Before the content parse below, so an oversized new draft is not parsed.
+    check_body_size(
+        &template.body,
+        existing.as_ref().map(|e| e.body.as_str()),
+        template.kind == TemplateKind::Content,
+    )?;
     template.applies_to = match &existing {
         // Reserved rows are read only; root edits keep the stored list.
         Some(e) if is_reserved_template_name(&e.name) => e.applies_to.clone(),
@@ -1456,8 +1479,8 @@ mod tests {
         let at_limit = "a".repeat(BODY_MAX_BYTES);
         let over = "a".repeat(BODY_MAX_BYTES + 1);
         // Create: no stored row.
-        assert!(check_body_size(&at_limit, None).is_ok());
-        let err = check_body_size(&over, None).unwrap_err();
+        assert!(check_body_size(&at_limit, None, false).is_ok());
+        let err = check_body_size(&over, None, false).unwrap_err();
         assert!(
             matches!(err, TemplateError::BodyTooLarge { size, max }
                 if size == BODY_MAX_BYTES + 1 && max == BODY_MAX_BYTES),
@@ -1466,13 +1489,36 @@ mod tests {
         assert!(err.to_string().contains("1048576"), "{err}");
         // A changed body over the limit is refused, even when the stored row is also large.
         let old_large = "b".repeat(BODY_MAX_BYTES + 10);
-        assert!(check_body_size(&over, Some(&old_large)).is_err());
-        assert!(check_body_size(&over, Some("small")).is_err());
+        assert!(check_body_size(&over, Some(&old_large), false).is_err());
+        assert!(check_body_size(&over, Some("small"), false).is_err());
         // An unchanged old large body keeps saving.
-        assert!(check_body_size(&old_large, Some(&old_large)).is_ok());
+        assert!(check_body_size(&old_large, Some(&old_large), false).is_ok());
         // Multi-byte text counts bytes, not characters.
         let wide = "\u{e9}".repeat(BODY_MAX_BYTES / 2 + 1);
-        assert!(check_body_size(&wide, None).is_err());
+        assert!(check_body_size(&wide, None, false).is_err());
+    }
+
+    #[test]
+    fn a_reformatted_content_body_over_the_limit_counts_as_unchanged() {
+        let spec = ContentSpec {
+            title: "t".into(),
+            body: "b".repeat(BODY_MAX_BYTES),
+            ..Default::default()
+        };
+        let compact = serde_json::to_string(&spec).unwrap();
+        // The editor saves `JSON.stringify(spec, null, 2)`.
+        let pretty = serde_json::to_string_pretty(&spec).unwrap();
+        assert_ne!(compact, pretty);
+        assert!(check_body_size(&pretty, Some(&compact), true).is_ok());
+        // A custom body is compared byte for byte.
+        assert!(check_body_size(&pretty, Some(&compact), false).is_err());
+        // A real content change is refused.
+        let edited = serde_json::to_string_pretty(&ContentSpec {
+            title: "changed".into(),
+            ..spec
+        })
+        .unwrap();
+        assert!(check_body_size(&edited, Some(&compact), true).is_err());
     }
 
     #[test]
