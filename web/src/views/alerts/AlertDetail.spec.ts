@@ -656,6 +656,39 @@ describe("AlertDetail — anomaly alerts", () => {
     expect(wrapper.findComponent({ name: "AnomalyDetectionChart" }).exists()).toBe(true);
   });
 
+  it("shows the duplicate-rows notice with the server's text on the charts tab", async () => {
+    const notice =
+      "Last run kept one row per time bucket and dropped 214 rows. Edit the query to return one value per bucket.";
+    wrapper = await mountView({
+      alert: { ...makeAnomalyAlert(), notice_class: "duplicate_rows", last_error: notice } as any,
+    });
+    const banner = wrapper.find('[data-test="alerts-alertdetail-anomaly-duplicate-rows"]');
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toContain("dropped 214 rows");
+  });
+
+  it("shows no duplicate-rows notice after a clean run", async () => {
+    wrapper = await mountView({ alert: { ...makeAnomalyAlert(), notice_class: null } as any });
+    expect(wrapper.find('[data-test="alerts-alertdetail-anomaly-duplicate-rows"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("reloads the config when the chart reports another model", async () => {
+    wrapper = await mountView({ alert: makeAnomalyAlert() });
+    expect(alertsService.get_by_alert_id).toHaveBeenCalledTimes(1);
+    wrapper.findComponent({ name: "AnomalyDetectionChart" }).vm.$emit("reload");
+    await flushPromises();
+    expect(alertsService.get_by_alert_id).toHaveBeenCalledTimes(2);
+  });
+
+  it("hands the chart's Ask AI payload to the layout's AI chat", async () => {
+    wrapper = await mountView({ alert: makeAnomalyAlert() });
+    const payload = { query: "q", chipName: "Anomaly x", newChat: true };
+    wrapper.findComponent({ name: "AnomalyDetectionChart" }).vm.$emit("ask-ai", payload);
+    expect(wrapper.emitted("sendToAiChat")?.[0]).toEqual([payload]);
+  });
+
   it("does not draw the generic evaluation chart, which has no SQL to build", async () => {
     wrapper = await mountView({ alert: makeAnomalyAlert() });
     expect(wrapper.findComponent({ name: "AlertGroupChart" }).exists()).toBe(false);

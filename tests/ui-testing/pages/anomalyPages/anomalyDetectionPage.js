@@ -132,6 +132,12 @@ class AnomalyDetectionPage {
             // Detection charts (AlertDetail)
             detectionCharts: '[data-test="alerts-anomalydetectionchart"]',
             detectionChartsRange: '[data-test="alerts-anomalydetectionchart-range"]',
+            summaryStrip: '[data-test="alerts-anomalysummarystrip"]',
+            summaryStripLoading: '[data-test="alerts-anomalysummarystrip-loading"]',
+            summaryStripOpen: '[data-test="alerts-anomalysummarystrip-open"]',
+            // One banner component on Logs, Traces and Metrics, told apart by the page's own prefix.
+            originBanner: (page) => `[data-test="${page}-anomaly-origin-banner"]`,
+            originBannerPart: (page, part) => `[data-test="${page}-anomaly-origin-banner-${part}"]`,
 
             toast: '[data-test="o-toast-message"]',
             toastDismiss: '[data-test="o-toast-dismiss"]',
@@ -984,6 +990,40 @@ class AnomalyDetectionPage {
                     .then(() => key),
             ),
         );
+    }
+
+    // Summary strip and the "Opened from anomaly" banner
+
+    getSummaryStripLocator() {
+        return this.page.locator(this.selectors.summaryStrip);
+    }
+
+    /** Waits out the skeleton; the strip always settles into a state, an error or a button. */
+    async waitForSummaryStrip() {
+        await this.getSummaryStripLocator().waitFor({ state: 'visible', timeout: 20000 });
+        await expect(this.page.locator(this.selectors.summaryStripLoading)).toHaveCount(0, { timeout: 30000 });
+    }
+
+    getSummaryStripOpenLocator() {
+        return this.page.locator(this.selectors.summaryStripOpen);
+    }
+
+    /** Clicks the strip's primary data button and waits for the target page route. */
+    async openDataFromSummaryStrip(pathPart) {
+        const open = this.getSummaryStripOpenLocator();
+        await open.waitFor({ state: 'visible', timeout: 20000 });
+        await open.click();
+        await this.page.waitForURL((url) => url.pathname.includes(pathPart), { timeout: 30000 });
+    }
+
+    /** @param {'logs'|'traces'|'metrics'} page */
+    getOriginBannerLocator(page) {
+        return this.page.locator(this.selectors.originBanner(page));
+    }
+
+    /** @param {'logs'|'traces'|'metrics'} page @param {'title'|'values'|'back'|'close'|'filter-not-applied'} part */
+    getOriginBannerPartLocator(page, part) {
+        return this.page.locator(this.selectors.originBannerPart(page, part));
     }
 
     // Cleanup

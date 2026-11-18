@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mx-2.5 mt-2.5 shrink-0"
       @dismiss="firstDataArrival = null"
     />
+    <AnomalyOriginBanner class="mx-2.5 mt-2.5 shrink-0" data-test="logs-anomaly-origin-banner" />
     <div id="secondLevel" class="h-full max-h-full min-h-0 flex-1 overflow-hidden">
       <OSplitter
         class="h-full max-h-full overflow-hidden"
@@ -756,6 +757,7 @@ import { logsReapplyRequest } from "@/utils/queryHistory/logs";
 import { takeRecentLanding } from "@/utils/queryHistory/routes";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
 import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
@@ -856,6 +858,7 @@ export default defineComponent({
     LogsNoEventsState,
     LogsNoDataState,
     FirstDataPanel,
+    AnomalyOriginBanner,
     LogsNoStreamState,
     LogsDrillDownStreamSelect,
     LogsErrorState,
