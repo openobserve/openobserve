@@ -23,6 +23,7 @@ import {
   findParent,
   groupLevel,
   insertNode,
+  liftAutoGroups,
   makeCondition,
   nestLeftToRight,
   newFilterId,
@@ -622,10 +623,14 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     if (items === group.items) return base;
     const next =
       group.id === base.id ? { ...base, items } : replaceNode(base, group.id, { ...group, items });
-    // The chip after the caret may now sit in the new group; the caret goes with it.
+    followCaret(next);
+    return next;
+  }
+
+  // The chip after the caret may now sit in another group; the caret goes with it.
+  function followCaret(next: FilterGroup) {
     const holder = caretBeforeId.value ? findParent(next, caretBeforeId.value) : undefined;
     if (holder) openGroupId.value = holder.id === next.id ? null : holder.id;
-    return next;
   }
 
   /** Drops the empty group the caret leaves, and any parent that empties with it, but never `keepId`. */
@@ -755,7 +760,11 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     if (config.value.connectors === "per-group" && parent)
       return options.commit(setGroupConnector(tree.value, parent.id, next));
     const flipped = replaceNode(tree.value, id, { ...node, connector: next });
-    options.commit(parent ? nestMixed(flipped, parent.id) : flipped);
+    if (!parent) return options.commit(flipped);
+    // A flip back undoes the nesting the first flip made, so the row reads as it did.
+    const lifted = liftAutoGroups(flipped, parent.id);
+    if (lifted !== flipped) followCaret(lifted);
+    options.commit(nestMixed(lifted, parent.id));
   }
 
   function toggleNegate(id: string) {

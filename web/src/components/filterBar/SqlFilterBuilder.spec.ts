@@ -155,4 +155,75 @@ describe("SqlFilterBuilder", () => {
     mountBuilder("level = 'a' OR level = 'b'");
     expect(wrapper!.find('[data-test="b-bar-connector-1"]').exists()).toBe(true);
   });
+
+  describe("groups that keep AND and OR apart", () => {
+    const logFields: FilterField[] = [
+      { name: "level", type: "string" },
+      { name: "svc_name", type: "string" },
+      { name: "code", type: "number" },
+    ];
+    const ALL_AND = "svc_name = 'alpha' AND level = 'error' AND code = 500";
+    const emitted = () => (wrapper!.emitted("update:query") ?? []).map(([sql]) => sql);
+    const find = (id: string) => wrapper!.find(`[data-test="b-bar-${id}"]`);
+    // The page writes each emitted query back, as Logs does.
+    const mountLive = (query: string) => {
+      wrapper = mount(SqlFilterBuilder, {
+        attachTo: document.body,
+        props: {
+          query,
+          fields: logFields,
+          dataTest: "b",
+          "onUpdate:query": (next: string) => wrapper!.setProps({ query: next }),
+        },
+      });
+    };
+    const click = async (id: string) => {
+      await find(id).trigger("click");
+      await flushPromises();
+    };
+    // A group must read as a box on the bar, as clearly as the chips' own borders.
+    const expectBox = (id: string) => {
+      expect(find(id).exists()).toBe(true);
+      expect(find(id).classes()).toContain("border-border-strong");
+    };
+
+    it("draws the group an added AND makes after an OR as a box", async () => {
+      mountLive("level = 'error' OR level = 'warn'");
+      await find("input").trigger("click");
+      await flushPromises();
+      const input = document.body.querySelector<HTMLInputElement>('[data-test="b-bar-input"]')!;
+      input.value = "svc_name=alpha";
+      input.dispatchEvent(new Event("input"));
+      await flushPromises();
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+      expect(emitted().at(-1)).toBe("(level = 'error' OR level = 'warn') AND svc_name = 'alpha'");
+      expectBox("group-0");
+    });
+
+    it("draws a loaded `a OR b AND c` with its AND run as a box", () => {
+      mountLive("level = 'error' OR level = 'warn' AND code = 500");
+      expectBox("group-1");
+      expect(find("ungroup-1").exists()).toBe(false);
+    });
+
+    it.each([
+      ["connector-2", "(svc_name = 'alpha' AND level = 'error') OR code = 500", "connector-1"],
+      ["connector-1", "(svc_name = 'alpha' OR level = 'error') AND code = 500", "connector-0-1"],
+    ])(
+      "flips %s and boxes what precedes it in one click, and a second click restores the row",
+      async (connector, grouped, flippedAt) => {
+        mountLive(ALL_AND);
+        await click(connector);
+        expect(emitted()).toEqual([grouped]);
+        expectBox("group-0");
+        expect(find(flippedAt).text()).toBe("OR");
+        expect(find("ungroup-0").exists()).toBe(false);
+        await click(flippedAt);
+        expect(emitted()).toEqual([grouped, ALL_AND]);
+        expect(find("group-0").exists()).toBe(false);
+        expect(["connector-1", "connector-2"].map((id) => find(id).text())).toEqual(["AND", "AND"]);
+      },
+    );
+  });
 });

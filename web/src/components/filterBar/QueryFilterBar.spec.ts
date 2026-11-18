@@ -454,6 +454,28 @@ describe("QueryFilterBar", () => {
         expect(wrapper!.find('[data-test="query-filter-bar-group-1"]').exists()).toBe(true);
         expect(wrapper!.find('[data-test="query-filter-bar-ungroup-1"]').exists()).toBe(false);
       });
+
+      it("undoes its nesting when the same connector is flipped back", async () => {
+        const flat = "level = 'a' AND level = 'b' AND level = 'c' AND level = 'd'";
+        const state = mountBar({ fields: logFields, modelValue: parseSqlFilter(flat)! });
+        await wrapper!.find('[data-test="query-filter-bar-connector-2"]').trigger("click");
+        expect(sql(state, logFields)).toBe(
+          "((level = 'a' AND level = 'b') OR level = 'c') AND level = 'd'",
+        );
+        await wrapper!.find('[data-test="query-filter-bar-connector-0-1"]').trigger("click");
+        expect(sql(state, logFields)).toBe(flat);
+        expect(wrapper!.find('[data-test^="query-filter-bar-group-"]').exists()).toBe(false);
+      });
+
+      it("keeps a group the user made when a flip leaves it on the same connector", async () => {
+        const state = mountBar({
+          fields: logFields,
+          modelValue: parseSqlFilter("code = 1 AND (level = 'a' OR level = 'b')")!,
+        });
+        await wrapper!.find('[data-test="query-filter-bar-connector-1"]').trigger("click");
+        expect(sql(state, logFields)).toBe("code = 1 OR (level = 'a' OR level = 'b')");
+        expect(wrapper!.find('[data-test="query-filter-bar-group-1"]').exists()).toBe(true);
+      });
     });
 
     it("joins with OR and groups with parentheses as they are typed", async () => {

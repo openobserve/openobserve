@@ -109,6 +109,8 @@ export interface FilterGroup {
   items: FilterNode[];
   /** The group matches what its items do not; only `any-of-groups` profiles offer it. */
   negate?: boolean;
+  /** Made by the bar to keep AND and OR apart; lifted again once its level no longer mixes them. */
+  auto?: boolean;
   meta?: FilterNodeMeta;
 }
 
@@ -665,10 +667,22 @@ export const nestLeftToRight = (items: FilterNode[]): FilterNode[] => {
   if (!mixesConnectors(items)) return items;
   let level = [items[0]];
   for (const item of items.slice(1)) {
-    if (level.length > 1 && item.connector !== level[1].connector) level = [wrapInGroup(level)];
+    if (level.length > 1 && item.connector !== level[1].connector)
+      level = [{ ...wrapInGroup(level), auto: true }];
     level.push(item);
   }
   return level;
+};
+
+/** Lifts the groups `nestLeftToRight` made in group `id`, and `id` itself, where its level no longer mixes AND and OR. */
+export const liftAutoGroups = (root: FilterGroup, id: string): FilterGroup => {
+  const group = id === root.id ? root : findNode(root, id);
+  if (group?.kind !== "group") return root;
+  const lift = (tree: FilterGroup, node: FilterNode) =>
+    node.kind === "group" && node.auto && canUngroupNode(tree, node.id)
+      ? ungroupNode(tree, node.id)
+      : tree;
+  return lift(group.items.reduce(lift, root), group);
 };
 
 /** A node's position as indexes from the root, joined by `-`; used for stable test ids. */
