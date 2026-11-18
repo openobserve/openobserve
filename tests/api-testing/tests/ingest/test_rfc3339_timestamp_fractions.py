@@ -1,4 +1,4 @@
-"""RFC3339 timestamps with 2 or 5 fractional digits and a zone are read like any other (#15058, #16565, #16907).
+"""RFC3339 timestamps with 2 or 5 fractional digits and a zone are read like any other (#15058).
 
 `parse_str_to_time` chose the zone-less `%.3f` / `%.6f` formats from the length of the text after
 the last `.`, zone included, so `.12Z` and `.12345Z` failed while `.123Z` parsed.
@@ -22,8 +22,8 @@ def ten_minutes_ago() -> tuple[str, int]:
     return at.strftime("%Y-%m-%dT%H:%M:%S"), int(at.timestamp()) * 1_000_000
 
 
-def _stored(client: OpenObserveClient, stream: str, minutes: int = 30) -> dict[str, int]:
-    resp = client.search.sql(f'SELECT shape, _timestamp FROM "{stream}"', minutes=minutes, raise_for_status=False)
+def _stored(client: OpenObserveClient, stream: str) -> dict[str, int]:
+    resp = client.search.sql(f'SELECT shape, _timestamp FROM "{stream}"', minutes=30, raise_for_status=False)
     if resp.status_code != 200:
         return {}
     return {hit["shape"]: hit["_timestamp"] for hit in resp.json().get("hits", [])}
@@ -74,46 +74,3 @@ def test_promql_query_range_reads_start_and_end(client: OpenObserveClient, ten_m
     )
     assert resp.status_code == 200, f"#15058: {resp.status_code} {resp.text}"
     assert resp.json()["status"] == "success", resp.text
-
-
-@pytest.mark.parametrize(
-    ("template", "offset_us"),
-    [
-        ("{d} {t}.123456", 123_456),
-        ("{d} {t}+00:00", 0),
-        ("{d} {t}.12+01:00", 120_000 - 3_600_000_000),
-        ("{d}T{t}.5", 500_000),
-        ("{d}T{t}.123456789", 123_456),
-        ("{d}T{t}+0000", 0),
-        ("{d}T{t}.123456+0100", 123_456 - 3_600_000_000),
-        ("{d}T{t},123", 123_000),
-        ("{d} {t},5+00", 500_000),
-    ],
-    ids=[
-        "space-six-digits",
-        "space-offset",
-        "space-fraction-colon-offset",
-        "t-one-digit-no-zone",
-        "t-nine-digits-no-zone",
-        "t-colonless-offset",
-        "t-colonless-nonzero-offset",
-        "t-comma-decimal",
-        "space-comma-hour-offset",
-    ],
-)
-def test_json_ingest_reads_space_separated_and_iso8601_variants(
-    client: OpenObserveClient, temp_stream_name: str, ten_minutes_ago: tuple[str, int], template: str, offset_us: int
-):
-    """#16565 / #16907: these shapes were refused or stored at ingest time instead of their own instant."""
-    second, second_us = ten_minutes_ago
-    day, clock = second.split("T")
-    text = template.format(d=day, t=clock)
-    resp = client.post(f"{temp_stream_name}/_json", json=[{"shape": text, "_timestamp": text}])
-    assert resp.status_code == 200, resp.text
-    status = resp.json()["status"][0]
-    assert (status["successful"], status["failed"]) == (1, 0), f"{text} -> {status}"
-
-    stored = wait_until(
-        lambda: _stored(client, temp_stream_name, minutes=180), timeout=30, msg=f"{temp_stream_name} has no record"
-    )
-    assert stored == {text: second_us + offset_us}

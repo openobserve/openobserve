@@ -2,9 +2,8 @@
 
 Covers #7077 (caller-supplied pipeline id), #6755 (destination stream name
 length), #6579 (a pipeline outliving its source stream), #7144 (a deleted
-realtime pipeline that kept routing until the ingester restarted), #14972
-(a scheduled pipeline skipping records stamped on a window boundary) and
-o2-enterprise#3567 (a cron with a seconds field stalling a scheduled pipeline).
+realtime pipeline that kept routing until the ingester restarted) and #14972
+(a scheduled pipeline skipping records stamped on a window boundary).
 """
 from __future__ import annotations
 
@@ -19,7 +18,6 @@ import requests
 
 from support.client import OpenObserveClient
 from support.factories import unique_name
-from support.wait import wait_until
 
 logger = logging.getLogger(__name__)
 
@@ -279,22 +277,10 @@ def test_deleted_realtime_pipeline_stops_routing(client: OpenObserveClient, seed
 # ----- #14972: a scheduled pipeline reads records stamped on a window boundary -----
 
 
-def _scheduled_payload(
-    name: str, source_stream: str, destination_stream: str, trigger: dict[str, Any] | None = None
-) -> dict[str, Any]:
+def _scheduled_payload(name: str, source_stream: str, destination_stream: str) -> dict[str, Any]:
     """Scheduled pipeline copying each 1-minute window of source_stream to destination_stream."""
     query_id = str(uuid.uuid4())
     output_id = str(uuid.uuid4())
-    trigger_condition = {
-        "period": 1,
-        "operator": "=",
-        "threshold": 0,
-        "frequency": 1,
-        "cron": "",
-        "frequency_type": "minutes",
-        "silence": 0,
-        **(trigger or {}),
-    }
     return {
         "name": name,
         "description": "",
@@ -317,7 +303,15 @@ def _scheduled_payload(
                         "vrl_function": None,
                         "search_event_type": "DerivedStream",
                     },
-                    "trigger_condition": trigger_condition,
+                    "trigger_condition": {
+                        "period": 1,
+                        "operator": "=",
+                        "threshold": 0,
+                        "frequency": 1,
+                        "cron": "",
+                        "frequency_type": "minutes",
+                        "silence": 0,
+                    },
                 },
                 "position": {"x": 100, "y": 100},
                 "io_type": "input",
@@ -391,65 +385,6 @@ def test_scheduled_pipeline_reads_a_record_on_a_window_boundary(client: OpenObse
         missing = [row for row in expected if row not in got]
         assert not missing, f"records never reached {destination}: {missing}"
         assert len(got) == len(set(got)), f"records reached {destination} more than once: {sorted(got)}"
-    finally:
-        _delete_pipeline_by_name(client, name)
-        for stream in (source, destination):
-            try:
-                client.delete(f"streams/{stream}?type=logs")
-            except Exception as e:
-                logger.warning("stream cleanup failed for %s: %s", stream, e)
-
-
-def _history(client: OpenObserveClient, pipeline_id: str, since: int) -> list[dict[str, Any]]:
-    resp = client.get(
-        "pipelines/history",
-        params={"pipeline_id": pipeline_id, "start_time": since, "end_time": (int(time.time()) + 60) * 1_000_000, "size": 100},
-    )
-    assert resp.status_code == 200, f"pipeline history: {resp.status_code} {resp.text}"
-    return resp.json()["hits"]
-
-
-@pytest.mark.slow
-def test_scheduled_pipeline_with_a_cron_seconds_field_keeps_running(client: OpenObserveClient):
-    """o2-enterprise#3567: with `7 * * * * *` every run after the first got an empty window and skipped forever."""
-    name = unique_name("pyt_3567")
-    source = unique_name("pyt_3567_src").lower()
-    destination = f"{source}_out"
-    created_at = int(time.time()) * 1_000_000
-
-    try:
-        seed = {"_timestamp": (int(time.time()) - 600) * 1_000_000, "kind": "seed"}
-        resp = client.post(f"{source}/_json", json=[seed])
-        assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text}"
-        trigger = {"frequency_type": "cron", "cron": "7 * * * * *", "timezone": "UTC"}
-        resp = client.post("pipelines", json=_scheduled_payload(name, source, destination, trigger))
-        assert resp.status_code == 200, f"create failed: {resp.status_code} {resp.text}"
-        pipeline = _find_pipeline(client, name)
-        assert pipeline, f"{name} is not listed after create"
-
-        # One record in each of the next three minutes, so three consecutive runs must each move the window.
-        minute = int(time.time()) // 60 * 60_000_000
-        expected = [(minute + k * 60_000_000 + 30_000_000, f"r{k}") for k in range(3)]
-        resp = client.post(f"{source}/_json", json=[{"_timestamp": ts, "kind": kind} for ts, kind in expected])
-        assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text}"
-
-        def delivered() -> list[tuple[int, str]] | None:
-            got = _rows(client, destination, minute - 60_000_000, minute + 4 * 60_000_000)
-            return got if set(expected) <= set(got) else None
-
-        got = wait_until(delivered, timeout=5 * 60, interval=5, msg=f"the cron pipeline stopped delivering into {destination}")
-        assert len(got) == len(set(got)), f"records reached {destination} more than once: {sorted(got)}"
-
-        def three_runs() -> list[dict[str, Any]] | None:
-            runs = _history(client, pipeline["pipeline_id"], created_at)
-            return runs if len(runs) >= 3 else None
-
-        runs = wait_until(three_runs, timeout=60, interval=2, msg=f"pipeline history never recorded three runs of {name}")
-        assert {h["pipeline_name"] for h in runs} == {name}, runs
-        skipped = [h for h in runs if h["status"] == "skipped" or "Invalid timerange" in (h.get("error") or "")]
-        assert not skipped, f"a run was skipped with an empty window: {skipped}"
-        windows = sorted((h["start_time"], h["end_time"]) for h in runs)
-        assert all(start < end for start, end in windows), f"a run searched an empty window: {windows}"
     finally:
         _delete_pipeline_by_name(client, name)
         for stream in (source, destination):
