@@ -794,11 +794,12 @@ async fn thread_change_in<C: ConnectionTrait>(
     }
     apply_row_change(txn, change).await?;
     if let Some(mark) = mark {
+        let key = mark.key();
         let content = SlackMessageContent {
             last_data_us: Some(change.data_us),
             ..mark.content.unwrap_or_default()
         };
-        set_content_with(txn, &mark.key(), &content, change.now).await?;
+        set_content_with(txn, &key, &content, change.now).await?;
     }
     Ok(true)
 }
