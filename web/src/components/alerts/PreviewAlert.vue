@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="showChartKey"
-      class="text-text-secondary flex h-5 shrink-0 items-center gap-3 px-4 pb-1 text-xs"
+      class="text-text-secondary flex min-h-5 shrink-0 flex-wrap items-center gap-x-3 gap-y-0.5 px-4 pb-1 text-xs"
       data-test="alert-preview-key"
     >
       <span
