@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { escapeEditor, focusControlAfter } from "./focusNextControl";
+import { escapeEditor, focusControlAfter, focusFirstControl } from "./focusNextControl";
 
 const page = (html: string) => {
   document.body.innerHTML = html;
@@ -41,6 +41,17 @@ describe("focusControlAfter", () => {
     (document.getElementById("inner") as HTMLElement).focus();
     focusControlAfter(editor);
     expect(document.activeElement?.id).toBe("inner");
+  });
+});
+
+describe("focusFirstControl", () => {
+  it("focuses the first control, past skipped parts, info icons and controls Tab skips", () => {
+    const editor = page(
+      '<div id="editor"><header><button id="arrow"></button></header><span role="img" tabindex="0"></span><button tabindex="-1"></button><button disabled></button><input id="first" /><button id="later"></button></div>',
+    );
+    expect(focusFirstControl(editor, "header")).toBe(true);
+    expect(document.activeElement?.id).toBe("first");
+    expect(focusFirstControl(page('<div id="editor"><p></p></div>'))).toBe(false);
   });
 });
 
