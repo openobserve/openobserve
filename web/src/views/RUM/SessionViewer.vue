@@ -441,6 +441,8 @@ const DEFAULT_LOOKUP_US = 30 * DAY_US;
 const IMAGE_LOOKBACK_US = 31 * DAY_US;
 // The SDK checks its hash cache expiry only at startup, so a long-running app can reference an older image.
 const IMAGE_RETAINED_LOOKBACK_US = 3650 * DAY_US;
+// Image rows are stamped at receive time, which can trail the session by minutes, so the query ends at now.
+const IMAGE_END_SKEW_US = 60 * SECOND_US;
 const IMAGE_ID_CHUNK = 100;
 // An image can be searchable only after the segment that references it, so unresolved ids are asked again.
 const IMAGE_RETRY_DELAYS_MS = [2000, 5000, 15000];
@@ -747,9 +749,9 @@ const imageResources = shallowRef<Map<string, string>>(new Map());
 interface ImageLookup {
   count: number;
   dueAt: number;
-  failed: boolean;
 }
 const imageLookups = new Map<string, ImageLookup>();
+const imageWideDone = new Set<string>();
 let imageLoading = false;
 let imageReloadQueued = false;
 let imageRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1055,8 +1057,14 @@ const getSession = async () => {
   }
 };
 
+// Rows can repeat per id (retried uploads), hence the group by.
 const imageResourcesSql = (applicationId: string, ids: string[]) =>
   `select resource_id, min(mime) as mime, min(image) as image from "${SESSION_REPLAY_RESOURCES_STREAM}" where ${sqlEquals("application_id", applicationId)} and ${sqlIn("resource_id", ids)} group by resource_id`;
+
+const imageWindowUs = (headUs: number): QueryWindow => ({
+  start: serverWindowUs(headUs, 0).start,
+  end: Date.now() * 1000 + IMAGE_END_SKEW_US,
+});
 
 const queryImages = async (applicationId: string, ids: string[], window: QueryWindow) => {
   const { hits } = await runStreamQuery(
@@ -1071,36 +1079,35 @@ const queryImages = async (applicationId: string, ids: string[], window: QueryWi
   return found;
 };
 
-// Rows can repeat per id (retried uploads), hence the group by in the SQL above.
+const addImages = (found: Map<string, string>) => {
+  if (found.size > 0) imageResources.value = new Map([...imageResources.value, ...found]);
+};
+
+// An image can only be newer than the session, so the wide range is asked once per id.
 const loadImageChunk = async (applicationId: string, ids: string[]) => {
-  const found = await queryImages(
-    applicationId,
-    ids,
-    serverWindowUs(IMAGE_LOOKBACK_US, EVENTS_TAIL_US),
-  );
-  const missing = ids.filter((id) => !found.has(id));
-  if (missing.length > 0) {
-    const wide = serverWindowUs(IMAGE_RETAINED_LOOKBACK_US, EVENTS_TAIL_US);
-    for (const [id, url] of await queryImages(applicationId, missing, wide)) found.set(id, url);
-  }
-  imageResources.value = new Map([...imageResources.value, ...found]);
+  const found = await queryImages(applicationId, ids, imageWindowUs(IMAGE_LOOKBACK_US));
+  addImages(found);
+  const wide = ids.filter((id) => !found.has(id) && !imageWideDone.has(id));
+  if (wide.length === 0) return;
+  addImages(await queryImages(applicationId, wide, imageWindowUs(IMAGE_RETAINED_LOOKBACK_US)));
+  wide.forEach((id) => imageWideDone.add(id));
 };
 
 const imagePending = (id: string) =>
   !imageResources.value.has(id) && (imageLookups.get(id)?.count ?? 0) < IMAGE_MAX_LOOKUPS;
 
-// A new batch asks again at once only for ids whose query failed; the rest wait out their backoff.
+// Failed and empty lookups wait out the same backoff, so a new record batch cannot spend the budget at once.
 const imageDue = (id: string) => {
   const lookup = imageLookups.get(id);
-  return !lookup || lookup.failed || lookup.dueAt <= Date.now();
+  return !lookup || lookup.dueAt <= Date.now();
 };
 
-const noteImageLookup = (ids: string[], failed: boolean) => {
+const noteImageLookup = (ids: string[]) => {
   const now = Date.now();
   for (const id of ids) {
     const count = (imageLookups.get(id)?.count ?? 0) + 1;
     const delay = IMAGE_RETRY_DELAYS_MS[Math.min(count, IMAGE_RETRY_DELAYS_MS.length) - 1];
-    imageLookups.set(id, { count, dueAt: now + delay, failed });
+    imageLookups.set(id, { count, dueAt: now + delay });
   }
 };
 
@@ -1135,12 +1142,11 @@ const loadImageResources = async () => {
       const chunk = ids.slice(i, i + IMAGE_ID_CHUNK);
       try {
         await loadImageChunk(applicationId, chunk);
-        noteImageLookup(chunk, false);
       } catch (error) {
         if (cancelled) return;
         console.error("Failed to load session replay images:", error);
-        noteImageLookup(chunk, true);
       }
+      noteImageLookup(chunk);
       if (cancelled) return;
     }
   } finally {

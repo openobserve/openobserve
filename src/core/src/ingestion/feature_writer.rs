@@ -652,6 +652,34 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
+    async fn a_session_replay_write_sends_usage_rows_to_its_stream_with_its_credential() {
+        let transport = RecordingTransport::answering(200);
+        let token = WriterToken::for_tests(FeatureWriter::SessionReplay, "demo-org", "o2oi_r");
+        write(
+            &transport,
+            &token,
+            SESSION_REPLAY_RESOURCES_STREAM,
+            b"[]".to_vec(),
+        )
+        .await
+        .unwrap();
+        let err = write(&transport, &token, "_rumdata", b"[]".to_vec())
+            .await
+            .unwrap_err();
+        assert!(matches!(err, WriteError::OutOfScope(_)), "{err:?}");
+        let sent = transport.credentials();
+        assert_eq!(sent.len(), 1);
+        let (credentials, org, body) = &sent[0];
+        assert_eq!(credentials, "session_replay@system.local:o2oi_r");
+        assert_eq!(org, "demo-org");
+        assert_eq!(body.stream_name, SESSION_REPLAY_RESOURCES_STREAM);
+        assert_eq!(
+            body.ingestion_type,
+            Some(cluster_rpc::IngestionType::Usage as i32)
+        );
+    }
+
+    #[tokio::test]
     async fn a_refused_or_uncached_write_is_an_error() {
         let token = WriterToken::for_tests(FeatureWriter::AutoObserve, META_ORG_ID, "o2oi_w");
         let err = write(&UncachedTransport, &token, "_o2_autoobserve_health", vec![])

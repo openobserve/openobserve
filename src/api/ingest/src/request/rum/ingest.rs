@@ -15,6 +15,7 @@
 
 use std::{
     collections::{BTreeMap, HashSet},
+    future::Future,
     io::prelude::*,
 };
 
@@ -37,7 +38,7 @@ use openobserve_core::{
     auth::UserEmail,
     ingestion::{
         check_ingestion_allowed,
-        feature_writer::{self, FeatureWriter, GrpcTransport},
+        feature_writer::{self, FeatureWriter, GrpcTransport, WriteError, WriterTokenError},
     },
     traces::service_graph::v4::writer::max_request_bytes,
 };
@@ -62,8 +63,9 @@ const MAX_RESOURCE_IMAGE_BYTES: usize = 10 * 1024 * 1024;
 /// Maximum `image` parts per replay resource upload; the mobile SDK batches up to 500 items.
 const MAX_RESOURCE_IMAGES: usize = 500;
 const MAX_APP_ID_BYTES: usize = 256;
-/// Rows per internal write, on top of the byte budget, so a request stays small.
-const RESOURCE_ROWS_PER_WRITE: usize = 5;
+/// JSON keys, app id and mime around each encoded image in a row.
+const RESOURCE_ROW_OVERHEAD_BYTES: usize = 1024;
+const IMAGE_TOO_LARGE_FOR_REQUEST: &str = "encoded row exceeds the request size";
 
 /// Multipart form data being ingested in the form of session-replay
 #[derive(ToSchema)]
@@ -130,6 +132,28 @@ struct ReplayUpload {
     images: Vec<(String, Bytes)>,
     dropped_images: usize,
     event: Option<Vec<u8>>,
+}
+
+/// Why a resource upload did not reach the stream.
+#[derive(Debug, PartialEq)]
+enum ResourceWriteError {
+    TokenDisabled,
+    Failed(String),
+}
+
+impl From<WriterTokenError> for ResourceWriteError {
+    fn from(e: WriterTokenError) -> Self {
+        match e {
+            WriterTokenError::Revoked(_) | WriterTokenError::Foreign(_) => Self::TokenDisabled,
+            WriterTokenError::Store(msg) => Self::Failed(msg),
+        }
+    }
+}
+
+impl From<WriteError> for ResourceWriteError {
+    fn from(e: WriteError) -> Self {
+        Self::Failed(e.to_string())
+    }
 }
 
 /// Rum data ingestion API
@@ -478,30 +502,39 @@ fn build_resource_rows(app_id: &str, images: &[(String, Bytes)]) -> Vec<json::Va
         .collect()
 }
 
-/// Written with the org's replay writer token, since the `_o2_` guard refuses every user write.
-async fn write_resource_rows(org_id: &str, rows: &[json::Value]) -> Result<(), Error> {
-    let body = json::to_vec(rows).map_err(|e| Error::Message(e.to_string()))?;
-    let token = feature_writer::token(FeatureWriter::SessionReplay, org_id)
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-    feature_writer::write(
-        &GrpcTransport,
-        &token,
-        SESSION_REPLAY_RESOURCES_STREAM,
-        body,
-    )
-    .await
-    .map_err(|e| Error::Message(e.to_string()))
+/// A disabled token drops the upload, since the SDK retries any 5xx forever.
+fn resource_write_status(result: &Result<(), ResourceWriteError>) -> StatusCode {
+    match result {
+        Ok(()) | Err(ResourceWriteError::TokenDisabled) => StatusCode::ACCEPTED,
+        Err(ResourceWriteError::Failed(_)) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
 }
 
-/// Groups images so one gRPC request stays under the size limit; an oversize image goes alone.
+fn encoded_row_size(data: &Bytes) -> usize {
+    data.len().div_ceil(3) * 4 + RESOURCE_ROW_OVERHEAD_BYTES
+}
+
+/// Splits off images whose row alone cannot fit one request, since a retry could never store them.
+fn drop_oversize_images(
+    images: Vec<(String, Bytes)>,
+    max_encoded_bytes: usize,
+) -> (Vec<(String, Bytes)>, usize) {
+    let before = images.len();
+    let kept: Vec<_> = images
+        .into_iter()
+        .filter(|(_, data)| encoded_row_size(data) <= max_encoded_bytes)
+        .collect();
+    let dropped = before - kept.len();
+    (kept, dropped)
+}
+
+/// Groups images so one gRPC request stays under the byte budget.
 fn write_batches(images: &[(String, Bytes)], max_encoded_bytes: usize) -> Vec<&[(String, Bytes)]> {
     let mut batches = Vec::new();
     let (mut start, mut encoded) = (0, 0);
     for (idx, (_, data)) in images.iter().enumerate() {
-        let size = data.len().div_ceil(3) * 4;
-        let full = idx - start >= RESOURCE_ROWS_PER_WRITE || encoded + size > max_encoded_bytes;
-        if idx > start && full {
+        let size = encoded_row_size(data);
+        if idx > start && encoded + size > max_encoded_bytes {
             batches.push(&images[start..idx]);
             (start, encoded) = (idx, 0);
         }
@@ -511,6 +544,41 @@ fn write_batches(images: &[(String, Bytes)], max_encoded_bytes: usize) -> Vec<&[
         batches.push(&images[start..]);
     }
     batches
+}
+
+/// Sends each batch to the replay stream through `send`, stopping at the first failure.
+async fn write_images<F, Fut>(
+    app_id: &str,
+    images: &[(String, Bytes)],
+    max_encoded_bytes: usize,
+    send: F,
+) -> Result<(), ResourceWriteError>
+where
+    F: Fn(&'static str, Vec<u8>) -> Fut,
+    Fut: Future<Output = Result<(), WriteError>>,
+{
+    for batch in write_batches(images, max_encoded_bytes) {
+        let body = json::to_vec(&build_resource_rows(app_id, batch))
+            .map_err(|e| ResourceWriteError::Failed(e.to_string()))?;
+        send(SESSION_REPLAY_RESOURCES_STREAM, body).await?;
+    }
+    Ok(())
+}
+
+/// Written with the org's replay writer token, since the `_o2_` guard refuses every user write.
+async fn write_resource_images(
+    org_id: &str,
+    app_id: &str,
+    images: &[(String, Bytes)],
+) -> Result<(), ResourceWriteError> {
+    if images.is_empty() {
+        return Ok(());
+    }
+    let token = feature_writer::token(FeatureWriter::SessionReplay, org_id).await?;
+    write_images(app_id, images, max_request_bytes(), |stream, body| {
+        feature_writer::write(&GrpcTransport, &token, stream, body)
+    })
+    .await
 }
 
 /// Skips each bad image instead of failing the batch because the SDK never retries a 4xx.
@@ -527,8 +595,12 @@ async fn store_resource_upload(org_id: &str, app_id: &str, upload: ReplayUpload)
     if upload.images.is_empty() {
         return MetaHttpResponse::bad_request("Missing 'image' field in replay resource upload");
     }
-    let (mut images, reasons) = select_valid_images(upload.images);
+    let (mut images, mut reasons) = select_valid_images(upload.images);
     dedup_images(&mut images);
+    let (images, oversize) = drop_oversize_images(images, max_request_bytes());
+    if oversize > 0 {
+        *reasons.entry(IMAGE_TOO_LARGE_FOR_REQUEST).or_insert(0) += oversize;
+    }
     let skipped: usize = reasons.values().sum();
     if skipped > 0 || upload.dropped_images > 0 {
         log::warn!(
@@ -536,13 +608,24 @@ async fn store_resource_upload(org_id: &str, app_id: &str, upload: ReplayUpload)
             upload.dropped_images
         );
     }
-    for batch in write_batches(&images, max_request_bytes()) {
-        if let Err(e) = write_resource_rows(org_id, &build_resource_rows(app_id, batch)).await {
-            log::error!("[RUM] replay resource write failed for org={org_id} app={app_id:?}: {e}");
-            return MetaHttpResponse::internal_error("Failed to store replay resource");
+    let result = write_resource_images(org_id, app_id, &images).await;
+    match &result {
+        Err(ResourceWriteError::TokenDisabled) => {
+            log::warn!(
+                "[RUM] replay resources dropped, the Session Replay ingestion token is disabled for org={org_id}"
+            );
         }
+        Err(ResourceWriteError::Failed(e)) => {
+            log::error!("[RUM] replay resource write failed for org={org_id} app={app_id:?}: {e}");
+        }
+        Ok(()) => {}
     }
-    StatusCode::ACCEPTED.into_response()
+    match resource_write_status(&result) {
+        StatusCode::INTERNAL_SERVER_ERROR => {
+            MetaHttpResponse::internal_error("Failed to store replay resource")
+        }
+        status => status.into_response(),
+    }
 }
 
 /// Rewrites a single JSON array body (mobile SDK batches) into NDJSON.
@@ -1182,40 +1265,102 @@ mod tests {
         (String::new(), Bytes::from(vec![0u8; len]))
     }
 
-    #[test]
-    fn write_batches_cap_the_row_count() {
-        let images: Vec<_> = (0..12).map(|_| sized(1)).collect();
-        let sizes: Vec<_> = write_batches(&images, usize::MAX)
-            .iter()
-            .map(|b| b.len())
-            .collect();
-        assert_eq!(sizes, vec![5, 5, 2]);
-    }
+    // Three raw bytes encode to four, so each row costs 4 plus the fixed overhead.
+    const THREE_BYTE_ROW: usize = 4 + RESOURCE_ROW_OVERHEAD_BYTES;
 
     #[test]
     fn write_batches_keep_each_request_under_the_byte_budget() {
-        // 3 raw bytes encode to 4, so a budget of 8 holds two of them.
         let images: Vec<_> = (0..5).map(|_| sized(3)).collect();
-        let sizes: Vec<_> = write_batches(&images, 8).iter().map(|b| b.len()).collect();
+        let batches = write_batches(&images, 2 * THREE_BYTE_ROW);
+        let sizes: Vec<_> = batches.iter().map(|b| b.len()).collect();
         assert_eq!(sizes, vec![2, 2, 1]);
-    }
-
-    #[test]
-    fn write_batches_send_an_image_over_the_budget_alone() {
-        let images = vec![sized(3), sized(300), sized(3)];
-        let sizes: Vec<_> = write_batches(&images, 8).iter().map(|b| b.len()).collect();
-        assert_eq!(sizes, vec![1, 1, 1]);
+        for batch in batches {
+            let total: usize = batch.iter().map(|(_, d)| encoded_row_size(d)).sum();
+            assert!(total <= 2 * THREE_BYTE_ROW);
+        }
         assert!(write_batches(&[], 8).is_empty());
     }
 
     #[test]
-    fn a_full_upload_of_max_size_images_never_exceeds_the_grpc_limit() {
+    fn drop_oversize_images_removes_rows_that_cannot_fit_one_request() {
+        let images = vec![sized(3), sized(300), sized(3)];
+        let (kept, dropped) = drop_oversize_images(images, THREE_BYTE_ROW);
+        assert_eq!((kept.len(), dropped), (2, 1));
+        assert!(kept.iter().all(|(_, d)| d.len() == 3));
+    }
+
+    #[test]
+    fn a_max_size_image_fits_a_default_request_and_every_batch_stays_within_it() {
         let budget = max_request_bytes();
         let images: Vec<_> = (0..5).map(|_| sized(MAX_RESOURCE_IMAGE_BYTES)).collect();
-        for batch in write_batches(&images, budget) {
-            let encoded: usize = batch.iter().map(|(_, d)| d.len().div_ceil(3) * 4).sum();
-            assert!(batch.len() == 1 || encoded <= budget);
+        let (kept, dropped) = drop_oversize_images(images, budget);
+        assert_eq!(dropped, 0);
+        for batch in write_batches(&kept, budget) {
+            let total: usize = batch.iter().map(|(_, d)| encoded_row_size(d)).sum();
+            assert!(total <= budget);
         }
+    }
+
+    #[test]
+    fn write_status_drops_for_a_disabled_token_and_fails_for_transient_errors() {
+        let status = |e: ResourceWriteError| resource_write_status(&Err(e));
+        let revoked = WriterTokenError::Revoked(FeatureWriter::SessionReplay);
+        let foreign = WriterTokenError::Foreign(FeatureWriter::SessionReplay);
+        let store = WriterTokenError::Store("db down".into());
+        assert_eq!(status(revoked.into()), StatusCode::ACCEPTED);
+        assert_eq!(status(foreign.into()), StatusCode::ACCEPTED);
+        assert_eq!(status(store.into()), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(resource_write_status(&Ok(())), StatusCode::ACCEPTED);
+        for e in [
+            WriteError::NotReady(FeatureWriter::SessionReplay),
+            WriteError::Failed("x".into()),
+            WriteError::OutOfScope("x".into()),
+        ] {
+            assert_eq!(status(e.into()), StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_valid_image_is_sent_to_the_replay_stream_as_the_expected_row() {
+        let (id, data) = image_of(PNG);
+        let sent = std::sync::Mutex::new(Vec::new());
+        let upper = vec![(id.to_uppercase(), data)];
+        let result = write_images("app-1", &upper, usize::MAX, |s, b| {
+            sent.lock().unwrap().push((s, b));
+            async { Ok(()) }
+        })
+        .await;
+        assert_eq!(result, Ok(()));
+        let sent = sent.into_inner().unwrap();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].0, "_o2_sessionreplay_resources");
+        let rows: Vec<json::Value> = json::from_slice(&sent[0].1).unwrap();
+        assert_eq!(
+            rows,
+            vec![json::json!({
+                "application_id": "app-1",
+                "resource_id": id,
+                "mime": "image/png",
+                "image": base64::encode_raw(PNG),
+            })]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_send_stops_the_upload_and_maps_to_500() {
+        let images = vec![sized(3), sized(3)];
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        let result = write_images("app", &images, THREE_BYTE_ROW, |_, _| {
+            calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            async { Err(WriteError::Failed("boom".into())) }
+        })
+        .await;
+        assert!(matches!(result, Err(ResourceWriteError::Failed(_))));
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(
+            resource_write_status(&result),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     #[test]
