@@ -560,7 +560,10 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     pendingConnector.value = "AND";
     reset();
     options.commit(next);
-    open.value = !wasEditing;
+    const chain = config.value.chainNext !== false;
+    open.value = !wasEditing && chain;
+    // Not chaining, a line opened between chips is done once its condition lands; an open group stays open.
+    if (!wasEditing && !chain && caretBeforeId.value) moveCaretTo(openGroupId.value, null);
   }
 
   // A new condition keeps the chip's value when it still takes one.

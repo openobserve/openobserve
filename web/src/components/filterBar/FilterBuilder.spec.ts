@@ -225,6 +225,15 @@ describe("FilterBuilder", () => {
     });
   });
 
+  it("opens its field list when the host activates it, so one click starts a condition", async () => {
+    mountBuilder("anomaly", []);
+    await flushPromises();
+    expect(rowKeys()).toEqual([]);
+    (wrapper!.vm as unknown as { activate: () => void }).activate();
+    await flushPromises();
+    expect(rowKeys()).toContain("level");
+  });
+
   describe("vertical layout (alerts engine tree)", () => {
     const saved = v2(leaf("level", "error"), leaf("service", "api", "AND"), {
       filterType: "group",

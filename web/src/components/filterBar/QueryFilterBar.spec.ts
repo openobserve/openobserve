@@ -141,6 +141,18 @@ describe("QueryFilterBar", () => {
     expect(rowKeys()).toContain("status");
   });
 
+  it("leaves the field list closed after a chip when the profile does not chain conditions", async () => {
+    const state = mountBar({ profile: "alert" });
+    await openBar();
+    await type("lev");
+    await press("Enter");
+    await press("Enter");
+    await vi.waitFor(() => expect(rowKeys()).toContain("error"));
+    await press("Enter");
+    expect(sql(state)).toBe("level = 'error'");
+    expect(rowKeys()).toEqual([]);
+  });
+
   it("opens the picker when the user types at the caret", async () => {
     mountBar();
     await type("s");

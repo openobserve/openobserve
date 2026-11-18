@@ -66,6 +66,8 @@ export interface FilterBuilderEmits {
 
 export interface FilterBuilderExpose {
   focus: () => void;
+  /** Focuses the bar and opens its list, as a click on it does. */
+  activate: () => void;
   /** Runs the profile's validation, marks the offending chips and returns the problems. */
   validate: () => FilterIssue[];
 }

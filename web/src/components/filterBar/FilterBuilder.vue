@@ -109,12 +109,16 @@ function focus() {
   barRef.value?.focus();
 }
 
+function activate() {
+  barRef.value?.activate();
+}
+
 function validate(): FilterIssue[] {
   showIssues.value = true;
   return issues.value;
 }
 
-defineExpose<FilterBuilderExpose>({ focus, validate });
+defineExpose<FilterBuilderExpose>({ focus, activate, validate });
 </script>
 
 <template>

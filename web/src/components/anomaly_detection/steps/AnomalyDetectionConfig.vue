@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :stream-type="config.stream_type"
           dialect="sql"
           data-test="add-alert-filter-sentence"
-          @add="openFilters"
+          @add="addFilter"
           @change="openFilters"
           @edit="openFilters"
           @toggle-connector="openFilters"
@@ -1267,7 +1267,7 @@ export default defineComponent({
     };
 
     const filtersOpen = ref(false);
-    const filterBuilderRef = ref<{ focus(): void } | null>(null);
+    const filterBuilderRef = ref<{ focus(): void; activate(): void } | null>(null);
     const filterGroup = computed(() =>
       FILTER_PROFILES.anomaly.codec.parse(filterRows.value, { fields: filterFields.value }),
     );
@@ -1276,6 +1276,12 @@ export default defineComponent({
       filtersOpen.value = true;
       await nextTick();
       filterBuilderRef.value?.focus();
+    };
+    // "Add filter" goes straight to the field list rather than to a second "Add condition" click.
+    const addFilter = async () => {
+      filtersOpen.value = true;
+      await nextTick();
+      filterBuilderRef.value?.activate();
     };
 
     const intervalText = (value: unknown, unit: unknown) => {
@@ -1380,6 +1386,7 @@ export default defineComponent({
       formContext,
       sensitivityOpened,
       filtersOpen,
+      addFilter,
       filterBuilderRef,
       filterGroup,
       openFilters,
