@@ -317,8 +317,11 @@ const applyThresholds = (): void => {
   dashboardPanelData.data.config.unit = unit.unit;
   dashboardPanelData.data.config.unit_custom = unit.unitCustom;
   // Counted events are whole numbers; an axis of "180.00" reads as a measurement.
+  const counts =
+    !props.isAggregationEnabled ||
+    ["count", "total_events"].includes(props.formData.query_condition?.aggregation?.function);
   dashboardPanelData.data.config.decimals =
-    props.selectedTab === "custom" && !props.isAggregationEnabled ? 0 : undefined;
+    props.selectedTab === "custom" && counts ? 0 : undefined;
   dashboardPanelData.data.config.mark_line = markLines;
   dashboardPanelData.data.config.y_axis_min = bounds.y_axis_min;
   dashboardPanelData.data.config.y_axis_max = bounds.y_axis_max;

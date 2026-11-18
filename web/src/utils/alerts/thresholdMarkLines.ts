@@ -100,7 +100,8 @@ export function thresholdAxisBounds(markLines: ThresholdMarkLine[]): ThresholdAx
 
   const highest = Math.max(...values);
   const lowest = Math.min(...values);
-  const pad = (value: number) => Math.max(Math.abs(value) * PAD_RATIO, MIN_PAD);
+  // Padding scales with the value, so a 0-1 ratio is not stretched to 1.9 by a fixed pad.
+  const pad = (value: number) => (value === 0 ? MIN_PAD : Math.abs(value) * PAD_RATIO);
 
   const floor = lowest - pad(lowest);
   // The value axis already starts at 0; a floor above it would start the axis at the data instead.

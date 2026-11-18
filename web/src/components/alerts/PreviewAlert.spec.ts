@@ -465,7 +465,7 @@ describe("PreviewAlert - refreshData method", () => {
   // The renderer takes min(y_axis_min, data min), so a floor above 0 would start the axis at the data.
   it.each([
     [2, undefined],
-    [-2, -3],
+    [-2, -2.2],
   ])("keeps a PromQL limit of %s on screen with the axis floor at %s", async (limit, floor) => {
     const formData = baseFormData() as any;
     formData.query_condition.promql_condition = { column: "value", operator: "=", value: limit };
@@ -3509,11 +3509,23 @@ describe("PreviewAlert - a PromQL chart says why it is empty and what unit it is
     w.unmount();
   });
 
-  it("draws counted events on a whole-number axis", async () => {
-    const w = await mountComp({ query: "SELECT * FROM logs" });
+  it.each([
+    ["counted events", false, "count", 0],
+    ["a count per group", true, "count", 0],
+    ["an average per group", true, "avg", undefined],
+  ])("draws %s on the right axis", async (_, aggregated, fn, decimals) => {
+    const formData = baseFormData() as any;
+    formData.query_condition.aggregation.function = fn;
+    formData.query_condition.aggregation.having = { column: "x", operator: ">=", value: 5 };
+    const w = await mountComp({
+      query:
+        "SELECT histogram(_timestamp) AS zo_sql_key, count(x) AS zo_sql_val FROM logs GROUP BY zo_sql_key",
+      isAggregationEnabled: aggregated,
+      formData,
+    });
     w.vm.refreshData();
     await flushPromises();
-    expect(w.vm.chartData.config).toMatchObject({ unit: "numbers", decimals: 0 });
+    expect(w.vm.chartData.config.decimals).toBe(decimals);
     w.unmount();
   });
 });

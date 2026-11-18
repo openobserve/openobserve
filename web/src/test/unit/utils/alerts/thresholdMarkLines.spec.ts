@@ -80,7 +80,7 @@ describe("thresholdAxisBounds", () => {
     const bounds = thresholdAxisBounds([line(100), { ...line(40), name: "Warning" }]);
 
     expect(bounds.y_axis_max).toBeGreaterThan(100);
-    expect(bounds.y_axis_min).toBeLessThan(40);
+    expect(bounds.y_axis_min).toBeUndefined();
   });
 
   it("pads a zero threshold by an absolute amount, not by zero percent", () => {
@@ -88,6 +88,10 @@ describe("thresholdAxisBounds", () => {
 
     expect(bounds.y_axis_max).toBeGreaterThan(0);
     expect(bounds.y_axis_min).toBeLessThan(0);
+  });
+
+  it("keeps a 0-1 ratio threshold on its own scale, not 1 above and below it", () => {
+    expect(thresholdAxisBounds([line(0.9)])).toEqual({ y_axis_min: undefined, y_axis_max: 0.99 });
   });
 
   it("returns nothing to apply when there are no thresholds", () => {
@@ -109,6 +113,6 @@ describe("thresholdAxisBounds", () => {
     const bounds = thresholdAxisBounds(buildThresholdMarkLines(500, 250));
 
     expect(bounds.y_axis_max).toBeGreaterThan(500);
-    expect(bounds.y_axis_min).toBeLessThan(250);
+    expect(bounds.y_axis_min).toBeUndefined();
   });
 });

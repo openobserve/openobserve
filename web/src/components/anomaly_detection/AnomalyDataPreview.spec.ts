@@ -164,6 +164,20 @@ describe("AnomalyDataPreview", () => {
     });
   });
 
+  it.each([
+    ["count", 0],
+    ["avg", undefined],
+  ])(
+    "ends a %s chart at the last whole bucket, so the latest point is not a partial dip",
+    async (fn, decimals) => {
+      wrapper = mountPreview({ detection_function: fn, detection_function_field: "x" });
+      await getSqlFromPreview(wrapper);
+      const vm = wrapper.vm as any;
+      expect(vm.previewTimeObj.end_time.getTime() % (5 * 60_000_000)).toBe(0);
+      expect(vm.previewPanelSchema.config.decimals).toBe(decimals);
+    },
+  );
+
   // =========================================================================
   describe("filters mode — histogram interval", () => {
     it("should embed 15m interval when histogram_interval_value is 15 and unit is m", async () => {
