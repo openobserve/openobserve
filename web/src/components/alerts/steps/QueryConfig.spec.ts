@@ -736,6 +736,21 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.emitted("input:update")![0]).toEqual(["conditions", tree]);
     });
 
+    it("re-reads the measure from the form after a fill written from outside", async () => {
+      hostForm().setFieldValue("query_condition.aggregation", {
+        function: "p95",
+        having: { column: "took", operator: ">", value: "" },
+        group_by: [],
+      });
+      await setQCProps({ isAggregationEnabled: true });
+      wrapper.vm.syncMeasureFromForm();
+      expect(wrapper.vm.selectedFunction).toBe("p95");
+      hostForm().setFieldValue("query_condition.aggregation", null);
+      await setQCProps({ isAggregationEnabled: false });
+      wrapper.vm.syncMeasureFromForm();
+      expect(wrapper.vm.selectedFunction).toBe("total_events");
+    });
+
     it("hands the builder the stream columns as typed fields", async () => {
       await setQCProps({
         columns: [

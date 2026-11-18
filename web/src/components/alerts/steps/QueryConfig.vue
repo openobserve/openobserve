@@ -3955,6 +3955,12 @@ export default defineComponent({
     };
 
     // When log function mode changes (count / unique_count / avg / etc.)
+    // A fill written from outside (an intent, a ready-made alert) calls this so the measure picker follows.
+    const syncMeasureFromForm = () => {
+      const fn = fv("query_condition.aggregation")?.function;
+      selectedFunction.value = props.isAggregationEnabled && fn ? fn : "total_events";
+    };
+
     const onLogFunctionChange = (modelValue: SelectModelValue) => {
       // Single-select of function names: value is a string at runtime.
       const value = typeof modelValue === "string" ? modelValue : "";
@@ -4440,6 +4446,7 @@ export default defineComponent({
     // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
     return {
+      syncMeasureFromForm,
       thresholdPlural,
       shownGroupLabels,
       groupByOptions,

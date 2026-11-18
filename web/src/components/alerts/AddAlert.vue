@@ -2547,15 +2547,11 @@ export default defineComponent({
       if (fill.anomaly) Object.assign(alertForm.anomalyConfig.value, fill.anomaly);
       if (fill.vrl) alertForm.showVrlFunction.value = true;
       alertForm.isAggregationEnabled.value = fill.aggregation;
-      const aggregation = fill.values["query_condition.aggregation"] as {
-        function?: string;
-      } | null;
       await nextTick();
-      // The builder keeps its measure picker in its own state, which a write to the form leaves behind.
-      const builder = alertForm.step2Ref.value as { selectedFunction?: string } | null;
-      if (builder && fill.values["query_condition.type"] === "custom") {
-        builder.selectedFunction =
-          fill.aggregation && aggregation?.function ? aggregation.function : "total_events";
+      if (fill.values["query_condition.type"] === "custom") {
+        (
+          alertForm.step2Ref.value as { syncMeasureFromForm?: () => void } | null
+        )?.syncMeasureFromForm?.();
       }
       appliedIntent.value = { fill, label };
     };
