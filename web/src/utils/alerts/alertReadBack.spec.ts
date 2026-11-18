@@ -313,14 +313,14 @@ describe("previewVerdictSentence", () => {
       { wouldTrigger: true, reason: "", count: 1500, windowMinutes: 30 },
       alert({ is_real_time: "true" }),
       { hasFilter: false },
-      "Fires on each matching event: 1,500 in the last 30 minutes. Add a filter to narrow it. About 72,000 notifications a day before Notify at most every",
+      "Fires on each matching event: 1,500 in the last 30 minutes. Add a filter to narrow it. About 72,000 notifications a day before Notify at most every.",
     ],
     [
       "real time with a filter that still matches a lot",
       { wouldTrigger: true, reason: "", count: 30952, windowMinutes: 30 },
       alert({ is_real_time: "true" }),
       { hasFilter: true },
-      "Fires on each matching event: 30,952 in the last 30 minutes. About 1,500,000 notifications a day before Notify at most every",
+      "Fires on each matching event: 30,952 in the last 30 minutes. About 1,500,000 notifications a day before Notify at most every.",
     ],
     [
       "real time with nothing matched",
