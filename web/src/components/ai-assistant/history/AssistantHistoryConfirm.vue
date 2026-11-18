@@ -166,7 +166,7 @@ const linksLine = computed(() => {
     return linksFailed.value ? t("assistant.history.clearAll.linksUnknown") : null;
   if (linksFailed.value) return t("assistant.history.delete.links.unknown");
   if (linkCount.value === null) return t("assistant.history.delete.links.checking");
-  if (linkCount.value === 0) return t("assistant.history.delete.links.none");
+  if (linkCount.value === 0) return null;
   return t("assistant.history.delete.links.count", { count: linkCount.value }, linkCount.value);
 });
 

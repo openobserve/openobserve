@@ -61,18 +61,18 @@ afterEach(() => {
 });
 
 describe("AssistantVoiceSetting", () => {
-  it("defaults to Off on self-hosted (A5)", () => {
+  it("defaults to In the browser on self-hosted, with no opt-in step (D2)", () => {
     const wrapper = render();
-    expect(pressed(wrapper, "off")).toBe("on");
-    expect(wrapper.text()).toContain("Members see no mic button; admins see it crossed out.");
+    expect(pressed(wrapper, "browser")).toBe("on");
   });
 
-  it("lets an admin turn on this browser, saved per user+org", async () => {
+  it("lets an admin turn this browser off, saved per user+org", async () => {
     const wrapper = render();
-    await wrapper.get(option("browser")).trigger("click");
+    await wrapper.get(option("off")).trigger("click");
     await flushPromises();
-    expect(readVoiceOptIn("k1")).toBe(true);
-    expect(pressed(wrapper, "browser")).toBe("on");
+    expect(readVoiceOptIn("k1")).toBe(false);
+    expect(pressed(wrapper, "off")).toBe("on");
+    expect(wrapper.text()).toContain("Nobody can dictate in this browser.");
     expect(wrapper.get('[data-test="settings-assistant-voice-note"]').text()).toContain(
       "Saved in this browser, for you only.",
     );
@@ -80,9 +80,9 @@ describe("AssistantVoiceSetting", () => {
 
   it("is read-only for a non-admin", async () => {
     const wrapper = render({ isAdmin: false });
-    await wrapper.get(option("browser")).trigger("click");
+    await wrapper.get(option("off")).trigger("click");
     await flushPromises();
-    expect(readVoiceOptIn("k1")).toBe(false);
+    expect(readVoiceOptIn("k1")).toBe(true);
   });
 
   it("is read-only at In the browser on Cloud", async () => {

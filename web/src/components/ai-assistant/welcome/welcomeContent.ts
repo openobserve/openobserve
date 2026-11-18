@@ -2,6 +2,7 @@
  * Static content for the assistant home-tab welcome screen.
  */
 
+import type { AgentId } from "@/composables/assistant";
 import type { I18nKey } from "@/types/i18n";
 
 type HomeCardId = "query" | "incident" | "dashboard" | "alert";
@@ -18,6 +19,8 @@ export interface CapabilityCard {
   iconColorClass: string;
   /** Tailwind tinted background class for the icon chip */
   iconBgClass: string;
+  /** The agent the card's prompt is for; the box picks it with the prompt. */
+  agent?: AgentId;
 }
 
 const homeText = (id: HomeCardId) => ({
@@ -43,6 +46,7 @@ export const CAPABILITY_CARDS: CapabilityCard[] = [
   },
   {
     ...homeText("incident"),
+    agent: "sre",
     icon: "warning",
     iconColorClass: "text-status-warning-text",
     iconBgClass: "bg-status-warning-bg",
@@ -95,12 +99,19 @@ export interface PromptSuggestion {
   key?: I18nKey;
   /** OIcon name */
   icon: string;
+  /** Names the org's first own log stream as `{stream}`; hidden when the org has none. */
+  logStream?: boolean;
 }
 
 export const PROMPT_SUGGESTIONS: PromptSuggestion[] = [
   { id: "vrlParseJson", icon: "code" },
   { id: "regexRedact", icon: "code" },
-  { id: "mapStreamSchema", icon: "data-object" },
+  {
+    id: "mapStreamSchema",
+    key: "assistant.welcome.starter.mapStreamSchema",
+    icon: "data-object",
+    logStream: true,
+  },
   { id: "promqlCpu", icon: "trending-up" },
   { id: "otherToolToO2", key: "assistant.welcome.starter.otherToolToO2", icon: "swap-horiz" },
   { id: "lastAlertFired", icon: "history" },

@@ -48,10 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <span v-if="logoShown" class="inline-flex shrink-0" data-test="assistant-thread-logo">
-        <img :src="aiLogo" alt="" class="size-6 dark:hidden" />
-        <img :src="aiLogoDark" alt="" class="hidden size-6 dark:block" />
-      </span>
       <!-- A toolbar reads New chat and ⓘ before its More menu -->
       <div
         v-if="toolbar"
@@ -82,6 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="newShown && newInBar"
           :label="newLabel"
           :icon="assistantGlyph.newChat"
+          :disabled="!newReady"
+          :disabled-reason="newReady ? undefined : newBlockedReason"
           data-test="assistant-thread-new"
           @click="askNew"
         />
@@ -150,6 +148,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="menuOpen || !titleCut"
                   max-width="22.5rem"
                 />
+                <AssistantStatusDot
+                  v-if="ownSignal"
+                  :state="ownSignal"
+                  data-test="assistant-thread-title-status"
+                />
                 <span
                   ref="titleEl"
                   class="min-w-0 truncate"
@@ -177,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <AssistantTitleMenu
               :sid="sid"
-              :new-chat="newInMenu && !readonly"
+              :new-chat="newInMenu && !readonly && !windowsFull"
               :actions-only="(placement === 'full' || toolbar) && chatActions"
               @new="askNew"
               @open="openChat"
@@ -276,6 +279,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="newShown && newInBar"
           :label="newLabel"
           :icon="assistantGlyph.newChat"
+          :disabled="!newReady"
+          :disabled-reason="newReady ? undefined : newBlockedReason"
           data-test="assistant-thread-new"
           @click="askNew"
         />
@@ -352,16 +357,18 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 
-import aiLogoDark from "@/assets/images/common/o2_ai_logo_dark.svg";
-import aiLogo from "@/assets/images/common/o2_ai_logo.svg";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
+import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantHistoryConfirm from "@/components/ai-assistant/history/AssistantHistoryConfirm.vue";
+import { editableTitle } from "@/components/ai-assistant/history/chatStatus";
+import { trayState } from "@/components/ai-assistant/shell/threadsBar";
 import {
   historyTargetAbove,
   hostOrgName,
   isRunning,
+  MAX_FLOATING_CHATS,
   registerHistoryTarget,
   runHistoryTarget,
   useAssistantCapability,
@@ -434,8 +441,6 @@ const titleText = computed(
   () => session.value?.title ?? object.value?.title ?? t("assistant.thread.newChatTitle"),
 );
 const readonly = computed(() => capability.value.canChat === "no");
-// The full view keeps its own bar; the panels lead with the product's logo.
-const logoShown = computed(() => !props.toolbar && props.placement !== "full");
 const pinned = computed(() => !!session.value?.record.pinned);
 const renamePending = computed(() => !!props.sid && history.pending[props.sid] === "rename");
 const running = computed(
@@ -462,16 +467,31 @@ const describedBy = computed(() =>
   saveTag.value && !narrow.value && !props.toolbar ? saveTagId : undefined,
 );
 const chatActions = computed(() => hasMessages.value && !readonly.value && !!props.sid);
-// Nothing to leave in an empty chat, and a read-only role cannot start one.
-const newShown = computed(() => !readonly.value && (hasMessages.value || chatsOpen.value));
-const { mdUp, lgUp } = useBreakpoint();
+// Every header offers New; an untouched chat is already new, so there it stays visible but unavailable.
+const newShown = computed(() => !readonly.value);
+const drafted = computed(() => {
+  const composer = session.value?.composer;
+  return (
+    !!composer && (!!composer.text.trim() || !!composer.images.length || !!composer.chips.length)
+  );
+});
+// A window's New opens another window, so at the cap it waits instead of closing one.
+const windowsFull = computed(
+  () => props.placement === "window" && store.state.shell.windows.length >= MAX_FLOATING_CHATS,
+);
+const newReady = computed(
+  () => !windowsFull.value && (hasMessages.value || chatsOpen.value || drafted.value),
+);
+const newBlockedReason = computed<I18nText>(() =>
+  windowsFull.value ? t("assistant.thread.windowsFull") : t("assistant.thread.alreadyNew"),
+);
+const { mdUp } = useBreakpoint();
 const phoneFull = computed(() => props.placement === "full" && !mdUp.value);
 // The Full page on a phone keeps the bar's room for the title; a window offers New chat in both places.
 const newInMenu = computed(
   () => !props.toolbar && (props.placement === "window" || phoneFull.value),
 );
-// Home's rail carries New chat from lg up, so a toolbar shows it only below.
-const newInBar = computed(() => (props.toolbar ? !lgUp.value : !phoneFull.value));
+const newInBar = computed(() => props.toolbar || !phoneFull.value);
 const newLabel = computed<I18nText>(() => {
   if (object.value) return raw(object.value.newLabel);
   return props.toolbar ? t("assistant.thread.toolbar.newChat") : t("assistant.thread.newChat");
@@ -482,7 +502,12 @@ const narrow = computed(() => {
   if (props.placement === "window") return props.narrow;
   return props.narrow || props.placement === "sheet" || widthRem.value < NARROW_REM;
 });
-const foldedLayout = computed(() => narrow.value && !!slots["menu-layout"]);
+// A phone sheet or a narrow window lacks the room for the move group, so it folds the moves into the menu.
+const foldedLayout = computed(
+  () =>
+    (props.placement === "sheet" || (props.placement === "window" && narrow.value)) &&
+    !!slots["menu-layout"],
+);
 const menuWidth = computed(() => {
   if (narrow.value) return "w-70 max-w-[calc(100vw-1rem)]";
   return props.placement === "window" ? "w-75" : "w-80";
@@ -492,7 +517,15 @@ const menuWidth = computed(() => {
 const others = computed(() => runs.rows.value.filter((row) => row.sid !== props.sid));
 const needs = computed(() => others.value.filter((row) => row.group === "needs_you").length);
 const answering = computed(() => others.value.filter((row) => row.group === "answering").length);
+// A window is one chat among several, so its bar says that chat's own state instead.
+const ownSignal = computed<AssistantSignal | null>(() => {
+  if (props.placement !== "window" || !session.value) return null;
+  const state = trayState(session.value);
+  if (state === "needsYou") return "attention";
+  return state === "working" ? "working" : null;
+});
 const mark = computed(() => {
+  if (props.placement === "window") return null;
   if (needs.value) return { signal: "attention" as const, count: needs.value };
   return answering.value ? { signal: "working" as const, count: answering.value } : null;
 });
@@ -522,7 +555,7 @@ function measureTitle(): void {
 
 function startRename(): void {
   if (!chatActions.value || renamePending.value) return;
-  draft.value = String(titleText.value);
+  draft.value = editableTitle(String(titleText.value));
   renaming.value = true;
   void nextTick(() => renameInput.value?.focus());
 }

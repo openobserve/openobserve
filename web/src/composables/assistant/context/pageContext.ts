@@ -30,6 +30,7 @@ export function holdChatWindow(
 ): void {
   const session = store.state.sessions[sid];
   if (!session || session.composer.timeOverride) return;
-  const { from, to, period } = timeWindowOf(pageContext.value, null);
+  const { from, to, period, source } = timeWindowOf(pageContext.value, null);
+  if (source === "default") return;
   store.setTimeOverride(sid, period ? { from, to, period } : { from, to });
 }

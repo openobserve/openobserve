@@ -29,10 +29,12 @@ import {
 import type { ActionResult, AssistantAction } from "./actions/types";
 import { approvalName, approvalToolEntity, approvalVerb } from "./approvalAnatomy";
 import type {
+  ActionLedgerEntry,
   ApprovalDecision,
   ApprovalOutcome,
   ApprovalResult,
   ApprovalsService,
+  AssistantHint,
   AssistantSession,
   AssistantState,
   BlockAnnotation,
@@ -71,6 +73,9 @@ const KEYBOARD_INPUT_MS = 1_000;
 const MAX_FOLLOW_UP_NAMES = 20;
 
 const MAX_FOLLOW_UP_NAME_CHARS = 100;
+
+// Objects whose change can send a notification before an Undo lands.
+const NOTIFYING: ReadonlySet<string> = new Set(["alert", "destination", "report"]);
 
 // Entity nouns with their own plural key; anything else is "object".
 const ENTITY_KEYS: ReadonlySet<string> = new Set([
@@ -127,7 +132,7 @@ export interface ApprovalsDeps {
   ): Promise<ServerCard | null>;
   /** An approve or an undo changed objects of these types, so their open lists refresh. */
   changed?(types: string[]): void;
-  hints: Pick<HintChannel, "on">;
+  hints: Pick<HintChannel, "on"> & { postFor?(userOrgKey: string, hint: AssistantHint): void };
   now(): number;
   lastKeydownAt(): number;
   t: TranslateFn;
@@ -328,6 +333,16 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
     shownAt.delete(key);
     clearTimer(sid, id);
     if (session?.pendingApproval?.id === id) session.pendingApproval = null;
+    // A Full page tab may show this same card; it lets it go instead of answering it twice.
+    if (result.ok && session)
+      deps.hints.postFor?.(session.userOrgKey, {
+        v: 1,
+        type: "approval_resolved",
+        sid,
+        callId: id,
+        approved: sent.wire.approved,
+        at: deps.now(),
+      });
     // A card that outlived its turn settles the chat here, so a summary read before this answer reads as stale.
     if (result.ok && session && (session.turn.state === "idle" || isTerminal(session.turn)))
       session.turnMeta.endedAt = deps.now();
@@ -433,6 +448,16 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
         session.pendingApproval = null;
       }
       retries.clear();
+    }),
+    // The other tab's answer reached the server; this copy of the card is now its record.
+    deps.hints.on("approval_resolved", (hint) => {
+      if (!hint.callId) return;
+      runtime.onResolved(hint.sid, {
+        type: "confirmation_resolved",
+        id: hint.callId,
+        approved: hint.approved,
+        at: hint.at,
+      });
     }),
   ];
 
@@ -667,6 +692,16 @@ export function approvalEntity(card: Pick<ApprovalBlockData, "targets">): string
 /** The entity noun key of one resource type; a type without its own noun reads "object". */
 export function entityKeyOf(type: string | undefined): string {
   return type && ENTITY_KEYS.has(type) ? type : "object";
+}
+
+/** Undo cannot take back a sent notification or deleted data, so its limits apply only to writes that can do either. */
+export function undoLimitsApply(
+  entries: readonly Pick<ActionLedgerEntry, "op" | "resource">[],
+): boolean {
+  return entries.some(
+    (entry) =>
+      entry.op === "delete" || entry.op === "run_command" || NOTIFYING.has(entry.resource.type),
+  );
 }
 
 /** The card's heading: verb, entity and name in one sentence; the raw id is never part of it (D3-n). */

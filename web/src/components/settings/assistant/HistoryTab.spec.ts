@@ -76,7 +76,7 @@ describe("HistoryTab", () => {
     expect(w.find('[data-test="settings-assistant-history-card"]').text()).toContain(
       "Saved in each member's browser only",
     );
-    expect(w.text()).toContain("are capped at 100 per member per organization");
+    expect(w.text()).toContain("Up to 100 chats per member");
     expect(
       w.find('[data-test="settings-assistant-env-O2_AI_CHAT_PERSISTENCE_ENABLED-value"]').text(),
     ).toBe("Off");

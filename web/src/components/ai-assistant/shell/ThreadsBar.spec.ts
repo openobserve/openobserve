@@ -51,12 +51,10 @@ vi.mock("@/composables/assistant", async () => {
   const rows = live(mocks.rows);
   const prefs = await import("@/composables/assistant/prefs");
   return {
-    isLauncherDismissed: prefs.isLauncherDismissed,
-    launcherDismissalVersion: prefs.launcherDismissalVersion,
     setLauncherDismissed: prefs.setLauncherDismissed,
     useAssistantRuns: () => ({ rows: computed(() => rows.value), open: vi.fn() }),
     useAssistantStore: () => ({
-      state: { sessions: { s1: { sid: "s1" } }, userOrgKey: "u1:o1" },
+      state: { sessions: { s1: { sid: "s1", turn: { state: "idle" } } }, userOrgKey: "u1:o1" },
       floatChat: mocks.floatChat,
       open: mocks.open,
       openSession: vi.fn(() => Promise.resolve()),
@@ -126,31 +124,41 @@ describe("ThreadsBar", () => {
     localStorage.clear();
   });
 
-  it("hides the launcher in this browser once dismissed, until the assistant is opened again", async () => {
-    const wrapper = mountBar();
+  it("ignores a Threads chip dismissal stored before the chip lost its close button", async () => {
+    setLauncherDismissed("u1:o1", true);
+    const wrapper = mount(ThreadsBar, {
+      props: { order: ["s1"] },
+      global: { plugins: [i18n, store] },
+      attachTo: document.body,
+    });
     await flushPromises();
-    await wrapper.get('[data-test="assistant-launcher"]').trigger("pointerenter");
-    await wrapper.get('[data-test="assistant-launcher-dismiss"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.find('[data-test="threads-bar"]').exists()).toBe(false);
-    expect(mocks.open).not.toHaveBeenCalled();
-    expect(mocks.floatChat).not.toHaveBeenCalled();
-    wrapper.unmount();
-    const again = mountBar();
-    await flushPromises();
-    expect(again.find('[data-test="threads-bar"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-launcher-toggle"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="assistant-tray-chip"]').attributes("data-sid")).toBe("s1");
     setLauncherDismissed("u1:o1", false);
-    await flushPromises();
-    expect(again.find('[data-test="assistant-launcher"]').exists()).toBe(true);
   });
 
-  it("badges every listed chat and previews the waiting one first", async () => {
+  it("counts chats and live incidents off screen on the Threads chip, with the most urgent signal", async () => {
     const wrapper = mountBar();
     await flushPromises();
-    expect(wrapper.get('[data-test="assistant-launcher-badge"]').text()).toBe("2");
-    await wrapper.get('[data-test="assistant-launcher"]').trigger("pointerenter");
-    const previews = wrapper.findAll('[data-test="assistant-launcher-preview"]');
-    expect(previews.map((p) => p.attributes("data-signal"))).toEqual(["approval", "running"]);
+    const chip = wrapper.get('[data-test="assistant-launcher-toggle"]');
+    expect(chip.get('[data-test="assistant-launcher-count"]').text()).toBe("7");
+    expect(chip.attributes("data-signal")).toBe("attention");
+  });
+
+  it("steps the Chats chip aside while a chat is on screen, unless another chat needs you", async () => {
+    reactive(mocks.rows).value = [{ sid: "s2", title: "Why slow", group: "answering" }];
+    const wrapper = mountBar();
+    await flushPromises();
+    await wrapper.setProps({ chatOpen: true });
+    expect(wrapper.find('[data-test="assistant-launcher-toggle"]').exists()).toBe(false);
+    reactive(mocks.rows).value = [
+      { sid: "s1", title: "Add a p95 panel", group: "needs_you" },
+      { sid: "s2", title: "Why slow", group: "answering" },
+    ];
+    await flushPromises();
+    const chip = wrapper.get('[data-test="assistant-launcher-toggle"]');
+    expect(chip.text()).toContain("Chats");
+    expect(chip.attributes("data-signal")).toBe("attention");
   });
 
   it("draws no incidents section or note when no run is live", async () => {
@@ -238,11 +246,11 @@ describe("ThreadsBar", () => {
     });
   });
 
-  it("opens a previewed chat as Float", async () => {
+  it("opens a listed chat as Float", async () => {
     const wrapper = mountBar();
     await flushPromises();
-    await wrapper.get('[data-test="assistant-launcher"]').trigger("pointerenter");
-    await wrapper.get('[data-test="assistant-launcher-preview"]').trigger("click");
+    await wrapper.get('[data-test="assistant-launcher-toggle"]').trigger("click");
+    await wrapper.get('[data-test="threads-bar-thread-s1"]').trigger("click");
     expect(mocks.floatChat).toHaveBeenCalledWith("s1");
   });
 
@@ -252,8 +260,8 @@ describe("ThreadsBar", () => {
     try {
       const wrapper = mountBar();
       await flushPromises();
-      await wrapper.get('[data-test="assistant-launcher"]').trigger("pointerenter");
-      await wrapper.get('[data-test="assistant-launcher-preview"]').trigger("click");
+      await wrapper.get('[data-test="assistant-launcher-toggle"]').trigger("click");
+      await wrapper.get('[data-test="threads-bar-thread-s1"]').trigger("click");
       expect(mocks.floatChat).not.toHaveBeenCalled();
       expect(mocks.open).toHaveBeenCalledWith({ kind: "full" }, { sid: "s1", focus: "composer" });
       expect(mocks.push).toHaveBeenCalledWith({
@@ -266,7 +274,28 @@ describe("ThreadsBar", () => {
     }
   });
 
-  it("opens the Threads panel from the icon", async () => {
+  it("restores a minimised window from its chip even on Home, leaving the other chips", async () => {
+    mocks.route.name = "home";
+    const stopListening = onOverviewFocusRequest(() => undefined);
+    try {
+      const wrapper = mount(ThreadsBar, {
+        props: { order: ["s1", "s2"] },
+        global: { plugins: [i18n, store] },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      mocks.open.mockClear();
+      await wrapper.get('[data-test="assistant-tray-chip-restore"]').trigger("click");
+      expect(wrapper.emitted("restore")?.[0]).toEqual(["s1"]);
+      expect(mocks.open).not.toHaveBeenCalled();
+      expect(mocks.push).not.toHaveBeenCalled();
+    } finally {
+      stopListening();
+      mocks.route.name = "logs";
+    }
+  });
+
+  it("opens the Threads panel from its chip", async () => {
     const wrapper = mountBar();
     await flushPromises();
     await wrapper.get('[data-test="assistant-launcher-toggle"]').trigger("click");
@@ -279,5 +308,17 @@ describe("ThreadsBar", () => {
     const wrapper = mountBar();
     await flushPromises();
     expect(wrapper.find('[data-test="threads-bar"]').exists()).toBe(false);
+  });
+
+  it("lifts bottom toasts above the chip row while it shows, and drops the lift when it goes", async () => {
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ top: window.innerHeight - 64, height: 40 } as DOMRect);
+    const wrapper = mountBar();
+    await flushPromises();
+    expect(document.documentElement.style.getPropertyValue("--o-toast-lift")).toBe("4rem");
+    wrapper.unmount();
+    expect(document.documentElement.style.getPropertyValue("--o-toast-lift")).toBe("");
+    rect.mockRestore();
   });
 });

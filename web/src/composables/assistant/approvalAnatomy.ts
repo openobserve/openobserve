@@ -140,7 +140,9 @@ export function approvalDiff(
       after: value,
       ...(before && field in before && { before: before[field] }),
     }));
-  return rows.length ? { rows, oneSided: !before && card.kind === "update" } : null;
+  // An empty or partial `before` cannot vouch for a field it lacks, so that row's old side reads unknown.
+  const unknownSide = card.kind === "update" && rows.some((row) => !("before" in row));
+  return rows.length ? { rows, oneSided: unknownSide } : null;
 }
 
 /** The native editor a single update can move to; `null` for a batch, a create or a type without one. */

@@ -3983,7 +3983,7 @@
           "note": "Operazioni e approfondimenti SRE automatizzati"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "Assistenza intelligente per query e analisi"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "Si è verificato un errore imprevisto",
       "toolExecutionFailed": "Esecuzione del tool non riuscita",
       "errorOccurred": "Si è verificato un errore",
-      "navigateConfirmQuestion": "Consentire a @:{'brand.autobot'} di navigare?",
       "confirmToolExecution": "Confermi l'esecuzione di {tool}?",
       "entity": {
         "alert": "Avviso",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "Abbonati per continuare a usare l'IA. L'utilizzo successivo viene addebitato sulla fattura di questa organizzazione.",
     "aiContractExhaustedMessage": "Contatta il tuo account manager per aggiungere più crediti AI",
     "aiPayerSubscribeMessage": "La fatturazione di questa organizzazione è gestita da {payer}. Chiedi a un amministratore di {payer} di abbonarsi; l'utilizzo successivo viene addebitato sulla sua fattura.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} e generazione query: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Ri-analisi: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} e generazione query: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Ri-analisi: {reanalysis}",
     "aiPaygMessage": "Crediti gratuiti esauriti: utilizzo fatturato all'abbonamento",
     "billingGroup": {
       "tabLabel": "Gruppo di fatturazione",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "L’uso a pagamento non è abilitato per tutte le organizzazioni richieste.",
     "updateFailed": "Impossibile aggiornare l'utilizzo a pagamento dell'IA. Riprova.",
     "declinedNotice": "L'utilizzo a pagamento dell'IA è disattivato, quindi questa richiesta non è stata inviata.",
-    "consentScope": "Si applica all'intera organizzazione: @:{'brand.askAutobot'}, generazione di query e analisi degli incidenti. Puoi disattivarlo in qualsiasi momento nella pagina Piani.",
+    "consentScope": "Si applica all'intera organizzazione: @:{'brand.autobot'}, generazione di query e analisi degli incidenti. Puoi disattivarlo in qualsiasi momento nella pagina Piani.",
     "managePaidUsage": "Attiva l'utilizzo a pagamento",
     "modePayAsYouGo": "Pagamento a consumo",
     "modeConsentRequired": "Consenso richiesto",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "Navigazione automatica",
-        "enabledTooltip": "Navigazione automatica abilitata: {product} navigherà automaticamente senza conferma",
-        "disabledTooltip": "Navigazione automatica disattivata: {product} chiederà prima di navigare"
-      }
-    }
+    "composer": {}
   }
 }

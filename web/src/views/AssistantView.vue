@@ -118,6 +118,10 @@ export const RAIL_MIN_REM = 14;
 export const RAIL_DEFAULT_REM = 22;
 export const RAIL_MAX_REM = 26;
 
+/** How long a new Full page tab waits for the chat its opener sent: 8 reads, one a second. */
+const PENDING_TRIES = 8;
+const PENDING_RETRY_MS = 1_000;
+
 export function railPx(rem: number): number {
   const root =
     typeof document === "undefined"
@@ -153,7 +157,13 @@ import {
   useAssistantHistory,
   useAssistantStore,
 } from "@/composables/assistant";
-import { fullThreadLocation, homeAskLocation, withoutThread } from "@/composables/assistant/pure";
+import {
+  fullTabPending,
+  fullThreadLocation,
+  startingOver,
+  startOverOnHost,
+  withoutThread,
+} from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -206,10 +216,7 @@ const chatId = computed(() => props.chatId || null);
 provide(SHELL_ROUTE_CONTEXT, { state: routeState, newChat });
 
 function newChat(): void {
-  if (props.bare) {
-    void router.push(homeAskLocation(route.query)).catch(() => undefined);
-    return;
-  }
+  if (props.bare) return void startOverOnHost(router, route.query);
   routeState.value = "idle";
   store.startNewChat({
     origin: { entryKind: "deep_link", objectKind: "none", container: "full_view" },
@@ -253,7 +260,7 @@ async function enter(): Promise<void> {
     let opened: string | null = null;
     try {
       if (target) {
-        opened = await store.openSession(target);
+        opened = await openRouted(target);
         result = "idle";
       }
     } catch (err) {
@@ -281,6 +288,21 @@ async function enter(): Promise<void> {
       latency_ms: 0,
     });
   entered = true;
+}
+
+// A Full page tab can open before the server has the chat its opener tab just sent.
+async function openRouted(target: NonNullable<ReturnType<typeof chatRef>>): Promise<string> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await store.openSession(target);
+    } catch (err) {
+      const key = store.state.userOrgKey;
+      const missing = (err as { code?: string } | null)?.code === "not_found";
+      const awaited = "sid" in target && !!key && fullTabPending(key, target.sid);
+      if (!missing || !awaited || attempt >= PENDING_TRIES) throw err;
+      await new Promise((resolve) => setTimeout(resolve, PENDING_RETRY_MS));
+    }
+  }
 }
 
 function settle(asked: number): void {
@@ -331,8 +353,9 @@ watch(
 function leave(): void {
   generation += 1;
   if (store.state.shell.placement.kind !== "full") return;
-  trackAssistant("ai_container_closed", { reason: "route" });
-  store.close("route");
+  const reason = startingOver.value ? "close" : "route";
+  trackAssistant("ai_container_closed", { reason });
+  store.close(reason);
 }
 
 // Home is kept alive, so coming back to a thread re-enters it instead of remounting.

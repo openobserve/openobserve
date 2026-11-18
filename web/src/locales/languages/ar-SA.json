@@ -3983,7 +3983,7 @@
           "note": "عمليات SRE الآلية والرؤى"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "المساعدة الذكية في الاستعلام والتحليل"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "حدث خطأ غير متوقع",
       "toolExecutionFailed": "فشل تنفيذ الأداة",
       "errorOccurred": "حدث خطأ",
-      "navigateConfirmQuestion": "هل يمكن السماح لـ @:{'brand.autobot'} بالتنقل؟",
       "confirmToolExecution": "هل تؤكد تنفيذ {tool}؟",
       "entity": {
         "alert": "تنبيه",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "اشترك لمواصلة استخدام الذكاء الاصطناعي. يُفاتر الاستخدام الإضافي على فاتورة هذه المؤسسة.",
     "aiContractExhaustedMessage": "اتصل بمدير حسابك لإضافة المزيد من اعتمادات الذكاء الاصطناعي",
     "aiPayerSubscribeMessage": "تتولى {payer} إدارة الفوترة لهذه المؤسسة. اطلب من أحد مسؤولي {payer} الاشتراك؛ ويُفوتَر الاستخدام الإضافي على فاتورتها.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} وتوليد الاستعلامات: {chat} · @:{'brand.autobotInvestigate'}: {incident} · إعادة التحليل: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} وتوليد الاستعلامات: {chat} · @:{'brand.autobotInvestigate'}: {incident} · إعادة التحليل: {reanalysis}",
     "aiPaygMessage": "تم نفاد الاعتمادات المجانية — الاستخدام سيتم فوترة الاشتراك",
     "billingGroup": {
       "tabLabel": "مجموعة الفوترة",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "الاستخدام المدفوع غير مفعّل لكل المؤسسات المطلوبة.",
     "updateFailed": "تعذّر تحديث استخدام الذكاء الاصطناعي المدفوع. حاول مرة أخرى.",
     "declinedNotice": "استخدام الذكاء الاصطناعي المدفوع معطّل، لذلك لم يُرسل هذا الطلب.",
-    "consentScope": "يسري على المؤسسة بأكملها: @:{'brand.askAutobot'} وإنشاء الاستعلامات وتحليل الحوادث. يمكنك إيقافه في أي وقت من صفحة الخطط.",
+    "consentScope": "يسري على المؤسسة بأكملها: @:{'brand.autobot'} وإنشاء الاستعلامات وتحليل الحوادث. يمكنك إيقافه في أي وقت من صفحة الخطط.",
     "managePaidUsage": "تشغيل الاستخدام المدفوع",
     "modePayAsYouGo": "الدفع حسب الاستخدام",
     "modeConsentRequired": "التفويض مطلوب",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "الملاحة التلقائية",
-        "enabledTooltip": "تفعيل التنقل التلقائي - {product} سيقوم بالتنقل تلقائيا بدون تأكيد",
-        "disabledTooltip": "تم تعطيل التنقل التلقائي - {product} سيطلب قبل التنقل"
-      }
-    }
+    "composer": {}
   }
 }

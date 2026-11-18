@@ -180,12 +180,12 @@ describe("AssistantMessage", () => {
     expect(bubble.classes()).toEqual(
       expect.arrayContaining([
         "bg-assistant-user-bg",
-        "rounded-chat-bubble",
-        "rounded-ee-default",
+        "rounded-surface",
         "max-w-[80%]",
         "text-text-body",
       ]),
     );
+    expect(bubble.classes()).not.toContain("rounded-ee-default");
   });
 
   it("keeps a sent message's action row at a fixed height, its time shown on hover or focus", () => {
@@ -529,7 +529,7 @@ describe("AssistantMessage", () => {
       "Blocked by policy: o2_UpdateAlert. Writes are off for this organization.",
     );
     expect(notice.text()).toContain(
-      `An admin can allow it in Settings › ${brandNames.askAutobot} › Permissions.`,
+      `An admin can allow it in Settings › ${brandNames.autobot} › Permissions.`,
     );
   });
 

@@ -280,12 +280,19 @@ describe("useAssistantStarters", () => {
     expect(labels(starters)).toContain("Summarise errors in `_myapp`");
   });
 
-  it("names a user-sourced stream even though the server marks it internal", async () => {
-    seedStreams("logs", ["_o2_internal", "_rumdata"]);
-    const { starters } = setup("home", null);
+  it("never names a stream the server marks internal, user-sourced or on the page", async () => {
+    seedStreams("logs", ["_o2_internal", "_rumdata", "app_logs"]);
+    const home = setup("home", null);
     await flushPromises();
-    expect(labels(starters)).toContain("Summarise errors in `_rumdata`");
-    expect(labels(starters).join(" ")).not.toContain("_o2_internal");
+    expect(labels(home.starters)).toContain("Summarise errors in `app_logs`");
+    expect(labels(home.starters).join(" ")).not.toContain("_rumdata");
+    const logs = setup("logs");
+    await flushPromises();
+    getActiveContext.mockResolvedValue({ ...LOGS_CONTEXT, selectedStreams: ["_rumdata"] });
+    refreshPageContext();
+    await flushPromises();
+    expect(labels(logs.starters).join(" ")).not.toContain("_rumdata");
+    expect(labels(logs.starters).join(" ")).toContain("app_logs");
   });
 
   it("stages Home starter streams so they reach the tray and the request from the full view", async () => {

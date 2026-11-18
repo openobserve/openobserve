@@ -18,30 +18,41 @@ import { describe, expect, it } from "vitest";
 
 import AssistantComposerBottomRow from "./AssistantComposerBottomRow.vue";
 
+const SLOTS = ["plus", "agent", "mic", "send"] as const;
+
+function stubs(names: readonly string[]): Record<string, string> {
+  return Object.fromEntries(names.map((name) => [name, `<button data-test="${name}-stub" />`]));
+}
+
+function order(wrapper: ReturnType<typeof mount>): string[] {
+  return wrapper
+    .findAll("[data-test$='-stub']")
+    .map((node) => node.attributes("data-test")!.replace("-stub", ""));
+}
+
 describe("AssistantComposerBottomRow", () => {
-  it("keeps the agent side and the action side on one line at any width: it never wraps", () => {
+  it("keeps one order in every host, on one line that never wraps", () => {
     const wrapper = mount(AssistantComposerBottomRow, {
-      props: { divided: true },
-      slots: {
-        agent: '<button data-test="agent-stub" />',
-        default: '<button data-test="send-stub" />',
-      },
+      slots: stubs([...SLOTS].reverse()),
     });
     const row = wrapper.get('[data-test="assistant-composer-bar"]');
     expect(row.classes()).toContain("flex-nowrap");
-    expect(row.classes()).not.toContain("flex-wrap");
     expect(row.classes().some((name) => name.startsWith("gap-y"))).toBe(false);
-    expect(
-      row
-        .get('[data-test="assistant-composer-bar-left"]')
-        .find('[data-test="agent-stub"]')
-        .exists(),
-    ).toBe(true);
-    expect(
-      row
-        .get('[data-test="assistant-composer-bar-right"]')
-        .find('[data-test="send-stub"]')
-        .exists(),
-    ).toBe(true);
+    expect(row.classes().some((name) => name.startsWith("border"))).toBe(false);
+    expect(order(wrapper)).toEqual([...SLOTS]);
+    const left = row.get('[data-test="assistant-composer-bar-left"]');
+    expect(left.find('[data-test="plus-stub"]').exists()).toBe(true);
+    const right = row.get('[data-test="assistant-composer-bar-right"]');
+    expect(right.find('[data-test="agent-stub"]').exists()).toBe(true);
+  });
+
+  it("shows the recording block after + only while dictating; agent, mic and Send stay", () => {
+    const wrapper = mount(AssistantComposerBottomRow, {
+      props: { dictating: true },
+      slots: stubs([...SLOTS, "recording"]),
+    });
+    expect(order(wrapper)).toEqual(["plus", "recording", "agent", "mic", "send"]);
+    const idle = mount(AssistantComposerBottomRow, { slots: stubs([...SLOTS, "recording"]) });
+    expect(order(idle)).toEqual([...SLOTS]);
   });
 });

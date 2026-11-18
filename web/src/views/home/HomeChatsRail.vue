@@ -56,7 +56,7 @@ import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantHistoryList from "@/components/ai-assistant/history/AssistantHistoryList.vue";
 import AssistantShareManager from "@/components/ai-assistant/share/AssistantShareManager.vue";
 import { useAssistantStore } from "@/composables/assistant";
-import { homeAskLocation } from "@/composables/assistant/pure";
+import { startOverOnHost } from "@/composables/assistant/pure";
 import { requestOverviewFocus } from "@/composables/goto/goToRequests";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -77,7 +77,7 @@ const sharesOpen = ref(false);
 
 // Home's hero is the new-chat state, so New chat lands on its Ask box.
 function newChat(): void {
-  if (props.thread) void router.push(homeAskLocation(route.query)).catch(() => undefined);
+  if (props.thread) void startOverOnHost(router, route.query);
   else requestOverviewFocus();
 }
 

@@ -75,6 +75,33 @@ describe("AssistantHistoryRow", () => {
     );
   });
 
+  it("leaves the row hover to the row: the row button paints no hover fill of its own", () => {
+    const button = setup().get('[data-test="assistant-history-row"]');
+    expect(button.classes()).toEqual(
+      expect.arrayContaining(["hover:bg-transparent!", "active:bg-transparent!"]),
+    );
+  });
+
+  it("keeps a compact row's time visible beside the kebab, which has its own slot", () => {
+    const wrapper = setup({}, { compact: true });
+    const time = wrapper.get('[data-test="assistant-history-row-time"]').classes().join(" ");
+    expect(time).not.toContain("invisible");
+    const kebab = wrapper.get('[data-test="assistant-history-row-menu"]').classes().join(" ");
+    expect(kebab).not.toContain("absolute");
+  });
+
+  it("names a truncated title with the title alone, never a raw date", () => {
+    const wrapper = setup({ title: "Checkout 5xx spike" as never });
+    const tip = wrapper.findComponent({ name: "OTooltip" });
+    expect(String(tip.props("content"))).toBe("Checkout 5xx spike");
+  });
+
+  it("tags a saved chat that holds an unsent draft, keeping its time", () => {
+    const wrapper = setup({}, { drafted: true });
+    expect(wrapper.get('[data-test="assistant-history-row-draft"]').text()).toBe("Draft");
+    expect(wrapper.find('[data-test="assistant-history-row-time"]').exists()).toBe(true);
+  });
+
   it("lets the title wrap to its two-line clamp inside the nowrap row button", () => {
     const title = setup().get('[data-test="assistant-history-row"] [data-test="o-truncated-text"]');
     expect(title.classes()).toEqual(expect.arrayContaining(["line-clamp-2", "whitespace-normal"]));

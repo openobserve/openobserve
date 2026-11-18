@@ -25,7 +25,7 @@ import AssistantDictateButton, {
 
 function render(props: Partial<AssistantDictateButtonProps> = {}) {
   return mount(AssistantDictateButton, {
-    props: { mic: "live", pressed: false, ...props },
+    props: { phase: "idle", ...props },
     attachTo: document.body,
   });
 }
@@ -37,51 +37,60 @@ afterEach(() => {
 });
 
 describe("AssistantDictateButton", () => {
-  it("keeps the name Dictate in both states; aria-pressed carries the state", () => {
+  it("keeps the name Dictate in every state; aria-pressed carries listening", () => {
     expect(render().get(mic).attributes()).toMatchObject({
       "aria-label": "Dictate",
       "aria-pressed": "false",
-      "data-size": "md",
+      "data-size": "sm",
     });
-    expect(render({ pressed: true }).get(mic).attributes()).toMatchObject({
+    expect(render({ phase: "listening" }).get(mic).attributes()).toMatchObject({
       "aria-label": "Dictate",
       "aria-pressed": "true",
     });
   });
 
+  it("never changes shape: the same 28 px square in every phase", () => {
+    for (const phase of [
+      "idle",
+      "requesting",
+      "listening",
+      "processing",
+      "denied",
+      "off",
+    ] as const) {
+      const button = render({ phase }).get(mic);
+      expect(button.classes()).not.toContain("rounded-full");
+      expect(button.attributes("data-size")).toBe("sm");
+    }
+  });
+
   it("uses aria-disabled with a reason, so the mic stays focusable", () => {
-    const button = render({ mic: "crossed", disabledReason: raw("Blocked") }).get(mic);
+    const button = render({ phase: "denied", disabledReason: raw("Blocked") }).get(mic);
     expect(button.attributes("aria-disabled")).toBe("true");
     expect(button.attributes("disabled")).toBeUndefined();
   });
 
-  it("crosses the mic only where a new press cannot help", () => {
-    const glyph = (state: AssistantDictateButtonProps["mic"]) =>
-      render({ mic: state }).findComponent(OIcon).props("name");
-    expect(glyph("live")).toBe("mic");
-    expect(glyph("off")).toBe("mic");
-    expect(glyph("crossed")).toBe("mic-off");
+  it("shows each phase with its own glyph", () => {
+    const glyph = (phase: AssistantDictateButtonProps["phase"]) =>
+      render({ phase }).findComponent(OIcon).props("name");
+    expect(glyph("idle")).toBe("mic");
+    expect(glyph("listening")).toBe("stop");
+    expect(glyph("denied")).toBe("mic-off");
+    expect(glyph("unavailable")).toBe("mic-off");
+    expect(glyph("off")).toBe("mic-off");
+  });
+
+  it("is busy while the browser asks and while the last words settle", () => {
+    expect(render({ phase: "requesting" }).get(mic).attributes("aria-busy")).toBe("true");
+    const processing = render({ phase: "processing" }).get(mic);
+    expect(processing.attributes("aria-busy")).toBe("true");
   });
 
   it("emits press with the click, for the composer to read pointer or keyboard", async () => {
     const wrapper = render();
     await wrapper.get(mic).trigger("click");
     expect(wrapper.emitted("press")).toHaveLength(1);
-  });
-
-  it("emits press for an admin's off mic too, so the composer offers Turn on in its strip", async () => {
-    const wrapper = render({ mic: "off" });
-    await wrapper.get(mic).trigger("click");
     await flushPromises();
-    expect(wrapper.emitted("press")).toHaveLength(1);
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();
-  });
-
-  it("turns into a filled round Stop in the same slot while dictating, with no primer", () => {
-    const button = render({ pressed: true }).get(mic);
-    expect(button.attributes("data-on")).toBeDefined();
-    expect(button.classes()).toContain("rounded-full");
-    expect(button.findComponent(OIcon).props("name")).toBe("stop");
-    expect(document.body.querySelector('[data-test="assistant-dictate-primer"]')).toBeNull();
   });
 });

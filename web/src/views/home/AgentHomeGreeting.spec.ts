@@ -27,7 +27,7 @@ const mountGreeting = (email?: string) =>
   });
 
 describe("AgentHomeGreeting", () => {
-  it("highlights the name inside the translated greeting, beside the plain logo", () => {
+  it("puts the name in the translated greeting as plain heading text, with no logo", () => {
     const wrapper = mountGreeting("marco.rossi@example.com");
     const heading = wrapper.get('[data-test="agent-home-greeting-text"]');
     expect(heading.element.tagName).toBe("H2");
@@ -35,15 +35,11 @@ describe("AgentHomeGreeting", () => {
     expect(heading.classes()).toEqual(expect.arrayContaining(["text-3xl", "max-md:text-2xl"]));
     const name = heading.get('[data-test="agent-home-greeting-name"]');
     expect(name.text()).toBe("Marco");
-    expect(name.classes()).toEqual(
-      expect.arrayContaining(["bg-gradient-brand-ribbon", "text-transparent"]),
-    );
-    const mark = wrapper.get('[data-test="agent-home-greeting-mark"]');
-    expect(mark.find(".blur-lg").exists()).toBe(false);
-    expect(mark.find('[data-test="assistant-mark"]').exists()).toBe(false);
-    expect(mark.get('[data-test="agent-home-greeting-logo"]').attributes("src")).toContain(
-      "o2_ai_logo",
-    );
+    // No gradient on assistant surfaces: the name reads in the heading's own colour.
+    expect(name.classes()).not.toContain("text-transparent");
+    expect(name.classes()).not.toContain("bg-gradient-brand-ribbon");
+    expect(wrapper.find('[data-test="agent-home-greeting-mark"]').exists()).toBe(false);
+    expect(wrapper.find("img").exists()).toBe(false);
   });
 
   it("greets without a name and draws no chips", () => {

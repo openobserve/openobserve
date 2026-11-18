@@ -86,10 +86,11 @@ const AI_TOKEN_LEGACY_CONSUMERS = [
 const AI_ASSISTANT_KEYS: string[] = JSON.parse(
   readFileSync(join(__dirname, "__fixtures__/aiAssistantKeys.json"), "utf8"),
 );
-// The status dot, plus the composer's two kit shapes (round Send/Stop, agent pill), each held in one exported class.
+// Status dots and switch tracks only; every composer control is a 6 px square.
 const ROUNDED_FULL_FILES = [
   "components/ai-assistant/common/AssistantStatusDot.vue",
-  "components/ai-assistant/composer/AssistantComposerBottomRow.vue",
+  "components/ai-assistant/composer/AssistantDictationWave.vue",
+  "components/ai-assistant/composer/AssistantMenuSwitchRow.vue",
   "components/ai-assistant/composer/AssistantAgentPill.vue",
   // Home's chats rail: the pill search and view tabs, and its small row dot.
   "components/ai-assistant/history/AssistantHistoryList.vue",
@@ -259,7 +260,7 @@ describe("assistant repo guards", () => {
     ).toEqual([]);
   });
 
-  it("allows rounded-full only in the status dot, the composer's round Send and agent pill, and Home's chats rail", () => {
+  it("allows rounded-full only in status dots, switch tracks, the agent pill and Home's chats rail", () => {
     expect(
       offenders(
         (f) =>

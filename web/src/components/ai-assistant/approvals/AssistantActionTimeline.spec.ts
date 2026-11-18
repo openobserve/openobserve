@@ -104,11 +104,23 @@ describe("AssistantActionTimeline", () => {
     );
   });
 
+  it("says nothing of undo limits for a change they cannot touch, such as a created dashboard", async () => {
+    const created = entry({
+      op: "create",
+      tool: "CreateDashboard",
+      resource: { type: "dashboard", id: "d1", name: "Ops" },
+      undoable: true,
+    });
+    const { wrapper } = mountTimeline([created]);
+    await expand(wrapper);
+    expect(wrapper.find('[data-test="assistant-action-timeline-limits"]').exists()).toBe(false);
+  });
+
   it("undoes an entry the server can restore, and states the honest limit", async () => {
     const { wrapper, undo } = mountTimeline([entry({ undoable: true })]);
     await expand(wrapper);
     expect(wrapper.get('[data-test="assistant-action-timeline-limits"]').text()).toBe(
-      "Undo restores the object. Notifications already sent and data already deleted stay as they are.",
+      "Sent notifications and deleted data can't be undone.",
     );
     await wrapper.get('[data-test="assistant-action-undo-c9:0"]').trigger("click");
     await flushPromises();

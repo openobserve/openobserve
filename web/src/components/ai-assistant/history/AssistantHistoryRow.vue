@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :role="tag === 'div' ? 'listitem' : undefined"
     :class="[
       'group/row rounded-default hover:bg-surface-subtle relative flex min-w-0 items-center gap-1',
-      current && 'bg-surface-subtle',
+      current && CURRENT_CLASS,
       compact && '-mx-3 px-3',
     ]"
     :aria-busy="pending ? 'true' : undefined"
@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-current="current ? 'true' : undefined"
           :class="[
             'h-auto! min-w-0 flex-1 justify-start! px-0! py-1.5 text-start max-md:min-h-11 pointer-coarse:min-h-11',
+            'hover:bg-transparent! active:bg-transparent!',
             compact ? 'min-h-9' : 'min-h-8',
           ]"
           data-test="assistant-history-row"
@@ -177,7 +178,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ chatStatusWord(status, expiresAt, now ?? Date.now(), t) }}</span
             >
             <OText
-              v-else
+              v-if="drafted && status !== 'draft'"
+              variant="meta"
+              as="span"
+              :class="[
+                'shrink-0',
+                current ? 'text-text-body!' : 'text-assistant-signal-attention!',
+              ]"
+              data-test="assistant-history-row-draft"
+              >{{ t("assistant.history.draftTag") }}</OText
+            >
+            <OText
+              v-if="!pending && !status"
               variant="meta"
               as="span"
               :class="[
@@ -284,6 +296,8 @@ export interface AssistantHistoryRowProps {
   compact?: boolean;
   /** The row sits under a section that names its status, so only screen readers get the word. */
   quietStatus?: boolean;
+  /** A saved chat holding an unsent draft, which the row alone cannot see. */
+  drafted?: boolean;
 }
 
 type RowAction = "stop" | "rename" | "pin" | "share" | "export" | "delete" | "deleteDraft";
@@ -296,15 +310,10 @@ const KEBAB_CLASS = [
   "group-data-[current]/row:opacity-100",
   "max-md:opacity-100 pointer-coarse:opacity-100",
 ];
-// The compact kebab sits over the time, so the time reaches the row's end; a touch screen keeps it in line.
-const COMPACT_KEBAB_CLASS =
-  "absolute! end-3 group-focus-within/row:opacity-100 pointer-coarse:static!";
-// The time steps aside wherever the kebab shows over it, and is never narrower than the kebab.
-const COMPACT_TRAIL_CLASS = [
-  "w-12 text-end",
-  "pointer-fine:group-hover/row:invisible pointer-fine:group-focus-within/row:invisible",
-  "pointer-fine:group-data-[current]/row:invisible pointer-fine:group-has-[[data-state=open]]/row:invisible",
-];
+const COMPACT_KEBAB_CLASS = "size-6! group-focus-within/row:opacity-100";
+const COMPACT_TRAIL_CLASS = "w-10 text-end";
+const CURRENT_CLASS =
+  "bg-surface-subtle before:bg-assistant-primary before:absolute before:inset-y-1.5 before:start-0 before:w-0.5";
 </script>
 
 <script setup lang="ts">
@@ -327,9 +336,9 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatOrgTime, formatRelativeCompact } from "@/utils/formatters";
+import { formatRelativeCompact } from "@/utils/formatters";
 
-import { chatStatusClass, chatStatusOf, chatStatusWord } from "./chatStatus";
+import { chatStatusClass, chatStatusOf, chatStatusWord, editableTitle } from "./chatStatus";
 
 // The Threads board's lights; a draft is at rest, so it has none.
 const STATUS_SIGNALS: Partial<Record<ChatStatus, AssistantSignal>> = {
@@ -351,6 +360,7 @@ const props = withDefaults(defineProps<AssistantHistoryRowProps>(), {
   tag: "li",
   compact: false,
   quietStatus: false,
+  drafted: false,
 });
 
 const emit = defineEmits<{
@@ -393,10 +403,7 @@ const pendingText = computed(() =>
   props.pending ? t(`assistant.history.pending.${props.pending}`) : undefined,
 );
 const time = computed(() => formatRelativeCompact(props.row.updatedAt, props.now));
-const absolute = computed(() =>
-  formatOrgTime(props.row.updatedAt, { timeZone: props.timezone, absolute: true }),
-);
-const fullTitle = computed(() => raw(`${String(props.row.title)} · ${absolute.value}`));
+const fullTitle = computed(() => raw(String(props.row.title)));
 const counter = computed(() => t("assistant.thread.titleCounter", { count: draft.value.length }));
 
 // A browser-only row in server mode can still be read and removed, nothing more.
@@ -490,7 +497,7 @@ function isDestructive(action: RowAction): boolean {
 }
 
 async function startRename(): Promise<void> {
-  draft.value = String(props.row.title);
+  draft.value = editableTitle(String(props.row.title));
   cancelled = false;
   renaming.value = true;
   await nextTick();

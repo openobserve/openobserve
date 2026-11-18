@@ -111,7 +111,7 @@ afterEach(() => {
 });
 
 describe("AssistantWindowLayer", () => {
-  it("renders one window per open chat, each with its own chat, and a badge counting the minimised one", async () => {
+  it("renders one window per open chat, each with its own chat, and a chip for the minimised one", async () => {
     const { store } = fake.current;
     const [a, b, c] = [newChat(), newChat(), newChat()];
     for (const sid of [a, b, c]) store.floatChat(sid, { focus: "none" });
@@ -119,9 +119,8 @@ describe("AssistantWindowLayer", () => {
     expect(windows()).toHaveLength(2);
     const shown = [...windows()].map((w) => (w as HTMLElement).dataset.assistantWindow);
     expect(shown.sort()).toEqual([b, c].sort());
-    expect(
-      document.body.querySelector('[data-test="assistant-launcher-badge"]')?.textContent?.trim(),
-    ).toBe("1");
+    const chips = document.body.querySelectorAll<HTMLElement>('[data-test="assistant-tray-chip"]');
+    expect([...chips].map((chip) => chip.dataset.sid)).toEqual([a]);
   });
 
   it("shows nothing below lg or on the full view, and keeps the windows for when they return", async () => {
@@ -139,13 +138,62 @@ describe("AssistantWindowLayer", () => {
     expect(tray()).not.toBeNull();
   });
 
-  it("hides the launcher on the full thread view", async () => {
+  it("keeps minimised chips on the full thread view, all but the chat on screen", async () => {
+    const { store } = fake.current;
+    const [a, b] = [newChat(), newChat()];
+    for (const sid of [a, b]) {
+      store.floatChat(sid, { focus: "none" });
+      store.minimiseWindow(sid, "button");
+    }
+    store.restoreWindow(b, { focus: "none" });
+    store.open({ kind: "full" }, { sid: b, focus: "none" });
+    const { router } = await setup(`/?thread=${b}`);
+    const chips = [
+      ...document.body.querySelectorAll<HTMLElement>('[data-test="assistant-tray-chip"]'),
+    ];
+    expect(chips.map((chip) => chip.dataset.sid)).toEqual([a]);
+    expect(windows()).toHaveLength(0);
+    chips[0].querySelector<HTMLElement>('[data-test="assistant-tray-chip-restore"]')!.click();
+    await flushPromises();
+    expect(router.currentRoute.value.query.thread).toBe(a);
+    expect(store.state.shell.activeSid).toBe(a);
+  });
+
+  it("keeps the chips up when focus lands on a large page area, and steps aside only for a control they hide", async () => {
     const { store } = fake.current;
     const sid = newChat();
     store.floatChat(sid, { focus: "none" });
     store.minimiseWindow(sid, "button");
-    await setup("/?thread=");
-    expect(tray()).toBeNull();
+    await setup();
+    const bar = document.body.querySelector<HTMLElement>('[data-test="threads-bar"]')!;
+    bar.getBoundingClientRect = () =>
+      ({ left: 900, right: 1000, top: 900, bottom: 940 }) as DOMRect;
+    const main = document.querySelector<HTMLElement>("main")!;
+    main.getBoundingClientRect = () => ({ left: 0, right: 1200, top: 0, bottom: 1000 }) as DOMRect;
+    vi.spyOn(main, "matches").mockReturnValue(true);
+    main.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    await flushPromises();
+    expect(bar.style.display).not.toBe("none");
+    const page = document.getElementById("page")!;
+    page.getBoundingClientRect = () =>
+      ({ left: 920, right: 980, top: 905, bottom: 935 }) as DOMRect;
+    vi.spyOn(page, "matches").mockReturnValue(true);
+    page.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    await flushPromises();
+    expect(bar.style.display).toBe("none");
+  });
+
+  it("puts focus on a minimised window's chip when nothing on the page sent it there", async () => {
+    const { store } = fake.current;
+    const sid = newChat();
+    store.floatChat(sid, { focus: "none" });
+    await setup();
+    const el = windows()[0] as HTMLElement;
+    el.addEventListener("keydown", (e) => runEscapeLadder(e as KeyboardEvent), { once: true });
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flushPromises();
+    expect(document.activeElement?.getAttribute("data-test")).toBe("assistant-tray-chip-restore");
+    expect(document.activeElement?.closest<HTMLElement>("[data-sid]")?.dataset.sid).toBe(sid);
   });
 
   it("minimises on Escape from inside a window (rung g) and reports the reason", async () => {
@@ -234,22 +282,45 @@ describe("AssistantWindowLayer", () => {
     expect(el.hasAttribute("data-collapsed")).toBe(false);
   });
 
-  it("hides the launcher while another chat window is open and shows it when none is", async () => {
+  it("keeps every minimised chat on screen as its own chip while a window or the sidebar is open", async () => {
     const { store } = fake.current;
-    const parked = newChat();
-    store.floatChat(parked, { focus: "none" });
-    store.minimiseWindow(parked, "button");
-    const open = newChat();
-    store.floatChat(open, { focus: "none" });
+    const [a, b] = [newChat(), newChat()];
+    for (const sid of [a, b]) {
+      store.floatChat(sid, { focus: "none" });
+      store.minimiseWindow(sid, "button");
+    }
+    store.floatChat(newChat(), { focus: "none" });
     await setup();
     const bar = () => document.body.querySelector<HTMLElement>('[data-test="threads-bar"]');
-    expect(bar()?.style.display).toBe("none");
-    store.minimiseWindow(open, "button");
+    const chips = () =>
+      [...document.body.querySelectorAll<HTMLElement>('[data-test="assistant-tray-chip"]')].map(
+        (chip) => chip.dataset.sid,
+      );
+    expect(bar()?.style.display).not.toBe("none");
+    expect(chips()).toEqual([a, b]);
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await flushPromises();
     expect(bar()?.style.display).not.toBe("none");
+    expect(chips()).toEqual([a, b]);
   });
 
-  it("keeps the Threads bar shown while a keyboard user is on its icon", async () => {
+  it("opens New chat from a window in a new window and keeps the old chat as a chip", async () => {
+    const { store } = fake.current;
+    const old = newChat();
+    store.state.sessions[old].messages.push({ role: "user", content: "hi" } as never);
+    store.floatChat(old, { focus: "none" });
+    await setup();
+    document.body.querySelector<HTMLElement>('[data-test="assistant-thread-new"]')?.click();
+    await flushPromises();
+    const shown = [...windows()].map((w) => (w as HTMLElement).dataset.assistantWindow);
+    expect(shown).toHaveLength(1);
+    expect(shown[0]).not.toBe(old);
+    expect(store.windowOf(old)?.state).toBe("minimised");
+    const chip = document.body.querySelector<HTMLElement>('[data-test="assistant-tray-chip"]');
+    expect(chip?.dataset.sid).toBe(old);
+  });
+
+  it("keeps the Threads bar shown while a keyboard user is on its chip", async () => {
     const { store } = fake.current;
     const sid = newChat();
     store.floatChat(sid, { focus: "none" });
@@ -257,7 +328,7 @@ describe("AssistantWindowLayer", () => {
     await setup();
     const bar = document.body.querySelector<HTMLElement>('[data-test="threads-bar"]')!;
     const toggle = document.body.querySelector<HTMLElement>(
-      '[data-test="assistant-launcher-toggle"]',
+      '[data-test="assistant-tray-chip-restore"]',
     )!;
     const box = { left: 0, right: 500, top: 0, bottom: 500 } as DOMRect;
     bar.getBoundingClientRect = () => box;

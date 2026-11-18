@@ -14,14 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 import * as clearance from "@/lib/core/Table/composables/useFloatingClearance";
 
-import AssistantFloatingLauncher, { previewTitle } from "./AssistantFloatingLauncher.vue";
+import AssistantFloatingLauncher, {
+  type AssistantFloatingLauncherProps,
+} from "./AssistantFloatingLauncher.vue";
 import type { ThreadPill } from "./threadsBar";
 
 const pill = (n: number, signal: ThreadPill["signal"] = "idle"): ThreadPill => ({
@@ -30,179 +32,68 @@ const pill = (n: number, signal: ThreadPill["signal"] = "idle"): ThreadPill => (
   signal,
 });
 
-const mountLauncher = (count: number, expanded = false) =>
+const mountTray = (props: Partial<AssistantFloatingLauncherProps> = {}) =>
   mount(AssistantFloatingLauncher, {
-    props: { items: Array.from({ length: count }, (_, i) => pill(i + 1)), expanded },
+    props: {
+      minimised: [],
+      othersCount: 0,
+      othersSignal: null,
+      othersShown: true,
+      expanded: false,
+      ...props,
+    },
     global: { plugins: [i18n, store] },
     attachTo: document.body,
   });
 
-const hover = async (wrapper: ReturnType<typeof mountLauncher>) =>
-  wrapper.get('[data-test="assistant-launcher"]').trigger("pointerenter");
-
 describe("AssistantFloatingLauncher", () => {
-  beforeEach(() => vi.useFakeTimers());
   afterEach(() => {
-    vi.useRealTimers();
     document.body.innerHTML = "";
   });
 
-  it("counts every listed chat in the badge", () => {
-    const wrapper = mountLauncher(5);
-    expect(wrapper.get('[data-test="assistant-launcher-badge"]').text()).toBe("5");
+  it("draws one chip per minimised chat, oldest first, with its title and no logo", () => {
+    const wrapper = mountTray({ minimised: [pill(1), pill(2), pill(3)] });
+    const chips = wrapper.findAll('[data-test="assistant-tray-chip"]');
+    expect(chips.map((chip) => chip.attributes("data-sid"))).toEqual(["s1", "s2", "s3"]);
+    expect(chips[0].text()).toContain("Chat number 1");
+    expect(wrapper.find("img").exists()).toBe(false);
   });
 
-  it("shows no badge and no previews when nothing is listed", async () => {
-    const wrapper = mountLauncher(0);
-    await hover(wrapper);
-    expect(wrapper.find('[data-test="assistant-launcher-badge"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="assistant-launcher-previews"]').exists()).toBe(false);
+  it("marks a running chat with the working ring and a waiting one with the needs-you dot", () => {
+    const wrapper = mountTray({ minimised: [pill(1, "running"), pill(2, "approval"), pill(3)] });
+    const states = wrapper
+      .findAll('[data-test="assistant-tray-chip"]')
+      .slice(0, 2)
+      .map((chip) => chip.get('[data-test="assistant-status-dot"]').attributes("data-state"));
+    expect(states).toEqual(["working", "attention"]);
+    const quiet = wrapper.findAll('[data-test="assistant-tray-chip"]')[2];
+    expect(quiet.find('[data-test="assistant-status-dot"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test="assistant-tray-chip-restore"]')[1].text()).toContain(
+      "Needs you",
+    );
   });
 
-  it("keeps previews hidden until hover", async () => {
-    const wrapper = mountLauncher(2);
-    expect(wrapper.find('[data-test="assistant-launcher-previews"]').exists()).toBe(false);
-    await hover(wrapper);
-    expect(wrapper.findAll('[data-test="assistant-launcher-preview"]')).toHaveLength(2);
-    expect(wrapper.find('[data-test="assistant-launcher-more"]').exists()).toBe(false);
-  });
-
-  it("opens on keyboard focus", async () => {
-    const wrapper = mountLauncher(1);
-    await wrapper.get('[data-test="assistant-launcher"]').trigger("focusin");
-    expect(wrapper.findAll('[data-test="assistant-launcher-preview"]')).toHaveLength(1);
-  });
-
-  it("shows two previews and a +N item past two", async () => {
-    const wrapper = mountLauncher(5);
-    await hover(wrapper);
-    expect(wrapper.findAll('[data-test="assistant-launcher-preview"]')).toHaveLength(2);
-    expect(wrapper.get('[data-test="assistant-launcher-more"]').text()).toBe("+3");
-  });
-
-  it("puts the +N chip after the top preview in the same slot row", async () => {
-    const wrapper = mountLauncher(5);
-    await hover(wrapper);
-    const slot = wrapper.findAll('[data-test="assistant-launcher-slot"]')[0];
-    const kids = Array.from(slot.element.children).map((c) => c.getAttribute("data-test"));
-    expect(kids).toEqual(["assistant-launcher-preview", "assistant-launcher-more"]);
-  });
-
-  it("keeps the previews through a short pointer gap and closes after the grace", async () => {
-    const wrapper = mountLauncher(2);
-    const root = wrapper.get('[data-test="assistant-launcher"]');
-    await hover(wrapper);
-    await root.trigger("pointerleave");
-    vi.advanceTimersByTime(100);
-    await root.trigger("pointerenter");
-    vi.advanceTimersByTime(500);
-    await wrapper.vm.$nextTick();
-    expect(wrapper.find('[data-test="assistant-launcher-previews"]').exists()).toBe(true);
-    await root.trigger("pointerleave");
-    vi.advanceTimersByTime(200);
-    await wrapper.vm.$nextTick();
-    expect(wrapper.find('[data-test="assistant-launcher-previews"]').exists()).toBe(false);
-  });
-
-  it("closes on Escape", async () => {
-    const wrapper = mountLauncher(2);
-    await hover(wrapper);
-    await wrapper.get('[data-test="assistant-launcher"]').trigger("keydown", { key: "Escape" });
-    expect(wrapper.find('[data-test="assistant-launcher-previews"]').exists()).toBe(false);
-  });
-
-  it("hides the previews while the Threads panel is open", async () => {
-    const wrapper = mountLauncher(2, true);
-    await hover(wrapper);
-    expect(wrapper.find('[data-test="assistant-launcher-previews"]').exists()).toBe(false);
-  });
-
-  it("restores the clicked chat", async () => {
-    const wrapper = mountLauncher(3);
-    await hover(wrapper);
-    await wrapper.findAll('[data-test="assistant-launcher-preview"]')[1].trigger("click");
+  it("restores a chat from its chip and closes it from its own close button", async () => {
+    const wrapper = mountTray({ minimised: [pill(1), pill(2)] });
+    await wrapper.findAll('[data-test="assistant-tray-chip-restore"]')[1].trigger("click");
+    await wrapper.findAll('[data-test="assistant-tray-chip-close"]')[0].trigger("click");
     expect(wrapper.emitted("restore")).toEqual([["s2"]]);
+    expect(wrapper.emitted("close")).toEqual([["s1"]]);
+    expect(
+      wrapper.findAll('[data-test="assistant-tray-chip-close"]')[0].attributes("aria-label"),
+    ).toBe("Close Chat number 1");
   });
 
-  it("toggles the Threads list from the icon and from +N", async () => {
-    const wrapper = mountLauncher(5);
-    await wrapper.get('[data-test="assistant-launcher-toggle"]').trigger("click");
-    await hover(wrapper);
-    await wrapper.get('[data-test="assistant-launcher-more"]').trigger("click");
-    expect(wrapper.emitted("toggle")).toHaveLength(2);
-  });
-
-  it("offers a named Hide button on hover and focus that dismisses without opening the chat", async () => {
-    const wrapper = mountLauncher(2);
-    expect(wrapper.find('[data-test="assistant-launcher-dismiss"]').exists()).toBe(false);
-    await wrapper.get('[data-test="assistant-launcher"]').trigger("focusin");
-    const dismiss = wrapper.get('[data-test="assistant-launcher-dismiss"]');
-    expect(dismiss.attributes("aria-label")).toBe("Hide");
-    await dismiss.trigger("click");
-    expect(wrapper.emitted("dismiss")).toHaveLength(1);
-    expect(wrapper.emitted("toggle")).toBeUndefined();
-    expect(wrapper.emitted("restore")).toBeUndefined();
-  });
-
-  it("places previews above and left of the icon", async () => {
-    const wrapper = mountLauncher(3);
-    await hover(wrapper);
-    const slots = wrapper.findAll('[data-test="assistant-launcher-slot"]');
-    expect(slots.map((x) => x.attributes("data-slot"))).toEqual(["above", "left"]);
-    expect(slots[0].classes()).toContain("md:bottom-full");
-    expect(slots[1].classes()).toContain("md:end-full");
-    expect(slots).toHaveLength(2);
-    expect(wrapper.get('[data-test="assistant-launcher-previews"]').classes()).toContain(
-      "flex-col-reverse",
-    );
-  });
-
-  it("puts the +N chip above the first preview", async () => {
-    const wrapper = mountLauncher(5);
-    await hover(wrapper);
-    const third = wrapper.findAll('[data-test="assistant-launcher-slot"]')[0];
-    expect(third.find('[data-test="assistant-launcher-more"]').exists()).toBe(true);
-  });
-
-  it("animates and announces when a chat is answering", () => {
-    const wrapper = mount(AssistantFloatingLauncher, {
-      props: { items: [pill(1, "running"), pill(2, "running"), pill(3)], expanded: false },
-      global: { plugins: [i18n, store] },
-    });
-    expect(wrapper.find('[data-test="assistant-launcher-spinner"]').exists()).toBe(false);
-    const dots = wrapper.get('[data-test="assistant-launcher-working-dot"]');
-    expect(dots.findAll("span")).toHaveLength(3);
-    expect(dots.find("span").classes()).toContain("motion-safe:animate-pulse");
-    expect(wrapper.get('[data-test="assistant-launcher-live"]').text()).toBe("2 chats answering");
-    expect(wrapper.get('[data-test="assistant-launcher-toggle"]').attributes("aria-label")).toBe(
-      "Threads, 2 chats answering",
-    );
-  });
-
-  it("keeps the badge small at the bottom-right corner, leaving the top-right to Hide", () => {
-    const badge = mountLauncher(2).get('[data-test="assistant-launcher-badge"]');
-    for (const c of ["h-6!", "text-xs", "-bottom-2", "-end-2", "ring-2", "ring-surface-base"])
-      expect(badge.classes()).toContain(c);
-    expect(badge.classes()).not.toContain("-top-2");
-  });
-
-  it("stays calm with no chat answering and flags needs-you on the badge", () => {
-    const wrapper = mount(AssistantFloatingLauncher, {
-      props: { items: [pill(1, "approval")], expanded: false },
-      global: { plugins: [i18n, store] },
-    });
-    expect(wrapper.find('[data-test="assistant-launcher-spinner"]').exists()).toBe(false);
-    expect(wrapper.get('[data-test="assistant-launcher-badge"]').attributes("data-state")).toBe(
-      "needsYou",
-    );
-  });
-
-  it("cuts a title to 26 characters with an ellipsis", () => {
-    expect(previewTitle("Short")).toBe("Short");
-    expect(previewTitle("Why is checkout-api failing after the deploy")).toBe(
-      "Why is checkout-api failin…",
-    );
-    expect(previewTitle("Exactly twenty six chars!!")).toBe("Exactly twenty six chars!!");
+  it("shows the Threads chip only with chats off screen, and toggles the list from it", async () => {
+    expect(mountTray().find('[data-test="assistant-launcher-toggle"]').exists()).toBe(false);
+    const hidden = mountTray({ othersCount: 2, othersShown: false });
+    expect(hidden.find('[data-test="assistant-launcher-toggle"]').exists()).toBe(false);
+    const wrapper = mountTray({ othersCount: 2, othersSignal: "working", expanded: true });
+    const toggle = wrapper.get('[data-test="assistant-launcher-toggle"]');
+    expect(toggle.attributes("aria-expanded")).toBe("true");
+    expect(toggle.get('[data-test="assistant-launcher-count"]').text()).toBe("2");
+    await toggle.trigger("click");
+    expect(wrapper.emitted("toggle")).toHaveLength(1);
   });
 
   it("publishes its rect scoped to the page, and withdraws it on unmount", () => {
@@ -212,7 +103,7 @@ describe("AssistantFloatingLauncher", () => {
     const box = { left: 1368, right: 1416, top: 800, bottom: 848, width: 48 } as DOMRect;
     const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(box);
     const publish = vi.spyOn(clearance, "publishFloatingObstacle");
-    const wrapper = mountLauncher(1);
+    const wrapper = mountTray({ minimised: [pill(1)] });
     expect(publish).toHaveBeenLastCalledWith({ rect: box, scope: main });
     wrapper.unmount();
     expect(publish).toHaveBeenLastCalledWith(null);
@@ -226,7 +117,7 @@ describe("AssistantFloatingLauncher", () => {
     main.dataset.test = "main-content";
     document.body.append(main);
     const publish = vi.spyOn(clearance, "publishFloatingObstacle");
-    mountLauncher(1).unmount();
+    mountTray({ minimised: [pill(1)] }).unmount();
     expect(publish.mock.calls.every(([next]) => next === null)).toBe(true);
     publish.mockRestore();
     main.remove();

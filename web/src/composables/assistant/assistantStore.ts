@@ -33,7 +33,7 @@ import {
   type ChatMessage,
   type ImageAttachment,
 } from "@/ts/interfaces/chat";
-import type { I18nKey, I18nText } from "@/types/i18n";
+import { raw, type I18nKey, type I18nText } from "@/types/i18n";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import { MAX_LEDGER } from "./actions/appliers/approval";
@@ -90,7 +90,7 @@ import type { TurnLockReason } from "./lifecycle";
 import { getAssistantRuntime } from "./runtime";
 import { SIDEBAR_MIN_REM } from "./sidebarWidth";
 import { isRunning, isTerminal, type TurnState, type TurnTerminal } from "./turnStates";
-import { MAX_FLOATING_CHATS, cascadeGeometry, openWindowCap } from "./windows";
+import { MAX_FLOATING_CHATS, cascadeGeometry, freeGeometry, openWindowCap } from "./windows";
 
 export { MAIN_MIN_REM, NAV_RAIL_REM, SIDEBAR_MIN_REM } from "./sidebarWidth";
 export { isRunning } from "./turnStates";
@@ -100,6 +100,9 @@ export const MAX_CHIP_ROWS = 20;
 export const MAX_CHIP_BYTES = 32 * 1024;
 
 export const MAX_IMAGES = 4;
+
+/** A chat is named after its first question, cut to this many characters, until the server names it. */
+export const DEFAULT_TITLE_CHARS = 40;
 
 /** Above this many idle sessions the least recently used release their transcript (`00` §4.2 rule 10). */
 export const IDLE_SESSION_LIMIT = 10;
@@ -234,6 +237,8 @@ export interface AssistantStoreInternal extends AssistantStoreApi {
   setWindowGeometry(sid: Sid, geometry: WindowGeometry): void;
   /** A door or the Chats view puts another chat in this window; the one it held keeps running. */
   replaceWindowChat(windowSid: Sid, nextSid: Sid, opts?: { focus?: "composer" | "none" }): void;
+  /** A window's New chat floats at its spot and the old chat minimises; at the cap it returns false and changes nothing. */
+  newChatWindow(windowSid: Sid, nextSid: Sid): boolean;
   /** Opens a chat from a window's list in that window, or raises it where it already shows. */
   openInWindow(windowSid: Sid, target: { sid: Sid } | { chatId: number }): Promise<Sid>;
   /** Minimises the least recent windows over this width's cap; below 1024 px the values stay. */
@@ -569,6 +574,13 @@ export function withRemoteLight(
   return local;
 }
 
+/** The other tabs' and devices' light from several sources: any waiting chat outranks every running one. */
+export function firstRemoteLight(
+  lights: readonly ({ state: "needs_you" | "working"; sid: Sid } | null | undefined)[],
+): { state: "needs_you" | "working"; sid: Sid } | null {
+  return lights.find((light) => light?.state === "needs_you") ?? lights.find(Boolean) ?? null;
+}
+
 /** The telemetry and `context.client` container of a placement; below `lg` the sidebar and dock render as the sheet. */
 export function containerOf(placement: Placement, lgUp: boolean): Container | null {
   if (placement.kind === "hidden") return null;
@@ -688,18 +700,10 @@ function createSessionSlice(core: StoreCore) {
     | "adoptSession"
     | "startNewChat"
   > = {
+    // A new chat follows the page's time; a range pinned on the previous chat stays with that chat.
     startNewChat(init) {
-      const previous = core.session(state.shell.activeSid);
-      const range =
-        previous && !ownsWindow(previous) ? toRaw(previous.composer.timeOverride) : null;
       core.setActive(null);
-      const sid = api.createSession(init);
-      const fresh = core.session(sid);
-      if (range && fresh) {
-        fresh.composer.timeOverride = { ...range };
-        core.persistDraft(fresh);
-      }
-      return sid;
+      return api.createSession(init);
     },
     createSession(init) {
       if (!state.ready || !state.userOrgKey) throw new Error("The assistant store is inert here");
@@ -917,6 +921,7 @@ function createWindowSlice(core: StoreCore) {
     | "raiseWindow"
     | "setWindowGeometry"
     | "replaceWindowChat"
+    | "newChatWindow"
     | "openInWindow"
     | "fitWindowsToViewport"
     | "focusNextContainer"
@@ -995,12 +1000,16 @@ function createWindowSlice(core: StoreCore) {
       showWindow(core, sid, opts.focus ?? "composer");
       if (wasMinimised) announce("assistant.announce.restored", sid);
     },
-    closeWindow(sid) {
+    closeWindow(sid, opts = {}) {
       const session = core.session(sid);
       if (!windowOf(state.shell, sid)) return;
       const running = !!session && isRunning(session.turn);
       announce(
-        running ? "assistant.announce.windowClosedRunning" : "assistant.announce.windowClosed",
+        opts.toTab
+          ? "assistant.announce.openedInTab"
+          : running
+            ? "assistant.announce.windowClosedRunning"
+            : "assistant.announce.windowClosed",
         sid,
       );
       removeWindow(core, sid);
@@ -1029,6 +1038,16 @@ function createWindowSlice(core: StoreCore) {
       if (session) session.unread = false;
       if ((opts.focus ?? "composer") === "composer") requestFocus(core, nextSid);
       else supersedeFocus(core);
+    },
+    newChatWindow(windowSid, nextSid) {
+      const win = windowOf(state.shell, windowSid);
+      if (!win || win.state !== "open" || !core.session(nextSid)) return false;
+      if (state.shell.windows.length >= MAX_FLOATING_CHATS) return false;
+      const geometry = { ...win.geometry };
+      trayWindow(core, win);
+      if (api.floatChat(nextSid, { geometry }).ok) return true;
+      showWindow(core, windowSid, "none");
+      return false;
     },
     async openInWindow(windowSid, target) {
       const ticket = takeOpenTicket(core);
@@ -1118,6 +1137,7 @@ function createComposerSlice(core: StoreCore) {
         range &&
         sameWindow(range, sent) &&
         !ownsWindow(session) &&
+        !sameWindow(range, session.pinnedWindow) &&
         session.origin.entryKind !== "home_launcher"
       )
         session.composer.timeOverride = null;
@@ -1166,6 +1186,12 @@ function createComposerSlice(core: StoreCore) {
       return result;
     },
     removeChip(sid, chipId) {
+      const session = core.session(sid);
+      if (session?.pinnedChipIds?.includes(chipId)) {
+        delete session.pinnedContext;
+        delete session.pinnedChipIds;
+        delete session.pinnedWindow;
+      }
       edit(sid, (composer) => {
         const chip = composer.chips.find((c) => c.id === chipId);
         if (!chip) return;
@@ -1365,6 +1391,9 @@ function createTurnSlice(core: StoreCore) {
       delete core.notices[sid];
       rememberPrompt(core, session);
       const { text, chips, timeOverride, removedPageKeys } = toRaw(session.composer);
+      // Every place that shows the chat reads its title, so the first Send names it before any answer.
+      if (session.title === null && text.trim())
+        session.title = raw(text.trim().slice(0, DEFAULT_TITLE_CHARS));
       const sent = { text, chips: [...chips], timeOverride, removedPageKeys: [...removedPageKeys] };
       return track(sid, sent, () => deps.engine.send(sid, opts));
     },
@@ -1695,6 +1724,8 @@ function applyInit(session: AssistantSession, init: SessionInit): void {
   session.titleSource = init.title ? "object" : "generated";
   if (init.messages?.length) session.messages = [...init.messages];
   delete session.pinnedContext;
+  delete session.pinnedChipIds;
+  delete session.pinnedWindow;
 }
 
 function emptyComposer(sendId: string): ComposerState {
@@ -1947,6 +1978,11 @@ function showWindow(core: StoreCore, sid: Sid, focus: "composer" | "none"): void
   const win = windowOf(shell, sid);
   if (!win) return;
   if (win.state === "minimised") {
+    // A window opened while this one was minimised may hold its spot; it comes back beside it.
+    win.geometry = freeGeometry(
+      win.geometry,
+      shell.windows.filter((other) => other.sid !== sid),
+    );
     win.state = "open";
     shell.trayOrder = shell.trayOrder.filter((id) => id !== sid);
   }
@@ -2134,6 +2170,6 @@ function inertHistory(): HistoryService {
     canReload: computed(() => false),
     mode: computed<"server" | "local">(() => "local"),
     hasMore: computed(() => false),
-    loadOlder: async () => undefined,
+    loadOlder: async () => false,
   };
 }

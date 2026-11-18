@@ -623,4 +623,21 @@ describe("createRuns", () => {
     feed([chat("far", { active_turn: true }), chat("wait", { pending_approval: true })]);
     expect(runs.light()).toEqual({ state: "needs_you", sid: "wait" });
   });
+
+  it("keeps a waiting chat lit after this tab reads it in idle, as the list keeps it under Needs you", async () => {
+    const { runs, feed, store } = setup();
+    feed([chat("far", { active_turn: true }), chat("wait", { pending_approval: true })]);
+    await nextTick();
+    store.adoptSession("wait", {
+      origin: { entryKind: "thread_open", objectKind: "none", container: "sidebar" },
+      title: null,
+      titleSource: "generated",
+      chatId: null,
+      messages: [],
+      record: { serverBacked: true },
+    } as never);
+    expect(store.state.sessions.wait.turnMeta.ownedByThisTab).toBe(true);
+    expect(runs.rows.value.find((row) => row.sid === "wait")?.group).toBe("needs_you");
+    expect(runs.light()).toEqual({ state: "needs_you", sid: "wait" });
+  });
 });

@@ -166,16 +166,27 @@ export function useAssistantStarters(input: AssistantStartersInput): {
     { immediate: true },
   );
 
-  const names = (index: number): string[] | null => {
+  const rows = (index: number): StreamOwnership[] | null => {
     const data = lists[index].data.value;
     return Array.isArray(data)
-      ? data
-          // The server's is_internal flag, so a user's own `_myapp` still counts and is named (BUG-015, X3).
-          .filter((s: StreamOwnership) => isUserDataStream(s, STREAM_TYPES[index]))
-          .map((s: StreamOwnership) => s?.name ?? "")
-          .filter((name) => !!name)
+      ? // The server's is_internal flag, so a user's own `_myapp` still counts and is named (BUG-015, X3).
+        data.filter((s: StreamOwnership) => isUserDataStream(s, STREAM_TYPES[index]))
       : null;
   };
+  const nameList = (list: StreamOwnership[] | null): string[] | null =>
+    list ? list.map((s) => s?.name ?? "").filter((name) => !!name) : null;
+  const names = (index: number): string[] | null => nameList(rows(index));
+  // A user-sourced internal stream (`_rumdata`) counts as data, but a starter only names streams the user made.
+  const ownNames = (index: number): string[] | null =>
+    nameList(rows(index)?.filter((s) => s.is_internal !== true) ?? null);
+  const internalNames = computed(
+    () =>
+      new Set(
+        STREAM_TYPES.flatMap((_, i) => rows(i) ?? [])
+          .filter((s) => s.is_internal === true)
+          .map((s) => s.name),
+      ),
+  );
   const streamCount = computed(() => {
     const loaded = STREAM_TYPES.map((_, i) => names(i)).filter((list) => list !== null);
     return loaded.length ? loaded.reduce((sum, list) => sum + list.length, 0) : null;
@@ -200,14 +211,19 @@ export function useAssistantStarters(input: AssistantStartersInput): {
   const facts = computed<StarterFacts>(() => ({
     org: org.value,
     orgName: orgName.value,
-    stream: pageStream(pageContext.value) ?? names(0)?.[0] ?? null,
-    logStream: names(0)?.[0] ?? null,
-    traceStream: names(2)?.[0] ?? null,
-    metric: names(1)?.[0] ?? null,
+    stream: ownPageStream() ?? ownNames(0)?.[0] ?? null,
+    logStream: ownNames(0)?.[0] ?? null,
+    traceStream: ownNames(2)?.[0] ?? null,
+    metric: ownNames(1)?.[0] ?? null,
     range: rangeOf(pageContext.value),
     dashboard: stringField(pageContext.value, "dashboardName"),
     home: homeFactsOf(pageContext.value, writeTier.value),
   }));
+
+  function ownPageStream(): string | null {
+    const stream = pageStream(pageContext.value);
+    return stream && !internalNames.value.has(stream) ? stream : null;
+  }
 
   const loading = computed(
     () =>

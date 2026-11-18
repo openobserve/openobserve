@@ -30,7 +30,9 @@ import brandLocale from "@/locales/languages/en-US.json";
 
 const brandNames = brandLocale.brand;
 
-const { fake, openAssistant, track, toast, lg } = vi.hoisted(() => ({
+const { fake, openAssistant, track, toast, lg, runRows, openRun } = vi.hoisted(() => ({
+  runRows: { value: [] as any[] },
+  openRun: vi.fn(async () => undefined),
   lg: { value: true },
   fake: { current: null as any },
   openAssistant: vi.fn(async () => ({ ok: true })),
@@ -55,6 +57,14 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantStore: () => fake.current.store,
   useAssistantCapability: () => fake.current.handle,
   useAssistantHistory: () => fake.current.history,
+  useAssistantRuns: () => ({
+    rows: {
+      get value() {
+        return runRows.value;
+      },
+    },
+    open: openRun,
+  }),
   openAssistant,
 }));
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
@@ -99,6 +109,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  runRows.value = [];
+  openRun.mockClear();
   document.body.innerHTML = "";
   closeLockedPanel();
   openAssistant.mockClear();
@@ -395,11 +407,31 @@ describe("AssistantHeaderButton light", () => {
     expect(tooltip(known.wrapper)).toBe("Answering: Remote chat");
   });
 
-  it("shows no count badge for another tab's waiting chat", async () => {
-    const { wrapper } = setup("available", {}, { state: "needs_you", sid: "elsewhere" });
+  it("counts another tab's waiting chat, as the chat list does", async () => {
+    runRows.value = [
+      { sid: "elsewhere", group: "needs_you", otherOrg: false },
+      { sid: "other-org", group: "needs_you", otherOrg: true },
+      { sid: "busy", group: "answering", otherOrg: false },
+    ];
+    const { wrapper, store } = setup("available", {}, { state: "needs_you", sid: "elsewhere" });
+    const local = session(store, "Delete alerts");
+    store.state.sessions[local].turn = { state: "awaiting_approval", callId: "c1" };
     await flushPromises();
     expect(button(wrapper).attributes("data-state")).toBe("needs_you");
-    expect(wrapper.find('[data-test="assistant-header-status-light"]').text()).toBe("");
+    expect(wrapper.find('[data-test="assistant-header-status-light"]').text()).toBe("2");
+  });
+
+  it("opens the waiting chat another tab or device started, not a new chat", async () => {
+    runRows.value = [{ sid: "elsewhere", group: "needs_you", otherOrg: false }];
+    const { wrapper } = setup("available", {}, { state: "needs_you", sid: "elsewhere" });
+    await flushPromises();
+    await button(wrapper).trigger("click");
+    await flushPromises();
+    expect(openRun).toHaveBeenCalledWith(
+      expect.objectContaining({ sid: "elsewhere" }),
+      expect.objectContaining({ focus: "card" }),
+    );
+    expect(openAssistant).not.toHaveBeenCalled();
   });
 
   it("ranks needs you above working and shows the count", async () => {
@@ -565,6 +597,16 @@ describe("AssistantHeaderButton announcements and toasts", () => {
     store.state.sessions[sid].turnMeta.turnId = "turn-rca";
     store.state.sessions[sid].turn = { state: "done", saved: "local" };
     store.state.sessions[sid].unread = true;
+    await flushPromises();
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("raises no Answer ready toast for a chat that ended its turn waiting on a decision", async () => {
+    const { store } = setup();
+    const a = session(store, "Waits");
+    store.state.sessions[a].turn = { state: "done", saved: "local" };
+    store.state.sessions[a].pendingApproval = { id: "p1" } as never;
+    store.state.sessions[a].unread = true;
     await flushPromises();
     expect(toast).not.toHaveBeenCalled();
   });

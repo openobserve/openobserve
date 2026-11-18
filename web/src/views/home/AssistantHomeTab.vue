@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-state="state"
     >
       <div
-        class="relative mx-auto flex min-h-0 w-full max-w-5xl min-w-0 flex-1 flex-col gap-4 pt-[12vh] max-md:pt-0"
+        class="relative mx-auto flex min-h-0 w-full max-w-5xl min-w-0 flex-1 flex-col justify-center-safe gap-4 max-md:justify-start md:pb-[8vh]"
         data-test="assistant-home-main"
       >
         <AgentHomeGreeting :class="entering && RISE.greeting" />
@@ -38,14 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="offReason"
           :reason="offReason"
           :org="org"
-          class="mx-auto max-w-3xl"
+          :class="HOME_COLUMN_CLASS"
         />
-        <!-- mt-3 leaves room for the chip row that floats above the box, clear of the greeting -->
-        <AssistantLauncher v-else ref="launcher" layout="overview" class="mx-auto mt-3 max-w-3xl" />
+        <AssistantLauncher v-else ref="launcher" layout="overview" :class="HOME_COLUMN_CLASS" />
         <AssistantHomeExamples
           v-if="state === 'ai'"
-          class="mx-auto max-w-3xl"
-          @select="launcher?.fill($event)"
+          :class="HOME_COLUMN_CLASS"
+          @select="(prompt, agent) => launcher?.fill(prompt, agent)"
         />
       </div>
     </div>
@@ -80,6 +79,9 @@ const HomeChatsRail = defineAsyncComponent(() => import("./HomeChatsRail.vue"));
 const RISE = {
   greeting: "motion-safe:animate-[assistant-fade-up_0.5s_ease-out_both]",
 } as const;
+
+// The full-page chat's 45 rem column less its composer's own gutter, so the box keeps its width when a chat opens.
+const HOME_COLUMN_CLASS = "mx-auto w-full max-w-174";
 
 const { t } = useI18nTyped();
 const store = useStore();

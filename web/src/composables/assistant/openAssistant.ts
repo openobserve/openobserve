@@ -25,9 +25,11 @@ import {
 } from "@/services/assistantAnalytics";
 import { createSeededChat, type SeededChatRequest } from "@/services/ai_chat_seed";
 import { gt, raw, type I18nKey } from "@/types/i18n";
+import type { PageContext } from "@/composables/contextProviders/types";
 
 import { defaultAgentFor, doorAgent } from "./agents";
 import {
+  DEFAULT_TITLE_CHARS,
   MAIN_MIN_REM,
   SIDEBAR_MIN_REM,
   containerOf,
@@ -48,6 +50,7 @@ import type {
   Placement,
   Sid,
 } from "./assistantStore.types";
+import { timeWindowOf } from "./context/contextChips";
 import type { TurnLockReason } from "./lifecycle";
 import { projectRecord, type StoredTurn } from "./record";
 import { getAssistantRuntime } from "./runtime";
@@ -58,8 +61,6 @@ export const ASSISTANT_QUERY_KEYS = ["assistant", "object", "ref"] as const;
 
 /** `thread: "auto"` appends to a chat whose last turn ended within this window (`10` §3.3). */
 export const THREAD_APPEND_WINDOW_MS = 30 * 60_000;
-
-export const DEFAULT_TITLE_CHARS = 40;
 
 /** A second activation of the same door inside this window returns the first one's result. */
 export const DOOR_REPEAT_MS = 1_000;
@@ -524,8 +525,22 @@ function stagePayload(
   if (payload.timeOverride) store.setTimeOverride(sid, payload.timeOverride);
   if (payload.title && fresh) store.setTitle(sid, payload.title, "object");
   // A blank chat reused for another door must not keep an earlier hand-off's pin.
-  if (payload.context) session.pinnedContext = { ...payload.context };
-  else if (fresh) delete session.pinnedContext;
+  if (payload.context) {
+    const { timeRange, ...pinned } = payload.context;
+    // A pinned range would outlive Follow page; as the chat's own range the picker can drop it.
+    const range = timeWindowOf({ currentPage: "", timeRange } as PageContext, null);
+    delete session.pinnedWindow;
+    if (timeRange && range.source === "page" && !payload.timeOverride) {
+      store.setTimeOverride(sid, { from: range.from, to: range.to, period: range.period });
+      session.pinnedWindow = { from: range.from, to: range.to };
+    }
+    session.pinnedContext = pinned;
+    session.pinnedChipIds = (payload.chips ?? []).map((chip) => chip.id);
+  } else if (fresh) {
+    delete session.pinnedContext;
+    delete session.pinnedChipIds;
+    delete session.pinnedWindow;
+  }
   const staged = store.state.sessions[sid].composer.chips.length - before;
   // A repeated prompt the store skipped adds nothing, so the helper line would claim a change that did not happen.
   const changed = staged > 0 || store.state.sessions[sid].composer.text !== textBefore;

@@ -20,30 +20,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-else
     v-model:open="menuOpen"
     side="top"
-    align="start"
+    align="end"
     privacy="mask"
     :content-class="composerPopoverClass(layout.tight)"
   >
     <template #trigger>
-      <OTag
-        type="assistantContext"
-        :label="agentName(shownAgent, t)"
-        :icon="agentGlyph[shownAgent]"
-        clickable
+      <OButton
+        variant="ghost-neutral"
+        size="xs"
+        :icon-right="assistantGlyph.expand"
         :disabled="disabled"
         :data-pending="pending ? '' : undefined"
-        :class="['h-7 shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
+        :class="[AGENT_TRIGGER_CLASS, CHIP_HIT_AREA_CLASS]"
         :aria-label="layout.agentIconOnly ? agentName(shownAgent, t) : undefined"
         data-test="assistant-agent-picker"
         @keydown.up.prevent="menuOpen = true"
       >
-        <!-- Without room for its name the pill keeps the icon and moves the name to the tooltip, so the row never wraps -->
-        <template v-if="!layout.agentIconOnly">{{ agentName(shownAgent, t) }}</template
-        ><OIcon :name="assistantGlyph.expand" size="xs" />
+        <span :class="layout.agentIconOnly ? AGENT_SHORT_CLASS : ''">{{
+          agentName(shownAgent, t)
+        }}</span>
         <OTooltip v-if="layout.agentIconOnly" :content="agentName(shownAgent, t)" />
-      </OTag>
+      </OButton>
     </template>
-    <ODropdownGroup :label="t('assistant.agent.picker.heading')">
+    <ODropdownGroup v-if="rows.length > 0" :label="t('assistant.agent.picker.heading')">
       <template v-if="sharedPolicy" #label-action>
         <span class="text-xs font-normal" data-test="assistant-agent-shared-policy">{{
           sharedPolicy
@@ -118,7 +117,10 @@ import { computed, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import { agentGlyph, assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import AssistantAgentPill from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
+import AssistantAgentPill, {
+  AGENT_SHORT_CLASS,
+  AGENT_TRIGGER_CLASS,
+} from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
 import {
   announceComposer,
@@ -140,7 +142,6 @@ import {
   rosterOffersChoice,
 } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";

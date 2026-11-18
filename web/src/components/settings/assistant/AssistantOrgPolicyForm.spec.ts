@@ -94,9 +94,7 @@ describe("AssistantOrgPolicyForm", () => {
     wrapper = await mountForm();
     const enabled = switchOf(wrapper, "settings-assistant-enabled-switch");
     const line = document.getElementById(enabled.attributes("aria-describedby")!);
-    expect(line?.textContent?.trim()).toMatch(
-      /^Turning it off shows members '.+ is turned off for this organization'\. Past chats stay readable\.$/,
-    );
+    expect(line?.textContent?.trim()).toMatch(/^Members keep their past chats\.$/);
     expect(find(wrapper, "settings-assistant-tier-group").exists()).toBe(true);
     expect(find(wrapper, "settings-assistant-who").exists()).toBe(true);
     expect(find(wrapper, "settings-assistant-policy-save").exists()).toBe(true);
@@ -177,7 +175,7 @@ describe("AssistantOrgPolicyForm", () => {
     const label = document.getElementById(group.attributes("aria-labelledby")!);
     expect(label?.textContent?.trim()).toBe("Default permission tier");
     const line = document.getElementById(group.attributes("aria-describedby")!);
-    expect(line?.textContent).toContain("approval");
+    expect(line?.textContent).toContain("Deletes always ask");
   });
 
   it("keeps the stored public-links value under a deployment lock and asks nothing about it", async () => {
@@ -296,7 +294,10 @@ describe("AssistantOrgPolicyForm", () => {
     await find(wrapper, "settings-assistant-policy-form").trigger("submit");
     await settle();
     expect(confirm).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith({ variant: "success", message: "Assistant settings saved" });
+    expect(toast).toHaveBeenCalledWith({
+      variant: "success",
+      message: `${en.brand.autobot} settings saved`,
+    });
   });
 
   it("adds no toast of its own when the save fails", async () => {

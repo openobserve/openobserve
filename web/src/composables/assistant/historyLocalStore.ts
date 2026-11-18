@@ -42,6 +42,7 @@ export const PRUNE_UNDO_MS = 10_000;
 export async function saveSession(
   sid: Sid,
   ctx: HistoryCtx,
+  live = false,
 ): Promise<"server" | "local" | "not_saved"> {
   const session = ctx.session(sid);
   const server = ctx.serverMode();
@@ -50,7 +51,7 @@ export async function saveSession(
     return server ? "server" : "local";
   // Captured before any await: the engine lets the turn's record go once the turn ends.
   const turns = server ? null : mergeCurrentTurn(sid, session, ctx);
-  const record = recordFromSession(session, ctx, turns);
+  const record = recordFromSession(session, ctx, turns, live);
   if (!record) return server ? "server" : "not_saved";
   if (!server) {
     const room = await makeRoom(record, ctx);
@@ -221,6 +222,7 @@ function recordFromSession(
   session: AssistantSession,
   ctx: HistoryCtx,
   turns: LocalTurn[] | null,
+  live = false,
 ): LocalRecord | null {
   const messages = serializable(session.messages);
   if (messages.length === 0) return null;
@@ -246,7 +248,7 @@ function recordFromSession(
     ...(pinned !== undefined && { pinned }),
     ...(server && { serverBacked: true }),
     ...(server &&
-      ended &&
+      (ended || live) &&
       session.turnMeta.turnId && {
         liveTurnId: session.turnMeta.turnId,
         liveSavedAt: ctx.deps.now(),

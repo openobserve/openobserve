@@ -38,7 +38,6 @@ import { contextRegistry } from "@/composables/contextProviders/registry";
 import { requestOverviewFocus } from "@/composables/goto/goToRequests";
 import { queryClient } from "@/composables/query/queryClient";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
-import { isAutoNavigationEnabled } from "@/composables/useAutoNavigationPreferences";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import assistantService, {
@@ -63,7 +62,6 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 
 import { requestDashboardDraft } from "./actions/appliers/drafts";
-import { mustOpenElsewhere } from "./actions/appliers/navigation";
 import { pruneQueryRuns } from "./actions/appliers/query";
 import { registerBuiltInAppliers } from "./actions/appliers";
 import { createActionDispatcher, type ActionEnv } from "./actions/registry";
@@ -72,6 +70,7 @@ import { createApprovalKeepAlive, type ApprovalKeepAlive } from "./approvalKeepA
 import {
   containerOf,
   createAssistantStore,
+  firstRemoteLight,
   inertAssistantDeps,
   type AssistantStoreInternal,
 } from "./assistantStore";
@@ -216,7 +215,6 @@ function buildRuntime(): AssistantRuntime {
         () => capability,
         () => lgUp.value,
         uiVersion,
-        () => hosts,
       ),
     );
 
@@ -263,10 +261,11 @@ function buildRuntime(): AssistantRuntime {
     const store = createAssistantStore(deps, {
       signOutKeys: () => orgKeysOf(context.value),
       remoteLight: () =>
-        lifecycle.remoteLight() ??
-        runs.light() ??
-        (deps.history as Partial<AssistantHistory>).listLight?.value ??
-        null,
+        firstRemoteLight([
+          lifecycle.remoteLight(),
+          runs.light(),
+          (deps.history as Partial<AssistantHistory>).listLight?.value,
+        ]),
       turnLock: (sid) => lifecycle.turnLock(sid),
     });
     flushDraftsOnLeave(store);
@@ -541,7 +540,6 @@ function engineDeps(
   capability: () => AssistantCapabilityHandle,
   lgUp: () => boolean,
   uiVersion: ShallowRef<string>,
-  hosts: () => HostRegistry,
 ): TurnEngineDeps {
   return {
     client: useAssistantClient(),
@@ -568,10 +566,6 @@ function engineDeps(
     // The turn-stream route serves only a server that saves chats; it answers 404 otherwise.
     tailEnabled: () => capability().capability.value.persistence,
     approvals: () => deps.approvals,
-    // A docked or dirty page opens links in a new tab, which only a click may do.
-    autoNavigation: (sid) =>
-      isAutoNavigationEnabled(store().state.userOrgKey, sid) &&
-      !mustOpenElsewhere({ store, hosts: hosts() }),
   };
 }
 

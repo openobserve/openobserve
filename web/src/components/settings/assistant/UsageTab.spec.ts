@@ -73,7 +73,7 @@ describe("UsageTab", () => {
     fake.current = fakeAssistant("available", { edition: "ee" });
     const { w } = await mountTab();
     expect(w.find('[data-test="settings-assistant-usage-not-metered"]').text()).toBe(
-      "Usage metering is available on OpenObserve Cloud. This deployment is not metered.",
+      "This deployment is not metered.",
     );
     expect(w.find('[data-test="settings-assistant-usage-stats"]').exists()).toBe(false);
   });
@@ -160,6 +160,6 @@ describe("UsageTab", () => {
     ]) {
       expect(caps.find(`[data-test="settings-assistant-env-${env}-value"]`).text()).toBe("—");
     }
-    expect(caps.text()).toContain("nothing is sent or charged");
+    expect(caps.text()).toContain("blocked and not charged");
   });
 });

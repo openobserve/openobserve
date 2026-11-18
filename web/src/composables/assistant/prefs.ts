@@ -285,7 +285,6 @@ export function markHintSeen(userOrgKey: string, hint: keyof HintPrefs): void {
   mergeJson<HintPrefs>("local", LOCAL_KEYS.hints(userOrgKey), { [hint]: true });
 }
 
-/** The self-hosted opt-in to browser dictation; it stays in this browser until org voice settings ship (PO A30). */
 /** Bumped on every launcher dismissal change in this tab, so its readers recompute. */
 export const launcherDismissalVersion = /* @__PURE__ */ ref(0);
 
@@ -299,8 +298,9 @@ export function setLauncherDismissed(userOrgKey: string | null, on: boolean): vo
   launcherDismissalVersion.value++;
 }
 
+/** Browser dictation is on with no opt-in step; only an admin's Off in Settings stops it (D2). */
 export function readVoiceOptIn(userOrgKey: string): boolean {
-  return readJson<boolean>("local", LOCAL_KEYS.voice(userOrgKey)) === true;
+  return readJson<boolean>("local", LOCAL_KEYS.voice(userOrgKey)) !== false;
 }
 
 export function writeVoiceOptIn(userOrgKey: string, on: boolean): void {

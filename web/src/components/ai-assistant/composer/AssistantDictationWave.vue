@@ -15,14 +15,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span class="flex h-6 flex-none items-center gap-1.5" data-test="assistant-dictate-wave">
-    <span aria-hidden="true" class="flex h-5 w-14 flex-none items-center justify-center gap-0.5">
+  <span
+    :class="[
+      'rounded-default flex h-7 min-w-0 items-center gap-1.5 px-2',
+      processing ? 'bg-surface-subtle' : 'bg-status-error-bg',
+    ]"
+    data-test="assistant-dictate-wave"
+    :data-phase="processing ? 'processing' : 'listening'"
+  >
+    <span
+      aria-hidden="true"
+      :class="[
+        'bg-status-error-text size-2 shrink-0 rounded-full',
+        processing ? 'opacity-50' : 'motion-safe:animate-pulse',
+      ]"
+      data-test="assistant-dictate-live-dot"
+    />
+    <!-- The word never cuts: a narrow bar shortens the meter first -->
+    <span
+      :class="[
+        'shrink-0 text-xs font-medium whitespace-nowrap',
+        processing ? 'text-text-secondary' : 'text-status-error-text',
+      ]"
+      data-test="assistant-dictate-label"
+      >{{ label }}</span
+    >
+    <span
+      aria-hidden="true"
+      class="flex h-5 w-14 min-w-0 shrink items-center justify-center gap-0.5 overflow-hidden"
+      data-test="assistant-dictate-meter"
+    >
       <span
         v-for="(bar, index) in WAVE_BARS"
         :key="index"
-        :class="[ASSISTANT_MOTION.wave, 'bg-accent rounded-default block h-1 w-0.5']"
+        :class="[
+          processing ? 'bg-text-secondary' : `bg-status-error-text ${ASSISTANT_MOTION.wave}`,
+          'rounded-default block h-1 w-0.5',
+        ]"
         :style="{
-          '--assistant-wave-peak': `${bar.peak}rem`,
+          '--assistant-wave-peak': `${bar.peak * (MIN_SCALE + (1 - MIN_SCALE) * level)}rem`,
           '--assistant-wave-delay': bar.delay,
         }"
       />
@@ -39,6 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 export interface AssistantDictationWaveProps {
   elapsedMs: number;
+  /** 0 to 1: the live input level scales the bars. */
+  level?: number;
+  /** The engine is settling the last words; the bars rest. */
+  processing?: boolean;
 }
 
 // Fourteen bars with uneven peaks read as speech, not as a progress bar.
@@ -47,14 +82,27 @@ const PEAKS_REM = [
 ];
 
 const WAVE_BARS = PEAKS_REM.map((peak, index) => ({ peak, delay: (index * 0.07).toFixed(2) }));
+
+// Quiet input still moves the bars a little, so a live mic never looks frozen.
+const MIN_SCALE = 0.35;
 </script>
 
 <script setup lang="ts">
 import { computed } from "vue";
 
 import { ASSISTANT_MOTION } from "@/components/ai-assistant/common/assistantMotion";
+import { useI18nTyped } from "@/types/i18n";
 
-const props = defineProps<AssistantDictationWaveProps>();
+const props = withDefaults(defineProps<AssistantDictationWaveProps>(), {
+  level: 0,
+  processing: false,
+});
+
+const { t } = useI18nTyped();
+
+const label = computed(() =>
+  props.processing ? t("assistant.voice.processing") : t("assistant.voice.listening"),
+);
 
 const elapsed = computed(() => {
   const seconds = Math.max(0, Math.floor(props.elapsedMs / 1000));

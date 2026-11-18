@@ -81,6 +81,30 @@ describe("approvalDiffRows", () => {
     ]);
   });
 
+  it("marks an update's old side unknown when the card's before is empty or lacks a field", () => {
+    const update = (before: Record<string, unknown>) =>
+      approvalOf({
+        type: "confirmation_required",
+        tool: "UpdateDashboard",
+        kind: "update",
+        targets: [{ type: "dashboard", id: "d1", name: "Ops" }],
+        before,
+        after: { title: "Ops v2", description: "" },
+      });
+    const sides = (before: Record<string, unknown>) =>
+      approvalDiffRows(t, update(before)).map((row) => [String(row.field), String(row.before)]);
+    expect(sides({})).toEqual([
+      ["Title", "assistant.approval.currentUnknown"],
+      ["Description", "assistant.approval.currentUnknown"],
+    ]);
+    expect(sides({ title: "Ops" })).toEqual([
+      ["Title", "Ops"],
+      ["Description", "assistant.approval.currentUnknown"],
+    ]);
+    const rows = approvalDiffRows(t, update({ title: "Ops" }));
+    expect(rows.map((row) => !!row.beforeUnknown)).toEqual([false, true]);
+  });
+
   it("leaves a pause card's duration to its Until line and words its flags", () => {
     const card = approvalOf({
       type: "confirmation_required",
@@ -120,6 +144,60 @@ describe("approvalDiffRows", () => {
     // A start older than today carries its weekday or date before the clock time.
     expect(rows["Starts at"]).toMatch(/\b\d{1,2}:\d{2}$/);
     expect(Object.values(rows).join(" ")).not.toMatch(/1794226306391000|\{|\[/);
+  });
+});
+
+describe("approvalDiffRows: a dashboard create", () => {
+  const body = {
+    title: "polish-approval-check",
+    description: "Error log count in app_logs",
+    tabs: [
+      {
+        tabId: "tab-1",
+        name: "Overview",
+        panels: [
+          {
+            id: "Panel_0",
+            type: "line",
+            title: "Error Log Count (app_logs)",
+            queries: [{ query: "SELECT count(*) FROM app_logs", customQuery: true }],
+            layout: { x: 0, y: 0, w: 192, h: 15, i: 0 },
+          },
+          { id: "Panel_1", type: "table", title: "Top services", queries: [] },
+        ],
+      },
+    ],
+  };
+  const card = approvalOf({
+    type: "confirmation_required",
+    tool: "CreateDashboard",
+    kind: "create",
+    targets: [{ type: "dashboard", name: "CreateDashboard" }],
+    after: body,
+    args: { request_body: body },
+  });
+
+  it("names its tabs and panels as rows and keeps each panel query readable, never as one JSON block", () => {
+    const rows = approvalDiffRows(t, card).map((row) => [String(row.field), String(row.value)]);
+    expect(rows).toEqual([
+      ["Title", "polish-approval-check"],
+      ["Description", "Error log count in app_logs"],
+      ["Tabs", "Overview"],
+      ["Panels", "Error Log Count (app_logs) · line, Top services · table"],
+      ["Query", "Error Log Count (app_logs): SELECT count(*) FROM app_logs"],
+    ]);
+  });
+
+  it("words a deep setting with no name as its own fields, never as JSON", () => {
+    const deep = approvalOf({
+      type: "confirmation_required",
+      tool: "UpdateAlert",
+      kind: "create",
+      targets: [{ type: "alert", name: "x" }],
+      after: { a: { b: { c: { limit: 5, unit: "minutes" } } }, items: [{ x: 1 }, { x: 2 }] },
+    });
+    const values = approvalDiffRows(t, deep).map((row) => String(row.value));
+    expect(values).toEqual(["limit: 5, unit: minutes", "x: 1; x: 2"]);
   });
 });
 

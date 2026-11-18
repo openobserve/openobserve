@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img
           :src="imageSrc"
           alt=""
-          class="rounded-default -my-0.5 size-4 shrink-0 object-cover"
+          class="rounded-default border-border-default -my-1 size-5 shrink-0 border object-cover"
           data-test="assistant-context-chip-thumb"
         />
       </template>

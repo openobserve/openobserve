@@ -76,7 +76,6 @@ const shapeOf = (messages: any[]) =>
 const liveFold = (turns: StoredTurn[]) => {
   const ctx: ReducerCtx = {
     isActive: true,
-    autoNavigationEnabled: true,
     phase: "live",
     t,
     generateNavigation: (tool, args, body) => generateNavigationFromToolResult(tool, args, body, t),

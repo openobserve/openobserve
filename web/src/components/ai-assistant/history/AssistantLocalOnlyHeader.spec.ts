@@ -56,7 +56,7 @@ describe("AssistantLocalOnlyHeader", () => {
 
   it("turns warm, never red, near the cap", () => {
     const line = setup({ count: NEAR_CAP }).get('[data-test="assistant-local-only-line"]');
-    expect(line.text()).toBe("95 of 100 · the oldest unpinned chat is removed when you reach 100");
+    expect(line.text()).toBe("95 of 100 chats");
     expect(line.classes()).toContain("text-status-warning-text");
     expect(line.classes().some((c) => c.includes("error"))).toBe(false);
   });

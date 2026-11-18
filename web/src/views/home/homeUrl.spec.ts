@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { periodToMs, readHomeUrl } from "./homeUrl";
+import { periodToMs, readHomeUrl, threadPeriodOf } from "./homeUrl";
 
 describe("readHomeUrl", () => {
   it("reads a relative period", () => {
@@ -48,5 +48,15 @@ describe("periodToMs", () => {
     expect(periodToMs("24h")).toBe(86_400_000);
     expect(periodToMs("15m")).toBe(900_000);
     expect(periodToMs("bogus")).toBe(900_000);
+  });
+});
+
+describe("threadPeriodOf", () => {
+  it("gives a thread on Home no window of its own when the URL names none, so it reads the 15 min default", () => {
+    expect(threadPeriodOf({})).toBeNull();
+  });
+
+  it("follows the range the URL names", () => {
+    expect(threadPeriodOf({ period: "1h" })).toEqual({ period: "1h", ms: 3_600_000 });
   });
 });

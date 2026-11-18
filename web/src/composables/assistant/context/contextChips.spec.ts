@@ -339,11 +339,11 @@ describe("phone short labels (F12)", () => {
 });
 
 describe("the time chip", () => {
-  it("reads the page's relative range as last 15 min with secondary page (CT-01 AC 1)", () => {
+  it("reads the page's relative range as past 15 min with secondary page (CT-01 AC 1)", () => {
     const window = timeWindowOf(PAGE_CONTEXTS.logs, null);
     expect(window).toMatchObject({ period: "15m", source: "page" });
     const chip = timeChipOf(window, "acme-prod");
-    expect(chip).toMatchObject({ id: "page:timeRange", kind: "time", label: "Time · last 15 min" });
+    expect(chip).toMatchObject({ id: "page:timeRange", kind: "time", label: "Time · past 15 min" });
     expect(chip.secondary).toBe("page");
   });
 
@@ -355,7 +355,7 @@ describe("the time chip", () => {
       period: "15m",
       source: "default",
     });
-    expect(timeChipOf(window, "acme-prod").label).toBe("Time · last 15 min · default");
+    expect(timeChipOf(window, "acme-prod").label).toBe("Time · past 15 min · default");
   });
 
   it("shows an absolute range with minute precision, never 15m (CT-01 AC 3)", () => {
@@ -372,7 +372,7 @@ describe("the time chip", () => {
   it("is custom once the user picks a window, and the page picker is not involved (CT-01 AC 4)", () => {
     const window = timeWindowOf(PAGE_CONTEXTS.logs, { from: 0, to: 1, period: "1h" }, 3_600_000);
     const chip = timeChipOf(window, "acme-prod");
-    expect(chip).toMatchObject({ label: "Time · last 1 h", secondary: "custom" });
+    expect(chip).toMatchObject({ label: "Time · past 1 h", secondary: "custom" });
     expect(chipStateOf(chip)).toBe("custom");
     expect(wireTimeRange(window)).toEqual({
       type: "relative",
@@ -390,7 +390,7 @@ describe("what the assistant sees", () => {
     expect(sent).toEqual([
       ["Organization", "acme-prod"],
       ["Page", "logs"],
-      ["Time range", "last 15 min"],
+      ["Time range", "past 15 min"],
       ["Streams", "default (logs)"],
       ["SQL", "1 line"],
       ["Current time", "When you send"],
@@ -412,6 +412,12 @@ describe("what the assistant sees", () => {
   it("puts the trace query under not read (CT-04 AC 2)", () => {
     const rows = seesRowsOf(PAGE_CONTEXTS.traces, { window, timezone: "UTC" });
     expect(rows.find((r) => r.label === "Trace query")?.group).toBe("not_read");
+  });
+
+  it("lists no time range for a page without one, as none is sent", () => {
+    const fallback = timeWindowOf(PAGE_CONTEXTS.dashboards, null, 10_000_000);
+    const rows = seesRowsOf(PAGE_CONTEXTS.dashboards, { window: fallback, timezone: "UTC" });
+    expect(rows.map((r) => r.id)).not.toContain("timeRange");
   });
 
   it("lists no routing internals and never agent_type", () => {

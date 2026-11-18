@@ -30,7 +30,16 @@ const mocks = vi.hoisted(() => ({
   fill: vi.fn(),
   route: { name: "autobotInvestigate", query: {} as Record<string, string> },
   threadSync: vi.fn(),
+  agents: { value: [{ id: "sre", available: true }] as { id: string; available: boolean }[] },
 }));
+
+vi.mock("@/composables/assistant", async () => {
+  const { computed, reactive: live } = await import("vue");
+  const agents = live(mocks.agents);
+  return {
+    useAssistantCapability: () => computed(() => ({ agents: agents.value })),
+  };
+});
 
 vi.mock("vue-router", () => ({ useRoute: () => mocks.route }));
 vi.mock("./home/useThreadUrl", () => ({ useThreadUrlSync: mocks.threadSync }));
@@ -126,6 +135,17 @@ describe("AutobotInvestigate", () => {
     expect(wrapper.get('[data-test="chats-rail-stub"]').attributes("data-investigations")).toBe(
       "true",
     );
+  });
+
+  it("hands the launcher its page agent even when the roster lacks it, so Ask stays on the page", async () => {
+    set(mocks.agents, [
+      { id: "o2-ai", available: true },
+      { id: "sre", available: false },
+    ]);
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.get('[data-test="launcher-stub"]').attributes("data-agent")).toBe("sre");
+    set(mocks.agents, [{ id: "sre", available: true }]);
   });
 
   it("shows the four investigate cards and no prompt list; a card fills the Ask box", async () => {

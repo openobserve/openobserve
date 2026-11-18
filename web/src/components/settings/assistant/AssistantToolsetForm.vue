@@ -189,12 +189,7 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
 import { onBeforeRouteUpdate } from "vue-router";
 
-import {
-  askLeaveGuard,
-  useAssistantLeaveGuard,
-  useAssistantName,
-  type LeaveGuard,
-} from "@/composables/assistant";
+import { askLeaveGuard, useAssistantLeaveGuard, type LeaveGuard } from "@/composables/assistant";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -248,7 +243,6 @@ const props = withDefaults(
 const emit = defineEmits<{ (e: "done"): void; (e: "forbidden"): void }>();
 
 const { t } = useI18nTyped();
-const name = useAssistantName();
 const page = useAssistantSettingsPage();
 const { confirm } = useConfirmDialog();
 // The org the form opened in is the one every request goes to.
@@ -392,10 +386,7 @@ async function save(values: ToolsetFormValues) {
     } else {
       const description = values.description || undefined;
       await create.mutateAsync({ name: values.name, kind: values.kind, description, data });
-      toast({
-        variant: "success",
-        message: t("assistant.toolsets.form.added", { ...name, org: orgName }),
-      });
+      toast({ variant: "success", message: t("assistant.toolsets.form.added") });
     }
     form.reset(values);
     emit("done");

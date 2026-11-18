@@ -117,17 +117,17 @@ describe("AssistantAskAdminPopover", () => {
   it.each([
     [
       "access",
-      `Hi, could you grant me ${brandNames.autobot} access in OpenObserve (IAM › Roles › ${brandNames.askAutobot}, Chat) for the acme organization?`,
+      `Hi, could you grant me ${brandNames.autobot} access in OpenObserve (IAM › Roles › ${brandNames.autobot}, Chat) for the acme organization?`,
     ],
     [
       "share_read",
-      `Could you grant me chat sharing access (IAM › Roles › ${brandNames.askAutobot}, Chat sharing) in acme?`,
+      `Could you grant me chat sharing access (IAM › Roles › ${brandNames.autobot}, Chat sharing) in acme?`,
     ],
     ["tool_policy", `${brandNames.autobot} wasn't allowed to run o2_delete in acme.`],
     ["credits", "Could you enable paid AI usage for acme? Billing › Paid usage: http"],
     [
       "settings",
-      `Could you change the ${brandNames.autobot} settings for acme in Settings › ${brandNames.askAutobot}?`,
+      `Could you change the ${brandNames.autobot} settings for acme in Settings › ${brandNames.autobot}?`,
     ],
   ] as const)("prefills the %s request", async (kind, expected) => {
     await openPopover({ kind, tool: "o2_delete" });
@@ -196,7 +196,7 @@ describe("AssistantAskAdminPopover", () => {
     await wrapper.get('[data-test="trigger"]').trigger("click");
     await flushPromises();
     expect(message()).toBe(
-      `Could you turn ${brandNames.autobot} on for acme? Settings › ${brandNames.askAutobot} › Access: ${window.location.origin}/settings/assistant/access?org_identifier=acme`,
+      `Could you turn ${brandNames.autobot} on for acme? Settings › ${brandNames.autobot} › Access: ${window.location.origin}/settings/assistant/access?org_identifier=acme`,
     );
   });
 

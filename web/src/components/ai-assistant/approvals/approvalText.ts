@@ -43,10 +43,14 @@ const SECONDS_FIELD = /_secs$/;
 // A pause card's duration already reads in its "Until …" line.
 const PAUSE_TIME_FIELDS = new Set(["minutes", "ends_at"]);
 
+// The keys a list entry is known by: a dashboard's tab `name`, a panel's `title`.
+const NAME_KEYS = ["title", "name", "label"];
+
 interface LeafChange {
   path: string[];
   after: unknown;
   before?: unknown;
+  summary?: true;
 }
 
 /** A heading as the tail of a sentence: "Pause alert x" reads "Denied: pause alert x". */
@@ -145,11 +149,66 @@ function recordOf(value: unknown): Record<string, unknown> | null {
 }
 
 function valueText(value: unknown, t: TranslateFn): string {
-  if (value === undefined) return "—";
+  if (value === undefined || value === null) return "—";
   if (typeof value === "boolean") return String(t(value ? "common.yes" : "common.no"));
-  if (Array.isArray(value) && value.every((entry) => typeof entry !== "object" || entry === null))
-    return value.map(String).join(", ");
-  return typeof value === "string" ? value : JSON.stringify(value);
+  if (Array.isArray(value)) {
+    const nested = value.some((entry) => typeof entry === "object" && entry !== null);
+    return value.map((entry) => valueText(entry, t)).join(nested ? "; " : ", ");
+  }
+  const record = recordOf(value);
+  if (!record) return String(value);
+  return Object.entries(record)
+    .map(([key, inner]) => {
+      const words = valueText(inner, t);
+      return `${key}: ${typeof inner === "object" && inner !== null ? `(${words})` : words}`;
+    })
+    .join(", ");
+}
+
+function entryName(entry: unknown): string | null {
+  const record = recordOf(entry);
+  for (const key of NAME_KEYS) {
+    const value = record?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+// A panel's chart type is part of what is being created, so its name carries it.
+function entryLabel(entry: unknown, name: string): string {
+  const type = recordOf(entry)?.type;
+  return typeof type === "string" && type.trim() ? `${name} · ${type.trim()}` : name;
+}
+
+// A list of named objects (a dashboard's tabs, then their panels) reads as its names, one row per level.
+function namedListChanges(path: string[], list: unknown[]): LeafChange[] | null {
+  const names = list.map(entryName);
+  if (!names.length || names.some((name) => name === null)) return null;
+  const nested = new Map<string, unknown[]>();
+  for (const entry of list)
+    for (const [key, value] of Object.entries(recordOf(entry) ?? {}))
+      if (Array.isArray(value) && value.length && value.every((item) => recordOf(item)))
+        nested.set(key, [...(nested.get(key) ?? []), ...value]);
+  const children = [...nested].flatMap(
+    ([key, entries]) => namedListChanges([...path, key], entries) ?? [],
+  );
+  // A panel's query is what the approver checks, so it keeps a row of its own beside the names.
+  const queries = list.flatMap((entry, index) =>
+    queryTexts(entry).map((query) => ({
+      path: [...path, "query"],
+      after: `${names[index]}: ${query}`,
+    })),
+  );
+  const labels = list.map((entry, index) => entryLabel(entry, names[index] as string));
+  return [{ path, after: labels.join(", "), summary: true }, ...queries, ...children];
+}
+
+function queryTexts(entry: unknown): string[] {
+  const queries = recordOf(entry)?.queries;
+  if (!Array.isArray(queries)) return [];
+  return queries
+    .map((item) => recordOf(item)?.query)
+    .filter((query): query is string => typeof query === "string" && !!query.trim());
 }
 
 // A time, a duration or a list of `{ids}` (a downtime's targets) in the reader's words.
@@ -201,6 +260,8 @@ function leafChanges(
   before: unknown,
   known: boolean,
 ): LeafChange[] {
+  const named = Array.isArray(after) && before === undefined ? namedListChanges(path, after) : null;
+  if (named) return named;
   const own = recordOf(after);
   const old = recordOf(before);
   if (!own || path.length >= MAX_FLAT_DEPTH || (known && before !== undefined && !old))
@@ -242,14 +303,12 @@ export function approvalDiffRows(
     const field = raw(labels[index]);
     const leaf = change.path.at(-1) ?? "";
     const value = raw(leafText(leaf, change.after, card, t));
-    if (card.kind === "create" || stateVerb) return { field, value, before: null };
-    const old =
-      "before" in change
-        ? leafText(leaf, change.before, card, t)
-        : changed?.oneSided
-          ? unknown
-          : null;
-    return { field, value, before: old === null ? null : raw(old) };
+    const summary = change.summary && { summary: true };
+    if (card.kind === "create" || stateVerb) return { field, value, before: null, ...summary };
+    if (!("before" in change) && changed?.oneSided)
+      return { field, value, before: unknown, beforeUnknown: true, ...summary };
+    const old = "before" in change ? leafText(leaf, change.before, card, t) : null;
+    return { field, value, before: old === null ? null : raw(old), ...summary };
   });
   const notifies = approvalNotifies(card);
   return notifies

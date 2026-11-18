@@ -3983,7 +3983,7 @@
           "note": "Automatyczne operacje SRE i spostrzeżenia"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "Inteligentna pomoc w zapytaniach i analizie"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "Wystąpił nieoczekiwany błąd",
       "toolExecutionFailed": "Wykonanie narzędzia nie powiodło się",
       "errorOccurred": "Wystąpił błąd",
-      "navigateConfirmQuestion": "Czy zezwolić @:{'brand.autobot'} na nawigację?",
       "confirmToolExecution": "Potwierdzić wykonanie {tool}?",
       "entity": {
         "alert": "alert",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "Subskrybuj, aby dalej korzystać z AI. Dalsze użycie zostanie rozliczone na fakturze tej organizacji.",
     "aiContractExhaustedMessage": "Skontaktuj się z menedżerem konta, aby dodać więcej kredytów AI",
     "aiPayerSubscribeMessage": "Rozliczeniami tej organizacji zarządza {payer}. Poproś administratora {payer} o subskrypcję; dalsze użycie zostanie rozliczone na jej fakturze.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} i generowanie zapytań: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Ponowna analiza: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} i generowanie zapytań: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Ponowna analiza: {reanalysis}",
     "aiPaygMessage": "Bezpłatne kredyty wyczerpane — użycie fakturowane na subskrypcję",
     "billingGroup": {
       "tabLabel": "Grupa rozliczeniowa",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "Płatne użycie nie jest włączone dla wszystkich wymaganych organizacji.",
     "updateFailed": "Nie udało się zaktualizować płatnego korzystania z AI. Spróbuj ponownie.",
     "declinedNotice": "Płatne korzystanie z AI jest wyłączone, więc to żądanie nie zostało wysłane.",
-    "consentScope": "Dotyczy całej organizacji: @:{'brand.askAutobot'}, generowania zapytań i analizy incydentów. Możesz to wyłączyć w dowolnym momencie na stronie Planów.",
+    "consentScope": "Dotyczy całej organizacji: @:{'brand.autobot'}, generowania zapytań i analizy incydentów. Możesz to wyłączyć w dowolnym momencie na stronie Planów.",
     "managePaidUsage": "Włącz płatne korzystanie",
     "modePayAsYouGo": "Płatność za użycie",
     "modeConsentRequired": "Wymagana zgoda",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "Automatyczna nawigacja",
-        "enabledTooltip": "Automatyczna nawigacja włączona - {product} będzie nawigować automatycznie bez potwierdzenia",
-        "disabledTooltip": "Automatyczna nawigacja wyłączona - {product} zapyta przed nawigacją"
-      }
-    }
+    "composer": {}
   }
 }

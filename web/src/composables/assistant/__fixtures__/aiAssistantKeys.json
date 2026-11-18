@@ -11,7 +11,6 @@
   "aiChat.entity.stream",
   "aiChat.entity.user",
   "aiChat.errorOccurred",
-  "aiChat.navigateConfirmQuestion",
   "aiChat.toolExecutionFailed",
   "aiChat.unexpectedError",
   "capabilities.alert.description",

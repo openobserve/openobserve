@@ -309,7 +309,7 @@ import {
   useHomeWindowProvider,
 } from "@/composables/contextProviders/homeContextProvider";
 import type { OverviewNowSnapshot } from "@/composables/contextProviders/types";
-import { DEFAULT_HOME_RANGE, homePeriodOf, readHomeUrl } from "@/views/home/homeUrl";
+import { threadPeriodOf } from "@/views/home/homeUrl";
 
 // Past this the tabs show in their default order; a key that resolves later never reorders them.
 const HOME_PREFS_WAIT_MS = 1_500;
@@ -346,15 +346,11 @@ const HomeThreadContext = defineComponent({
   setup(props) {
     const route = useRoute();
     useHomeWindowProvider(useStore(), () =>
-      props.askedOnHome() ? null : homePeriodOfRoute(route),
+      props.askedOnHome() ? null : threadPeriodOf(route.query),
     );
     return () => null;
   },
 });
-
-function homePeriodOfRoute(route: ReturnType<typeof useRoute>) {
-  return homePeriodOf(readHomeUrl(route.query).range ?? DEFAULT_HOME_RANGE);
-}
 
 /** One dynamic import per mount, shared by the gate and the tab prefs. */
 function loadAssistant() {

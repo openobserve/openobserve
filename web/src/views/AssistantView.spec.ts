@@ -23,7 +23,7 @@ import {
   fakeVuex,
 } from "@/components/ai-assistant/__tests__/fakeAssistant";
 import type { AssistantCapability, GateCode } from "@/composables/assistant";
-import { pushFromThread } from "@/composables/assistant/pure";
+import { leaveFullTabHandoff, pushFromThread } from "@/composables/assistant/pure";
 
 import { SHELL_ROUTE_CONTEXT } from "@/components/ai-assistant/shell/AssistantShell.vue";
 import { closeLockedPanel } from "@/components/ai-assistant/shell/lockedPanel";
@@ -124,7 +124,7 @@ describe("AssistantView", () => {
   it("opens a new session in the full view with the welcome and focuses its container", async () => {
     const { wrapper, store } = await setup();
     await flushPromises();
-    expect(wrapper.find('[data-test="assistant-view-title"]').text()).toBe(en.brand.askAutobot);
+    expect(wrapper.find('[data-test="assistant-view-title"]').text()).toBe(en.brand.autobot);
     expect(store.state.shell.placement.kind).toBe("full");
     expect(store.state.shell.activeSid).not.toBeNull();
     expect(store.focusRequest.value?.target).toBe("composer");
@@ -143,7 +143,7 @@ describe("AssistantView", () => {
     expect(max).toBeGreaterThan(railPx(RAIL_DEFAULT_REM));
   });
 
-  it("starts a new chat on the window the previous chat was asking about", async () => {
+  it("starts a new chat on the page's time, leaving the previous chat's pinned window behind", async () => {
     const { wrapper, store } = await setup();
     await flushPromises();
     const first = store.state.shell.activeSid as string;
@@ -154,11 +154,7 @@ describe("AssistantView", () => {
     await flushPromises();
     const next = store.state.shell.activeSid as string;
     expect(next).not.toBe(first);
-    expect(store.state.sessions[next].composer.timeOverride).toEqual({
-      from: 1,
-      to: 2,
-      period: "24h",
-    });
+    expect(store.state.sessions[next].composer.timeOverride).toBeNull();
   });
 
   it("keeps the conversation mounted when the URL catches up with the chat on screen", async () => {
@@ -197,6 +193,32 @@ describe("AssistantView", () => {
     const { wrapper } = await setup(`/assistant/${SID}`);
     await flushPromises();
     expect(wrapper.find('[data-test="assistant-shell-not-found"]').exists()).toBe(true);
+  });
+
+  it("waits for a chat its opener tab just sent instead of calling it missing", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    let calls = 0;
+    const { wrapper } = await setup(`/assistant/${SID}`, "available", {}, (store) => {
+      leaveFullTabHandoff({
+        userOrgKey: store.state.userOrgKey,
+        target: SID,
+        text: "",
+        chips: [],
+        pending: true,
+        at: Date.now(),
+      });
+      vi.spyOn(store, "openSession").mockImplementation(() => {
+        calls += 1;
+        if (calls < 3) return Promise.reject(Object.assign(new Error("x"), { code: "not_found" }));
+        return Promise.resolve(SID);
+      });
+    });
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await flushPromises();
+    vi.useRealTimers();
+    expect(calls).toBe(3);
+    expect(wrapper.find('[data-test="assistant-shell-not-found"]').exists()).toBe(false);
   });
 
   it("restores the previous placement on leave without touching the session", async () => {
@@ -449,6 +471,24 @@ describe("AssistantView", () => {
     expect(router.currentRoute.value.query.focus).toBe("ask");
   });
 
+  it("starts over on Home's Ask box without popping the old chat into the side panel", async () => {
+    const { wrapper, router, store } = await setup("/logs", "available", {}, undefined, true);
+    const old = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.open({ kind: "sidebar" }, { focus: "none" });
+    store.state.sessions[old].messages.push({ role: "user", content: "hi" });
+    store.setDraft(old, { text: "unsent" });
+    await router.push(`/assistant/${old}`);
+    await flushPromises();
+    expect(store.state.shell.placement.kind).toBe("full");
+    await wrapper.get('[data-test="assistant-thread-new"]').trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.query.focus).toBe("ask");
+    expect(store.state.shell.placement.kind).toBe("hidden");
+    expect(store.state.sessions[old].composer.text).toBe("unsent");
+  });
+
   it("floats New Chat and More in the chat's corner on a phone, never a Home button, a move or the ⓘ", async () => {
     reactive(wide).value = false;
     const { wrapper, router, store } = await setup("/assistant", "available", {}, undefined, true);
@@ -465,10 +505,12 @@ describe("AssistantView", () => {
       .findAll("button")
       .map((button) => button.attributes("data-test"))
       .filter(Boolean);
-    // Home's chat is the page itself, so it offers no move; what it sees opens from the composer.
+    // Every header carries New and the moves; what it sees opens from the composer.
     expect(ids).toEqual([
       "assistant-thread-heading-edit-trigger",
       "assistant-thread-new",
+      "assistant-shell-place-full",
+      "assistant-shell-place-sidebar",
       "assistant-thread-more",
     ]);
     await chrome.get('[data-test="assistant-thread-new"]').trigger("click");

@@ -15,7 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 import type { LocalRecord } from "@/composables/assistant/historyDb";
 import aiChatShare from "@/services/ai_chat_share";
@@ -30,6 +30,7 @@ import { followedRcaRun, stopFollowingRca } from "../shell/rcaFollow";
 import AssistantHistoryConfirm from "./AssistantHistoryConfirm.vue";
 import AssistantHistoryList, {
   type AssistantHistoryListProps,
+  INVESTIGATION_AUTO_PAGES,
   SEARCH_DEBOUNCE_MS,
   VIRTUAL_FROM,
 } from "./AssistantHistoryList.vue";
@@ -140,6 +141,21 @@ async function pickMenuView(wrapper: any, id: string): Promise<void> {
 }
 
 describe("AssistantHistoryList", () => {
+  it("tags a chat New chat left behind with its unsent draft", async () => {
+    const { wrapper, store } = await setup();
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.state.sessions[sid].messages.push({ role: "user", content: raw("Live question") });
+    store.setDraft(sid, { text: "half typed" });
+    await flushPromises();
+    const tags = wrapper.findAll('[data-test="assistant-history-row-draft"]');
+    expect(tags).toHaveLength(1);
+    expect(
+      tags[0].element.closest('[data-test="assistant-history-item"]')?.getAttribute("data-sid"),
+    ).toBe(sid);
+  });
+
   it("groups by calendar day in the org zone, pinned first and only there", async () => {
     const { wrapper } = await setup();
     const groups = wrapper.findAll('[data-test="assistant-history-group"]');
@@ -154,7 +170,7 @@ describe("AssistantHistoryList", () => {
       "Pinned",
       "Today",
       "Yesterday",
-      "Previous 7 Days",
+      "Previous 7 days",
       "Older",
     ]);
     expect(groups[2].text()).toContain("Beta late last night");
@@ -551,6 +567,9 @@ describe("AssistantHistoryList", () => {
     const groups = wrapper.findAll('[data-test="assistant-history-group"]');
     expect(groups[0].attributes("data-group")).toBe("needs_you");
     expect(groups[0].get("h3").text()).toBe("Needs you 1");
+    const count = groups[0].get('[data-test="assistant-history-needs_you-count"]');
+    expect(count.classes()).toContain("rounded-default");
+    expect(count.classes()).not.toContain("rounded-full");
     expect(groups[0].text()).toContain("Gamma this week");
     expect(wrapper.find('[data-group="week"]').exists()).toBe(false);
   });
@@ -640,5 +659,35 @@ describe("AssistantHistoryConfirm", () => {
       await wrapper.get('[data-test="assistant-history-error-banner-retry"]').trigger("click");
       expect(retry).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("pages a few times on its own for investigations; Load older reads on until history ends", async () => {
+    const hasMore = ref(true);
+    const loadOlder = vi.fn(async () => {
+      if (loadOlder.mock.calls.length >= 12) hasMore.value = false;
+      return true;
+    });
+    const { wrapper } = await setup(
+      { investigationsOnly: true },
+      { patchHistory: (history: any) => ({ ...history, hasMore, loadOlder }) },
+    );
+    await flushPromises();
+    expect(loadOlder).toHaveBeenCalledTimes(INVESTIGATION_AUTO_PAGES);
+    await wrapper.get('[data-test="assistant-history-load-older"]').trigger("click");
+    await flushPromises();
+    expect(loadOlder).toHaveBeenCalledTimes(12);
+  });
+
+  it("drops a search left by the chat list before listing investigations", async () => {
+    const { history } = await setup(
+      { investigationsOnly: true },
+      {
+        patchHistory: (h: any) => {
+          h.setFilter({ q: "checkout", kind: "shared" });
+          return h;
+        },
+      },
+    );
+    expect(history.filter.value).toMatchObject({ q: "", kind: "all" });
   });
 });

@@ -3983,7 +3983,7 @@
           "note": "Automatisierte SRE-Operationen und Einblicke"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "Intelligente Abfrage- und Analyseunterstützung"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten",
       "toolExecutionFailed": "Tool-Ausführung fehlgeschlagen",
       "errorOccurred": "Ein Fehler ist aufgetreten",
-      "navigateConfirmQuestion": "Soll @:{'brand.autobot'} navigieren?",
       "confirmToolExecution": "Ausführung von {tool} bestätigen?",
       "entity": {
         "alert": "Alarm",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "Abonnieren Sie, um KI weiter zu nutzen. Die weitere Nutzung wird über die Rechnung dieser Organisation abgerechnet.",
     "aiContractExhaustedMessage": "Kontaktieren Sie Ihren Account-Manager, um weitere AI-Guthaben hinzuzufügen",
     "aiPayerSubscribeMessage": "Die Abrechnung für diese Organisation wird von {payer} verwaltet. Bitten Sie einen Administrator von {payer} zu abonnieren; die weitere Nutzung wird über dessen Rechnung abgerechnet.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} und Abfragegenerierung: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Neuanalyse: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} und Abfragegenerierung: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Neuanalyse: {reanalysis}",
     "aiPaygMessage": "Kostenlose Credits sind aufgebraucht — Nutzung wird dem Abonnement in Rechnung gestellt",
     "billingGroup": {
       "tabLabel": "Abrechnungsgruppe",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "Die kostenpflichtige Nutzung ist nicht für alle erforderlichen Organisationen aktiviert.",
     "updateFailed": "Kostenpflichtige KI-Nutzung konnte nicht aktualisiert werden. Versuchen Sie es erneut.",
     "declinedNotice": "Die kostenpflichtige KI-Nutzung ist deaktiviert, daher wurde diese Anfrage nicht gesendet.",
-    "consentScope": "Gilt für die gesamte Organisation: @:{'brand.askAutobot'}, Abfragegenerierung und Vorfallanalyse. Sie können sie jederzeit auf der Seite „Pläne“ deaktivieren.",
+    "consentScope": "Gilt für die gesamte Organisation: @:{'brand.autobot'}, Abfragegenerierung und Vorfallanalyse. Sie können sie jederzeit auf der Seite „Pläne“ deaktivieren.",
     "managePaidUsage": "Kostenpflichtige Nutzung aktivieren",
     "modePayAsYouGo": "Nutzungsbasiert",
     "modeConsentRequired": "Zustimmung erforderlich",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "Automatische Navigation",
-        "enabledTooltip": "Autonavigation aktiviert — {product} navigiert automatisch ohne Bestätigung",
-        "disabledTooltip": "Autonavigation deaktiviert — {product} fragt vor dem Navigieren"
-      }
-    }
+    "composer": {}
   }
 }

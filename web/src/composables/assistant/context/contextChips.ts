@@ -423,10 +423,10 @@ export function periodText(period: string, locale: string): string | null {
   }).format(count);
 }
 
-/** "last 15 min" for a relative window, "13:43–13:58 IST" (org zone, minute precision) otherwise (CT-01 AC 3). */
+/** "past 15 min" for a relative window, "13:43–13:58 IST" (org zone, minute precision) otherwise (CT-01 AC 3). */
 export function timeRangeText(window: TimeWindow, t: TranslateFn = gt): I18nText {
   const period = window.period ? periodText(window.period, uiIntlLocale()) : null;
-  if (period) return t("assistant.welcome.lastRange", { period: raw(period) });
+  if (period) return t("assistant.context.time.pastRange", { period: raw(period) });
   return raw(formatOrgRange(window.from, window.to));
 }
 
@@ -641,7 +641,9 @@ function seenRow(
   if (OVERVIEW_LIST_NAMES[field]) return overviewSeenRow(row, page, { id: field, group }, t);
   const base = { id: field, group, label: t(row.labelKey) };
   if (field === "timeRange")
-    return { ...base, value: timeRangeText(opts.window, t), fields: ["timeRange"] };
+    return opts.window.source === "default"
+      ? null
+      : { ...base, value: timeRangeText(opts.window, t), fields: ["timeRange"] };
   if (field === "user_timezone")
     return { ...base, value: raw(opts.timezone), fields: ["user_timezone"] };
   if (field === "request_timestamp")

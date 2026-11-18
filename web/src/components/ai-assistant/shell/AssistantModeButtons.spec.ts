@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
 
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import { movedToTab, takeFullTabHandoff } from "@/composables/assistant/pure";
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
@@ -117,6 +118,31 @@ afterEach(() => {
   track.mockClear();
 });
 
+describe("header move group", () => {
+  it("draws the current place pressed beside the places the chat can move to", async () => {
+    const router = fakeRouter();
+    await router.push("/logs");
+    mount(AssistantModeButtons, {
+      props: { placement: "sidebar", sid: fake.current.store.state.shell.activeSid },
+      global: { plugins: [router, fakeVuex()] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const order = [...document.body.querySelectorAll("[data-test^='assistant-shell-place-']")];
+    expect(order.map((el) => el.getAttribute("data-test"))).toEqual([
+      "assistant-shell-place-full",
+      "assistant-shell-place-sidebar",
+      "assistant-shell-place-window",
+    ]);
+    expect(item("sidebar")?.getAttribute("aria-pressed")).toBe("true");
+    expect(item("full")?.getAttribute("aria-pressed")).toBe("false");
+    expect(item("window")?.getAttribute("aria-pressed")).toBe("false");
+    item("sidebar")!.click();
+    await flushPromises();
+    expect(fake.current.store.state.shell.placement.kind).toBe("sidebar");
+  });
+});
+
 describe("Open as", () => {
   it("offers only the other places: full page and floating window from the sidebar", async () => {
     await setup({});
@@ -188,19 +214,166 @@ describe("Open as", () => {
     expect(item("full")).not.toBeNull();
   });
 
-  it("moves a window's chat to the full view by its own sid", async () => {
+  it("opens a window's chat at full page in a new browser tab and closes it here", async () => {
     const { store } = fake.current;
     const sid = store.state.shell.activeSid;
     store.floatChat(sid);
+    store.state.sessions[sid].record.serverBacked = true;
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
     const { router } = await setup({ placement: "window", sid });
     item("full")!.click();
     await flushPromises();
-    expect(store.windowOf(sid)).toBeNull();
-    expect(store.state.shell.activeSid).toBe(sid);
-    expect(router.currentRoute.value.name).toBe("assistant");
+    expect(open).toHaveBeenCalledWith(`/?tab=ai&thread=${sid}`, "_blank");
+    expect(store.windowOf(sid)).toBeFalsy();
+    expect(store.windowAnnouncement.value?.key).toBe("assistant.announce.openedInTab");
+    expect(store.state.sessions[sid]).toBeDefined();
+    expect(router.currentRoute.value.name).toBe("logs");
+    open.mockRestore();
   });
 
-  it("starts an empty full-page chat from a chat with messages, leaving that chat as it was", async () => {
+  it("opens a running chat not saved yet in a new tab on that chat, telling the tab to wait for it", async () => {
+    const { store } = fake.current;
+    const sid = store.state.shell.activeSid;
+    store.floatChat(sid);
+    store.state.sessions[sid].messages.push({
+      role: "user",
+      content: raw("why 5xx?"),
+      turnId: "t1",
+    });
+    store.state.sessions[sid].turn = { state: "responding.writing" } as never;
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const save = vi.spyOn(fake.current.history, "save");
+    const { router } = await setup({ placement: "window", sid });
+    item("full")!.click();
+    await flushPromises();
+    expect(open).toHaveBeenCalledWith(`/?tab=ai&thread=${sid}`, "_blank");
+    expect(router.currentRoute.value.name).toBe("logs");
+    expect(store.state.sessions[sid].turn.state).toBe("responding.writing");
+    expect(takeFullTabHandoff(store.state.userOrgKey, sid, false)).toMatchObject({
+      target: sid,
+      pending: true,
+    });
+    expect(save).toHaveBeenCalledWith(sid, { live: true });
+    open.mockRestore();
+  });
+
+  it("hands the new tab the card a waiting chat holds, so it can be answered there", async () => {
+    const { store } = fake.current;
+    const sid = store.state.shell.activeSid;
+    const session = store.state.sessions[sid];
+    session.record.serverBacked = true;
+    session.messages.push({ role: "user", content: raw("mute it"), turnId: "t1" });
+    session.pendingApproval = {
+      id: "apr_1",
+      sessionId: sid,
+      turnId: "t1",
+      kind: "permission",
+      destructive: false,
+      operation: "CreateDowntime",
+      tool: "CreateDowntime",
+      targets: [],
+      expiresAt: 9_000_000_000_000,
+      askedIn: "here",
+      grantable: false,
+      editable: false,
+      question: "Create the downtime?",
+    };
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await setup({});
+    item("full")!.click();
+    await flushPromises();
+    const handoff = takeFullTabHandoff(store.state.userOrgKey, sid, false);
+    expect(handoff?.card).toMatchObject({
+      turnId: "t1",
+      block: { id: "apr_1", tool: "CreateDowntime", expiresAt: 9_000_000_000_000 },
+    });
+    expect(handoff?.card?.block).not.toHaveProperty("sessionId");
+    open.mockRestore();
+  });
+
+  it("names a chat not yet created as the one Full page took, so the panel's close says so", async () => {
+    const { store } = fake.current;
+    store.state.shell.activeSid = null;
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await setup({ sid: null });
+    item("full")!.click();
+    await flushPromises();
+    expect(open).toHaveBeenCalledWith("/?tab=ai&thread=", "_blank");
+    expect(movedToTab.value).toEqual({ sid: null });
+    expect(store.state.shell.placement.kind).toBe("hidden");
+    movedToTab.value = null;
+    open.mockRestore();
+  });
+
+  it("closes the side panel here once its chat opens at full page in a new tab", async () => {
+    const { store } = fake.current;
+    const sid = store.state.shell.activeSid;
+    store.state.sessions[sid].record.serverBacked = true;
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await setup({});
+    item("full")!.click();
+    await flushPromises();
+    expect(open).toHaveBeenCalledWith(`/?tab=ai&thread=${sid}`, "_blank");
+    expect(store.state.shell.placement.kind).toBe("hidden");
+    open.mockRestore();
+  });
+
+  it("keeps the phone sheet's Full page in this tab", async () => {
+    lg.value = false;
+    const { store } = fake.current;
+    const sid = store.state.shell.activeSid;
+    store.state.sessions[sid].record.serverBacked = true;
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const { router } = await setup({ sheet: true });
+    item("full")!.click();
+    await flushPromises();
+    expect(open).not.toHaveBeenCalled();
+    expect(store.state.shell.placement.kind).toBe("full");
+    expect(router.currentRoute.value.query.thread).toBe(sid);
+    open.mockRestore();
+  });
+
+  it("hands the new tab the draft's photos and the agent picked for it", async () => {
+    const { store } = fake.current;
+    const sid = store.state.shell.activeSid;
+    const image = {
+      id: "i1",
+      data: "AAAA",
+      mimeType: "image/png" as const,
+      filename: "a.png",
+      size: 3,
+    };
+    store.state.sessions[sid].composer.images.push(image);
+    store.state.sessions[sid].agentId = "sre";
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await setup({});
+    item("full")!.click();
+    await flushPromises();
+    expect(open).toHaveBeenCalledWith("/?tab=ai&thread=", "_blank");
+    expect(takeFullTabHandoff(store.state.userOrgKey, "fresh", true)).toMatchObject({
+      target: null,
+      images: [image],
+      agentId: "sre",
+    });
+    open.mockRestore();
+  });
+
+  it("opens an unsent chat as a new full-page chat in a new tab that takes its draft", async () => {
+    const { store } = fake.current;
+    const sid = store.state.shell.activeSid;
+    store.state.sessions[sid].composer.text = "why 5xx?";
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await setup({});
+    item("full")!.click();
+    await flushPromises();
+    expect(open).toHaveBeenCalledWith("/?tab=ai&thread=", "_blank");
+    const handoff = takeFullTabHandoff(store.state.userOrgKey, "fresh", true);
+    expect(handoff).toMatchObject({ target: null, text: "why 5xx?" });
+    expect(store.state.sessions[sid].composer.text).toBe("why 5xx?");
+    open.mockRestore();
+  });
+
+  it("starts an empty full-page chat in a new tab from a chat with messages, leaving that chat as it was", async () => {
     const { store } = fake.current;
     const sid = store.state.shell.activeSid;
     store.state.sessions[sid].messages.push({
@@ -208,17 +381,15 @@ describe("Open as", () => {
       content: raw("why 5xx?"),
       turnId: "t1",
     });
-    const { router } = await setup({});
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await setup({});
     expect(item("full-new")!.textContent).toContain("New chat in full page");
     item("full-new")!.click();
     await flushPromises();
-    const fresh = store.state.shell.activeSid;
-    expect(fresh).not.toBe(sid);
-    expect(store.state.sessions[fresh].messages).toHaveLength(0);
-    expect(store.state.sessions[sid].messages).toHaveLength(1);
-    expect(store.state.shell.placement.kind).toBe("full");
-    expect(router.currentRoute.value.name).toBe("assistant");
-    expect(router.currentRoute.value.params.chatId).toBeFalsy();
+    expect(open).toHaveBeenCalledWith("/?tab=ai&thread=", "_blank");
+    expect(store.state.shell.activeSid).toBe(sid);
+    expect(store.state.shell.placement.kind).toBe("sidebar");
+    open.mockRestore();
   });
 
   it("offers no separate new full-page chat when the chat is already empty", async () => {
@@ -246,14 +417,14 @@ describe("Open as", () => {
       "assistant-shell-place-window",
     ]);
     expect([...items].map((el) => el.textContent?.trim())).toEqual([
-      "Full Page",
-      "Floating Window",
+      "Full page",
+      "Floating window",
     ]);
     expect(document.body.querySelector("[aria-checked]")).toBeNull();
     expect(document.body.querySelector('[role="separator"]')).toBeNull();
   });
 
-  it("draws the other moves as direct buttons named by their mode, with no trigger", async () => {
+  it("draws the moves as direct buttons named by their mode, with no trigger", async () => {
     const router = fakeRouter();
     await router.push("/logs");
     const wrapper = mount(AssistantModeButtons, {
@@ -263,12 +434,14 @@ describe("Open as", () => {
     });
     await flushPromises();
     expect(wrapper.find('[data-test="assistant-open-as-button"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="assistant-shell-place-sidebar"]').exists()).toBe(false);
+    expect(
+      wrapper.get('[data-test="assistant-shell-place-sidebar"]').attributes("aria-pressed"),
+    ).toBe("true");
     expect(wrapper.get('[data-test="assistant-shell-place-full"]').attributes("aria-label")).toBe(
-      "Full Page",
+      "Full page",
     );
     expect(wrapper.get('[data-test="assistant-shell-place-window"]').attributes("aria-label")).toBe(
-      "Floating Window",
+      "Floating window",
     );
     await wrapper.get('[data-test="assistant-shell-place-window"]').trigger("click");
     await flushPromises();
@@ -281,7 +454,7 @@ describe("Open as", () => {
   ])("T-02-02: Full Page from %s keeps only the keys that belong on Home", async (url, query) => {
     const router = fakeRouter();
     await router.push(url);
-    const push = vi.spyOn(router, "push");
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
     const wrapper = mount(AssistantModeButtons, {
       props: { placement: "sidebar", sid: fake.current.store.state.shell.activeSid },
       global: { plugins: [router, fakeVuex()] },
@@ -290,7 +463,9 @@ describe("Open as", () => {
     await flushPromises();
     await wrapper.get('[data-test="assistant-shell-place-full"]').trigger("click");
     await flushPromises();
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "assistant", query }));
+    const href = router.resolve({ name: "home", query: { ...query, tab: "ai", thread: "" } }).href;
+    expect(open).toHaveBeenCalledWith(href, "_blank");
+    open.mockRestore();
     wrapper.unmount();
   });
 });

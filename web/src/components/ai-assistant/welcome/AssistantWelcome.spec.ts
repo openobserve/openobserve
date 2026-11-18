@@ -60,7 +60,7 @@ beforeEach(() => resetWelcomeTelemetryForTests());
 afterEach(() => track.mockClear());
 
 describe("AssistantWelcome", () => {
-  it("greets with the mark and a heading, then three icon starter cards, nothing else (§8)", () => {
+  it("greets with a heading and no logo, then three icon starter cards, nothing else (§8)", () => {
     const wrapper = mountWelcome();
     const section = wrapper.get('[data-test="assistant-welcome"]');
     expect(section.element.tagName).toBe("SECTION");
@@ -71,7 +71,8 @@ describe("AssistantWelcome", () => {
       wrapper
         .find('[data-test="assistant-welcome-greeting"] [data-test="assistant-mark"]')
         .exists(),
-    ).toBe(true);
+    ).toBe(false);
+    expect(wrapper.find("img").exists()).toBe(false);
     expect(wrapper.findAll("li")).toHaveLength(3);
     expect(wrapper.findAll("h2")).toHaveLength(1);
     expect(wrapper.find('[data-test="assistant-welcome-scope"]').exists()).toBe(false);
@@ -80,13 +81,13 @@ describe("AssistantWelcome", () => {
     }
   });
 
-  it("plays the opening only when asked: sparkle on the mark, greeting and cards rising in turn", () => {
+  it("plays the opening only when asked: greeting and cards rising in turn, with no mark", () => {
     const still = mountWelcome();
     expect(still.find(".assistant-mark-sparkle").exists()).toBe(false);
     expect(still.find(".assistant-fade-up").exists()).toBe(false);
     const opening = mountWelcome({ opening: true });
     expect(opening.attributes("data-opening")).toBe("");
-    expect(opening.find(".assistant-mark-sparkle").exists()).toBe(true);
+    expect(opening.find(".assistant-mark-sparkle").exists()).toBe(false);
     expect(opening.get('[data-test="assistant-welcome-greeting"]').classes()).toEqual(
       expect.arrayContaining(["assistant-fade-up", "assistant-fade-up-0"]),
     );

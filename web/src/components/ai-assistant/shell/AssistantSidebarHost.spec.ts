@@ -21,6 +21,7 @@ import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant"
 import AssistantSidebarHost from "./AssistantSidebarHost.vue";
 import { tearOffRequest } from "./assistantWindowHost";
 import { closeLockedPanel, openLockedPanel, useLockedPanel } from "./lockedPanel";
+import { movedToTab } from "@/composables/assistant/pure";
 import {
   followedRcaRun,
   stopFollowingRca,
@@ -274,6 +275,37 @@ describe("AssistantSidebarHost", () => {
     expect(column()!.style.display).toBe("none");
   });
 
+  it("says the chat opened in a new tab, not that the panel closed, when Full page took it", async () => {
+    const { open, store } = await setup();
+    open();
+    await flushPromises();
+    const sid = store.state.shell.activeSid!;
+    store.setTitle(sid, "Cart errors" as never, "renamed");
+    movedToTab.value = { sid };
+    store.close("close");
+    await flushPromises();
+    const text = document.body.querySelector(
+      '[data-test="assistant-container-status"]',
+    )?.textContent;
+    expect(text).toContain("Cart errors opened in a new tab.");
+    expect(text).not.toContain("closed");
+    expect(movedToTab.value).toBeNull();
+  });
+
+  it("says a new chat opened in a new tab when Full page took a chat not yet created", async () => {
+    const { open, store } = await setup();
+    open();
+    await flushPromises();
+    movedToTab.value = { sid: null };
+    store.close("close");
+    await flushPromises();
+    const text = document.body.querySelector(
+      '[data-test="assistant-container-status"]',
+    )?.textContent;
+    expect(text).toContain("New chat opened in a new tab.");
+    expect(text).not.toContain("closed");
+  });
+
   it("closes on rung f, says so outside the hidden column and returns focus to the invoker", async () => {
     const { open, store } = await setup();
     open();
@@ -394,6 +426,7 @@ describe("AssistantSidebarHost", () => {
     await flushPromises();
     const row = document.body.querySelector('[data-test="assistant-shell-sheet-peek-row"]');
     expect(row?.textContent).toContain("New chat");
+    expect(row?.querySelector('[data-test="assistant-mark"]')).toBeNull();
   });
 
   it("drops the locked panel once the gate stops locking", async () => {

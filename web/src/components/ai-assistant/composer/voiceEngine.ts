@@ -33,6 +33,8 @@ export interface VoiceHandlers {
 export interface VoiceSession {
   start(): void;
   abort(): void;
+  /** Ends listening but still delivers the last results, then `onEnd`. */
+  stop?(): void;
 }
 
 /** The level source; it never records, and closing it releases the microphone. */
@@ -79,6 +81,7 @@ interface BrowserRecogniser {
   onend: (() => void) | null;
   start(): void;
   abort(): void;
+  stop(): void;
 }
 
 interface BrowserRecogniserClass {
@@ -217,7 +220,11 @@ function wire(
   recogniser.onresult = (event) => handlers.onResults(resultItems(event));
   recogniser.onerror = (event) => handlers.onError(event.error);
   recogniser.onend = handlers.onEnd;
-  return { start: () => recogniser.start(), abort: () => recogniser.abort() };
+  return {
+    start: () => recogniser.start(),
+    abort: () => recogniser.abort(),
+    stop: () => recogniser.stop(),
+  };
 }
 
 function resultItems(event: BrowserResultEvent): VoiceResultItem[] {

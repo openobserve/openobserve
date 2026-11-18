@@ -81,19 +81,24 @@ afterEach(() => {
 });
 
 describe("AssistantLauncherAgent", () => {
-  it("draws nothing without a choice of agents", () => {
+  it("names the default agent as plain text, with no menu, without a choice of agents", () => {
     for (const roster of [[], [ROSTER[0]]]) {
-      expect(setup(roster).find('[data-test="assistant-launcher-agent"]').exists()).toBe(false);
+      const wrapper = setup(roster);
+      expect(chip(wrapper).text()).toBe(`${brandNames.autobot}`);
+      expect(chip(wrapper).element.tagName).not.toBe("BUTTON");
+      expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(0);
     }
   });
 
-  it("is a context chip naming the default agent, with no ✕ and a hint on hover", () => {
+  it("is quiet text and a chevron naming the default agent, with no box and no hint", () => {
     const wrapper = setup();
     expect(chip(wrapper).text()).toBe(`${brandNames.autobot}`);
     expect(chip(wrapper).attributes("data-agent")).toBe("o2-ai");
     expect(chip(wrapper).element.tagName).toBe("BUTTON");
+    expect(chip(wrapper).attributes("data-o2-variant")).toBe("ghost-neutral");
+    expect(chip(wrapper).classes()).toContain("text-text-secondary!");
     expect(wrapper.find('[data-test="assistant-context-chip-remove"]').exists()).toBe(false);
-    expect(wrapper.get('[data-test="tooltip"]').text()).toBe("The agent that answers");
+    expect(wrapper.find('[data-test="tooltip"]').exists()).toBe(false);
   });
 
   it("lists one radio row per agent, checks the current one, and says why one is locked", () => {
@@ -124,14 +129,18 @@ describe("AssistantLauncherAgent", () => {
     expect(wrapper.emitted("update:modelValue")).toEqual([["sre"], [null]]);
   });
 
-  it("names a fixed agent with no menu or chevron, even when the roster offers no choice", () => {
-    for (const roster of [ROSTER, [ROSTER[0]]]) {
-      const wrapper = setup(roster, null, "sre");
-      expect(chip(wrapper).text()).toBe(`${brandNames.autobotInvestigate}`);
-      expect(chip(wrapper).attributes("data-agent")).toBe("sre");
-      expect(chip(wrapper).element.tagName).not.toBe("BUTTON");
-      expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(0);
-      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
-    }
+  it("names a fixed agent with no menu or chevron while the org can reach it", () => {
+    const wrapper = setup(ROSTER, null, "sre");
+    expect(chip(wrapper).text()).toBe(`${brandNames.autobotInvestigate}`);
+    expect(chip(wrapper).attributes("data-agent")).toBe("sre");
+    expect(chip(wrapper).element.tagName).not.toBe("BUTTON");
+    expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(0);
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  });
+
+  it("never claims a fixed agent the org cannot reach: the chip names the default (no silent fallback)", () => {
+    const wrapper = setup([ROSTER[0]], null, "sre");
+    expect(wrapper.find('[data-agent="sre"]').exists()).toBe(false);
+    expect(chip(wrapper).attributes("data-agent")).toBe("o2-ai");
   });
 });

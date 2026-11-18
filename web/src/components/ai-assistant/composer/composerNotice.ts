@@ -16,7 +16,7 @@
 import type { VoiceBrand } from "./voiceEngine";
 import { raw, type I18nText } from "@/types/i18n";
 
-/** The strip's line, title and links together, never cut mid-word (K5). */
+/** The strip's line, title and links together; a title is cut only between sentences (K5). */
 export const STRIP_MAX_CHARS = 44;
 
 /** Between the title and each link. */
@@ -34,9 +34,9 @@ export const NOTICE_PRIORITY = [
   "runLimit",
   "orgBusy",
   "credits",
-  "creditsLow",
   "offline",
   "unreachable",
+  "creditsLow",
   "cap",
   "cleared",
   "queued",
@@ -70,7 +70,7 @@ export type NoticeAction =
   | "askAdmin"
   | "micHelp"
   | "voiceRetry"
-  | "turnOn"
+  | "voiceCancel"
   | "showRunning"
   | "retry"
   | "manageUsage"
@@ -89,7 +89,7 @@ export interface NoticeLink {
 export interface ComposerNotice {
   id: NoticeId;
   tone: NoticeTone;
-  /** The short title; `fitNotice` shortens it by whole words. */
+  /** The short title; `fitNotice` shortens it by whole sentences. */
   title: I18nText;
   /** The full shipped sentence, for `title=` and screen readers. */
   sentence: I18nText;
@@ -101,20 +101,22 @@ export function stripText(notice: Pick<ComposerNotice, "title" | "links">): stri
   return [notice.title, ...notice.links.map((link) => link.label)].join(STRIP_SEPARATOR);
 }
 
-/** Whole words of `text` up to `max` characters, trailing punctuation dropped; a first word longer than `max` stays whole. */
-export function fitWords(text: string, max: number): string {
+/** Whole sentences of `text` up to `max` characters; the first sentence always stays whole. */
+export function fitSentences(text: string, max: number): string {
   const clean = text.trim();
   if (clean.length <= max) return clean;
-  const words = clean.split(/\s+/);
-  let out = words[0];
-  for (const word of words.slice(1)) {
-    if (out.length + 1 + word.length > max) break;
-    out = `${out} ${word}`;
+  // A stop inside a word ("screenshot.png", "2.5") is not a sentence end.
+  const sentences = clean.match(/\S.*?[.!?]+(?=\s|$)|\S.*$/gsu) ?? [clean];
+  let out = sentences[0].trim();
+  for (const sentence of sentences.slice(1)) {
+    const next = `${out} ${sentence.trim()}`;
+    if (next.length > max) break;
+    out = next;
   }
-  return out.replace(/[\s.,;:·]+$/u, "");
+  return out;
 }
 
-/** Keeps every link and shortens the title so the line fits; the sentence is never touched. */
+/** Keeps every link and drops trailing sentences of the title so the line fits; the strip wraps the rest. */
 export function fitNotice(notice: ComposerNotice): ComposerNotice {
   if (stripText(notice).length <= STRIP_MAX_CHARS) return notice;
   const linksLength = notice.links.reduce(
@@ -122,7 +124,7 @@ export function fitNotice(notice: ComposerNotice): ComposerNotice {
     0,
   );
   const budget = Math.max(1, STRIP_MAX_CHARS - linksLength);
-  return { ...notice, title: raw(fitWords(notice.title, budget)) };
+  return { ...notice, title: raw(fitSentences(notice.title, budget)) };
 }
 
 /** The most urgent notice, fitted to the strip, or null when the strip shows chips. */
@@ -138,7 +140,7 @@ export function pickNotice(
   return best ? fitNotice(best) : null;
 }
 
-/** A notice whose short title is its own sentence cut to whole words. */
+/** A notice whose short title is its own sentence cut to whole sentences. */
 export function sentenceNotice(
   id: NoticeId,
   sentence: I18nText,

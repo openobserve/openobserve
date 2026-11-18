@@ -101,7 +101,7 @@ describe("AssistantSettingsView", () => {
   it("titles the page with the product name and renders the tab strip", async () => {
     const { w } = await mountView("/settings/assistant/status");
     wrapper = w;
-    expect(w.find('[data-test="settings-assistant-page-title"]').text()).toBe(en.brand.askAutobot);
+    expect(w.find('[data-test="settings-assistant-page-title"]').text()).toBe(en.brand.autobot);
     for (const id of [
       "status",
       "access",

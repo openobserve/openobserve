@@ -148,6 +148,15 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
     return true;
   };
 
+  // A Full page tab answers the card its opener handed it; the opener's turn lock keeps `holdRestored` out.
+  const takeHandedCard = (sid: Sid, turnId: string, card: ApprovalBlockData) => {
+    const session = ctx.session(sid);
+    if (!session || ownsRunning(sid)) return;
+    if (session.turnMeta.ownedByThisTab) return void deps.approvals?.()?.restore(sid, card);
+    session.turnMeta.turnId ??= turnId;
+    if (restore(sid, turnId, card)) void cardGone(sid, card.id).then(() => resume(sid));
+  };
+
   // The answered card hands the followed turn back to the server's run until its poll sees the end.
   const resume = (sid: Sid) => {
     const session = ctx.session(sid);
@@ -313,6 +322,7 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
   return {
     elsewhere: (sid: Sid | null) => (sid ? (elsewhere.views[sid] ?? null) : null),
     refreshElsewhere: (sid: Sid) => elsewhere.refresh(sid),
+    takeHandedCard,
     dispose() {
       stopLocks();
       for (const off of offs) off();

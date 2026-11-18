@@ -24,6 +24,7 @@ import {
   coversFully,
   defaultGeometry,
   dropTargetAt,
+  freeGeometry,
   geometryOf,
   intersects,
   openWindowCap,
@@ -58,6 +59,17 @@ describe("placement", () => {
     expect(cascadeGeometry(taken)).toMatchObject({ dxRem: 2.5, dyRem: 2.5 });
     taken.push({ sid: "b", state: "open", geometry: cascadeGeometry(taken) });
     expect(cascadeGeometry(taken)).toMatchObject({ dxRem: 4.5, dyRem: 4.5 });
+  });
+
+  it("moves a returning window off a spot an open one holds, and keeps a free spot as it is", () => {
+    const spot = defaultGeometry();
+    const open: FloatingWindow[] = [{ sid: "b", state: "open", geometry: defaultGeometry() }];
+    expect(freeGeometry(spot, open)).toMatchObject({ dxRem: 2.5, dyRem: 2.5 });
+    const near = { ...spot, dxRem: spot.dxRem + 1, dyRem: spot.dyRem + 1 };
+    expect(freeGeometry(near, open)).toMatchObject({ dxRem: 3.5, dyRem: 3.5 });
+    const away = { ...spot, dxRem: 20 };
+    expect(freeGeometry(away, open)).toEqual(away);
+    expect(freeGeometry(spot, [{ ...open[0], state: "minimised" }])).toEqual(spot);
   });
 
   it("ignores a minimised window's spot", () => {

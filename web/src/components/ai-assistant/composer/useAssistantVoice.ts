@@ -61,6 +61,9 @@ export const VOICE_LIMIT_MS = 120_000;
 /** With zero results by then, the session is silent (B58). */
 export const SILENCE_MS = 8_000;
 
+/** After a stop, the engine gets this long to deliver the last words. */
+export const PROCESSING_MS = 2_000;
+
 /** Input above this level counts as speech for B58. */
 export const SPEECH_LEVEL_DBFS = -50;
 
@@ -72,6 +75,8 @@ const TICK_MS = 100;
 const ENTER_HINT_MS = 3_000;
 
 const LEVEL_FLOOR_DBFS = -60;
+
+const GRACEFUL_STOPS: ReadonlySet<VoiceStopReason> = new Set(["mic", "escape", "release"]);
 
 const IDLE = { phase: "idle", owner: null, via: null, tail: "", elapsedMs: 0, level: 0 } as const;
 
@@ -103,12 +108,23 @@ export type VoiceMode = "off" | "browser";
 /** What a text entry may offer: `silent` keeps a disabled mic rather than removing it mid-use (`40` §1.8.4). */
 export type VoiceStatus = "off" | "unsupported" | "silent" | "ready";
 
-/** `none` renders no mic; `crossed` is a reason a new press cannot help; `off` is an admin's Turn on. */
+/** `none` renders no mic; `crossed` is a reason a new press cannot help; `off` is an admin's Off in Settings. */
 export type VoiceMic = "none" | "live" | "crossed" | "off";
 
-export type VoicePhase = "idle" | "waiting" | "listening";
+export type VoicePhase = "idle" | "waiting" | "listening" | "processing";
 
 export type VoiceVia = "mic" | "hold";
+
+/** What the mic shows; every composer reads this, never the owner (F11). */
+export type DictationPhase =
+  | "idle"
+  | "requesting"
+  | "listening"
+  | "processing"
+  | "denied"
+  | "unavailable"
+  | "unsupported"
+  | "off";
 
 export type VoiceStopReason = "mic" | "escape" | "enter" | "send" | "release" | "other";
 
@@ -214,6 +230,7 @@ export interface VoiceComposer {
   /** Mic off for now, but still there. */
   offline: ComputedRef<boolean>;
   mine: ComputedRef<boolean>;
+  phase: ComputedRef<DictationPhase>;
   listening: ComputedRef<boolean>;
   waiting: ComputedRef<boolean>;
   denied: ComputedRef<boolean>;
@@ -233,8 +250,6 @@ export interface VoiceComposer {
   /** The browser brand whose help page explains a blocked microphone. */
   brand(): VoiceBrand;
   sentence: ComputedRef<I18nText | null>;
-  /** Saves the opt-in, which makes the mic live in place. */
-  turnOn(): void;
   press(via: VoiceVia): void;
   retry(): void;
   stop(reason: VoiceStopReason): void;
@@ -257,6 +272,8 @@ interface VoiceRun {
   speechMs: number;
   words: number;
   buffer: VoiceResultItem[];
+  /** Set while the engine finishes after a stop; the reason the stop reports. */
+  stopping: VoiceStopReason | null;
 }
 
 /** The tab's one controller; a spec swaps its engine with `resetVoiceForTests`. */
@@ -292,6 +309,7 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
   let run: VoiceRun | null = null;
   let composing = false;
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
+  let stopTimer: ReturnType<typeof setTimeout> | null = null;
   let holding = false;
 
   function insert(current: VoiceRun, piece: string): void {
@@ -335,6 +353,8 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
     if (current.timer) clearInterval(current.timer);
     current.meter?.close();
     current.session?.abort();
+    if (stopTimer) clearTimeout(stopTimer);
+    stopTimer = null;
     if (end.kind !== "cancelled") {
       for (const item of current.buffer) if (item.final) insert(current, item.text);
       settleTail(current);
@@ -369,11 +389,12 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
 
   // Continuous recognisers end on their own after a pause or at a vendor cap; what was heard is kept as a stop.
   function endHeard(current: VoiceRun): void {
-    finish(current, { kind: "stopped", reason: "other", words: 0 });
+    finish(current, { kind: "stopped", reason: current.stopping ?? "other", words: 0 });
   }
 
   function onError(current: VoiceRun, code: string): void {
     if (code === "aborted") return;
+    if (current.stopping) return endHeard(current);
     if (current.results > 0 && code === "no-speech") return endHeard(current);
     if (current.results > 0) return fail(current, "stt_unavailable");
     if (code === "not-allowed") return fail(current, "mic_denied");
@@ -407,7 +428,7 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
         },
         onEnd() {
           if (!live()) return;
-          if (current.results > 0) endHeard(current);
+          if (current.results > 0 || current.stopping) endHeard(current);
           else failSilent(current);
         },
       },
@@ -434,6 +455,7 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
       speechMs: 0,
       words: 0,
       buffer: [],
+      stopping: null,
     };
     run = current;
     const anchor = target.read().caret;
@@ -454,8 +476,24 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
 
   function stop(reason: VoiceStopReason): void {
     if (!run) return;
+    if (state.phase === "listening" && run.session?.stop && GRACEFUL_STOPS.has(reason))
+      return drain(run, reason);
     const cancelled = state.phase === "waiting";
     finish(run, cancelled ? { kind: "cancelled" } : { kind: "stopped", reason, words: 0 });
+  }
+
+  // A mic or Escape stop lets the engine hand over its last words; a send cannot wait for them.
+  function drain(current: VoiceRun, reason: VoiceStopReason): void {
+    current.stopping = reason;
+    state.phase = "processing";
+    if (current.timer) clearInterval(current.timer);
+    current.timer = null;
+    current.meter?.close();
+    current.meter = null;
+    current.session?.stop?.();
+    stopTimer = setTimeout(() => {
+      if (run === current) endHeard(current);
+    }, PROCESSING_MS);
   }
 
   function noteEdit(caret: number): void {
@@ -641,7 +679,6 @@ export function holdKeys(): string {
 export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer {
   const { t } = useI18nTyped();
   const store = useAssistantStore();
-  const capability = useAssistantCapability();
   const availability = useVoiceAvailability();
   const controller = voiceController();
   const state = controller.state;
@@ -661,13 +698,25 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
   const offline = computed(() => !state.online && !state.onDevice);
   const mic = computed<VoiceMic>(() => {
     if (options.touch() || status.value === "unsupported") return "none";
-    if (status.value === "off") return capability.value.isAdmin ? "off" : "none";
+    if (status.value === "off") return "off";
     const unavailable =
       status.value === "silent" || state.denied || state.languageRefused || offline.value;
     return unavailable && !mine.value ? "crossed" : "live";
   });
   const show = computed(() => mic.value !== "none");
   const brand = () => controller.engine.brand();
+  const phase = computed<DictationPhase>(() => {
+    if (mine.value)
+      return state.phase === "waiting"
+        ? "requesting"
+        : state.phase === "processing"
+          ? "processing"
+          : "listening";
+    if (mic.value === "none") return "unsupported";
+    if (mic.value === "off") return "off";
+    if (state.denied) return "denied";
+    return mic.value === "crossed" ? "unavailable" : "idle";
+  });
 
   const languageLine = computed(() =>
     t("assistant.voice.language", { language: raw(languageEndonym(getIntlLocale())) }),
@@ -774,11 +823,6 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
     begin(via);
   }
 
-  function turnOn(): void {
-    const key = store.state.userOrgKey;
-    if (key) setVoiceOptIn(key, true);
-  }
-
   function stopMine(reason: VoiceStopReason): void {
     if (mine.value) controller.stop(reason);
   }
@@ -813,6 +857,7 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
     mic,
     offline,
     mine,
+    phase,
     listening,
     waiting,
     denied: computed(() => state.denied),
@@ -832,7 +877,6 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
     firstUse,
     brand,
     sentence: availability.sentence,
-    turnOn,
     press,
     retry: () => press("mic"),
     stop: stopMine,

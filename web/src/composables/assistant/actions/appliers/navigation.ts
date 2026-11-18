@@ -65,7 +65,7 @@ export async function openTarget(
   const router = env.router();
   const session = env.store().state.sessions[sid];
   if (!router || !session) return { ok: false, reason: "failed" };
-  // A page the license leaves out is never opened, by a click or by Auto Navigation; the card stays.
+  // A page the license leaves out is never opened; the card stays.
   if (isLicenseLocked(router, target)) return { ok: false, reason: "gated" };
   const { org_identifier: _org, ...query }: Record<string, string> = { ...(target.query ?? {}) };
   const traces = target.name === EXPLORER_ROUTE_NAMES.traces;

@@ -16,26 +16,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex h-7 min-h-7 min-w-0 items-center gap-1.5 overflow-hidden px-0.5 max-md:h-11 pointer-coarse:h-11"
+    class="flex min-h-7 min-w-0 items-center gap-1.5 overflow-hidden px-0.5 max-md:min-h-11 pointer-coarse:min-h-11"
     data-test="assistant-composer-strip"
   >
     <span
       v-if="notice"
       :title="notice.sentence"
-      class="text-text-body flex min-w-0 items-center gap-1.5 text-xs leading-none font-medium whitespace-nowrap"
+      class="text-text-body flex min-w-0 items-center gap-1.5 text-xs font-medium"
       data-test="assistant-composer-notice"
       :data-notice="notice.id"
     >
-      <OIcon :name="TONE_GLYPH[notice.tone]" size="xs" :class="TONE_CLASS[notice.tone]" />
-      <span aria-hidden="true" data-test="assistant-composer-notice-title">{{ notice.title }}</span>
+      <OIcon
+        :name="TONE_GLYPH[notice.tone]"
+        size="xs"
+        :class="[TONE_CLASS[notice.tone], 'shrink-0']"
+      />
+      <span
+        aria-hidden="true"
+        class="min-w-0 py-1 leading-snug break-words"
+        data-test="assistant-composer-notice-title"
+        >{{ notice.title }}</span
+      >
       <template v-for="link in notice.links" :key="link.action">
-        <span aria-hidden="true" class="text-text-secondary font-normal">·</span>
+        <span aria-hidden="true" class="text-text-secondary shrink-0 font-normal">·</span>
         <slot v-if="$slots[`link-${link.action}`]" :name="`link-${link.action}`" />
         <OButton
           v-else
           variant="ghost-primary"
           size="chip"
-          :class="STRIP_LINK_CLASS"
+          :class="[STRIP_LINK_CLASS, 'shrink-0 whitespace-nowrap']"
           :data-test="`assistant-composer-notice-${link.action}`"
           @click="emit('action', link.action)"
         >
@@ -47,9 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="flex min-w-0 flex-1 items-center self-stretch overflow-hidden">
       <slot />
     </div>
-    <span class="ms-auto flex flex-none items-center">
-      <slot name="sees" />
-    </span>
   </div>
 </template>
 

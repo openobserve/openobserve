@@ -252,12 +252,10 @@ export interface PendingConfirmation {
   tool: string;
   args: Record<string, any>;
   message: I18nText;
-  navAction?: NavigationAction;
 }
 
 export interface ReducerCtx {
   isActive: boolean;
-  autoNavigationEnabled: boolean;
   phase: StreamPhase;
   t: TranslateFn;
   generateNavigation: (
@@ -304,7 +302,6 @@ export type StreamEffect =
   | { kind: "scroll"; whenActive?: boolean }
   | { kind: "save" }
   | { kind: "throttledSave"; force: boolean }
-  | { kind: "navigate"; action: NavigationAction }
   | { kind: "confirmPost"; approved: boolean }
   | { kind: "dashboardEvent"; payload: AiDashboardEvent }
   | { kind: "animateTitle"; title: string }
@@ -406,10 +403,8 @@ function reduceConfirmationRequired(
     return effects;
   }
 
-  if (data.tool === "navigation_action" && ctx.autoNavigationEnabled) {
-    effects.push({ kind: "confirmPost", approved: true });
-    return effects;
-  }
+  // A navigation is a link card the user clicks, never a prompt.
+  if (data.tool === "navigation_action") return effects;
 
   // data.message is always set by the backend: a validated navigation label, or "Confirm execution of {tool}?".
   const confirmBlock: ContentBlock = {
@@ -623,45 +618,10 @@ function reduceToolResult(state: StreamState, data: any, ctx: ReducerCtx): Strea
   return effects;
 }
 
-function reduceNavigationAction(state: StreamState, data: any, ctx: ReducerCtx): StreamEffect[] {
+// Only the typed path draws the link card; here a navigation never prompts and never routes.
+function reduceNavigationAction(state: StreamState, ctx: ReducerCtx): StreamEffect[] {
   const effects: StreamEffect[] = [];
   finalizeTextBlock(state, ctx, effects);
-
-  if (!ctx.isActive) return effects;
-
-  const navAction: NavigationAction = {
-    resource_type: data.resource_type,
-    action: data.action,
-    label: data.label,
-    target: data.target,
-  };
-
-  if (ctx.autoNavigationEnabled) {
-    effects.push({ kind: "navigate", action: navAction });
-    return effects;
-  }
-
-  const confirmBlock: ContentBlock = {
-    type: "tool_call",
-    tool: "navigation_action",
-    message: data.label || ctx.t("aiAssistant.aiChat.navigateConfirmQuestion"),
-    context: { navAction },
-    pendingConfirmation: true,
-    confirmationMessage: data.label,
-    confirmationArgs: data.target || {},
-  };
-  state.activeToolCall = null;
-
-  appendBlock(state, confirmBlock);
-
-  state.pendingConfirmation = {
-    tool: "navigation_action",
-    args: data.target || {},
-    message: data.label || ctx.t("aiAssistant.aiChat.navigateConfirmQuestion"),
-    navAction,
-  };
-
-  effects.push({ kind: "scroll" });
   return effects;
 }
 
@@ -750,7 +710,7 @@ export function reduce(state: StreamState, data: any, ctx: ReducerCtx): StreamEf
   if (data && data.type === "tool_result") return reduceToolResult(state, data, ctx);
   // ponytail: phase gate reproduces the tail-flush handler gap on purpose. Delete with the follow-up fix.
   if (data && data.type === "navigation_action" && ctx.phase === "stream") {
-    return reduceNavigationAction(state, data, ctx);
+    return reduceNavigationAction(state, ctx);
   }
 
   const streamText = extractStreamText(data);

@@ -17,7 +17,7 @@ import type { FloatingWindow, WindowGeometry } from "./assistantStore.types";
 
 export const MAX_FLOATING_CHATS = 4;
 
-export const WINDOW_DEFAULT_W_REM = 24;
+export const WINDOW_DEFAULT_W_REM = 28;
 
 export const WINDOW_DEFAULT_H_REM = 36;
 
@@ -97,16 +97,24 @@ export function defaultGeometry(): WindowGeometry {
 
 /** The next window steps toward the start and top while its spot is taken. */
 export function cascadeGeometry(taken: readonly FloatingWindow[]): WindowGeometry {
-  const next = defaultGeometry();
-  const occupied = (geometry: WindowGeometry) =>
+  return freeGeometry(defaultGeometry(), taken);
+}
+
+/** A window keeps its spot unless an open one sits within a cascade step of it; then it steps on until clear. */
+export function freeGeometry(
+  geometry: WindowGeometry,
+  taken: readonly FloatingWindow[],
+): WindowGeometry {
+  const next = { ...geometry };
+  const occupied = () =>
     taken.some(
       ({ geometry: other, state }) =>
         state === "open" &&
-        other.corner === geometry.corner &&
-        other.dxRem === geometry.dxRem &&
-        other.dyRem === geometry.dyRem,
+        other.corner === next.corner &&
+        Math.abs(other.dxRem - next.dxRem) < CASCADE_REM &&
+        Math.abs(other.dyRem - next.dyRem) < CASCADE_REM,
     );
-  while (occupied(next)) {
+  while (occupied()) {
     next.dxRem += CASCADE_REM;
     next.dyRem += CASCADE_REM;
   }

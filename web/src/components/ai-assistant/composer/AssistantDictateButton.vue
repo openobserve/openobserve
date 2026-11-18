@@ -18,12 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AssistantIconButton
     :label="t('assistant.voice.dictate')"
     :icon="glyph"
-    size="md"
-    :on="pressed"
-    :pressed="pressed"
-    :disabled="mic === 'crossed'"
+    :size="BAR_CONTROL_SIZE"
+    :pressed="phase === 'listening' || phase === 'processing'"
+    :loading="phase === 'requesting' || phase === 'processing'"
+    :disabled="CROSSED.has(phase)"
     :disabled-reason="disabledReason"
-    :class="pressed ? ROUND_ACTION_CLASS : ''"
+    :class="TONE[phase] ?? ''"
+    :data-phase="phase"
     data-test="assistant-dictate"
     @click="(event: MouseEvent) => emit('press', event)"
   >
@@ -32,13 +33,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import type { DictationPhase } from "./useAssistantVoice";
 import type { I18nText } from "@/types/i18n";
 
 export interface AssistantDictateButtonProps {
-  /** `live` presses; `crossed` is unavailable and says why; `off` asks the composer to offer Turn on. */
-  mic: "live" | "crossed" | "off";
-  /** Dictating now: the slot becomes a filled round Stop in place; the name stays Dictate and `aria-pressed` says the state. */
-  pressed: boolean;
+  /** The one state machine every composer shows the mic from (D2). */
+  phase: DictationPhase;
   /** Why a crossed mic cannot start; it stays focusable so the reason can be read. */
   disabledReason?: I18nText;
 }
@@ -46,6 +46,13 @@ export interface AssistantDictateButtonProps {
 export interface AssistantDictateButtonEmits {
   (e: "press", event: MouseEvent): void;
 }
+
+const CROSSED: ReadonlySet<DictationPhase> = new Set(["denied", "unavailable", "off"]);
+
+const TONE: Partial<Record<DictationPhase, string>> = {
+  listening: "text-status-error-text!",
+  denied: "text-status-error-text!",
+};
 </script>
 
 <script setup lang="ts">
@@ -55,7 +62,7 @@ import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconB
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-import { ROUND_ACTION_CLASS } from "./AssistantComposerBottomRow.vue";
+import { BAR_CONTROL_SIZE } from "./AssistantComposerBottomRow.vue";
 import { holdKeys } from "./useAssistantVoice";
 
 const props = withDefaults(defineProps<AssistantDictateButtonProps>(), {
@@ -67,13 +74,13 @@ const emit = defineEmits<AssistantDictateButtonEmits>();
 const { t } = useI18nTyped();
 
 const glyph = computed(() => {
-  if (props.pressed) return assistantGlyph.stop;
-  return props.mic === "crossed" ? assistantGlyph.dictateOff : assistantGlyph.dictate;
+  if (props.phase === "listening" || props.phase === "processing") return assistantGlyph.stop;
+  return CROSSED.has(props.phase) ? assistantGlyph.dictateOff : assistantGlyph.dictate;
 });
 
 const tooltip = computed(() => {
-  if (props.mic === "off") return t("assistant.voice.offAdmin");
-  return props.pressed
+  if (props.phase === "off") return t("assistant.voice.offAdmin");
+  return props.phase === "listening"
     ? t("assistant.voice.stopTooltip")
     : t("assistant.voice.tooltip", { keys: raw(holdKeys()) });
 });

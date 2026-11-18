@@ -179,7 +179,7 @@ describe("AssistantApprovalResult", () => {
     ["declined", "Denied: delete 2 alerts"],
     ["new_chat", "Declined because you started a new chat"],
     ["stopped", "Declined · you stopped the answer"],
-    ["withdrawn", "This request is no longer valid. The conversation moved on."],
+    ["withdrawn", "This request is no longer valid."],
     ["expired", "Request expired. Nothing was changed."],
   ] as const)("reads %s as its own record", (state, text) => {
     const { wrapper } = mountRecord({ outcome: { state, at: 1 } });
@@ -231,9 +231,7 @@ describe("AssistantApprovalResult", () => {
 
   it("says a card another decision holds is already being decided, with no Send again (O2AI-01)", () => {
     const { wrapper } = mountRecord({ outcome: { state: "deciding", at: 1 } });
-    expect(line(wrapper)).toBe(
-      "This request is already being decided in another tab. Checking how it ends…",
-    );
+    expect(line(wrapper)).toBe("Being decided in another tab…");
     expect(wrapper.find('[data-test="assistant-approval-result-send-again"]').exists()).toBe(false);
   });
 
@@ -246,7 +244,7 @@ describe("AssistantApprovalResult", () => {
 
   it("says a replayed card has no record here, and offers no action on a readonly page", () => {
     const { wrapper } = mountRecord(null, { readonly: true });
-    expect(line(wrapper)).toBe("This browser has no record of how this request was answered.");
+    expect(line(wrapper)).toBe("No answer recorded in this browser.");
     expect(wrapper.find("button, a").exists()).toBe(false);
   });
 
@@ -550,7 +548,7 @@ describe("AssistantApprovalResult", () => {
         }).wrapper,
       );
     expect(ended("expired")).toBe("Request expired. Nothing was changed.");
-    expect(ended("withdrawn")).toBe("This request is no longer valid. The conversation moved on.");
+    expect(ended("withdrawn")).toBe("This request is no longer valid.");
   });
 
   it("reads a replayed card's server approval row as this user's own decision", () => {
@@ -562,9 +560,7 @@ describe("AssistantApprovalResult", () => {
     expect(line(recorded("denied").wrapper)).toBe("Denied: delete 2 alerts");
     expect(line(recorded("expired").wrapper)).toBe("Request expired. Nothing was changed.");
     expect(recorded("denied").wrapper.find("button, a").exists()).toBe(false);
-    expect(line(recorded("withdrawn").wrapper)).toBe(
-      "This request is no longer valid. The conversation moved on.",
-    );
+    expect(line(recorded("withdrawn").wrapper)).toBe("This request is no longer valid.");
   });
 
   it("reads a card recovered from this browser's copy as approved without a made-up time, and with the server's time when it has one", () => {
@@ -606,9 +602,7 @@ describe("AssistantApprovalResult", () => {
       },
     });
     await flushPromises();
-    expect(line(wrapper)).toBe(
-      "Waiting for your approval in the tab where you asked. Approve or deny it there, or stop this answer.",
-    );
+    expect(line(wrapper)).toBe("Waiting for your approval in another tab");
     await wrapper.get('[data-test="assistant-approval-result-stop"]').trigger("click");
     expect(wrapper.emitted("stop")).toHaveLength(1);
   });
@@ -999,8 +993,27 @@ describe("AssistantApprovalResult", () => {
       });
       await nextTick();
       expect(single.wrapper.get('[data-test="assistant-approval-result-undo-limits"]').text()).toBe(
-        "Undo restores the object. Notifications already sent and data already deleted stay as they are.",
+        "Sent notifications and deleted data can't be undone.",
       );
+    });
+
+    it("leaves the undo-limits sentence off a created dashboard's Undo", async () => {
+      const created = mountRecord({ outcome: { state: "done", at: 1 } });
+      created.evidence.store.state.sessions[created.evidence.sid]!.ledger.push({
+        id: "led-2",
+        approvalId: "c9",
+        turnId: "t1",
+        tool: "CreateDashboard",
+        op: "create",
+        resource: { type: "dashboard", name: "Ops" },
+        status: "done",
+        undoable: true,
+        at: 1,
+      });
+      await nextTick();
+      expect(
+        created.wrapper.find('[data-test="assistant-approval-result-undo-limits"]').exists(),
+      ).toBe(false);
     });
   });
   describe("pass 3: gathered pauses and standing grants", () => {
@@ -1375,9 +1388,7 @@ describe("AssistantApprovalResult", () => {
       await flushPromises();
       const always = wrapper.get('[data-test="assistant-approval-result-always"]');
       expect(always.attributes("data-grant")).toBe("not_stored");
-      expect(always.text()).toBe(
-        `Approved this once. It wasn't saved for later, so ${brandNames.autobot} will ask next time.`,
-      );
+      expect(always.text()).toBe(`Approved once. ${brandNames.autobot} will ask next time.`);
       expect(wrapper.find('[data-test="assistant-approval-result-revoke"]').exists()).toBe(false);
     });
 

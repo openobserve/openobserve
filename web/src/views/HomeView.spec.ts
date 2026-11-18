@@ -1058,7 +1058,7 @@ describe("HomeView", () => {
         // The words the thread's time chip draws for its window.
         const chip = async (override: { from: number; to: number; period: string } | null) => {
           const window = timeWindowOf(await contextRegistry.getActiveContext(), override);
-          return String(gt("assistant.context.time.last", { period: timeRangeShortText(window) }));
+          return String(gt("assistant.context.time.past", { period: timeRangeShortText(window) }));
         };
         try {
           await router.replace({
@@ -1068,14 +1068,14 @@ describe("HomeView", () => {
           wrapper = mountHome();
           await resolveKey("k1");
           await settleAsync();
-          expect(await chip(null)).toBe("Last 15 min");
-          expect(await chip({ from: 0, to: 3_600_000, period: "1h" })).toBe("Last 1 h");
+          expect(await chip(null)).toBe("Past 15 min");
+          expect(await chip({ from: 0, to: 3_600_000, period: "1h" })).toBe("Past 1 h");
           await router.replace({
             name: "home",
             query: { tab: "ai", thread: "panel", period: "7d" },
           });
           await flushPromises();
-          expect(await chip(null)).toBe("Last 7 days");
+          expect(await chip(null)).toBe("Past 7 days");
         } finally {
           delete (assistant as Record<string, unknown>).shell;
           delete (assistant as Record<string, unknown>).sessions;
@@ -1149,8 +1149,8 @@ describe("HomeView", () => {
         await settleAsync();
         const window = timeWindowOf(await contextRegistry.getActiveContext(), null);
         expect(
-          String(gt("assistant.context.time.last", { period: timeRangeShortText(window) })),
-        ).toBe("Last 15 min");
+          String(gt("assistant.context.time.past", { period: timeRangeShortText(window) })),
+        ).toBe("Past 15 min");
         await router.replace({ path: "/" }).catch(() => undefined);
       });
 

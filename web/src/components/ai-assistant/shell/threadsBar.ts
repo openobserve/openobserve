@@ -21,8 +21,9 @@ export type TrayState = "needsYou" | "working" | "failed" | "idle";
 /** The chat's state: waiting for the person, answering, failed, or quiet. */
 export function trayState(session: AssistantSession | undefined): TrayState {
   if (!session) return "idle";
-  if (session.pendingApproval || session.turn.state === "awaiting_consent") return "needsYou";
   const state = session.turn.state;
+  if (session.pendingApproval || state === "awaiting_approval" || state === "awaiting_consent")
+    return "needsYou";
   if (state === "failed" || state === "refused") return "failed";
   if (state === "done" || state === "stopped") return "idle";
   return state === "idle" ? "idle" : "working";
@@ -37,11 +38,11 @@ export const INCIDENT_PILLS = 5;
 /** Pills shown for the user's own threads. */
 export const THREAD_PILLS = 5;
 
-/** One own thread in the bar: running shows a spinner, unread a dot, waiting an approval badge. */
+/** One own thread in the bar; its signal picks the shared status dot. */
 export interface ThreadPill {
   sid: string;
   title: string;
-  signal: "running" | "unread" | "approval" | "idle";
+  signal: "running" | "unread" | "approval" | "failed" | "idle";
 }
 
 export interface IncidentPills {
@@ -70,7 +71,7 @@ export function threadPills(
   candidates: readonly ThreadPill[],
   minimised: readonly string[],
 ): ThreadPill[] {
-  const rank = { approval: 0, running: 1, unread: 2, idle: 3 } as const;
+  const rank = { approval: 0, running: 1, failed: 2, unread: 2, idle: 3 } as const;
   const seen = new Set(minimised);
   const out: ThreadPill[] = [];
   for (const pill of [...candidates].sort((a, b) => rank[a.signal] - rank[b.signal])) {

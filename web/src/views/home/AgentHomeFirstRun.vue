@@ -45,7 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AgentHomeAskNote v-if="offReason" :reason="offReason" :org="org" />
       <!-- mt-6 leaves room for the chip row that floats above the box, clear of the note -->
       <AssistantLauncher v-else ref="launcher" layout="overview" class="mt-6" />
-      <AssistantHomeExamples v-if="state === 'ai'" @select="launcher?.fill($event)" />
+      <AssistantHomeExamples
+        v-if="state === 'ai'"
+        @select="(prompt, agent) => launcher?.fill(prompt, agent)"
+      />
     </div>
   </section>
 </template>

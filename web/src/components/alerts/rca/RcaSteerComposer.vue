@@ -69,61 +69,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ chip.label }}
             </OButton>
           </div>
-          <template #sees>
-            <OPopover
-              side="top"
-              align="end"
-              :aria-label="t('assistant.context.title')"
-              content-class="w-max max-w-[min(26rem,calc(100vw-1.5rem))] p-3"
-            >
-              <template #trigger>
-                <AssistantIconButton
-                  :label="t('assistant.context.title')"
-                  :icon="assistantGlyph.info"
-                  data-test="rca-steer-sees"
-                />
-              </template>
-              <section
-                class="flex flex-col gap-2"
-                data-dd-privacy="mask"
-                data-assistant-surface
-                data-test="rca-steer-sees-popover"
-              >
-                <OText variant="card-title" as="h2">{{ t("assistant.context.title") }}</OText>
-                <OText variant="meta" as="p">
-                  {{
-                    waitingInput
-                      ? t("alerts.incidents.rcaSteer.composerHintPaused")
-                      : t("alerts.incidents.rcaSteer.composerHintLive")
-                  }}
-                </OText>
-                <OText variant="meta" as="p" data-test="rca-steer-sending-as">
-                  {{ t("alerts.incidents.rcaSteer.sendingAs", { email: authorEmail }) }}
-                </OText>
-                <OText v-if="waitingInput" variant="meta" as="p" data-test="rca-steer-answer-note">
-                  {{ t("alerts.incidents.rcaSteer.answerNote") }}
-                </OText>
-              </section>
-            </OPopover>
-          </template>
         </AssistantComposerStrip>
+      </template>
+      <template #corner>
+        <AssistantContextInfo :rows="contextRows" />
       </template>
       <template #bar>
         <AssistantComposerBottomRow>
           <template #agent>
             <AssistantAgentPill agent="sre" />
           </template>
-          <AssistantIconButton
-            variant="primary"
-            size="md"
-            :label="t('alerts.incidents.rcaSteer.send')"
-            :icon="assistantGlyph.send"
-            :disabled="!canSend"
-            :loading="sending"
-            :class="SEND_ACTION_CLASS"
-            data-test="rca-steer-send-btn"
-            @click="submit"
-          />
+          <template #send>
+            <AssistantIconButton
+              variant="primary"
+              :size="BAR_CONTROL_SIZE"
+              :label="t('alerts.incidents.rcaSteer.send')"
+              :icon="assistantGlyph.send"
+              :disabled="!canSend"
+              :loading="sending"
+              :class="SEND_ACTION_CLASS"
+              data-test="rca-steer-send-btn"
+              @click="submit"
+            />
+          </template>
         </AssistantComposerBottomRow>
       </template>
     </AssistantComposerFrame>
@@ -140,16 +108,18 @@ import AssistantAgentPill, {
   AGENT_PICKER_CLASS,
 } from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
 import AssistantComposerBottomRow, {
+  BAR_CONTROL_SIZE,
   SEND_ACTION_CLASS,
 } from "@/components/ai-assistant/composer/AssistantComposerBottomRow.vue";
 import AssistantComposerFrame from "@/components/ai-assistant/composer/AssistantComposerFrame.vue";
 import AssistantComposerStrip from "@/components/ai-assistant/composer/AssistantComposerStrip.vue";
 import { pickNotice, sentenceNotice } from "@/components/ai-assistant/composer/composerNotice";
 import { CHIP_HIT_AREA_CLASS } from "@/components/ai-assistant/composer/composerUi";
+import AssistantContextInfo, {
+  type AssistantContextInfoRow,
+} from "@/components/ai-assistant/context/AssistantContextInfo.vue";
 import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OText from "@/lib/core/Typography/OText.vue";
-import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import type { RcaOpenQuestion } from "@/services/incidents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { isClosedRunRefusal } from "@/utils/incidents/rcaSteering";
@@ -231,6 +201,21 @@ const notice = computed(() =>
       },
   ]),
 );
+
+const contextRows = computed<AssistantContextInfoRow[]>(() => [
+  {
+    id: "incident",
+    label: t("assistant.context.field.incident"),
+    value: t("alerts.incidents.rcaSteer.thisIncident"),
+  },
+  {
+    id: "author",
+    label: t("alerts.incidents.rcaSteer.sentAs"),
+    value: raw(props.authorEmail),
+    secondary: t("alerts.incidents.rcaSteer.visibleOnIncident"),
+    secondaryTest: "rca-steer-sending-as",
+  },
+]);
 
 const canSend = computed(() => draft.value.trim().length > 0 && !props.sending);
 

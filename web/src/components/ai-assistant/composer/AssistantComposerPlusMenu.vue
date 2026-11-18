@@ -15,95 +15,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODropdown
-    v-if="items.length > 0"
-    side="top"
-    align="start"
-    privacy="mask"
-    @close-auto-focus="onClosed"
-  >
+  <ODropdown v-if="items.length > 0 || connectorsShown" side="top" align="start" privacy="mask">
     <template #trigger>
       <AssistantIconButton
         :label="t('assistant.composer.plus')"
         :icon="assistantGlyph.addContext"
-        size="md"
+        :size="BAR_CONTROL_SIZE"
         :disabled="disabled"
         data-test="assistant-composer-plus"
       />
     </template>
-    <ODropdownItem
-      v-for="item in items"
-      :key="item.id"
-      :icon-left="item.icon"
-      :data-test="item.test"
-      @select="choose(item.id)"
-    >
-      {{ item.label }}
-    </ODropdownItem>
+    <template v-for="item in items" :key="item.id">
+      <ODropdownItem :icon-left="item.icon" :data-test="item.test" @select="choose(item.id)">
+        {{ item.label }}
+      </ODropdownItem>
+      <AssistantConnectorsMenu v-if="item.id === 'attach' && connectorsShown" />
+    </template>
+    <AssistantConnectorsMenu v-if="connectorsShown && !actions.includes('attach')" />
   </ODropdown>
 </template>
 
 <script lang="ts">
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 
-export type ComposerPlusAction = "attach" | "context" | "time" | "recall";
+/** `connectors` opens its own submenu; the others emit `select`. */
+export type ComposerPlusAction = "attach" | "connectors";
 
 export interface AssistantComposerPlusMenuProps {
-  /** What the menu offers; it always lists them as Attach Image, Add Context, Time Range, Recent Prompts. */
+  /** What the menu offers, always listed as Photo, Connectors (D3). */
   actions: readonly ComposerPlusAction[];
   disabled?: boolean;
 }
 
 export interface AssistantComposerPlusMenuEmits {
-  (e: "select", action: ComposerPlusAction): void;
+  (e: "select", action: Exclude<ComposerPlusAction, "connectors">): void;
 }
 
-// The listing order; the image and recall ids are the ones their old bottom-row buttons had.
+// The image id is the one its old bottom-row button had.
 const ITEMS = [
   { id: "attach", icon: assistantGlyph.chipImage, test: "assistant-attach-image" },
-  { id: "context", icon: assistantGlyph.chipStream, test: "assistant-composer-add-context" },
-  { id: "time", icon: assistantGlyph.chipTime, test: "assistant-composer-time-range" },
-  { id: "recall", icon: assistantGlyph.history, test: "assistant-recall-open" },
-] as const satisfies readonly { id: ComposerPlusAction; icon: string; test: string }[];
+] as const satisfies readonly {
+  id: Exclude<ComposerPlusAction, "connectors">;
+  icon: string;
+  test: string;
+}[];
 </script>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useStore } from "vuex";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18nTyped } from "@/types/i18n";
+import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
+
+import { BAR_CONTROL_SIZE } from "./AssistantComposerBottomRow.vue";
+import AssistantConnectorsMenu from "./AssistantConnectorsMenu.vue";
 
 const props = withDefaults(defineProps<AssistantComposerPlusMenuProps>(), { disabled: false });
 
 const emit = defineEmits<AssistantComposerPlusMenuEmits>();
 
 const { t } = useI18nTyped();
+const vuex = useStore();
+const { locked: toolsetsLocked } = useLicenseLock("ai_toolsets");
+const { locked: assistantLocked } = useLicenseLock("ai_assistant");
+
+// The same gates as Settings › Toolsets: the edition offers it and neither license locks the list.
+const connectorsShown = computed(
+  () =>
+    props.actions.includes("connectors") &&
+    !toolsetsLocked.value &&
+    !assistantLocked.value &&
+    checkFeatureAccess("aiToolsets", buildFeatureGateContext(vuex?.state.zoConfig)).allowed,
+);
 
 const items = computed(() => {
-  const label = {
-    attach: t("assistant.composer.attachImage"),
-    context: t("assistant.composer.addContext"),
-    time: t("assistant.composer.timeRange"),
-    recall: t("assistant.composer.recentPrompts"),
-  };
+  const label = { attach: t("assistant.composer.attachImage") };
   return ITEMS.filter((item) => props.actions.includes(item.id)).map((item) => ({
     ...item,
     label: label[item.id],
   }));
 });
 
-let chosen: ComposerPlusAction | null = null;
-
-function choose(action: ComposerPlusAction): void {
-  chosen = action;
+function choose(action: Exclude<ComposerPlusAction, "connectors">): void {
   emit("select", action);
-}
-
-// Every item but Attach Image moves focus on (the textbox, the time picker, the sheet), so the closing menu must not pull it back.
-function onClosed(event: Event): void {
-  if (chosen && chosen !== "attach") event.preventDefault();
-  chosen = null;
 }
 </script>

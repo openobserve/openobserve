@@ -74,6 +74,10 @@ export interface ApprovalDiffRow {
   value: I18nText;
   /** The value now; null when the change has no old side (a create, an added field). */
   before: I18nText | null;
+  /** `before` is the "unknown" line, not a value: it is never drawn as one being replaced. */
+  beforeUnknown?: boolean;
+  /** A list read as its names only; the card keeps the full arguments under Details. */
+  summary?: boolean;
 }
 
 /** Provided by the shell beside the evidence host. */

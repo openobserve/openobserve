@@ -4123,7 +4123,7 @@
           "note": "Automated SRE operations and insights"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "Intelligent query and analysis assistance"
         },
         "anomaly_detection": {
@@ -4983,11 +4983,11 @@
         "mcp": "Connect external AI clients ({clients}) to this organization through MCP."
       },
       "groups": {
-        "assistant": "@:{'brand.askAutobot'}",
+        "assistant": "@:{'brand.autobot'}",
         "llmObservability": "LLM observability"
       },
       "labels": {
-        "ai": "@:{'brand.askAutobot'}",
+        "ai": "@:{'brand.autobot'}",
         "ai_chat_share": "Chat sharing",
         "ai_toolsets": "Toolsets",
         "mcp": "MCP access"
@@ -10493,22 +10493,22 @@
     "placeholder": "Describe what went wrong, or paste an alert or incident link",
     "cards": {
       "whyAlertFired": {
-        "title": "Why Did My Alert Fire?",
+        "title": "Why did my alert fire?",
         "description": "Pick an alert. @:{'brand.autobot'} checks the data behind it and explains the cause.",
         "prompt": "Why did my last alert fire?"
       },
       "investigateIncident": {
-        "title": "Investigate An Incident",
+        "title": "Investigate an incident",
         "description": "Find what changed, which services are hit, and where it started.",
         "prompt": "Help me investigate my latest incident"
       },
       "errorSpike": {
-        "title": "Find The Cause Of An Error Spike",
+        "title": "Find the cause of an error spike",
         "description": "Compare errors before and after the spike, by service and message.",
         "prompt": "Find the cause of the latest error spike"
       },
       "slowService": {
-        "title": "Check A Slow Service",
+        "title": "Check a slow service",
         "description": "Look at traces and latency to find the slow step.",
         "prompt": "Find which service is slow and why"
       }
@@ -10559,7 +10559,7 @@
     "agent": {
       "askOff": {
         "budget": "AI credits for this month are used up, so {product} cannot answer",
-        "oss": "@:{'brand.askAutobot'} is part of OpenObserve Enterprise. This Open Source build has no @:{'brand.autobot'} and no incidents.",
+        "oss": "@:{'brand.autobot'} is part of OpenObserve Enterprise. This Open Source build has no @:{'brand.autobot'} and no incidents.",
         "not_entitled": "{product} is not part of this plan",
         "not_configured": "{product} is not set up for this organization yet",
         "off_for_org": "{product} is off for this organization",
@@ -10841,7 +10841,7 @@
         "prompt": "Help me write a query"
       },
       "incident": {
-        "title": "Investigate incidents",
+        "title": "Investigate issues",
         "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\"",
         "prompt": "Help me investigate an incident"
       },
@@ -10884,7 +10884,6 @@
       "unexpectedError": "An unexpected error occurred",
       "toolExecutionFailed": "Tool execution failed",
       "errorOccurred": "An error occurred",
-      "navigateConfirmQuestion": "Allow @:{'brand.autobot'} to navigate?",
       "confirmToolExecution": "Confirm execution of {tool}?",
       "entity": {
         "alert": "alert",
@@ -10918,7 +10917,7 @@
       "restored": "Restored",
       "undo": "Undo",
       "undoFailed": "Undo didn't work.",
-      "undoLimits": "Undo restores the object. Notifications already sent and data already deleted stay as they are.",
+      "undoLimits": "Sent notifications and deleted data can't be undone.",
       "undoNotYet": "Undo isn't available yet",
       "undoUnconfirmed": "Undo was sent, but its result couldn't be confirmed.",
       "undoing": "Undoing…",
@@ -10939,7 +10938,7 @@
         "when": "When"
       },
       "done": "Done",
-      "empty": "No assistant actions in this period.",
+      "empty": "No @:{'brand.autobot'} actions in this period.",
       "failed": "Failed: {cause}",
       "failedPlain": "Failed",
       "loadFailed": "Activity could not be loaded.",
@@ -10982,6 +10981,7 @@
       "moveCancelled": "Move cancelled.",
       "moveStarted": "Moving {title}. Arrow keys move it. Enter places it, Escape puts it back.",
       "narrower": "Narrower.",
+      "openedInTab": "{title} opened in a new tab.",
       "pinned": "{title} is now in the sidebar.",
       "pinnedSwapped": "{title} is now in the sidebar. {other} moved to the tray.",
       "resizeStarted": "Resizing {title}. Arrow keys change the size. Enter keeps it, Escape puts it back.",
@@ -11031,7 +11031,7 @@
       "moreTargets": "and {count} more",
       "moreTime": "More time",
       "named": "{verb} {name}",
-      "nameUnknown": "Couldn't load the name of {entity} {shortId}; you may not have access to it.",
+      "nameUnknown": "Couldn't load the name of {entity} {shortId}",
       "needsOk": "Needs you",
       "noDecision": "No answer was recorded for this request",
       "nothingSelected": "Nothing selected",
@@ -11046,6 +11046,8 @@
         "unknown": "error"
       },
       "reply": "Reply",
+      "showLess": "Show less",
+      "showMore": "Show more",
       "result": {
         "approved": "Approved · {time}",
         "approvedNoTime": "Approved",
@@ -11056,7 +11058,7 @@
         "declined": "Declined · nothing was changed",
         "declinedElsewhere": "Denied in another tab · {time}",
         "declinedNewChat": "Declined because you started a new chat",
-        "deciding": "This request is already being decided in another tab. Checking how it ends…",
+        "deciding": "Being decided in another tab…",
         "done": {
           "create": "Created {entity}",
           "delete": "Deleted {count} {entity}",
@@ -11076,9 +11078,9 @@
         "stop": "Stop",
         "stopped": "Declined · you stopped the answer",
         "unconfirmed": "Your decision was sent, but its result couldn't be confirmed.",
-        "unknown": "This browser has no record of how this request was answered.",
-        "waitingElsewhere": "Waiting for your approval in the tab where you asked. Approve or deny it there, or stop this answer.",
-        "withdrawn": "This request is no longer valid. The conversation moved on.",
+        "unknown": "No answer recorded in this browser.",
+        "waitingElsewhere": "Waiting for your approval in another tab",
+        "withdrawn": "This request is no longer valid.",
         "partialBy": {
           "change": "Changed {done} of {total} {entity} · {failed} failed",
           "create": "Created {done} of {total} {entity} · {failed} failed",
@@ -11137,7 +11139,7 @@
       "recheckFailed": "Couldn't check for changes, so nothing was written",
       "more": "More actions",
       "revokeFailed": "Couldn't revoke. Try again from Settings.",
-      "grantNotStored": "Approved this once. It wasn't saved for later, so @:{'brand.autobot'} will ask next time.",
+      "grantNotStored": "Approved once. @:{'brand.autobot'} will ask next time.",
       "actionPhrase": {
         "create": "creating {entity}",
         "pause": "pausing {entity}",
@@ -11158,11 +11160,11 @@
         "access": "Hi, could you grant me {product} access in OpenObserve ({whereToGrant}, Chat) for the {org} organization?",
         "consent": "Could you enable paid AI usage for {org}? Billing › Paid usage: {link}",
         "credits": "Could you enable paid AI usage for {org}? Billing › Paid usage: {link}",
-        "enable": "Could you turn {product} on for {org}? Settings › @:{'brand.askAutobot'} › Access: {link}",
-        "settings": "Could you change the {product} settings for {org} in Settings › @:{'brand.askAutobot'}?",
+        "enable": "Could you turn {product} on for {org}? Settings › @:{'brand.autobot'} › Access: {link}",
+        "settings": "Could you change the {product} settings for {org} in Settings › @:{'brand.autobot'}?",
         "share_read": "Could you grant me chat sharing access ({whereToGrant}, Chat sharing) in {org}?",
-        "tool_policy": "@:{'brand.autobot'} wasn't allowed to run {tool} in {org}. Could you review the permissions of @:{'brand.autobot'} in Settings › @:{'brand.askAutobot'} › Permissions?",
-        "agent_access": "Could you let me use {agent} in {product} for {org}? Settings › @:{'brand.askAutobot'} › Agents: {link}"
+        "tool_policy": "@:{'brand.autobot'} wasn't allowed to run {tool} in {org}. Could you review the permissions of @:{'brand.autobot'} in Settings › @:{'brand.autobot'} › Permissions?",
+        "agent_access": "Could you let me use {agent} in {product} for {org}? Settings › @:{'brand.autobot'} › Agents: {link}"
       },
       "messageLabel": "Message",
       "subject": {
@@ -11248,11 +11250,6 @@
       "title": "You're signed in"
     },
     "composer": {
-      "autoNavigation": {
-        "label": "Auto Navigation",
-        "enabledTooltip": "Auto navigation enabled - {product} will auto navigate without confirmation",
-        "disabledTooltip": "Auto navigation disabled - {product} will ask before navigating"
-      },
       "cleared": "Draft cleared",
       "clearedOrg": "Draft from {org} cleared",
       "draftStayed": "New chat. Your draft stayed in {chat}",
@@ -11291,10 +11288,18 @@
       "scoped": "Ask about {stream}",
       "askAgent": "Ask {agent}…",
       "sendTo": "Send to {agent}",
-      "attachImage": "Attach Image",
-      "plus": "Add to Message",
-      "addContext": "Add Context",
-      "timeRange": "Time Range",
+      "attachImage": "Photo",
+      "plus": "Add to message",
+      "connectors": {
+        "label": "Connectors",
+        "on": "{count} on",
+        "heading": "Connectors",
+        "empty": "No toolsets are on for this organization.",
+        "failed": "Couldn't load toolsets.",
+        "add": "Add a toolset",
+        "noPermission": "Only an admin can change toolsets.",
+        "toggleFailed": "Couldn't switch {name}. Try again."
+      },
       "inert": "Decide above to continue",
       "busy": "{product} is busy. Send again in {s} s.",
       "imageCap": "{name} wasn't added. Up to {count} images, {size} each.",
@@ -11302,7 +11307,6 @@
       "offline": "You're offline. Draft kept.",
       "rateLimited": "Wait for the Retry countdown to end.",
       "recalled": "Recalled prompt {n} of {count}",
-      "recentPrompts": "Recent Prompts",
       "removeImage": "Remove {name}",
       "noAccess": "You can read your chats. Starting or continuing one needs AI access.",
       "replyHelper": "Reply declines the request",
@@ -11318,13 +11322,13 @@
       "followUpAt": "Ask a follow-up · {'@'} to add context",
       "queued": "{count} queued",
       "queuedEdit": "Edit",
-      "steerPlaceholder": "Steer this run · read after the current step",
+      "steerPlaceholder": "Steer this run",
       "strip": {
         "runLimit": "Run limit reached",
         "showRunning": "Show running chats",
         "creditsOut": "AI credits used up",
         "managePaid": "Manage paid usage",
-        "orgBusy": "Assistant busy for your org",
+        "orgBusy": "@:{'brand.autobot'} is busy for your organization",
         "retry": "Retry",
         "micBlocked": "Microphone blocked",
         "howToAllow": "How to allow",
@@ -11339,7 +11343,7 @@
         "enterQueues": "Answer running · Enter queues this"
       },
       "queuedSentence": "Your next message is sent when this answer finishes.",
-      "queuedAlreadySentence": "One message is already queued. Edit it to change it, or send this one after the answer finishes."
+      "queuedAlreadySentence": "One message is already queued."
     },
     "consent": {
       "aMember": "a member",
@@ -11382,18 +11386,8 @@
       "chipName": "{label}, {secondary}",
       "dataSharing": "Data sharing · {level}",
       "disclosure": "Attached data is sent to @:{'brand.autobot'} and saved with this chat.",
-      "seesDisclosure": "Saved with this chat.",
+      "defaultContext": "Default context",
       "seesEmpty": "Only your message is sent.",
-      "seesGroup": {
-        "added": "You Added",
-        "notRead": "Not Read",
-        "notReadReason": "On this page, but {product} does not read these yet, so they are not sent.",
-        "page": "This Page",
-        "time": "Time"
-      },
-      "seesIntro": "These go with your next message.",
-      "seesIntroRemove": "These go with your next message. To leave out something you added, remove its chip.",
-      "seesTitle": "What {product} Will See",
       "disclosureShared": "Attached data is sent to @:{'brand.autobot'}, saved with this chat and included in any share.",
       "field": {
         "alert": "Alert",
@@ -11427,9 +11421,7 @@
       "mixedStreams": "One stream type per message. Remove the {type} stream to add this one.",
       "more": "+{count}",
       "moreName": "Show {count} more context chip | Show {count} more context chips",
-      "notSent": "Not Sent",
       "orgLine": "{org} organization",
-      "notReadHint": "@:{'brand.autobot'} does not read this yet",
       "notReadYet": "not read yet",
       "openSource": "Open in {page}",
       "remove": "Remove {label} from context",
@@ -11442,23 +11434,13 @@
       "streamsValue": "{names} ({type})",
       "summary": "{scope} · {range}",
       "time": {
-        "last": "Last {period}",
-        "name": "Time range, {range}, {source}",
-        "reversed": "End must be after start",
-        "source": {
-          "default": "default",
-          "page": "from this page",
-          "custom": "custom"
-        },
+        "past": "Past {period}",
+        "pastRange": "past {period}",
         "custom": "custom",
-        "default": "Time · last 15 min · default",
+        "default": "Time · past 15 min · default",
         "fromPage": "page",
-        "page": "Time · {range}",
-        "swap": "Change time range",
-        "hint": "@:{'brand.autobot'} looks at data from this time range.",
-        "customRange": "Custom Range…"
+        "page": "Time · {range}"
       },
-      "title": "What @:{'brand.autobot'} sees",
       "trayLabel": "Context for your next message",
       "trimInternal": "Hide internal fields",
       "truncated": "truncated to {size}",
@@ -11473,7 +11455,7 @@
       "pasteInline": "Paste into the message instead",
       "pasteInlineShort": "Paste into the message",
       "withheld": "not sent at this data level",
-      "withheldLine": "Not sent at this data level ({level}). Admins can change it in assistant settings."
+      "withheldLine": "Not sent at this data level ({level})."
     },
     "credits": {
       "copyRequest": "Please add AI credits for {org}: {used} of {limit} included credits used as of {date}.",
@@ -11590,7 +11572,7 @@
       "ask": "Ask {product}",
       "assistant": "@:{'brand.askAutobot'}",
       "buildFailed": "Couldn't prepare this request",
-      "capReached": "Not added: the message is at its limit of 20 rows or 32 KB. Remove a chip and try again.",
+      "capReached": "Not added: the message is full. Remove a chip and try again.",
       "chip": {
         "alertFired": "Alert · {name} · fired {time}",
         "alertNew": "Alert · new alert",
@@ -11635,25 +11617,25 @@
         "setUpTracing": "Set up tracing"
       },
       "tooltip": {
-        "add": "Attaches this to the chat without sending",
-        "createRegex": "Opens a new regex pattern with @:{'brand.autobot'} beside it, ready to write one for this field",
-        "dockedAsk": "Opens @:{'brand.autobot'} for this editor",
-        "emptyResult": "Sends the query, streams and time range and asks why nothing matched",
-        "explain": "Sends this and asks @:{'brand.autobot'} to explain it",
-        "explainAlert": "Sends the alert, its query and threshold and asks what it watches",
-        "explainEdge": "Sends this dependency's request, error and latency numbers and asks if it is healthy",
-        "explainField": "Sends this field and its value and asks what it means",
-        "explainPanel": "Sends this panel's query, time range and variables and asks what it shows",
-        "explainSeries": "Sends this series, its labels, query and window and asks what drives it",
-        "explainService": "Sends this service's call counts and asks if it is healthy",
-        "explainSpan": "Sends this span, its attributes and timing and asks what happened",
-        "fix": "Sends this finding and asks how to fix it",
-        "ingestion": "Sends this guide's check result and asks how to get the first data in",
-        "noStream": "Asks how to send the first data to this organization",
-        "sidebarAsk": "Opens @:{'brand.autobot'} in the sidebar with this function",
-        "troubleshootAlert": "Sends the alert, its query, threshold and last firing and asks why it fired",
-        "troubleshootQuery": "Sends the query, the error and the time range and asks what to change",
-        "troubleshootSpan": "Sends this failing span and asks why it failed"
+        "add": "Add to chat",
+        "createRegex": "Write a regex pattern with @:{'brand.autobot'}",
+        "dockedAsk": "Open @:{'brand.autobot'} for this editor",
+        "emptyResult": "Ask why nothing matched",
+        "explain": "Explain this",
+        "explainAlert": "Explain this alert",
+        "explainEdge": "Check this dependency",
+        "explainField": "Explain this field",
+        "explainPanel": "Explain this panel",
+        "explainSeries": "Explain this series",
+        "explainService": "Check this service",
+        "explainSpan": "Explain this span",
+        "fix": "Fix this finding",
+        "ingestion": "Get the first data in",
+        "noStream": "Send the first data",
+        "sidebarAsk": "Open @:{'brand.autobot'} with this function",
+        "troubleshootAlert": "Ask why this alert fired",
+        "troubleshootQuery": "Fix this query",
+        "troubleshootSpan": "Ask why this span failed"
       },
       "troubleshoot": "Troubleshoot",
       "troubleshootAlert": "Troubleshoot this alert",
@@ -11757,7 +11739,7 @@
         "action": "Open IAM roles",
         "actionAdmin": "Open IAM roles",
         "actionMember": "Ask an admin",
-        "body": "This chat stays readable. An admin can grant access in IAM › Roles › @:{'brand.askAutobot'}.",
+        "body": "This chat stays readable. An admin can grant access in IAM › Roles › @:{'brand.autobot'}.",
         "title": "Your role can no longer use {product}. Your message wasn't sent."
       },
       "permission_denied_tool": {
@@ -11874,7 +11856,7 @@
       },
       "agent_not_permitted": {
         "title": "Your role can't use {agent}. Your message wasn't sent.",
-        "body": "An admin can grant it in Settings › @:{'brand.askAutobot'} › Agents.",
+        "body": "An admin can grant it in Settings › @:{'brand.autobot'} › Agents.",
         "action": "Ask an admin"
       },
       "agent_unreachable": {
@@ -11907,7 +11889,7 @@
       "lastMinutes": "last {count} min",
       "noRows": "No rows in this range",
       "noStreamAccess": "You don't have access to stream {stream}",
-      "openHint": "Opens with the query loaded. Nothing runs until you choose Run query.",
+      "openHint": "Opens with the query loaded",
       "opensNewTab": "{label} (opens in a new tab)",
       "otherOrg": "This query belongs to {org}. Switch organization to run it.",
       "queryFailed": "Query failed: {reason}",
@@ -12035,7 +12017,7 @@
         "tooltip": "{product} is part of OpenObserve Enterprise and Cloud"
       },
       "offForOrg": {
-        "body": "Past chats stay readable. An admin can turn it on in Settings › @:{'brand.askAutobot'}.",
+        "body": "Past chats stay readable. An admin can turn it on in Settings › @:{'brand.autobot'}.",
         "title": "{product} is turned off for this organization"
       },
       "openAccessSettings": "Open access settings",
@@ -12144,8 +12126,7 @@
         "links": {
           "checking": "Checking share links…",
           "count": "Its {count} active link stops working | Its {count} active links stop working",
-          "none": "No active links",
-          "unknown": "Couldn't check its share links. Deleting still revokes any that exist."
+          "unknown": "Couldn't check its share links. Deleting revokes them."
         },
         "running": "This chat is still answering. Deleting stops the answer.",
         "title": "Delete “{title}”?"
@@ -12184,9 +12165,9 @@
         "needsYou": "Needs you",
         "older": "Older",
         "pinned": "Pinned",
-        "running": "In Progress",
+        "running": "In progress",
         "today": "Today",
-        "week": "Previous 7 Days",
+        "week": "Previous 7 days",
         "yesterday": "Yesterday"
       },
       "import": {
@@ -12203,15 +12184,15 @@
         "offline": "You're offline. The chats stay in this browser until you try again.",
         "progress": "Moving {done} of {count}…",
         "retry": "Retry",
-        "unavailable": "You have {count} chats saved in this browser. History is now saved to your account, but these can't be moved yet."
+        "unavailable": "{count} chats are saved in this browser and can't be moved yet."
       },
       "loadOlder": "Load older",
       "loadedOlder": "Loaded {count} older chat | Loaded {count} older chats",
       "localOnly": {
-        "adminHelp": "To turn it on, set O2_AI_CHAT_PERSISTENCE_ENABLED. Settings › @:{'brand.askAutobot'} explains the options.",
+        "adminHelp": "Set O2_AI_CHAT_PERSISTENCE_ENABLED to keep chats on the server.",
         "adminLink": "Read the docs",
         "description": "Chats, saved in this browser only, {count} of {cap}",
-        "help": "Chats stay in this browser. Signing out keeps them unless you choose otherwise below; clearing site data removes them. An admin can turn on account history in Settings › @:{'brand.askAutobot'}.",
+        "help": "Chats stay in this browser.",
         "info": "About browser history",
         "keptOnSignOut": "Your browser chats were kept when you signed out.",
         "title": "Saved in this browser only"
@@ -12236,13 +12217,15 @@
       "pinFailed": "Couldn't pin the chat",
       "pinLocal": "Pin (in this browser)",
       "pinned": "Pinned",
-      "prune": "{count} of {cap} · the oldest unpinned chat is removed when you reach {cap}",
+      "prune": "{count} of {cap} chats",
       "pruned": "Removed the oldest chat to make room: “{title}”",
       "readOnly": "You can read your chats. Starting or continuing one needs AI access.",
       "rename": "Rename",
       "rowMenu": "Actions for {title}",
       "search": "Search chats",
-      "searchInvestigations": "Search Investigations",
+      "searchInvestigations": "Search investigations",
+      "investigationsEmpty": "No investigations yet",
+      "draftTag": "Draft",
       "serverError": "Couldn't load your chats",
       "serverErrorCached": "Showing chats saved in this browser · Couldn't reach the server",
       "sharedLinks": "Shared links",
@@ -12330,7 +12313,7 @@
       "parityLine": "Your agent gets the same tools and permissions as {product}. Tools {product} itself can use are set up in {link}.",
       "replaceToken": "Replace {token} with the token you generate above, or with the Base64 of a service account's email:token.",
       "skillsHint": "Teaches your agent how to query, alert and build dashboards in {brand}.",
-      "toolsetsPath": "Settings › @:{'brand.askAutobot'} › Toolsets"
+      "toolsetsPath": "Settings › @:{'brand.autobot'} › Toolsets"
     },
     "message": {
       "actionsName": "Message actions",
@@ -12370,7 +12353,7 @@
       "branchFailed": "Couldn't branch this chat",
       "newTag": "New"
     },
-    "name": "@:{'brand.askAutobot'}",
+    "name": "@:{'brand.autobot'}",
     "limit": {
       "slotFree": "A chat finished. You can send now."
     },
@@ -12419,9 +12402,9 @@
       "unlisted": "{count} more item has no name and is included | {count} more items have no name and are included"
     },
     "policy": {
-      "autoDeclined": "Auto-declined by the safety settings of @:{'brand.autobot'}",
+      "autoDeclined": "Declined by @:{'brand.autobot'} safety settings",
       "denied": "Blocked by policy: {tool}. {detail}",
-      "deniedAdmin": "An admin can allow it in Settings › @:{'brand.askAutobot'} › Permissions.",
+      "deniedAdmin": "An admin can allow it in Settings › @:{'brand.autobot'} › Permissions.",
       "deniedPlain": "Blocked by policy: {tool}.",
       "unreviewed": "@:{'brand.autobot'} changed {count} {entity} without a review step.",
       "unreviewedAction": "See what changed",
@@ -12458,11 +12441,11 @@
         "builtInEditor": "Chat, toolsets",
         "builtInViewer": "No access",
         "cancel": "Cancel",
-        "enabled": "Assistant enabled for this organization",
-        "enabledLine": "Turning it off shows members '{product} is turned off for this organization'. Past chats stay readable.",
+        "enabled": "@:{'brand.autobot'} enabled for this organization",
+        "enabledLine": "Members keep their past chats.",
         "grantedPerRole": "Access is granted per role in {whereToGrant}",
         "noRole": "Signed-in users with no role (SSO default) have no access.",
-        "notice": "Per-organization controls need a newer server version. These values come from the deployment.",
+        "notice": "Per-organization controls need a newer server version.",
         "orgSharing": "Members with sharing access can share chats in this organization",
         "publicOff": {
           "confirm": "Turn off public links",
@@ -12472,7 +12455,7 @@
         "publicSharing": "Allow public links",
         "publicSharingDeploymentOff": "Public links are off for this deployment (ZO_PUBLIC_AI_CHAT_ENABLED).",
         "publicSharingLine": "Public link options disappear from the share dialog.",
-        "rbacOff": "Role-based access is off in this deployment, so every user is an admin and can use @:{'brand.autobot'}.",
+        "rbacOff": "Role-based access is off, so every user can use @:{'brand.autobot'}.",
         "roles": {
           "allRoles": "IAM › Roles",
           "capped": "Showing {shown} of {total} roles. See all roles in {link}.",
@@ -12485,16 +12468,16 @@
           "unknown": "Unknown"
         },
         "save": "Save",
-        "saved": "Assistant settings saved",
+        "saved": "@:{'brand.autobot'} settings saved",
         "sharing": "Sharing",
         "tier": "Default permission tier",
         "tierAct": "Act with approval",
-        "tierActLine": "Members can grant per-tool approvals for this chat or always; deletes always ask.",
+        "tierActLine": "Members approve tools per chat or always. Deletes always ask.",
         "tierNeedsAgent": "Needs a newer agent version to enforce",
         "tierPropose": "Propose changes",
-        "tierProposeLine": "@:{'brand.autobot'} drafts changes as approval cards; nothing is applied without a member's approval.",
+        "tierProposeLine": "Every change needs a member's approval.",
         "tierRead": "Read and query",
-        "tierReadLine": "@:{'brand.autobot'} runs queries only and never changes anything.",
+        "tierReadLine": "Runs queries only. Never changes anything.",
         "tierStored": "Saved tier: {tier}. It applies once the agent can enforce it.",
         "offInOrg": "Off in this organization",
         "onInOrg": "On in this organization",
@@ -12514,11 +12497,11 @@
         "youNone": "no access",
         "youUnknown": "not known yet"
       },
-      "adminOnly": "Only organization admins can change assistant settings.",
+      "adminOnly": "Only organization admins can change these settings.",
       "data": {
         "about": "About data sharing",
         "aboutProvider": "Answers are generated by {provider}.",
-        "aboutRedaction": "Attached rows, images and page context are sent as the member sees them; redaction rules in Sensitive data redaction apply first.",
+        "aboutRedaction": "Sensitive data redaction rules apply first.",
         "level": "Data shared with the model",
         "levelAggregates": "Schema and aggregates",
         "levelAggregatesLine": "Counts, percentiles and histograms; no individual rows.",
@@ -12529,19 +12512,19 @@
         "notice": "Data-sharing levels need a newer server and agent version."
       },
       "env": {
-        "help": "Set by the deployment, read-only here",
+        "help": "Set by the deployment",
         "notReported": "Not reported by this server version",
         "setBy": "Set by {env}"
       },
       "forbidden": "You don't have access to this setting.",
       "history": {
-        "browserBody": "Chats live in the browser they were started in. They are not shared between devices, are capped at 100 per member per organization, and are cleared when the browser data is cleared.",
+        "browserBody": "Not shared between devices. Up to 100 chats per member, cleared with browser data.",
         "browserTitle": "Saved in each member's browser only",
-        "deleteLine": "Deleting a chat is logical: it disappears from every device, stops running answers and revokes its links.",
+        "deleteLine": "Deleting a chat removes it everywhere and revokes its links.",
         "off": "Off",
         "on": "On",
         "persistence": "Server history",
-        "persistenceHelp": "Turn this on in the deployment to keep chats on the server and enable sharing.",
+        "persistenceHelp": "Turn on in the deployment to keep chats on the server.",
         "publicLinks": "Public links",
         "publicLinksOff": "off",
         "publicLinksOn": "on, up to {days} day | on, up to {days} days",
@@ -12550,12 +12533,12 @@
         "retentionForever": "until deleted",
         "serverTitle": "Saved to the server"
       },
-      "leaveName": "the @:{'brand.askAutobot'} settings of {org}",
-      "offInDeployment": "@:{'brand.autobot'} is off in this deployment, so these settings have no effect yet.",
-      "pageTitle": "@:{'brand.askAutobot'}",
+      "leaveName": "the @:{'brand.autobot'} settings of {org}",
+      "offInDeployment": "@:{'brand.autobot'} is off in this deployment.",
+      "pageTitle": "@:{'brand.autobot'}",
       "railDesc": "Status, access, data, history, usage, toolsets, permissions and activity",
       "status": {
-        "agentEnabled": "Assistant enabled",
+        "agentEnabled": "@:{'brand.autobot'} enabled",
         "agentHa": "High availability",
         "agentUrl": "Agent address",
         "agentVersion": "Agent version",
@@ -12578,9 +12561,9 @@
         "openAccess": "Open access settings",
         "reachable": "Reachable",
         "unreachable": "Unreachable",
-        "unreachableBody": "Users see @:{'brand.autobot'} as unavailable until this is fixed.",
+        "unreachableBody": "Members see @:{'brand.autobot'} as unavailable.",
         "notEntitled": "Not in your license",
-        "notEntitledBody": "Your license doesn't include @:{'brand.askAutobot'}, so nobody in this organization sees it. Contact your account team to add it."
+        "notEntitledBody": "Your license doesn't include @:{'brand.autobot'}. Contact your account team."
       },
       "tabs": {
         "access": "Access",
@@ -12602,18 +12585,18 @@
         "running": "Testing…",
         "unknownCause": "no reason given"
       },
-      "title": "@:{'brand.askAutobot'}",
+      "title": "@:{'brand.autobot'}",
       "usage": {
         "allowance": "Credit allowance",
         "answered": "Answered",
         "caps": "Caps",
-        "capsLine": "A member who exceeds the cap sees 'Another answer is still running' and nothing is sent or charged.",
+        "capsLine": "Extra answers are blocked and not charged.",
         "consentLine": "Paid usage hasn't been enabled. Members are asked for consent on their next answer.",
         "exhaustedLine": "Members see 'AI credits are used up for {org}.'",
         "failed": "Failed",
         "longest": "Longest answer",
         "managePaid": "Manage paid usage",
-        "notMetered": "Usage metering is available on OpenObserve Cloud. This deployment is not metered.",
+        "notMetered": "This deployment is not metered.",
         "perMember": "Active answers per member",
         "perNode": "Active answers per node",
         "perOrg": "Active answers per organization",
@@ -12623,11 +12606,11 @@
       },
       "voice": {
         "browser": "In the browser",
-        "browserHelp": "Most browsers send audio to their vendor's speech service (Google, Microsoft or Apple); some transcribe on the device. Some browsers can't dictate.",
-        "help": "Members can dictate into the composer and edit the text before sending. Nothing is sent until they press Send.",
-        "localOnly": "Saved in this browser, for you only. Settings for the whole organization need a newer server version.",
+        "browserHelp": "Most browsers send audio to their vendor's speech service.",
+        "help": "Members can dictate and edit the text before sending.",
+        "localOnly": "Saved in this browser, for you only.",
         "off": "Off",
-        "offHelp": "Members see no mic button; admins see it crossed out.",
+        "offHelp": "Nobody can dictate in this browser.",
         "readOnly": "Server speech-to-text needs a newer server version.",
         "title": "Voice dictation"
       }
@@ -12792,10 +12775,10 @@
     },
     "shell": {
       "answeringElsewhere": "Answering in another tab",
-      "answeringElsewherePolling": "Still answering in another tab. This view refreshes every few seconds.",
-      "answeringHerePolling": "Still answering. This view refreshes every few seconds.",
-      "approvalElsewhere": "Another tab is waiting for your approval on this chat. Decide there first.",
-      "approvalNotAnswerableHere": "Waiting for your approval in the tab where you asked. Approve or deny it there, or stop this answer.",
+      "answeringElsewherePolling": "Still answering in another tab",
+      "answeringHerePolling": "Still answering",
+      "approvalElsewhere": "Waiting for your approval in another tab",
+      "approvalNotAnswerableHere": "Waiting for your approval in another tab",
       "close": "Close {product}",
       "deletedElsewhere": "This chat was deleted elsewhere",
       "deletedInAnotherTab": "This chat was deleted in another tab",
@@ -12814,7 +12797,7 @@
       "orgSwitchRunningBody": "{count} answer is still running in {org}. Stop it, or keep it running there? | {count} answers are still running in {org}. Stop them, or keep them running there?",
       "orgSwitchRunningTitle": "Answers are still running in {org}",
       "orgSwitchWithdrawn": "Keeping withdraws {count} waiting approval. | Keeping withdraws {count} waiting approvals.",
-      "otherAccount": "Another account signed in. Reload to continue with it; this tab's chats stay with the account that signed out.",
+      "otherAccount": "Another account signed in. Reload to continue.",
       "placeDock": "Beside the editor",
       "placeWindow": "Floating",
       "prefersWindowHint": "This page keeps its width with a floating window",
@@ -12848,20 +12831,13 @@
       "widthWider": "Wider",
       "loadFailedAgain": "Still couldn't load this chat · tried {time}",
       "openAs": "Open as",
-      "sidePanel": "Side Panel",
-      "fullPage": "Full Page",
+      "sidePanel": "Side panel",
+      "fullPage": "Full page",
       "newChatFullPage": "New chat in full page",
-      "popOut": "Floating Window"
+      "popOut": "Floating window"
     },
     "tray": {
-      "more": "+{count}"
-    },
-    "launcher": {
-      "iconWorking": "Threads, {count} chat answering | Threads, {count} chats answering",
-      "more": "{count} more chats",
-      "previews": "Recent chats",
-      "restore": "Open {title}",
-      "working": "{count} chat answering | {count} chats answering"
+      "close": "Close {title}"
     },
     "window": {
       "dropSidebar": "Pin as sidebar",
@@ -12970,6 +12946,8 @@
       "loadToContinue": "Load the chat to continue it",
       "newAnnounce": "New chat",
       "newChat": "New chat",
+      "alreadyNew": "This chat is already new",
+      "windowsFull": "Close a chat to start a new one",
       "newChatTitle": "New chat",
       "notSaved": "Not saved",
       "pin": "Pin",
@@ -12991,9 +12969,9 @@
       "titleNameAnswering": "{title}, chats and chat actions, {count} other chat answering | {title}, chats and chat actions, {count} other chats answering",
       "titleTooltip": "{title} · {summary}",
       "toolbar": {
-        "more": "More Actions",
-        "newChat": "New Chat",
-        "openAs": "Open As"
+        "more": "More actions",
+        "newChat": "New chat",
+        "openAs": "Open as"
       }
     },
     "toolsets": {
@@ -13009,7 +12987,7 @@
         "status": "Status"
       },
       "deleteFailed": "{name} could not be deleted.",
-      "deleteMessage": "{product} and incident analysis lose this tool from the next answer. Chats that used it keep their history.",
+      "deleteMessage": "{product} and incident analysis lose this tool from the next answer.",
       "deleteNamed": "Delete {name}",
       "deleteTitle": "Delete {name}?",
       "deleted": "{name} deleted",
@@ -13021,7 +12999,7 @@
       "form": {
         "aboutCli": "Each run stops after {timeout} seconds and keeps at most {bytes} bytes of output.",
         "aboutCliLabel": "About CLI tools",
-        "added": "Toolset added. {product} and incident analysis in {org} can use it from the next answer.",
+        "added": "Toolset added",
         "agentName": "@:{'brand.autobot'} calls this {agent}",
         "allowHelp": "Only these subcommands can run. Separate with commas.",
         "allowRequired": "Enter at least one subcommand",
@@ -13029,16 +13007,16 @@
         "approvalOffConfirm": "Turn off approval",
         "approvalOffMessage": "Allowed subcommands: {allow}",
         "approvalOffTitle": "Let @:{'brand.autobot'} run {command} without asking?",
-        "approvalOn": "Members see an approval card with the exact command before it runs.",
+        "approvalOn": "Members approve the exact command before it runs.",
         "back": "Back to toolsets",
         "cliSection": "CLI tool",
-        "descriptionHelp": "@:{'brand.autobot'} reads this to decide when to call the tool. Say what it does and when to use it, e.g. 'Look up who is on call and page them for PagerDuty services.'",
+        "descriptionHelp": "Say what it does and when to use it.",
         "descriptionLabel": "What @:{'brand.autobot'} should use this tool for",
         "editTitle": "Edit toolset",
         "enterAgain": "Enter the value again",
         "wholeNumber": "Enter a whole number greater than 0",
         "insertTemplate": "Insert template",
-        "kindLocked": "The kind can't change after creation; create a new toolset instead.",
+        "kindLocked": "The kind can't change after creation.",
         "leaveName": "changes to {name} in {org}",
         "loadFailed": "This toolset could not be loaded.",
         "maskValue": "*** is how a kept secret is sent. Enter the real value.",
@@ -13052,7 +13030,7 @@
         "requireApproval": "Require approval before each run",
         "retypeNotice": "This server version needs every secret entered again when you save.",
         "saveFailed": "The toolset could not be saved.",
-        "scope": "Runs on the OpenObserve server as the credentials below, on behalf of the member who asked.",
+        "scope": "Runs on the OpenObserve server with the credentials below.",
         "skillTemplate": "## When to use\n\n## Steps\n\n## Examples\n",
         "updated": "Toolset updated"
       },
@@ -13068,7 +13046,7 @@
       "mcpLink": "MCP server",
       "moreFor": "More actions for {name}",
       "notSetUp": "Toolsets take effect once @:{'brand.autobot'} is set up.",
-      "runtimeRule": "Enabled toolsets are available to {product} and to incident analysis in this organization.",
+      "runtimeRule": "Used by {product} and incident analysis.",
       "search": "Search toolsets",
       "secret": {
         "hide": "Hide value",
@@ -13102,12 +13080,12 @@
       "testUnsupported": "testing needs a newer server version",
       "testing": "Testing",
       "unguarded": "Runs without approval",
-      "viewOnly": "You can view toolsets. Editing needs the Toolsets permission in IAM › Roles."
+      "viewOnly": "View only. Editing needs the Toolsets permission."
     },
     "transcript": {
       "answerName": "{agent}, answer to {prompt}",
       "earlierCount": "{count} earlier message | {count} earlier messages",
-      "followUps": "Follow-Ups",
+      "followUps": "Follow-ups",
       "name": "Conversation with {product}",
       "showEarlier": "Show earlier messages",
       "turnLabel": "Turn {n}: {prompt}"
@@ -13173,7 +13151,7 @@
         "device": "Your browser turns speech into text on this device.",
         "google": "Chrome turns speech into text with Google's speech service.",
         "microsoft": "Edge turns speech into text with Microsoft's speech service.",
-        "vendor": "Your browser sends speech to its maker's speech service to turn it into text."
+        "vendor": "Your browser's speech service turns speech into text."
       },
       "enterToSend": "Press Enter again to send.",
       "error": {
@@ -13192,8 +13170,7 @@
       "primerEngine": "{engineSentence} OpenObserve doesn't store the audio.",
       "primerTitle": "Dictate into the message",
       "holdLine": "Release {keys} to stop",
-      "seesLine": "Dictation uses your browser's speech service. Audio is not stored.",
-      "started": "Listening. Press Enter, Escape or the mic to stop.",
+      "started": "Listening. Enter sends; Escape or the mic stops.",
       "stopTooltip": "Stop dictation",
       "stopped": "Dictation stopped. {count} word added. | Dictation stopped. {count} words added.",
       "stoppedEnter": "Dictation stopped. {count} word added. Press Enter to send. | Dictation stopped. {count} words added. Press Enter to send.",
@@ -13201,22 +13178,22 @@
       "tryAgain": "Try again",
       "waitingPermission": "Waiting for permission",
       "waitingShort": "Waiting",
+      "allowPrompt": "Allow the microphone in the browser prompt.",
+      "privacy": "Your browser may send audio to its vendor.",
+      "processing": "Finishing",
       "offAdmin": "Dictation is off in this browser.",
-      "turnOn": "Turn on",
       "silent": "Your browser didn't turn speech into text. Reload to try again.",
-      "language": "Dictation isn't available in {language}, your browser language.",
-      "listeningPlaceholder": "Listening… press ↵ to send"
+      "language": "Dictation isn't available in {language}, your browser language."
     },
     "welcome": {
       "lastRange": "last {period}",
       "launcher": {
-        "agentHint": "The agent that answers",
         "ask": "Ask",
         "inputName": "Ask {product}",
-        "noThreadsYet": "No threads yet · your first answer shows up here",
+        "noThreadsYet": "No chats yet",
         "openFull": "Open full view",
-        "recentThreads": "Recent threads",
-        "allThreads": "All threads",
+        "recentThreads": "Recent chats",
+        "allThreads": "All chats",
         "askEmpty": "Type a question or attach an image to ask"
       },
       "prefill": {
@@ -13227,6 +13204,7 @@
       },
       "starter": {
         "otherToolToO2": "Convert a query from another tool to OpenObserve SQL",
+        "mapStreamSchema": "Map the schema of `{stream}`",
         "alerts": {
           "1": "Which alerts fired most in the past 24 hours?",
           "2": "Draft an alert for errors in `{stream}`",
@@ -13362,8 +13340,8 @@
           "investigator": "{agent} can look for the cause",
           "queryBuilder": "{agent} can write this query"
         },
-        "body": "It gets this chat and its context. It can take a few minutes.",
-        "bodyMetered": "It gets this chat and its context. It can take a few minutes. · Uses AI credits",
+        "body": "It can take a few minutes.",
+        "bodyMetered": "It can take a few minutes · Uses AI credits",
         "accept": "Hand off to {agent}",
         "dismiss": "Not now",
         "collapsed": "{agent} was suggested",
@@ -13384,14 +13362,14 @@
       "needsAnswerLabel": "Needs your answer"
     },
     "threadsBar": {
-      "label": "Threads",
-      "title": "Threads",
-      "incidents": "Incidents with a live @:{'brand.autobotInvestigate'} run · {count}",
-      "moreIncidents": "{count} more, newest first",
+      "label": "Chats",
+      "title": "Chats",
+      "incidents": "Live investigations · {count}",
+      "moreIncidents": "{count} more",
       "pageFull": "{count}+ open",
       "openIncidents": "Open incidents",
-      "yourThreads": "Your threads · {count}",
-      "noThreads": "No threads running"
+      "yourThreads": "Your chats · {count}",
+      "noThreads": "No chats running"
     },
     "chart": {
       "showChart": "Show chart",
@@ -13498,7 +13476,7 @@
     "aiExhaustedMessage": "Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
     "aiContractExhaustedMessage": "Contact your account manager to add more AI credits",
     "aiPayerSubscribeMessage": "Billing for this organization is managed by {payer}. Ask an admin of {payer} to subscribe; further usage is billed on its invoice.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} and query generation: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Reanalysis: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} and query generation: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Reanalysis: {reanalysis}",
     "aiPaygMessage": "Free credits exhausted — usage billed to subscription",
     "billingGroup": {
       "tabLabel": "Billing Group",
@@ -15216,18 +15194,17 @@
       },
       "rcaSteer": {
         "composerTitleLive": "Steer this run",
-        "composerHintLive": "Read after the current step",
         "composerTitlePaused": "Answer the agent",
-        "composerHintPaused": "The run resumes when you send",
         "agentAsks": "Agent asks",
-        "answerNote": "Your answer is a lead, not evidence. It can move the hypothesis to Likely. Root cause needs a tool result.",
-        "placeholderPaused": "Answer the agent or add context, e.g. PR #812 in acme/checkout, deployed around 14:02.",
+        "placeholderPaused": "Answer the agent or add context",
         "suggestions": "Suggestions",
         "chipCheck": "Check …",
         "chipIgnore": "Ignore …",
         "chipFocus": "Focus on service …",
         "chipChanged": "We changed …",
-        "sendingAs": "Sending as {email} · visible to everyone on this incident",
+        "sentAs": "Sent as",
+        "thisIncident": "This incident",
+        "visibleOnIncident": "Visible on this incident",
         "send": "Send",
         "steered": "steered {count}×",
         "fromSteering": "from steering",
@@ -18477,7 +18454,7 @@
     "generalLabel": "General Settings",
     "groupGeneral": "General",
     "groupAccessSecurity": "Access & Security",
-    "groupAssistant": "@:{'brand.askAutobot'}",
+    "groupAssistant": "@:{'brand.autobot'}",
     "groupDestinations": "Destinations",
     "groupData": "Data",
     "groupOperations": "Operations",
@@ -26039,7 +26016,7 @@
       "synthetics": "Synthetics",
       "fleet": "Fleet",
       "kubernetes": "Kubernetes",
-      "assistant": "@:{'brand.askAutobot'}"
+      "assistant": "@:{'brand.autobot'}"
     },
     "pages": {
       "global": "Global",
@@ -26100,7 +26077,7 @@
       "fleetConfigEditor": "Configuration editor",
       "fleetOverview": "Fleet pipelines",
       "securityRecord": "Security — open record",
-      "assistant": "@:{'brand.askAutobot'}",
+      "assistant": "@:{'brand.autobot'}",
       "assistantComposer": "{product} composer",
       "queryEditor": "Query editor"
     },
@@ -26245,7 +26222,7 @@
       "fleetFlowCloseDetails": "Close the path details or collapse the map",
       "securityRecordNext": "Next record",
       "securityRecordPrev": "Previous record",
-      "threadsBarOpen": "Open the Threads bar",
+      "threadsBarOpen": "Open chats",
       "homeFocusAsk": "Focus the Ask box"
     }
   },
@@ -31557,7 +31534,7 @@
     "consentStillRequired": "Paid usage is not enabled for every required organization.",
     "updateFailed": "Couldn't update paid AI usage. Try again.",
     "declinedNotice": "Paid AI usage is off, so this request wasn't sent.",
-    "consentScope": "Applies to the whole organization: @:{'brand.askAutobot'}, query generation and incident analysis. You can turn it off anytime on the Plans page.",
+    "consentScope": "Applies to the whole organization: @:{'brand.autobot'}, query generation and incident analysis. You can turn it off anytime on the Plans page.",
     "managePaidUsage": "Turn on paid usage",
     "modePayAsYouGo": "Pay as you go",
     "modeConsentRequired": "Consent required",

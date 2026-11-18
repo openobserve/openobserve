@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="assistant-approval-result-fresh-diff"
       />
       <OText
-        v-if="anyUndo && sid"
+        v-if="anyUndo && sid && undoLimitsApply(undoEntries)"
         variant="meta"
         as="p"
         class="ps-6 break-words"
@@ -272,6 +272,7 @@ import {
   approvalVerb,
   assistantEvidenceHostKey,
   assistantTranscriptHostKey,
+  undoLimitsApply,
   type ActionLedgerEntry,
   type ApprovalBlockData,
   type ApprovalResult,

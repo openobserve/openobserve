@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :cards="INVESTIGATE_CARDS"
           :prompts="false"
           class="mx-auto max-w-3xl"
-          @select="launcher?.fill($event)"
+          @select="(prompt, agent) => launcher?.fill(prompt, agent)"
         />
       </div>
     </div>

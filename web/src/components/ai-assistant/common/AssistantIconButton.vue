@@ -51,9 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }}</span>
     <OIcon v-if="chevron" :name="assistantGlyph.expand" size="xs" />
     <template v-if="unavailable" #unavailable-reason>{{ disabledReason }}</template>
-    <!-- An open menu or popover covers what the tooltip would say, so the tooltip waits (D2) -->
+    <!-- An open menu or popover covers what the tooltip would say, so the tooltip waits (D2); one shows at a time -->
     <OTooltip
       v-if="!noTooltip && !done"
+      exclusive
       :disabled="$attrs['aria-expanded'] === true || $attrs['aria-expanded'] === 'true'"
       :content="$slots.tooltip && !unavailable ? undefined : tooltip"
       :shortcut-id="shortcutId"

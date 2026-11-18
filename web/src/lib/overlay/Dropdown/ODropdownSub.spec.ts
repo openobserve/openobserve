@@ -63,6 +63,37 @@ describe("ODropdownSub", () => {
     await vi.waitFor(() => expect(item("sub")).toBeNull());
   });
 
+  it("lines the submenu up with the trigger edge it is given", async () => {
+    wrapper = mount(ODropdown, {
+      attachTo: document.body,
+      props: { open: true },
+      slots: {
+        trigger: () => h("button", "Menu"),
+        default: () =>
+          h(
+            ODropdownSub,
+            { "data-test": "sub", textValue: raw("Connectors"), align: "end" },
+            {
+              trigger: () => "Connectors",
+              default: () => h(ODropdownItem, { "data-test": "inner" }, () => "Inner"),
+            },
+          ),
+      },
+    });
+    await flushPromises();
+    const sub = document.querySelector<HTMLElement>('[data-test="sub"]')!;
+    sub.focus();
+    sub.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    await vi.waitFor(() =>
+      expect(
+        document
+          .querySelector('[data-test="inner"]')
+          ?.closest("[data-align]")
+          ?.getAttribute("data-align"),
+      ).toBe("end"),
+    );
+  });
+
   it("stays open when the pointer comes back onto its own trigger", async () => {
     wrapper = mount(ODropdown, {
       attachTo: document.body,

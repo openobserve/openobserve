@@ -30,6 +30,7 @@ import {
   openWindowsOf,
   renameWindowSid,
   withRemoteLight,
+  firstRemoteLight,
   inertAssistantDeps,
   sessionView,
   useAssistantPlacement,
@@ -667,6 +668,22 @@ describe("composer", () => {
     expect(store.state.sessions[other].composer.text).toBe("");
   });
 
+  it("names a new chat after its first question at Send, from any composer, and keeps a name it has", async () => {
+    const { store } = makeStore();
+    const sid = newSession(store);
+    store.setDraft(sid, { text: `  ${"why do checkout requests fail ".repeat(3)}` });
+    void store.send(sid);
+    expect(String(store.state.sessions[sid].title)).toBe(
+      "why do checkout requests fail why do che",
+    );
+    expect(store.state.sessions[sid].titleSource).toBe("generated");
+    const named = newSession(store);
+    store.setTitle(named, "Cart errors" as never, "renamed");
+    store.setDraft(named, { text: "and now?" });
+    void store.send(named);
+    expect(String(store.state.sessions[named].title)).toBe("Cart errors");
+  });
+
   it("recalls older and newer prompts and gives back the live draft", async () => {
     const { store } = makeStore();
     const sid = newSession(store);
@@ -1165,6 +1182,14 @@ describe("lifecycle seams", () => {
     expect(withRemoteLight(local("idle"), null)).toMatchObject({ state: "idle" });
   });
 
+  it("lets any source's waiting chat outrank another source's running one", () => {
+    const working = { state: "working" as const, sid: "here" };
+    const waiting = { state: "needs_you" as const, sid: "there" };
+    expect(firstRemoteLight([working, waiting, null])).toEqual(waiting);
+    expect(firstRemoteLight([null, working])).toEqual(working);
+    expect(firstRemoteLight([null, undefined])).toBeNull();
+  });
+
   it("purges every org this tab used and every org's recall on sign-out", async () => {
     vi.useFakeTimers();
     const signOutKeys = vi.fn().mockResolvedValue(["k1", "k2", "k3"]);
@@ -1287,6 +1312,33 @@ describe("floating windows (WP-32)", () => {
     expect(store.state.shell.windows).toHaveLength(4);
   });
 
+  it("opens a window's new chat in a new window at its spot and minimises the old one", () => {
+    const { store } = makeStore();
+    const parked = floated(store);
+    store.minimiseWindow(parked, "button");
+    const old = floated(store);
+    const spot = { ...store.windowOf(old)!.geometry, dxRem: 9 };
+    store.setWindowGeometry(old, spot);
+    const fresh = newDetached(store);
+    expect(store.newChatWindow(old, fresh)).toBe(true);
+    expect(store.windowOf(old)?.state).toBe("minimised");
+    expect(store.windowOf(fresh)).toMatchObject({ state: "open", geometry: spot });
+    expect(store.state.shell.trayOrder).toEqual([parked, old]);
+    expect(store.focusRequest.value).toMatchObject({ window: fresh });
+  });
+
+  it("never closes a minimised chat to make room for a window's new chat", () => {
+    const { store } = makeStore();
+    const [a, b, c] = [floated(store), floated(store), floated(store)];
+    for (const sid of [a, b]) store.minimiseWindow(sid, "button");
+    const d = floated(store);
+    expect(store.newChatWindow(d, newDetached(store))).toBe(false);
+    expect(store.state.shell.trayOrder).toEqual([a, b]);
+    expect(store.windowOf(c)?.state).toBe("open");
+    expect(store.windowOf(d)?.state).toBe("open");
+    expect(store.state.shell.windows).toHaveLength(4);
+  });
+
   it("never shows a chat twice: floating it again raises it", () => {
     const { store } = makeStore();
     const a = floated(store);
@@ -1295,6 +1347,18 @@ describe("floating windows (WP-32)", () => {
     expect(store.state.shell.windows).toHaveLength(1);
     expect(store.windowOf(a)?.state).toBe("open");
     expect(store.state.shell.trayOrder).toEqual([]);
+  });
+
+  it("restores a window clear of an open one that took its spot while it was minimised", () => {
+    const { store } = makeStore();
+    const a = floated(store);
+    store.minimiseWindow(a, "button");
+    const b = floated(store);
+    expect(store.windowOf(b)?.geometry).toEqual(store.windowOf(a)?.geometry);
+    store.restoreWindow(a);
+    const [ga, gb] = [store.windowOf(a)!.geometry, store.windowOf(b)!.geometry];
+    expect(ga.corner === gb.corner && ga.dxRem === gb.dxRem && ga.dyRem === gb.dyRem).toBe(false);
+    expect(openSids(store).sort()).toEqual([a, b].sort());
   });
 
   it("restores at the cap by sending the least recent open window to the tray", () => {
@@ -1563,13 +1627,14 @@ describe("draft restore after a reload (WP-05)", () => {
     expect(selected()).toBe(fresh);
   });
 
-  it("starts a new chat on the previous one's window, but not on an Investigate thread's own", () => {
+  it("starts a new chat on the page's time, never on the previous chat's pinned window", () => {
     const { store } = makeStore();
     const home = newSession(store);
     store.setTimeOverride(home, { from: 1, to: 2, period: "24h" });
     const next = store.startNewChat({ origin: ORIGIN });
     expect(next).not.toBe(home);
-    expect(store.state.sessions[next].composer.timeOverride).toEqual({
+    expect(store.state.sessions[next].composer.timeOverride).toBeNull();
+    expect(store.state.sessions[home].composer.timeOverride).toEqual({
       from: 1,
       to: 2,
       period: "24h",

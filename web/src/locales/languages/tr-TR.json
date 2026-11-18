@@ -3983,7 +3983,7 @@
           "note": "Otomatik SRE işlemleri ve içgörüleri"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "Akıllı sorgu ve analiz yardımı"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "Beklenmeyen bir hata oluştu",
       "toolExecutionFailed": "Araç yürütmesi başarısız oldu",
       "errorOccurred": "Bir hata oluştu",
-      "navigateConfirmQuestion": "@:{'brand.autobot'} gezinebilsin mi?",
       "confirmToolExecution": "{tool} çalıştırılmasını onaylıyor musunuz?",
       "entity": {
         "alert": "Uyarı",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "Yapay zekayı kullanmaya devam etmek için abone olun. Daha fazla kullanım bu kuruluşun faturasına yansıtılır.",
     "aiContractExhaustedMessage": "Daha fazla AI kredisi eklemek için hesap yöneticinizle iletişime geçin",
     "aiPayerSubscribeMessage": "Bu kuruluşun faturalandırması {payer} tarafından yönetilir. Abone olmak için {payer} yöneticisinden isteyin; daha fazla kullanım onun faturasına yansıtılır.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} ve sorgu oluşturma: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Yeniden analiz: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} ve sorgu oluşturma: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Yeniden analiz: {reanalysis}",
     "aiPaygMessage": "Ücretsiz krediler tükendi — kullanım aboneliğe faturalandırılır",
     "billingGroup": {
       "tabLabel": "Faturalandırma Grubu",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "Ücretli kullanım gerekli tüm kuruluşlar için etkinleştirilmedi.",
     "updateFailed": "Ücretli Yapay Zeka kullanımı güncellenemedi. Tekrar deneyin.",
     "declinedNotice": "Ücretli Yapay Zeka kullanımı kapalı olduğundan bu istek gönderilmedi.",
-    "consentScope": "Tüm kuruluş için geçerlidir: @:{'brand.askAutobot'}, sorgu oluşturma ve vaka analizi. Planlar sayfasından istediğiniz zaman kapatabilirsiniz.",
+    "consentScope": "Tüm kuruluş için geçerlidir: @:{'brand.autobot'}, sorgu oluşturma ve vaka analizi. Planlar sayfasından istediğiniz zaman kapatabilirsiniz.",
     "managePaidUsage": "Ücretli kullanımı aç",
     "modePayAsYouGo": "Kullandıkça öde",
     "modeConsentRequired": "Onay gerekli",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "Otomatik Navigasyon",
-        "enabledTooltip": "Otomatik navigasyon etkin - {product} onay olmadan otomatik olarak gezinecek",
-        "disabledTooltip": "Otomatik navigasyon devre dışı - {product} gezinmeden önce soracak"
-      }
-    }
+    "composer": {}
   }
 }

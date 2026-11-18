@@ -124,7 +124,7 @@ describe("AssistantStatusCard", () => {
       },
     });
     expect(chip(w)).toBe("Unreachable");
-    expect(w.text()).toContain(`Users see ${en.brand.autobot} as unavailable until this is fixed.`);
+    expect(w.text()).toContain(`Members see ${en.brand.autobot} as unavailable.`);
     expect(w.find('[data-test="settings-assistant-status-last-error"]').text()).toContain(
       "upstream connect error",
     );
@@ -256,7 +256,7 @@ describe("AssistantStatusCard", () => {
       );
       expect(chip(w)).toBe("Not in your license");
       expect(w.find('[data-test="settings-assistant-status-body"]').text()).toBe(
-        `Your license doesn't include ${en.brand.askAutobot}, so nobody in this organization sees it. Contact your account team to add it.`,
+        `Your license doesn't include ${en.brand.autobot}. Contact your account team.`,
       );
       expect(w.find('[data-test="settings-assistant-test-btn"]').exists()).toBe(false);
       expect(w.find('[data-test="settings-assistant-open-access"]').exists()).toBe(false);

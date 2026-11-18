@@ -20,14 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="@container flex w-full min-w-0 flex-col gap-4 pt-4"
     data-test="assistant-home-examples"
   >
-    <div class="grid grid-cols-1 gap-2 @sm:grid-cols-2 @2xl:grid-cols-4">
+    <div class="flex flex-wrap justify-center gap-2">
       <button
         v-for="card in cards"
         :key="card.id"
         type="button"
-        class="rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 flex min-w-0 cursor-pointer items-center gap-2 border px-2.5 py-2 text-left transition-[border-color,box-shadow,translate] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:ring-2 focus-visible:outline-none"
+        class="rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 flex min-w-0 cursor-pointer items-center gap-2 border py-1.5 ps-1.5 pe-3 text-left transition-[border-color,box-shadow,translate] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:ring-2 focus-visible:outline-none"
         :data-test="`assistant-home-capability-${card.id}`"
-        @click="emit('select', t(card.prompt))"
+        @click="emit('select', t(card.prompt), card.agent)"
       >
         <span
           class="rounded-default inline-flex size-7 shrink-0 items-center justify-center"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon :name="card.icon" size="sm" :class="card.iconColorClass" />
         </span>
-        <span class="text-text-heading min-w-0 text-sm leading-tight font-medium">
+        <span class="text-text-heading min-w-0 text-sm leading-tight font-medium whitespace-nowrap">
           {{ t(card.title) }}
         </span>
         <OTooltip :content="t(card.description)" />
@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { AgentId } from "@/composables/assistant";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -60,5 +61,5 @@ withDefaults(defineProps<{ cards?: CapabilityCard[]; prompts?: boolean }>(), {
 
 const { t } = useI18nTyped();
 
-const emit = defineEmits<{ (e: "select", prompt: string): void }>();
+const emit = defineEmits<{ (e: "select", prompt: string, agent?: AgentId): void }>();
 </script>

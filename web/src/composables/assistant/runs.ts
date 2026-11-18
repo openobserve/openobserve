@@ -478,9 +478,12 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
     open: openRow,
     light() {
       const sessions = state().sessions;
-      const others = chats.value.filter(
-        (chat) => !sessions[chat.session_id]?.turnMeta.ownedByThisTab,
-      );
+      // Only a turn or card this tab holds speaks for a chat here; an idle copy read from history does not.
+      const others = chats.value.filter((chat) => {
+        const session = sessions[chat.session_id];
+        const held = !!session && (isRunning(session.turn) || !!session.pendingApproval);
+        return !(held && session.turnMeta.ownedByThisTab);
+      });
       const waiting = others.find(
         (chat) =>
           chat.pending_approval &&

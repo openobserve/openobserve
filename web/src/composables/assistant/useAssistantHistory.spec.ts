@@ -787,6 +787,21 @@ describe("useAssistantHistory reload", () => {
     }
   });
 
+  it("lets another tab read a running turn's transcript before the server commits it", async () => {
+    vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+    const fake = setup({ persistence: true });
+    await flushPromises();
+    const running = chat(fake, "still running");
+    fake.store.state.sessions[running].turn = { state: "responding.writing" } as never;
+    await fake.history.save(running);
+    const plain = [...fake.db.rows.values()].find((row) => row.sessionId === running);
+    expect(plain?.liveTurnId).toBeUndefined();
+    await fake.history.save(running, { live: true });
+    const live = [...fake.db.rows.values()].find((row) => row.sessionId === running);
+    expect(live).toMatchObject({ liveTurnId: "t1", serverBacked: true });
+    expect(live?.messages).toHaveLength(2);
+  });
+
   it("keeps this browser's live save inside the grace window and the server's after it", async () => {
     vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
     vi.spyOn(assistant, "getChat").mockResolvedValue(detail([]) as never);
@@ -1402,6 +1417,31 @@ describe("useAssistantHistory reload of a chat waiting on an approval", () => {
       expect.anything(),
     );
     expect(fake.store.state.sessions[sid].turnMeta.ownedByThisTab).toBe(false);
+  });
+
+  it("holds the card a Full page hand-off carried though the opener still streams the turn", async () => {
+    const locks = {
+      query: vi.fn(async () => ({ held: [{ name: `o2-assistant-turn:${sid}` }], pending: [] })),
+      request: vi.fn(async () => undefined),
+    };
+    const frame = cardFrame();
+    vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+    vi.spyOn(assistant, "getChat").mockResolvedValue(running([frame]) as never);
+    const fake = open(locks);
+    fake.db.rows.set(1, structuredClone(record(1, { serverBacked: true })));
+    fake.history.ensureLoaded();
+    await flushPromises();
+    await fake.history.open({ sid });
+    await flushPromises();
+    const session = fake.store.state.sessions[sid];
+    expect(session.pendingApproval).toBeNull();
+    fake.history.takeHandedCard(sid, "t1", approvalOf(frame));
+    expect(session.pendingApproval?.id).toBe("apr_1");
+    expect(session.turn.state).toBe("awaiting_approval");
+    await fake.approvals.decide(sid, { approved: true, scope: "once" }, "apr_1");
+    await flushPromises();
+    expect(session.pendingApproval).toBeNull();
+    expect(session.turn.state).toBe("responding.thinking");
   });
 
   it("keeps a card only this browser saw, with its outcome, when the turn ends without this tab", async () => {

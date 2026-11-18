@@ -72,7 +72,7 @@ describe("AssistantEnvValue", () => {
       .find('[data-test="settings-assistant-env-O2_AI_CHAT_RETENTION_DAYS-info"]')
       .trigger("click");
     await flushPromises();
-    expect(document.body.textContent).toContain("Set by the deployment, read-only here");
+    expect(document.body.textContent).toContain("Set by the deployment");
     expect(document.body.textContent).toContain("O2_AI_CHAT_RETENTION_DAYS");
   });
 });

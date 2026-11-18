@@ -28,6 +28,9 @@ export interface FakeVoiceEngine extends VoiceEngine {
   options: VoiceListenOptions | null;
   meter: VoiceMeter & { db: number };
   abort: ReturnType<typeof vi.fn>;
+  /** The graceful stop a real recogniser offers; only a `graceful` engine has one. */
+  stopSession: ReturnType<typeof vi.fn>;
+  graceful: boolean;
   rejectMic: Error | null;
   /** Resolves the pending microphone prompt when `holdPrompt` was set. */
   grant: (() => void) | null;
@@ -44,6 +47,8 @@ export function fakeVoiceEngine(): FakeVoiceEngine {
     options: null,
     meter: { db: -90, read: () => fake.meter.db, close: vi.fn() },
     abort: vi.fn(),
+    stopSession: vi.fn(),
+    graceful: false,
     rejectMic: null,
     grant: null,
     holdPrompt: false,
@@ -62,7 +67,11 @@ export function fakeVoiceEngine(): FakeVoiceEngine {
     listen(options, handlers) {
       fake.options = options;
       fake.handlers = handlers;
-      return { start: vi.fn(), abort: fake.abort };
+      return {
+        start: vi.fn(),
+        abort: fake.abort,
+        ...(fake.graceful && { stop: fake.stopSession }),
+      };
     },
   };
   return fake;

@@ -72,11 +72,11 @@ describe("Settings rail: Assistant", () => {
     config.isEnterprise = "true";
     const w = mountIndex();
     const labels = (w.vm as any).sectionGroups.map((g: any) => g.label);
-    expect(labels.indexOf(enLocale.brand.askAutobot)).toBeGreaterThan(-1);
-    expect(labels.indexOf(enLocale.brand.askAutobot)).toBeLessThan(labels.indexOf("Data"));
+    expect(labels.indexOf(enLocale.brand.autobot)).toBeGreaterThan(-1);
+    expect(labels.indexOf(enLocale.brand.autobot)).toBeLessThan(labels.indexOf("Data"));
     const item = assistantItem(w);
     expect(item).toMatchObject({
-      label: enLocale.brand.askAutobot,
+      label: enLocale.brand.autobot,
       description: "Status, access, data, history, usage, toolsets, permissions and activity",
       icon: "auto-awesome",
       dataTest: "settings-assistant-tab",

@@ -16,6 +16,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 
 import AssistantIconButton from "./AssistantIconButton.vue";
@@ -35,6 +36,10 @@ describe("AssistantIconButton", () => {
     const button = mountButton().get('[data-test="assistant-shell-close"]');
     expect(button.element.tagName).toBe("BUTTON");
     expect(button.attributes("aria-label")).toBe("Close");
+  });
+
+  it("shows its tooltip alone: opening another assistant tooltip closes this one", () => {
+    expect(mountButton().findComponent(OTooltip).props("exclusive")).toBe(true);
   });
 
   it("renders the glyph decoratively", () => {

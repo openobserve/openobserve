@@ -144,6 +144,7 @@ function onKeydown(event: KeyboardEvent) {
       <DropdownMenuSubContent
         ref="content"
         :side-offset="4"
+        :align="align"
         :collision-padding="8"
         :hide-when-detached="true"
         :style="{ zIndex: contentZIndex }"

@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </AssistantMessageActions>
             </template>
-            <template v-if="followUpsOf(turn).length" #follow-ups>
+            <template v-if="!decisionPending && followUpsOf(turn).length" #follow-ups>
               <AssistantFollowUps :sid="sid!" :items="followUpsOf(turn)" />
             </template>
           </AssistantMessage>
@@ -205,6 +205,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </article>
       <slot name="cards" />
+      <!-- A pending card is the next step, so the suggestions wait under it, never above it -->
+      <AssistantFollowUps
+        v-if="decisionPending && pendingFollowUps.length"
+        :sid="sid!"
+        :items="pendingFollowUps"
+      />
     </section>
     <div
       v-if="jumpShown"
@@ -216,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :aria-label="jumpName"
         :class="[
-          'bg-surface-panel! text-text-heading! border-border-default! pointer-events-auto size-10! rounded-full! shadow-lg',
+          'bg-surface-panel! text-text-heading! border-border-default! rounded-default! pointer-events-auto size-10! shadow-lg',
           TOUCH_TARGET_CLASS,
         ]"
         data-test="assistant-transcript-jump-latest"
@@ -487,6 +493,12 @@ const hiddenCount = computed(() =>
     .slice(0, turns.value.length - mounted.value.length)
     .reduce((sum, turn) => sum + (turn.user ? 1 : 0) + (turn.answer ? 1 : 0), 0),
 );
+
+const decisionPending = computed(() => !!session.value?.pendingApproval);
+const pendingFollowUps = computed(() => {
+  const last = mounted.value.at(-1);
+  return last ? followUpsOf(last) : [];
+});
 
 // Every committed batch changes this, so following lands in the same frame as the DOM commit (`00` §5.6).
 const contentVersion = computed(() => {

@@ -433,6 +433,18 @@ describe("other tabs", () => {
     expect(lifecycle.turnLock("z")).toBeNull();
   });
 
+  it("does not lock a chat whose card this tab holds too, as a Full page tab does", () => {
+    const { lifecycle, receive, store } = setup();
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "full_view" },
+    });
+    receive({ v: 1, type: "approval_pending", sid, turnId: "t", callId: "c", at: 1 });
+    expect(lifecycle.turnLock(sid)).toBe("approval_elsewhere");
+    store.state.sessions[sid].pendingApproval = { id: "c", expiresAt: 9e12 } as never;
+    expect(lifecycle.approvalElsewhere(sid)).toBe(false);
+    expect(lifecycle.turnLock(sid)).toBeNull();
+  });
+
   it("beats at once when it hides or shows, and says hello again after a back-forward restore", async () => {
     vi.useFakeTimers();
     const { store, hints } = setup();

@@ -247,6 +247,7 @@ import {
   useAssistantName,
   useAssistantOpenChord,
   useAssistantPlacement,
+  useAssistantRuns,
   useAssistantStore,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -274,6 +275,7 @@ const { t } = useI18nTyped();
 const { isDark } = useTheme();
 const { product } = useAssistantName();
 const store = useAssistantStore();
+const runs = useAssistantRuns();
 const history = useAssistantHistory();
 const capability = useAssistantCapability();
 const placement = useAssistantPlacement(store);
@@ -302,6 +304,17 @@ const mine = computed(() =>
   Object.values(store.state.sessions).filter(
     (s) => s.userOrgKey === store.state.userOrgKey && !s.record.ephemeral,
   ),
+);
+
+// The chat list's "Needs you" reads the runs, which also hold other tabs' and devices' chats; the badge counts the same.
+const waitingSids = computed(
+  () =>
+    new Set([
+      ...mine.value.filter(needsYou).map((session) => session.sid),
+      ...runs.rows.value
+        .filter((row) => row.group === "needs_you" && !row.otherOrg)
+        .map((row) => row.sid),
+    ]),
 );
 
 const view = computed<HeaderView>(() => gateView() ?? lightView());
@@ -382,7 +395,7 @@ function lightView(): HeaderView {
 function needsYouView(sid: string | null): HeaderView {
   const p = { product };
   const open = visible.value;
-  const waiting = mine.value.filter(needsYou).length;
+  const waiting = waitingSids.value.size;
   const session = sid ? store.state.sessions[sid] : undefined;
   const consent = session?.turn.state === "awaiting_consent";
   const name =
@@ -535,6 +548,9 @@ function openOnLitSession(invoker: HTMLElement | null, sid?: string): void {
   }
   // A lit chat in a window opens where it lives: raised, or back from the tray.
   if (store.windowOf(target)) return store.restoreWindow(target as string);
+  // A chat only the server knows (another tab or device) is read in before the container opens on it.
+  const run = target && !store.state.sessions[target] ? runRow(target) : null;
+  if (run) return void runs.open(run, { focus: "card", invoker });
   if (target && store.state.sessions[target]) store.setActive(target);
   void openAssistant({
     entryKind: sid ? "toast" : "header_button",
@@ -544,6 +560,10 @@ function openOnLitSession(invoker: HTMLElement | null, sid?: string): void {
     thread: "current",
     invoker,
   });
+}
+
+function runRow(sid: string) {
+  return runs.rows.value.find((row) => row.sid === sid && !row.otherOrg) ?? null;
 }
 
 function closeDialog(): void {
@@ -616,7 +636,7 @@ function toastHidden(): void {
 }
 
 function toastKind(session: AssistantSession): "ready" | "failed" | null {
-  if (!session.unread) return null;
+  if (!session.unread || needsYou(session)) return null;
   if (session.turn.state === "done") return "ready";
   return session.turn.state === "failed" || session.turn.state === "refused" ? "failed" : null;
 }

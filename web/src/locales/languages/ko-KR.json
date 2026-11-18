@@ -3983,7 +3983,7 @@
           "note": "자동화된 SRE 운영 및 인사이트"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "지능형 쿼리 및 분석 지원"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "예기치 않은 오류 발생",
       "toolExecutionFailed": "도구 실행 실패",
       "errorOccurred": "오류 발생",
-      "navigateConfirmQuestion": "@:{'brand.autobot'}의 탐색을 허용하시겠습니까?",
       "confirmToolExecution": "{tool} 실행을 확인하시겠습니까?",
       "entity": {
         "alert": "알림",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "AI를 계속 사용하려면 구독하세요. 추가 사용량은 이 조직의 청구서로 청구됩니다.",
     "aiContractExhaustedMessage": "추가 AI 크레딧을 원하시면 계정 관리자에게 문의하세요.",
     "aiPayerSubscribeMessage": "이 조직의 요금 청구는 {payer}에서 관리합니다. {payer}의 관리자에게 구독을 요청하세요. 추가 사용량은 해당 청구서로 청구됩니다.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} 및 쿼리 생성: {chat} · @:{'brand.autobotInvestigate'}: {incident} · 재분석: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} 및 쿼리 생성: {chat} · @:{'brand.autobotInvestigate'}: {incident} · 재분석: {reanalysis}",
     "aiPaygMessage": "무료 크레딧 소진 — 사용량이 구독에 청구됨",
     "billingGroup": {
       "tabLabel": "결제 그룹",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "필요한 모든 조직에서 유료 사용이 활성화되지 않았습니다.",
     "updateFailed": "유료 AI 사용을 업데이트하지 못했습니다. 다시 시도하세요.",
     "declinedNotice": "유료 AI 사용이 꺼져 있어 이 요청이 전송되지 않았습니다.",
-    "consentScope": "전체 조직에 적용됩니다: @:{'brand.askAutobot'}, 쿼리 생성, 인시던트 분석. 플랜 페이지에서 언제든 끌 수 있습니다.",
+    "consentScope": "전체 조직에 적용됩니다: @:{'brand.autobot'}, 쿼리 생성, 인시던트 분석. 플랜 페이지에서 언제든 끌 수 있습니다.",
     "managePaidUsage": "유료 사용 켜기",
     "modePayAsYouGo": "종량제",
     "modeConsentRequired": "승인 필요",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "자동 내비게이션",
-        "enabledTooltip": "자동 내비게이션 활성화 - {product}가 확인 없이 자동으로 탐색합니다.",
-        "disabledTooltip": "자동 내비게이션 비활성화 - {product}가 탐색 전에 묻습니다."
-      }
-    }
+    "composer": {}
   }
 }

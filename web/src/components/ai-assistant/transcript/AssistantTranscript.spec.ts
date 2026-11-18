@@ -677,4 +677,55 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
     });
     expect(readonly.find('[data-test="assistant-handoff-suggestion"]').exists()).toBe(false);
   });
+
+  it("puts the last answer's follow-ups below a pending approval card, and back in the answer once decided", async () => {
+    const answer = reply("Here is the plan.", [
+      { type: "follow_ups", followUps: ["Show db errors"] } as never,
+    ]);
+    const session = liveSession([prompt("one", "t1"), answer]);
+    Object.assign(session, { pendingApproval: { id: "a1" } });
+    const host = {
+      session: () => session,
+      setFollow: vi.fn(),
+      setScroll: vi.fn(),
+      selectVersion: vi.fn(),
+      outcomeAction: vi.fn(),
+      isAdmin: () => true,
+      persistence: () => true,
+      online: () => true,
+      focusComposer: vi.fn(),
+      stageFollowUp: vi.fn(),
+      canRetry: () => true,
+    } as AssistantTranscriptHost;
+    const wrapper = mount(AssistantTranscript, {
+      props: { sid: "s1" },
+      slots: { cards: '<div data-test="card-stub" />' },
+      global: {
+        provide: {
+          [assistantSessionSourceKey as symbol]: () => computed(() => session.messages),
+          [assistantTranscriptHostKey as symbol]: host,
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await new Promise((r) => setTimeout(r, 50));
+    const logEl = log(wrapper).element;
+    const card = logEl.querySelector('[data-test="card-stub"]');
+    const followUps = logEl.querySelector('[data-test="assistant-follow-ups"]');
+    expect(card).not.toBeNull();
+    expect(followUps).not.toBeNull();
+    expect(
+      card!.compareDocumentPosition(followUps!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      wrapper.find('[data-test="assistant-answer-t1"] [data-test="assistant-follow-ups"]').exists(),
+    ).toBe(false);
+    Object.assign(session, { pendingApproval: null });
+    await flushPromises();
+    expect(
+      wrapper.find('[data-test="assistant-answer-t1"] [data-test="assistant-follow-ups"]').exists(),
+    ).toBe(true);
+    expect(wrapper.findAll('[data-test="assistant-follow-ups"]')).toHaveLength(1);
+  });
 });

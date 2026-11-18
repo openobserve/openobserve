@@ -25,10 +25,6 @@ import { raw } from "@/types/i18n";
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantContextSeesPopover from "./AssistantContextSeesPopover.vue";
 
-import brandLocale from "@/locales/languages/en-US.json";
-
-const brandNames = brandLocale.brand;
-
 const { fake } = vi.hoisted(() => ({ fake: { current: null as any, emptyContext: false } }));
 
 vi.mock("@/composables/assistant", async (importOriginal) => {
@@ -77,6 +73,12 @@ beforeEach(() => {
       streamType: "traces",
       currentQuery: "service_name='cart'",
       organization_identifier: "acme-prod",
+      timeRange: {
+        type: "relative",
+        relativeTimePeriod: "15m",
+        startTime: 1_000_000,
+        endTime: 901_000_000,
+      },
     }),
   });
   contextRegistry.setActive("traces");
@@ -136,85 +138,46 @@ async function openPopover(
 }
 
 describe("AssistantContextSeesPopover", () => {
-  it("says what goes with the next message under the title, then shows four compact rows in one card", async () => {
+  it("lists the default context as one plain list, with no explanation text", async () => {
     const { panel, group, fieldsOf } = await openPopover();
-    expect(panel()!.querySelector('[data-test="assistant-context-sees-intro"]')?.textContent).toBe(
-      "These go with your next message.",
-    );
-    expect(panel()!.querySelector('[data-test="assistant-context-sees-heading"]')).toBeNull();
-    expect(fieldsOf("page")).toEqual(["currentPage", "selectedStreams", "timeRange", "not_read"]);
-    expect(group("page")!.classList.contains("divide-y")).toBe(true);
-    expect(group("page")!.textContent).toContain("default (traces)");
-    expect(group("page")!.querySelector('[data-test="assistant-context-sees-org"]')).not.toBeNull();
-    expect(
-      group("page")!.querySelector('[data-test="assistant-context-sees-timezone"]'),
-    ).not.toBeNull();
-    expect(group("page")!.querySelector('[data-field="request_timestamp"]')).toBeNull();
-    expect(group("added")).toBeNull();
-    expect(group("page")!.querySelector('[data-field="not_read"]')?.textContent).toContain(
-      "Trace query",
-    );
-    expect(
-      group("page")!
-        .querySelector('[data-test="assistant-context-sees-not-read-hint"]')
-        ?.getAttribute("aria-label"),
-    ).toBe(`${brandNames.autobot} does not read this yet`);
+    expect(fieldsOf("page")).toEqual(["currentPage", "selectedStreams", "timeRange"]);
+    const list = group("page")!;
+    expect(list.tagName).toBe("DL");
+    expect(list.className).not.toMatch(/divide-y|border|bg-/);
+    expect(list.textContent).toContain("default (traces)");
+    expect(list.querySelector('[data-test="assistant-context-sees-org"]')).not.toBeNull();
+    expect(list.querySelector('[data-test="assistant-context-sees-timezone"]')).not.toBeNull();
+    expect(list.querySelector('[data-field="request_timestamp"]')).toBeNull();
+    expect(list.textContent).not.toContain("Trace query");
+    expect(panel()!.querySelectorAll("p")).toHaveLength(0);
     expect(trackAssistant).toHaveBeenCalledWith("ai_context_inspected", { target: "sees" });
   });
 
-  it("wraps the Not Sent list over up to three lines so no withheld name is cut off", async () => {
-    const { group } = await openPopover();
-    const notSent = group("page")!.querySelector('[data-field="not_read"]')!;
-    const value = notSent.querySelector('[data-test="o-truncated-text"]')!;
-    expect(value.classList.contains("line-clamp-3")).toBe(true);
-    expect(notSent.classList.contains("items-start")).toBe(true);
-    const page = group("page")!.querySelector(
-      '[data-field="currentPage"] [data-test="o-truncated-text"]',
-    )!;
-    expect(page.classList.contains("line-clamp-3")).toBe(false);
+  it("lists what the user added at the end of the same list", async () => {
+    const { group, fieldsOf } = await openPopover(false, { chips: [ROW, MENTION] });
+    expect(fieldsOf("page").slice(-2)).toEqual(["selectedStreams", "attachments"]);
+    expect(fieldsOf("page").filter((id) => id === "selectedStreams")).toHaveLength(1);
+    expect(group("page")!.textContent).toContain("1 attachment");
   });
 
-  it("shows each row as one line with an icon, a label and a value", async () => {
-    const { group } = await openPopover();
-    const rows = group("page")!.querySelectorAll('[data-test="assistant-context-sees-row"]');
-    expect(rows.length).toBe(4);
-    for (const row of rows) {
-      expect(row.querySelector('[data-test="assistant-context-sees-row-icon"]')).not.toBeNull();
-      expect(row.textContent?.trim().length).toBeGreaterThan(0);
-    }
-  });
-
-  it("shows the dictation line only when a speech engine is named", async () => {
-    const { panel } = await openPopover();
-    const voice = panel()!.querySelector('[data-test="assistant-context-sees-voice"]');
-    if (voice)
-      expect(voice.textContent?.trim()).toBe(
-        "Dictation uses your browser's speech service. Audio is not stored.",
-      );
-  });
-
-  it("lists what the user added under You Added, @ mentions included, and says how to remove it", async () => {
-    const { panel, group, fieldsOf } = await openPopover(false, { chips: [ROW, MENTION] });
-    expect(fieldsOf("added")).toEqual(["selectedStreams", "attachments"]);
-    expect(fieldsOf("page")).not.toContain("selectedStreams");
-    expect(group("added")!.querySelector(".divide-y")).not.toBeNull();
-    expect(group("added")!.textContent).toContain("1 attachment");
-    expect(panel()!.querySelector('[data-test="assistant-context-sees-intro"]')?.textContent).toBe(
-      "These go with your next message. To leave out something you added, remove its chip.",
-    );
-  });
-
-  it("reads a box with no chat from its draft: its range, its @ picks and its images", async () => {
+  it("reads a box with no chat from its draft: its @ picks and its images", async () => {
     const draft: ContextDraft = {
       chips: [MENTION],
       images: [{ id: "i1", data: "AA==", mimeType: "image/png", filename: "a.png", size: 2048 }],
-      timeOverride: { from: 1_000, to: 3_601_000, period: "1h" },
     };
     const { group, fieldsOf } = await openPopover(false, { noSession: true, props: { draft } });
-    expect(fieldsOf("added")).toEqual(["selectedStreams", "attachments"]);
-    expect(group("added")!.textContent).toContain("checkout");
-    expect(group("added")!.textContent).toContain("1 attachment · 2 KB");
-    expect(group("page")!.textContent).toContain("1 h");
+    expect(fieldsOf("page").slice(-2)).toEqual(["selectedStreams", "attachments"]);
+    expect(group("page")!.textContent).toContain("checkout");
+    expect(group("page")!.textContent).toContain("1 attachment · 2 KB");
+  });
+
+  it("lists no time range on a page without one, as none is sent", async () => {
+    contextRegistry.register("traces", {
+      getContext: () => ({ currentPage: "alerts", organization_identifier: "acme-prod" }),
+    });
+    contextRegistry.setActive("traces");
+    const { fieldsOf } = await openPopover();
+    expect(fieldsOf("page")).toEqual(["currentPage"]);
   });
 
   it("says only the message goes when there is nothing else", async () => {
@@ -223,45 +186,23 @@ describe("AssistantContextSeesPopover", () => {
     expect(
       panel()!.querySelector('[data-test="assistant-context-sees-empty"]')?.textContent?.trim(),
     ).toBe("Only your message is sent.");
-    expect(panel()!.querySelector('[data-test="assistant-context-sees-heading"]')).toBeNull();
   });
 
-  it("opens with focus on its heading and is named after the product (CT-04 AC 6–7)", async () => {
-    const { panel } = await openPopover();
+  it("opens from an (i) button titled Default context, with focus on its heading", async () => {
+    const { panel, trigger } = await openPopover();
+    expect(trigger.text()).toBe("");
+    expect(trigger.attributes("aria-label")).toBe("Default context");
     const heading = panel()!.querySelector("h2")!;
     expect(document.activeElement).toBe(heading);
-    expect(heading.textContent?.trim()).toBe(`What ${brandNames.autobot} Will See`);
-    expect(panel()!.closest("[role='dialog']")?.getAttribute("aria-label")).toBe(
-      `What ${brandNames.autobot} Will See`,
-    );
-  });
-
-  it("states the disclosure, and the shared one in a shared chat (CT-04 AC 4)", async () => {
-    const plain = await openPopover();
-    expect(
-      plain.panel()!.querySelector('[data-test="assistant-context-sees-disclosure"]')?.textContent,
-    ).toBe("Saved with this chat.");
-    document.body.innerHTML = "";
-    const shared = await openPopover(true);
-    expect(
-      shared.panel()!.querySelector('[data-test="assistant-context-sees-disclosure"]')?.textContent,
-    ).toContain("included in any share");
-  });
-
-  it("opens from a small named icon that fits the box's corner, taking no text width (PO A34)", async () => {
-    const { trigger, wrapper } = await openPopover();
-    expect(trigger.text()).toBe("");
-    expect(trigger.attributes("aria-label")).toBe(`What ${brandNames.autobot} Will See`);
-    expect(trigger.attributes("data-size")).toBe("sm");
-    expect(trigger.classes()).toContain("max-md:min-h-11");
-    expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
+    expect(heading.textContent?.trim()).toBe("Default context");
+    expect(panel()!.closest("[role='dialog']")?.getAttribute("aria-label")).toBe("Default context");
   });
 
   it("never runs past the side panel or the viewport: its width caps at the room it has (T-03-02)", async () => {
     const { panel } = await openPopover();
     const content = panel()!.closest<HTMLElement>("[data-o-popover-content]")!;
     expect(content.className).toContain(
-      "max-w-[min(26rem,calc(100vw-1.5rem),var(--reka-popper-available-width,100vw))]",
+      "max-w-[min(22rem,calc(100vw-1.5rem),var(--reka-popper-available-width,100vw))]",
     );
   });
 

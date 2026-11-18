@@ -83,7 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex min-w-0 flex-1 items-center gap-2 text-start"
           data-test="assistant-shell-sheet-status"
         >
-          <AssistantMark size="sm" />
           <OTruncatedText class="text-text-heading min-w-0 flex-1 text-sm font-medium">{{
             peekTitle
           }}</OTruncatedText>
@@ -156,12 +155,11 @@ import {
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
-import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { ASSISTANT_MOTION } from "@/components/ai-assistant/common/assistantMotion";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
-import { isFullThreadRoute } from "@/composables/assistant/pure";
+import { isFullThreadRoute, movedToTab } from "@/composables/assistant/pure";
 import {
   SIDEBAR_MIN_REM,
   TEAR_OFF_REM,
@@ -297,6 +295,7 @@ function activeRunning(): boolean {
 }
 
 function onOpen(): void {
+  movedToTab.value = null;
   returnFocusTo = lockedPanel.value?.invoker ?? (document.activeElement as HTMLElement | null);
   if (!lgUp.value)
     store.setSheetSnap(window.innerHeight < LANDSCAPE_PHONE_REM * 16 ? "full" : "half");
@@ -312,10 +311,18 @@ function onOpen(): void {
 
 // Focus goes back to the invoker, else the element focused before the open, else `main` (IW-09 AC 3).
 async function onClose(): Promise<void> {
+  const tab = movedToTab.value;
+  movedToTab.value = null;
   region.value?.announce(
-    t(activeRunning() ? "assistant.announce.closedRunning" : "assistant.announce.closed", {
-      product,
-    }),
+    tab
+      ? t("assistant.announce.openedInTab", {
+          title: String(
+            store.state.sessions[tab.sid ?? ""]?.title ?? t("assistant.thread.newChatTitle"),
+          ),
+        })
+      : t(activeRunning() ? "assistant.announce.closedRunning" : "assistant.announce.closed", {
+          product,
+        }),
   );
   await nextTick();
   const invoker = store.state.shell.invoker?.el.deref();

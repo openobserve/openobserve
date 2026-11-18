@@ -2461,7 +2461,12 @@
 /* ── O2 Assistant signal and identity (90 §2.2): every value points at a token that already flips in dark.css ── */
 :root {
   --color-assistant-signal-working: var(--color-ai-accent);
-  --color-assistant-signal-attention: var(--color-status-warning-text);
+  /* Its small text sits on panel surfaces, where the shared warning text misses 4.5:1; dark.css restores it. */
+  --color-assistant-signal-attention: color-mix(
+    in srgb,
+    var(--color-status-warning-text) 85%,
+    black
+  );
   --color-assistant-signal-failed: var(--color-status-negative);
   --color-assistant-signal-unread: var(--color-text-secondary);
   /* A refused turn's title sits on the warning wash, where the shared warning text misses 4.5:1. */

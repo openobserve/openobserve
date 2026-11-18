@@ -561,12 +561,34 @@ describe("the request", () => {
     });
   });
 
-  it("sends the default 15 minutes on a page with no range", () => {
+  it("lets a hand-off's pinned values win, except a field the user removed", () => {
+    const current = session();
+    current.pinnedContext = { selectedStreams: ["checkout"], streamType: "traces", traceId: "t1" };
+    const kept = serialize(current, snapshot(), CLIENT, turn(PAGE_CONTEXTS.logs));
+    expect(kept.context.selectedStreams).toEqual(["checkout"]);
+    expect(kept.context.traceId).toBe("t1");
+    current.composer.removedPageKeys = ["selectedStreams"];
+    const removed = serialize(current, snapshot(), CLIENT, turn(PAGE_CONTEXTS.logs));
+    expect(removed.context).not.toHaveProperty("selectedStreams");
+    expect(removed.context).not.toHaveProperty("streamType");
+    expect(removed.context.traceId).toBe("t1");
+  });
+
+  it("sends the range the user picked over a hand-off's pinned range", () => {
+    const current = session();
+    const pinnedRange = { type: "absolute", startTime: 1, endTime: 2 };
+    current.pinnedContext = { timeRange: pinnedRange, traceId: "t1" };
+    const handedOff = serialize(current, snapshot(), CLIENT, turn(PAGE_CONTEXTS.logs));
+    expect(handedOff.context.timeRange).toEqual(pinnedRange);
+    const timeOverride = { from: 0, to: 3_600_000, period: "1h" };
+    const picked = serialize(current, snapshot({ timeOverride }), CLIENT, turn(PAGE_CONTEXTS.logs));
+    expect(picked.context.timeRange).toMatchObject({ type: "relative", relativeTimePeriod: "1h" });
+    expect(picked.context.traceId).toBe("t1");
+  });
+
+  it("sends no range on a page with none, so the agent picks the window", () => {
     const request = serialize(session(), snapshot(), CLIENT, turn(PAGE_CONTEXTS.dashboards));
-    expect(request.context.timeRange).toMatchObject({
-      type: "relative",
-      relativeTimePeriod: "15m",
-    });
+    expect(request.context).not.toHaveProperty("timeRange");
   });
 
   it("sends a mention of another stream type under its own type, never mislabelled (F5)", () => {

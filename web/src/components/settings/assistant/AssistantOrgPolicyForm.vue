@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </div>
           <p :id="ids.enabled" class="text-text-secondary text-xs">
-            {{ t("assistant.settings.access.enabledLine", name) }}
+            {{ t("assistant.settings.access.enabledLine") }}
           </p>
         </div>
         <div class="flex flex-col gap-1">

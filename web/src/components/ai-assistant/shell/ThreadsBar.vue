@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    v-if="hasItems && !launcherDismissed"
+    v-if="hasItems"
     ref="root"
     :aria-label="t('assistant.threadsBar.label')"
     data-test="threads-bar"
-    class="fixed end-[calc((var(--o-tray-end,0)+1.5)*1rem)] bottom-6 z-5000 flex flex-col items-end gap-2 max-md:end-4 max-md:bottom-4"
+    class="fixed end-[calc((var(--o-tray-end,0)+1.5)*1rem)] bottom-[calc(var(--o-tray-lift,1.5)*1rem)] z-5000 flex flex-col items-end gap-2 max-md:end-4 max-md:bottom-4"
   >
     <div
       v-if="expanded"
@@ -117,11 +117,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <AssistantFloatingLauncher
       ref="launcher"
-      :items="launcherItems"
+      :minimised="minimisedPills"
+      :others-count="othersCount"
+      :others-signal="othersSignal"
+      :others-shown="!chatOpen || othersSignal === SIGNAL.approval"
       :expanded="expanded"
       @toggle="toggle"
       @restore="openThread"
-      @dismiss="setLauncherDismissed(store.state.userOrgKey, true)"
+      @close="(sid) => emit('close', sid)"
     />
   </section>
 </template>
@@ -132,25 +135,25 @@ import type { Sid } from "@/composables/assistant";
 export interface ThreadsBarProps {
   /** Minimised windows, oldest first. */
   order: Sid[];
+  /** The sidebar or a window shows a chat. */
+  chatOpen?: boolean;
 }
 </script>
 
 <script setup lang="ts">
 import { useQuery } from "@tanstack/vue-query";
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import config from "@/aws-exports";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
+import { useAssistantRuns, useAssistantStore } from "@/composables/assistant";
 import {
-  isLauncherDismissed,
-  launcherDismissalVersion,
-  setLauncherDismissed,
-  useAssistantRuns,
-  useAssistantStore,
-} from "@/composables/assistant";
-import { fullThreadLocation, isHomeAskShown } from "@/composables/assistant/pure";
+  fullThreadLocation,
+  isFullThreadRoute,
+  isHomeAskShown,
+} from "@/composables/assistant/pure";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -172,6 +175,7 @@ import {
 const SIGNAL = {
   running: "working",
   approval: "attention",
+  failed: "failed",
   unread: "unread",
   idle: null,
 } as const;
@@ -181,7 +185,13 @@ const INCIDENT_REFRESH_OPEN_MS = 60_000;
 
 const INCIDENT_REFRESH_COLLAPSED_MS = 300_000;
 
-const props = defineProps<ThreadsBarProps>();
+const TRAY_SIGNAL: Partial<Record<ReturnType<typeof trayState>, ThreadPill["signal"]>> = {
+  needsYou: "approval",
+  working: "running",
+  failed: "failed",
+};
+
+const props = withDefaults(defineProps<ThreadsBarProps>(), { chatOpen: false });
 
 const emit = defineEmits<{ restore: [sid: Sid]; close: [sid: Sid] }>();
 
@@ -236,29 +246,23 @@ const threads = computed(() => {
 const minimisedPills = computed<ThreadPill[]>(() =>
   props.order.map((sid) => {
     const session = store.state.sessions[sid];
-    const state = trayState(session);
     return {
       sid,
       title: String(session?.title ?? t("assistant.thread.newChatTitle")),
-      signal: state === "needsYou" ? "approval" : state === "working" ? "running" : "idle",
+      signal: TRAY_SIGNAL[trayState(session)] ?? (session?.unread ? "unread" : "idle"),
     };
   }),
 );
-// Waiting chats first, then answering, then the rest; minimised ones newest first.
-const launcherItems = computed<ThreadPill[]>(() => {
-  const rank = { approval: 0, running: 1, unread: 2, idle: 2 } as const;
-  return [...threads.value, ...[...minimisedPills.value].reverse()].sort(
-    (a, b) => rank[a.signal] - rank[b.signal],
-  );
+const othersCount = computed(() => threads.value.length + incidents.value.shown.length);
+const othersSignal = computed(() => {
+  const signals = threads.value.map((pill) => pill.signal);
+  if (signals.includes("approval")) return SIGNAL.approval;
+  if (signals.includes("running") || incidents.value.shown.length > 0) return SIGNAL.running;
+  return signals.includes("unread") ? SIGNAL.unread : null;
 });
 const hasItems = computed(
   () => incidents.value.shown.length > 0 || threads.value.length > 0 || props.order.length > 0,
 );
-const launcherDismissed = computed(() => {
-  void launcherDismissalVersion.value;
-  return isLauncherDismissed(store.state.userOrgKey);
-});
-
 watch(hasItems, (has) => {
   if (!has) expanded.value = false;
 });
@@ -271,12 +275,43 @@ watch(panel, (el, prev) => {
   el?.addEventListener("keydown", onPanelKey);
 });
 
+// Bottom toasts read --o-toast-lift, so an answer-ready toast lands above the chips instead of on them.
+let chipRowObserver: ResizeObserver | null = null;
+watch(
+  root,
+  (el) => {
+    chipRowObserver?.disconnect();
+    chipRowObserver = null;
+    const row = el?.querySelector<HTMLElement>('[data-test="assistant-launcher"]') ?? null;
+    liftToasts(row);
+    if (!row || typeof ResizeObserver === "undefined") return;
+    chipRowObserver = new ResizeObserver(() => liftToasts(row));
+    chipRowObserver.observe(row);
+  },
+  { flush: "post" },
+);
+
+onBeforeUnmount(() => {
+  chipRowObserver?.disconnect();
+  liftToasts(null);
+});
+
+function liftToasts(row: HTMLElement | null): void {
+  const style = document.documentElement.style;
+  const rect = row?.getBoundingClientRect();
+  if (rect && rect.height > 0) {
+    style.setProperty("--o-toast-lift", `${(window.innerHeight - rect.top) / 16}rem`);
+  } else {
+    style.removeProperty("--o-toast-lift");
+  }
+}
+
 function items(): HTMLElement[] {
   return [...(panel.value?.querySelectorAll<HTMLElement>("[data-threads-item]") ?? [])];
 }
 
 async function expand(): Promise<void> {
-  if (!hasItems.value || launcherDismissed.value) return;
+  if (!hasItems.value) return;
   expanded.value = true;
   if (incidentsOn.value) void openIncidents.refetch?.();
   await nextTick();
@@ -328,11 +363,12 @@ function openIncidentList(): void {
     .catch(() => undefined);
 }
 
-// A minimised chat comes back as its window; any other thread opens as Float, or where it already shows.
+// A minimised chat comes back as its window, Home included; the full page shows it in place; any other thread floats.
 function openThread(sid: Sid): void {
   expanded.value = false;
-  if (isHomeAskShown(route)) return openOnHome(sid);
+  if (isFullThreadRoute(route)) return openOnHome(sid);
   if (props.order.includes(sid)) return emit("restore", sid);
+  if (isHomeAskShown(route)) return openOnHome(sid);
   const row = runs.rows.value.find((candidate) => candidate.sid === sid);
   if (store.state.sessions[sid] && store.floatChat(sid).ok) return;
   if (row) void runs.open(row, { focus: "composer" });

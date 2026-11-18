@@ -36,9 +36,14 @@ describe("AssistantFollowUps", () => {
       "Which endpoints?",
     ]);
     const list = wrapper.get('[data-test="assistant-follow-ups"]');
-    expect(list.attributes("aria-label")).toBe("Follow-Ups");
-    expect(list.text()).toContain("Follow-Ups");
+    expect(list.attributes("aria-label")).toBe("Follow-ups");
+    expect(list.text()).toContain("Follow-ups");
     expect(rows[0].element.tagName).toBe("BUTTON");
+    // Every row reads alike: no rule drawn between some rows and not others.
+    expect(wrapper.get('[data-test="assistant-follow-up-list"]').classes()).not.toContain(
+      "divide-y",
+    );
+    for (const row of rows) expect(row.classes().some((c) => c.startsWith("border"))).toBe(false);
     expect(rows[0].findComponent({ name: "OIcon" }).classes()).toContain("text-text-link");
     expect(rows[0].findComponent({ name: "OIcon" }).props("name")).toBe("arrow-forward");
     await rows[0].trigger("click");

@@ -80,7 +80,6 @@ function makeState(over: Partial<StreamState> = {}): StreamState {
 
 const liveCtx = (): ReducerCtx => ({
   isActive: true,
-  autoNavigationEnabled: false,
   phase: "live",
   t,
   generateNavigation: () => null,
@@ -110,6 +109,7 @@ function setup(
   registerUndoAppliers();
   const dispatcher = createActionDispatcher(ctx.env);
   const handlers = new Map<string, (hint: AssistantHint) => void>();
+  const posted = vi.fn();
   const engine = { approvalDecided: vi.fn(), approvalExtended: vi.fn(), approvalSending: vi.fn() };
   const resend = vi.fn(async () => undefined);
   const extend = vi.fn(async () => ({ expires_at: now + 300_000 }));
@@ -129,6 +129,7 @@ function setup(
         handlers.set(type, handler as (hint: AssistantHint) => void);
         return () => handlers.delete(type);
       },
+      postFor: posted,
     },
     now: () => now,
     lastKeydownAt: () => Number.NEGATIVE_INFINITY,
@@ -139,7 +140,19 @@ function setup(
   held = (sid) => ctx.store.state.sessions[sid]?.pendingApproval?.id;
   const session = ctx.store.state.sessions[ctx.sid];
   const outcome = () => session.annotations[approvalAnnotationKey(block.id)]?.approvalOutcome;
-  return { ...ctx, approvals, engine, resend, extend, changed, handlers, session, block, outcome };
+  return {
+    ...ctx,
+    approvals,
+    engine,
+    resend,
+    extend,
+    changed,
+    handlers,
+    posted,
+    session,
+    block,
+    outcome,
+  };
 }
 
 describe("useAssistantApprovals", () => {
@@ -325,6 +338,43 @@ describe("useAssistantApprovals", () => {
     const { env, session, handlers } = setup();
     handlers.get("signed_out")?.({ v: 1, type: "signed_out", at: now });
     expect(session.pendingApproval).toBeNull();
+    expect(env.confirm).not.toHaveBeenCalled();
+  });
+
+  it("tells the other tabs which card it answered once the server took the decision", async () => {
+    const { sid, approvals, session, posted, block } = setup();
+    await approvals.decide(sid, { approved: true, scope: "once" }, held(sid));
+    expect(posted).toHaveBeenCalledWith(session.userOrgKey, {
+      v: 1,
+      type: "approval_resolved",
+      sid,
+      callId: block.id,
+      approved: true,
+      at: now,
+    });
+  });
+
+  it("lets its copy of a card go when another tab answered that card, never posting it again", () => {
+    const { sid, env, session, handlers, outcome, engine, block } = setup();
+    handlers.get("approval_resolved")?.({
+      v: 1,
+      type: "approval_resolved",
+      sid,
+      approved: true,
+      at: now,
+    });
+    expect(session.pendingApproval?.id).toBe(block.id);
+    handlers.get("approval_resolved")?.({
+      v: 1,
+      type: "approval_resolved",
+      sid,
+      callId: block.id,
+      approved: true,
+      at: now,
+    });
+    expect(session.pendingApproval).toBeNull();
+    expect(outcome()?.state).toBe("approved_elsewhere");
+    expect(engine.approvalDecided).toHaveBeenCalledWith(sid);
     expect(env.confirm).not.toHaveBeenCalled();
   });
 

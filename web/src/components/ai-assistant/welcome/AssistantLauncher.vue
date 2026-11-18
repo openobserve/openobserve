@@ -77,42 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="pickMention"
           @close="closeMention"
         />
-        <!-- Home floats the chips above the box so adding one never moves it -->
-        <div
-          v-if="trayChips.length > 0"
-          :class="[
-            'flex h-7 min-h-7 min-w-0 items-center overflow-hidden px-0.5',
-            layout === 'overview' ? 'absolute inset-x-0 bottom-full mb-1' : 'mb-1',
-          ]"
-          data-test="assistant-launcher-chip-row"
-        >
-          <AssistantChipTray
-            :items="shownTrayChips"
-            :hidden="hiddenTrayChips"
-            data-test="assistant-launcher-chips"
-          >
-            <template #chip="{ item }">
-              <AssistantContextChip
-                :chip="item.chip"
-                compact
-                :short-label="item.chip.short"
-                :image-src="item.src"
-                :popup="false"
-                :data-test="
-                  item.src ? 'assistant-launcher-image-chip' : 'assistant-launcher-mention-chip'
-                "
-                @remove="removeTrayChip(item.chip)"
-              />
-            </template>
-            <template #hidden-item="{ item }">
-              <AssistantHiddenChipRow
-                :chip="item.chip"
-                :image-src="item.src"
-                @remove="removeTrayChip(item.chip)"
-              />
-            </template>
-          </AssistantChipTray>
-        </div>
         <AssistantComposerFrame
           ref="input"
           :model-value="shownText"
@@ -122,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder-tone="strong"
           :input-attrs="{
             'aria-label': t('assistant.welcome.launcher.inputName', { product }),
+            'aria-describedby': notice ? noticeId : undefined,
             maxlength: MAX_LAUNCHER_CHARS,
             enterkeyhint: 'send',
             ...(mentionAt !== null && {
@@ -133,65 +98,104 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'aria-activedescendant': mention?.activeId,
             }),
           }"
-          tall
+          :listening="voice.listening.value"
           data-test="assistant-launcher-input"
           @update:model-value="onInput"
           @keydown="onKeydown"
-          @focus="focused = true"
-          @blur="focused = false"
         >
+          <template v-if="notice || trayChips.length > 0" #strip>
+            <div
+              v-if="trayChips.length > 0"
+              class="flex h-7 min-h-7 min-w-0 items-center overflow-hidden"
+              data-test="assistant-launcher-chip-row"
+            >
+              <AssistantChipTray
+                :items="shownTrayChips"
+                :hidden="hiddenTrayChips"
+                data-test="assistant-launcher-chips"
+              >
+                <template #chip="{ item }">
+                  <AssistantContextChip
+                    :chip="item.chip"
+                    compact
+                    :short-label="item.chip.short"
+                    :image-src="item.src"
+                    :popup="false"
+                    :data-test="
+                      item.src ? 'assistant-launcher-image-chip' : 'assistant-launcher-mention-chip'
+                    "
+                    @remove="removeTrayChip(item.chip)"
+                  />
+                </template>
+                <template #hidden-item="{ item }">
+                  <AssistantHiddenChipRow
+                    :chip="item.chip"
+                    :image-src="item.src"
+                    @remove="removeTrayChip(item.chip)"
+                  />
+                </template>
+              </AssistantChipTray>
+            </div>
+            <AssistantComposerStrip
+              v-if="notice"
+              :notice="notice"
+              :sentence-id="noticeId"
+              @action="onNoticeAction"
+            />
+          </template>
           <template v-if="fieldReady" #corner>
             <AssistantContextSeesPopover :sid="null" :draft="seesDraft" />
           </template>
           <template #bar>
-            <AssistantComposerBottomRow divided>
-              <template #agent>
+            <AssistantComposerBottomRow
+              :dictating="voice.mine.value && voice.phase.value !== 'requesting'"
+            >
+              <template v-if="mentionsOn" #plus>
                 <AssistantComposerPlusMenu
-                  v-if="mentionsOn"
-                  :actions="['attach', 'context']"
+                  :actions="['attach', 'connectors']"
                   :disabled="fieldLoading"
                   @select="onPlus"
                 />
-                <!-- Shrinks so a long time range cuts its own text, not the agent pill under mic and Send -->
-                <span class="flex min-w-0 items-center gap-2">
-                  <AssistantTimePrefix
-                    v-model:open="timeOpen"
-                    :window="window"
-                    :timezone="vuex.state.timezone || 'UTC'"
-                    :disabled="fieldLoading"
-                    fixed
-                    align="start"
-                    @change="timeOverride = $event"
-                  />
-                  <AssistantLauncherAgent
-                    v-model="agent"
-                    :fixed="fixedAgent"
-                    :disabled="fieldLoading"
-                  />
-                </span>
-                <AssistantAutoNavToggle v-if="!voice.mine.value" v-model="autoNavigation" />
               </template>
-              <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
-              <AssistantDictateButton
-                v-if="voice.mic.value !== 'none'"
-                :mic="voice.mic.value"
-                :pressed="voice.mine.value"
-                :disabled-reason="voice.helperLine.value ?? undefined"
-                @press="onMicPress"
-              />
-              <AssistantIconButton
-                variant="primary"
-                size="md"
-                :label="t('assistant.welcome.launcher.ask')"
-                :icon="assistantGlyph.send"
-                :disabled="!canSend"
-                :disabled-reason="
-                  fieldLoading ? undefined : t('assistant.welcome.launcher.askEmpty')
-                "
-                :class="SEND_ACTION_CLASS"
-                data-test="assistant-launcher-ask"
-                @click="ask(false)"
-              />
+              <template #recording>
+                <AssistantDictationWave
+                  :elapsed-ms="voice.elapsedMs.value"
+                  :level="voice.level.value"
+                  :processing="voice.phase.value === 'processing'"
+                />
+              </template>
+              <template #agent>
+                <AssistantLauncherAgent
+                  v-model="agent"
+                  :fixed="fixedAgent"
+                  :disabled="fieldLoading"
+                />
+              </template>
+              <template #mic>
+                <AssistantDictateButton
+                  v-if="voice.mic.value !== 'none'"
+                  :phase="voice.phase.value"
+                  :disabled-reason="voice.helperLine.value ?? undefined"
+                  @press="onMicPress"
+                />
+              </template>
+              <template #send>
+                <AssistantIconButton
+                  variant="primary"
+                  :size="BAR_CONTROL_SIZE"
+                  :label="t('assistant.welcome.launcher.ask')"
+                  :icon="assistantGlyph.send"
+                  :disabled="!canSend"
+                  :disabled-reason="
+                    fieldLoading
+                      ? undefined
+                      : (fixedOff ?? t('assistant.welcome.launcher.askEmpty'))
+                  "
+                  :class="SEND_ACTION_CLASS"
+                  data-test="assistant-launcher-ask"
+                  @click="ask()"
+                />
+              </template>
             </AssistantComposerBottomRow>
           </template>
         </AssistantComposerFrame>
@@ -406,28 +410,24 @@ import AssistantContextSeesPopover from "@/components/ai-assistant/context/Assis
 import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
-import AssistantTimePrefix from "@/components/ai-assistant/context/AssistantTimePrefix.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import {
   MAX_IMAGES,
   focusWhenReady,
   openAssistant,
+  openTabWithoutOpener,
   starterPayload,
-  periodMs,
-  timeWindowOf,
   useAssistantCapability,
   useAssistantHistory,
   useAssistantName,
   useAssistantRuns,
   useAssistantStarters,
   useAssistantStore,
-  type ComposerState,
   type ContextDraft,
   type Starter,
-  type TimeWindow,
 } from "@/composables/assistant";
+import { agentReason } from "@/composables/assistant/pure";
 import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
-import { useAutoNavigationPreferences } from "@/composables/useAutoNavigationPreferences";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -447,14 +447,21 @@ import { formatRelativeCompact } from "@/utils/formatters";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import AssistantComposerBottomRow, {
+  BAR_CONTROL_SIZE,
   SEND_ACTION_CLASS,
 } from "@/components/ai-assistant/composer/AssistantComposerBottomRow.vue";
+import AssistantComposerStrip from "@/components/ai-assistant/composer/AssistantComposerStrip.vue";
+import {
+  micHelpUrl,
+  sentenceNotice,
+  type ComposerNotice,
+  type NoticeAction,
+} from "@/components/ai-assistant/composer/composerNotice";
 import AssistantComposerFrame from "@/components/ai-assistant/composer/AssistantComposerFrame.vue";
 import { announceComposer, composerUi } from "@/components/ai-assistant/composer/composerUi";
 import AssistantComposerPlusMenu, {
   type ComposerPlusAction,
 } from "@/components/ai-assistant/composer/AssistantComposerPlusMenu.vue";
-import AssistantAutoNavToggle from "@/components/ai-assistant/composer/AssistantAutoNavToggle.vue";
 import AssistantDictateButton from "@/components/ai-assistant/composer/AssistantDictateButton.vue";
 import AssistantDictationWave from "@/components/ai-assistant/composer/AssistantDictationWave.vue";
 import {
@@ -464,11 +471,11 @@ import {
   type ImageCap,
 } from "@/components/ai-assistant/composer/composerImages";
 import { useAssistantVoice } from "@/components/ai-assistant/composer/useAssistantVoice";
+import { helpBrand } from "@/components/ai-assistant/composer/voiceEngine";
 
 import AssistantLauncherAgent from "./AssistantLauncherAgent.vue";
 import AssistantStarterRow from "./AssistantStarterRow.vue";
 import { starterIcon } from "./starterIcons";
-import { useTypewriterPlaceholder } from "./useTypewriterPlaceholder";
 
 const props = withDefaults(
   defineProps<{
@@ -497,28 +504,12 @@ const vuex = useStore();
 const capability = useAssistantCapability();
 const assistant = useAssistantStore();
 const { mdUp } = useBreakpoint();
-// No chat yet: the choice waits and the chat that Ask opens inherits it.
-const { isAutoNavigationEnabled: autoNavigation } = useAutoNavigationPreferences(
-  ref(null),
-  computed(() => assistant.state.userOrgKey),
-);
 // The layout is fixed per mount, and only the card lists starters and recent chats.
 const isCard = props.layout === "card";
 const starterList = isCard ? useAssistantStarters({ page: "home" }) : null;
 
 const titleId = `assistant-launcher-title-${useId()}`;
 const text = ref("");
-// Home asks over the default window until a range is picked; a picked preset slides to the moment of sending.
-const timeOverride = ref<ComposerState["timeOverride"]>(null);
-function sendRange(): ComposerState["timeOverride"] {
-  const range = timeOverride.value;
-  if (!range?.period) return range;
-  const to = Date.now();
-  return { from: to - periodMs(range.period), to, period: range.period };
-}
-// The chip always shows the range the box asks over; Home's own page range stays out of the box.
-const timeOpen = ref(false);
-const window = computed<TimeWindow>(() => timeWindowOf(null, timeOverride.value));
 const input = ref<InstanceType<typeof AssistantComposerFrame> | null>(null);
 const mention = ref<InstanceType<typeof AssistantMentionMenu> | null>(null);
 const mentionAt = ref<number | null>(null);
@@ -539,8 +530,12 @@ const state = computed(() => {
 // Starters refetch when the @ menu loads the same lists; only the gate may disable the field, or it drops focus.
 const fieldReady = computed(() => launcherState(capability.gate.value) === "ready");
 const fieldLoading = computed(() => capability.gate.value === "loading");
+// While dictating the words may still be interim; Send commits them, as Enter does.
 const canSend = computed(
-  () => !fieldLoading.value && (text.value.trim() !== "" || images.value.length > 0),
+  () =>
+    !fieldLoading.value &&
+    !fixedOff.value &&
+    (voice.mine.value || text.value.trim() !== "" || images.value.length > 0),
 );
 // The card names itself with its heading; the Home layouts draw none, so they carry the name.
 const sectionName = computed(() => {
@@ -575,37 +570,27 @@ const trayChips = computed<TrayChip[]>(() => [
 const { shown: shownTrayChips, hidden: hiddenTrayChips } = useChipCollapse(trayChips, chipLayout);
 // The launcher's line has no chat yet, so it speaks through its own draft's composer status.
 const status = computed(() => composerUi(LAUNCHER_DRAFT).status);
-// The ⓘ reads what Enter would send: the @ picks, the images and the range `ask` uses.
+// The ⓘ reads what Enter would send: the @ picks and the images.
 const seesDraft = computed<ContextDraft>(() => ({
   chips: mentionChips.value,
   images: images.value,
-  timeOverride: timeOverride.value,
 }));
 
 const mentionsOn = computed(() => fieldReady.value);
-// An idle, empty field types example prompts as on main's Home; focus, a draft or a chip brings back the plain hint.
-const focused = ref(false);
-const typing = computed(
+const fixedAvailable = computed(
   () =>
-    !props.askPlaceholder &&
-    fieldReady.value &&
-    !focused.value &&
-    !text.value &&
-    trayChips.value.length === 0,
+    !!props.fixedAgent &&
+    !!capability.value.agents?.some((row) => row.id === props.fixedAgent && row.available),
 );
-const { placeholder: typed } = useTypewriterPlaceholder(
-  computed(() => [
-    t("aiAssistant.placeholderRotation.one"),
-    t("aiAssistant.placeholderRotation.two"),
-    t("aiAssistant.placeholderRotation.three"),
-  ]),
-  { enabled: typing, typeSpeedMs: 85, eraseSpeedMs: 45, holdMs: 2800, initialDelayMs: 500 },
-);
-const placeholder = computed(
-  () =>
-    props.askPlaceholder ??
-    (typing.value ? raw(typed.value) : t("assistant.composer.placeholderAt")),
-);
+// A fixed agent the roster lists as off, or does not list, takes no line, so it never goes to another agent.
+const fixedOff = computed<I18nText | null>(() => {
+  const roster = capability.value.agents;
+  if (!props.fixedAgent || !roster) return null;
+  const row = roster.find((entry) => entry.id === props.fixedAgent);
+  if (!row) return t("assistant.agent.unavailable.short");
+  return row.available ? null : agentReason(row, null, t);
+});
+const placeholder = computed(() => props.askPlaceholder ?? t("assistant.composer.placeholderAt"));
 
 const coarse = ref(!!globalThis.matchMedia?.("(pointer: coarse)")?.matches);
 const voice = useAssistantVoice({
@@ -616,9 +601,51 @@ const voice = useAssistantVoice({
   blocked: () => !shown.value || state.value !== "ready",
   tap: () => undefined,
   touch: () => !mdUp.value && coarse.value,
-  say: () => undefined,
+  say: (line) => announceComposer(LAUNCHER_DRAFT, line),
 });
 const shownText = computed(() => voice.shown(text.value));
+const noticeId = `assistant-launcher-notice-${useId()}`;
+
+// The same voice lines the chat composer's strip shows, so dictation reads alike in every host.
+const notice = computed<ComposerNotice | null>(() => {
+  if (voice.waiting.value) {
+    const ask = t("assistant.voice.allowPrompt");
+    const privacy = t("assistant.voice.privacy");
+    return {
+      id: "voice",
+      tone: "info",
+      title: voice.firstUse.value ? privacy : ask,
+      sentence: voice.firstUse.value ? raw(`${ask} ${privacy}`) : ask,
+      links: [{ action: "voiceCancel", label: t("common.cancel") }],
+    };
+  }
+  const line = voice.helperLine.value;
+  if (!line) return null;
+  if (voice.action.value === "how")
+    return {
+      id: "voice",
+      tone: "warning",
+      title: t("assistant.composer.strip.micBlocked"),
+      sentence: line,
+      links: micHelpUrl(voice.brand() ?? helpBrand())
+        ? [{ action: "micHelp", label: t("assistant.composer.strip.howToAllow") }]
+        : [],
+    };
+  const links =
+    voice.action.value === "retry"
+      ? [{ action: "voiceRetry" as const, label: t("assistant.voice.tryAgain") }]
+      : [];
+  return sentenceNotice("voice", line, voice.failure.value ? "warning" : "info", links);
+});
+
+function onNoticeAction(action: NoticeAction): void {
+  if (action === "voiceCancel") voice.stop("other");
+  else if (action === "voiceRetry") voice.retry();
+  else if (action === "micHelp") {
+    const href = micHelpUrl(voice.brand() ?? helpBrand());
+    if (href) openTabWithoutOpener(href);
+  }
+}
 
 function onInput(value: string): void {
   text.value = value;
@@ -715,15 +742,12 @@ function mentionKey(event: KeyboardEvent): boolean {
 }
 
 function onMicPress(event: MouseEvent): void {
-  // An admin's first press turns dictation on in this browser; the next one starts it.
-  if (voice.mic.value === "off") return voice.turnOn();
   voice.press("mic");
   if (event.detail > 0) input.value?.focus({ preventScroll: true });
 }
 
 function onPlus(action: ComposerPlusAction): void {
   if (action === "attach") file.value?.open();
-  else if (action === "context") addContext();
 }
 
 function onPicked(value: FileValue): void {
@@ -747,19 +771,6 @@ function refuse(cap: ImageCap, line: I18nText): void {
 
 function refuseSize(picked: File): void {
   refuse("size", imageTooBigLine(t, picked));
-}
-
-// Add Context types the `@` at the caret, so it opens the same mention menu typing does.
-function addContext(): void {
-  const value = text.value;
-  const at = input.value?.textarea?.selectionStart ?? value.length;
-  const gap = at > 0 && !/\s/.test(value[at - 1]) ? " " : "";
-  onInput(`${value.slice(0, at)}${gap}@${value.slice(at)}`);
-  void nextTick(() => {
-    input.value?.focus();
-    input.value?.textarea?.setSelectionRange(at + gap.length + 1, at + gap.length + 1);
-    detectMention();
-  });
 }
 
 function focusField(clear: boolean): void {
@@ -835,18 +846,22 @@ onBeforeUnmount(() => {
 function onKeydown(event: KeyboardEvent): void {
   if (event.isComposing || event.keyCode === 229) return;
   if (mentionAt.value !== null && mentionKey(event)) return;
-  if (event.key === "Enter") {
+  // Shift+Enter is a new line, as in every composer.
+  if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
-    ask(event.shiftKey);
+    ask();
   } else if (event.key === "Escape") {
-    // Escape never clears what was typed (round 1 X-20).
-    (event.target as HTMLElement | null)?.blur();
+    // Escape stops dictation first, keeping its words; it never clears what was typed (X-20).
+    if (voice.mine.value) voice.stop("escape");
+    else (event.target as HTMLElement | null)?.blur();
   }
 }
 
 // The launcher is a door, not a composer: the line goes to `/assistant` and nothing stays here (`70` §5 note 6).
-function ask(stage: boolean): void {
+function ask(): void {
   if (!fieldReady.value) return;
+  if (fixedOff.value) return announceComposer(LAUNCHER_DRAFT, fixedOff.value);
+  if (props.fixedAgent && !fixedAvailable.value) return;
   if (voice.mine.value) voice.stop("send");
   const line = text.value.trim();
   const attached = images.value;
@@ -857,7 +872,6 @@ function ask(stage: boolean): void {
       ? announceComposer(LAUNCHER_DRAFT, t("assistant.welcome.launcher.askEmpty"))
       : openFull();
   text.value = "";
-  const time = sendRange();
   const chips = mentionChips.value;
   const picked = props.fixedAgent ?? agent.value;
   mentionChips.value = [];
@@ -867,14 +881,14 @@ function ask(stage: boolean): void {
     entryKind: "home_launcher",
     entryVerb: "ask",
     objectKind: "none",
-    intent: stage ? "stage" : "send",
+    intent: "send",
     thread: "new",
-    container: overview && sidebarOpen.value ? "sidebar" : "full",
+    // A fixed-agent page keeps its chats on the page, even with the sidebar open.
+    container: overview && sidebarOpen.value && !props.fixedAgent ? "sidebar" : "full",
     ...(picked && { agent: picked }),
     payload: {
       text: line,
       chips,
-      ...(time && { timeOverride: time }),
       ...(attached.length > 0 && { images: attached }),
     },
   });
@@ -894,10 +908,7 @@ function pickStarter(starter: Starter, index: number): void {
     intent: "stage",
     thread: "new",
     container: "full",
-    payload: {
-      ...starterPayload(starter, org.value),
-      ...(timeOverride.value && { timeOverride: sendRange() }),
-    },
+    payload: starterPayload(starter, org.value),
   });
 }
 
@@ -918,9 +929,11 @@ function openBilling(): void {
 defineExpose({
   /** Focus on arrival; skipped when the field is gated or the user is elsewhere. */
   focusAsk: () => focusWhenReady(() => input.value?.textarea),
-  /** Puts an example prompt in the field and focuses it, as main's welcome cards did. */
-  fill: (prompt: string) => {
+  /** Puts an example prompt in the field, with the agent it is for when that one can answer, and focuses it. */
+  fill: (prompt: string, forAgent?: AgentId) => {
     text.value = prompt;
+    const usable = capability.value.agents?.some((row) => row.id === forAgent && row.available);
+    if (forAgent && usable && !props.fixedAgent) agent.value = forAgent;
     void nextTick(() => input.value?.textarea?.focus());
   },
 });

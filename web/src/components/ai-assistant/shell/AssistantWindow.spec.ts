@@ -127,7 +127,7 @@ describe("AssistantWindow", () => {
     expect(el.attributes("aria-label")).toContain(`${brandNames.autobot}`);
     expect(el.attributes("data-assistant-window")).toBe(sid);
     expect(wrapper.get('[data-test="assistant-shell-window"]').attributes("data-sid")).toBe(sid);
-    expect(vars(wrapper)).toEqual([65.5, 23.5, 24, 36]);
+    expect(vars(wrapper)).toEqual([61.5, 23.5, 28, 36]);
   });
 
   it("minimises and closes through its title bar", async () => {
@@ -159,7 +159,7 @@ describe("AssistantWindow", () => {
     await pointer(wrapper, "pointerdown", [800, 400], bar);
     await pointer(wrapper, "pointermove", [160, 90]);
     await nextTick();
-    expect(vars(wrapper).slice(0, 2)).toEqual([25.5, 3.5]);
+    expect(vars(wrapper).slice(0, 2)).toEqual([21.5, 3.5]);
     await pointer(wrapper, "pointerup", [160, 90]);
     expect(store.windowOf(sid).geometry).toMatchObject({ corner: "top-start" });
     expect(track).toHaveBeenCalledWith("ai_window_moved", { snap: "edge" });
@@ -196,7 +196,7 @@ describe("AssistantWindow", () => {
     await pointer(wrapper, "pointerdown", [500, 400], edge);
     await pointer(wrapper, "pointermove", [436, 400]);
     await pointer(wrapper, "pointerup", [436, 400]);
-    expect(store.windowOf(sid).geometry.wRem).toBe(28);
+    expect(store.windowOf(sid).geometry.wRem).toBe(32);
     expect(track).toHaveBeenCalledWith("ai_window_resized", {});
   });
 
@@ -219,7 +219,7 @@ describe("AssistantWindow", () => {
     rect.mockRestore();
   });
 
-  it("folds Open as into the title menu below 24 rem and keeps Minimise and Close direct (PO A15)", async () => {
+  it("folds the moves into the title menu below 24 rem, keeping Minimise and Close on the bar", async () => {
     const wide = setup();
     expect(wide.wrapper.find('[data-test="assistant-shell-place-full"]').exists()).toBe(true);
     wide.wrapper.unmount();
@@ -243,7 +243,7 @@ describe("AssistantWindow", () => {
     await nextTick();
     expect(wrapper.emitted("mode-started")).toEqual([["move"]]);
     expect(wrapper.get('[data-test="assistant-window-move-mode"]').text()).toContain("Arrows move");
-    expect(vars(wrapper).slice(0, 2)).toEqual([64.5, 22.5]);
+    expect(vars(wrapper).slice(0, 2)).toEqual([60.5, 22.5]);
     const size = vars(wrapper).slice(2, 4);
     await grip.trigger("keydown", { key: "ArrowLeft", shiftKey: true });
     await nextTick();

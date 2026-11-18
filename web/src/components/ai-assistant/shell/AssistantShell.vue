@@ -48,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :layout-direct="onlyFullPage"
         :toolbar="bare"
       >
-        <template #container-actions="{ narrow }">
+        <template #container-actions="{ narrow: tight }">
           <AssistantModeButtons
-            v-if="!narrow && !bare"
+            v-if="!sheet && !(placement === 'window' && tight)"
             :placement="placement"
             :sheet="sheet"
             :sid="activeSid"
@@ -258,11 +258,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-show="!chatsOpen"
       :class="[
-        'min-h-0 flex-1 max-md:min-h-20',
+        'min-h-0 max-md:min-h-20',
+        centered ? 'flex-1 md:mt-auto md:flex-initial' : 'flex-1',
         readingWidth,
         state === 'conversation' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
       ]"
       data-test="assistant-shell-body"
+      :data-centered="centered ? '' : undefined"
     >
       <AssistantForkSource
         v-if="activeSid && (state === 'empty' || state === 'conversation')"
@@ -395,6 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="lower"
       :class="[
         'flex shrink-0 flex-col max-md:min-h-0 max-md:shrink max-md:overflow-y-auto',
+        centered && 'md:mb-auto md:pb-[8vh]',
         readingWidth,
       ]"
       data-test="assistant-shell-lower"
@@ -655,6 +658,7 @@ import {
   assistantApprovals,
   orgDisplayName,
   isRunning,
+  MAX_FLOATING_CHATS,
   noteAssistantKeydown,
   markSignedIn,
   queryRunOf,
@@ -675,6 +679,7 @@ import {
   stopElsewhere as stopHeldTurn,
   useTurnLock,
   type AssistantError,
+  type AssistantSession,
   type Container,
   type GateReason,
   type Starter,
@@ -686,6 +691,8 @@ import {
   pushFromThread,
   recordedLedger,
   homeQueryFrom,
+  openTabWithoutOpener,
+  takeFullTabHandoff,
   useViewedChat,
   type AssistantEvidenceHost,
   type AssistantTranscriptHost,
@@ -843,8 +850,11 @@ const chromeClasses = computed(() => {
   return [base, props.sheet ? "h-11" : "h-10 max-md:h-11"];
 });
 const readingWidth = computed(() =>
-  props.placement === "full" ? "mx-auto w-full max-w-3xl" : undefined,
+  props.placement === "full" ? "mx-auto w-full max-w-180" : undefined,
 );
+// A new full-page chat holds its greeting and composer mid-page; the first message docks the composer.
+// A phone keeps it at the bottom, in thumb reach.
+const centered = computed(() => props.placement === "full" && state.value === "empty");
 // The Chats view hides the chat instead of unmounting it, so its draft, scroll and stream carry on.
 const chatsOpen = ref(false);
 // The phone sheet's only move is to the full page, so its menus show that move directly.
@@ -868,31 +878,6 @@ provide(assistantThreadHostKey, {
 const historyUnavailable = computed(
   () => state.value === "conversation" && !!session.value?.record.historyUnavailable,
 );
-
-// Another tab or device runs this turn: server truth by tail or poll, and Stop still reaches it.
-const elsewhere = computed(() => {
-  const current = session.value;
-  if (!current || !isRunning(current.turn) || current.turnMeta.ownedByThisTab) return null;
-  // A card this tab holds again after a reload is the one status while it waits (B1).
-  if (current.pendingApproval) return null;
-  const view = history.elsewhere(current.sid);
-  const mode = view?.mode ?? "hint";
-  const line =
-    mode === "stalled"
-      ? t("assistant.shell.stillRunningRefresh")
-      : view?.ownedHere
-        ? t("assistant.shell.answeringHerePolling")
-        : view?.evidence === false
-          ? t("assistant.runs.state.reconnecting")
-          : mode === "polling"
-            ? t("assistant.shell.answeringElsewherePolling")
-            : t("assistant.shell.answeringElsewhere");
-  return {
-    line,
-    stalled: mode === "stalled",
-    approval: !!view?.approval && !approvalElsewhere.value,
-  };
-});
 
 // The chat this container last showed; a deletion of it elsewhere replaces the body, never another chat.
 const lastShownSid = ref<Sid | null>(null);
@@ -940,15 +925,6 @@ watch(
     if (!seq || !text || !visible.value || seq <= (historySpoken.get(history) ?? 0)) return;
     historySpoken.set(history, seq);
     region.value?.announce(text);
-  },
-);
-
-// The elsewhere line speaks when it appears and when polling gives up, never on every poll.
-watch(
-  () => (elsewhere.value ? (elsewhere.value.stalled ? "stalled" : "running") : null),
-  (mode, before) => {
-    if (!mode || mode === before || !visible.value || !elsewhere.value) return;
-    region.value?.announce(elsewhere.value.line);
   },
 );
 
@@ -1146,6 +1122,40 @@ const approvalElsewhere = computed(
   () => !!decisions.value && turnLock.value === "approval_elsewhere",
 );
 
+// Another tab or device runs this turn: server truth by tail or poll, and Stop still reaches it.
+const elsewhere = computed(() => {
+  const current = session.value;
+  if (!current || !isRunning(current.turn) || current.turnMeta.ownedByThisTab) return null;
+  // A card this tab holds again after a reload is the one status while it waits (B1).
+  if (current.pendingApproval) return null;
+  const view = history.elsewhere(current.sid);
+  const mode = view?.mode ?? "hint";
+  const line =
+    mode === "stalled"
+      ? t("assistant.shell.stillRunningRefresh")
+      : view?.ownedHere
+        ? t("assistant.shell.answeringHerePolling")
+        : view?.evidence === false
+          ? t("assistant.runs.state.reconnecting")
+          : mode === "polling"
+            ? t("assistant.shell.answeringElsewherePolling")
+            : t("assistant.shell.answeringElsewhere");
+  return {
+    line,
+    stalled: mode === "stalled",
+    approval: !!view?.approval && !approvalElsewhere.value,
+  };
+});
+
+// The elsewhere line speaks when it appears and when polling gives up, never on every poll.
+watch(
+  () => (elsewhere.value ? (elsewhere.value.stalled ? "stalled" : "running") : null),
+  (mode, before) => {
+    if (!mode || mode === before || !visible.value || !elsewhere.value) return;
+    region.value?.announce(elsewhere.value.line);
+  },
+);
+
 // The org-wide paid-usage prompt shows here while this chat's turn waits on it, else in the global dialog.
 const awaitingConsent = computed(
   () => !!decisions.value && session.value?.turn.state === "awaiting_consent",
@@ -1165,6 +1175,23 @@ const sheetRequest = computed(() =>
 );
 const sheetRequestWord = computed(() =>
   chatStatusWord("needs_you", sheetRequest.value?.expiresAt, reviewClock.value, t),
+);
+
+// A Full page tab opened from another tab's chat starts with that chat's draft.
+watch(
+  () => (props.placement === "full" ? activeSid.value : null),
+  (sid) => {
+    const chat = sid ? store.state.sessions[sid] : undefined;
+    const key = store.state.userOrgKey;
+    if (!sid || !chat || !key) return;
+    const handoff = takeFullTabHandoff(key, sid, isBlank(chat));
+    if (!handoff) return;
+    store.stage(sid, { text: handoff.text, chips: handoff.chips, mode: "replace" });
+    for (const image of handoff.images ?? []) store.addImage(sid, image);
+    if (handoff.agentId) store.pickAgent(sid, handoff.agentId, "door");
+    if (handoff.card) history.takeHandedCard(sid, handoff.card.turnId, handoff.card.block);
+  },
+  { immediate: true },
 );
 
 // The request reached from another chat, so its record alone leads back there.
@@ -1655,12 +1682,13 @@ function newChat(): void {
   const { text = "", chips = [], images = [] } = previous?.composer ?? {};
   const drafted = !!text.trim() || chips.length > 0 || images.length > 0;
   const sid = freshChat(previous?.sid ?? null);
-  if (!previous || !drafted || previous.sid === sid) return;
+  // A window's old chat keeps its draft in its own minimised window.
+  if (!previous || !drafted || previous.sid === sid || store.windowOf(previous.sid)) return;
   noteDraftCleared(sid, { token: null, from: previous.sid, at: Date.now() });
   trackAssistant("ai_composer_cleared", { reason: "new_chat", undone: false });
 }
 
-// A window swaps its own chat; the primary container's New goes through the store's active chat.
+// A window's New opens its own window and minimises this one; the primary container's goes through the store's active chat.
 function freshChat(previous: Sid | null): Sid {
   const own = scopedSid.value;
   if (!own) {
@@ -1668,13 +1696,20 @@ function freshChat(previous: Sid | null): Sid {
       origin: { entryKind: "thread_new", objectKind: "none", container: container.value },
     });
   }
-  if (previous && !store.state.sessions[previous]?.messages.length) return previous;
+  if (previous && isBlank(store.state.sessions[previous])) return previous;
+  if (store.state.shell.windows.length >= MAX_FLOATING_CHATS) return own;
   const sid = store.createSession({
     origin: { entryKind: "thread_new", objectKind: "none", container: container.value },
     detached: true,
   });
-  store.replaceWindowChat(own, sid);
+  if (!store.newChatWindow(own, sid)) store.replaceWindowChat(own, sid);
   return sid;
+}
+
+function isBlank(chat: AssistantSession | undefined): boolean {
+  if (!chat) return true;
+  const { text, chips, images } = chat.composer;
+  return !chat.messages.length && !text.trim() && !chips.length && !images.length;
 }
 
 // Under a cross-tab lock the retry is refused; the reader hears why instead of nothing happening.
@@ -1700,10 +1735,16 @@ function sheetToFull(): void {
   });
 }
 
-// The locked sidebar has no placement to move, so its full view is the route's hero gate.
+// The locked sidebar has no placement to move, so its full view is the route's hero gate; a phone keeps it in this tab.
 function openInFullView(): void {
+  const to = { name: "assistant", query: homeQueryFrom(route) };
+  if (!props.sheet) {
+    closeLockedPanel();
+    openTabWithoutOpener(router.resolve(to).href);
+    return;
+  }
   closeLockedPanel("move");
-  void router.push({ name: "assistant", query: homeQueryFrom(route) });
+  void router.push(to);
 }
 
 function closeContainer(): void {
@@ -1885,6 +1926,33 @@ watch(lower, (el, _was, onCleanup) => {
     children.disconnect();
   });
 });
+
+// The full page's composer runs to the bottom edge, so the minimised chips sit above it instead of on its controls.
+watch(
+  () => (props.placement === "full" ? lower.value : null),
+  (el, _was, onCleanup) => {
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const style = document.documentElement.style;
+    const lift = (): void => {
+      if (!el.clientHeight) {
+        style.removeProperty("--o-tray-lift");
+        return;
+      }
+      const top = el.getBoundingClientRect().top;
+      style.setProperty("--o-tray-lift", String((window.innerHeight - top) / 16 + 0.5));
+    };
+    const sizes = new ResizeObserver(lift);
+    sizes.observe(el);
+    window.addEventListener("resize", lift, { passive: true });
+    lift();
+    onCleanup(() => {
+      sizes.disconnect();
+      window.removeEventListener("resize", lift);
+      style.removeProperty("--o-tray-lift");
+    });
+  },
+  { flush: "post" },
+);
 
 defineExpose({ focusEntry, openSharedLinks: () => (shareManagerOpen.value = true) });
 </script>

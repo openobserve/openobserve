@@ -744,6 +744,10 @@ export interface AssistantSession {
   nextAgentId?: AgentId;
   /** An Ask hand-off's context, merged into every turn's `context`; in memory only, never persisted. */
   pinnedContext?: Record<string, unknown>;
+  /** The chips that hand-off staged; removing one before a send drops `pinnedContext` with it. */
+  pinnedChipIds?: string[];
+  /** The hand-off's range, kept across sends until the user picks another or Follow page. */
+  pinnedWindow?: { from: number; to: number };
 }
 
 export interface AssistantState {
@@ -851,7 +855,8 @@ export interface AssistantStoreApi {
   minimiseWindow(sid: Sid, reason: MinimiseReason): void;
   restoreWindow(sid: Sid, opts?: { focus?: "composer" | "none" }): void;
   /** The chat leaves the screen; a running answer keeps running. */
-  closeWindow(sid: Sid): void;
+  /** `toTab`: the chat moved to a Full page tab, so the window closes saying so. */
+  closeWindow(sid: Sid, opts?: { toTab?: boolean }): void;
 
   stage(
     sid: Sid,
@@ -1116,7 +1121,8 @@ export interface HistoryService {
   open(ref: { sid: Sid } | { chatId: number }): Promise<Sid>;
   create(): Sid;
   recent(n: number): ComputedRef<HistoryRow[]>;
-  save(sid: Sid): Promise<"server" | "local" | "not_saved">;
+  /** `live` keeps a running turn's transcript ahead of the server's copy, for a tab opening it now. */
+  save(sid: Sid, opts?: { live?: boolean }): Promise<"server" | "local" | "not_saved">;
   /** Gives the writes a standing grant let run in this chat their ledger entry, so Undo shows. */
   joinGrantedLedger?(sid: Sid): Promise<void>;
   rename(sid: Sid, title: string): Promise<MutationResult>;
@@ -1129,7 +1135,7 @@ export interface HistoryService {
   canReload: ComputedRef<boolean>;
   mode: ComputedRef<"server" | "local">;
   hasMore: ComputedRef<boolean>;
-  loadOlder(): Promise<void>;
+  loadOlder(): Promise<boolean>;
 }
 
 export interface HintChannel {

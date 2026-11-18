@@ -263,6 +263,36 @@ describe("assistant runtime", () => {
     expect(session.turnMeta.usage).toMatchObject({ tokensIn: 18342, tokensOut: 612 });
   });
 
+  it("never routes on a navigation frame: the link waits for a click", async () => {
+    const frames = ["status", "navigation_action", "message_delta", "complete"].map(frame);
+    const body = frames.map((f) => `data: ${JSON.stringify(f)}\n\n`).join("");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } }),
+        ),
+    );
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => setTimeout(cb, 0));
+    const ctx = context("admin");
+    const router = ctx.router as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    router.resolve = vi.fn(() => ({ href: "/web/logs", meta: {}, query: {} }));
+    assistantStore.init(ctx);
+    await vi.waitFor(() => expect(assistantStore.state.ready).toBe(true));
+    const sid = assistantStore.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      thread: "new",
+    });
+    assistantStore.open({ kind: "sidebar" }, { sid, focus: "none" });
+    assistantStore.setDraft(sid, { text: "show payments errors" });
+    await expect(assistantStore.send(sid)).resolves.toMatchObject({ state: "done" });
+    await flushPromises();
+    expect(router.push).not.toHaveBeenCalled();
+    const blocks = assistantStore.state.sessions[sid].messages[1].contentBlocks ?? [];
+    expect(blocks.some((block) => block.type === "link")).toBe(true);
+  });
+
   it("resumes a dropped stream of a saved chat from its last seq (HT-06)", async () => {
     const sse = (items: [number, unknown][]) =>
       new Response(items.map(([id, f]) => `id: ${id}\ndata: ${JSON.stringify(f)}\n\n`).join(""), {

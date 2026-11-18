@@ -304,7 +304,6 @@ describe("the final-chunk gap is closed for the new path", () => {
   const t = ((key: string) => key) as any;
   const ctx: ReducerCtx = {
     isActive: true,
-    autoNavigationEnabled: false,
     phase: "live",
     t,
     generateNavigation: () => null,

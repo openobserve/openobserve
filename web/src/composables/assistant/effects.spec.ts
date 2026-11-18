@@ -56,7 +56,6 @@ const CAPABILITY: AssistantCapability = {
 
 const ctx: ReducerCtx = {
   isActive: true,
-  autoNavigationEnabled: false,
   phase: "live",
   t: ((key: string) => key) as never,
   generateNavigation: () => null,

@@ -360,6 +360,8 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
       return turns;
     },
     approvalElsewhere: (sid) => {
+      // A Full page tab holds the card its opener still shows; either one may answer it.
+      if (store.state.sessions[sid]?.pendingApproval) return false;
       const entry = remote.get(sid);
       return entry?.state === "needs_you" && cardLive(entry, deps.now());
     },

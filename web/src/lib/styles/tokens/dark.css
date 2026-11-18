@@ -1057,6 +1057,7 @@
   --color-assistant-link-hover: var(--color-primary-300);
   --color-assistant-primary: var(--color-primary-600);
   --color-assistant-refused-text: var(--color-status-warning-text);
+  --color-assistant-signal-attention: var(--color-status-warning-text);
   --color-assistant-primary-hover: var(--color-primary-600);
   --color-assistant-user-bg: color-mix(
     in srgb,

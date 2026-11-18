@@ -289,10 +289,11 @@ export function createHistoryList(ctx: HistoryCtx) {
       if (!ctx.serverMode()) return void (await ctx.reloadLocal());
       await Promise.all(observers.map(({ observer }) => observer.refetch()));
     },
-    async loadOlder() {
+    /** True when a new page was asked for; a page of hidden rows still counts. */
+    async loadOlder(): Promise<boolean> {
       const org = deps.org();
       const cursor = pages.value.at(-1)?.next_cursor ?? undefined;
-      if (!org || !cursor || cursors.value.includes(cursor)) return;
+      if (!org || !cursor || cursors.value.includes(cursor)) return false;
       const before = serverRows.value.length;
       cursors.value = [...cursors.value, cursor];
       observe(org, cursor, cursors.value.length - 1);
@@ -300,6 +301,7 @@ export function createHistoryList(ctx: HistoryCtx) {
       await observer.refetch().catch(() => undefined);
       const added = serverRows.value.length - before;
       if (added > 0) ctx.announce("assistant.history.loadedOlder", { count: added }, added);
+      return true;
     },
   };
 

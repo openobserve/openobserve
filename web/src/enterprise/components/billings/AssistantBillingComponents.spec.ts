@@ -353,7 +353,7 @@ describe("AssistantCreditsCard", () => {
       used_by_feature: { chat: 700, incident: 400, incident_reanalysis: 100 },
     });
     expect(w.find('[data-test="billing-ai-used-by-feature"]').text()).toBe(
-      `${en.brand.askAutobot} and query generation: 700 · ${en.brand.autobotInvestigate}: 400 · Reanalysis: 100`,
+      `${en.brand.autobot} and query generation: 700 · ${en.brand.autobotInvestigate}: 400 · Reanalysis: 100`,
     );
   });
 

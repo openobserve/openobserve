@@ -139,7 +139,7 @@ describe("AssistantHomeTab", () => {
     const wrapper = mountTab();
     await flushPromises();
     const examples = wrapper.get('[data-test="assistant-home-examples"]');
-    expect(examples.classes()).toEqual(expect.arrayContaining(["mx-auto", "max-w-3xl"]));
+    expect(examples.classes()).toEqual(expect.arrayContaining(["mx-auto", "max-w-174"]));
     expect(wrapper.get('[data-test="launcher-stub"]').element.nextElementSibling).toBe(
       examples.element,
     );
@@ -234,19 +234,20 @@ describe("AssistantHomeTab", () => {
     expect(mocks.railMounted).not.toHaveBeenCalled();
   });
 
-  it("keeps the Ask box in flow right under the greeting, centred and set a little down the page, on every screen size", async () => {
+  it("keeps the Ask box in flow right under the greeting, centred in the page, on every screen size", async () => {
     for (const wide of [true, false]) {
       set(mocks.lgUp, wide);
       const wrapper = mountTab();
       await flushPromises();
       const main = wrapper.get('[data-test="assistant-home-main"]');
-      expect(main.classes()).toEqual(expect.arrayContaining(["flex", "flex-col", "pt-[12vh]"]));
+      expect(main.classes()).toEqual(
+        expect.arrayContaining(["flex", "flex-col", "justify-center-safe", "max-md:justify-start"]),
+      );
       const ask = wrapper.get('[data-test="launcher-stub"][data-layout="overview"]');
       expect(ask.element.previousElementSibling?.getAttribute("data-test")).toBe(
         "agent-home-greeting",
       );
-      // mt-3 keeps the chip row that floats above the box clear of the greeting.
-      expect(ask.classes()).toEqual(expect.arrayContaining(["mx-auto", "mt-3", "max-w-3xl"]));
+      expect(ask.classes()).toEqual(expect.arrayContaining(["mx-auto", "w-full", "max-w-174"]));
       for (const pinned of ["sticky", "bottom-0", "mt-auto", "z-10", "from-surface-base"]) {
         expect(ask.classes()).not.toContain(pinned);
       }

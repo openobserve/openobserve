@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="imageSrc"
       :src="imageSrc"
       alt=""
-      class="rounded-default size-4 shrink-0 object-cover"
+      class="rounded-default border-border-default size-5 shrink-0 border object-cover"
     />
     <OIcon
       v-else

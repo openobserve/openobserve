@@ -21,6 +21,7 @@ import {
   isLive,
   liveIncidentPills,
   threadPills,
+  trayState,
 } from "./threadsBar";
 
 const incident = (id: string, created_at: number, state?: string, stale = false) =>
@@ -60,5 +61,13 @@ describe("threadsBar pills", () => {
       ["d"],
     );
     expect(pills.map((p) => p.sid)).toEqual(["c", "b", "a"]);
+  });
+
+  it("reads every way a chat can wait for the person as needs you", () => {
+    const chat = (turn: object, pendingApproval?: object) => ({ turn, pendingApproval }) as any;
+    expect(trayState(chat({ state: "awaiting_approval", callId: "c" }))).toBe("needsYou");
+    expect(trayState(chat({ state: "awaiting_consent" }))).toBe("needsYou");
+    expect(trayState(chat({ state: "idle" }, { callId: "c" }))).toBe("needsYou");
+    expect(trayState(chat({ state: "responding.writing" }))).toBe("working");
   });
 });

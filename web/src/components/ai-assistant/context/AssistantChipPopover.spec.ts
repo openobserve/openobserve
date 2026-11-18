@@ -61,7 +61,7 @@ describe("AssistantChipPopover: withheld at the data level", () => {
       chip: { ...ROW, sent: "not_read", withheldAt: "aggregates" },
     });
     expect(popover()?.querySelector('[data-test="assistant-chip-withheld"]')?.textContent).toBe(
-      "Not sent at this data level (Schema and aggregates). Admins can change it in assistant settings.",
+      "Not sent at this data level (Schema and aggregates).",
     );
   });
 

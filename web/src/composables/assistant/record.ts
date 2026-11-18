@@ -361,10 +361,9 @@ export function foldTurns(
 ): { messages: ChatMessage[]; spans: TurnSpan[] } {
   const messages: ChatMessage[] = [];
   const spans: TurnSpan[] = [];
-  // isActive records tool calls like the visible chat; auto-navigation stops a past navigation replaying as a prompt.
+  // isActive records tool calls like the visible chat.
   const ctx: ReducerCtx = {
     isActive: true,
-    autoNavigationEnabled: true,
     phase,
     t,
     generateNavigation: (tool, args, body) => generateNavigationFromToolResult(tool, args, body, t),

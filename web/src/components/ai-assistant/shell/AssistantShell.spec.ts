@@ -18,7 +18,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, defineComponent, inject, ref, shallowRef } from "vue";
 
 import type { AssistantCapability, GateCode, Starter } from "@/composables/assistant";
-import { assistantSessionSourceKey, viewedChatSids } from "@/composables/assistant/pure";
+import {
+  assistantSessionSourceKey,
+  leaveFullTabHandoff,
+  takeFullTabHandoff,
+  viewedChatSids,
+} from "@/composables/assistant/pure";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { CREDIT_NOTICE_PREFIX } from "@/composables/assistant/useAssistantCredits";
@@ -28,7 +33,6 @@ import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex, hintBus } from "../__tests__/fakeAssistant";
 import { historyStubs } from "../__tests__/historyStubs";
-import AssistantComposerPlusMenu from "../composer/AssistantComposerPlusMenu.vue";
 import { fakeRuns } from "../runs/runsTestKit";
 import AssistantShareControl from "../share/AssistantShareControl.vue";
 import AssistantThreadHeader from "../thread/AssistantThreadHeader.vue";
@@ -97,8 +101,10 @@ function setup(
   over: Partial<AssistantCapability> = {},
   routed?: ShellRouteState,
   historyDeps: Partial<HistoryDeps> = {},
+  prepare?: (store: ReturnType<typeof fakeAssistant>["store"]) => void,
 ) {
   fake.current = fakeAssistant(gate, over, {}, 80, false, historyDeps);
+  prepare?.(fake.current.store);
   const router = fakeRouter();
   const routeState = ref<ShellRouteState>(routed ?? "idle");
   const newChat = vi.fn();
@@ -141,7 +147,7 @@ describe("AssistantShell landmark", () => {
   it(`is an aside named ${brandNames.autobot} in the sidebar, masked for session replay`, () => {
     const el = root(setup().wrapper);
     expect(el.element.tagName).toBe("ASIDE");
-    expect(el.attributes("aria-label")).toBe(`${brandNames.askAutobot}`);
+    expect(el.attributes("aria-label")).toBe(`${brandNames.autobot}`);
     expect(el.attributes("data-dd-privacy")).toBe("mask");
     expect(el.attributes("data-test")).toBe("assistant-shell-sidebar");
     expect(el.attributes("data-placement")).toBe("sidebar");
@@ -151,7 +157,7 @@ describe("AssistantShell landmark", () => {
     const full = root(setup({ placement: "full", density: "roomy" }).wrapper);
     expect(full.element.tagName).toBe("SECTION");
     expect(full.attributes("role")).toBe("region");
-    expect(full.attributes("aria-label")).toBe(`${brandNames.askAutobot}`);
+    expect(full.attributes("aria-label")).toBe(`${brandNames.autobot}`);
     document.body.innerHTML = "";
     const sheet = root(setup({ sheet: true }).wrapper);
     expect(sheet.element.tagName).toBe("DIV");
@@ -197,12 +203,24 @@ describe("AssistantShell states", () => {
     expect(wrapper.find('[data-gate="no_permission"]').exists()).toBe(false);
   });
 
-  it("moves the locked sidebar to the full view's hero and closes the panel", async () => {
+  it("opens the locked sidebar's full view in a new tab and closes the panel", async () => {
     openLockedPanel(null);
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
     const { wrapper, router } = setup({}, "no_permission");
+    const before = router.currentRoute.value.fullPath;
     await wrapper.get('[data-test="assistant-shell-open-in-full-view"]').trigger("click");
     await flushPromises();
     expect(useLockedPanel().value).toBeNull();
+    expect(open).toHaveBeenCalledWith(expect.stringContaining("/assistant"), "_blank");
+    expect(router.currentRoute.value.fullPath).toBe(before);
+    open.mockRestore();
+  });
+
+  it("moves the locked phone sheet to the full view's hero in this tab", async () => {
+    openLockedPanel(null);
+    const { wrapper, router } = setup({ sheet: true }, "no_permission");
+    await wrapper.get('[data-test="assistant-shell-open-in-full-view"]').trigger("click");
+    await flushPromises();
     expect(lockedPanelMoved()).toBe(true);
     expect(router.currentRoute.value.name).toBe("assistant");
   });
@@ -338,7 +356,7 @@ describe("AssistantShell states", () => {
     await button.trigger("click");
     await flushPromises();
     expect(retry).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain("Another tab is waiting for your approval on this chat.");
+    expect(wrapper.text()).toContain("Waiting for your approval in another tab");
     setRuntimeHandle(null);
   });
 
@@ -351,11 +369,13 @@ describe("AssistantShell states", () => {
 });
 
 describe("AssistantShell chrome and focus", () => {
-  it("keeps one 40 px bar with the two mode buttons and close in the sidebar, and 44 px in the sheet", () => {
+  it("keeps one 40 px bar with the move group and close in the sidebar, and 44 px in the sheet", () => {
     const { wrapper } = setup();
     expect(wrapper.find('[data-test="assistant-shell-place-full"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-shell-place-window"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-shell-place-sidebar"]').exists()).toBe(false);
+    expect(
+      wrapper.get('[data-test="assistant-shell-place-sidebar"]').attributes("aria-pressed"),
+    ).toBe("true");
     expect(wrapper.find('[data-test="assistant-density-switch"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="assistant-shell-close"]').attributes("aria-label")).toBe(
@@ -386,11 +406,12 @@ describe("AssistantShell chrome and focus", () => {
     expect(chrome.find('[data-test="assistant-thread-more"]').exists()).toBe(true);
     // What the assistant sees opens from the composer box's corner, so the header carries no ⓘ.
     expect(chrome.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
-    // Home's chat is the page itself, so it offers no move to another container.
-    expect(chrome.find('[data-test^="assistant-shell-place-"]').exists()).toBe(false);
+    // Home's full page offers the same moves as every other header.
+    expect(chrome.find('[data-test^="assistant-shell-place-"]').exists()).toBe(true);
+    expect(chrome.find('[data-test="assistant-thread-new"]').exists()).toBe(true);
     expect(chrome.find('[data-test="assistant-open-as-button"]').exists()).toBe(false);
     expect(chrome.get('[data-test="assistant-thread-more"]').attributes("aria-label")).toBe(
-      "More Actions",
+      "More actions",
     );
     expect(wrapper.find('[data-test="assistant-transcript"]').exists()).toBe(true);
     document.body.innerHTML = "";
@@ -407,10 +428,106 @@ describe("AssistantShell chrome and focus", () => {
     );
   });
 
+  it("gives a new full-page chat the draft its opener tab left for it, once", async () => {
+    leaveFullTabHandoff({
+      userOrgKey: "k1",
+      target: null,
+      text: "why 5xx?",
+      chips: [],
+      at: Date.now(),
+    });
+    const { store } = setup({ placement: "full" });
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "full_view" },
+    });
+    await flushPromises();
+    expect(store.state.sessions[sid].composer.text).toBe("why 5xx?");
+    expect(takeFullTabHandoff("k1", sid, true)).toBeNull();
+  });
+
+  it("holds the card its opener handed over, so the chat can be answered in this tab", async () => {
+    const block = { id: "apr_1", tool: "CreateDowntime", expiresAt: Date.now() + 60_000 };
+    let take: ReturnType<typeof vi.fn> | undefined;
+    let sid = "";
+    setup({ placement: "full" }, "available", {}, undefined, {}, (store) => {
+      sid = store.createSession({
+        origin: { entryKind: "header_button", objectKind: "none", container: "full_view" },
+      });
+      take = vi.spyOn(fake.current.history, "takeHandedCard").mockImplementation(() => {});
+      leaveFullTabHandoff({
+        userOrgKey: "k1",
+        target: sid,
+        text: "",
+        chips: [],
+        card: { turnId: "t1", block: block as never },
+        at: Date.now(),
+      });
+    });
+    await flushPromises();
+    expect(take).toHaveBeenCalledWith(sid, "t1", block);
+  });
+
+  it("gives the new full-page chat its opener's photos and agent pick", async () => {
+    const image = {
+      id: "i1",
+      data: "AAAA",
+      mimeType: "image/png" as const,
+      filename: "a.png",
+      size: 3,
+    };
+    leaveFullTabHandoff({
+      userOrgKey: "k1",
+      target: null,
+      text: "what is this?",
+      chips: [],
+      images: [image],
+      agentId: "sre",
+      at: Date.now(),
+    });
+    const { store } = setup({ placement: "full" });
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "full_view" },
+    });
+    await flushPromises();
+    expect(store.state.sessions[sid].composer.images.map((i) => i.data)).toEqual(["AAAA"]);
+    expect(store.state.sessions[sid].agentId).toBe("sre");
+  });
+
+  it("lifts the minimised chips above the full page's composer, and drops the lift on leaving", async () => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private readonly cb: () => void) {}
+        observe(): void {
+          this.cb();
+        }
+        disconnect(): void {}
+      },
+    );
+    const { wrapper, store } = setup({ placement: "full" });
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "full_view" },
+    });
+    store.state.sessions[sid].messages.push({ role: "user", content: raw("hi") });
+    await flushPromises();
+    const lower = wrapper.get('[data-test="assistant-shell-lower"]').element as HTMLElement;
+    Object.defineProperty(lower, "clientHeight", { configurable: true, value: 160 });
+    lower.getBoundingClientRect = () => ({ top: window.innerHeight - 160 }) as DOMRect;
+    window.dispatchEvent(new Event("resize"));
+    expect(document.documentElement.style.getPropertyValue("--o-tray-lift")).toBe(
+      String(160 / 16 + 0.5),
+    );
+    wrapper.unmount();
+    expect(document.documentElement.style.getPropertyValue("--o-tray-lift")).toBe("");
+    vi.unstubAllGlobals();
+  });
+
   it("leaves the full page by navigating, so it has no ×", () => {
     const { wrapper } = setup({ placement: "full" });
     expect(wrapper.find('[data-test="assistant-shell-place-sidebar"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-shell-place-full"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="assistant-shell-place-full"]').attributes("aria-pressed")).toBe(
+      "true",
+    );
     expect(wrapper.find('[data-test="assistant-shell-close"]').exists()).toBe(false);
   });
 
@@ -590,15 +707,6 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="assistant-context-tray"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-composer-root"]').exists()).toBe(true);
-    wrapper.findComponent(AssistantComposerPlusMenu).vm.$emit("select", "time");
-    await flushPromises();
-    expect(
-      wrapper
-        .find(
-          '[data-test="assistant-context-time-picker"], [data-test="assistant-context-chip-time"]',
-        )
-        .exists(),
-    ).toBe(true);
     expect(wrapper.find('[data-test="assistant-context-disclosure"]').exists()).toBe(false);
   });
 
@@ -1399,7 +1507,7 @@ describe("AssistantShell history states", () => {
     expect(header.find('[data-test="assistant-thread-title-button"]').exists()).toBe(true);
   });
 
-  it("orders the bar title, +, Open as, close once a turn exists, and drops + from an empty chat", async () => {
+  it("orders the bar title, +, Open as, close, with + unavailable in an empty chat", async () => {
     const { wrapper, store } = setup();
     const sid = open(store);
     store.state.sessions[sid].messages.length = 0;
@@ -1416,10 +1524,13 @@ describe("AssistantShell history states", () => {
         );
     expect(order()).toEqual([
       "assistant-thread-title-button",
+      "assistant-thread-new",
       "assistant-shell-place-full",
       "assistant-shell-place-window",
       "assistant-shell-close",
     ]);
+    const add = () => wrapper.get('[data-test="assistant-thread-new"]').attributes("aria-disabled");
+    expect(add()).toBe("true");
     store.state.sessions[sid].messages.push({ role: "user", content: raw("q") });
     await flushPromises();
     expect(order()).toEqual([
@@ -1429,6 +1540,7 @@ describe("AssistantShell history states", () => {
       "assistant-shell-place-window",
       "assistant-shell-close",
     ]);
+    expect(add()).toBeUndefined();
   });
 
   it("reaches Floating window from the bar's own button", async () => {
@@ -1494,16 +1606,18 @@ describe("AssistantShell history states", () => {
     expect(document.activeElement).toBe(title);
   });
 
-  it("leads the panel's bar with the logo and keeps what it sees out of the bar and the title menu", async () => {
+  it("draws no logo in the panel's or the sheet's bar and keeps what it sees out of the bar and the title menu", async () => {
+    const sheet = mountMenus({ sheet: true });
+    await flushPromises();
+    expect(sheet.wrapper.find('[data-test="assistant-thread-logo"]').exists()).toBe(false);
+    sheet.wrapper.unmount();
     const { wrapper } = mountMenus();
     await flushPromises();
     const chrome = wrapper.get('[data-test="assistant-shell-chrome"]');
-    expect(chrome.find('[data-test="assistant-thread-logo"]').exists()).toBe(true);
+    expect(chrome.find('[data-test="assistant-thread-logo"]').exists()).toBe(false);
     expect(chrome.classes()).toContain("ps-3");
     expect(chrome.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-thread-menu-sees"]').exists()).toBe(false);
-    const corner = wrapper.get('[data-test="assistant-composer-corner"]');
-    expect(corner.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
   });
 
   it("puts the sheet's only move, Full page, straight into its title menu", async () => {
@@ -1562,6 +1676,24 @@ describe("AssistantShell history states", () => {
     expect(wrapper.find('[data-test="assistant-shell-elsewhere-stop"]').exists()).toBe(true);
   });
 
+  it("mounts on a chat another tab is running with no card yet, as right after a reload", async () => {
+    const errors: unknown[] = [];
+    const { wrapper } = setup({}, "available", {}, undefined, {}, (store) => {
+      const sid = open(store);
+      store.state.sessions[sid].turn = { state: "responding.writing" } as never;
+      store.state.sessions[sid].turnMeta.ownedByThisTab = false;
+      vi.spyOn(fake.current.history, "elsewhere").mockReturnValue({
+        mode: "polling",
+        approval: true,
+        turnId: "t1",
+      });
+    });
+    wrapper.vm.$.appContext.config.errorHandler = (err) => void errors.push(err);
+    await flushPromises();
+    expect(errors).toEqual([]);
+    expect(wrapper.find('[data-test="assistant-shell-elsewhere-status"]').exists()).toBe(true);
+  });
+
   it("reads a run this tab started before a reload as its own, in one place only (B1)", async () => {
     const { wrapper, store } = setup();
     const sid = open(store);
@@ -1576,7 +1708,7 @@ describe("AssistantShell history states", () => {
     store.state.sessions[sid].turnMeta.ownedByThisTab = false;
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-shell-elsewhere-status"]').text()).toBe(
-      "Still answering. This view refreshes every few seconds.",
+      "Still answering",
     );
     expect(wrapper.text()).not.toContain("another tab");
     expect(wrapper.find('[data-test="assistant-sticky-status"]').exists()).toBe(false);

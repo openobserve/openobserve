@@ -358,7 +358,6 @@ function liveGrantedWrite(): { messages: ChatMessage[]; rows: ChatActivityRow[];
   };
   const ctx = {
     isActive: false,
-    autoNavigationEnabled: false,
     phase: "live" as const,
     t: ((key: string) => key) as any,
     generateNavigation: () => null,

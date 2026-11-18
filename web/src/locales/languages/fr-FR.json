@@ -3983,7 +3983,7 @@
           "note": "Opérations et informations SRE automatisées"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "Assistance intelligente aux requêtes et à l'analyse"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "Une erreur inattendue est survenue",
       "toolExecutionFailed": "Échec de l'exécution de l'outil",
       "errorOccurred": "Une erreur est survenue",
-      "navigateConfirmQuestion": "Autoriser @:{'brand.autobot'} à naviguer ?",
       "confirmToolExecution": "Confirmer l'exécution de {tool} ?",
       "entity": {
         "alert": "alerte",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "Abonnez-vous pour continuer à utiliser l'IA. L'utilisation supplémentaire est facturée sur la facture de cette organisation.",
     "aiContractExhaustedMessage": "Contactez votre gestionnaire de compte pour ajouter plus de crédits IA",
     "aiPayerSubscribeMessage": "La facturation de cette organisation est gérée par {payer}. Demandez à un administrateur de {payer} de s'abonner ; l'utilisation supplémentaire est facturée sur sa facture.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} et génération de requêtes : {chat} · @:{'brand.autobotInvestigate'} : {incident} · Réanalyse : {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} et génération de requêtes : {chat} · @:{'brand.autobotInvestigate'} : {incident} · Réanalyse : {reanalysis}",
     "aiPaygMessage": "Crédits gratuits épuisés — utilisation facturée à l'abonnement",
     "billingGroup": {
       "tabLabel": "Groupe de facturation",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "L’utilisation payante n’est pas activée pour toutes les organisations requises.",
     "updateFailed": "Impossible de mettre à jour l'utilisation payante de l'IA. Réessayez.",
     "declinedNotice": "L'utilisation payante de l'IA est désactivée, cette requête n'a donc pas été envoyée.",
-    "consentScope": "S'applique à toute l'organisation : @:{'brand.askAutobot'}, génération de requêtes et analyse des incidents. Vous pouvez la désactiver à tout moment sur la page Plans.",
+    "consentScope": "S'applique à toute l'organisation : @:{'brand.autobot'}, génération de requêtes et analyse des incidents. Vous pouvez la désactiver à tout moment sur la page Plans.",
     "managePaidUsage": "Activer l'utilisation payante",
     "modePayAsYouGo": "Paiement à l’usage",
     "modeConsentRequired": "Consentement requis",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "Navigation automatique",
-        "enabledTooltip": "Navigation automatique activée - {product} navigue automatiquement sans confirmation",
-        "disabledTooltip": "Navigation automatique désactivée - {product} vous posera une question avant de naviguer"
-      }
-    }
+    "composer": {}
   }
 }

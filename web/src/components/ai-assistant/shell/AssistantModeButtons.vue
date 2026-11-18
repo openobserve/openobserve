@@ -36,12 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </template>
   <template v-else>
     <AssistantIconButton
-      v-for="item in others"
+      v-for="item in group"
       :key="item.id"
       :label="item.label"
       :icon="PLACE_ICONS[item.id]"
+      :pressed="item.checked"
+      :class="item.checked && PRESSED_CLASS"
       :data-test="`assistant-shell-place-${item.id}`"
-      @click="item.run"
+      @click="!item.checked && item.run()"
     />
   </template>
 </template>
@@ -66,6 +68,8 @@ export interface AssistantModeButtonsProps {
   /** The dock this container is, for the modal check. */
   dockHost?: DockHostId;
 }
+
+const PRESSED_CLASS = "bg-button-ghost-subtle-active-bg! text-text-heading!";
 
 const PLACE_ICONS: Record<PlaceId, IconName> = {
   sidebar: assistantGlyph.sidePanel,
@@ -95,6 +99,8 @@ const { places, freshFull } = useAssistantPlaces(() => ({
   sheet: props.sheet,
   dockHost: props.dockHost,
 }));
-// The container you are in is never offered, and a move that cannot run (window cap) is not drawn dead.
+// The menu never offers the container you are in, and a move that cannot run (window cap) is not drawn dead.
 const others = computed(() => places.value.filter((p) => !p.checked && !p.disabled));
+// The header group also shows where the chat is now, pressed, so the move reads as a choice.
+const group = computed(() => places.value.filter((p) => p.checked || !p.disabled));
 </script>

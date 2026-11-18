@@ -153,9 +153,9 @@ describe("HomeChatsRail", () => {
     const tools = wrapper.get('[data-test="assistant-history-tools"]').classes();
     expect(tools).not.toEqual(expect.arrayContaining(["border-b"]));
     expect(tools).not.toContain("border-border-default");
-    expect(wrapper.get('[data-test="assistant-history-search"]').classes()).toEqual(
-      expect.arrayContaining(["[&>div]:h-8", "[&>div]:rounded-full"]),
-    );
+    const search = wrapper.get('[data-test="assistant-history-search"]').classes();
+    expect(search).toContain("[&>div]:h-8");
+    expect(search.join(" ")).not.toContain("rounded-full");
     expect(tools).toEqual(expect.arrayContaining(["gap-2"]));
     expect(wrapper.get('[data-test="home-chats-rail-header"]').classes()).toEqual(
       expect.arrayContaining(["px-3"]),
@@ -167,7 +167,7 @@ describe("HomeChatsRail", () => {
     expect(wrapper.find('[data-test="assistant-history-views"]').exists()).toBe(false);
   });
 
-  it("lays every row out as status dot, one-line title and the time at the row's end, with the menu over the time", async () => {
+  it("lays every row out as status dot, one-line title, the time, then the menu in its own slot", async () => {
     vi.spyOn(assistant, "listChats").mockResolvedValue({
       chats: [
         chat(1, NOW - HOUR, { title: "Waiting on approval", pending_approval: true }),
@@ -183,11 +183,12 @@ describe("HomeChatsRail", () => {
       expect(row.get('[data-test="o-truncated-text"]').classes()).toContain("truncate");
     }
     const time = wrapper.get('[data-test="assistant-history-row-time"]').classes();
-    expect(time).toContain("w-12");
+    expect(time).toContain("w-10");
+    expect(time.join(" ")).not.toContain("invisible");
     const state = wrapper.get('[data-test="assistant-history-row-state"]');
     expect(state.classes()).toEqual(["sr-only"]);
     expect(state.text()).toBe("Needs you");
-    expect(wrapper.get('[data-test="assistant-history-row-menu"]').classes()).toContain(
+    expect(wrapper.get('[data-test="assistant-history-row-menu"]').classes()).not.toContain(
       "absolute!",
     );
   });
@@ -299,7 +300,7 @@ describe("HomeChatsRail", () => {
     expect(wrapper.get('[data-test="home-chats-rail-header"]').text()).toBe("Investigations");
     expect(
       wrapper.get('[data-test="assistant-history-search"] input').attributes("placeholder"),
-    ).toBe("Search Investigations");
+    ).toBe("Search investigations");
     expect(wrapper.find('[data-test="assistant-history-list-menu"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-history-filter-active"]').exists()).toBe(false);
     expect(rows(wrapper).map((row) => row.text())).toEqual([
@@ -313,5 +314,57 @@ describe("HomeChatsRail", () => {
       expect.stringContaining("Error spike"),
     ]);
     expect(history.filter.value).toEqual(stored);
+  });
+
+  it("on the investigate page keeps reading older pages until an investigation shows", async () => {
+    const listChats = vi
+      .spyOn(assistant, "listChats")
+      .mockImplementation(async (_org, params = {}) =>
+        params.cursor === "p2"
+          ? { chats: [chat(3, NOW - 30 * HOUR, { title: "Old spike", agent_type: "sre" })] }
+          : {
+              chats: [chat(1, NOW - HOUR, { title: "Write a query", agent_type: "o2-ai" })],
+              next_cursor: "p2",
+            },
+      );
+    const { wrapper } = await setup({ persistence: true, investigations: true });
+    await flushPromises();
+    expect(listChats).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ cursor: "p2" }),
+    );
+    expect(rows(wrapper).map((row) => row.text())).toEqual([expect.stringContaining("Old spike")]);
+  });
+
+  it("on the investigate page reads past a page that holds only hidden helper chats", async () => {
+    const pages: Record<string, Awaited<ReturnType<typeof assistant.listChats>>> = {
+      first: {
+        chats: [chat(1, NOW - HOUR, { title: "Write a query", agent_type: "o2-ai" })],
+        next_cursor: "p2",
+      },
+      p2: {
+        chats: [chat(2, NOW - 2 * HOUR, { title: "Helper", agent_type: "generate_query" })],
+        next_cursor: "p3",
+      },
+      p3: { chats: [chat(3, NOW - 30 * HOUR, { title: "Old spike", agent_type: "sre" })] },
+    };
+    vi.spyOn(assistant, "listChats").mockImplementation(
+      async (_org, params = {}) => pages[params.cursor ?? "first"],
+    );
+    const { wrapper } = await setup({ persistence: true, investigations: true });
+    await flushPromises();
+    expect(rows(wrapper).map((row) => row.text())).toEqual([expect.stringContaining("Old spike")]);
+  });
+
+  it("on the investigate page names an empty list as no investigations, not a filter miss", async () => {
+    vi.spyOn(assistant, "listChats").mockResolvedValue({
+      chats: [chat(1, NOW - HOUR, { title: "Write a query", agent_type: "o2-ai" })],
+    });
+    const { wrapper } = await setup({ persistence: true, investigations: true });
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-history-filter-empty"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="assistant-history-investigations-empty"]').text()).toContain(
+      "No investigations yet",
+    );
   });
 });

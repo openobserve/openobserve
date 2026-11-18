@@ -48,7 +48,7 @@ import {
   type TimeWindow,
 } from "./contextChips";
 import { pageContext } from "./pageContext";
-import { sentWindows, wireContextOf } from "./serialize";
+import { pinnedWireOf, sentWindows, wireContextOf } from "./serialize";
 import type { ContextChip, PageContext } from "./types";
 
 /** How often a visible container re-reads the page provider, so the tray follows the page (CT-01 AC 5). */
@@ -158,19 +158,29 @@ export function useAssistantContext(
       },
       { org: org.value, window: window.value },
     );
+    // A hand-off's pinned values ride every turn, so the list shows them too.
+    const pinned = pinnedWireOf(
+      session.value?.pinnedContext,
+      removedKeys.value,
+      !!composer.value?.timeOverride,
+    );
     const rows = seesRowsOf(
-      { ...extrasOf(page.value), ...wire, currentPage: page.value?.currentPage ?? "" },
+      { ...extrasOf(page.value), ...wire, currentPage: page.value?.currentPage ?? "", ...pinned },
       {
         removed: removedKeys.value,
         window: window.value,
         timezone: browserTimezone(),
-        pageLabel: pageLabelOf(t),
+        pageLabel: pageLabelOf(t, page.value?.currentPage),
         orgName: options.orgName ?? hostOrgName,
         t,
       },
     );
     if (incidentSent.value)
       for (const row of rows) if (row.id === "incident_id") row.group = "sent";
+    // A pinned field rides the wire whatever the page whitelist says, so it never reads as not sent.
+    for (const row of rows)
+      if (row.group === "not_read" && row.fields.some((field) => field in pinned))
+        row.group = "sent";
     const attached = [
       ...stagedChips.value.filter((chip) => !!serializedNameOf(chip) && chip.sent !== "not_read"),
       ...(composer.value?.images ?? []).map((image) => ({ sizeBytes: image.size })),
@@ -321,10 +331,15 @@ function extrasOf(context: PageContext | null): Record<string, unknown> {
 }
 
 // The localised title of the route the page provider describes (CT-04 AC 3).
-function pageLabelOf(t: TranslateFn): (context: PageContext) => I18nText {
+// The route's title names only the page being read; a hand-off's pinned page names itself.
+function pageLabelOf(
+  t: TranslateFn,
+  livePage: string | undefined,
+): (context: PageContext) => I18nText {
   return (context) => {
     const route = getAssistantRuntime().context.value?.router?.currentRoute.value;
     const key = route?.meta?.titleKey as string | undefined;
-    return key ? t(key) : raw(context.pageTitle || context.currentPage);
+    if (key && context.currentPage === (livePage ?? "")) return t(key);
+    return raw(context.pageTitle || context.currentPage);
   };
 }

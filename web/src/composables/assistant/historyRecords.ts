@@ -282,8 +282,8 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
         thread: "new",
       });
     },
-    async save(sid: Sid): Promise<"server" | "local" | "not_saved"> {
-      return saveSession(sid, ctx);
+    async save(sid: Sid, opts?: { live?: boolean }): Promise<"server" | "local" | "not_saved"> {
+      return saveSession(sid, ctx, opts?.live);
     },
     joinGrantedLedger: (sid: Sid) => joinGrantedLedger(sid, ctx),
     notSaved: (sid: Sid | null) => !!sid && ctx.notSavedSids.has(sid),

@@ -78,3 +78,8 @@ export function inProgressFirst<T>(
   const live = rows.filter((row) => isInProgress(statusOf(row)));
   return [...live, ...rows.filter((row) => !isInProgress(statusOf(row)))];
 }
+
+/** The title a rename starts from: a cut title's trailing ellipsis is display, not part of the name. */
+export function editableTitle(title: string): string {
+  return title.replace(/\s*(…|\.\.\.)\s*$/u, "");
+}

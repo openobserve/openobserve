@@ -107,7 +107,7 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
     message: { text, ...(snapshot.images.length > 0 && { images: [...snapshot.images] }) },
     context: {
       ...context,
-      ...session.pinnedContext,
+      ...pinnedWireOf(session.pinnedContext, composer.removedPageKeys, !!composer.timeOverride),
       client,
       user_timezone: browserTimezone(),
       locale: uiIntlLocale(),
@@ -134,9 +134,7 @@ export function wireContextOf(
   opts: { org: string; window?: TimeWindow; now?: number },
 ): Record<string, unknown> {
   const now = opts.now ?? Date.now();
-  const removed = new Set(
-    composer.removedPageKeys.flatMap((key) => fieldRowOf(key)?.fields ?? [key]),
-  );
+  const removed = removedFieldsOf(composer.removedPageKeys);
   const out: Record<string, unknown> = {};
   for (const field of WHITELIST_FIELDS) {
     const value = page?.[field];
@@ -145,13 +143,29 @@ export function wireContextOf(
   delete out.organization_identifier;
   out.org_id = opts.org || page?.org_id || page?.organization_identifier || "";
   out.currentPage = page?.routeName || page?.currentPage || "";
-  out.timeRange = wireTimeRange(opts.window ?? timeWindowOf(page, composer.timeOverride, now));
+  const window = opts.window ?? timeWindowOf(page, composer.timeOverride, now);
+  // A page with no range sends none, so the agent picks the window from the question.
+  if (window.source !== "default") out.timeRange = wireTimeRange(window);
   out.request_timestamp = Math.round(now * 1000);
   delete out.user_timezone;
   applyMentions(out, composer.chips);
   if (!Array.isArray(out.selectedStreams)) delete out.streamType;
   if (!out.org_id) delete out.org_id;
   if (!out.currentPage) delete out.currentPage;
+  return out;
+}
+
+/** A hand-off's pinned values without the fields the user removed, and without its range once the user picks one. */
+export function pinnedWireOf(
+  pinned: Record<string, unknown> | undefined,
+  removedPageKeys: readonly string[],
+  userPickedRange = false,
+): Record<string, unknown> {
+  if (!pinned) return {};
+  const removed = removedFieldsOf(removedPageKeys);
+  const out = Object.fromEntries(Object.entries(pinned).filter(([key]) => !removed.has(key)));
+  if (removed.has("selectedStreams")) delete out.streamType;
+  if (userPickedRange) delete out.timeRange;
   return out;
 }
 
@@ -186,6 +200,10 @@ export function serializeBlocks(chips: readonly ContextChip[], nonce: string): S
   }
   if (omitted > 0) parts.push(block("Omitted", JSON.stringify({ attachments: omitted }), nonce));
   return { text: parts.join("\n\n"), rows, bytes, omitted };
+}
+
+function removedFieldsOf(removedPageKeys: readonly string[]): Set<string> {
+  return new Set(removedPageKeys.flatMap((key) => fieldRowOf(key)?.fields ?? [key]));
 }
 
 /** Eight base32 characters from the platform CSPRNG. */

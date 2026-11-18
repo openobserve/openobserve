@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-label="groupName"
       :aria-describedby="metaLine ? metaId : undefined"
       :aria-busy="sending ? 'true' : undefined"
-      class="border-assistant-signal-attention flex min-w-0 flex-col gap-1.5 border-s-2 py-0.5 ps-2.5"
+      class="border-border-default bg-surface-panel rounded-surface flex min-w-0 flex-col gap-2 border p-3"
       :data-kind="card.kind"
       data-test="assistant-approval-card"
     >
@@ -49,11 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="remainingMs !== null"
           role="timer"
           aria-live="off"
-          :aria-label="
-            t(expiringSoon ? 'assistant.approval.expiringSoon' : 'assistant.approval.expiresIn', {
-              time: clockText,
-            })
-          "
+          :aria-label="timerText"
           :class="[
             'text-assistant-signal-attention inline-flex shrink-0 items-center gap-0.5 text-xs whitespace-nowrap tabular-nums',
             expiringSoon && 'font-medium',
@@ -68,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="xs"
             aria-hidden="true"
             data-test="assistant-approval-expiring-icon"
-          />{{ clockText }}</span
+          />{{ timerText }}</span
         >
       </div>
       <h3
@@ -303,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <li v-for="(line, index) in impact" :key="index" class="break-words">{{ line }}</li>
           </ul>
           <OCodeBlock
-            v-if="card.args && !diff.length"
+            v-if="argsShown"
             :code="argsText"
             lang="json"
             contrast="aa"
@@ -486,6 +482,11 @@ const remainingMs = computed(() =>
   typeof props.card.expiresAt === "number" ? Math.max(0, props.card.expiresAt - now.value) : null,
 );
 const clockText = computed(() => raw(approvalClock(remainingMs.value ?? 0)));
+const timerText = computed(() =>
+  t(expiringSoon.value ? "assistant.approval.expiringSoon" : "assistant.approval.expiresIn", {
+    time: clockText.value,
+  }),
+);
 // From mount, so the reader never has to race the countdown for it (PO A11, A23).
 const extendsSpent = computed(() => props.card.userExtendsLeft === 0);
 const moreTime = computed(
@@ -593,12 +594,14 @@ const scopeOptions = computed(() =>
     : [],
 );
 
+// Rows that only name a list's entries leave its settings out, so the full request stays one click away.
+const argsShown = computed(
+  () => !!props.card.args && (!diff.value.length || diff.value.some((row) => row.summary)),
+);
 const hasDetails = computed(
   () =>
     !question.value &&
-    (impact.value.length > 0 ||
-      (!!props.card.args && !diff.value.length) ||
-      (!planned.value && allTargets.value.length > 1)),
+    (impact.value.length > 0 || argsShown.value || (!planned.value && allTargets.value.length > 1)),
 );
 
 // Reply, Edit, More time and Finish in the editor: the secondary ways forward, in ⋯.

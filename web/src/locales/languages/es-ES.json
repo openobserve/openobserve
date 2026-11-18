@@ -3983,7 +3983,7 @@
           "note": "Operaciones e información automatizadas de SRE"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "Asistencia inteligente para consultas y análisis"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "Ocurrió un error inesperado",
       "toolExecutionFailed": "La ejecución de la herramienta falló",
       "errorOccurred": "Ocurrió un error",
-      "navigateConfirmQuestion": "¿Permitir a @:{'brand.autobot'} navegar?",
       "confirmToolExecution": "¿Confirmar la ejecución de {tool}?",
       "entity": {
         "alert": "alerta",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "Suscríbete para seguir usando la IA. El uso adicional se factura en la factura de esta organización.",
     "aiContractExhaustedMessage": "Póngase en contacto con su administrador de cuenta para agregar más créditos de IA",
     "aiPayerSubscribeMessage": "La facturación de esta organización la gestiona {payer}. Pide a un administrador de {payer} que se suscriba; el uso adicional se factura en su factura.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} y generación de consultas: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Reanálisis: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} y generación de consultas: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Reanálisis: {reanalysis}",
     "aiPaygMessage": "Créditos gratuitos agotados: el uso se factura a la suscripción",
     "billingGroup": {
       "tabLabel": "Grupo de facturación",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "El uso de pago no está habilitado en todas las organizaciones requeridas.",
     "updateFailed": "No se pudo actualizar el uso de IA de pago. Inténtalo de nuevo.",
     "declinedNotice": "El uso de IA de pago está desactivado, por lo que esta solicitud no se envió.",
-    "consentScope": "Se aplica a toda la organización: @:{'brand.askAutobot'}, generación de consultas y análisis de incidentes. Puedes desactivarlo en cualquier momento en la página de Planes.",
+    "consentScope": "Se aplica a toda la organización: @:{'brand.autobot'}, generación de consultas y análisis de incidentes. Puedes desactivarlo en cualquier momento en la página de Planes.",
     "managePaidUsage": "Activar el uso de pago",
     "modePayAsYouGo": "Pago por uso",
     "modeConsentRequired": "Consentimiento requerido",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "Navegación automática",
-        "enabledTooltip": "Navegación automática habilitada: {product} navegará automáticamente sin confirmación",
-        "disabledTooltip": "Navegación automática desactivada: {product} preguntará antes de navegar"
-      }
-    }
+    "composer": {}
   }
 }

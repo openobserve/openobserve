@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeVoiceEngine, fakeVoiceTarget } from "../__tests__/fakeVoice";
 import {
   HOLD_MS,
+  PROCESSING_MS,
   SILENCE_MS,
   VOICE_LIMIT_MS,
   createVoiceController,
@@ -387,6 +388,37 @@ describe("errors and limits", () => {
     late.onEnd();
     expect(target.writes).toEqual([]);
     expect(target.ends).toHaveLength(1);
+  });
+
+  it("processes for up to 2 s after a mic stop, keeping the last words the engine sends", async () => {
+    engine.graceful = true;
+    const target = await listening();
+    controller.stop("mic");
+    expect(controller.state.phase).toBe("processing");
+    expect(engine.stopSession).toHaveBeenCalled();
+    engine.handlers!.onResults([{ index: 0, text: "last words", final: true }]);
+    engine.handlers!.onEnd();
+    expect(controller.state.phase).toBe("idle");
+    expect(target.text).toBe("last words");
+    expect(target.ends).toEqual([{ kind: "stopped", reason: "mic", words: 2 }]);
+  });
+
+  it("ends processing after 2 s when the engine never answers", async () => {
+    engine.graceful = true;
+    const target = await listening();
+    controller.stop("escape");
+    vi.advanceTimersByTime(PROCESSING_MS);
+    expect(controller.state.phase).toBe("idle");
+    expect(target.ends).toEqual([{ kind: "stopped", reason: "escape", words: 0 }]);
+  });
+
+  it("stops at once for a send, so the settled text goes with it", async () => {
+    engine.graceful = true;
+    const target = await listening();
+    engine.handlers!.onResults([{ index: 0, text: "now", final: false }]);
+    controller.stop("send");
+    expect(controller.state.phase).toBe("idle");
+    expect(target.text).toBe("now");
   });
 
   it("only ever hands the level source to the meter, never to the target", async () => {

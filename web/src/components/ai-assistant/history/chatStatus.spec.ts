@@ -21,6 +21,7 @@ import {
   chatStatusClass,
   chatStatusOf,
   chatStatusWord,
+  editableTitle,
   inProgressFirst,
   isInProgress,
 } from "./chatStatus";
@@ -83,5 +84,13 @@ describe("chatStatus", () => {
       "a",
       "c",
     ]);
+  });
+});
+
+describe("editableTitle", () => {
+  it("drops a cut title's trailing ellipsis and keeps any other title as it is", () => {
+    expect(editableTitle("Create a dashboar…")).toBe("Create a dashboar");
+    expect(editableTitle("Why so slow ...")).toBe("Why so slow");
+    expect(editableTitle("Wait… what?")).toBe("Wait… what?");
   });
 });

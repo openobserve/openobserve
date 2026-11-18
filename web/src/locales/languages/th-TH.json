@@ -3982,7 +3982,7 @@
           "note": "Automated SRE operations and insights"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "Intelligent query and analysis assistance"
         },
         "anomaly_detection": {
@@ -10619,7 +10619,6 @@
       "unexpectedError": "An unexpected error occurred",
       "toolExecutionFailed": "Tool execution failed",
       "errorOccurred": "An error occurred",
-      "navigateConfirmQuestion": "อนุญาตให้ @:{'brand.autobot'} นำทางหรือไม่?",
       "confirmToolExecution": "Confirm execution of {tool}?",
       "entity": {
         "alert": "alert",
@@ -10698,7 +10697,7 @@
     "aiExhaustedMessage": "Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
     "aiContractExhaustedMessage": "Contact your account manager to add more AI credits",
     "aiPayerSubscribeMessage": "Billing for this organization is managed by {payer}. Ask an admin of {payer} to subscribe; further usage is billed on its invoice.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} และการสร้างคิวรี: {chat} · @:{'brand.autobotInvestigate'}: {incident} · การวิเคราะห์ซ้ำ: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} และการสร้างคิวรี: {chat} · @:{'brand.autobotInvestigate'}: {incident} · การวิเคราะห์ซ้ำ: {reanalysis}",
     "aiPaygMessage": "Free credits exhausted — usage billed to subscription",
     "billingGroup": {
       "tabLabel": "Billing Group",
@@ -27787,7 +27786,7 @@
     "consentStillRequired": "Paid usage is not enabled for every required organization.",
     "updateFailed": "Couldn't update paid AI usage. Try again.",
     "declinedNotice": "Paid AI usage is off, so this request wasn't sent.",
-    "consentScope": "มีผลกับทั้งองค์กร: @:{'brand.askAutobot'} การสร้างคิวรี และการวิเคราะห์เหตุการณ์ คุณปิดได้ทุกเมื่อในหน้าแพ็กเกจ",
+    "consentScope": "มีผลกับทั้งองค์กร: @:{'brand.autobot'} การสร้างคิวรี และการวิเคราะห์เหตุการณ์ คุณปิดได้ทุกเมื่อในหน้าแพ็กเกจ",
     "managePaidUsage": "Turn on paid usage",
     "modePayAsYouGo": "Pay as you go",
     "modeConsentRequired": "Consent required",
@@ -30118,12 +30117,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "Auto Navigation",
-        "enabledTooltip": "Auto navigation enabled - {product} will auto navigate without confirmation",
-        "disabledTooltip": "Auto navigation disabled - {product} will ask before navigating"
-      }
-    }
+    "composer": {}
   }
 }

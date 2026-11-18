@@ -388,6 +388,35 @@ describe("intent × thread", () => {
     expect(store.state.sessions[sid].pinnedContext).toEqual(pinned);
   });
 
+  it("removing the hand-off's chip before sending drops the context it pinned", async () => {
+    const { open, store } = setup();
+    const { sid } = ok(
+      await open(legacyRelayArgs({ query: "q", chipName: "Run", context: { currentPage: "x" } })),
+    );
+    const chip = store.state.sessions[sid].composer.chips[0];
+    store.removeChip(sid, "unrelated");
+    expect(store.state.sessions[sid].pinnedContext).toEqual({ currentPage: "x" });
+    store.removeChip(sid, chip.id);
+    expect(store.state.sessions[sid].pinnedContext).toBeUndefined();
+  });
+
+  it("a hand-off's pinned time becomes the chat's own range, so Follow page really follows the page", async () => {
+    const { open, store } = setup();
+    const timeRange = { type: "absolute", startTime: 1_000_000_000, endTime: 2_000_000_000 };
+    const { sid } = ok(
+      await open(
+        legacyRelayArgs({ query: "q", chipName: "Run", context: { currentPage: "x", timeRange } }),
+      ),
+    );
+    const session = store.state.sessions[sid];
+    expect(session.composer.timeOverride).toEqual({ from: 1_000_000, to: 2_000_000 });
+    expect(session.pinnedContext).toEqual({ currentPage: "x" });
+    const sent = { from: 1_000_000, to: 2_000_000 };
+    store.keepThreadWindow(sid, sent, true);
+    store.keepThreadWindow(sid, sent, true);
+    expect(session.composer.timeOverride).toEqual(sent);
+  });
+
   it("a blank chat reused by another door drops an earlier hand-off's pin", async () => {
     const { open, store } = setup();
     const { sid } = ok(

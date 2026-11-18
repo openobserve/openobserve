@@ -47,7 +47,7 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
   afterEach(() => wrapper?.unmount());
 
   const openSees = async (wrapper: VueWrapper) => {
-    await byTest(wrapper, "rca-steer-sees").trigger("click");
+    await byTest(wrapper, "assistant-context-sees").trigger("click");
     await flushPromises();
     return (id: string) => document.body.querySelector(`[data-test="${id}"]`);
   };
@@ -57,9 +57,7 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
 
     expect(byTest(wrapper, "assistant-composer-frame").exists()).toBe(true);
     expect(byTest(wrapper, "assistant-composer-strip").exists()).toBe(true);
-    expect(textarea(wrapper).attributes("placeholder")).toBe(
-      "Steer this run · read after the current step",
-    );
+    expect(textarea(wrapper).attributes("placeholder")).toBe("Steer this run");
     expect(textarea(wrapper).attributes("aria-label")).toBe("Steer this run");
     expect(byTest(wrapper, "assistant-agent-pill").attributes("data-agent")).toBe("sre");
     expect(byTest(wrapper, "assistant-agent-pill").text()).toBe(en.brand.autobotInvestigate);
@@ -124,17 +122,26 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
     height.mockRestore();
   });
 
-  it("puts 'Sending as … visible to everyone' in the ⓘ popover, not under the field", async () => {
+  it("lists the incident and the sender under the (i) in the corner, with no notes", async () => {
     wrapper = mountComposer();
+    const corner = byTest(wrapper, "assistant-composer-corner");
+    expect(corner.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
+    expect(byTest(wrapper, "assistant-composer-bar-left").text()).toBe("");
     const find = await openSees(wrapper);
 
-    expect(find("rca-steer-sending-as")?.textContent?.trim()).toBe(
-      "Sending as a.rao@acme.io · visible to everyone on this incident",
+    expect(find("assistant-context-sees-popover")?.querySelector("h2")?.textContent?.trim()).toBe(
+      "Default context",
     );
-    expect(find("rca-steer-answer-note")).toBeNull();
+    const rows = [
+      ...document.body.querySelectorAll('[data-test="assistant-context-sees-row"]'),
+    ].map((row) => row.getAttribute("data-field"));
+    expect(rows).toEqual(["incident", "author"]);
+    expect(find("assistant-context-sees-page")?.textContent).toContain("a.rao@acme.io");
+    expect(find("rca-steer-sending-as")?.textContent?.trim()).toBe("Visible on this incident");
+    expect(find("assistant-context-sees-popover")?.querySelectorAll("p")).toHaveLength(0);
   });
 
-  it("paused: the strip says the agent asks, with the full question in title=, and ⓘ keeps the answer note", async () => {
+  it("paused: the strip says the agent asks, with the full question in title=", async () => {
     const question = rcaSteeringPaused().open_question;
     wrapper = mountComposer({ waitingInput: true, openQuestion: question });
 
@@ -142,10 +149,7 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
     expect(notice.attributes("title")).toBe(question?.question);
     expect(byTest(wrapper, "assistant-composer-notice-title").text()).toBe("Agent asks");
     expect(byTest(wrapper, "rca-steer-chip-check").exists()).toBe(false);
-    const find = await openSees(wrapper);
-    expect(find("rca-steer-answer-note")?.textContent?.trim()).toBe(
-      "Your answer is a lead, not evidence. It can move the hypothesis to Likely. Root cause needs a tool result.",
-    );
+    expect(textarea(wrapper).attributes("placeholder")).toBe("Answer the agent or add context");
   });
 
   it("a chip prefills its text and focuses the box", async () => {

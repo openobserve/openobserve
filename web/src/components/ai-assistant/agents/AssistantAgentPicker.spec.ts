@@ -126,13 +126,13 @@ describe("AssistantAgentPicker", () => {
     expect(trigger(wrapper).attributes("aria-label")).toBeUndefined();
   });
 
-  it("keeps only the icon without room for the name, naming the agent in its label and tooltip", () => {
+  it("cuts the name at 12 characters without room, naming the agent in its label and tooltip", () => {
     const wide = trigger(setup().wrapper);
     expect(wide.text()).toContain(`${brandNames.autobot}`);
     expect(wide.attributes("aria-label")).toBeUndefined();
     document.body.innerHTML = "";
     const { wrapper } = setup(ROSTER, false, true);
-    expect(trigger(wrapper).text()).not.toContain(`${brandNames.autobot}`);
+    expect(trigger(wrapper).find(".max-w-\\[12ch\\]").exists()).toBe(true);
     expect(trigger(wrapper).attributes("aria-label")).toBe(`${brandNames.autobot}`);
     expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe(
       `${brandNames.autobot}`,
@@ -149,9 +149,17 @@ describe("AssistantAgentPicker", () => {
     }
   });
 
-  it("is a pill naming the agent, lists one radio row per agent by name only, and checks the current one", () => {
+  it("is quiet text and a chevron naming the agent, lists one radio row per agent, and checks the current one", () => {
     const { wrapper } = setup();
     expect(trigger(wrapper).text()).toBe(`${brandNames.autobot}`);
+    expect(trigger(wrapper).attributes("data-o2-variant")).toBe("ghost-neutral");
+    expect(trigger(wrapper).classes()).toContain("text-text-secondary!");
+    expect(
+      trigger(wrapper)
+        .classes()
+        .some((name) => /^bg-surface/.test(name)),
+    ).toBe(false);
+    expect(wrapper.find('[data-test="assistant-composer-auto-navigation"]').exists()).toBe(false);
     expect(trigger(wrapper).classes()).not.toContain("opacity-60");
     expect(wrapper.text()).toContain("Agent");
     expect(wrapper.find('[data-test="assistant-agent-option-clause"]').exists()).toBe(false);

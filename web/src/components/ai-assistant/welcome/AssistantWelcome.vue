@@ -23,18 +23,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-labelledby="headingId"
     :class="[
       'flex min-h-full flex-col justify-end gap-4 px-3 pb-2',
-      variant === 'roomy' ? 'mx-auto w-full max-w-3xl' : '',
+      variant === 'roomy' ? 'mx-auto w-full max-w-180' : '',
     ]"
   >
     <div
-      :class="['flex min-w-0 flex-col items-start gap-3', opening ? fadeUpClasses(0) : '']"
+      :class="[
+        'flex min-w-0 flex-col gap-3',
+        variant === 'roomy' ? 'items-center pb-2 text-center' : 'items-start',
+        opening ? fadeUpClasses(0) : '',
+      ]"
       data-test="assistant-welcome-greeting"
     >
-      <AssistantMark size="lg" :sparkle="opening" />
-      <div class="flex min-w-0 flex-col gap-0.5">
+      <div :class="['flex min-w-0 flex-col', variant === 'roomy' ? 'gap-2' : 'gap-0.5']">
         <h2
           :id="headingId"
-          class="text-text-heading text-lg font-semibold"
+          :class="[
+            'text-text-heading font-semibold',
+            variant === 'roomy' ? 'text-3xl leading-tight max-md:text-2xl' : 'text-lg',
+          ]"
           data-test="assistant-welcome-heading"
         >
           {{ greeting }}
@@ -98,7 +104,6 @@ export function resetWelcomeTelemetryForTests(): void {
 import { computed, useId, watch } from "vue";
 import { useStore } from "vuex";
 
-import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { fadeUpClasses } from "@/components/ai-assistant/common/assistantMotion";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

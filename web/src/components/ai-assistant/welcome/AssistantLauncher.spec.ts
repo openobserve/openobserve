@@ -15,10 +15,9 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computed, ref } from "vue";
+import { computed } from "vue";
 
 import { contextRegistry } from "@/composables/contextProviders/registry";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { requestOverviewFocus } from "@/composables/goto/goToRequests";
 
@@ -26,14 +25,9 @@ import type { CapabilityAgent, GateCode, Starter } from "@/composables/assistant
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
-import AssistantTimePrefix from "../context/AssistantTimePrefix.vue";
 import AssistantComposerPlusMenu, {
   type ComposerPlusAction,
 } from "../composer/AssistantComposerPlusMenu.vue";
-import {
-  isAutoNavigationEnabled,
-  useAutoNavigationPreferences,
-} from "@/composables/useAutoNavigationPreferences";
 import { fakeVoiceEngine } from "../__tests__/fakeVoice";
 import { resetVoiceForTests, setVoiceOptIn } from "../composer/useAssistantVoice";
 import AssistantLauncher, { launcherState } from "./AssistantLauncher.vue";
@@ -201,7 +195,7 @@ describe("AssistantLauncher", () => {
     const card = wrapper.get('[data-test="assistant-launcher"]');
     expect(card.attributes("data-dd-privacy")).toBe("mask");
     const heading = wrapper.get(`#${card.attributes("aria-labelledby")}`);
-    expect(heading.text()).toBe(`${brandNames.askAutobot}`);
+    expect(heading.text()).toBe(`${brandNames.autobot}`);
     expect(input(wrapper).attributes("aria-label")).toBe(`Ask ${brandNames.autobot}`);
     expect(input(wrapper).attributes("maxlength")).toBe("4000");
     expect(wrapper.findAll('[data-test^="assistant-launcher-starter-"]')).toHaveLength(3);
@@ -215,6 +209,20 @@ describe("AssistantLauncher", () => {
     expect((input(wrapper).element as HTMLTextAreaElement).value).toBe("Help me write a query");
     expect(document.activeElement).toBe(input(wrapper).element);
     expect(open).not.toHaveBeenCalled();
+  });
+
+  it("picks the agent an example is for along with its prompt, when that agent can answer", async () => {
+    const { wrapper } = setupOn({ layout: "overview" });
+    fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
+    await flushPromises();
+    const vm = wrapper.vm as unknown as { fill(prompt: string, agent?: string): void };
+    vm.fill("Help me investigate an incident", "sre");
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-launcher-agent"]').attributes("data-agent")).toBe(
+      "sre",
+    );
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open.mock.calls[0][0]).toMatchObject({ agent: "sre" });
   });
 
   it("opens the composer's @ menu on Home and sends the picked stream as a chip, not as text", async () => {
@@ -245,17 +253,6 @@ describe("AssistantLauncher", () => {
     await input(wrapper).trigger("keydown", { key: "Enter" });
     expect(open.mock.calls[0][0].payload).toMatchObject({ text: "count errors", chips: [chip] });
     expect(wrapper.findAll('[data-test="assistant-launcher-mention-chip"]')).toHaveLength(0);
-  });
-
-  it("types an @ at the caret from the + menu's Add Context and opens the @ menu", async () => {
-    const { wrapper } = setupOn({ layout: "overview" });
-    await flushPromises();
-    await input(wrapper).setValue("count errors");
-    plus(wrapper, "context");
-    await flushPromises();
-    expect((input(wrapper).element as HTMLTextAreaElement).value).toBe("count errors @");
-    expect(document.activeElement).toBe(input(wrapper).element);
-    expect(wrapper.get('[data-test="assistant-mention-panel"]').attributes("data-query")).toBe("");
   });
 
   it("keeps an unmatched @query as text and lists context only in the @ menu", async () => {
@@ -291,7 +288,7 @@ describe("AssistantLauncher", () => {
     expect(open.mock.calls[1][0]).not.toHaveProperty("agent");
   });
 
-  it("sends every line to a fixed agent, whose chip cannot change, under the given hint", async () => {
+  it("sends every line to a fixed agent, whose menu offers no other agent, under the given hint", async () => {
     const { wrapper } = setupOn({
       layout: "overview",
       fixedAgent: "sre",
@@ -301,7 +298,7 @@ describe("AssistantLauncher", () => {
     await flushPromises();
     const agentChip = wrapper.get('[data-test="assistant-launcher-agent"]');
     expect(agentChip.attributes("data-agent")).toBe("sre");
-    expect(agentChip.element.tagName).not.toBe("BUTTON");
+    expect(agentChip.attributes("data-fixed")).toBeDefined();
     expect(input(wrapper).attributes("placeholder")).toBe("Describe what went wrong");
     for (const line of ["why did checkout fail?", "and now?"]) {
       await input(wrapper).setValue(line);
@@ -309,6 +306,43 @@ describe("AssistantLauncher", () => {
       await flushPromises();
     }
     expect(open.mock.calls.map((call) => call[0].agent)).toEqual(["sre", "sre"]);
+  });
+
+  it("never sends a fixed agent's line to another agent when the org cannot reach it", async () => {
+    const { wrapper } = setupOn({ layout: "overview", fixedAgent: "sre" });
+    fake.current.capability.value = {
+      ...fake.current.capability.value,
+      agents: [ROSTER[0], { id: "sre", pickable: true, available: false, reason: "disabled" }],
+    };
+    await flushPromises();
+    expect(wrapper.find('[data-agent="sre"]').exists()).toBe(false);
+    await input(wrapper).setValue("why?");
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open).not.toHaveBeenCalled();
+    expect(input(wrapper).element.value).toBe("why?");
+    expect(wrapper.get('[data-test="assistant-launcher-ask"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
+  });
+
+  it("holds a fixed agent's line when the roster does not list that agent", async () => {
+    const { wrapper } = setupOn({ layout: "overview", fixedAgent: "sre" });
+    fake.current.capability.value = { ...fake.current.capability.value, agents: [ROSTER[0]] };
+    await flushPromises();
+    await input(wrapper).setValue("why?");
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open).not.toHaveBeenCalled();
+    expect(input(wrapper).element.value).toBe("why?");
+  });
+
+  it("keeps a fixed agent's chats on the page with the sidebar open", async () => {
+    const { wrapper, store } = setupOn({ layout: "overview", fixedAgent: "sre" });
+    fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
+    store.state.shell.placement = { kind: "sidebar" };
+    await flushPromises();
+    await input(wrapper).setValue("why?");
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open.mock.calls[0][0]).toMatchObject({ agent: "sre", container: "full" });
   });
 
   it("sends the typed line on Enter as a new chat in the full view (HOME-01)", async () => {
@@ -327,13 +361,13 @@ describe("AssistantLauncher", () => {
     expect((input(wrapper).element as HTMLInputElement).value).toBe("");
   });
 
-  it("stages on Shift+Enter, ignores an IME Enter and opens /assistant on an empty Enter", async () => {
+  it("makes Shift+Enter a new line, ignores an IME Enter and opens /assistant on an empty Enter", async () => {
     const { wrapper, router } = setup();
     await input(wrapper).setValue("draft");
     await input(wrapper).trigger("keydown", { key: "Enter", isComposing: true });
-    expect(open).not.toHaveBeenCalled();
     await input(wrapper).trigger("keydown", { key: "Enter", shiftKey: true });
-    expect(open.mock.calls[0][0]).toMatchObject({ intent: "stage", payload: { text: "draft" } });
+    expect(open).not.toHaveBeenCalled();
+    await input(wrapper).setValue("");
     await input(wrapper).trigger("keydown", { key: "Enter" });
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("assistant");
@@ -393,7 +427,7 @@ describe("AssistantLauncher", () => {
     const row = wrapper.get('[data-test="assistant-launcher-recent-0"]');
     expect(row.attributes("data-status")).toBe("answering");
     expect(row.get('[data-test="assistant-launcher-recent-status"]').text()).toBe("Answering");
-    expect(wrapper.get('[data-test="assistant-launcher-all-chats"]').text()).toBe("All threads");
+    expect(wrapper.get('[data-test="assistant-launcher-all-chats"]').text()).toBe("All chats");
   });
 
   it("puts a chat that needs the user first in Your chats, with its state in words", async () => {
@@ -441,84 +475,57 @@ describe("AssistantLauncher", () => {
     expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(true);
   });
 
-  it("always shows the time chip after +, Past 15 Minutes by default, and a pick from the chip replaces it with no remove", async () => {
+  it("draws no time chip and sends no range of its own, so the agent picks the window", async () => {
     const { wrapper } = setup();
-    const field = wrapper.get('[data-test="assistant-launcher-input"]');
-    const chip = () => field.find('[data-test="assistant-context-chip-time"]');
-    const remove = () => chip().find('[data-test="assistant-context-chip-remove"]');
-    expect(chip().text()).toBe("Past 15 Minutes");
-    expect(remove().exists()).toBe(false);
-    await chip().trigger("click");
-    await flushPromises();
-    (document.body.querySelector('[data-test="assistant-context-time-1h"]') as HTMLElement).click();
-    await flushPromises();
-    expect(chip().text()).toBe("Past 1 Hour");
-    expect(remove().exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-context-chip-time"]').exists()).toBe(false);
     await input(wrapper).setValue("why?");
     await input(wrapper).trigger("keydown", { key: "Enter" });
-    expect(open.mock.calls[0][0].payload.timeOverride).toMatchObject({ period: "1h" });
+    expect(open.mock.calls[0][0].payload).not.toHaveProperty("timeOverride");
   });
 
-  it("lets the chip row shrink, so a long time chip cannot push the agent pill under mic and Send (T-03-01)", () => {
+  it("is the composer everywhere else is: + left, agent mic Send right, (i) in the corner, 28 px square controls", async () => {
     const { wrapper } = setup();
-    const chip = wrapper.get('[data-test="assistant-context-chip-time"]').element;
-    const row = chip.closest("span.gap-2")!;
-    expect(row.classList).toContain("min-w-0");
-    expect(row.classList).not.toContain("shrink-0");
-  });
-
-  it("is the composer everywhere else is: no strip while empty, + and the time chip left, Send right", () => {
-    const { wrapper } = setup();
+    fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
+    await flushPromises();
     const field = wrapper.get('[data-test="assistant-composer-frame"]');
     expect(field.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
     const left = field.get('[data-test="assistant-composer-bar-left"]');
-    const time = left.get('[data-test="assistant-context-chip-time"]');
-    expect(time.classes()).toContain("h-7");
-    expect(time.findAllComponents(OIcon).map((icon) => icon.props("name"))).toContain(
-      "expand-more",
-    );
-    expect(left.find('[data-test="assistant-agent-pill"]').exists()).toBe(false);
-    expect(left.findAll("button")[0].attributes("data-test")).toBe("assistant-composer-plus");
+    const ids = (node: typeof left) =>
+      node
+        .findAll(
+          '[data-test="assistant-composer-plus"], [data-test="assistant-context-sees"], [data-test="assistant-context-chip-time"], [data-test="assistant-launcher-agent"], [data-test="assistant-dictate"], [data-test="assistant-launcher-ask"]',
+        )
+        .map((n) => n.attributes("data-test"));
+    expect(ids(left)).toEqual(["assistant-composer-plus"]);
+    const right = field.get('[data-test="assistant-composer-bar-right"]');
+    expect(ids(right)[0]).toBe("assistant-launcher-agent");
+    expect(ids(right).at(-1)).toBe("assistant-launcher-ask");
     expect(wrapper.findComponent(AssistantComposerPlusMenu).props("actions")).toEqual([
       "attach",
-      "context",
+      "connectors",
     ]);
-    expect(wrapper.find('[data-test="assistant-launcher-chip-row"]').exists()).toBe(false);
-    const right = field.get('[data-test="assistant-composer-bar-right"]');
     const ask = right.get('[data-test="assistant-launcher-ask"]');
+    expect(ask.classes()).not.toContain("rounded-full");
     expect(ask.classes()).toEqual(
       expect.arrayContaining([
-        "rounded-full",
         "aria-disabled:bg-surface-subtle!",
         "aria-disabled:text-text-secondary!",
       ]),
     );
-    // + and Send share one 2 rem box and one 0.5 rem inset, so they sit on one centre line.
-    expect(left.get('[data-test="assistant-composer-plus"]').attributes("data-size")).toBe("md");
-    expect(ask.attributes("data-size")).toBe("md");
-    expect(field.get('[data-test="assistant-composer-bar"]').classes()).toEqual(
-      expect.arrayContaining(["px-2", "pt-2", "min-h-10"]),
-    );
-    expect(wrapper.find('[data-test="assistant-launcher-narrow-tools"]').exists()).toBe(false);
-  });
-
-  it("shows the ⓘ in the box's top-end corner with nothing added, keeps the bar one line, and none while gated", async () => {
-    const { wrapper } = setupOn({ layout: "overview" });
-    const right = wrapper.get('[data-test="assistant-composer-bar-right"]');
-    expect(
-      right.findAll('[data-test^="assistant-"]').map((node) => node.attributes("data-test")),
-    ).toEqual(["assistant-launcher-ask"]);
-    expect(wrapper.get('[data-test="assistant-composer-bar"]').classes()).toContain("flex-nowrap");
+    expect(left.get('[data-test="assistant-composer-plus"]').attributes("data-size")).toBe("sm");
+    expect(ask.attributes("data-size")).toBe("sm");
     const corner = wrapper.get('[data-test="assistant-composer-corner"]');
     expect(corner.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
-    expect(input(wrapper).classes()).toEqual(expect.arrayContaining(["min-h-18", "pe-7!"]));
+  });
+
+  it("drops the (i) while gated", async () => {
     const gated = setupOn({ layout: "overview" });
     fake.current.capability.value = { ...fake.current.capability.value, gate: "no_permission" };
     await flushPromises();
     expect(gated.wrapper.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
   });
 
-  it("opens the ⓘ on what Ask would send: the @ picks under You Added and the picked range", async () => {
+  it("opens the (i) on what Ask would send: the @ picks", async () => {
     mentionPick.current = {
       id: "mention:stream:logs|checkout",
       kind: "stream",
@@ -541,8 +548,8 @@ describe("AssistantLauncher", () => {
     await flushPromises();
     await wrapper.get('[data-test="assistant-context-sees"]').trigger("click");
     await flushPromises();
-    const added = document.body.querySelector('[data-test="assistant-context-sees-added"]');
-    expect(added?.textContent).toContain("checkout");
+    const list = document.body.querySelector('[data-test="assistant-context-sees-page"]');
+    expect(list?.textContent).toContain("checkout");
   });
 
   it("gives Home's field the same plain frame as every other composer", async () => {
@@ -552,29 +559,24 @@ describe("AssistantLauncher", () => {
     expect(home).toEqual(card);
     expect(home).toContain("[&>div]:focus-within:ring-1");
     expect(home.some((c) => /glow|gradient|shadow/.test(c))).toBe(false);
-    expect(wrapper.get('[data-test="assistant-composer-bar"]').classes()).toContain("border-t");
+    expect(
+      wrapper
+        .get('[data-test="assistant-composer-bar"]')
+        .classes()
+        .some((c) => c.startsWith("border")),
+    ).toBe(false);
     expect(input(wrapper).classes()).toContain("placeholder:text-text-secondary");
   });
 
-  it("types example prompts while idle and empty, and shows the plain hint on focus or with a draft", async () => {
+  it("shows one plain hint that never types itself", async () => {
     vi.useFakeTimers();
     try {
       const { wrapper } = setupOn({ layout: "overview" });
       const shown = () => input(wrapper).attributes("placeholder") ?? "";
-      await vi.advanceTimersByTimeAsync(500 + 85 * 6);
-      expect(shown()).not.toBe("");
-      expect("Show me errors from the last hour…".startsWith(shown())).toBe(true);
-      // The field keeps its own name and nothing announces the typing.
+      expect(shown()).toBe("Ask anything · @ to add context");
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(shown()).toBe("Ask anything · @ to add context");
       expect(input(wrapper).attributes("aria-label")).toBe(`Ask ${brandNames.autobot}`);
-      expect(input(wrapper).attributes("aria-placeholder")).toBeUndefined();
-      expect(wrapper.find("[aria-live] textarea, textarea[aria-live]").exists()).toBe(false);
-      await input(wrapper).trigger("focus");
-      expect(shown()).toBe("Ask anything · @ to add context");
-      await vi.advanceTimersByTimeAsync(2_000);
-      expect(shown()).toBe("Ask anything · @ to add context");
-      await input(wrapper).setValue("why?");
-      await input(wrapper).trigger("blur");
-      expect(shown()).toBe("Ask anything · @ to add context");
     } finally {
       vi.useRealTimers();
     }
@@ -619,7 +621,7 @@ describe("AssistantLauncher", () => {
   it("shows at most three suggestions and no other suggestion group (PO A34)", () => {
     const { wrapper } = setup();
     expect(wrapper.findAll('[data-test^="assistant-launcher-starter-"]')).toHaveLength(3);
-    expect(wrapper.findAll("h3").map((heading) => heading.text())).toEqual(["Recent threads"]);
+    expect(wrapper.findAll("h3").map((heading) => heading.text())).toEqual(["Recent chats"]);
   });
 
   it("shows skeleton rows while the starters load, and keeps the field typable unless the gate loads", () => {
@@ -668,20 +670,17 @@ describe("AssistantLauncher", () => {
       const row = wrapper.get('[data-test="assistant-launcher-chip-row"]');
       const frame = wrapper.get('[data-test="assistant-composer-frame"]');
       expect(left.find('[data-test="assistant-launcher-chips"]').exists()).toBe(false);
-      // Home floats the row above the box: it takes no flow space, so the box does not move.
-      expect(frame.element.contains(row.element)).toBe(false);
-      expect(row.element.nextElementSibling).toBe(frame.element);
-      expect(row.classes()).toEqual(
-        expect.arrayContaining(["absolute", "inset-x-0", "bottom-full", "mb-1"]),
-      );
+      // The photo sits inside the box it rides with, above the text.
+      expect(frame.element.contains(row.element)).toBe(true);
+      expect(row.classes()).not.toContain("absolute");
       expect(row.element.compareDocumentPosition(wrapper.get("textarea").element)).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING,
       );
       const chip = row.get('[data-test="assistant-launcher-image-chip"]');
       expect(chip.text()).toBe("shot.png");
-      expect(chip.get('[data-test="assistant-context-chip-thumb"]').attributes("src")).toBe(
-        "data:image/png;base64,AAAAAAAAAAAAAA==",
-      );
+      const thumb = chip.get('[data-test="assistant-context-chip-thumb"]');
+      expect(thumb.attributes("src")).toBe("data:image/png;base64,AAAAAAAAAAAAAA==");
+      expect(thumb.classes()).toContain("rounded-default");
       expect(wrapper.find('[data-test="assistant-composer-strip"]').exists()).toBe(false);
       await chip.get('[data-test="assistant-context-chip-remove"]').trigger("click");
       expect(thumbs(wrapper)).toHaveLength(0);
@@ -707,7 +706,7 @@ describe("AssistantLauncher", () => {
       expect(status().text()).toBe("b.png removed from context");
     });
 
-    it("hands the images to the new chat with the line on Enter and on Shift+Enter, and sends images alone", async () => {
+    it("hands the images to the new chat with the line on Enter, and sends images alone", async () => {
       const { wrapper } = setupOn({ layout: "overview" });
       await flushPromises();
       pick(wrapper, [png("a.png"), png("b.png", 20)]);
@@ -730,21 +729,13 @@ describe("AssistantLauncher", () => {
         expect.objectContaining({ filename: "b.png", mimeType: "image/png", size: 20 }),
       ]);
       expect(thumbs(wrapper)).toHaveLength(0);
-      pick(wrapper, [png("c.png")]);
-      await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(1));
-      await input(wrapper).setValue("draft");
-      await input(wrapper).trigger("keydown", { key: "Enter", shiftKey: true });
-      expect(open.mock.calls[1][0]).toMatchObject({
-        intent: "stage",
-        payload: { text: "draft", images: [expect.objectContaining({ filename: "c.png" })] },
-      });
       pick(wrapper, [png("d.png")]);
       await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(1));
       expect(
         wrapper.get('[data-test="assistant-launcher-ask"]').attributes("aria-disabled"),
       ).toBeUndefined();
       await input(wrapper).trigger("keydown", { key: "Enter" });
-      expect(open.mock.calls[2][0].payload).toMatchObject({
+      expect(open.mock.calls[1][0].payload).toMatchObject({
         text: "",
         images: [expect.objectContaining({ filename: "d.png" })],
       });
@@ -794,29 +785,18 @@ describe("AssistantLauncher", () => {
       expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(false);
     });
 
-    it("draws the agent chip right after the time chip in both layouts, only with a choice of agents", async () => {
+    it("draws the agent first on the right in both layouts, as quiet text with no box", async () => {
       for (const mountIt of [() => setupOn({ layout: "overview" }), () => setup()]) {
         const { wrapper } = mountIt();
-        expect(wrapper.find('[data-test="assistant-launcher-agent"]').exists()).toBe(false);
         fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
         await flushPromises();
-        const chips = wrapper
-          .get('[data-test="assistant-composer-bar-left"]')
-          .findAll('[data-test^="assistant-"]')
-          .map((el) => el.attributes("data-test"));
-        expect(chips.indexOf("assistant-launcher-agent")).toBe(
-          chips.indexOf("assistant-context-chip-time") + 1,
+        const right = wrapper.get('[data-test="assistant-composer-bar-right"]');
+        expect(right.findAll("[data-test]")[0].attributes("data-test")).toBe(
+          "assistant-launcher-agent",
         );
-        // The two chips sit a gap apart, as + and the time chip do.
-        const agentChip = wrapper.get('[data-test="assistant-launcher-agent"]').element;
-        expect(agentChip.parentElement?.classList.contains("gap-2")).toBe(true);
-        // Home's chips keep the kit's small radius, not a pill.
-        for (const test of ["assistant-launcher-agent", "assistant-context-chip-time"]) {
-          const classes = wrapper.get(`[data-test="${test}"]`).classes();
-          expect(classes).toContain("rounded-default");
-          expect(classes).not.toContain("rounded-full");
-        }
-        expect(wrapper.html()).not.toContain(":rounded-full");
+        const classes = wrapper.get('[data-test="assistant-launcher-agent"]').classes();
+        expect(classes).toContain("text-text-secondary!");
+        expect(classes.some((name) => /^(border-(?!0)|bg-surface)/.test(name))).toBe(false);
         expect(wrapper.find('[data-test="assistant-agent-pill"]').exists()).toBe(false);
       }
     });
@@ -860,47 +840,6 @@ describe("AssistantLauncher", () => {
       await input(wrapper).setValue("why?");
       await input(wrapper).trigger("keydown", { key: "Enter" });
       expect(open.mock.calls[0][0].payload).toEqual({ text: "why?", chips: [] });
-    });
-
-    it("reads a Custom Range in the user's time zone, as the chat composer does", async () => {
-      fake.current = fakeAssistant("available");
-      const vuex = fakeVuex();
-      (vuex.state as Record<string, unknown>).timezone = "Asia/Kolkata";
-      const wrapper = mount(AssistantLauncher, {
-        props: { layout: "overview" },
-        global: { plugins: [fakeRouter([]), vuex] },
-        attachTo: document.body,
-      });
-      mounted.push(wrapper);
-      await flushPromises();
-      expect(wrapper.findComponent(AssistantTimePrefix).props("timezone")).toBe("Asia/Kolkata");
-    });
-
-    it("asks over the window its chip shows: the default unpicked, a pick once one is made", async () => {
-      const { wrapper } = setupOn({ layout: "overview" });
-      await flushPromises();
-      const chip = () => wrapper.get('[data-test="assistant-context-chip-time"]');
-      const ask = async (line: string) => {
-        await input(wrapper).setValue(line);
-        await input(wrapper).trigger("keydown", { key: "Enter" });
-        return open.mock.calls.at(-1)![0].payload.timeOverride;
-      };
-      const pick = async (period: string) => {
-        await chip().trigger("click");
-        await flushPromises();
-        document.body
-          .querySelector<HTMLElement>(`[data-test="assistant-context-time-${period}"]`)!
-          .click();
-        await flushPromises();
-      };
-      expect(chip().text()).toBe("Past 15 Minutes");
-      expect(await ask("first")).toBeUndefined();
-      await pick("7d");
-      expect(chip().text()).toBe("Past 7 Days");
-      expect(await ask("second")).toMatchObject({ period: "7d" });
-      await pick("15m");
-      expect(chip().text()).toBe("Past 15 Minutes");
-      expect(await ask("third")).toBeUndefined();
     });
 
     it("sends Enter's line and its @ chips as a new chat in the full view", async () => {
@@ -973,11 +912,9 @@ describe("AssistantLauncher", () => {
   });
 });
 
-describe("AssistantLauncher: auto navigation toggle", () => {
-  const TOGGLE = '[data-test="assistant-composer-auto-navigation-btn"]';
-
+describe("AssistantLauncher: dictation", () => {
   beforeEach(() => {
-    open.mockReset().mockResolvedValue({ ok: true });
+    open.mockReset().mockResolvedValue({ ok: true, sid: "new-chat" });
     document.body.innerHTML = "";
   });
   afterEach(() => {
@@ -985,36 +922,40 @@ describe("AssistantLauncher: auto navigation toggle", () => {
     resetVoiceForTests();
   });
 
-  it("renders the toggle on, and hides it while dictating", async () => {
+  it("has no auto-open switch, keeps the agent while dictating and shows the live block", async () => {
     const engine = fakeVoiceEngine();
     resetVoiceForTests(engine);
     localStorage.setItem("o2.assistant.hints:k1", JSON.stringify({ dictate: true }));
     const { wrapper } = setup();
     setVoiceOptIn("k1", true);
     await flushPromises();
-    expect(wrapper.get(TOGGLE).attributes("aria-checked")).toBe("true");
+    expect(wrapper.find('[data-test="assistant-composer-auto-navigation"]').exists()).toBe(false);
+    await wrapper.get('[data-test="assistant-dictate"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-dictate-wave"]').exists()).toBe(false);
+    engine.handlers!.onStart();
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-launcher-agent"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="assistant-dictate-wave"]').text()).toContain("Listening");
+    expect(wrapper.get('[data-test="assistant-composer-frame"]').attributes("data-listening")).toBe(
+      "",
+    );
+  });
+
+  it("lets Send take a line that is still only interim dictation, as Enter does", async () => {
+    const engine = fakeVoiceEngine();
+    resetVoiceForTests(engine);
+    localStorage.setItem("o2.assistant.hints:k1", JSON.stringify({ dictate: true }));
+    const { wrapper } = setup();
+    setVoiceOptIn("k1", true);
+    await flushPromises();
+    const send = () => wrapper.get('[data-test="assistant-launcher-ask"]');
+    expect(send().attributes("aria-disabled")).toBe("true");
     await wrapper.get('[data-test="assistant-dictate"]').trigger("click");
     await flushPromises();
     engine.handlers!.onStart();
+    engine.handlers!.onResults([{ index: 0, text: "cart fail", final: false }]);
     await flushPromises();
-    expect(wrapper.find(TOGGLE).exists()).toBe(false);
-  });
-
-  it("hands a turn-off made on Home to the chat Ask opens", async () => {
-    const { wrapper, store } = setup();
-    await wrapper.get(TOGGLE).trigger("click");
-    expect(wrapper.get(TOGGLE).attributes("aria-checked")).toBe("false");
-    await input(wrapper).setValue("count errors");
-    await input(wrapper).trigger("keydown", { key: "Enter" });
-    expect(open).toHaveBeenCalled();
-    // The new chat's composer mounts with its id already set.
-    const { useAutoNavigationPreferences } =
-      await import("@/composables/useAutoNavigationPreferences");
-    const { isAutoNavigationEnabled: onNewChat } = useAutoNavigationPreferences(
-      ref("new-chat"),
-      computed(() => store.state.userOrgKey),
-    );
-    expect(onNewChat.value).toBe(false);
-    expect(isAutoNavigationEnabled(store.state.userOrgKey, "new-chat")).toBe(false);
+    expect(send().attributes("aria-disabled")).toBeUndefined();
   });
 });

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    v-if="mountable && onShellPage"
+    v-if="mountable"
     data-test="assistant-window-layer"
     :inert="modalOpen || undefined"
     class="contents"
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="win.sid"
       :win="win"
       :area="area"
-      :band-rem="0"
+      :band-rem="trayBand"
       :focused="focusedSid === win.sid"
       :obscured="obscured[win.sid] ?? null"
       :tear-off="tearOffRequest?.sid === win.sid ? tearOffRequest : null"
@@ -38,9 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @mode-started="(mode) => modeStarted(win.sid, mode)"
     />
     <ThreadsBar
-      v-show="!trayHidden && !chatOpen"
+      v-show="!trayHidden"
       ref="tray"
-      :order="shell.trayOrder"
+      :order="trayOrder"
+      :chat-open="chatOpen"
       @restore="restore"
       @close="close"
     />
@@ -74,7 +75,7 @@ const OWN_SURFACES = `${ASSISTANT_SURFACES_SELECTOR}, [data-test='threads-bar']`
 </script>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
 import { isFullThreadRoute } from "@/composables/assistant/pure";
@@ -84,6 +85,7 @@ import {
   isRunning,
   openWindowsOf,
   registerEscapeRung,
+  TRAY_FOOTPRINT_REM,
   useAssistantCapability,
   useAssistantRuns,
   useAssistantStore,
@@ -122,13 +124,19 @@ let modalWatch: MutationObserver | null = null;
 const shell = computed(() => store.state.shell);
 const mountable = computed(() => !UNMOUNTED_GATES.has(capability.gate.value));
 const onShellPage = computed(() => !isFullThreadRoute(route));
-// Floating windows need the wide shell; the launcher shows at every width.
-const windowsShown = computed(() => (lgUp.value ? openWindows.value : []));
+// Floating windows need the wide shell and stay off the full page; the chips show at every width and on every page.
+const windowsShown = computed(() => (lgUp.value && onShellPage.value ? openWindows.value : []));
 const openWindows = computed(() => openWindowsOf(shell.value));
-// The launcher stands in for chats that are not on screen, so it hides while the side panel or a window is open.
+// Every minimised chat keeps its chip, except the one the full page shows.
+const trayOrder = computed(() => {
+  const onScreen = shell.value.placement.kind === "full" ? shell.value.activeSid : null;
+  return shell.value.trayOrder.filter((sid) => sid !== onScreen);
+});
 const chatOpen = computed(
-  () => shell.value.placement.kind === "sidebar" || openWindows.value.length > 0,
+  () => shell.value.placement.kind !== "hidden" || windowsShown.value.length > 0,
 );
+// Windows keep their bottom edge above the minimised chips.
+const trayBand = computed(() => (shell.value.trayOrder.length > 0 ? TRAY_FOOTPRINT_REM : 0));
 const focusedSid = computed(() => {
   const focused = shell.value.lastFocusedContainer;
   return focused && focused !== "sidebar" ? focused.window : null;
@@ -165,17 +173,25 @@ function titleOf(title: I18nText | null | undefined): ReturnType<typeof raw> {
   return raw(String(title ?? t("assistant.thread.newChatTitle")));
 }
 
-// Focus goes to the previous container's composer, else back to the page element it came from.
-function leaveWindow(): void {
+// Focus goes to the previous container's composer, else the page element it came from, else the minimised chip.
+function leaveWindow(minimised: Sid | null = null): void {
   if (store.focusNextContainer()) return;
-  const target = pageFocus?.isConnected ? pageFocus : document.querySelector<HTMLElement>("main");
-  target?.focus();
+  if (pageFocus?.isConnected) return pageFocus.focus();
+  if (minimised) return void nextTick(() => focusChip(minimised));
+  document.querySelector<HTMLElement>(MAIN_SELECTOR)?.focus();
+}
+
+function focusChip(sid: Sid): void {
+  const chip = document.querySelector<HTMLElement>(
+    `[data-test="assistant-tray-chip"][data-sid="${CSS.escape(sid)}"] [data-test="assistant-tray-chip-restore"]`,
+  );
+  (chip ?? document.querySelector<HTMLElement>(MAIN_SELECTOR))?.focus();
 }
 
 function minimise(sid: Sid, reason: MinimiseReason): void {
   store.minimiseWindow(sid, reason);
   trackAssistant("ai_window_minimised", { reason });
-  leaveWindow();
+  leaveWindow(sid);
 }
 
 function close(sid: Sid): void {
@@ -247,13 +263,13 @@ async function giveWay(target: Element): Promise<void> {
   }
 }
 
-// The tray never covers a focused control: the page scrolls it clear, or the tray steps aside.
+// The tray never hides a focused control: the page scrolls it clear, or the tray steps aside (SC 2.4.11).
 function clearTray(target: Element): void {
   const el = tray.value?.el;
   if (!el) return;
   if (!intersects(el.getBoundingClientRect(), target.getBoundingClientRect())) return;
   target.scrollIntoView?.({ block: "nearest" });
-  trayHidden.value = intersects(el.getBoundingClientRect(), target.getBoundingClientRect());
+  trayHidden.value = coversFully(el.getBoundingClientRect(), target.getBoundingClientRect());
 }
 
 function onFocusIn(event: FocusEvent): void {

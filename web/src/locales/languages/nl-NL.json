@@ -3983,7 +3983,7 @@
           "note": "Geautomatiseerde SRE-activiteiten en -inzichten"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "Intelligente hulp bij het opvragen en analyseren"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "Er is een onverwachte fout opgetreden",
       "toolExecutionFailed": "Tooluitvoering mislukt",
       "errorOccurred": "Er is een fout opgetreden",
-      "navigateConfirmQuestion": "@:{'brand.autobot'} toestaan om te navigeren?",
       "confirmToolExecution": "Bevestig uitvoering van {tool}?",
       "entity": {
         "alert": "alarm",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "Neem een abonnement om AI te blijven gebruiken. Verder gebruik wordt gefactureerd op de factuur van deze organisatie.",
     "aiContractExhaustedMessage": "Neem contact op met uw accountmanager om meer AI-tegoed toe te voegen",
     "aiPayerSubscribeMessage": "De facturatie voor deze organisatie wordt beheerd door {payer}. Vraag een beheerder van {payer} om een abonnement te nemen; verder gebruik wordt gefactureerd op de factuur ervan.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} en querygeneratie: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Heranalyse: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} en querygeneratie: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Heranalyse: {reanalysis}",
     "aiPaygMessage": "Gratis credits uitgeput — gebruik wordt gefactureerd op het abonnement",
     "billingGroup": {
       "tabLabel": "Factureringsgroep",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "Betaald gebruik is niet ingeschakeld voor alle vereiste organisaties.",
     "updateFailed": "Betaald AI-gebruik kon niet worden bijgewerkt. Probeer het opnieuw.",
     "declinedNotice": "Betaald AI-gebruik staat uit, dus dit verzoek is niet verzonden.",
-    "consentScope": "Geldt voor de hele organisatie: @:{'brand.askAutobot'}, querygeneratie en incidentanalyse. Je kunt het altijd uitschakelen op de pagina Abonnementen.",
+    "consentScope": "Geldt voor de hele organisatie: @:{'brand.autobot'}, querygeneratie en incidentanalyse. Je kunt het altijd uitschakelen op de pagina Abonnementen.",
     "managePaidUsage": "Betaald gebruik inschakelen",
     "modePayAsYouGo": "Betalen per gebruik",
     "modeConsentRequired": "Toestemming vereist",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "Autonavigatie",
-        "enabledTooltip": "Automatische navigatie ingeschakeld - {product} navigeert automatisch zonder bevestiging",
-        "disabledTooltip": "Autonavigatie uitgeschakeld - {product} zal dit vragen voordat u gaat navigeren"
-      }
-    }
+    "composer": {}
   }
 }

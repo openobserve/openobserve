@@ -32,37 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select="pickMention"
         @close="closeMention"
       />
-      <!-- Above the frame, not in it, so a chip or a notice never resizes the box -->
-      <AssistantComposerStrip
-        v-if="stripShown"
-        :notice="notice"
-        :sentence-id="noticeId"
-        class="mb-1"
-        @action="onNoticeAction"
-      >
-        <slot v-if="!replying" name="chips" />
-        <template #link-askAdmin>
-          <AssistantAskAdminPopover kind="access" :org="org">
-            <template #trigger>
-              <OButton
-                variant="ghost-primary"
-                size="chip"
-                :class="STRIP_LINK_CLASS"
-                data-test="assistant-composer-ask-admin"
-              >
-                {{ t("assistant.gate.noPermission.askAdmin") }}
-              </OButton>
-            </template>
-          </AssistantAskAdminPopover>
-        </template>
-      </AssistantComposerStrip>
       <AssistantComposerFrame
         ref="textbox"
         :model-value="shownText"
         :state="state"
         :inert="inertKind !== null"
         :opening="opening"
-        tall
+        :listening="voice.listening.value"
         :readonly="inertKind !== null"
         :placeholder="placeholder"
         :input-attrs="textboxAttrs"
@@ -76,6 +52,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus="refreshPageContext"
         @blur="onBlur"
       >
+        <template v-if="stripShown" #strip>
+          <AssistantComposerStrip :notice="notice" :sentence-id="noticeId" @action="onNoticeAction">
+            <slot v-if="!replying" name="chips" />
+            <template #link-askAdmin>
+              <AssistantAskAdminPopover kind="access" :org="org">
+                <template #trigger>
+                  <OButton
+                    variant="ghost-primary"
+                    size="chip"
+                    :class="STRIP_LINK_CLASS"
+                    data-test="assistant-composer-ask-admin"
+                  >
+                    {{ t("assistant.gate.noPermission.askAdmin") }}
+                  </OButton>
+                </template>
+              </AssistantAskAdminPopover>
+            </template>
+          </AssistantComposerStrip>
+        </template>
         <template v-if="!inertKind && !accessLost" #corner>
           <AssistantContextSeesPopover :sid="liveSid">
             <template v-if="storageBlocked" #detail>
@@ -86,59 +81,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </AssistantContextSeesPopover>
         </template>
         <template #bar>
-          <AssistantComposerBottomRow divided>
-            <template #agent>
+          <AssistantComposerBottomRow
+            :dictating="voice.mine.value && voice.phase.value !== 'requesting'"
+          >
+            <template #plus>
               <AssistantComposerPlusMenu
                 :actions="plusActions"
                 :disabled="inertKind !== null"
                 @select="onPlus"
               />
-              <!-- Shrinks so a long time range cuts its own text, not the agent pill under mic and Send -->
-              <span class="flex min-w-0 items-center gap-2">
-                <AssistantSessionTime :sid="sid" :disabled="inertKind !== null || accessLost" />
-                <!-- Dictation wave needs the room; only the time range stays -->
-                <AssistantAgentPicker
-                  v-if="!voice.mine.value"
-                  :sid="sid"
-                  :disabled="inertKind !== null || accessLost"
-                />
-              </span>
-              <AssistantAutoNavToggle
-                v-if="!running && !voice.mine.value"
-                v-model="autoNavigation"
+            </template>
+            <template #recording>
+              <AssistantDictationWave
+                :elapsed-ms="voice.elapsedMs.value"
+                :level="voice.level.value"
+                :processing="voice.phase.value === 'processing'"
               />
             </template>
-            <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
-            <AssistantDictateButton
-              v-if="voice.mic.value !== 'none'"
-              :mic="accessLost || inertKind ? 'crossed' : voice.mic.value"
-              :pressed="voice.mine.value"
-              :disabled-reason="voice.helperLine.value ?? micOffReason"
-              @press="onMicPress"
-            />
-            <AssistantIconButton
-              v-if="showStop"
-              variant="primary"
-              size="md"
-              :label="t('assistant.turn.stopLabel')"
-              :icon="assistantGlyph.stop"
-              :loading="state === 'stopping'"
-              :class="ROUND_ACTION_CLASS"
-              data-test="assistant-stop"
-              @click="stop"
-            />
-            <AssistantIconButton
-              v-else
-              variant="primary"
-              size="md"
-              :label="sendLabel"
-              :icon="assistantGlyph.send"
-              :disabled="!canSend"
-              :disabled-reason="sendBlockedReason"
-              :class="SEND_ACTION_CLASS"
-              data-test="assistant-send"
-              @click="trySend"
-            />
+            <template #agent>
+              <AssistantAgentPicker :sid="sid" :disabled="inertKind !== null || accessLost" />
+            </template>
+            <template #mic>
+              <AssistantDictateButton
+                v-if="voice.mic.value !== 'none'"
+                :phase="accessLost || inertKind ? 'unavailable' : voice.phase.value"
+                :disabled-reason="voice.helperLine.value ?? micOffReason"
+                @press="onMicPress"
+              />
+            </template>
+            <template #send>
+              <AssistantIconButton
+                v-if="showStop"
+                variant="primary"
+                :size="BAR_CONTROL_SIZE"
+                :label="t('assistant.turn.stopLabel')"
+                :icon="assistantGlyph.stop"
+                :loading="state === 'stopping'"
+                data-test="assistant-stop"
+                @click="stop"
+              />
+              <AssistantIconButton
+                v-else
+                variant="primary"
+                :size="BAR_CONTROL_SIZE"
+                :label="sendLabel"
+                :icon="assistantGlyph.send"
+                :disabled="!canSend"
+                :disabled-reason="sendBlockedReason"
+                :class="SEND_ACTION_CLASS"
+                data-test="assistant-send"
+                @click="trySend"
+              />
+            </template>
           </AssistantComposerBottomRow>
         </template>
       </AssistantComposerFrame>
@@ -164,12 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @change="onPicked"
       @size-error="(files) => files.forEach(refuseSize)"
       @type-error="() => refuse('type', t('assistant.context.imageType'))"
-    />
-    <AssistantRecallSheet
-      v-if="coarse"
-      v-model:open="recallOpen"
-      :entries="recallEntries"
-      @select="pickRecall"
     />
   </div>
 </template>
@@ -257,7 +245,6 @@ import {
   useAssistantContext,
   useAssistantPlacement,
   useAssistantStore,
-  type RecallEntry,
 } from "@/composables/assistant";
 import {
   DEFAULT_AGENT,
@@ -268,10 +255,8 @@ import {
   nextAgent,
   openTabWithoutOpener,
 } from "@/composables/assistant/pure";
-import { useAutoNavigationPreferences } from "@/composables/useAutoNavigationPreferences";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
@@ -282,7 +267,7 @@ import { formatBytes, formatOrgDay } from "@/utils/formatters";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import AssistantComposerBottomRow, {
-  ROUND_ACTION_CLASS,
+  BAR_CONTROL_SIZE,
   SEND_ACTION_CLASS,
 } from "./AssistantComposerBottomRow.vue";
 import { attachImageFiles, imageTooBigLine, type ImageCap } from "./composerImages";
@@ -291,12 +276,9 @@ import AssistantComposerPlusMenu, {
   type ComposerPlusAction,
 } from "./AssistantComposerPlusMenu.vue";
 import AssistantComposerStrip from "./AssistantComposerStrip.vue";
-import AssistantSessionTime from "@/components/ai-assistant/context/AssistantSessionTime.vue";
-import AssistantAutoNavToggle from "./AssistantAutoNavToggle.vue";
 import AssistantDictateButton from "./AssistantDictateButton.vue";
 import AssistantDictationTail from "./AssistantDictationTail.vue";
 import AssistantDictationWave from "./AssistantDictationWave.vue";
-import AssistantRecallSheet from "./AssistantRecallSheet.vue";
 import {
   lineCount,
   micHelpUrl,
@@ -311,7 +293,6 @@ import {
   announceComposer,
   composerLayoutKey,
   composerRowOf,
-  composerTimeOpenKey,
   composerUi,
   moveDraft,
   forgetComposerUi,
@@ -354,8 +335,6 @@ const noticeId = `assistant-composer-notice-${uid}`;
 const blockedLine = ref<I18nText | null>(null);
 const queueRefused = ref(false);
 const droppedImages = ref(0);
-const recallOpen = ref(false);
-const recallEntries = ref<RecallEntry[]>([]);
 const mentionAt = ref<number | null>(null);
 const mentionQuery = ref("");
 const prefillPending = ref<{ text: string; chips: ContextChip[]; homeStarter?: boolean } | null>(
@@ -363,11 +342,8 @@ const prefillPending = ref<{ text: string; chips: ContextChip[]; homeStarter?: b
 );
 // The last long paste, offered back as plain text until the next edit or send (D4 decision 10).
 const pasteOffer = ref<{ chipId: string; text: string; at: number } | null>(null);
-// An admin pressed a mic that is off in this browser; the strip offers Turn on until the next edit.
-const offOffer = ref(false);
 const now = ref(Date.now());
 let emptyEnterSaid = false;
-let recallPicked = false;
 let mentionTimer: ReturnType<typeof setTimeout> | null = null;
 let pointerDown = false;
 let cancelDeferredClose: (() => void) | null = null;
@@ -388,10 +364,6 @@ const session = computed(() =>
     : null,
 );
 const liveSid = computed(() => session.value?.sid ?? null);
-const { isAutoNavigationEnabled: autoNavigation } = useAutoNavigationPreferences(
-  liveSid,
-  computed(() => store.state.userOrgKey),
-);
 const composer = computed(() => session.value?.composer ?? null);
 const context = useAssistantContext(liveSid, { store });
 const org = computed(() => session.value?.org ?? String(context.page.value?.org_id ?? ""));
@@ -405,8 +377,6 @@ const attached = computed(() => stagedChips.value.length > 0 || images.value.len
 const chipsShown = computed(
   () => images.value.length > 0 || stagedChips.value.some((chip) => chip.kind !== "time"),
 );
-// The + menu opens the time pill's picker.
-const timeOpen = ref(false);
 // An empty box draws no strip: it holds only a notice, or the chips the user added.
 const stripShown = computed(() => !!notice.value || (!replying.value && chipsShown.value));
 // A bare `@` is an unfinished mention, not a question (CT-05).
@@ -553,7 +523,6 @@ const agentLabel = computed(() => agentName(shownAgent.value, t));
 const placeholder = computed<I18nText>(() => {
   if (inertKind.value) return raw("");
   if (replying.value) return t("assistant.composer.replyPlaceholder");
-  if (voice.mine.value && voice.firstUse.value) return t("assistant.voice.listeningPlaceholder");
   if (shownAgent.value !== DEFAULT_AGENT)
     return t("assistant.composer.askAgent", { agent: agentLabel.value });
   return session.value?.messages.length
@@ -656,7 +625,6 @@ provide(
     agentIconOnly: width.agentIconOnly.value,
   })),
 );
-provide(composerTimeOpenKey, timeOpen);
 
 const holdNotice = computed<ComposerNotice | null>(() => {
   if (prefillPending.value)
@@ -699,12 +667,18 @@ const holdNotice = computed<ComposerNotice | null>(() => {
 });
 
 const voiceNotice = computed<ComposerNotice | null>(() => {
-  if (offOffer.value)
-    return sentenceNotice("voice", t("assistant.voice.offAdmin"), "info", [
-      { action: "turnOn", label: t("assistant.voice.turnOn") },
-    ]);
-  if (voice.waiting.value)
-    return sentenceNotice("voice", t("assistant.voice.waitingPermission"), "info");
+  // The browser's own prompt is up; the first time, one line says where the audio goes (D2).
+  if (voice.waiting.value) {
+    const ask = t("assistant.voice.allowPrompt");
+    const privacy = t("assistant.voice.privacy");
+    return {
+      id: "voice",
+      tone: "info",
+      title: voice.firstUse.value ? privacy : ask,
+      sentence: voice.firstUse.value ? raw(`${ask} ${privacy}`) : ask,
+      links: [{ action: "voiceCancel", label: t("common.cancel") }],
+    };
+  }
   const line = voice.helperLine.value;
   if (!line) return null;
   if (voice.action.value === "how") {
@@ -768,6 +742,21 @@ const stateNotice = computed<ComposerNotice | null>(() => {
         ? [{ action: "manageUsage", label: t("assistant.composer.strip.managePaid") }]
         : [],
     };
+  const offline =
+    errorRow.value === t("assistant.composer.offline") || (voice.show.value && voice.offline.value);
+  if (offline)
+    return {
+      id: "offline",
+      tone: "warning",
+      title: t("assistant.composer.strip.offline"),
+      sentence: t("assistant.composer.offline"),
+      links: [],
+    };
+  // A failed send outranks the dismissible low-credit warning, and says how to resend.
+  if (errorRow.value)
+    return sentenceNotice("unreachable", errorRow.value, "warning", [
+      { action: "retry", label: t("assistant.error.agent_unreachable.action") },
+    ]);
   const low = props.lowCredits;
   if (low) {
     const percent = low.threshold;
@@ -791,17 +780,7 @@ const stateNotice = computed<ComposerNotice | null>(() => {
       ],
     };
   }
-  const offline =
-    errorRow.value === t("assistant.composer.offline") || (voice.show.value && voice.offline.value);
-  if (offline)
-    return {
-      id: "offline",
-      tone: "warning",
-      title: t("assistant.composer.strip.offline"),
-      sentence: t("assistant.composer.offline"),
-      links: [],
-    };
-  return errorRow.value ? sentenceNotice("unreachable", errorRow.value) : null;
+  return null;
 });
 
 const draftNotice = computed<ComposerNotice | null>(() => {
@@ -894,10 +873,7 @@ const textboxAttrs = computed(() => ({
   "aria-controls": mentionAt.value !== null ? listboxId : undefined,
   "aria-activedescendant": mentionAt.value !== null ? mention.value?.activeId : undefined,
   "data-assistant-composer": "",
-  class: [
-    "max-md:min-h-11 pointer-coarse:min-h-11",
-    inertKind.value ? "text-text-muted!" : "",
-  ].join(" "),
+  class: inertKind.value ? "text-text-muted!" : "",
 }));
 
 /** Puts the caret at the end or at an offset (CT-08 AC 9; `70` landing rules). */
@@ -945,7 +921,6 @@ function onInput(value: string): void {
   blockedLine.value = null;
   droppedImages.value = 0;
   pasteOffer.value = null;
-  offOffer.value = false;
   freshSendId(id);
   emptyEnterSaid = false;
   // Typing in the new chat ends the Undo offer, so Undo never replaces new work (U9).
@@ -1066,7 +1041,6 @@ function onKeydown(event: KeyboardEvent): void {
   if (!target) return;
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
-    if (voice.mine.value) return voice.stop("enter");
     return void trySend();
   }
   // Ctrl+↑ / ⌘↑ on the first line goes to the latest answer; elsewhere the native caret move runs (round 2 X-28).
@@ -1141,8 +1115,9 @@ function mentionKey(event: KeyboardEvent): boolean {
   return false;
 }
 
+// Enter or Send while dictating stops it, keeps the settled words and sends them (one rule, F05).
 function trySend(): void {
-  if (voice.mine.value) return voice.stop("send");
+  if (voice.mine.value) voice.stop("send");
   const id = liveSid.value;
   if (!id || !composer.value) return;
   if (inertKind.value) {
@@ -1176,10 +1151,7 @@ function trySend(): void {
   usedSendIds.add(sendId);
   blockedLine.value = null;
   pasteOffer.value = null;
-  void store
-    .send(id)
-    .then((result) => onRefused(id, sendId, result))
-    .finally(refreshRecall);
+  void store.send(id).then((result) => onRefused(id, sendId, result));
 }
 
 // Enter while this tab's answer streams queues one message; a second one is refused with both texts kept as they are.
@@ -1262,28 +1234,6 @@ function recall(direction: "older" | "newer"): boolean {
   return true;
 }
 
-function pickRecall(index: number): void {
-  const id = ensureSid();
-  const entry = recallEntries.value[index];
-  recallPicked = true;
-  recallOpen.value = false;
-  void nextTick(() => (recallPicked = false));
-  if (!id || !entry) return;
-  store.stage(id, {
-    text: entry.text,
-    chips: entry.chips,
-    mode: hasContent.value ? "append" : "replace",
-  });
-  trackAssistant("ai_composer_recall", { direction: "older", index });
-  say(t("assistant.composer.recalled", { n: index + 1, count: recallEntries.value.length }));
-  void nextTick(() => focusInput("end"));
-}
-
-function refreshRecall(): void {
-  const key = store.state.userOrgKey;
-  recallEntries.value = key ? readRecall(key) : [];
-}
-
 // Backspace in an empty textbox focuses the last chip; a second key removes it (CT-08 AC 5).
 function focusLastChip(): boolean {
   const scope = root.value?.closest("[data-assistant-root]") ?? document;
@@ -1361,29 +1311,13 @@ function openPicker(): void {
   file.value?.open();
 }
 
-// A reply carries no context, so only Recent Prompts is left in it.
-const plusActions = computed<ComposerPlusAction[]>(() => [
-  ...(replying.value ? [] : (["attach", "context", "time"] as const)),
-  ...(coarse.value && recallEntries.value.length > 0 ? (["recall"] as const) : []),
-]);
+// A reply carries no context, so its + menu offers nothing.
+const plusActions = computed<ComposerPlusAction[]>(() =>
+  replying.value ? [] : ["attach", "connectors"],
+);
 
 function onPlus(action: ComposerPlusAction): void {
   if (action === "attach") openPicker();
-  else if (action === "context") addContext();
-  else if (action === "time") timeOpen.value = true;
-  else recallOpen.value = true;
-}
-
-// Add Context types the `@` at the caret, so it opens the same mention menu typing does.
-function addContext(): void {
-  const value = text.value;
-  const at = el()?.selectionStart ?? value.length;
-  const gap = at > 0 && !/\s/.test(value[at - 1]) ? " " : "";
-  onInput(`${value.slice(0, at)}${gap}@${value.slice(at)}`);
-  void nextTick(() => {
-    focusInput(at + gap.length + 1);
-    detectMention();
-  });
 }
 
 function onPicked(value: FileValue): void {
@@ -1458,17 +1392,8 @@ async function addFiles(files: File[], pasted = false): Promise<void> {
 
 // A keyboard press has `detail` 0 and keeps focus on the mic, so Enter or Space stops it (D4 §4.3).
 function onMicPress(event: MouseEvent): void {
-  if (voice.mic.value === "off") {
-    offOffer.value = true;
-    return;
-  }
   voice.press("mic");
   if (event.detail > 0) el()?.focus({ preventScroll: true });
-}
-
-function turnOnVoice(): void {
-  offOffer.value = false;
-  voice.turnOn();
 }
 
 function openHref(href: string | null): void {
@@ -1494,7 +1419,7 @@ const NOTICE_HANDLERS: Record<NoticeAction, () => void> = {
   askAdmin: () => undefined,
   micHelp: () => openHref(micHelpUrl(voice.brand() ?? helpBrand())),
   voiceRetry: () => voice.retry(),
-  turnOn: turnOnVoice,
+  voiceCancel: () => voice.stop("other"),
   showRunning: () => emit("show-running"),
   retry: retryRefused,
   manageUsage: () => {
@@ -1740,21 +1665,12 @@ watch(
   { immediate: true },
 );
 
-// A dismissed sheet hands focus back to the + menu it came from; a pick puts it in the textbox (`95` §4).
-watch(recallOpen, (open, was) => {
-  if (open || !was || recallPicked) return;
-  void nextTick(() =>
-    root.value?.querySelector<HTMLElement>('[data-test="assistant-composer-plus"]')?.focus(),
-  );
-});
-
 watch(
   () => Object.keys(store.state.sessions).join("\n"),
   (keys) => forgetComposerUi(new Set(keys.split("\n"))),
 );
 
 onMounted(() => {
-  refreshRecall();
   const shell = shellRoot();
   shell?.addEventListener("dragover", onDragOver);
   shell?.addEventListener("dragleave", onDragLeave);

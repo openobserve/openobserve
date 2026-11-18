@@ -140,7 +140,7 @@ describe("AssistantGateState", () => {
   it("names where to grant access, as a link to IAM roles for admins only", () => {
     const member = mountGate();
     expect(member.text()).toContain(
-      `An admin can grant access in IAM › Roles › ${brandNames.askAutobot}.`,
+      `An admin can grant access in IAM › Roles › ${brandNames.autobot}.`,
     );
     expect(member.find('[data-test="assistant-gate-where-to-grant"]').exists()).toBe(false);
     const admin = mountGate({ isAdmin: true });

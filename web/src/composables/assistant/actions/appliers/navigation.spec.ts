@@ -375,23 +375,22 @@ describe("navigation applier", () => {
       expect(router.push).toHaveBeenCalled();
     });
 
-    it("never auto-navigates to a locked explorer, by the stream type it opens", async () => {
+    it("never opens a locked explorer, by the stream type it opens", async () => {
       const { env, sid, router } = withFeatures({ metrics: "locked" });
       const link = (streamType: string) =>
         buildNavigationRoute(
           { resource_type: streamType, action: "load_query", target: { stream: "s" } },
           "org1",
         )!;
-      // Auto Navigation dispatches the same same-tab navigate a click does.
-      const autoOpen = (streamType: string) =>
+      const open = (streamType: string) =>
         navigationApplier(
           sid,
           { kind: "navigate", target: link(streamType).route, newTab: false, label: "x" as any },
           env,
         );
-      expect(await autoOpen("metrics")).toEqual({ ok: false, reason: "gated" });
+      expect(await open("metrics")).toEqual({ ok: false, reason: "gated" });
       expect(router.push).not.toHaveBeenCalled();
-      expect(await autoOpen("logs")).toMatchObject({ ok: true });
+      expect(await open("logs")).toMatchObject({ ok: true });
       expect(router.push).toHaveBeenCalledTimes(1);
     });
   });

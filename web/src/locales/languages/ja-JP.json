@@ -3983,7 +3983,7 @@
           "note": "自動化されたSRE運用と洞察"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "インテリジェントなクエリと分析の支援"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "予期しないエラーが発生しました",
       "toolExecutionFailed": "ツールの実行に失敗しました",
       "errorOccurred": "エラーが発生しました",
-      "navigateConfirmQuestion": "@:{'brand.autobot'} がナビゲートすることを許可しますか？",
       "confirmToolExecution": "{tool} の実行を確認しますか？",
       "entity": {
         "alert": "アラート",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "AI を使い続けるにはサブスクライブしてください。以降の使用量はこの組織の請求書に請求されます。",
     "aiContractExhaustedMessage": "AIクレジットを追加するには、アカウントマネージャーにお問い合わせください",
     "aiPayerSubscribeMessage": "この組織の請求は {payer} が管理しています。サブスクライブするには {payer} の管理者に依頼してください。以降の使用量はその請求書に請求されます。",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} とクエリ生成: {chat} · @:{'brand.autobotInvestigate'}: {incident} · 再分析: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} とクエリ生成: {chat} · @:{'brand.autobotInvestigate'}: {incident} · 再分析: {reanalysis}",
     "aiPaygMessage": "無料クレジットを使い切りました — 使用量はサブスクリプションに請求されます",
     "billingGroup": {
       "tabLabel": "請求グループ",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "必要なすべての組織で有料利用が有効になっていません。",
     "updateFailed": "有料のAI使用を更新できませんでした。もう一度お試しください。",
     "declinedNotice": "有料のAI使用がオフのため、このリクエストは送信されませんでした。",
-    "consentScope": "組織全体に適用されます：@:{'brand.askAutobot'}、クエリ生成、インシデント分析。プランページでいつでもオフにできます。",
+    "consentScope": "組織全体に適用されます：@:{'brand.autobot'}、クエリ生成、インシデント分析。プランページでいつでもオフにできます。",
     "managePaidUsage": "有料使用を有効にする",
     "modePayAsYouGo": "従量課金",
     "modeConsentRequired": "承認が必要",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "オートナビゲーション",
-        "enabledTooltip": "自動ナビゲーション有効-{product}は確認なしで自動ナビゲートします",
-        "disabledTooltip": "オートナビゲーション無効-{product}はナビゲートする前に確認する"
-      }
-    }
+    "composer": {}
   }
 }

@@ -155,7 +155,7 @@ describe("AssistantToolsetForm", () => {
     confirm.mockResolvedValue(false);
     const w = (wrapper = await mountForm({ editId: "ts_2" }));
     expect(w.find('[data-test="ai-toolset-cli-approval-line"]').text()).toContain(
-      "Members see an approval card",
+      "Members approve the exact command",
     );
     await w.find('[data-test="ai-toolset-cli-approval-btn"]').trigger("click");
     await settle();
@@ -308,7 +308,7 @@ describe("AssistantToolsetForm", () => {
     expect(w.emitted("forbidden")).toHaveLength(1);
   });
 
-  it("previews the agent name and names the org in the create toast", async () => {
+  it("previews the agent name and confirms the create in a toast", async () => {
     const w = (wrapper = await mountForm({}));
     await w.find('[data-test="ai-toolset-name-input"] input').setValue("My_Tool");
     await settle();
@@ -323,7 +323,7 @@ describe("AssistantToolsetForm", () => {
     );
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: `Toolset added. ${en.brand.autobot} and incident analysis in Acme can use it from the next answer.`,
+        message: "Toolset added",
       }),
     );
   });

@@ -15,15 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OTag
-    type="assistantContext"
-    :label="agentName(agent, t)"
-    :icon="agentGlyph[agent]"
-    :disabled="disabled"
-    class="shrink-0"
+  <span
+    :class="[AGENT_TEXT_CLASS, disabled ? 'text-text-body' : 'text-text-secondary']"
     data-test="assistant-agent-pill"
     :data-agent="agent"
-  />
+    >{{ agentName(agent, t) }}</span
+  >
 </template>
 
 <script lang="ts">
@@ -33,16 +30,23 @@ import type { AgentId } from "@/composables/assistant";
 export const AGENT_PICKER_CLASS =
   "bg-surface-subtle! text-text-heading! enabled:hover:bg-button-ghost-subtle-hover-bg! enabled:active:bg-button-ghost-subtle-active-bg! aria-expanded:bg-button-ghost-subtle-hover-bg! disabled:opacity-45";
 
+export const AGENT_SHORT_CLASS = "inline-block max-w-[12ch] truncate align-bottom";
+
+// Plain text and a chevron: the agent is a quiet setting, so it never outweighs the message.
+export const AGENT_TRIGGER_CLASS =
+  "text-text-secondary! enabled:hover:text-text-body! aria-expanded:text-text-body! bg-transparent! enabled:hover:bg-transparent! enabled:active:bg-transparent! ps-1.5! pe-1! gap-0.5! font-normal shrink-0";
+
+const AGENT_TEXT_CLASS = "inline-flex h-7 shrink-0 items-center px-1.5 text-xs";
+
 export interface AssistantAgentPillProps {
   agent: AgentId;
+  /** Held under a decision: the box is tinted, where secondary text misses 4.5:1, so the name reads as body text. */
   disabled?: boolean;
 }
 </script>
 
 <script setup lang="ts">
-import { agentGlyph } from "@/components/ai-assistant/common/glyphs";
 import { agentName } from "@/composables/assistant/pure";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 withDefaults(defineProps<AssistantAgentPillProps>(), { disabled: false });

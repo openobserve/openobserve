@@ -16,9 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    ref="root"
     :class="['relative min-w-0', sweeping ? ASSISTANT_MOTION.sweep : '']"
     data-test="assistant-composer-frame"
     :data-state="state"
+    :data-listening="listening ? '' : undefined"
   >
     <OTextarea
       ref="textbox"
@@ -33,21 +35,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? { ...fieldAttrs, class: `${fieldAttrs.class} ${CORNER_FIELD_CLASS}` }
           : fieldAttrs
       "
-      :class="[FRAME_CLASS, inert ? INERT_CLASS : '']"
+      :class="[FRAME_CLASS, inert ? INERT_CLASS : '', listening ? LISTENING_CLASS : '']"
       @update:model-value="(value: string) => emit('update:modelValue', value)"
     >
       <template #header>
-        <slot name="strip" />
-        <!-- The corner holds the ⓘ without a row of its own; the field's end padding keeps text clear of it -->
+        <div v-if="$slots.strip" :class="['min-w-0', $slots.corner ? 'pe-7' : '']">
+          <slot name="strip" />
+        </div>
+      </template>
+      <template #footer>
+        <!-- Drawn at the top corner but placed after the field, so Tab reaches the text first -->
         <span
           v-if="$slots.corner"
-          class="absolute end-1 top-1 flex"
+          class="absolute end-2 top-3 flex max-md:top-1 pointer-coarse:top-1"
           data-test="assistant-composer-corner"
         >
           <slot name="corner" />
         </span>
-      </template>
-      <template #footer>
         <slot name="bar" />
       </template>
     </OTextarea>
@@ -65,33 +69,36 @@ export interface AssistantComposerFrameProps {
   opening?: boolean;
   /** Attributes for the textarea itself; `class` adds to the frame's own. */
   inputAttrs?: Record<string, string | number | boolean | undefined>;
-  /** Both composers start three lines tall. */
-  tall?: boolean;
+  /** The mic is live: the border turns the recording colour so nobody misses it. */
+  listening?: boolean;
 }
 
 export interface AssistantComposerFrameEmits {
   (e: "update:modelValue", value: string): void;
 }
 
-/** Six lines, then the field scrolls (K4). */
+/** One line at rest, six as it grows, then the field scrolls (K4). */
 export const MAX_ROWS = 6;
 
 // OTextarea's bordered box is its only div child here, so the frame styles it from the root until the lib grows a frame variant.
 const FRAME_CLASS = [
-  "[&>div]:rounded-surface [&>div]:border-border-default [&>div]:gap-0.5 [&>div]:px-2 [&>div]:pt-1.5 [&>div]:pb-2",
+  "[&>div]:rounded-surface [&>div]:border-border-default [&>div]:gap-1 [&>div]:px-2 [&>div]:pt-2.5 [&>div]:pb-2",
   "[&>div]:ring-offset-0 [&>div]:motion-reduce:transition-none [&>div]:focus-within:border-input-border-focus [&>div]:focus-within:ring-1 [&>div]:focus-within:ring-focus-ring-accent",
 ].join(" ");
 
 const INERT_CLASS = "[&>div]:bg-surface-subtle";
 
-const FIELD_CLASS = "px-1! py-0! my-0.5! max-h-36! text-sm leading-6! basis-auto!";
+const LISTENING_CLASS =
+  "[&>div]:border-status-error-text! [&>div]:ring-1 [&>div]:ring-status-error-text! [&>div]:focus-within:border-status-error-text! [&>div]:focus-within:ring-status-error-text!";
 
-// Clears the corner button: its width and inset less the box's own end padding, plus a hair.
-const CORNER_FIELD_CLASS = "pe-7! max-md:pe-11! pointer-coarse:pe-11!";
+const FIELD_CLASS = "px-1.5! py-0! my-1! min-h-6 max-h-36! text-sm leading-6! basis-auto!";
+
+// Clears the corner button, which shares the box's end padding with Send.
+const CORNER_FIELD_CLASS = "pe-8! max-md:pe-11! pointer-coarse:pe-11!";
 </script>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 import {
   ASSISTANT_MOTION,
@@ -106,7 +113,7 @@ const props = withDefaults(defineProps<AssistantComposerFrameProps>(), {
   inert: false,
   opening: false,
   inputAttrs: () => ({}),
-  tall: false,
+  listening: false,
 });
 
 const emit = defineEmits<AssistantComposerFrameEmits>();
@@ -125,8 +132,20 @@ const textbox = ref<InstanceType<typeof OTextarea> | null>(null);
 
 const fieldAttrs = computed(() => ({
   ...props.inputAttrs,
-  class: [FIELD_CLASS, props.tall ? "min-h-18" : "min-h-6", props.inputAttrs.class ?? ""].join(" "),
+  class: [FIELD_CLASS, props.inputAttrs.class ?? ""].join(" "),
 }));
+
+const root = ref<HTMLElement | null>(null);
+
+// The field is one line tall, so a tap on the box that is not a control lands in it; Tab reaches the field itself.
+function focusFromFrame(event: MouseEvent): void {
+  const control = (event.target as Element | null)?.closest("button, a, input, textarea, [role]");
+  if (control && root.value?.contains(control)) return;
+  textbox.value?.focus();
+}
+
+onMounted(() => root.value?.addEventListener("click", focusFromFrame));
+onBeforeUnmount(() => root.value?.removeEventListener("click", focusFromFrame));
 
 defineExpose({
   focus: (options?: FocusOptions) => textbox.value?.focus(options),

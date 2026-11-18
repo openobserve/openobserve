@@ -130,7 +130,7 @@ describe("AssistantThreadHeader", () => {
     expect(wrapper.find('[data-test="assistant-mark"]').exists()).toBe(false);
   });
 
-  it("draws the title as a menu button, with no + in an empty chat", async () => {
+  it("draws the title as a menu button, with + drawn but unavailable in an empty chat", async () => {
     const { wrapper } = await setup({}, { messages: false });
     const heading = wrapper.get('[data-test="assistant-thread-title"]');
     expect(heading.element.tagName).toBe("H2");
@@ -138,8 +138,34 @@ describe("AssistantThreadHeader", () => {
     const button = wrapper.get(title);
     expect(button.attributes("aria-haspopup")).toBe("menu");
     expect(button.attributes("aria-label")).toBe("New chat, chats and chat actions");
-    expect(wrapper.find('[data-test="assistant-thread-new"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="assistant-thread-new"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
     expect(wrapper.find('[data-test="assistant-thread-menu-rename"]').exists()).toBe(false);
+  });
+
+  it("disables a window's New chat at the window cap and says why", async () => {
+    const { wrapper, store } = await setup({ placement: "window", container: "window" });
+    const button = () => wrapper.get('[data-test="assistant-thread-new"]');
+    expect(button().attributes("aria-disabled")).not.toBe("true");
+    store.state.shell.windows = Array.from({ length: 4 }, (_, i) => ({ sid: `w${i}` }) as never);
+    await flushPromises();
+    expect(button().attributes("aria-disabled")).toBe("true");
+    expect(wrapper.text() + document.body.textContent).toContain("Close a chat to start a new one");
+  });
+
+  it("offers New chat once an empty chat holds an image or a chip, not only typed text", async () => {
+    const { wrapper, store, sid } = await setup({}, { messages: false });
+    const ready = () =>
+      wrapper.get('[data-test="assistant-thread-new"]').attributes("aria-disabled") !== "true";
+    expect(ready()).toBe(false);
+    store.state.sessions[sid].composer.images = [{ id: "i1" } as never];
+    await flushPromises();
+    expect(ready()).toBe(true);
+    store.state.sessions[sid].composer.images = [];
+    store.state.sessions[sid].composer.chips = [{ id: "c1" } as never];
+    await flushPromises();
+    expect(ready()).toBe(true);
   });
 
   it("hangs the title tooltip on the whole title button, not on its chevron", async () => {
@@ -326,17 +352,22 @@ describe("AssistantThreadHeader", () => {
     expect(wrapper.find('[data-test="assistant-thread-menu-rename"]').exists()).toBe(true);
   });
 
-  it("folds Layout into the title menu below 24 rem, and the tag under the chat's name", async () => {
+  it("keeps Layout on the bar below 24 rem, and the tag under the chat's name", async () => {
     const { wrapper, store, sid } = await setup({ narrow: true });
     store.state.sessions[sid].turn = { state: "done", saved: "not_saved" };
     await nextTick();
-    expect(wrapper.find('[data-test="assistant-title-menu-layout"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-title-menu-layout"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-thread-save-tag"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="assistant-title-menu-header"]').text()).toContain("Not saved");
   });
 
+  it("folds Layout into the title menu only on a sheet", async () => {
+    const { wrapper } = await setup({ placement: "sheet" });
+    expect(wrapper.find('[data-test="assistant-title-menu-layout"]').exists()).toBe(true);
+  });
+
   it("shows a single move as a direct item, with no one-row Layout submenu", async () => {
-    const { wrapper } = await setup({ narrow: true, layoutDirect: true });
+    const { wrapper } = await setup({ placement: "sheet", layoutDirect: true });
     expect(wrapper.find('[data-test="layout-stub"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-title-menu-layout"]').exists()).toBe(false);
   });
@@ -373,27 +404,28 @@ describe("AssistantThreadHeader", () => {
   describe("as a toolbar", () => {
     const toolbar = { placement: "full", container: "full_view", toolbar: true } as const;
 
-    it("leads with the chat's title as the page heading, then the container's controls before More, and no +", async () => {
+    it("leads with the chat's title as the page heading, then +, the container's controls and More", async () => {
       const { wrapper } = await setup(toolbar);
       const heading = wrapper.get('[data-test="assistant-thread-heading"]');
       expect(heading.attributes("role")).toBe("heading");
       expect(heading.attributes("aria-level")).toBe("1");
       expect(heading.text()).not.toBe("");
       expect(wrapper.find(title).exists()).toBe(false);
-      expect(wrapper.find('[data-test="assistant-thread-new"]').exists()).toBe(false);
       const ids = wrapper
         .findAll("button")
         .map((b) => b.attributes("data-test"))
-        .filter((id) => ["close-stub", "assistant-thread-more"].includes(id ?? ""));
-      expect(ids).toEqual(["close-stub", "assistant-thread-more"]);
+        .filter((id) =>
+          ["assistant-thread-new", "close-stub", "assistant-thread-more"].includes(id ?? ""),
+        );
+      expect(ids).toEqual(["assistant-thread-new", "close-stub", "assistant-thread-more"]);
       const more = wrapper.get('[data-test="assistant-thread-more"]');
-      expect(more.attributes("aria-label")).toBe("More Actions");
+      expect(more.attributes("aria-label")).toBe("More actions");
       expect(more.attributes("aria-haspopup")).toBe("menu");
       expect(wrapper.find('[data-test="assistant-title-menu-all"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="layout-stub"]').exists()).toBe(false);
     });
 
-    it("puts New Chat first where no rail lists the chats", async () => {
+    it("puts New Chat first below lg too", async () => {
       lg.value = false;
       const { wrapper, newChat } = await setup(toolbar);
       const ids = wrapper
@@ -404,7 +436,7 @@ describe("AssistantThreadHeader", () => {
         );
       expect(ids).toEqual(["assistant-thread-new", "close-stub", "assistant-thread-more"]);
       const add = wrapper.get('[data-test="assistant-thread-new"]');
-      expect(add.attributes("aria-label")).toBe("New Chat");
+      expect(add.attributes("aria-label")).toBe("New chat");
       await add.trigger("click");
       expect(newChat).toHaveBeenCalledTimes(1);
       expect(wrapper.find('[data-test="assistant-title-menu-new"]').exists()).toBe(false);
@@ -536,6 +568,36 @@ describe("AssistantThreadHeader", () => {
     );
     // A phone shows the count on the header button; the title's name still says it (B-shell3-7).
     expect(mark().classes()).toContain("max-md:hidden");
+  });
+
+  it("gives a window's bar its own chat's state instead of the logo and the others' mark", async () => {
+    const { wrapper, store, sid, runs } = await setup({ placement: "window", container: "window" });
+    const own = () => wrapper.find('[data-test="assistant-thread-title-status"]');
+    expect(wrapper.find('[data-test="assistant-thread-logo"]').exists()).toBe(false);
+    expect(own().exists()).toBe(false);
+    store.state.sessions[sid].turn = { state: "responding.writing" } as never;
+    runs.rows.value = [runRow("a", { group: "needs_you" })];
+    await nextTick();
+    expect(own().attributes("data-state")).toBe("working");
+    expect(wrapper.find('[data-test="assistant-title-mark"]').exists()).toBe(false);
+    store.state.sessions[sid].turn = { state: "awaiting_approval" } as never;
+    await nextTick();
+    expect(own().attributes("data-state")).toBe("attention");
+    store.state.sessions[sid].turn = { state: "awaiting_consent" } as never;
+    await nextTick();
+    expect(own().attributes("data-state")).toBe("attention");
+  });
+
+  it("folds the moves into the title menu only in a narrow window", async () => {
+    const wide = await setup({ placement: "window", container: "window" });
+    await wide.wrapper.get(title).trigger("click");
+    await flushPromises();
+    expect(wide.wrapper.find('[data-test="layout-stub"]').exists()).toBe(false);
+    wide.wrapper.unmount();
+    const narrow = await setup({ placement: "window", container: "window", narrow: true });
+    await narrow.wrapper.get(title).trigger("click");
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="layout-stub"]')).not.toBeNull();
   });
 
   it("never marks a failed chat", async () => {

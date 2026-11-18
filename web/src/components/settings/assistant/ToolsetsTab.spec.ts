@@ -129,7 +129,7 @@ describe("ToolsetsTab", () => {
     expect(w.find('[data-test="ai-toolset-pagerduty-enabled"]').exists()).toBe(false);
     expect(w.find('[data-test="ai-toolset-pagerduty-test"]').exists()).toBe(false);
     expect(w.find('[data-test="ai-toolsets-footer-note"]').text()).toContain(
-      `Enabled toolsets are available to ${en.brand.autobot} and to incident analysis`,
+      `Used by ${en.brand.autobot} and incident analysis`,
     );
     expect(w.find('[data-test="settings-assistant-mcp-link"]').exists()).toBe(true);
   });
@@ -216,7 +216,7 @@ describe("ToolsetsTab", () => {
     await settle();
     expect(toast).not.toHaveBeenCalled();
     expect(w.find('[data-test="ai-toolsets-view-only"]').text()).toBe(
-      "You can view toolsets. Editing needs the Toolsets permission in IAM › Roles.",
+      "View only. Editing needs the Toolsets permission.",
     );
     expect(w.find('[data-test="ai-toolsets-add-btn"]').exists()).toBe(false);
     expect(w.find('[data-test="ai-toolset-pagerduty-delete"]').exists()).toBe(false);

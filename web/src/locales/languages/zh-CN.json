@@ -3983,7 +3983,7 @@
           "note": "自动化 SRE 操作和见解"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "智能查询和分析协助"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "发生意外错误",
       "toolExecutionFailed": "工具执行失败",
       "errorOccurred": "发生错误",
-      "navigateConfirmQuestion": "允许 @:{'brand.autobot'} 进行导航吗？",
       "confirmToolExecution": "确认执行 {tool} 吗？",
       "entity": {
         "alert": "告警",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "订阅后可继续使用 AI。后续用量将计入本组织的账单。",
     "aiContractExhaustedMessage": "联系您的客户经理以添加更多 AI 积分",
     "aiPayerSubscribeMessage": "本组织的账单由 {payer} 管理。请让 {payer} 的管理员进行订阅；后续用量将计入其账单。",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} 与查询生成：{chat} · @:{'brand.autobotInvestigate'}：{incident} · 重新分析：{reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} 与查询生成：{chat} · @:{'brand.autobotInvestigate'}：{incident} · 重新分析：{reanalysis}",
     "aiPaygMessage": "免费积分已用尽 — 使用量计入订阅账单",
     "billingGroup": {
       "tabLabel": "账单组",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "并非所有必需的组织都已启用付费使用。",
     "updateFailed": "无法更新付费 AI 使用设置。请重试。",
     "declinedNotice": "付费 AI 使用已关闭，因此未发送此请求。",
-    "consentScope": "适用于整个组织：@:{'brand.askAutobot'}、查询生成和事件分析。您可以随时在计划页面关闭。",
+    "consentScope": "适用于整个组织：@:{'brand.autobot'}、查询生成和事件分析。您可以随时在计划页面关闭。",
     "managePaidUsage": "开启付费使用",
     "modePayAsYouGo": "按量付费",
     "modeConsentRequired": "需要授权",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "自动导航",
-        "enabledTooltip": "启用自动导航-{product} 无需确认即可自动导航",
-        "disabledTooltip": "自动导航已禁用-{product} 会在导航前询问"
-      }
-    }
+    "composer": {}
   }
 }

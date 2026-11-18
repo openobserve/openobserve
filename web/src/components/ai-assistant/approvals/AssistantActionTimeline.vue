@@ -66,8 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag variant="default-soft" size="xs" :label="t('assistant.actions.noReview')" />
           </li>
         </ul>
-        <OText v-if="anyApplied" variant="meta" as="p" data-test="assistant-action-timeline-limits">
-          {{ anyUndoable ? t("assistant.actions.undoLimits") : t("assistant.actions.undoNotYet") }}
+        <OText v-if="limitsLine" variant="meta" as="p" data-test="assistant-action-timeline-limits">
+          {{ limitsLine }}
         </OText>
       </div>
     </OCollapsible>
@@ -82,6 +82,7 @@ import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget
 import {
   approvalVerb,
   entityKeyOf,
+  undoLimitsApply,
   type ActionLedgerEntry,
   type PolicyBlockData,
   type Sid,
@@ -118,6 +119,14 @@ const anyUndoable = computed(() =>
 const anyApplied = computed(
   () => !!props.unreviewed.length || props.entries.some((entry) => entry.status !== "failed"),
 );
+const limitsLine = computed(() => {
+  if (!anyApplied.value) return null;
+  if (!anyUndoable.value) return t("assistant.actions.undoNotYet");
+  const applied = props.entries.filter((entry) => entry.status !== "failed");
+  return props.unreviewed.length || undoLimitsApply(applied)
+    ? t("assistant.actions.undoLimits")
+    : null;
+});
 
 const rows = computed(() =>
   props.entries.map((entry) => {

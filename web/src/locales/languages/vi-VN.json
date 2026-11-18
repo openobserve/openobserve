@@ -3983,7 +3983,7 @@
           "note": "Vận hành và phân tích SRE tự động"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "Hỗ trợ truy vấn và phân tích thông minh"
         },
         "anomaly_detection": {
@@ -10622,7 +10622,6 @@
       "unexpectedError": "Đã xảy ra lỗi không mong muốn",
       "toolExecutionFailed": "Thực thi công cụ thất bại",
       "errorOccurred": "Đã xảy ra lỗi",
-      "navigateConfirmQuestion": "Cho phép @:{'brand.autobot'} điều hướng?",
       "confirmToolExecution": "Xác nhận thực thi {tool}?",
       "entity": {
         "alert": "cảnh báo",
@@ -10727,7 +10726,7 @@
     "aiExhaustedMessage": "Đăng ký để tiếp tục sử dụng AI. Phần sử dụng thêm sẽ được tính vào hóa đơn của tổ chức này.",
     "aiContractExhaustedMessage": "Liên hệ với quản lý tài khoản của bạn để thêm tín dụng AI",
     "aiPayerSubscribeMessage": "Việc thanh toán cho tổ chức này do {payer} quản lý. Hãy yêu cầu quản trị viên của {payer} đăng ký; phần sử dụng thêm sẽ được tính vào hóa đơn của tổ chức đó.",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} và tạo truy vấn: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Phân tích lại: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} và tạo truy vấn: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Phân tích lại: {reanalysis}",
     "aiPaygMessage": "Tín dụng miễn phí đã hết — mức sử dụng được tính vào đăng ký",
     "billingGroup": {
       "tabLabel": "Nhóm thanh toán",
@@ -27819,7 +27818,7 @@
     "consentStillRequired": "Sử dụng có phí chưa được bật cho mọi tổ chức bắt buộc.",
     "updateFailed": "Không thể cập nhật sử dụng AI trả phí. Vui lòng thử lại.",
     "declinedNotice": "Sử dụng AI trả phí đang tắt, nên yêu cầu này chưa được gửi.",
-    "consentScope": "Áp dụng cho toàn bộ tổ chức: @:{'brand.askAutobot'}, tạo truy vấn và phân tích sự cố. Bạn có thể tắt bất cứ lúc nào trên trang Gói dịch vụ.",
+    "consentScope": "Áp dụng cho toàn bộ tổ chức: @:{'brand.autobot'}, tạo truy vấn và phân tích sự cố. Bạn có thể tắt bất cứ lúc nào trên trang Gói dịch vụ.",
     "managePaidUsage": "Bật sử dụng trả phí",
     "modePayAsYouGo": "Trả theo mức dùng",
     "modeConsentRequired": "Cần ủy quyền",
@@ -30156,12 +30155,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "Tự động điều hướng",
-        "enabledTooltip": "Đã bật tự động điều hướng - {product} sẽ tự động điều hướng mà không cần xác nhận",
-        "disabledTooltip": "Đã tắt tự động điều hướng - {product} sẽ hỏi trước khi điều hướng"
-      }
-    }
+    "composer": {}
   }
 }

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OText as="span" variant="meta" aria-hidden="true">
       {{ t("assistant.transcript.followUps") }}
     </OText>
-    <div class="divide-border-subtle flex min-w-0 flex-col divide-y">
+    <div class="flex min-w-0 flex-col" data-test="assistant-follow-up-list">
       <button
         v-for="item in items"
         :key="item"

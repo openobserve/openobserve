@@ -42,6 +42,18 @@ import brandLocale from "@/locales/languages/en-US.json";
 
 const brandNames = brandLocale.brand;
 
+const liveRoute = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
+vi.mock("../runtime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../runtime")>();
+  return {
+    ...actual,
+    getAssistantRuntime: () =>
+      liveRoute.current
+        ? { context: { value: { router: { currentRoute: { value: liveRoute.current } } } } }
+        : actual.getAssistantRuntime(),
+  };
+});
+
 const capability = { gate: "available", persistence: true } as AssistantCapability;
 
 let scope: EffectScope;
@@ -78,6 +90,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  liveRoute.current = null;
   scope.stop();
   resetAssistantContextForTests();
   contextRegistry.cleanup();
@@ -89,7 +102,7 @@ describe("useAssistantContext", () => {
     const view = mountContext(async () => PAGE_CONTEXTS.logs);
     await flushPromises();
     expect(view.chips.value.map((chip) => chip.label)).toEqual([
-      "Time · last 15 min",
+      "Time · past 15 min",
       "Stream · default",
       "SQL · default",
     ]);
@@ -107,11 +120,40 @@ describe("useAssistantContext", () => {
       timeRange: { ...PAGE_CONTEXTS.logs.timeRange, relativeTimePeriod: "1h" },
     };
     await vi.advanceTimersByTimeAsync(PAGE_POLL_MS);
-    expect(view.timeChip.value.label).toBe("Time · last 1 h");
+    expect(view.timeChip.value.label).toBe("Time · past 1 h");
     store.setTimeOverride(sid, { from: 0, to: 86_400_000, period: "24h" });
     page = { ...page, timeRange: { ...page.timeRange, relativeTimePeriod: "7d" } };
     await vi.advanceTimersByTimeAsync(PAGE_POLL_MS);
-    expect(view.timeChip.value).toMatchObject({ label: "Time · last 24 h", secondary: "custom" });
+    expect(view.timeChip.value).toMatchObject({ label: "Time · past 24 h", secondary: "custom" });
+  });
+
+  it("lists a hand-off's pinned values, and drops one the user removed", async () => {
+    const view = mountContext(async () => PAGE_CONTEXTS.logs);
+    await flushPromises();
+    store.state.sessions[sid].pinnedContext = {
+      selectedStreams: ["checkout"],
+      traceId: "t1",
+      currentQuery: "service = 'api'",
+      currentPage: "incidents",
+    };
+    const value = (id: string) => view.sees.value.find((row) => row.id === id)?.value;
+    expect(String(value("currentPage"))).toMatch(/incident/i);
+    const group = (id: string) => view.sees.value.find((row) => row.id === id)?.group;
+    expect(value("selectedStreams")).toContain("checkout");
+    expect(value("traceId")).toBe("t1");
+    expect(group("traceId")).toBe("sent");
+    expect(group("currentQuery")).toBe("sent");
+    store.setDraft(sid, { removedPageKeys: ["selectedStreams"] });
+    expect(value("selectedStreams")).toBeUndefined();
+  });
+
+  it("names a pinned page by its own title, not the title of the route the user is on", async () => {
+    liveRoute.current = { fullPath: "/", meta: { titleKey: "menu.home" } };
+    const view = mountContext(async () => PAGE_CONTEXTS.logs);
+    await flushPromises();
+    store.state.sessions[sid].pinnedContext = { currentPage: "incidents" };
+    const page = view.sees.value.find((row) => row.id === "currentPage")?.value;
+    expect(String(page)).toBe("incidents");
   });
 
   it("turns a removed page chip into a ghost for this chat only (CT-01 AC 7)", async () => {
@@ -143,15 +185,15 @@ describe("useAssistantContext", () => {
     await flushPromises();
     sentWindows.set(sid, { from: 0, to: 600_000, period: "10m", source: "page" });
     store.state.sessions[sid].turn = { state: "connecting" } as never;
-    expect(view.timeChip.value.label).toBe("Time · last 10 min");
+    expect(view.timeChip.value.label).toBe("Time · past 10 min");
     store.state.sessions[sid].turn = { state: "done", saved: "server" };
-    expect(view.timeChip.value.label).toBe("Time · last 15 min");
+    expect(view.timeChip.value.label).toBe("Time · past 15 min");
   });
 
   it("summarises the scope for the placeholder, and says when there is none (CT-01 AC 10)", async () => {
     const view = mountContext(async () => PAGE_CONTEXTS.logs);
     await flushPromises();
-    expect(view.summary.value).toBe("default · last 15 min");
+    expect(view.summary.value).toBe("default · past 15 min");
     expect(view.noScope.value).toBe(false);
     store.setDraft(sid, { removedPageKeys: ["selectedStreams"] });
     expect(view.noScope.value).toBe(true);

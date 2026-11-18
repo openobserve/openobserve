@@ -42,15 +42,22 @@ export {
   HOME_TAB_QUERY_KEY,
   THREAD_QUERY_KEY,
   fullThreadLocation,
+  fullTabPending,
   homeAskLocation,
   isFullThreadRoute,
   isHomeAskShown,
+  leaveFullTabHandoff,
+  movedToTab,
   pushFromThread,
+  startingOver,
+  startOverOnHost,
+  takeFullTabHandoff,
   threadHost,
   threadParam,
   withoutThread,
   homeQueryFrom,
 } from "./fullThreadRoute";
+export type { FullTabHandoff } from "./fullThreadRoute";
 export { INLINE_HOST_IDS, isDockHostId } from "./hostIds";
 export { openTabWithoutOpener } from "./openTab";
 export { answerTextOf, lastAnswerOf, markdownMessage } from "./answers";
@@ -176,7 +183,7 @@ export type {
   StepResult,
 } from "./evidence";
 export type { QueryRun } from "./actions/appliers/query";
-export { canAlwaysAllow, recordedLedger } from "./actions/appliers/approval";
+export { approvalCardOf, canAlwaysAllow, recordedLedger } from "./actions/appliers/approval";
 export {
   approvalDiff,
   approvalCoversTargets,
@@ -205,6 +212,7 @@ export {
   approvalTargetHref,
   approvalVerbText,
   entityKeyOf,
+  undoLimitsApply,
 } from "./useAssistantApprovals";
 export type {
   ApprovalBlockData,

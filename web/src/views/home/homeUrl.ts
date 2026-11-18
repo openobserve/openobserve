@@ -29,9 +29,6 @@ const PERIOD_UNIT_MS: Record<string, number> = {
   M: 2_592_000_000,
 };
 
-/** Home opens on the window its baselines are read against. */
-export const DEFAULT_HOME_RANGE: HomeRange = { type: "relative", period: "24h" };
-
 /** The Overview's range as the picker emits it; absolute bounds in microseconds. */
 export type HomeRange =
   { type: "relative"; period: string } | { type: "absolute"; from: number; to: number };
@@ -76,4 +73,10 @@ export function periodToMs(period: string): number {
 /** The period the assistant reads a relative Home range as; `null` for an absolute one. */
 export function homePeriodOf(range: HomeRange): HomePeriod | null {
   return range.type === "relative" ? { period: range.period, ms: periodToMs(range.period) } : null;
+}
+
+/** A thread on Home follows only a range the URL names; without one it reads the assistant's default window. */
+export function threadPeriodOf(query: LocationQuery): HomePeriod | null {
+  const range = readHomeUrl(query).range;
+  return range ? homePeriodOf(range) : null;
 }

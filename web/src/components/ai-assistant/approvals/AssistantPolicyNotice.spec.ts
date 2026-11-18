@@ -55,7 +55,7 @@ describe("AssistantPolicyNotice", () => {
     const notice = wrapper.get('[data-test="assistant-permission-denied"]');
     expect(notice.text()).toContain("Blocked by policy: o2_UpdateAlert. Writes are off.");
     expect(notice.text()).toContain(
-      `An admin can allow it in Settings › ${brandNames.askAutobot} › Permissions.`,
+      `An admin can allow it in Settings › ${brandNames.autobot} › Permissions.`,
     );
     expect(track).toHaveBeenCalledWith("ai_policy_notice", { kind: "permission_denied" });
   });
@@ -65,9 +65,7 @@ describe("AssistantPolicyNotice", () => {
       policy: { kind: "denied", tool: "bash", policy: "auto_reject" },
     });
     expect(wrapper.text()).toContain("Blocked by policy: bash.");
-    expect(wrapper.text()).toContain(
-      `Auto-declined by the safety settings of ${brandNames.autobot}`,
-    );
+    expect(wrapper.text()).toContain(`Declined by ${brandNames.autobot} safety settings`);
   });
 
   it("surfaces a change made without a review step, with the object in a new tab", () => {

@@ -41,6 +41,7 @@ import { createHistoryMutations } from "./historyMutations";
 import { createHistoryRecords } from "./historyRecords";
 import { readClearOnSignOut, takeKeptOnSignOut, writeClearOnSignOut } from "./prefs";
 import type { StoredTurn } from "./record";
+import type { ApprovalBlockData } from "./reducer";
 import { getAssistantRuntime } from "./runtime";
 
 export { isHelperChat, originOf } from "./historyContext";
@@ -93,6 +94,8 @@ export interface AssistantHistory extends HistoryService {
   clearDeletedNotice(): void;
   elsewhere(sid: Sid | null): ElsewhereView | null;
   refreshElsewhere(sid: Sid): void;
+  /** Holds the card a Full page hand-off carried, so this tab can answer it too. */
+  takeHandedCard(sid: Sid, turnId: string, card: ApprovalBlockData): void;
   /** Local mode, all 100 pinned: the chat keeps going in memory with "· not saved". */
   notSaved(sid: Sid | null): boolean;
   importView: ComputedRef<ImportView | null>;

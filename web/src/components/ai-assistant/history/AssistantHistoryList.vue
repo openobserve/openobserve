@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="xs"
         icon-right="close"
-        class="h-6! rounded-full!"
+        class="h-6!"
         :aria-label="
           t('assistant.history.filter.remove', { filter: raw(String(activeMenuView.label)) })
         "
@@ -268,6 +268,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </AssistantErrorRow>
         <OEmptyState
+          v-else-if="investigationsOnly && !drawn.length && !query && !history.hasMore.value"
+          size="inline"
+          :backdrop="false"
+          :title="t('assistant.history.investigationsEmpty')"
+          data-test="assistant-history-investigations-empty"
+        />
+        <OEmptyState
           v-else-if="!history.rows.value.length && !drawn.length && !query"
           size="inline"
           :backdrop="false"
@@ -323,6 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge
                     v-if="COUNTED_GROUPS.has(item.id)"
                     size="sm"
+                    shape="rounded"
                     :data-test="`assistant-history-${item.id}-count`"
                     >{{ groupCount(item.id) }}</OBadge
                   >
@@ -366,6 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OBadge
                   v-if="COUNTED_GROUPS.has(group.id)"
                   size="sm"
+                  shape="rounded"
                   :data-test="`assistant-history-${group.id}-count`"
                   >{{ group.rows.length }}</OBadge
                 >
@@ -391,12 +400,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
         </ul>
         <OButton
-          v-if="history.hasMore.value && drawn.length && !endScope"
+          v-if="history.hasMore.value && (drawn.length || investigationsOnly) && !endScope"
           variant="ghost-primary"
           size="xs"
           class="mt-1 max-md:min-h-11 pointer-coarse:min-h-11"
           data-test="assistant-history-load-older"
-          @click="loadOlder"
+          @click="loadOlder()"
         >
           {{ t("assistant.history.loadOlder") }}
         </OButton>
@@ -424,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-primary"
           size="xs"
           data-test="assistant-history-load-older"
-          @click="loadOlder"
+          @click="loadOlder()"
         >
           {{ t("assistant.history.loadOlder") }}
         </OButton>
@@ -496,6 +505,9 @@ export const FILTER_FROM = 8;
 
 export const SEARCH_DEBOUNCE_MS = 300;
 
+/** Investigations are filtered here; opening the list reads at most this many pages before Load older takes over. */
+export const INVESTIGATION_AUTO_PAGES = 5;
+
 /** From this many rows the list mounts only what is on screen. */
 export const VIRTUAL_FROM = 150;
 
@@ -521,8 +533,7 @@ const COUNTDOWN_TICK_MS = 1_000;
 const GROUP_HEADING_CLASS =
   "text-text-secondary flex items-center justify-between gap-1.5 pb-1 text-xs font-medium";
 
-// A bare list's search and filters take the Ask box's pill chips: the field's box is its first child.
-const BARE_SEARCH_CLASS = "[&>div]:h-8 [&>div]:rounded-full [&_input]:text-xs";
+const BARE_SEARCH_CLASS = "[&>div]:h-8 [&_input]:text-xs";
 
 type GroupId = (typeof GROUP_ORDER)[number];
 
@@ -825,6 +836,9 @@ onMounted(() => {
   history.ensureLoaded();
   // A filter stored before the filter row existed has no control left to clear it.
   const stored = history.filter.value;
+  // Investigations search locally, so a server search or view left by the chat list would hide them.
+  if (props.investigationsOnly && (stored.q || stored.kind !== "all" || stored.started))
+    history.setFilter({ q: "", kind: "all", agent: null, started: null });
   if (
     !props.investigationsOnly &&
     (stored.kind === "pinned" ||
@@ -878,7 +892,14 @@ function rowProps(row: HistoryRow) {
     timezone: timezone.value,
     compact: props.bare,
     quietStatus: statusOf(row) === "needs_you",
+    drafted: drafted(row.sid),
   };
+}
+
+// A chat left behind by New chat keeps its unsent text; its row says so.
+function drafted(sid: Sid): boolean {
+  const session = store.state.sessions[sid];
+  return !!session?.messages.length && !!session.composer.text.trim();
 }
 
 function agentIcon(row: HistoryRow): IconName | null {
@@ -1095,9 +1116,35 @@ function setClearOnSignOut(on: boolean): void {
   history.setClearOnSignOut(on);
 }
 
-async function loadOlder(): Promise<void> {
-  await history.loadOlder();
+// One Load older reads on until an investigation shows or history ends; the unasked run on open stops at a cap.
+let pagingOlder = false;
+async function loadOlder(maxPages = Number.POSITIVE_INFINITY): Promise<void> {
+  if (!props.investigationsOnly) return void (await history.loadOlder());
+  if (pagingOlder) return;
+  pagingOlder = true;
+  const before = drawn.value.length;
+  try {
+    // A repeated cursor reads nothing new and ends the run, so it never spins.
+    for (let page = 0; page < maxPages; page++) {
+      const read = await history.loadOlder();
+      if (!read || !history.hasMore.value || drawn.value.length > before) break;
+    }
+  } finally {
+    pagingOlder = false;
+  }
 }
+
+watch(
+  () =>
+    props.investigationsOnly &&
+    listState.value.status === "ready" &&
+    history.hasMore.value &&
+    !drawn.value.length,
+  (empty) => {
+    if (empty) void loadOlder(INVESTIGATION_AUTO_PAGES);
+  },
+  { immediate: true },
+);
 
 defineExpose({ focusSearch });
 </script>

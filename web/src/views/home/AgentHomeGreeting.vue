@@ -16,17 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex min-w-0 items-center justify-center gap-4 pt-10 pb-2 max-md:pt-6"
+    class="flex min-w-0 items-center justify-center pt-10 pb-2 max-md:pt-6"
     data-test="agent-home-greeting"
   >
-    <span class="relative inline-flex shrink-0" data-test="agent-home-greeting-mark">
-      <img
-        :src="logoSrc"
-        :alt="t('aiAssistant.welcome.taglineHighlight')"
-        class="relative size-14 max-md:size-10"
-        data-test="agent-home-greeting-logo"
-      />
-    </span>
     <div class="flex min-w-0 flex-col gap-1.5">
       <i18n-t
         v-if="displayName"
@@ -36,11 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="agent-home-greeting-text"
       >
         <template #name>
-          <span
-            class="bg-gradient-brand-ribbon [background-clip:text] text-transparent [-webkit-background-clip:text]"
-            data-test="agent-home-greeting-name"
-            >{{ displayName }}</span
-          >
+          <span data-test="agent-home-greeting-name">{{ displayName }}</span>
         </template>
       </i18n-t>
       <h2 v-else :class="HEADING_CLASS" data-test="agent-home-greeting-text">
@@ -55,9 +43,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 
 import { useGreeting } from "@/components/ai-assistant/welcome/useGreeting";
-import { useTheme } from "@/composables/useTheme";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
-import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps<{
   /** The investigate page asks what to look into instead of greeting by time of day. */
@@ -68,10 +54,6 @@ const HEADING_CLASS = "text-text-heading text-3xl leading-tight font-semibold ma
 
 const { t } = useI18nTyped();
 const vuex = useStore();
-const { isDark } = useTheme();
-const logoSrc = computed(() =>
-  getImageURL(isDark.value ? "images/common/o2_ai_logo_dark.svg" : "images/common/o2_ai_logo.svg"),
-);
 const { greeting, displayName, period } = useGreeting(() => vuex?.state.userInfo?.email);
 // The name sits in the translated sentence as a slot, so the language still decides where it goes.
 const namedKey = computed<I18nKey>(() =>

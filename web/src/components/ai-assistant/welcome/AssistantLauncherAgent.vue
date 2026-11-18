@@ -15,107 +15,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OTag
-    v-if="fixed"
-    type="assistantContext"
-    :label="agentName(fixed, t)"
-    :icon="agentGlyph[fixed]"
-    class="h-7 shrink-0"
+  <AssistantAgentPill
+    v-if="pinned || !shown"
+    :agent="current"
     data-test="assistant-launcher-agent"
-    :data-agent="fixed"
-    data-fixed=""
+    :data-fixed="pinned ? '' : undefined"
+  />
+  <ODropdown
+    v-else
+    v-model:open="menuOpen"
+    side="top"
+    align="end"
+    privacy="mask"
+    :content-class="composerPopoverClass(layout.tight)"
   >
-    <template v-if="!layout.agentIconOnly">{{ agentName(fixed, t) }}</template>
-    <OTooltip v-if="layout.agentIconOnly" :content="agentName(fixed, t)" />
-  </OTag>
-  <template v-else-if="shown">
-    <ODropdown
-      v-model:open="menuOpen"
-      side="top"
-      align="start"
-      privacy="mask"
-      :content-class="composerPopoverClass(layout.tight)"
-    >
-      <template #trigger>
-        <OTag
-          type="assistantContext"
-          :label="agentName(current, t)"
-          :icon="agentGlyph[current]"
-          clickable
-          :disabled="disabled"
-          :class="['h-7 shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
-          :aria-label="layout.agentIconOnly ? agentName(current, t) : undefined"
-          data-test="assistant-launcher-agent"
-          :data-agent="current"
-        >
-          <!-- Without room for its name the pill keeps the icon and moves the name to the tooltip, so the row never wraps -->
-          <template v-if="!layout.agentIconOnly">{{ agentName(current, t) }}</template
-          ><OIcon :name="assistantGlyph.expand" size="xs" />
-          <OTooltip v-if="layout.agentIconOnly" :content="agentName(current, t)" />
-        </OTag>
+    <template #trigger>
+      <OButton
+        variant="ghost-neutral"
+        size="xs"
+        :icon-right="assistantGlyph.expand"
+        :disabled="disabled"
+        :class="[AGENT_TRIGGER_CLASS, CHIP_HIT_AREA_CLASS]"
+        :aria-label="layout.agentIconOnly ? agentName(current, t) : undefined"
+        data-test="assistant-launcher-agent"
+        :data-agent="current"
+      >
+        <span :class="layout.agentIconOnly ? AGENT_SHORT_CLASS : ''">{{
+          agentName(current, t)
+        }}</span>
+        <OTooltip v-if="layout.agentIconOnly" :content="agentName(current, t)" />
+      </OButton>
+    </template>
+    <ODropdownGroup v-if="rows.length > 0" :label="t('assistant.agent.picker.heading')">
+      <template v-if="sharedPolicy" #label-action>
+        <span class="text-xs font-normal" data-test="assistant-launcher-agent-shared-policy">{{
+          sharedPolicy
+        }}</span>
       </template>
-      <ODropdownGroup :label="t('assistant.agent.picker.heading')">
-        <template v-if="sharedPolicy" #label-action>
-          <span class="text-xs font-normal" data-test="assistant-launcher-agent-shared-policy">{{
-            sharedPolicy
-          }}</span>
-        </template>
-        <template v-for="row in rows" :key="row.id">
-          <ODropdownItem
-            role="menuitemradio"
-            :aria-checked="row.id === current"
-            :disabled="!!row.reason"
-            focusable-unavailable
-            :text-value="row.name"
-            class="min-h-8"
-            :data-test="`assistant-launcher-agent-option-${row.id}`"
-            @select="choose(row)"
-          >
-            <template #icon-left>
-              <OIcon
-                :name="row.reason ? assistantGlyph.locked : agentGlyph[row.id]"
+      <template v-for="row in rows" :key="row.id">
+        <ODropdownItem
+          role="menuitemradio"
+          :aria-checked="row.id === current"
+          :disabled="!!row.reason"
+          focusable-unavailable
+          :text-value="row.name"
+          class="min-h-8"
+          :data-test="`assistant-launcher-agent-option-${row.id}`"
+          @select="choose(row)"
+        >
+          <template #icon-left>
+            <OIcon
+              :name="row.reason ? assistantGlyph.locked : agentGlyph[row.id]"
+              size="xs"
+              class="text-text-secondary"
+            />
+          </template>
+          <span class="flex min-w-0 flex-1 flex-col items-start text-start">
+            <span :class="['text-sm', row.reason ? 'text-text-secondary' : '']">{{
+              row.name
+            }}</span>
+            <span
+              v-if="row.askAdmin || row.reason"
+              class="text-text-secondary min-w-0 text-xs"
+              data-test="assistant-launcher-agent-option-clause"
+              >{{ row.askAdmin ? t("assistant.agent.unavailable.short") : row.reason }}</span
+            >
+          </span>
+          <template v-if="row.id === current" #icon-right>
+            <OIcon
+              :name="assistantGlyph.done"
+              size="sm"
+              class="text-assistant-link ms-auto"
+              data-test="assistant-launcher-agent-option-checked"
+            />
+          </template>
+        </ODropdownItem>
+        <div v-if="row.askAdmin" class="flex justify-end px-3 pb-1">
+          <AssistantAskAdminPopover kind="agent_access" :org="org" :agent="String(row.name)">
+            <template #trigger>
+              <OButton
+                variant="ghost-primary"
                 size="xs"
-                class="text-text-secondary"
-              />
-            </template>
-            <span class="flex min-w-0 flex-1 flex-col items-start text-start">
-              <span :class="['text-sm', row.reason ? 'text-text-secondary' : '']">{{
-                row.name
-              }}</span>
-              <span
-                v-if="row.askAdmin || row.reason"
-                class="text-text-secondary min-w-0 text-xs"
-                data-test="assistant-launcher-agent-option-clause"
-                >{{ row.askAdmin ? t("assistant.agent.unavailable.short") : row.reason }}</span
+                data-test="assistant-launcher-agent-ask-admin"
               >
-            </span>
-            <template v-if="row.id === current" #icon-right>
-              <OIcon
-                :name="assistantGlyph.done"
-                size="sm"
-                class="text-assistant-link ms-auto"
-                data-test="assistant-launcher-agent-option-checked"
-              />
+                {{ t("assistant.outcome.actions.askAdmin") }}
+              </OButton>
             </template>
-          </ODropdownItem>
-          <div v-if="row.askAdmin" class="flex justify-end px-3 pb-1">
-            <AssistantAskAdminPopover kind="agent_access" :org="org" :agent="String(row.name)">
-              <template #trigger>
-                <OButton
-                  variant="ghost-primary"
-                  size="xs"
-                  data-test="assistant-launcher-agent-ask-admin"
-                >
-                  {{ t("assistant.outcome.actions.askAdmin") }}
-                </OButton>
-              </template>
-            </AssistantAskAdminPopover>
-          </div>
-        </template>
-      </ODropdownGroup>
-    </ODropdown>
-    <OTooltip :content="t('assistant.welcome.launcher.agentHint')" />
-  </template>
+          </AssistantAskAdminPopover>
+        </div>
+      </template>
+    </ODropdownGroup>
+  </ODropdown>
 </template>
 
 <script setup lang="ts">
@@ -124,6 +114,10 @@ import { useStore } from "vuex";
 
 import { sharedAgentPolicy } from "@/components/ai-assistant/agents/agentClause";
 import { agentGlyph, assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import AssistantAgentPill, {
+  AGENT_SHORT_CLASS,
+  AGENT_TRIGGER_CLASS,
+} from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
 import {
   CHIP_HIT_AREA_CLASS,
   composerPopoverClass,
@@ -142,7 +136,6 @@ import {
   DEFAULT_AGENT,
   rosterOffersChoice,
 } from "@/composables/assistant/pure";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -158,7 +151,13 @@ interface Row {
   askAdmin: boolean;
 }
 
-withDefaults(defineProps<{ disabled?: boolean; fixed?: AgentId }>(), { disabled: false });
+const props = withDefaults(
+  defineProps<{
+    disabled?: boolean;
+    fixed?: AgentId;
+  }>(),
+  { disabled: false, fixed: undefined },
+);
 
 /** The agent the line goes to; `null` is the default agent. */
 const agent = defineModel<AgentId | null>({ default: null });
@@ -171,22 +170,30 @@ const layout = useComposerLayout();
 const menuOpen = ref(false);
 
 const roster = computed(() => capability.value.agents);
-const shown = computed(() => rosterOffersChoice(roster.value));
-const current = computed<AgentId>(() => agent.value ?? DEFAULT_AGENT);
+// A fixed agent the org cannot reach is not shown; the launcher holds its line instead of rerouting it.
+const pinned = computed<AgentId | null>(() =>
+  props.fixed && roster.value?.some((row) => row.id === props.fixed && row.available)
+    ? props.fixed
+    : null,
+);
+const shown = computed(() => !pinned.value && rosterOffersChoice(roster.value));
+const current = computed<AgentId>(() => pinned.value ?? agent.value ?? DEFAULT_AGENT);
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 const sharedPolicy = computed(() => sharedAgentPolicy(roster.value, t));
 
 // The same rows as the chat's agent picker; Home has no chat yet, so a pick only waits for Send.
 const rows = computed<Row[]>(() =>
-  (roster.value ?? []).map((row) => {
-    const refusal = store.agentRefusal(row.id);
-    return {
-      id: row.id,
-      name: agentName(row.id, t),
-      reason: agentReason(row, refusal, t),
-      askAdmin: refusal ? refusal === "agent_not_permitted" : isRoleLocked(row),
-    };
-  }),
+  (roster.value ?? [])
+    .filter((row) => (pinned.value ? row.id === pinned.value : shown.value))
+    .map((row) => {
+      const refusal = store.agentRefusal(row.id);
+      return {
+        id: row.id,
+        name: agentName(row.id, t),
+        reason: agentReason(row, refusal, t),
+        askAdmin: refusal ? refusal === "agent_not_permitted" : isRoleLocked(row),
+      };
+    }),
 );
 
 function isRoleLocked(row: CapabilityAgent): boolean {

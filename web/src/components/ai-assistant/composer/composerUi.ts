@@ -13,15 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  computed,
-  inject,
-  reactive,
-  toRaw,
-  type ComputedRef,
-  type InjectionKey,
-  type Ref,
-} from "vue";
+import { computed, inject, reactive, toRaw, type ComputedRef, type InjectionKey } from "vue";
 
 import type { AssistantError, TurnState, useAssistantStore } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
@@ -101,9 +93,6 @@ export interface ComposerLayout {
 
 export const composerLayoutKey: InjectionKey<ComputedRef<ComposerLayout>> =
   Symbol("assistantComposerLayout");
-
-/** The time picker's open state: the composer's + menu opens it, the tray's time chip holds it. */
-export const composerTimeOpenKey: InjectionKey<Ref<boolean>> = Symbol("assistantComposerTimeOpen");
 
 const states = reactive(new Map<string, ComposerUi>());
 

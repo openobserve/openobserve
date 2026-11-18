@@ -16,36 +16,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[
-      'flex min-w-0 flex-nowrap items-center gap-x-1',
-      divided ? 'border-border-default relative -mx-2 mt-1 min-h-10 border-t px-2 pt-2' : 'min-h-8',
-    ]"
+    class="flex min-h-8 min-w-0 flex-nowrap items-center gap-x-1"
     data-test="assistant-composer-bar"
+    :data-dictating="dictating ? '' : undefined"
   >
     <span class="flex min-w-0 items-center gap-1" data-test="assistant-composer-bar-left">
-      <slot name="agent" />
+      <slot name="plus" />
+      <slot v-if="dictating" name="recording" />
     </span>
     <span
       class="ms-auto flex flex-none items-center gap-1"
       data-test="assistant-composer-bar-right"
     >
-      <slot />
+      <slot name="agent" />
+      <slot name="mic" />
+      <slot name="send" />
     </span>
   </div>
 </template>
 
 <script lang="ts">
-// Send, Stop and the dictation Stop are the kit's one round shape; repoGuards allows it only here.
-export const ROUND_ACTION_CLASS = "rounded-full";
-
 // An idle Send reads as neutral, not as a half-lit primary; the arrow keeps 3:1 on the fill in both themes.
-export const SEND_ACTION_CLASS = `${ROUND_ACTION_CLASS} aria-disabled:bg-surface-subtle! aria-disabled:text-text-secondary!`;
+export const SEND_ACTION_CLASS =
+  "aria-disabled:bg-surface-subtle! aria-disabled:text-text-secondary!";
+
+export const BAR_CONTROL_SIZE = "sm";
 </script>
 
 <script setup lang="ts">
-withDefaults(defineProps<{ /** A thin line above the controls. */ divided?: boolean }>(), {
-  divided: false,
-});
+withDefaults(
+  defineProps<{
+    /** The recording block shows after +; agent, mic and Send stay where they are. */
+    dictating?: boolean;
+  }>(),
+  { dictating: false },
+);
 
-defineSlots<{ agent?: () => unknown; default?: () => unknown }>();
+defineSlots<{
+  plus?: () => unknown;
+  recording?: () => unknown;
+  agent?: () => unknown;
+  mic?: () => unknown;
+  send?: () => unknown;
+}>();
 </script>

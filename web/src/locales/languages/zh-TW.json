@@ -3983,7 +3983,7 @@
           "note": "自動化 SRE 作業與洞察"
         },
         "ai_assistant": {
-          "name": "@:{'brand.askAutobot'}",
+          "name": "@:{'brand.autobot'}",
           "note": "智慧查詢與分析協助"
         },
         "anomaly_detection": {
@@ -10617,7 +10617,6 @@
       "unexpectedError": "發生未預期的錯誤",
       "toolExecutionFailed": "工具執行失敗",
       "errorOccurred": "發生錯誤",
-      "navigateConfirmQuestion": "允許 @:{'brand.autobot'} 導覽嗎？",
       "confirmToolExecution": "確認執行 {tool} 嗎？",
       "entity": {
         "alert": "警示",
@@ -10722,7 +10721,7 @@
     "aiExhaustedMessage": "訂閱即可繼續使用 AI。後續用量將計入此組織的帳單。",
     "aiContractExhaustedMessage": "聯絡您的帳戶管理員以新增更多 AI 額度",
     "aiPayerSubscribeMessage": "此組織的帳務由 {payer} 管理。請要求 {payer} 的管理員訂閱；後續用量將計入其帳單。",
-    "aiUsedByFeature": "@:{'brand.askAutobot'} 與查詢生成：{chat} · @:{'brand.autobotInvestigate'}：{incident} · 重新分析：{reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} 與查詢生成：{chat} · @:{'brand.autobotInvestigate'}：{incident} · 重新分析：{reanalysis}",
     "aiPaygMessage": "免費額度已用完 — 使用量計入訂閱費用",
     "billingGroup": {
       "tabLabel": "計費群組",
@@ -27814,7 +27813,7 @@
     "consentStillRequired": "並非所有必要的組織都已啟用付費使用。",
     "updateFailed": "無法更新付費 AI 使用設定。請再試一次。",
     "declinedNotice": "付費 AI 使用已關閉，因此未送出此請求。",
-    "consentScope": "適用於整個組織：@:{'brand.askAutobot'}、查詢產生與事件分析。您可隨時在方案頁面將其關閉。",
+    "consentScope": "適用於整個組織：@:{'brand.autobot'}、查詢產生與事件分析。您可隨時在方案頁面將其關閉。",
     "managePaidUsage": "開啟付費使用",
     "modePayAsYouGo": "按量付費",
     "modeConsentRequired": "需要授權",
@@ -30151,12 +30150,6 @@
     }
   },
   "assistant": {
-    "composer": {
-      "autoNavigation": {
-        "label": "自動導覽",
-        "enabledTooltip": "已啟用自動導覽 - {product}將在不確認的情況下自動導覽",
-        "disabledTooltip": "已停用自動導覽 - {product}將在導覽前先詢問"
-      }
-    }
+    "composer": {}
   }
 }

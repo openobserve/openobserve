@@ -21,14 +21,27 @@ import {
   hostRegistry,
   isPageHost,
   isRunning,
+  useAssistantHistory,
   useAssistantStore,
+  type AssistantSession,
   type DockHostId,
   type Sid,
 } from "@/composables/assistant";
-import { homeQueryFrom, isFullThreadRoute, withoutThread } from "@/composables/assistant/pure";
+import {
+  approvalCardOf,
+  fullThreadLocation,
+  homeQueryFrom,
+  isFullThreadRoute,
+  leaveFullTabHandoff,
+  movedToTab,
+  openTabWithoutOpener,
+  withoutThread,
+  type FullTabHandoff,
+} from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { trackAssistant, type PlacementMode } from "@/services/assistantAnalytics";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { isSavedSession } from "@/views/home/useThreadUrl";
 
 export type AssistantPlacementName = "sidebar" | "full" | "docked" | "window";
 
@@ -81,6 +94,7 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
 } {
   const { t } = useI18nTyped();
   const store = useAssistantStore();
+  const history = useAssistantHistory();
   const hosts = hostRegistry;
   const router = useRouter();
   const route = useRoute();
@@ -134,10 +148,10 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
       run: toDock,
     };
     if (modalDock.value) return [full];
-    if (sheet) return placement === "sidebar" ? [full] : [sidebar, full];
-    if (!lgUp.value) return [sidebar, full];
-    if (placement === "docked") return [dock, full, window];
-    return [sidebar, full, window, ...(chatDock.value ? [dock] : [])];
+    if (sheet) return placement === "sidebar" ? [full] : [full, sidebar];
+    if (!lgUp.value) return [full, sidebar];
+    if (placement === "docked") return [full, dock, window];
+    return [full, sidebar, window, ...(chatDock.value ? [dock] : [])];
   });
 
   // Full page carries the chat; from a chat with messages this starts an empty one there instead.
@@ -204,26 +218,42 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
     leaveFullView();
   }
 
+  // A chat with messages opens on itself, even mid-run; one never sent opens as a new chat carrying its draft.
+  function openFullTab(sid: Sid | null): void {
+    const session = sid ? store.state.sessions[sid] : undefined;
+    const target = session && (session.messages.length > 0 || isSavedSession(session)) ? sid : null;
+    const { userOrgKey } = store.state;
+    const handoff = session ? handoffOf(session, target) : null;
+    if (userOrgKey && handoff) leaveFullTabHandoff({ userOrgKey, ...handoff, at: Date.now() });
+    // The server holds a running turn back until it ends; the browser copy shows it there meanwhile.
+    if (target && session && isRunning(session.turn)) void history.save(target, { live: true });
+    openTabWithoutOpener(router.resolve(fullThreadLocation(target, homeQueryFrom(route))).href);
+  }
+
   function toFull(): void {
     if (input().placement === "full") return;
     trackMove("full");
+    const { placement, sheet } = input();
     const sid = input().sid ?? store.state.shell.activeSid;
-    if (sid && store.windowOf(sid)) store.open({ kind: "full" }, { sid, focus: "composer" });
+    if (sheet) return moveFullHere(sid ?? ensureChat());
+    openFullTab(sid);
+    // The chat now lives in its own tab; this one stops showing it, so it is never answered twice.
+    if (placement === "window" && sid) store.closeWindow(sid, { toTab: true });
+    else if (placement === "sidebar") {
+      movedToTab.value = { sid };
+      store.close("close");
+    }
+  }
+
+  function moveFullHere(sid: Sid): void {
+    if (store.windowOf(sid)) store.open({ kind: "full" }, { sid, focus: "composer" });
     else store.moveTo({ kind: "full" });
-    void router.push({
-      name: "assistant",
-      params: sid ? { chatId: sid } : {},
-      query: homeQueryFrom(route),
-    });
+    void router.push(fullThreadLocation(sid, homeQueryFrom(route))).catch(() => undefined);
   }
 
   function toFreshFull(): void {
     trackMove("full");
-    const sid = store.startNewChat({
-      origin: { entryKind: "thread_new", objectKind: "none", container: "full_view" },
-    });
-    store.open({ kind: "full" }, { sid, focus: "composer" });
-    void router.push({ name: "assistant", query: homeQueryFrom(route) });
+    openFullTab(null);
   }
 
   function toDock(): void {
@@ -235,6 +265,34 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
   }
 
   return { places, freshFull };
+}
+
+function handoffOf(
+  session: AssistantSession,
+  target: Sid | null,
+): Omit<FullTabHandoff, "userOrgKey" | "at"> | null {
+  const { text, chips, images } = session.composer;
+  const agentId = session.messages.length ? session.nextAgentId : session.agentId;
+  const pending = !!target && !isSavedSession(session);
+  const card = target ? waitingCard(session) : undefined;
+  if (!text.trim() && !chips.length && !images.length && !agentId && !pending && !card) return null;
+  return {
+    target,
+    text,
+    chips: [...chips],
+    ...(images.length > 0 && { images: images.map((image) => ({ ...image })) }),
+    ...(agentId && { agentId }),
+    ...(pending && { pending }),
+    ...(card && { card }),
+  };
+}
+
+function waitingCard(session: AssistantSession): FullTabHandoff["card"] {
+  const pending = session.pendingApproval;
+  const block = pending ? approvalCardOf(session, pending.id) : null;
+  if (!pending || !block) return undefined;
+  const { sessionId: _sessionId, turnId: _turnId, ...data } = block;
+  return { turnId: pending.turnId, block: { ...data, expiresAt: pending.expiresAt } };
 }
 
 // Back must skip every chat the full view pushed, or it reopens one at full page (C-06).

@@ -415,7 +415,7 @@ describe("AssistantTurnOutcome", () => {
     } as never);
     const held = mountOutcome({ kind: "stopped", steps: 3, partial: true, sid: "s1" });
     expect(buttons(held)[0].attributes("aria-disabled")).toBe("true");
-    expect(held.text()).toContain("Another tab is waiting for your approval on this chat.");
+    expect(held.text()).toContain("Waiting for your approval in another tab");
     const free = mountOutcome({ kind: "stopped", steps: 3, partial: true, sid: "s2" });
     expect(buttons(free)[0].attributes("aria-disabled")).toBeUndefined();
     setRuntimeHandle(null);

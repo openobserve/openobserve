@@ -384,13 +384,13 @@ describe("one-time notices", () => {
 });
 
 describe("voice opt-in", () => {
-  it("is off until written, per user+org", () => {
-    expect(readVoiceOptIn(KEY)).toBe(false);
-    writeVoiceOptIn(KEY, true);
+  it("is on until an admin turns it off, per user+org (D2)", () => {
     expect(readVoiceOptIn(KEY)).toBe(true);
-    expect(readVoiceOptIn(`${KEY}:other`)).toBe(false);
     writeVoiceOptIn(KEY, false);
     expect(readVoiceOptIn(KEY)).toBe(false);
+    expect(readVoiceOptIn(`${KEY}:other`)).toBe(true);
+    writeVoiceOptIn(KEY, true);
+    expect(readVoiceOptIn(KEY)).toBe(true);
   });
 
   it("is reported by watchPrefs when another tab writes it", () => {

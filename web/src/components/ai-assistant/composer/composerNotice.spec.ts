@@ -21,7 +21,7 @@ import {
   NOTICE_PRIORITY,
   STRIP_MAX_CHARS,
   fitNotice,
-  fitWords,
+  fitSentences,
   lineCount,
   micHelpUrl,
   pickNotice,
@@ -84,7 +84,7 @@ describe("composerNotice: the strip's one line (K5)", () => {
     expect(stripText(KIT_NOTICES[0])).toBe("Run limit reached · Show running chats");
   });
 
-  it("shortens a long title by whole words, keeps the link, and leaves the sentence for title=", () => {
+  it("shortens a long title to whole sentences, keeps the link, and leaves the sentence for title=", () => {
     const sentence = raw(
       `Your role can no longer use ${brandNames.autobot}. Your message wasn't sent.`,
     );
@@ -93,20 +93,43 @@ describe("composerNotice: the strip's one line (K5)", () => {
         { action: "askAdmin", label: raw("Ask an admin") },
       ]),
     );
-    expect(stripText(fitted).length).toBeLessThanOrEqual(STRIP_MAX_CHARS);
-    expect(fitted.title).toBe("Your role can no longer use");
-    expect(sentence.startsWith(fitted.title)).toBe(true);
-    expect(sentence.split(/\s+/)).toEqual(expect.arrayContaining(fitted.title.split(" ")));
+    expect(fitted.title).toBe(`Your role can no longer use ${brandNames.autobot}.`);
     expect(fitted.links).toEqual([{ action: "askAdmin", label: "Ask an admin" }]);
     expect(fitted.sentence).toBe(sentence);
   });
 
-  it("never cuts a word and drops dangling punctuation", () => {
-    expect(fitWords("Couldn't reach OpenObserve. Your message wasn't sent.", 30)).toBe(
-      "Couldn't reach OpenObserve",
+  it("never cuts a sentence: an unreachable agent's line keeps its first sentence whole", () => {
+    const sentence = raw(
+      `${brandNames.autobot} isn't reachable right now. Your message wasn't sent.`,
     );
-    expect(fitWords("Short line.", 44)).toBe("Short line.");
-    expect(fitWords("Supercalifragilistic word", 5)).toBe("Supercalifragilistic");
+    const fitted = fitNotice(
+      sentenceNotice("unreachable", sentence, "warning", [
+        { action: "retry", label: raw("Try again") },
+      ]),
+    );
+    expect(fitted.title).toBe(`${brandNames.autobot} isn't reachable right now.`);
+  });
+
+  it("keeps whole sentences up to the budget, and an over-long first sentence whole", () => {
+    expect(fitSentences("Couldn't reach it. Your message wasn't sent.", 30)).toBe(
+      "Couldn't reach it.",
+    );
+    expect(fitSentences("Short line.", 44)).toBe("Short line.");
+    expect(fitSentences("One very long first sentence here. Two.", 5)).toBe(
+      "One very long first sentence here.",
+    );
+    expect(fitSentences("screenshot.png is 2.5 MB. Pick a smaller image.", 30)).toBe(
+      "screenshot.png is 2.5 MB.",
+    );
+  });
+
+  it("ranks offline and unreachable above the low-credit warning", () => {
+    const rank = (id: (typeof NOTICE_PRIORITY)[number]) => NOTICE_PRIORITY.indexOf(id);
+    expect(rank("offline")).toBeLessThan(rank("creditsLow"));
+    expect(rank("unreachable")).toBeLessThan(rank("creditsLow"));
+    const low = sentenceNotice("creditsLow", raw("70% of AI credits used"));
+    const offline = sentenceNotice("offline", raw("You're offline. Draft kept."));
+    expect(pickNotice([low, offline])?.id).toBe("offline");
   });
 
   it("shows the most urgent notice, whatever order the candidates come in", () => {

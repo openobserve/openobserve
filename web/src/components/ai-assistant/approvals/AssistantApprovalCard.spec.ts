@@ -130,7 +130,7 @@ describe("AssistantApprovalCard", () => {
     expect(group.attributes("aria-label")).toBe("Needs you: delete 1 alert");
     expect(wrapper.get('[data-test="assistant-approval-heading"]').text()).toBe("Delete 1 alert");
     const timer = wrapper.get('[data-test="assistant-approval-countdown"]');
-    expect(timer.text()).toBe("3:42");
+    expect(timer.text()).toBe("Expires in 3:42");
     expect(timer.attributes("aria-label")).toBe("Expires in 3:42");
     expect(buttons(wrapper)).toEqual([
       "assistant-approval-more",
@@ -148,13 +148,12 @@ describe("AssistantApprovalCard", () => {
     expect(strip.element.contains(timer.element)).toBe(true);
   });
 
-  it("draws the amber edge and no box, and marks an irreversible kind's verb destructive", () => {
+  it("draws a 12 px surface with no coloured edge, and marks an irreversible kind's verb destructive", () => {
     const wrapper = mountCard(cardOf(DELETE_ONE));
     const group = wrapper.get('[data-test="assistant-approval-card"]');
-    expect(group.classes()).toEqual(
-      expect.arrayContaining(["border-s-2", "border-assistant-signal-attention"]),
-    );
-    expect(group.classes()).not.toContain("rounded-surface");
+    expect(group.classes()).toEqual(expect.arrayContaining(["rounded-surface", "border"]));
+    expect(group.classes()).not.toContain("border-s-2");
+    expect(group.classes()).not.toContain("border-assistant-signal-attention");
     const approve = wrapper.get('[data-test="assistant-approval-approve"]');
     expect(approve.attributes("data-o2-variant")).toBe("destructive");
     expect(approve.text()).toBe("Delete 1 alert");
@@ -162,6 +161,37 @@ describe("AssistantApprovalCard", () => {
     expect(
       pause.get('[data-test="assistant-approval-approve"]').attributes("data-o2-variant"),
     ).toBe("primary");
+  });
+
+  it("shows a dashboard create as named field rows, a long value cut short until expanded", async () => {
+    const description = "Error log count ".repeat(9).trim();
+    const body = {
+      title: "polish-approval-check",
+      description,
+      tabs: [{ tabId: "t1", name: "Overview", panels: [{ id: "p0", title: "Errors" }] }],
+    };
+    const frame = {
+      type: "confirmation_required",
+      tool: "CreateDashboard",
+      kind: "create",
+      targets: [{ type: "dashboard", name: "CreateDashboard" }],
+      after: body,
+      args: { request_body: body },
+    };
+    const wrapper = mountCard(cardOf(frame));
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-approval-heading"]').text()).toContain(
+      "polish-approval-check",
+    );
+    const diff = wrapper.get('[data-test="assistant-approval-diff"]');
+    expect(diff.text()).not.toMatch(/[{[]/);
+    expect(diff.text()).toContain("Overview");
+    expect(diff.text()).toContain("Errors");
+    expect(diff.text()).not.toContain(description);
+    await diff.get('[data-test="assistant-approval-diff-expand"]').trigger("click");
+    expect(diff.text()).toContain(description);
+    await openDetails(wrapper);
+    expect(wrapper.get('[data-test="assistant-approval-args"]').text()).toContain("tabId");
   });
 
   it("takes focus to the heading within one frame from the page, and says it is waiting", async () => {
@@ -398,7 +428,7 @@ describe("AssistantApprovalCard", () => {
     const heading = wrapper.get('[data-test="assistant-approval-heading"]').text();
     expect(heading).toBe("Pause alert");
     expect(wrapper.get('[data-test="assistant-approval-meta"]').text()).toBe(
-      "Couldn't load the name of alert 2Yx9aler…; you may not have access to it.",
+      "Couldn't load the name of alert 2Yx9aler…",
     );
     expect(wrapper.text()).not.toContain("2Yx9alertcart");
   });
@@ -771,7 +801,7 @@ describe("AssistantApprovalCard", () => {
       const wrapper = mountCard(cardOf(PAUSE, { expiresAt: Date.now() + 48_000 }));
       await flushPromises();
       const timer = wrapper.get('[data-test="assistant-approval-countdown"]');
-      expect(timer.text()).toBe("0:48");
+      expect(timer.text()).toBe("Expires soon · 0:48");
       expect(timer.classes()).toContain("font-medium");
       expect(timer.attributes("data-expiring")).toBe("");
       expect(timer.find('[data-test="assistant-approval-expiring-icon"]').exists()).toBe(true);

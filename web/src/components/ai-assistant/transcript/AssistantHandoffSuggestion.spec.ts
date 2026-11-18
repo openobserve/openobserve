@@ -29,7 +29,7 @@ describe("AssistantHandoffSuggestion", () => {
     const w = mount(AssistantHandoffSuggestion, { props: { agent: "sre" } });
     expect(card(w).text()).toContain(`${brandNames.autobotInvestigate} can look for the cause`);
     expect(w.get('[data-test="assistant-handoff-suggestion-body"]').text()).toBe(
-      "It gets this chat and its context. It can take a few minutes.",
+      "It can take a few minutes.",
     );
     const buttons = w.findAll("button").map((button) => button.text());
     expect(buttons).toEqual([`Hand off to ${brandNames.autobotInvestigate}`, "Not now"]);

@@ -60,7 +60,6 @@ function makeState(over: Partial<StreamState> = {}): StreamState {
 function makeCtx(over: Partial<ReducerCtx> = {}): ReducerCtx {
   return {
     isActive: true,
-    autoNavigationEnabled: false,
     phase: "stream",
     t,
     generateNavigation: () => null,
@@ -730,26 +729,15 @@ describe("reduce: confirmation_required", () => {
     expect(state.pendingConfirmation).toBeNull();
   });
 
-  it("auto-approves a navigation confirmation when auto navigation is on", () => {
+  it("never turns a navigation confirmation into a prompt", () => {
     const state = makeState({ messages: [assistant()] });
     const effects = reduce(
       state,
       { type: "confirmation_required", tool: "navigation_action", message: "Go" },
-      makeCtx({ autoNavigationEnabled: true }),
+      makeCtx(),
     );
-    expect(effects).toEqual([{ kind: "finalizeText" }, { kind: "confirmPost", approved: true }]);
+    expect(effects).toEqual([{ kind: "finalizeText" }]);
     expect(state.pendingConfirmation).toBeNull();
-  });
-
-  it("still asks for a navigation confirmation when auto navigation is off", () => {
-    const state = makeState({ messages: [assistant()] });
-    const effects = reduce(
-      state,
-      { type: "confirmation_required", tool: "navigation_action", message: "Go" },
-      makeCtx({ autoNavigationEnabled: false }),
-    );
-    expect(kinds(effects)).toEqual(["finalizeText", "scroll"]);
-    expect(state.pendingConfirmation?.tool).toBe("navigation_action");
   });
 
   it("CURRENT BEHAVIOR (BUG): the tail flush has no confirmation handler at all", () => {
@@ -774,57 +762,25 @@ describe("reduce: navigation_action", () => {
     target: { query: "select 1" },
   };
 
-  it("navigates immediately when auto navigation is on", () => {
-    const state = makeState({ messages: [assistant()] });
-    const effects = reduce(state, event, makeCtx({ autoNavigationEnabled: true }));
-    expect(effects).toEqual([
-      { kind: "finalizeText" },
-      {
-        kind: "navigate",
-        action: {
-          resource_type: "logs",
-          action: "load_query",
-          label: "View in Logs",
-          target: { query: "select 1" },
-        },
-      },
-    ]);
-    expect(state.pendingConfirmation).toBeNull();
-  });
-
-  it("asks for confirmation when auto navigation is off", () => {
+  it("neither routes nor prompts: the link waits for a click", () => {
     const msg = assistant();
     const state = makeState({ messages: [msg] });
     const effects = reduce(state, event, makeCtx());
-    expect(msg.contentBlocks?.[0]).toMatchObject({
-      tool: "navigation_action",
-      message: "View in Logs",
-      pendingConfirmation: true,
-    });
-    expect(state.pendingConfirmation?.navAction?.resource_type).toBe("logs");
-    expect(kinds(effects)).toEqual(["finalizeText", "scroll"]);
-  });
-
-  it("falls back to a translated prompt when the event has no label", () => {
-    const state = makeState({ messages: [assistant()] });
-    reduce(state, { ...event, label: undefined }, makeCtx());
-    expect(state.pendingConfirmation?.message).toBe("aiAssistant.aiChat.navigateConfirmQuestion");
+    expect(effects).toEqual([{ kind: "finalizeText" }]);
+    expect(msg.contentBlocks ?? []).toEqual([]);
+    expect(state.pendingConfirmation).toBeNull();
   });
 
   it("flushes the text segment but skips navigation when detached", () => {
     const state = makeState({ messages: [assistant()], textSegment: "x" });
-    const effects = reduce(state, event, makeCtx({ isActive: false, autoNavigationEnabled: true }));
+    const effects = reduce(state, event, makeCtx({ isActive: false }));
     expect(effects).toEqual([]);
     expect(state.textSegment).toBe("");
   });
 
   it("CURRENT BEHAVIOR (BUG): the tail flush has no navigation handler at all", () => {
     const state = makeState({ messages: [assistant()], textSegment: "keep" });
-    const effects = reduce(
-      state,
-      event,
-      makeCtx({ phase: "tailFlush", autoNavigationEnabled: true }),
-    );
+    const effects = reduce(state, event, makeCtx({ phase: "tailFlush" }));
     expect(effects).toEqual([]);
     expect(state.textSegment).toBe("keep");
   });
@@ -980,14 +936,10 @@ describe("reduce: live-gated effects", () => {
     }
   });
 
-  it("leaves the two unconditional scrolls unconditional", () => {
-    for (const event of [
-      { type: "confirmation_required", tool: "x", message: "m" },
-      { type: "navigation_action", label: "Go", target: {} },
-    ]) {
-      const effects = reduce(makeState({ messages: [assistant()] }), event, makeCtx());
-      expect(effects.find((e) => e.kind === "scroll")).toEqual({ kind: "scroll" });
-    }
+  it("leaves the confirmation scroll unconditional", () => {
+    const event = { type: "confirmation_required", tool: "x", message: "m" };
+    const effects = reduce(makeState({ messages: [assistant()] }), event, makeCtx());
+    expect(effects.find((e) => e.kind === "scroll")).toEqual({ kind: "scroll" });
   });
 });
 

@@ -104,7 +104,7 @@ describe("AssistantContextChip", () => {
     });
     const thumb = wrapper.get('[data-test="assistant-context-chip-thumb"]');
     expect(thumb.attributes("src")).toBe("data:image/png;base64,AAAA");
-    expect(thumb.classes()).toContain("size-4");
+    expect(thumb.classes()).toContain("size-5");
   });
 
   it("removes on Delete and Backspace and moves on the arrows (CT-01 AC 11, CT-08 AC 4)", async () => {

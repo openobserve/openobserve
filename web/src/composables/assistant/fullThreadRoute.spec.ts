@@ -24,8 +24,11 @@ import {
   homeAskLocation,
   homeQueryFrom,
   isFullThreadRoute,
+  fullTabPending,
   isHomeAskShown,
+  leaveFullTabHandoff,
   pushFromThread,
+  takeFullTabHandoff,
   threadHost,
 } from "./fullThreadRoute";
 
@@ -131,5 +134,72 @@ describe("a page that hosts its own thread", () => {
       threadHost.value = "home";
     }
     expect(fullThreadLocation("y")).toEqual({ name: "home", query: { tab: "ai", thread: "y" } });
+  });
+});
+
+describe("full page tab hand-off", () => {
+  const handoff = (target: string | null, at = 1_000) => ({
+    userOrgKey: "k1",
+    target,
+    text: "why 5xx?",
+    chips: [],
+    at,
+  });
+
+  it("gives a chat's draft once, to that chat in the same user+org", () => {
+    leaveFullTabHandoff(handoff("s1"));
+    expect(takeFullTabHandoff("k2", "s1", false, 2_000)).toBeNull();
+    expect(takeFullTabHandoff("k1", "s2", true, 2_000)).toBeNull();
+    expect(takeFullTabHandoff("k1", "s1", false, 2_000)?.text).toBe("why 5xx?");
+    expect(takeFullTabHandoff("k1", "s1", false, 2_000)).toBeNull();
+  });
+
+  it("gives a draft aimed at no chat to a blank new chat only, and never a stale one", () => {
+    leaveFullTabHandoff(handoff(null));
+    expect(takeFullTabHandoff("k1", "s9", false, 2_000)).toBeNull();
+    expect(takeFullTabHandoff("k1", "s9", true, 2_000)?.target).toBeNull();
+    leaveFullTabHandoff(handoff(null));
+    expect(takeFullTabHandoff("k1", "s9", true, 1_000 + 61_000)).toBeNull();
+  });
+
+  it("carries photos and the agent pick, and drops only the photos when storage is full", () => {
+    const image = {
+      id: "i1",
+      data: "AAAA",
+      mimeType: "image/png" as const,
+      filename: "a.png",
+      size: 3,
+    };
+    leaveFullTabHandoff({ ...handoff("s1"), images: [image], agentId: "sre" });
+    expect(takeFullTabHandoff("k1", "s1", false, 2_000)).toMatchObject({
+      images: [image],
+      agentId: "sre",
+    });
+    const real = Storage.prototype.setItem;
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+      value: string,
+    ) {
+      if (value.includes("AAAA")) throw new DOMException("full", "QuotaExceededError");
+      real.call(this, key, value);
+    });
+    leaveFullTabHandoff({ ...handoff("s1"), images: [image], agentId: "sre" });
+    set.mockRestore();
+    const taken = takeFullTabHandoff("k1", "s1", false, 2_000);
+    expect(taken?.text).toBe("why 5xx?");
+    expect(taken?.images).toBeUndefined();
+    expect(taken?.agentId).toBe("sre");
+  });
+
+  it("says a chat is on its way from its opener, without taking the hand-off", () => {
+    leaveFullTabHandoff({ ...handoff("s1"), pending: true });
+    expect(fullTabPending("k1", "s2", 2_000)).toBe(false);
+    expect(fullTabPending("k2", "s1", 2_000)).toBe(false);
+    expect(fullTabPending("k1", "s1", 2_000)).toBe(true);
+    expect(takeFullTabHandoff("k1", "s1", false, 2_000)?.pending).toBe(true);
+    expect(fullTabPending("k1", "s1", 2_000)).toBe(false);
+    leaveFullTabHandoff({ ...handoff("s1"), pending: true });
+    expect(fullTabPending("k1", "s1", 1_000 + 61_000)).toBe(false);
   });
 });

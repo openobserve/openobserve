@@ -201,14 +201,17 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
 </script>
 
 <template>
-  <div data-test="navbar-organizations-select" class="md:max-xl:w-56 md:max-xl:min-w-20">
+  <div
+    data-test="navbar-organizations-select"
+    class="max-md:w-24 max-md:min-w-0 max-md:shrink md:max-xl:w-56 md:max-xl:min-w-20"
+  >
     <ODropdown v-model:open="open" side="bottom" align="end">
       <template #trigger>
         <OButton
           variant="outline-primary"
           size="xs"
           data-test="navbar-organizations-select-trigger"
-          class="text-text-body! w-56 max-md:w-28 md:max-xl:w-full"
+          class="text-text-body! w-56 max-md:w-full md:max-xl:w-full"
           :class="open ? 'ring-focus-ring-accent ring-2 ring-inset' : ''"
         >
           <template #icon-left>
