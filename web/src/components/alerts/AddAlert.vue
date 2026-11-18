@@ -357,12 +357,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="stream_name"
                         :aria-label="t('alerts.stream_name')"
                         data-test="add-alert-stream-name-select-dropdown"
-                        :options="indexOptions"
+                        :options="streamPickerOptions"
+                        :search-placeholder="
+                          formData.stream_type === 'metrics'
+                            ? t('alerts.discovery.metricSearch')
+                            : undefined
+                        "
                         :loading="isFetchingStreams"
                         class="w-full"
                         :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
                         @update:model-value="updateStreamFields($event)"
-                      />
+                      >
+                        <template #option="{ option }">
+                          <AlertStreamOption :option="option" />
+                        </template>
+                      </OFormSelect>
                       <OTooltip
                         v-if="!formData.stream_type"
                         :content="t('alerts.selectStreamTypeFirst')"
@@ -370,6 +379,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </OSettingRow>
+                <AlertMetricLabels
+                  v-if="
+                    formData.stream_name && formData.stream_type === 'metrics' && !isAnomalyMode
+                  "
+                  :stream-name="formData.stream_name"
+                  @insert="onMetricLabelInsert"
+                />
                 <AlertSampleEvents
                   v-if="formData.stream_name && !isAnomalyMode"
                   :stream-name="formData.stream_name"
@@ -1223,6 +1239,13 @@ import OSectionNav from "@/lib/navigation/SectionNav/OSectionNav.vue";
 import OChoiceCards from "@/lib/forms/ChoiceCards/OChoiceCards.vue";
 import type { ChoiceCardOption } from "@/lib/forms/ChoiceCards/OChoiceCards.types";
 import AlertSampleEvents from "./AlertSampleEvents.vue";
+import AlertStreamOption from "./AlertStreamOption.vue";
+import AlertMetricLabels from "./AlertMetricLabels.vue";
+import {
+  insertLabelIntoPromql,
+  recentStreams,
+  streamOptions,
+} from "@/composables/alerts/useStreamDiscovery";
 import AlertCheckTimeline from "./AlertCheckTimeline.vue";
 import AlertBacktest from "./AlertBacktest.vue";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
@@ -1388,6 +1411,8 @@ export default defineComponent({
     OSectionNav,
     OChoiceCards,
     AlertSampleEvents,
+    AlertStreamOption,
+    AlertMetricLabels,
     AlertCheckTimeline,
     AlertBacktest,
     OCommandSearch,
@@ -2350,10 +2375,32 @@ export default defineComponent({
         },
       });
 
+    // Freshness is judged when the type's list lands, from the stats each row already carries.
+    const streamPickerOptions = computed(() =>
+      streamOptions(alertForm.schemaList.value as any[], {
+        t: alertForm.t,
+        nowUs: Date.now() * 1000,
+        recent: recentStreams(
+          store.state.selectedOrganization?.identifier ?? "",
+          alertForm.formData.value.stream_type,
+        ),
+      }),
+    );
+    const onMetricLabelInsert = ({ label, value }: { label: string; value?: string }) => {
+      const condition = alertForm.formData.value.query_condition;
+      const current = condition.type === "promql" ? (condition.promql ?? "") : "";
+      if (condition.type !== "promql") alertForm.updateTab("promql");
+      alertForm.updatePromqlQuery(
+        insertLabelIntoPromql(current, alertForm.formData.value.stream_name, label, value),
+      );
+    };
+
     return {
       raw,
       siemDetectionId,
       openInSecurity,
+      streamPickerOptions,
+      onMetricLabelInsert,
       ...alertForm,
       alertDraft: alertEditorDraft.draft,
       calibrationHandoff,
