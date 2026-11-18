@@ -16,9 +16,8 @@
 // Same list as the alerts condition builder (utils/alerts/conditionsFormatter.ts).
 const STRING_TYPES = ["String", "Utf8", "LargeUtf8", "Utf8View"];
 
-// The (empty) series sums NULL and "" rows. Only a string column holds "", and
-// '' against any other type fails the query, so a non-string field matches NULL
-// only. An unknown type keeps the string form.
+// Only a string column holds "", and '' against another type fails the query,
+// so a non-string field checks NULL alone; an unknown type keeps both checks.
 export const emptyValueConditions = (
   field: string,
   action: "include" | "exclude",
@@ -31,6 +30,7 @@ export const emptyValueConditions = (
   return [isNull, action === "include" ? `${quoted} = ''` : `${quoted} != ''`];
 };
 
+// The (empty) series counts NULL and "" rows together, so its filter matches both.
 export const getEmptyBreakdownFilter = (
   field: string,
   action: "include" | "exclude",
