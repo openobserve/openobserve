@@ -40,14 +40,14 @@ use o2_enterprise::enterprise::{
         INTERVAL_SECS,
         api::{Deps, Page},
         context::{
-            self, IssueContext, IssueIncident, IssueRef, ViewerResolver, for_issues, issue_by_id,
-            issue_for,
+            self, CohortStreams, IssueContext, IssueIncident, IssueRef, ViewerResolver, for_issues,
+            issue_by_id, issue_for,
         },
         contract::ActionRequest,
         decisions::{Action, Change, DecisionView},
         names::decision_kinds,
         outcomes::{self, OutcomeReport, OutcomeSource, OutcomeSubject},
-        page_routing::{catalogue, cohort_dimensions, stream_service},
+        page_routing::{catalogue, cohort_dimensions, compatible, stream_dimensions},
         paging_enabled_for,
         plugins::stream::{PageSubject, cohort_title, finding_id, page_subject},
         ports::{ActionRefused, InvestigationPort, Recovery},
@@ -286,12 +286,12 @@ impl RespondedAs {
 
 /// The pure half of `start`: the subject the incident path correlates on, scoped by `records`.
 pub fn finding_incident(s: &PageSubject, org: &str, records: &[ServiceRecord]) -> FindingIncident {
-    let scope = stream_service(records, &s.stream_type, &s.stream_name);
+    let dims = stream_dimensions(records, &s.stream_type, &s.stream_name);
     let mut streams = vec![(s.stream_type.clone(), s.stream_name.clone())];
     streams.extend(
         s.cohort
             .iter()
-            .filter(|(t, n)| stream_service(records, t, n) == scope)
+            .filter(|(t, n)| compatible(&stream_dimensions(records, t, n), &dims))
             .cloned(),
     );
     FindingIncident {
@@ -308,7 +308,7 @@ pub fn finding_incident(s: &PageSubject, org: &str, records: &[ServiceRecord]) -
         ),
         streams,
         cohort: true,
-        scope,
+        dims,
     }
 }
 
@@ -666,13 +666,22 @@ fn member_firings(
 
 fn issue_incident(
     org: &str,
-    incident: &IncidentView,
+    item: &AutoObserveIncident,
     page: &PageView,
     record: Option<&Response>,
 ) -> IssueIncident {
+    let members = &item.members;
+    let cohort = (members.len() >= 2).then(|| CohortStreams {
+        streams: u32::try_from(members.len()).unwrap_or(u32::MAX),
+        names: members
+            .iter()
+            .filter_map(|m| m.stream_name.clone())
+            .take(3)
+            .collect(),
+    });
     IssueIncident {
-        incident_id: incident.id.clone(),
-        status: incident.status.clone(),
+        incident_id: item.incident.id.clone(),
+        status: item.incident.status.clone(),
         paged: page.outcome == PageOutcome::Paged,
         page_failed: page.outcome == PageOutcome::Failed,
         response_id: record.map(|r| r.id.clone()),
@@ -683,6 +692,7 @@ fn issue_incident(
             let cfg = config::get_config();
             page_url(&cfg.common.web_url, &cfg.common.base_uri, org, &r.id)
         }),
+        cohort,
     }
 }
 
@@ -804,7 +814,7 @@ async fn page_of(
 ) -> anyhow::Result<(PageView, IssueIncident)> {
     let record = OncallPager.record(org, &item.incident.id).await?;
     let page = page_view(org, item, record.as_ref(), unrouted, staffed_since, now).await?;
-    let incident = issue_incident(org, &item.incident, &page, record.as_ref());
+    let incident = issue_incident(org, item, &page, record.as_ref());
     Ok((page, incident))
 }
 
@@ -973,8 +983,37 @@ mod tests {
 
     #[test]
     fn a_page_subject_maps_to_an_alert_id_incident_at_the_onset() {
-        let s = subject();
-        let f = finding_incident(&s, "demo-org", &[]);
+        let record = |service: &str, logs: &[&str]| ServiceRecord {
+            id: config::ider::generate(),
+            org_id: "demo-org".into(),
+            service_name: service.into(),
+            set_id: "default".into(),
+            disambiguation: serde_json::json!({}),
+            all_dimensions: serde_json::json!({}),
+            logs_streams: serde_json::json!(logs),
+            traces_streams: serde_json::json!([]),
+            metrics_streams: serde_json::json!([]),
+            profiles_streams: serde_json::json!([]),
+            field_name_mapping: None,
+            last_seen: 1,
+        };
+        let records = [
+            record("checkout", &["checkout", "cart"]),
+            record("payments", &["payments"]),
+        ];
+        let peer = |n: &str| ("logs".to_string(), n.to_string());
+        let s = PageSubject {
+            cohort: vec![peer("cart"), peer("payments")],
+            ..subject()
+        };
+        let f = finding_incident(&s, "demo-org", &records);
+        assert_eq!(
+            f.streams,
+            [peer("checkout"), peer("cart")],
+            "a peer of another service opens its own incident, so the page leaves it out"
+        );
+        assert_eq!(f.dims, stream_dimensions(&records, "logs", "checkout"));
+        assert!(!f.dims.is_empty());
         assert_eq!(f.org_id, "demo-org");
         assert_eq!(f.subject_id, format!("autoobserve:{}", s.finding_id));
         assert_eq!(

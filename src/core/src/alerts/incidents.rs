@@ -289,14 +289,14 @@ pub struct FindingIncident {
     pub title: String,
     pub dimensions: HashMap<String, String>,
     pub triggered_at: i64,
-    /// The streams its page routes on, as (type, name): itself first, then its scope's peers.
+    /// The streams its page routes on, as (type, name): itself first, then its compatible peers.
     pub streams: Vec<(String, String)>,
     /// What its page says: the cohort's size when peers were dispatched with it.
     pub page_title: String,
-    /// R6: joins the open stop incident of its kind and scope instead of opening its own.
+    /// R6': joins the open stop incident of its kind it shares an onset and catalogue dims with.
     pub cohort: bool,
-    /// The one service its stream has in the org's catalogue; None groups it org-wide.
-    pub scope: Option<String>,
+    /// The catalogue dimensions every service writing to its stream agrees on.
+    pub dims: HashMap<String, String>,
 }
 
 /// What on-call routing did for a new incident: the record that paged, and what failed.
@@ -4145,7 +4145,7 @@ fn finding_incident_id(f: &FindingIncident, known: &[String]) -> String {
     svix_ksuid::Ksuid::from_bytes(bytes).to_string()
 }
 
-/// A cohort's next id: org, kind, scope and the newest incident of that kind and scope.
+/// A cohort's next id: org, kind, dims and the newest incident of that kind with compatible dims.
 #[cfg(feature = "enterprise")]
 fn cohort_incident_id(f: &FindingIncident, latest: Option<&str>) -> String {
     use sha2::{Digest, Sha256};
@@ -4156,10 +4156,12 @@ fn cohort_incident_id(f: &FindingIncident, latest: Option<&str>) -> String {
         .dimensions
         .get(FINDING_KIND_DIMENSION)
         .map_or("", String::as_str);
+    let mut dims: Vec<String> = f.dims.iter().map(|(k, v)| format!("{k}={v}")).collect();
+    dims.sort();
     let digest = Sha256::digest(format!(
         "{}\ncohort\n{kind}\n{}\n{}",
         f.org_id,
-        f.scope.as_deref().unwrap_or(""),
+        dims.join("\n"),
         latest.unwrap_or("")
     ));
     let mut bytes = [0u8; 20];
@@ -4182,11 +4184,12 @@ struct CohortLookup {
     next_id: Option<String>,
 }
 
-/// R6: the open incident of the finding's kind and scope whose last member arrived within the gap.
+/// R6': the newest open incident of the finding's kind whose first onset is within the gap and
+/// whose lead stream's catalogue dims are compatible with the finding's.
 #[cfg(feature = "enterprise")]
 async fn cohort_of(f: &FindingIncident, now: i64) -> Result<CohortLookup, anyhow::Error> {
     use o2_enterprise::enterprise::autoobserve::{
-        page_routing::{catalogue, stream_service},
+        page_routing::{catalogue, compatible, stream_dimensions},
         plugins::stream::{PAGE_COHORT_GAP_US, PAGE_COHORT_MAX_AGE_US},
     };
 
@@ -4201,7 +4204,7 @@ async fn cohort_of(f: &FindingIncident, now: i64) -> Result<CohortLookup, anyhow
             return false;
         };
         dim(FINDING_KIND_DIMENSION) == f.dimensions.get(FINDING_KIND_DIMENSION).map(String::as_str)
-            && stream_service(&records, t, n) == f.scope
+            && compatible(&stream_dimensions(&records, t, n), &f.dims)
     };
     let newest =
         infra::table::alert_incidents::newest_with_alert_kind(&f.org_id, kind, COHORT_IDS_SCANNED)
@@ -4209,23 +4212,15 @@ async fn cohort_of(f: &FindingIncident, now: i64) -> Result<CohortLookup, anyhow
     let latest = newest.iter().find(|i| same(i)).map(|i| i.id.clone());
     // Named before the open lookup, so a sibling created in between is joined, never skipped.
     let next_id = free_cohort_id(f, latest).await?;
-    let open: Vec<_> = infra::table::alert_incidents::open_with_alert_kind_since(
+    // Anchored on the first member's onset, which a join never moves, so a cohort cannot drift.
+    let open = infra::table::alert_incidents::open_with_alert_kind_since(
         &f.org_id,
         kind,
         now - PAGE_COHORT_MAX_AGE_US,
     )
     .await?
     .into_iter()
-    .filter(|i| same(i))
-    .collect();
-    let ids: Vec<String> = open.iter().map(|i| i.id.clone()).collect();
-    let linked = infra::table::alert_incidents::last_linked_at(&ids, kind).await?;
-    let open = open
-        .into_iter()
-        .filter_map(|i| linked.get(&i.id).map(|at| (*at, i)))
-        .filter(|(at, _)| now - at <= PAGE_COHORT_GAP_US)
-        .max_by(|(a, x), (b, y)| a.cmp(b).then_with(|| y.id.cmp(&x.id)))
-        .map(|(_, i)| i);
+    .find(|i| (f.triggered_at - i.first_alert_at).abs() <= PAGE_COHORT_GAP_US && same(i));
     Ok(CohortLookup { open, next_id })
 }
 
@@ -7419,6 +7414,8 @@ mod tests {
         const TITLE: &str = "checkout (logs) stopped sending data";
         const ONSET: i64 = 1_793_784_600_000_000;
         const QUARTER_HOUR: i64 = 900_000_000;
+        /// A re-onset inside the cohort gap, so the finding's open incident still takes it.
+        const NEXT_ONSET: i64 = ONSET + 300_000_000;
         const BACK: i64 = ONSET + 4 * QUARTER_HOUR;
         /// Ample for an unblocked write to land on SQLite or a local Postgres.
         const WAIT: std::time::Duration = std::time::Duration::from_millis(500);
@@ -7629,7 +7626,7 @@ mod tests {
                 streams: vec![("logs".to_string(), "checkout".to_string())],
                 page_title: TITLE.to_string(),
                 cohort: true,
-                scope: None,
+                dims: HashMap::new(),
             }
         }
 
@@ -7647,12 +7644,12 @@ mod tests {
                 streams: vec![("logs".to_string(), name)],
                 page_title: title,
                 cohort: true,
-                scope: None,
+                dims: HashMap::new(),
             }
         }
 
         fn stop(org_id: &str, i: usize) -> FindingIncident {
-            member(org_id, "stream_silence", i, ONSET + i as i64 * QUARTER_HOUR)
+            member(org_id, "stream_silence", i, ONSET)
         }
 
         async fn age(id: &str, links_by: i64, incident_by: i64) {
@@ -7693,9 +7690,31 @@ mod tests {
             let _db = store().await;
             for n in [1, 3, 40] {
                 let (org, pager) = (new_org(), Pager::default());
+                let names: Vec<String> = (0..n).map(|i| format!("s{i}")).collect();
+                {
+                    let mut schemas = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+                    for name in &names {
+                        let empty = arrow_schema::Schema::empty();
+                        let cached = infra::schema::SchemaCache::new(empty);
+                        schemas.insert(format!("{org}/logs/{name}"), cached);
+                    }
+                }
+                // Under its real finding id, so the incident list names the member's stream.
+                let named = |i: usize| FindingIncident {
+                    subject_id: format!(
+                        "{}{}",
+                        crate::autoobserve::incidents::SUBJECT_PREFIX,
+                        o2_enterprise::enterprise::autoobserve::plugins::stream::finding_id(
+                            &org,
+                            "stream_silence",
+                            &format!("logs/s{i}"),
+                        )
+                    ),
+                    ..stop(&org, i)
+                };
                 let mut ids = Vec::new();
                 for i in 0..n {
-                    ids.push(open(&stop(&org, i), &pager).await.unwrap());
+                    ids.push(open(&named(i), &pager).await.unwrap());
                 }
                 assert!(ids.iter().all(|id| *id == ids[0]), "{n}: {ids:?}");
                 assert_eq!(incidents_of(&org).await.len(), 1, "{n}");
@@ -7709,60 +7728,76 @@ mod tests {
                     _ => format!("{n} streams stopped sending data, including s0 (logs)"),
                 };
                 assert_eq!(title_of(&org, &ids[0]).await, want);
+                let (thread, _) = issue_incidents_of(&org).await.remove(&ids[0]).unwrap();
+                match thread.cohort {
+                    None => assert_eq!(n, 1, "only a lone member has no cohort"),
+                    Some(c) => {
+                        assert_eq!(c.streams as usize, n);
+                        assert_eq!(c.names.len(), 3, "{n}: at most three named");
+                        assert!(c.names.iter().all(|m| names.contains(m)), "{c:?}");
+                    }
+                }
+                let mut schemas = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+                for name in &names {
+                    schemas.remove(&format!("{org}/logs/{name}"));
+                }
             }
         }
 
         #[tokio::test]
-        async fn a_stop_after_the_gap_or_into_a_day_old_incident_opens_its_own() {
-            use o2_enterprise::enterprise::autoobserve::{
-                INTERVAL_SECS, plugins::stream::PAGE_COHORT_MAX_AGE_US,
-            };
+        async fn a_stop_joins_by_its_onset_and_never_a_day_old_incident() {
+            use o2_enterprise::enterprise::autoobserve::plugins::stream::PAGE_COHORT_MAX_AGE_US;
 
+            const MINUTE: i64 = 60_000_000;
             let _db = store().await;
-            let (org, pager) = (new_org(), Pager::default());
-            let tick = INTERVAL_SECS * 1_000_000;
-            let first = open(&stop(&org, 0), &pager).await.unwrap();
-            age(&first, tick + 30_000_000, 0).await;
-            let inside = open(&stop(&org, 1), &pager).await.unwrap();
-            assert_eq!(
-                inside, first,
-                "one detection tick plus jitter later still joins"
-            );
-            age(&first, 3 * tick, 0).await;
-            let after = open(&stop(&org, 2), &pager).await.unwrap();
-            assert_ne!(after, first, "the gap closed the cohort");
-            age(&after, 0, PAGE_COHORT_MAX_AGE_US + 60_000_000).await;
-            let old = open(&stop(&org, 3), &pager).await.unwrap();
-            assert_ne!(old, after, "a day-old incident takes no new member");
-            assert_eq!(incidents_of(&org).await.len(), 3);
-            assert_eq!(pager.pages(), 3, "one page per incident");
+            let day_old = PAGE_COHORT_MAX_AGE_US + MINUTE;
+            for (case, onset, links_by, incident_by, joins) in [
+                ("same onset, links 15m44s old", ONSET, 944_000_000, 0, true),
+                (
+                    "same tick, onsets an hour apart",
+                    ONSET + 4 * QUARTER_HOUR,
+                    0,
+                    0,
+                    false,
+                ),
+                ("onsets 9 min apart", ONSET + 9 * MINUTE, 0, 0, true),
+                ("same onset, a day-old incident", ONSET, 0, day_old, false),
+            ] {
+                let (org, pager) = (new_org(), Pager::default());
+                let first = open(&stop(&org, 0), &pager).await.unwrap();
+                age(&first, links_by, incident_by).await;
+                let next = open(&member(&org, "stream_silence", 1, onset), &pager)
+                    .await
+                    .unwrap();
+                assert_eq!(next == first, joins, "{case}");
+                assert_eq!(pager.pages(), if joins { 1 } else { 2 }, "{case}");
+            }
         }
 
         #[tokio::test]
         async fn a_member_that_stops_again_past_the_gap_or_the_day_opens_and_pages_its_own() {
-            use o2_enterprise::enterprise::autoobserve::{
-                INTERVAL_SECS, plugins::stream::PAGE_COHORT_MAX_AGE_US,
-            };
+            use o2_enterprise::enterprise::autoobserve::plugins::stream::PAGE_COHORT_MAX_AGE_US;
 
             let _db = store().await;
-            let tick = INTERVAL_SECS * 1_000_000;
-            for (links_by, incident_by) in [(3 * tick, 0), (0, PAGE_COHORT_MAX_AGE_US + 60_000_000)]
-            {
+            let minute = 60_000_000;
+            let day_old = PAGE_COHORT_MAX_AGE_US + minute;
+            for (again_at, incident_by) in [(BACK + QUARTER_HOUR, 0), (NEXT_ONSET, day_old)] {
                 let (org, pager) = (new_org(), Pager::default());
                 let (a, b) = (stop(&org, 0), stop(&org, 1));
                 let first = open(&a, &pager).await.unwrap();
                 assert_eq!(open(&b, &pager).await.unwrap(), first);
-                let resolved = resolve_finding_firing(&org, &a.subject_id, a.triggered_at, BACK)
+                let back = again_at - minute;
+                let resolved = resolve_finding_firing(&org, &a.subject_id, a.triggered_at, back)
                     .await
                     .unwrap();
                 assert!(!resolved, "the other member is still stopped");
                 infra::table::alert_incidents::acknowledge(&org, &first, PERSON)
                     .await
                     .unwrap();
-                age(&first, links_by, incident_by).await;
-                let again = member(&org, "stream_silence", 0, BACK + QUARTER_HOUR);
+                age(&first, 0, incident_by).await;
+                let again = member(&org, "stream_silence", 0, again_at);
                 let second = open(&again, &pager).await.unwrap();
-                assert_ne!(second, first, "{links_by}/{incident_by}: a new outage");
+                assert_ne!(second, first, "{again_at}/{incident_by}: a new outage");
                 assert_eq!(pager.pages(), 2, "and its own page");
                 assert_eq!(status(&org, &first).await, "acknowledged");
                 let replay = open(&again, &pager).await.unwrap();
@@ -8076,13 +8111,13 @@ mod tests {
             let _db = store().await;
             let (org, pager) = (new_org(), Pager::default());
             let first = open(&stop(&org, 0), &pager).await.unwrap();
-            age(&first, 3 * QUARTER_HOUR, 0).await;
             for i in 0..COHORT_IDS_SCANNED as usize {
                 let mut other = member(&org, "stream_drop", i, ONSET);
                 other.cohort = false;
                 let _opened = open(&other, &pager).await.unwrap();
             }
-            let next = open(&stop(&org, 1), &pager).await.unwrap();
+            let far = member(&org, "stream_silence", 1, ONSET + 4 * QUARTER_HOUR);
+            let next = open(&far, &pager).await.unwrap();
             assert_ne!(next, first, "never the first cohort's id, out of the scan");
             assert_eq!(
                 pager.pages(),
@@ -8097,15 +8132,17 @@ mod tests {
 
         #[tokio::test]
         async fn another_kind_or_another_service_opens_its_own_incident() {
+            use o2_enterprise::enterprise::autoobserve::page_routing::stream_dimensions;
+
             let _db = store().await;
             let (org, pager) = (new_org(), Pager::default());
-            for (stream, service) in [("s0", "checkout"), ("s1", "payments"), ("s2", "checkout")] {
-                let record = infra::table::service_streams::ServiceRecord {
+            let record = |stream: &str, service: &str, ids: serde_json::Value| {
+                infra::table::service_streams::ServiceRecord {
                     id: config::ider::generate(),
                     org_id: org.clone(),
                     service_name: service.to_string(),
                     set_id: "default".to_string(),
-                    disambiguation: serde_json::json!({}),
+                    disambiguation: ids,
                     all_dimensions: serde_json::json!({}),
                     logs_streams: serde_json::json!([stream]),
                     traces_streams: serde_json::json!([]),
@@ -8113,26 +8150,38 @@ mod tests {
                     profiles_streams: serde_json::json!([]),
                     field_name_mapping: None,
                     last_seen: 1,
-                };
-                let _stored = infra::table::service_streams::put(&org, record, 100)
+                }
+            };
+            let records = [
+                record("s0", "checkout", serde_json::json!({})),
+                record("s1", "payments", serde_json::json!({})),
+                record("s2", "checkout", serde_json::json!({})),
+                record("s5", "checkout", serde_json::json!({"k8s-cluster": "prod"})),
+            ];
+            for r in &records {
+                let _stored = infra::table::service_streams::put(&org, r.clone(), 100)
                     .await
                     .unwrap();
             }
-            let scoped = |i: usize, service: &str| FindingIncident {
-                scope: Some(service.to_string()),
-                ..stop(&org, i)
+            let catalogued = |i: usize| {
+                let f = stop(&org, i);
+                FindingIncident {
+                    dims: stream_dimensions(&records, "logs", &f.streams[0].1),
+                    ..f
+                }
             };
-            let checkout = open(&scoped(0, "checkout"), &pager).await.unwrap();
-            let payments = open(&scoped(1, "payments"), &pager).await.unwrap();
-            assert_ne!(
-                payments, checkout,
-                "per service when the catalogue knows one"
-            );
-            let joined = open(&scoped(2, "checkout"), &pager).await.unwrap();
-            assert_eq!(joined, checkout);
+            let checkout = open(&catalogued(0), &pager).await.unwrap();
+            let payments = open(&catalogued(1), &pager).await.unwrap();
+            assert_ne!(payments, checkout, "a conflicting service");
+            let joined = open(&catalogued(2), &pager).await.unwrap();
+            assert_eq!(joined, checkout, "the same service");
+            let wider = open(&catalogued(5), &pager).await.unwrap();
+            assert_eq!(wider, checkout, "the same service with one more dimension");
             let unscoped = open(&stop(&org, 3), &pager).await.unwrap();
             assert!(![checkout.as_str(), payments.as_str()].contains(&unscoped.as_str()));
-            let drop = open(&member(&org, "stream_drop", 4, ONSET), &pager)
+            let uncatalogued = open(&stop(&org, 4), &pager).await.unwrap();
+            assert_eq!(uncatalogued, unscoped, "both uncatalogued");
+            let drop = open(&member(&org, "stream_drop", 6, ONSET), &pager)
                 .await
                 .unwrap();
             assert_ne!(drop, unscoped, "another kind");
@@ -8492,7 +8541,7 @@ mod tests {
                 .await
                 .unwrap();
             let onsets: Vec<i64> = links.iter().map(|l| l.alert_fired_at).collect();
-            assert_eq!(onsets, [ONSET + QUARTER_HOUR, ONSET], "both onsets");
+            assert_eq!(onsets, [NEXT_ONSET, ONSET], "both onsets");
         }
 
         #[tokio::test]
@@ -8537,9 +8586,7 @@ mod tests {
             let _db = crate::alerts::rca_runs::tests::db().await;
             let (org, pager) = (new_org(), Pager::default());
             let id = open(&finding(&org, ONSET), &pager).await.unwrap();
-            let later = open(&finding(&org, ONSET + QUARTER_HOUR), &pager)
-                .await
-                .unwrap();
+            let later = open(&finding(&org, NEXT_ONSET), &pager).await.unwrap();
             assert_eq!(later, id);
             assert_eq!(incidents_of(&org).await.len(), 1);
             let links = infra::table::alert_incidents::get_incident_alerts(&id)
@@ -8676,8 +8723,7 @@ mod tests {
         async fn a_node_stalled_past_its_lease_check_joins_the_incident_the_next_holder_opened() {
             let _db = crate::alerts::rca_runs::tests::db().await;
             let (org, pager) = (new_org(), Pager::default());
-            let (old_onset, new_onset) =
-                (finding(&org, ONSET), finding(&org, ONSET + QUARTER_HOUR));
+            let (old_onset, new_onset) = (finding(&org, ONSET), finding(&org, NEXT_ONSET));
             let cluster = Arc::default();
             let gate = Gate::at(FenceStep::Open, true);
             let (a, b) = (Node::gated(&cluster, &gate), Node::of(&cluster));
@@ -8697,8 +8743,7 @@ mod tests {
         async fn a_node_whose_lease_lapses_before_its_insert_opens_nothing() {
             let _db = crate::alerts::rca_runs::tests::db().await;
             let (org, pager) = (new_org(), Pager::default());
-            let (old_onset, new_onset) =
-                (finding(&org, ONSET), finding(&org, ONSET + QUARTER_HOUR));
+            let (old_onset, new_onset) = (finding(&org, ONSET), finding(&org, NEXT_ONSET));
             let cluster = Arc::default();
             let gate = Gate::at(FenceStep::Open, false);
             let (a, b) = (Node::gated(&cluster, &gate), Node::of(&cluster));
@@ -8723,7 +8768,7 @@ mod tests {
             let _db = crate::alerts::rca_runs::tests::db().await;
             let (org, pager) = (new_org(), Pager::default());
             let x = open(&finding(&org, ONSET), &pager).await.unwrap();
-            let f = finding(&org, ONSET + QUARTER_HOUR);
+            let f = finding(&org, NEXT_ONSET);
             let cluster = Arc::default();
             let (a_gate, b_gate) = (
                 Gate::at(FenceStep::Join, true),
@@ -9201,7 +9246,7 @@ mod tests {
                             .unwrap();
                     }
                     _ => {
-                        let later = finding(&org, ONSET + QUARTER_HOUR);
+                        let later = finding(&org, NEXT_ONSET);
                         assert_eq!(open(&later, &pager).await.unwrap(), id, "{case}");
                     }
                 }
@@ -9459,7 +9504,7 @@ mod tests {
             let _db = store().await;
             let (org, pager) = (new_org(), Pager::default());
             let id = open(&finding(&org, ONSET), &pager).await.unwrap();
-            let later = finding(&org, ONSET + QUARTER_HOUR);
+            let later = finding(&org, NEXT_ONSET);
             assert_eq!(open(&later, &pager).await.unwrap(), id);
             let resolved =
                 resolve_finding_firing(&org, &later.subject_id, later.triggered_at, BACK).await;

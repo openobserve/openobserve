@@ -1675,34 +1675,6 @@ pub async fn newest_with_alert_kind(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
-/// When each incident's newest `alert_kind` link was written, on the primary.
-pub async fn last_linked_at(
-    incident_ids: &[String],
-    alert_kind: &str,
-) -> Result<HashMap<String, i64>, errors::Error> {
-    if incident_ids.is_empty() {
-        return Ok(HashMap::new());
-    }
-    let rows: Vec<(String, Option<i64>)> = alert_incident_alerts::Entity::find()
-        .select_only()
-        .column(alert_incident_alerts::Column::IncidentId)
-        .column_as(alert_incident_alerts::Column::CreatedAt.max(), "linked_at")
-        .filter(
-            alert_incident_alerts::Column::IncidentId
-                .is_in(incident_ids.iter().map(String::as_str)),
-        )
-        .filter(alert_incident_alerts::Column::AlertKind.eq(alert_kind))
-        .group_by(alert_incident_alerts::Column::IncidentId)
-        .into_tuple()
-        .all(get_orm_client_rw().await)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(rows
-        .into_iter()
-        .filter_map(|(id, at)| Some((id, at?)))
-        .collect())
-}
-
 /// Every `alert_kind` link of these incidents, oldest firing first.
 pub async fn links_with_alert_kind(
     incident_ids: &[String],
