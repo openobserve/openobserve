@@ -419,6 +419,24 @@ export function buildSQLContext(
   const axisWidthSet = axisWidth !== null && axisWidth !== undefined;
   const reserveYLabelLeft = !isHorizontalChart && !hasYAxisName && !axisWidthSet;
 
+  // Without containLabel the tick-label band only covers one unrotated line, so a rotated
+  // label's extra height is reserved here or it runs into a bottom legend.
+  const rotatedLabelExtraSpace =
+    reserveYLabelLeft && !hasXAxisName && labelRotation !== 0 && xAxisKeys.length > 0
+      ? (() => {
+          const rotationInRadians = (Math.abs(labelRotation) * Math.PI) / 180;
+          // eslint-disable-next-line local/no-hardcoded-px -- must match `labelFontSize`, which ECharts paints axis labels at as a literal CSS px
+          const measured = calculateWidthText(
+            largestLabel(getAxisDataFromKey(xAxisKeys[0])),
+            "12px",
+          );
+          const rotatedHeight =
+            Math.min(labelWidth, measured) * Math.sin(rotationInRadians) +
+            labelFontSize * Math.cos(rotationInRadians);
+          return Math.max(0, Math.ceil(rotatedHeight - labelFontSize));
+        })()
+      : 0;
+
   const horizontalCategoryLabelWidth = isHorizontalChart
     ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(xAxisKeys?.[0]))), 120)
     : 0;
@@ -475,7 +493,7 @@ export function buildSQLContext(
                     : breakDownKeys.length > 0
                       ? 25
                       : 0;
-              return baseBottom + additionalBottomSpace;
+              return baseBottom + additionalBottomSpace + rotatedLabelExtraSpace;
             })()) + (reserveYLabelLeft || reserveHorizontalYName ? X_AXIS_TICK_LABEL_BAND : 0),
     },
     tooltip: {
