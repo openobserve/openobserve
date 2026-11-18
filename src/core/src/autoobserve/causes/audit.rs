@@ -300,20 +300,23 @@ fn record(
         }
         Object::Pipeline { id, name } => {
             let named = a.target.clone().or(name);
+            let created = id.is_none();
             let id = id.or_else(|| only_named(names, named.as_deref()?))?;
             let subject = EntityRef::new(kinds::PIPELINE, &[(dims::ENTITY_ID, &id)]);
+            let open = link("pipeline/pipelines/edit", &[("id", &id)])
+                .filter(|_| !a.deleted && names.contains_key(&id));
             match fed.get(&id) {
                 Some(f) => {
-                    let open =
-                        link("pipeline/pipelines/edit", &[("id", &id)]).filter(|_| !a.deleted);
                     let name = a.target.clone().unwrap_or_else(|| f.name.clone());
                     (subject, name, f.affects.clone(), open)
                 }
-                // Gone since, so what it fed is unknown and the change counts org-wide.
-                None if !names.contains_key(&id) => {
-                    (subject, named.unwrap_or_default(), Vec::new(), None)
+                // A create cannot have cut a stream off.
+                None if created => return None,
+                // Only the current config is stored, so what an edit cut off is unknown: org-wide.
+                None => {
+                    let name = named.or_else(|| names.get(&id).cloned());
+                    (subject, name.unwrap_or_default(), Vec::new(), open)
                 }
-                None => return None,
             }
         }
         Object::Alert { id, stream } => {
@@ -699,7 +702,15 @@ mod tests {
                 "",
                 r#"{"name":"Mask-App ","nodes":[{"id":"#,
             ),
+            audit_row(
+                133,
+                "POST",
+                "acme/pipelines",
+                "",
+                r#"{"name":"p9","nodes":[{"id":"#,
+            ),
             audit_row(135, "PUT", "acme/pipelines", "", r#"{"pipeline_id":"p9"}"#),
+            audit_row(136, "PUT", "acme/pipelines/p1/enable", "value=false", ""),
             audit_row(137, "DELETE", "acme/pipelines/p7", "", ""),
             audit_row(140, "PUT", "v2/acme/alerts/a1", "", "{}"),
             audit_row(142, "DELETE", "v2/acme/alerts/a7", "", ""),
@@ -778,6 +789,18 @@ mod tests {
                     Vec::new()
                 ),
                 (
+                    136,
+                    ChangeKind::PipelineChanged,
+                    kinds::PIPELINE,
+                    vec![logs("app")]
+                ),
+                (
+                    135,
+                    ChangeKind::PipelineChanged,
+                    kinds::PIPELINE,
+                    Vec::new()
+                ),
+                (
                     132,
                     ChangeKind::PipelineChanged,
                     kinds::PIPELINE,
@@ -811,6 +834,12 @@ mod tests {
         );
         for issue in &ask.issues {
             let ranked = context::rank(records.clone(), issue, &[]).top;
+            // p9 no longer touches app, but the edit may be what cut app off.
+            assert!(
+                ranked.iter().any(|(r, ..)| r.at == 135),
+                "{}",
+                issue.decision_id
+            );
             assert!(
                 ranked
                     .iter()
