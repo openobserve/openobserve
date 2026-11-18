@@ -132,6 +132,21 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
     expect(headers(wrapper!)).toEqual(expect.arrayContaining(["Applies to", "Used by"]));
   });
 
+  it("clears a choice made on the other viewport on Reset", async () => {
+    mdUpRef.value = false;
+    await mountList();
+    await choose({ applies_to: true, used_by: false });
+    await resize(true);
+    await choose({ applies_to: true, used_by: false });
+    expect(headers(wrapper!)).not.toContain("Used by");
+
+    await choose({ applies_to: true, used_by: true });
+    await resize(false);
+    const shown = headers(wrapper!);
+    expect(shown).not.toContain("Applies to");
+    expect(shown).not.toContain("Used by");
+  });
+
   it("shows both columns again when the viewport grows to md", async () => {
     mdUpRef.value = false;
     await mountList();

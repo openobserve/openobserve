@@ -561,8 +561,14 @@ const columnVisibility = computed(() => ({
   ...responsiveColumns.value,
   ...columnOverrides.value,
 }));
-// A changed column back at its viewport default drops its override (this is also how Reset clears).
+// A view back at this viewport's defaults (Reset, or the last change undone) clears every override.
+// Otherwise a changed column back at its default drops its override.
 const setColumnVisibility = (next: Record<string, boolean>) => {
+  const defaults = responsiveColumns.value;
+  if (Object.keys(defaults).every((id) => (next[id] ?? true) === defaults[id])) {
+    columnOverrides.value = {};
+    return;
+  }
   const overrides = { ...columnOverrides.value };
   for (const [id, visible] of Object.entries(next)) {
     if (visible === (columnVisibility.value[id] ?? true)) continue;
