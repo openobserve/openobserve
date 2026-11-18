@@ -105,16 +105,27 @@ pub(crate) fn limit_body(
 fn same_spec(a: &str, b: &str) -> bool {
     let value = |body: &str| {
         let mut spec = ContentSpec::parse(body).ok()?;
-        spec.body = spec.body.trim().to_string();
+        // JavaScript `trim` also removes U+FEFF, which Rust does not count as whitespace.
+        spec.body = spec
+            .body
+            .trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}')
+            .to_string();
         serde_json::to_value(spec).ok()
     };
     matches!((value(a), value(b)), (Some(a), Some(b)) if a == b)
 }
 
-/// The body limit on a draft spec, measured as the editor saves it: JSON with two-space indents.
+/// The body limit on a draft spec, measured as the editor saves it: JSON with two-space indents,
+/// with no keys for absent optional values.
 pub fn check_spec_size(spec: &ContentSpec) -> Result<(), TemplateError> {
     // A spec serializes to JSON infallibly; on a failure fall back to the body text alone.
-    let size = serde_json::to_vec_pretty(spec).map_or(spec.body.len(), |json| json.len());
+    let size = serde_json::to_value(spec)
+        .map(|mut value| {
+            drop_nulls(&mut value);
+            value
+        })
+        .and_then(|value| serde_json::to_vec_pretty(&value))
+        .map_or(spec.body.len(), |json| json.len());
     if size <= BODY_MAX_BYTES {
         return Ok(());
     }
@@ -122,6 +133,18 @@ pub fn check_spec_size(spec: &ContentSpec) -> Result<(), TemplateError> {
         size,
         max: BODY_MAX_BYTES,
     })
+}
+
+/// Removes object keys whose value is null, at every depth.
+fn drop_nulls(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            map.retain(|_, v| !v.is_null());
+            map.values_mut().for_each(drop_nulls);
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(drop_nulls),
+        _ => {}
+    }
 }
 
 pub async fn save(
@@ -1556,6 +1579,12 @@ mod tests {
         resaved["future"] = serde_json::Value::Bool(true);
         let resaved = serde_json::to_string_pretty(&resaved).unwrap();
         assert_eq!(limit(&resaved, &legacy, true).unwrap(), legacy);
+        // JavaScript `trim` also removes a leading U+FEFF.
+        let bom = format!(
+            "{{\"title\":\"t\",\"body\":\"\u{feff}{}\"}}",
+            "b".repeat(BODY_MAX_BYTES)
+        );
+        assert_eq!(limit(&pretty, &bom, true).unwrap(), bom);
     }
 
     #[test]
@@ -1570,6 +1599,21 @@ mod tests {
             body: "b".repeat(BODY_MAX_BYTES),
             ..small
         };
+        // Absent optional values are not measured: the editor saves no key for them.
+        let fields = serde_json::to_value(vec![
+            serde_json::json!({"label": "l", "value": "v"});
+            14_000
+        ])
+        .unwrap();
+        let many_fields: ContentSpec = serde_json::from_value(serde_json::json!({
+            "title": "t", "body": "b", "fields": fields
+        }))
+        .unwrap();
+        let mut with_nulls = serde_json::to_value(&many_fields).unwrap();
+        assert!(serde_json::to_vec_pretty(&with_nulls).unwrap().len() > BODY_MAX_BYTES);
+        drop_nulls(&mut with_nulls);
+        assert!(serde_json::to_vec_pretty(&with_nulls).unwrap().len() < BODY_MAX_BYTES);
+        assert!(check_spec_size(&many_fields).is_ok());
         assert!(matches!(
             check_spec_size(&large),
             Err(TemplateError::BodyTooLarge { .. })
