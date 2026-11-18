@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-if="active"
+      v-if="active && active !== 'promql'"
       class="text-text-body min-w-0 text-sm leading-8"
       data-test="add-alert-intent-sentence"
     >
@@ -86,7 +86,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :search-debounce="300"
               @search="valueSearch = $event"
               @close="reapply"
-              ><template #trigger>{{ valuesText }}</template></OSelect
+              ><template #trigger>{{ valuesText }}</template
+              ><template #after-options
+                ><p
+                  class="text-text-secondary border-border-default m-0 border-t px-3 py-2 text-xs"
+                  data-test="add-alert-intent-slot-value-help"
+                >
+                  {{ valueHelp }}
+                </p></template
+              ></OSelect
             >
           </span>
         </template>
@@ -303,6 +311,8 @@ import {
   fieldsBySamplePresence,
   intentsFor,
   isCounterLike,
+  labelPattern,
+  patternText,
   labelProfile,
   familyMember,
   metricFamilySiblings,
@@ -610,13 +620,40 @@ const valueOptions = computed<SelectOption[]>(() => {
     }));
   const typed = (slots.values ?? [])
     .filter((v) => !seen.some((s) => s.value === v))
-    .map((v) => ({ label: raw(v), value: v }));
-  return [...typed, ...listed];
+    .map((v) => ({ label: raw(patternText(v)), value: v }));
+  return [...patternOptions.value, ...typed, ...listed];
 });
+
+// A "5xx" typed for a metric label offers every value it covers, since the query reads values as a regex.
+const patternOptions = computed<SelectOption[]>(() => {
+  const search = valueSearch.value.trim();
+  if (!isMetrics.value || !search) return [];
+  const regex = labelPattern(
+    search,
+    labelValues.value.map((v) => v.value),
+  );
+  if (regex === search || slots.values?.includes(regex)) return [];
+  const re = new RegExp(`^(?:${regex})$`);
+  const covered = labelValues.value.filter((v) => re.test(v.value));
+  return [
+    {
+      label: t("alerts.intent.slots.patternOption", { pattern: raw(search) }),
+      value: regex,
+      suffix: formatNumber(covered.reduce((sum, v) => sum + v.count, 0)),
+    },
+  ];
+});
+const valueHelp = computed(() =>
+  isMetrics.value
+    ? t("alerts.intent.slots.valueHelpSeries", { example: raw("5xx") })
+    : t("alerts.intent.slots.valueHelpEvents", { noun: noun.value }),
+);
 
 // The picked values read as words in the sentence, so the picker sizes to them like the other slots.
 const valuesText = computed<I18nText>(() =>
-  slots.values?.length ? joinListOrMore(slots.values, t) : t("alerts.intent.slots.valuePrompt"),
+  slots.values?.length
+    ? joinListOrMore(slots.values.map(patternText), t)
+    : t("alerts.intent.slots.valuePrompt"),
 );
 
 const offersGroup = computed(() => !!props.active && wantsGroup(props.active));
@@ -632,10 +669,25 @@ const SENTENCES: Record<IntentId, [I18nKey, I18nKey]> = {
   metricAbove: ["alerts.intent.metricAbove.sentencePer", "alerts.intent.metricAbove.sentenceAll"],
   ratio: ["alerts.intent.ratio.sentenceWhere", "alerts.intent.ratio.sentenceWhereAll"],
   unusualChange: ["alerts.intent.unusualChange.sentence", "alerts.intent.unusualChange.sentence"],
+  promql: ["alerts.intent.promql.label", "alerts.intent.promql.label"],
 };
+const RATE_SENTENCES: [I18nKey, I18nKey] = [
+  "alerts.intent.metricAbove.rateSentencePer",
+  "alerts.intent.metricAbove.rateSentenceAll",
+];
+// Only a type the metric declares turns "above a value" into a rate; an unknown one keeps the average.
+const isCounter = computed(
+  () =>
+    isMetrics.value &&
+    !!pickedMetric.value?.metrics_meta?.metric_type &&
+    isCounterLike(pickedMetric.value),
+);
 // An empty group ("") is one the user asked for but has not picked yet.
 const sentenceKey = computed<I18nKey>(() => {
-  const pair = SENTENCES[props.active ?? "countWhere"];
+  const pair =
+    props.active === "metricAbove" && isCounter.value
+      ? RATE_SENTENCES
+      : SENTENCES[props.active ?? "countWhere"];
   return slots.group !== undefined ? pair[0] : pair[1];
 });
 const intentLabel = (id: IntentId) =>
@@ -650,7 +702,7 @@ const fillFor = (id: IntentId): IntentFill =>
           ...slots,
           metric: props.streamName,
           family: family.value,
-          counter: isCounterLike(pickedMetric.value),
+          counter: id === "ratio" ? isCounterLike(pickedMetric.value) : isCounter.value,
         },
         { periodMinutes: props.periodMinutes },
       )
@@ -752,17 +804,25 @@ const setValues = (value: SelectModelValue) => {
 };
 
 const addValue = (value: string) => {
-  const text = value.trim();
+  const typed = value.trim();
+  const text = isMetrics.value
+    ? labelPattern(
+        typed,
+        labelValues.value.map((v) => v.value),
+      )
+    : typed;
   if (!text) return;
   const previous = slots.values ?? [];
   slots.values = [...new Set(pickedValues([...previous, text], previous, seeded))];
   seeded = [];
 };
 
-// The share's rate window is written into its query, so the query follows a new window.
+// A rate window is written into the query, so the query follows a new window.
 const setWindow = async (minutes: number | "") => {
   emit("update:period", minutes);
-  if (props.active !== "ratio" || !(Number(minutes) > 0)) return;
+  const readsWindow =
+    props.active === "ratio" || (props.active === "metricAbove" && isCounter.value);
+  if (!readsWindow || !(Number(minutes) > 0)) return;
   await nextTick();
   reapply();
 };

@@ -242,6 +242,18 @@ describe("buildAlertAutoName", () => {
     expect(name).toBe("k8s_logs_status_gte_500");
   });
 
+  it.each([
+    ["rate(node_cpu_seconds_total[10m])", "node_cpu_seconds_total_rate"],
+    ["sum by (host) (rate(node_cpu_seconds_total[5m]))", "node_cpu_seconds_total_rate"],
+    ["node_cpu_seconds_total > 3", "node_cpu_seconds_total_query_alert"],
+  ])("names the PromQL %s as %s", (promql, expected) => {
+    const named = buildAlertAutoName(
+      alert({ stream_name: "node_cpu_seconds_total", query_condition: { type: "promql", promql } }),
+      t,
+    );
+    expect(named).toBe(expected);
+  });
+
   it("produces a name the alert-name rule accepts (no spaces or reserved chars)", () => {
     const name = buildAlertAutoName(
       alert({

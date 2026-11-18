@@ -27,7 +27,8 @@ export type IntentId =
   | "compareLastWeek"
   | "metricAbove"
   | "ratio"
-  | "unusualChange";
+  | "unusualChange"
+  | "promql";
 
 export type FieldKind = "string" | "number" | "boolean" | "other";
 
@@ -95,7 +96,12 @@ export const EVENT_INTENTS: readonly IntentId[] = [
   "unusualVolume",
   "compareLastWeek",
 ];
-export const METRIC_INTENTS: readonly IntentId[] = ["metricAbove", "ratio", "unusualChange"];
+export const METRIC_INTENTS: readonly IntentId[] = [
+  "metricAbove",
+  "ratio",
+  "unusualChange",
+  "promql",
+];
 const ANOMALY_INTENTS = new Set<IntentId>(["unusualVolume", "unusualChange"]);
 
 /** Fields asked about in the one shape search; a wider stream ranks its first ones only. */
@@ -597,6 +603,17 @@ export function compareFactor(vrl: string | null | undefined): number | undefine
   return bare(vrl ?? "") === bare(compareFunction(factor)) ? factor : undefined;
 }
 
+/** A metric as a PromQL query; a counter only ever grows, so it reads as its per-second rate. */
+export function metricPromql(
+  metric: string,
+  opts: { counter: boolean; group?: string; windowMinutes: number },
+): string {
+  const window = `${Math.max(1, Math.round(opts.windowMinutes))}m`;
+  const read = opts.counter ? `rate(${metric}[${window}])` : metric;
+  if (!opts.group) return read;
+  return `${opts.counter ? "sum" : "avg"} by (${opts.group}) (${read})`;
+}
+
 /** A metric intent as the values it writes. */
 export function buildMetricFill(
   intent: IntentId,
@@ -614,6 +631,24 @@ export function buildMetricFill(
         query_mode: "filters",
         detection_function: "avg",
         detection_function_field: "value",
+      },
+    };
+  }
+  if (intent === "promql" || (intent === "metricAbove" && slots.counter)) {
+    return {
+      intent,
+      howItChecks: "false",
+      aggregation: false,
+      vrl: false,
+      values: {
+        "query_condition.type": "promql",
+        "query_condition.promql": metricPromql(slots.metric, {
+          counter: !!slots.counter,
+          group: slots.group,
+          windowMinutes: ctx.periodMinutes,
+        }),
+        "query_condition.promql_condition": { column: "value", operator: ">", value: "" },
+        "query_condition.promql_multi_alert": !!slots.group,
       },
     };
   }
@@ -779,6 +814,18 @@ export function rankMetricCategory(
     profile.map((p) => p.label),
   );
 }
+
+const DIGIT_PATTERN = /^(?=.*\d)(?=.*x)[\dx]+$/i;
+const DIGIT_REGEX = /^(?=.*\d)(?=.*\.)[\d.]+$/;
+
+/** A typed "5xx" as the label regex it stands for, one character per x; a value the series
+ * really carry, or any other text, stays as typed. */
+export const labelPattern = (typed: string, seen: readonly string[]): string =>
+  DIGIT_PATTERN.test(typed) && !seen.includes(typed) ? typed.replace(/x/gi, ".") : typed;
+
+/** A digit regex read back the way it was typed: "5.." as "5xx". */
+export const patternText = (value: string): string =>
+  DIGIT_REGEX.test(value) ? value.replace(/\./g, "x") : value;
 
 const promLabelValue = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 

@@ -891,6 +891,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :value-hint="conditionDiscovery.valueHint"
                     :field-detail="conditionDiscovery.fieldDetail"
                     :value-empty-text="conditionDiscovery.valueEmptyText"
+                    :value-note="t('alerts.intent.slots.valueHelpEvents', { noun: countedNoun })"
                     :add-labels="{
                       add: t('alerts.form.filter.add'),
                       addBelow: t('alerts.form.filter.addBelow'),
@@ -1901,6 +1902,7 @@ import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions"
 import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
 import { dataNoun, joinListMore } from "@/utils/alerts/alertCopy";
+import { metricPromql } from "@/utils/alerts/alertIntents";
 import { isSpanDurationMeasure, UNIT_KEEPING_FUNCTIONS } from "@/utils/alerts/alertReadBack";
 import { alwaysOneRow, oneRowMeetsLimit } from "@/utils/alerts/alertSqlUtils";
 import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
@@ -2357,6 +2359,26 @@ export default defineComponent({
       },
       { immediate: true },
     );
+    // A counter only grows, so a new alert's first measure is its rate, never an average of the raw count.
+    let rateDefaultedFor = "";
+    watch(promqlMetricType, (type) => {
+      const stream = props.streamName;
+      if (!type || type.toLowerCase() === "gauge" || rateDefaultedFor === stream) return;
+      rateDefaultedFor = stream;
+      const untouched =
+        localTab.value === "custom" &&
+        selectedFunction.value === "avg" &&
+        [undefined, null, ""].includes(fv("query_condition.aggregation.having.value"));
+      if (props.beingUpdated || props.isSeeding || !untouched) return;
+      updateTab("promql");
+      emit(
+        "update:promqlQuery",
+        metricPromql(stream, {
+          counter: true,
+          windowMinutes: Number(props.triggerCondition?.period) || 10,
+        }),
+      );
+    });
     const promqlSamples = computed(() =>
       props.streamType === "metrics" && props.streamName
         ? alertPromqlSamples({

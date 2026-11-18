@@ -466,6 +466,22 @@ describe("QueryConfig.vue", () => {
     });
   });
 
+  describe("a new alert on a counter metric", () => {
+    it.each([
+      ["counter", "rate(node_cpu_seconds_total[10m])"],
+      ["gauge", undefined],
+    ])("on a %s first reads %s", async (metricType, promql) => {
+      streamFixtures.node_cpu_seconds_total = {
+        schema: [{ name: "value" }],
+        metrics_meta: { metric_type: metricType },
+      };
+      await setQCProps({ streamType: "metrics", streamName: "node_cpu_seconds_total" });
+      await flushPromises();
+      expect(wrapper.emitted("update:promqlQuery")?.at(-1)?.[0]).toBe(promql);
+      expect(wrapper.emitted("update:tab")?.at(-1)?.[0]).toBe(promql ? "promql" : undefined);
+    });
+  });
+
   describe("Tab Options Computation", () => {
     it("should show all three tabs for metrics stream type", async () => {
       await setQCProps({ streamType: "metrics" });

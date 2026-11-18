@@ -23,6 +23,8 @@ import {
   fieldKind,
   fieldsBySamplePresence,
   intentsFor,
+  labelPattern,
+  patternText,
   labelProfile,
   familyMember,
   metricFamilySiblings,
@@ -47,8 +49,8 @@ describe("alertIntents", () => {
   it.each([
     ["logs", true, ["countWhere", "percentile", "anyEvent", "unusualVolume", "compareLastWeek"]],
     ["traces", false, ["countWhere", "percentile", "anyEvent", "compareLastWeek"]],
-    ["metrics", true, ["metricAbove", "ratio", "unusualChange"]],
-    ["metrics", false, ["metricAbove", "ratio"]],
+    ["metrics", true, ["metricAbove", "ratio", "unusualChange", "promql"]],
+    ["metrics", false, ["metricAbove", "ratio", "promql"]],
   ])("offers %s intents (anomaly %s)", (type, anomaly, ids) => {
     expect(intentsFor(type, { anomaly })).toEqual(ids);
   });
@@ -392,6 +394,32 @@ describe("alertIntents", () => {
     expect(fill.values["query_condition.promql_multi_alert"]).toBe(true);
   });
 
+  it.each([
+    { intent: "metricAbove", counter: true, group: "host", promql: "sum by (host) (rate(m[10m]))" },
+    { intent: "metricAbove", counter: true, group: undefined, promql: "rate(m[10m])" },
+    { intent: "promql", counter: true, group: undefined, promql: "rate(m[10m])" },
+    { intent: "promql", counter: false, group: undefined, promql: "m" },
+  ] as const)(
+    "$intent on a counter $counter per $group reads $promql",
+    ({ intent, counter, group, promql }) => {
+      const fill = buildMetricFill(intent, { metric: "m", counter, group }, { periodMinutes: 10 });
+      expect(fill.values).toMatchObject({
+        "query_condition.type": "promql",
+        "query_condition.promql": promql,
+        "query_condition.promql_multi_alert": !!group,
+      });
+    },
+  );
+
+  it("a gauge above a value keeps the builder's average", () => {
+    const fill = buildMetricFill(
+      "metricAbove",
+      { metric: "m", counter: false },
+      { periodMinutes: 10 },
+    );
+    expect(fill.values["query_condition.type"]).toBe("custom");
+  });
+
   it("ranks metric labels for grouping by how many series carry them", () => {
     const profile = labelProfile([
       { __name__: "m", host: "a", cpu: "0", job: "x" },
@@ -407,5 +435,28 @@ describe("alertIntents", () => {
     [10, true],
   ])("folds the cards for an org with %s alerts: %s", (count, folded) => {
     expect(cardsFolded(count)).toBe(folded);
+  });
+});
+
+describe("label value patterns", () => {
+  it.each([
+    ["5xx", ["200"], "5.."],
+    ["5XX", [], "5.."],
+    ["50x", [], "50."],
+    ["5xx", ["5xx", "200"], "5xx"],
+    ["500", [], "500"],
+    ["xx", [], "xx"],
+    ["OOMKilled", [], "OOMKilled"],
+  ])("%s typed beside %j matches %s", (typed, seen, expected) => {
+    expect(labelPattern(typed, seen)).toBe(expected);
+  });
+
+  it.each([
+    ["5..", "5xx"],
+    ["50.", "50x"],
+    ["a.b", "a.b"],
+    ["500", "500"],
+  ])("%s reads as %s", (value, text) => {
+    expect(patternText(value)).toBe(text);
   });
 });
