@@ -668,14 +668,15 @@ const useLogs = (t: TranslateFn) => {
 
       const quotedField =
         searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(String(field)) : field;
-      // "" and the text "null" are values a row holds; only a missing value is a null check.
-      if (field_value === null || field_value === undefined) {
+      const isNumericType = (type: string) => ["int64", "float64"].includes(type.toLowerCase());
+      const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
+      const isTyped = isNumericType(fieldType) || isBooleanType(fieldType);
+
+      // "" and the text "null" are values a string holds; a number or boolean shown as "" is missing.
+      if (field_value === null || field_value === undefined || (isTyped && field_value === "")) {
         return `${quotedField} ${action == "include" ? "is" : "is not"} null`;
       }
       let expression = `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
-
-      const isNumericType = (type: string) => ["int64", "float64"].includes(type.toLowerCase());
-      const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
 
       if (isNumericType(fieldType)) {
         expression = `${quotedField} ${operator} ${field_value}`;
