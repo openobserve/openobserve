@@ -12231,7 +12231,11 @@
         "suppressTail": ", only when the level changes",
         "compare": "Compared with the same window {offsets} earlier.",
         "compareFunction": "Compared with the same window {offsets} earlier, through a function.",
-        "function": "Runs the results through a function before checking the threshold."
+        "function": "Runs the results through a function before checking the threshold.",
+        "firesSomeGroupsCount": "Fires when at least {count} {groups} group has {condition} in the last {window}. | Fires when at least {count} {groups} groups have {condition} in the last {window}.",
+        "firesSomeGroupsValue": "Fires when {measure} is {comparison} for at least {count} {groups} group in the last {window}. | Fires when {measure} is {comparison} for at least {count} {groups} groups in the last {window}.",
+        "weeks": "{count} week | {count} weeks",
+        "months": "{count} month | {count} months"
       },
       "watch": {
         "title": "What should we watch?",
@@ -12260,7 +12264,8 @@
         "helpSpans": "Choose which spans count and how many is a problem. The preview shows how it behaves right now.",
         "helpMetrics": "Choose what to measure and what value is a problem. The preview shows how it behaves right now.",
         "helpSql": "Write the query and how many rows is a problem. The preview shows how it behaves right now.",
-        "helpPromql": "Write the query and what value is a problem. The preview shows how it behaves right now."
+        "helpPromql": "Write the query and what value is a problem. The preview shows how it behaves right now.",
+        "navFact": "{name} {value}"
       },
       "notify": {
         "title": "Who should hear about it?",
