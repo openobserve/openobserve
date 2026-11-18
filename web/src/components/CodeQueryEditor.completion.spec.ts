@@ -2297,6 +2297,13 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
       const range = { startTime: 1_000_000, endTime: 2_000_000 };
       expect(await emptyRow("e-range", { valuesTimeRange: range })).toContain("valuesEmptyInRange");
     });
+
+    it("speaks of the latest hours when only those were searched", { timeout: 30000 }, async () => {
+      const range = { startTime: 1_000_000, endTime: 2_000_000, capped: true };
+      expect(await emptyRow("e-capped", { valuesTimeRange: range })).toContain(
+        "valuesEmptyInLatestHours",
+      );
+    });
   });
 
   describe("the typed prefix reaches the resolver", () => {

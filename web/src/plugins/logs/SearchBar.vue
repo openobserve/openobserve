@@ -1315,6 +1315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :suggestions="effectiveSuggestions"
                 :field-value-resolver="resolveFieldValues"
                 :recent-queries="recentQueries"
+                :values-time-range="valuesWindow"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
@@ -1785,6 +1786,7 @@ const EDITOR_POINTER_FOCUS_MS = 1000;
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { valuesWindowFor } from "@/composables/fieldValueStore";
 import { json2csv } from "json-2-csv";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
 import {
@@ -2407,7 +2409,13 @@ export default defineComponent({
       updateFunctionKeywords,
       updateStreamKeywords,
       resolveFieldValues,
+      setValuesTimeRange,
     } = useSqlSuggestions();
+
+    const valuesWindow = computed(() =>
+      valuesWindowFor(searchObj.data.datetime?.startTime, searchObj.data.datetime?.endTime),
+    );
+    watch(valuesWindow, (range) => setValuesTimeRange(range), { immediate: true });
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = Number(item.value);
@@ -5172,6 +5180,7 @@ export default defineComponent({
       recentDrawerRef,
       recentFocusOpen,
       recentQueries,
+      valuesWindow,
       recentExamples,
       onRecentEditorKeydown,
       noteEditorPointer,
