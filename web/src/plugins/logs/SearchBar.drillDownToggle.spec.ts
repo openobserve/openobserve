@@ -142,6 +142,19 @@ describe("SearchBar — Drill down mode toggle", () => {
     },
   );
 
+  it("leaves the Patterns view when the stream switches to a traces stream", async () => {
+    (config as any).isEnterprise = "true";
+    wrapper = mountSearchBar();
+    wrapper.vm.searchObj.data.stream.streamType = "logs";
+    wrapper.vm.searchObj.meta.logsVisualizeToggle = "patterns";
+    await flushPromises();
+
+    wrapper.vm.searchObj.data.stream.streamType = "traces";
+    await flushPromises();
+
+    expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+  });
+
   it("keeps Patterns enabled on a logs stream", async () => {
     (config as any).isEnterprise = "true";
     wrapper = mountSearchBar();

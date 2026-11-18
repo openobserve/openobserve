@@ -15,9 +15,15 @@
 
 const URL_VIEW_TOGGLES = ["logs", "visualize", "build", "drilldown"];
 
-/** The view tab a link asks for, or "logs" when the value is unknown or Patterns is locked. */
-export const resolveUrlViewToggle = (value: unknown, patternsAllowed: boolean): string => {
+/** The view tab a link asks for, or "logs" when the value is unknown or Patterns is locked or the stream is not logs. */
+export const resolveUrlViewToggle = (
+  value: unknown,
+  patternsAllowed: boolean,
+  streamType?: unknown,
+): string => {
   if (typeof value !== "string") return "logs";
-  if (value === "patterns") return patternsAllowed ? "patterns" : "logs";
+  if (value === "patterns") {
+    return patternsAllowed && (!streamType || streamType === "logs") ? "patterns" : "logs";
+  }
   return URL_VIEW_TOGGLES.includes(value) ? value : "logs";
 };

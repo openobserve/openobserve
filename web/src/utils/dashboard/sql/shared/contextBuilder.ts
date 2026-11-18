@@ -426,9 +426,10 @@ export function buildSQLContext(
       ? (() => {
           const rotationInRadians = (Math.abs(labelRotation) * Math.PI) / 180;
           // eslint-disable-next-line local/no-hardcoded-px -- must match `labelFontSize`, which ECharts paints axis labels at as a literal CSS px
+          const labelFont = "12px";
           const measured = calculateWidthText(
             largestLabel(getAxisDataFromKey(xAxisKeys[0])),
-            "12px",
+            labelFont,
           );
           const rotatedHeight =
             Math.min(labelWidth, measured) * Math.sin(rotationInRadians) +

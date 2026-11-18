@@ -26,6 +26,15 @@ describe("resolveUrlViewToggle", () => {
     expect(resolveUrlViewToggle("patterns", false)).toBe("logs");
   });
 
+  it.each(["traces", "metrics"])("falls back to logs for patterns on a %s stream", (type) => {
+    expect(resolveUrlViewToggle("patterns", true, type)).toBe("logs");
+  });
+
+  it("keeps patterns on a logs stream or when the link names no type", () => {
+    expect(resolveUrlViewToggle("patterns", true, "logs")).toBe("patterns");
+    expect(resolveUrlViewToggle("patterns", true, undefined)).toBe("patterns");
+  });
+
   it.each(["bogus", "", undefined, null, ["logs", "build"], 3])(
     "falls back to logs for %s",
     (value) => {

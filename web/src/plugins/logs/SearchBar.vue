@@ -4924,6 +4924,12 @@ export default defineComponent({
       return !sameSignature(autoRun.readSignature(), baseline);
     };
 
+    watch(patternsUnavailableForStreamType, (unavailable) => {
+      if (unavailable && searchObj.meta.logsVisualizeToggle === "patterns") {
+        onLogsVisualizeToggleUpdate("logs");
+      }
+    });
+
     const onLogsVisualizeToggleUpdate = async (value: any) => {
       // OToggleGroup is controlled (`:model-value`), so refusing to advance
       // here is what keeps the locked Patterns view from becoming active —

@@ -1514,6 +1514,7 @@ export default defineComponent({
         const urlToggle = resolveUrlViewToggle(
           router.currentRoute.value.query.logs_visualize_toggle,
           checkFeatureAccess("logPatterns", buildFeatureGateContext(store.state.zoConfig)).allowed,
+          router.currentRoute.value.query.stream_type,
         );
         // Restoring directly onto the Timechart tab: setupLogsTab() will run the
         // visualization once fields are ready, so tell the toggle watcher to skip
