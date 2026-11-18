@@ -391,10 +391,12 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
 
   // The equality filters each source's charts read, for the pages the drawer opens.
   const scopes = shallowRef<Partial<Record<ChartSource, RouteScope>>>({});
+  const traceStream = shallowRef<string | undefined>();
 
   const load = async () => {
     const gen = ++generation;
     scopes.value = {};
+    traceStream.value = undefined;
     cancelAll();
     nowMs.value = Date.now();
     LIVE_SIGNALS.forEach((s) => set(s, blank(s)));
@@ -430,6 +432,7 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
           : [],
       ),
     );
+    traceStream.value = sources.traces?.name;
     if (!sources.traces && !sources.logs) return noMatch();
     plan(sources, nowMs.value).forEach(runQuery);
   };
@@ -469,5 +472,5 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
     return { start, end: last };
   });
 
-  return { charts, span, scopes: readonly(scopes) };
+  return { charts, span, scopes: readonly(scopes), traceStream: readonly(traceStream) };
 };
