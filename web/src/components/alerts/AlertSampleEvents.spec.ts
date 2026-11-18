@@ -60,6 +60,24 @@ describe("AlertSampleEvents", () => {
     expect(rows[1].text()).toContain('{"level":"info"}');
   });
 
+  it("opens a row to every field as key and value, one row at a time", async () => {
+    answer([
+      { _timestamp: 1_700_000_000_000_000, message: "OOM", k8s_node_name: "node-a", n: { x: 1 } },
+      { _timestamp: 1_700_000_000_000_000, message: "ok" },
+    ]);
+    const wrapper = mountSamples();
+    await flushPromises();
+    const fields = () =>
+      wrapper
+        .findAll('[data-test="add-alert-sample-field"]')
+        .map((f) => `${f.get("dt").text()}=${f.get("dd").text()}`);
+    expect(fields()).toEqual([]);
+    await wrapper.findAll('[data-test="add-alert-sample-toggle"]')[0].trigger("click");
+    expect(fields()).toEqual(["message=OOM", "k8s_node_name=node-a", 'n={"x":1}']);
+    await wrapper.findAll('[data-test="add-alert-sample-toggle"]')[1].trigger("click");
+    expect(fields()).toEqual(["message=ok"]);
+  });
+
   it("asks the streaming search for the stream, with its name escaped", async () => {
     answer([]);
     mountSamples('odd"name');

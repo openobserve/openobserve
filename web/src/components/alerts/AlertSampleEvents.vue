@@ -15,9 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
@@ -38,6 +40,10 @@ const store = useStore();
 const query = useAlertStreamQuery();
 
 const timestampColumn = computed(() => store.state.zoConfig?.timestamp_column || "_timestamp");
+const openIndex = ref<number | null>(null);
+
+const showValue = (value: unknown) =>
+  typeof value === "string" ? value : JSON.stringify(value ?? null);
 
 const rows = computed(() =>
   query.hits.value.slice(0, SAMPLE_SIZE).map((hit) => {
@@ -46,6 +52,7 @@ const rows = computed(() =>
     return {
       time: timestampToTimezoneDate(Number(timestamp), store.state.timezone, "HH:mm:ss"),
       text: field ? String(fields[field]) : JSON.stringify(fields),
+      fields: Object.entries(fields).map(([key, value]) => ({ key, value: showValue(value) })),
     };
   }),
 );
@@ -53,6 +60,7 @@ const rows = computed(() =>
 watch(
   () => [props.streamName, props.streamType],
   () => {
+    openIndex.value = null;
     if (!props.streamName) return;
     const now = Date.now() * 1000;
     query.run({
@@ -75,15 +83,47 @@ watch(
     wide
     data-test="add-alert-sample-events"
   >
-    <ul v-if="rows.length" class="m-0 flex list-none flex-col gap-1.5 p-0">
-      <li
-        v-for="(row, index) in rows"
-        :key="index"
-        class="flex min-w-0 gap-3 text-xs"
-        data-test="add-alert-sample-event"
-      >
-        <span class="text-text-secondary shrink-0">{{ raw(row.time) }}</span>
-        <span class="text-text-body min-w-0 truncate font-mono">{{ raw(row.text) }}</span>
+    <ul v-if="rows.length" class="m-0 flex list-none flex-col gap-0.5 p-0">
+      <li v-for="(row, index) in rows" :key="index" data-test="add-alert-sample-event">
+        <OCollapsible
+          :model-value="openIndex === index"
+          trigger-class="px-1! py-0.5!"
+          @update:model-value="openIndex = $event ? index : null"
+        >
+          <template #trigger="{ open }">
+            <span
+              class="flex min-w-0 flex-1 items-center gap-3 text-xs"
+              data-test="add-alert-sample-toggle"
+            >
+              <OIcon
+                name="chevron-right"
+                size="xs"
+                class="text-text-secondary shrink-0 transition-transform duration-150"
+                :class="open ? 'rotate-90' : ''"
+              />
+              <span class="text-text-secondary shrink-0">{{ raw(row.time) }}</span>
+              <span class="text-text-body min-w-0 truncate font-mono">{{ raw(row.text) }}</span>
+              <span class="sr-only">{{
+                open ? t("alerts.discovery.sampleCollapse") : t("alerts.discovery.sampleExpand")
+              }}</span>
+            </span>
+          </template>
+          <dl
+            class="m-0 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-0.5 py-1 ps-6 text-xs"
+          >
+            <div
+              v-for="field in row.fields"
+              :key="field.key"
+              class="contents"
+              data-test="add-alert-sample-field"
+            >
+              <dt class="text-text-secondary min-w-0 break-all">{{ raw(field.key) }}</dt>
+              <dd class="text-text-body m-0 min-w-0 font-mono break-all">
+                {{ raw(field.value) }}
+              </dd>
+            </div>
+          </dl>
+        </OCollapsible>
       </li>
     </ul>
     <p v-else class="text-text-secondary m-0 pt-2 text-xs" data-test="add-alert-sample-status">
