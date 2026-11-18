@@ -810,6 +810,34 @@ mod tests {
         };
         assert_eq!(read("ok"), "🟢 Sample CPU alert resolved|resolved");
         assert_eq!(read("critical"), "🔴 Sample CPU alert firing|firing");
+        // The default template, as a new destination previews it: title and Event field agree.
+        let model = |severity: &str| {
+            let req = PreviewRequest {
+                definition: super::super::default_template::compiled_default_content(),
+                channel: "slack".into(),
+                severity: Some(severity.into()),
+                sample: None,
+                kind: NotificationKind::Alert,
+            };
+            let model = preview(&req).unwrap().preview_model;
+            let event = model
+                .fields
+                .iter()
+                .find(|kv| kv.label == "Event")
+                .map(|kv| kv.value.clone());
+            (model.title, event)
+        };
+        assert_eq!(
+            model("ok"),
+            (
+                "🟢 Sample CPU alert resolved".into(),
+                Some("Resolved".into())
+            )
+        );
+        assert_eq!(
+            model("critical"),
+            ("🔴 Sample CPU alert firing".into(), Some("Firing".into()))
+        );
         let ctx = synthetic_context(Some(AlertLevel::Ok));
         assert_eq!(ctx.event, NotificationEvent::Resolved);
         assert_eq!(ctx.alert_status, "resolved");
