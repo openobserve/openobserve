@@ -19,10 +19,10 @@ pub use runtime::{
     CompositeEvaluation, CompositeEvaluator, CompositeStateInput, EvaluatedChild, EvaluationFailure,
 };
 pub use service::{
-    CompositeCreate, CompositeServiceError, GraphFault, check_move_composite, clone_composite,
+    CompositeCreate, CompositeServiceError, check_move_composite, clone_composite,
     create_composite, delete_composite, evaluate_definition, evaluate_expression, get_composite,
-    graph_fault, move_composite, set_composite_enabled, sync_replica_job, trigger_composite,
-    update_composite, validate_composite_graph,
+    move_composite, set_composite_enabled, sync_replica_job, trigger_composite, update_composite,
+    validate_composite_graph,
 };
 
 #[cfg(test)]
@@ -144,39 +144,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn concurrent_updates_cannot_commit_a_cycle() {
+    async fn a_composite_child_is_refused_before_anything_is_written() {
         let mut h = CompositeHarness::at(NOW).await;
         let a = h.add_child(child("a")).await;
         let b = h.add_child(child("b")).await;
-        let c = h.add_child(child("c")).await;
-        let first = h
+        let inner = h
             .add_composite(composite(&format!("{{{a}}} && {{{b}}}")))
             .await;
-        let second = h
-            .add_composite(composite(&format!("{{{b}}} && {{{c}}}")))
-            .await;
 
-        let (left, right) = h
-            .race_graph_mutations(
-                Mutation::UpdateExpression {
-                    composite_id: first.clone(),
-                    expression: format!("{{{second}}} && {{{a}}}"),
-                },
-                Mutation::UpdateExpression {
-                    composite_id: second,
-                    expression: format!("{{{first}}} && {{{c}}}"),
-                },
-            )
-            .await;
+        let error = h
+            .try_add_composite(composite(&format!("{{{inner}}} && {{{a}}}")))
+            .await
+            .unwrap_err();
 
-        assert_ne!(
-            left.is_ok(),
-            right.is_ok(),
-            "each edit is valid alone, but exactly one may win the graph lock"
+        assert_eq!(
+            (error.status, error.code.as_str()),
+            (400, "child_is_composite")
         );
-        assert!(h.persisted_graph_is_acyclic().await);
-        assert!(h.persisted_graph_max_depth().await <= 2);
-        assert_eq!(h.max_simultaneous_graph_critical_sections(), 1);
+        assert_eq!(h.composite_definition_count().await, 1);
+        assert!(!h.graph_lock_is_held());
     }
 
     #[tokio::test]
@@ -594,7 +580,6 @@ mod tests {
             assert_eq!(state.level, AlertLevel::Critical);
             assert_eq!(state.level_at, NOW - 10_000_000);
             assert_eq!(h.delivery_attempts(&parent), 0);
-            assert_eq!(h.parent_nudges(&parent), 0);
         }
     }
 
@@ -623,39 +608,6 @@ mod tests {
         );
         h.set_now(NOW + 120_000_001);
         assert!(h.preview(&parent).await.children[0].stale);
-    }
-
-    #[tokio::test]
-    async fn rollup_state_change_propagates_through_depth_two_exactly_once() {
-        let mut h = CompositeHarness::at(NOW).debounce_seconds(15).await;
-        let a = h.add_child(child("a")).await;
-        let b = h.add_child(child("b")).await;
-        let c = h.add_child(child("c")).await;
-        let depth_one = h
-            .add_composite(composite(&format!("{{{a}}} && {{{b}}}")))
-            .await;
-        let depth_two = h
-            .add_composite(composite(&format!("{{{depth_one}}} || {{{c}}}")))
-            .await;
-        h.write_rollup_and_nudge(&a, AlertLevel::Critical, NOW)
-            .await;
-        h.write_rollup_and_nudge(&b, AlertLevel::Critical, NOW)
-            .await;
-        h.write_rollup_and_nudge(&c, AlertLevel::Ok, NOW).await;
-
-        h.run_due_jobs_until_idle(NOW + 30_000_000).await;
-
-        assert_eq!(
-            h.state(&depth_one).await.unwrap().level,
-            AlertLevel::Critical
-        );
-        assert_eq!(
-            h.state(&depth_two).await.unwrap().level,
-            AlertLevel::Critical
-        );
-        assert_eq!(h.evaluation_count(&depth_one), 1);
-        assert_eq!(h.evaluation_count(&depth_two), 1);
-        assert_eq!(h.child_query_count(), 0, "composites consume state only");
     }
 
     #[tokio::test]
@@ -812,7 +764,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn silence_suppresses_delivery_not_evaluation_or_parent_propagation() {
+    async fn silence_suppresses_delivery_not_evaluation() {
         let mut h = CompositeHarness::at(NOW).await;
         let a = h.add_child(child("a")).await;
         let b = h.add_child(child("b")).await;
@@ -830,11 +782,10 @@ mod tests {
         assert_eq!(h.state(&parent).await.unwrap().level, AlertLevel::Critical);
         assert_eq!(h.delivery_attempts(&parent), 0);
         assert_eq!(h.committed_state_writes(&parent), 1);
-        assert_eq!(h.parent_nudges(&parent), 1);
     }
 
     #[tokio::test]
-    async fn state_transaction_failure_never_delivers_or_nudges_and_uses_scheduler_retry() {
+    async fn state_transaction_failure_never_delivers_and_uses_scheduler_retry() {
         let mut h = CompositeHarness::at(NOW).await;
         let a = h.add_child(child("a")).await;
         let b = h.add_child(child("b")).await;
@@ -850,7 +801,6 @@ mod tests {
         assert_eq!(result.outcome, RunOutcome::Error);
         assert!(h.state(&parent).await.is_none());
         assert_eq!(h.delivery_attempts(&parent), 0);
-        assert_eq!(h.parent_nudges(&parent), 0);
         assert!(h.job(&parent).await.unwrap().is_retry_scheduled);
     }
 
@@ -1143,7 +1093,6 @@ mod tests {
             (ChildKind::Scheduled, true),
             (ChildKind::Slo, true),
             (ChildKind::MultiAlert, true),
-            (ChildKind::Composite, true),
             (ChildKind::Realtime, false),
             (ChildKind::AnomalyDetection, false),
             (ChildKind::External, false),

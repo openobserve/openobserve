@@ -8,8 +8,8 @@ use super::{
     alert_composites::{
         ChildKind, CompositeWithChildren, ReplicaWrite, ReplicatedKind, Resolution,
         apply_replicated, create_with_children, delete_by_id, get_by_id,
-        increment_evaluation_generation, list_by_org, list_parents, load_graph, move_to_folder,
-        replica_write, resolve_by_id, set_enabled, update_with_children,
+        increment_evaluation_generation, list_by_org, list_parents, move_to_folder, replica_write,
+        resolve_by_id, set_enabled, update_with_children,
     },
     entity::{alert_composite_children, alert_composites, alerts},
     migration::{
@@ -415,7 +415,7 @@ async fn repository_crud_preserves_child_order_kind_org_scope_and_generation() {
 }
 
 #[tokio::test]
-async fn reverse_lookup_is_scoped_by_child_kind_and_org_and_graph_is_complete() {
+async fn reverse_lookup_is_scoped_by_child_kind_and_org() {
     let db = db().await;
     let shared_id = id();
     let parent_a = id();
@@ -454,7 +454,6 @@ async fn reverse_lookup_is_scoped_by_child_kind_and_org_and_graph_is_complete() 
             .collect::<Vec<_>>(),
         vec![parent_b.clone()]
     );
-    assert_eq!(load_graph(&db, ORG).await.unwrap().len(), 2);
 }
 
 #[tokio::test]

@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Ack writes that replicate (R-125); receivers apply through `infra`, so nothing re-broadcasts.
 //! Composite definition writes; each one publishes to the other regions of a super cluster.
 
 #[cfg(feature = "enterprise")]

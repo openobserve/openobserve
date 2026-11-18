@@ -22,7 +22,6 @@ pub enum ChildKind {
     Scheduled,
     Slo,
     MultiAlert,
-    Composite,
     Realtime,
     AnomalyDetection,
     External,
@@ -30,17 +29,13 @@ pub enum ChildKind {
 
 impl ChildKind {
     pub fn is_composite_eligible(self) -> bool {
-        matches!(
-            self,
-            Self::Scheduled | Self::Slo | Self::MultiAlert | Self::Composite
-        )
+        matches!(self, Self::Scheduled | Self::Slo | Self::MultiAlert)
     }
 
     fn wire_name(self) -> &'static str {
         match self {
             Self::Scheduled | Self::MultiAlert => "scheduled",
             Self::Slo => "slo",
-            Self::Composite => "composite",
             Self::Realtime => "realtime",
             Self::AnomalyDetection => "anomaly_detection",
             Self::External => "external",
@@ -263,10 +258,6 @@ pub enum Mutation {
     Move,
     ManualTrigger,
     ChildNudge,
-    UpdateExpression {
-        composite_id: String,
-        expression: String,
-    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -729,9 +720,10 @@ impl CompositeHarness {
                 &format!("graph_failpoint_{failpoint}"),
             ));
         }
-        let mut candidate = self.graph();
-        candidate.insert(id.clone(), refs.clone());
-        validate_graph(&candidate)?;
+        if refs.iter().any(|id| self.composites.contains_key(id)) {
+            self.graph_lock_held = false;
+            return Err(ServiceError::new(400, "child_is_composite"));
+        }
         let definition = CompositeDefinition {
             id: id.clone(),
             name: spec.name.clone(),
@@ -766,8 +758,6 @@ impl CompositeHarness {
     {
         let mut ids = Vec::with_capacity(count);
         for index in 0..count {
-            // Bulk setup still populates the production data shape but avoids
-            // repeated whole-graph validation in the scale contract.
             let spec = create(index);
             let id = new_id();
             self.child_index
@@ -808,10 +798,6 @@ impl CompositeHarness {
         self.graph_lock_held = true;
         self.max_graph_critical_sections = self.max_graph_critical_sections.max(1);
         Ok(())
-    }
-
-    fn graph(&self) -> HashMap<String, Vec<String>> {
-        self.child_index.clone()
     }
 
     pub async fn write_rollup(&mut self, id: &str, level: AlertLevel, level_at: i64) {
@@ -886,18 +872,6 @@ impl CompositeHarness {
                     effective_cadence_seconds: child.spec.cadence_seconds,
                     stale_deadline: None,
                 });
-            } else if let Some(child) = self.composites.get(&child_id) {
-                let state = self.states.get(&(child_id.clone(), String::new())).cloned();
-                inputs.push(CompositeStateInput {
-                    alert_id: child_id,
-                    name: child.name.clone(),
-                    alert_type: "composite".to_string(),
-                    enabled: child.spec.enabled,
-                    level: state.as_ref().map(|row| row.level),
-                    level_at: state.as_ref().map(|row| row.level_at),
-                    effective_cadence_seconds: self.sweep_seconds,
-                    stale_deadline: None,
-                });
             }
         }
         match CompositeEvaluator::evaluate(
@@ -968,7 +942,6 @@ impl CompositeHarness {
             return self.error_evaluation(EvalErrorCode::ChildRead);
         }
         let level = result.level.expect("successful evaluation has a level");
-        let previous = self.states.get(&(id.to_string(), String::new())).cloned();
         let state = StateRow {
             level,
             level_at: self.now,
@@ -986,9 +959,6 @@ impl CompositeHarness {
             .or_default() += 1;
         self.increment_metric("alert_composite_evaluations_total", None);
         self.record_evaluation_log(id, &result);
-        if previous.as_ref().map(|row| row.level) != Some(level) {
-            self.nudge_parents_of(id);
-        }
         if result.outcome == RunOutcome::Firing {
             let silenced = self
                 .composites
@@ -1345,14 +1315,13 @@ impl CompositeHarness {
 
     pub async fn run_due_jobs_until_idle(&mut self, deadline: i64) {
         self.now = deadline;
-        // Evaluate in depth order so a depth-one state is visible to its parent.
         let mut due = self
             .jobs
             .iter()
             .filter(|(_, job)| !job.processing && job.next_run_at <= deadline)
             .map(|(id, _)| id.clone())
             .collect::<Vec<_>>();
-        due.sort_by_key(|id| graph_depth(id, &self.child_index, &mut HashSet::new()).unwrap_or(0));
+        due.sort();
         for id in due {
             self.evaluate(&id).await;
         }
@@ -1369,40 +1338,6 @@ impl CompositeHarness {
         for id in second_wave {
             self.evaluate(&id).await;
         }
-    }
-
-    pub async fn race_graph_mutations(
-        &mut self,
-        left: Mutation,
-        right: Mutation,
-    ) -> (Result<(), ServiceError>, Result<(), ServiceError>) {
-        let left_result = self.apply_graph_mutation(left).await;
-        let right_result = self.apply_graph_mutation(right).await;
-        (left_result, right_result)
-    }
-
-    async fn apply_graph_mutation(&mut self, mutation: Mutation) -> Result<(), ServiceError> {
-        let Mutation::UpdateExpression {
-            composite_id,
-            expression,
-        } = mutation
-        else {
-            return Ok(());
-        };
-        self.acquire_graph_lock()?;
-        let mut candidate = self.graph();
-        candidate.insert(composite_id.clone(), expression_references(&expression));
-        let result = validate_graph(&candidate);
-        if result.is_ok() {
-            if let Some(definition) = self.composites.get_mut(&composite_id) {
-                definition.expression = expression.clone();
-                definition.spec.expression = expression;
-                definition.generation += 1;
-            }
-            self.child_index = candidate;
-        }
-        self.graph_lock_held = false;
-        result
     }
 
     pub async fn race_composite_create_and_child_delete(
@@ -1944,17 +1879,6 @@ impl CompositeHarness {
                 || self.missing_ids.contains(id)
         })
     }
-    pub async fn persisted_graph_is_acyclic(&self) -> bool {
-        validate_graph(&self.child_index).is_ok()
-    }
-    pub async fn persisted_graph_max_depth(&self) -> usize {
-        self.child_index
-            .keys()
-            .filter_map(|id| graph_depth(id, &self.child_index, &mut HashSet::new()).ok())
-            .max()
-            .unwrap_or(0)
-    }
-
     pub fn teardown_order(&self) -> Vec<String> {
         self.teardown_order.clone()
     }
@@ -2090,36 +2014,6 @@ fn expression_references(expression: &str) -> Vec<String> {
         cursor = &rest[end + 1..];
     }
     references
-}
-
-fn validate_graph(graph: &HashMap<String, Vec<String>>) -> Result<(), ServiceError> {
-    for id in graph.keys() {
-        match graph_depth(id, graph, &mut HashSet::new()) {
-            Ok(depth) if depth <= 2 => {}
-            Ok(_) => return Err(ServiceError::new(409, "composite_too_deep")),
-            Err(()) => return Err(ServiceError::new(409, "composite_cycle")),
-        }
-    }
-    Ok(())
-}
-
-fn graph_depth(
-    id: &str,
-    graph: &HashMap<String, Vec<String>>,
-    visiting: &mut HashSet<String>,
-) -> Result<usize, ()> {
-    let Some(children) = graph.get(id) else {
-        return Ok(0);
-    };
-    if !visiting.insert(id.to_string()) {
-        return Err(());
-    }
-    let mut depth = 0;
-    for child in children {
-        depth = depth.max(graph_depth(child, graph, visiting)?);
-    }
-    visiting.remove(id);
-    Ok(depth + 1)
 }
 
 fn map_failure(failure: EvaluationFailure) -> EvalErrorCode {

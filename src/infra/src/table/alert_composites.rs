@@ -481,37 +481,6 @@ pub async fn children_count_for_many<C: ConnectionTrait>(
     Ok(counts)
 }
 
-pub async fn load_graph<C: ConnectionTrait>(
-    conn: &C,
-    org: &str,
-) -> Result<HashMap<String, Vec<String>>, sea_orm::DbErr> {
-    let definitions = list_by_org(conn, org).await?;
-    let ids = definitions
-        .into_iter()
-        .map(|definition| definition.id)
-        .collect::<Vec<_>>();
-    let mut graph = ids
-        .iter()
-        .cloned()
-        .map(|id| (id, Vec::new()))
-        .collect::<HashMap<_, _>>();
-    if ids.is_empty() {
-        return Ok(graph);
-    }
-    let children = alert_composite_children::Entity::find()
-        .filter(alert_composite_children::Column::CompositeId.is_in(ids))
-        .filter(alert_composite_children::Column::ChildKind.eq(ChildKind::Composite as i16))
-        .order_by_asc(alert_composite_children::Column::DisplayOrder)
-        .all(conn)
-        .await?;
-    for child in children {
-        if let Some(parent_children) = graph.get_mut(&child.composite_id) {
-            parent_children.push(child.child_alert_id);
-        }
-    }
-    Ok(graph)
-}
-
 pub async fn current_generation<C: ConnectionTrait>(
     conn: &C,
     org: &str,

@@ -71,7 +71,6 @@ pub async fn persist(update: &StateUpdate, ledger: Option<&EvalLedgerWrite>) -> 
     Ok(())
 }
 
-/// Returns the closes and reaps that matched, so the caller emits only those.
 /// Writes `update` in `txn` and commits it; the write is published only once the commit succeeded.
 pub async fn persist_and_commit(txn: DatabaseTransaction, update: &StateUpdate) -> Result<()> {
     infra::table::alert_states::persist_update_in_transaction(&txn, update).await?;
@@ -89,6 +88,7 @@ pub async fn persist_and_commit(txn: DatabaseTransaction, update: &StateUpdate) 
     Ok(())
 }
 
+/// Returns the closes and reaps that matched, so the caller emits only those.
 #[inline]
 pub async fn persist_group_plan(
     plan: &GroupPlan,

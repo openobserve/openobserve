@@ -330,13 +330,7 @@ async fn persist_alert_run_state_deferred(
             .unwrap_or(false)
         });
     if transition_changed || stale_to_fresh {
-        nudge_composite_parents(
-            &alert.org_id,
-            alert_id,
-            infra::table::alert_composites::ChildKind::Alert,
-            now,
-        )
-        .await;
+        nudge_composite_parents(&alert.org_id, alert_id, now).await;
     }
     Some(vec![])
 }
@@ -421,13 +415,7 @@ async fn persist_group_run_state(
             .unwrap_or(false)
         });
     if transition_changed || stale_to_fresh {
-        nudge_composite_parents(
-            &alert.org_id,
-            alert_id,
-            infra::table::alert_composites::ChildKind::Alert,
-            at,
-        )
-        .await;
+        nudge_composite_parents(&alert.org_id, alert_id, at).await;
     }
     Some(
         write
@@ -1272,16 +1260,11 @@ fn composite_stale_k() -> i64 {
 /// they observe (a level/outcome transition, or a stale-to-fresh return at the
 /// same level). Idempotent and coalesced: `next_run_at` is only ever pulled
 /// earlier, never pushed out.
-async fn nudge_composite_parents(
-    org: &str,
-    child_id: &str,
-    child_kind: infra::table::alert_composites::ChildKind,
-    now: i64,
-) {
+async fn nudge_composite_parents(org: &str, child_id: &str, now: i64) {
     let parents = match infra::table::alert_composites::list_parents(
         get_orm_client_ro().await,
         org,
-        child_kind,
+        infra::table::alert_composites::ChildKind::Alert,
         child_id,
     )
     .await
@@ -1328,31 +1311,27 @@ async fn nudge_composite_parents(
     }
 }
 
-/// Ends the run of a composite whose nested graph holds a cycle or nests past two.
-async fn refuse_broken_graph(
-    db: &sea_orm::DatabaseConnection,
+/// Ends the run of a composite that references another composite, which only legacy rows hold.
+fn refuse_nested(
     composite: &infra::table::alert_composites::CompositeWithChildren,
 ) -> Result<(), anyhow::Error> {
-    use infra::table::alert_composites::{ChildKind, load_graph};
+    use infra::table::alert_composites::ChildKind;
 
-    let nested = composite
+    let Some(child) = composite
         .children
         .iter()
-        .any(|child| child.child_kind == ChildKind::Composite as i16);
-    if !nested {
-        return Ok(());
-    }
-    let definition = &composite.definition;
-    let graph = load_graph(db, &definition.org).await?;
-    let Some(fault) = crate::alerts::composite::graph_fault(&graph, &definition.id) else {
+        .find(|child| child.child_kind == ChildKind::Composite as i16)
+    else {
         return Ok(());
     };
+    let definition = &composite.definition;
     log::error!(
-        "[COMPOSITE_ALERT] not evaluating {}/{}: {fault}",
+        "[COMPOSITE_ALERT] not evaluating {}/{}: child {} is a composite; remove it to evaluate again",
         definition.org,
-        definition.id
+        definition.id,
+        child.child_alert_id
     );
-    Err(fault.into())
+    anyhow::bail!("composite child {} is a composite", child.child_alert_id)
 }
 
 /// Composite jobs are routed explicitly by their append-only scheduler
@@ -1387,7 +1366,7 @@ async fn handle_composite_alert_trigger(
         .await?;
         return Ok(());
     }
-    refuse_broken_graph(db, &definition).await?;
+    refuse_nested(&definition)?;
     let mut scheduled_data: config::meta::triggers::ScheduledTriggerData =
         config::utils::json::from_str(&trigger.data).unwrap_or_default();
 
@@ -1412,7 +1391,6 @@ async fn handle_composite_alert_trigger(
     let resolved =
         infra::table::alert_composites::resolve_many(db, &trigger.org, &child_ids).await?;
     let stale_k = composite_stale_k();
-    let composite_sweep_seconds = composite_sweep_secs();
     let mut children = Vec::with_capacity(definition.children.len());
     for child in &definition.children {
         let state = states.get(&child.child_alert_id);
@@ -1446,18 +1424,9 @@ async fn handle_composite_alert_trigger(
                         stale_deadline,
                     )
                 }
-                Some(infra::table::alert_composites::Resolution::Composite(model)) => (
-                    model.name.clone(),
-                    "composite",
-                    model.enabled,
-                    composite_sweep_seconds,
-                    state.and_then(|state| state.level_at).and_then(|level_at| {
-                        composite_sweep_seconds
-                            .checked_mul(stale_k)
-                            .and_then(|seconds| seconds.checked_mul(1_000_000))
-                            .and_then(|window| level_at.checked_add(window))
-                    }),
-                ),
+                Some(infra::table::alert_composites::Resolution::Composite(_)) => {
+                    anyhow::bail!("composite child is not eligible")
+                }
                 _ => anyhow::bail!("composite child definition missing"),
             };
         children.push(crate::alerts::composite::CompositeStateInput {
@@ -1837,31 +1806,6 @@ async fn handle_composite_alert_trigger(
         next_run_at: trigger.next_run_at,
         ..Default::default()
     });
-
-    let significant = previous.as_ref().is_none_or(|previous| {
-        previous.level != Some(evaluated.level)
-            || previous.last_outcome.as_ref() != Some(&outcome)
-            || previous.level_at.is_some_and(|level_at| {
-                // Composite staleness is measured against
-                // `ZO_ALERT_COMPOSITE_STALE_K * ZO_ALERT_COMPOSITE_SWEEP_SECS`.
-                // If the composite was stale before this run and just wrote a
-                // fresh `level_at`, its parent must re-evaluate even at an
-                // unchanged level.
-                let window = composite_stale_k()
-                    .saturating_mul(composite_sweep_secs())
-                    .saturating_mul(1_000_000);
-                now.saturating_sub(level_at) > window
-            })
-    });
-    if significant {
-        nudge_composite_parents(
-            &trigger.org,
-            &definition.definition.id,
-            infra::table::alert_composites::ChildKind::Composite,
-            now,
-        )
-        .await;
-    }
 
     // A list kept past the cycle would skip those destinations on the next firing.
     if delivery_retry_at.is_none() {
@@ -10804,5 +10748,100 @@ mod tests {
         );
         handle_triggers("t", row).await.unwrap();
         assert!(infra::scheduler::get(&org, module, "engine").await.is_err());
+    }
+
+    /// Stores an enabled composite over `children` and returns its claimed scheduler job.
+    async fn claimed_composite(
+        org: &str,
+        id: &str,
+        expression: String,
+        children: &[(&str, infra::table::alert_composites::ChildKind)],
+    ) -> db::scheduler::Trigger {
+        use infra::table::entity::{alert_composite_children, alert_composites};
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set};
+
+        let definition = alert_composites::Model {
+            id: id.to_string(),
+            org: org.to_string(),
+            folder_id: "default".to_string(),
+            name: id.to_string(),
+            expression,
+            destinations: serde_json::json!([]),
+            workflows: serde_json::json!([]),
+            enabled: true,
+            ..Default::default()
+        };
+        let rows = children
+            .iter()
+            .enumerate()
+            .map(
+                |(order, (child, kind))| alert_composite_children::ActiveModel {
+                    composite_id: Set(id.to_string()),
+                    child_alert_id: Set(child.to_string()),
+                    child_kind: Set(*kind as i16),
+                    display_order: Set(order as i32),
+                },
+            )
+            .collect();
+        infra::table::alert_composites::create_with_children(
+            infra::db::get_orm_client_rw().await,
+            alert_composites::ActiveModel::from(definition).reset_all(),
+            rows,
+        )
+        .await
+        .unwrap();
+        let module = db::scheduler::TriggerModule::CompositeAlert;
+        infra::scheduler::push(db::scheduler::Trigger {
+            org: org.to_string(),
+            module: module.clone(),
+            module_key: id.to_string(),
+            next_run_at: 1,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let status = db::scheduler::TriggerStatus::Processing;
+        infra::scheduler::update_status(org, module.clone(), id, status, 0, None)
+            .await
+            .unwrap();
+        infra::scheduler::get(org, module, id).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_composite_with_a_composite_child_is_refused_and_an_ordinary_one_evaluates() {
+        use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+        use infra::table::alert_composites::ChildKind;
+        use svix_ksuid::KsuidLike;
+
+        let Some(alert) = stored_host_alert("composite_nesting", &[], 0).await else {
+            return;
+        };
+        let org = alert.org_id.as_str();
+        let child = alert.id.unwrap().to_string();
+        let new_id = || svix_ksuid::Ksuid::new(None, None).to_string();
+        let (plain, legacy) = (new_id(), new_id());
+
+        let job = claimed_composite(
+            org,
+            &plain,
+            format!("{{{child}}}"),
+            &[(&child, ChildKind::Alert)],
+        )
+        .await;
+        handle_composite_alert_trigger("t", job).await.unwrap();
+        let rollup = infra::table::alert_states::get(&plain, ROLLUP_GROUP_KEY).await;
+        assert!(rollup.unwrap().is_some(), "an ordinary composite evaluates");
+
+        let job = claimed_composite(
+            org,
+            &legacy,
+            format!("{{{plain}}} && {{{child}}}"),
+            &[(&plain, ChildKind::Composite), (&child, ChildKind::Alert)],
+        )
+        .await;
+        let refused = handle_composite_alert_trigger("t", job).await.unwrap_err();
+        assert!(refused.to_string().contains(&plain), "{refused}");
+        let rollup = infra::table::alert_states::get(&legacy, ROLLUP_GROUP_KEY).await;
+        assert!(rollup.unwrap().is_none(), "a refused run writes no state");
     }
 }

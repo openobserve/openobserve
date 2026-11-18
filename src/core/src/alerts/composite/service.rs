@@ -5,7 +5,7 @@
 //! Every graph mutation is serialized by the organization graph lock and the
 //! definition plus derived child index commit in one repository transaction.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use common::meta::authz::Authz;
 use config::meta::{
@@ -87,10 +87,10 @@ pub enum CompositeServiceError {
     ChildNotAccessible(Vec<String>),
     #[error("child alert {0} is not eligible for composite evaluation")]
     ChildNotEligible(String),
-    #[error("composite graph contains a cycle")]
-    Cycle,
-    #[error("composite graph exceeds nesting depth two")]
-    TooDeep,
+    #[error(
+        "child alert {0} is a composite alert; a composite can reference only scheduled alerts"
+    )]
+    ChildIsComposite(String),
     #[error("composite alert not found")]
     NotFound,
     #[error("composite target folder does not exist")]
@@ -113,15 +113,6 @@ pub enum CompositeServiceError {
     JiraDestinationNotSupported(String),
     #[error(transparent)]
     NotificationTarget(crate::alerts::alert::AlertError),
-}
-
-/// Why a stored composite graph cannot be evaluated from one of its nodes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum GraphFault {
-    #[error("a cycle is reachable from it")]
-    Cycle,
-    #[error("its nesting exceeds depth two")]
-    TooDeep,
 }
 
 pub async fn create_composite(
@@ -428,17 +419,6 @@ async fn persist_under_lock(
     update: bool,
 ) -> Result<composite_entity::Model, CompositeServiceError> {
     let resolved = resolve_children(db, &request.org, &references).await?;
-    let mut graph = alert_composites::load_graph(db, &request.org).await?;
-    graph.insert(
-        id.to_string(),
-        resolved
-            .iter()
-            .filter(|(_, kind)| *kind == alert_composites::ChildKind::Composite)
-            .map(|(id, _)| id.clone())
-            .collect(),
-    );
-    validate_candidate_graph(&graph)?;
-
     let model = composite_entity::ActiveModel {
         id: Set(id.to_string()),
         org: Set(request.org),
@@ -468,10 +448,10 @@ async fn persist_under_lock(
         .into_iter()
         .enumerate()
         .map(
-            |(display_order, (child_alert_id, kind))| alert_composite_children::ActiveModel {
+            |(display_order, child_alert_id)| alert_composite_children::ActiveModel {
                 composite_id: Set(id.to_string()),
                 child_alert_id: Set(child_alert_id),
-                child_kind: Set(kind as i16),
+                child_kind: Set(alert_composites::ChildKind::Alert as i16),
                 display_order: Set(display_order as i32),
             },
         )
@@ -490,7 +470,7 @@ async fn resolve_children(
     db: &DatabaseConnection,
     org: &str,
     references: &[String],
-) -> Result<Vec<(String, alert_composites::ChildKind)>, CompositeServiceError> {
+) -> Result<Vec<String>, CompositeServiceError> {
     // Resolve the whole reference set in one batched query, rather than a
     // `resolve_by_id` round trip per child.
     let resolved_map = alert_composites::resolve_many(db, org, references).await?;
@@ -502,10 +482,10 @@ async fn resolve_children(
                 if alert.is_real_time {
                     return Err(CompositeServiceError::ChildNotEligible(id.clone()));
                 }
-                resolved.push((id.clone(), alert_composites::ChildKind::Alert));
+                resolved.push(id.clone());
             }
             Some(alert_composites::Resolution::Composite(_)) => {
-                resolved.push((id.clone(), alert_composites::ChildKind::Composite));
+                return Err(CompositeServiceError::ChildIsComposite(id.clone()));
             }
             _ => inaccessible.push(id.clone()),
         }
@@ -515,48 +495,6 @@ async fn resolve_children(
     } else {
         Err(CompositeServiceError::ChildNotAccessible(inaccessible))
     }
-}
-
-fn validate_candidate_graph(
-    graph: &HashMap<String, Vec<String>>,
-) -> Result<(), CompositeServiceError> {
-    // Memoize depth per node so validation is O(V + E), not a DFS re-run from
-    // every node. Cycle detection still happens via `visiting`, which never
-    // memoizes an incomplete traversal.
-    let mut memo: HashMap<String, usize> = HashMap::new();
-    for id in graph.keys() {
-        match depth(id, graph, &mut HashSet::new(), &mut memo) {
-            Err(()) => return Err(CompositeServiceError::Cycle),
-            Ok(value) if value > 2 => return Err(CompositeServiceError::TooDeep),
-            Ok(_) => {}
-        }
-    }
-    Ok(())
-}
-
-fn depth(
-    id: &str,
-    graph: &HashMap<String, Vec<String>>,
-    visiting: &mut HashSet<String>,
-    memo: &mut HashMap<String, usize>,
-) -> Result<usize, ()> {
-    if let Some(cached) = memo.get(id) {
-        return Ok(*cached);
-    }
-    let Some(children) = graph.get(id) else {
-        return Ok(0);
-    };
-    if !visiting.insert(id.to_string()) {
-        return Err(());
-    }
-    let mut maximum = 0;
-    for child in children {
-        maximum = maximum.max(depth(child, graph, visiting, memo)?);
-    }
-    visiting.remove(id);
-    let value = maximum + 1;
-    memo.insert(id.to_string(), value);
-    Ok(value)
 }
 
 async fn schedule_definition(definition: &composite_entity::Model) {
@@ -632,7 +570,6 @@ async fn resolve_child_inputs(
     org: &str,
     child_ids: &[String],
     stale_k: i64,
-    sweep_secs: i64,
 ) -> Result<Vec<super::CompositeStateInput>, anyhow::Error> {
     use config::meta::alerts::composite::alert_stale_deadline_micros;
 
@@ -675,18 +612,9 @@ async fn resolve_child_inputs(
                     stale_deadline,
                 )
             }
-            Some(alert_composites::Resolution::Composite(model)) => (
-                model.name.clone(),
-                "composite",
-                model.enabled,
-                sweep_secs,
-                state.and_then(|state| state.level_at).and_then(|level_at| {
-                    sweep_secs
-                        .checked_mul(stale_k)
-                        .and_then(|seconds| seconds.checked_mul(1_000_000))
-                        .and_then(|window| level_at.checked_add(window))
-                }),
-            ),
+            Some(alert_composites::Resolution::Composite(_)) => {
+                anyhow::bail!("composite child is not eligible")
+            }
             _ => anyhow::bail!("composite child definition missing"),
         };
         inputs.push(super::CompositeStateInput {
@@ -707,10 +635,6 @@ fn composite_stale_k() -> i64 {
     config::get_config().alert_composite.stale_k.max(1)
 }
 
-fn composite_sweep_secs() -> i64 {
-    config::get_config().alert_composite.sweep_secs.max(1)
-}
-
 /// Evaluate a composite definition over its persisted children and current
 /// rollup states, exactly as the scheduler would. Shared by the detail and
 /// validate endpoints so they render the same truth without re-running any
@@ -727,14 +651,7 @@ pub async fn evaluate_definition(
         .iter()
         .map(|child| child.child_alert_id.clone())
         .collect::<Vec<_>>();
-    let inputs = resolve_child_inputs(
-        db,
-        &definition.org,
-        &child_ids,
-        composite_stale_k(),
-        composite_sweep_secs(),
-    )
-    .await?;
+    let inputs = resolve_child_inputs(db, &definition.org, &child_ids, composite_stale_k()).await?;
     let stale_policy = match definition.stale_child_policy {
         1 => StaleChildPolicy::TreatAsFalse,
         2 => StaleChildPolicy::TreatAsTrue,
@@ -762,14 +679,7 @@ pub async fn evaluate_expression(
     use config::meta::alerts::composite::{StaleChildPolicy, collect_references, parse_expr};
 
     let references = collect_references(&parse_expr(expression)?)?;
-    let inputs = resolve_child_inputs(
-        db,
-        org,
-        &references,
-        composite_stale_k(),
-        composite_sweep_secs(),
-    )
-    .await?;
+    let inputs = resolve_child_inputs(db, org, &references, composite_stale_k()).await?;
     let stale_policy = match stale_child_policy {
         1 => StaleChildPolicy::TreatAsFalse,
         2 => StaleChildPolicy::TreatAsTrue,
@@ -795,32 +705,13 @@ pub async fn validate_composite_graph(
     let references = collect_references(&parsed).map_err(map_expression_error)?;
     validate_children(&references).map_err(map_expression_error)?;
     let db = get_orm_client_rw().await;
-    let resolved = resolve_children(db, org, &references).await?;
-    let mut graph = alert_composites::load_graph(db, org).await?;
-    let candidate_id = composite_id.unwrap_or("__composite_preview__");
-    if composite_id.is_some() && !graph.contains_key(candidate_id) {
+    resolve_children(db, org, &references).await?;
+    if let Some(id) = composite_id
+        && alert_composites::get_by_id(db, org, id).await?.is_none()
+    {
         return Err(CompositeServiceError::NotFound);
     }
-    graph.insert(
-        candidate_id.to_string(),
-        resolved
-            .into_iter()
-            .filter(|(_, kind)| *kind == alert_composites::ChildKind::Composite)
-            .map(|(id, _)| id)
-            .collect(),
-    );
-    validate_candidate_graph(&graph)?;
     Ok(canonical_expression(&parsed))
-}
-
-/// Why `id` must not be evaluated over `graph`; regions validate writes apart, so it can break.
-/// [pure]
-pub fn graph_fault(graph: &HashMap<String, Vec<String>>, id: &str) -> Option<GraphFault> {
-    match depth(id, graph, &mut HashSet::new(), &mut HashMap::new()) {
-        Err(()) => Some(GraphFault::Cycle),
-        Ok(value) if value > 2 => Some(GraphFault::TooDeep),
-        Ok(_) => None,
-    }
 }
 
 pub async fn delete_composite(org: &str, id: &str) -> Result<(), CompositeServiceError> {
@@ -899,8 +790,8 @@ mod tests {
     use config::meta::destinations::{Destination, DestinationType, Endpoint, Module, Template};
 
     use super::{
-        CompositeCreate, GraphFault, composite_entity, create_composite, graph_fault, replica_job,
-        set_composite_enabled, sync_replica_job, update_composite, validate_jira_destinations,
+        CompositeCreate, composite_entity, create_composite, replica_job, set_composite_enabled,
+        sync_replica_job, update_composite, validate_jira_destinations,
     };
     use crate::alerts::notifications::jira;
 
@@ -1007,6 +898,121 @@ mod tests {
         assert_eq!(
             refused.map(|_| ()).map_err(|e| e.to_string()),
             Err("Alert destination nope not found".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_composite_child_is_refused_on_every_save_but_a_legacy_nested_row_stays_manageable() {
+        use infra::table::{
+            alert_composites::{ChildKind, create_with_children},
+            entity::alert_composite_children,
+        };
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set};
+        use svix_ksuid::KsuidLike as _;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("composite_no_nesting_{}", config::utils::time::now_micros());
+        let org = org.as_str();
+        let folder = config::meta::folder::Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(org, folder, config::meta::folder::FolderType::Alerts)
+            .await
+            .unwrap();
+        let conn = infra::db::get_orm_client_rw().await;
+        let mut alerts = Vec::new();
+        for name in ["child_a", "child_b"] {
+            let mut child = config::meta::alerts::alert::Alert::default();
+            child.name = name.to_string();
+            let child = infra::table::alerts::create(conn, org, "default", child, false)
+                .await
+                .unwrap();
+            alerts.push(child.id.unwrap().to_string());
+        }
+        common::infra::config::DESTINATIONS.insert(
+            format!("{org}/real"),
+            Destination {
+                org_id: org.into(),
+                name: "real".into(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type: DestinationType::Http(Endpoint::default()),
+                },
+                ..Default::default()
+            },
+        );
+        let (a, b) = (&alerts[0], &alerts[1]);
+        let request = |expression: String| composite_request(org, expression, "real", None);
+        let refused =
+            |result: Result<composite_entity::Model, super::CompositeServiceError>| match result {
+                Err(super::CompositeServiceError::ChildIsComposite(id)) => id,
+                other => panic!("expected child_is_composite, got {other:?}"),
+            };
+
+        let plain = create_composite(request(format!("{{{a}}} && {{{b}}}")))
+            .await
+            .unwrap();
+        let nested = format!("{{{}}} && {{{a}}}", plain.id);
+        assert_eq!(
+            refused(create_composite(request(nested.clone())).await),
+            plain.id
+        );
+        let other = create_composite(request(format!("{{{a}}} || {{{b}}}")))
+            .await
+            .unwrap();
+        assert_eq!(
+            refused(update_composite(&other.id, request(nested.clone())).await),
+            plain.id
+        );
+
+        let legacy_id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut legacy = composite_entity::ActiveModel::from(other.clone()).reset_all();
+        legacy.id = Set(legacy_id.clone());
+        legacy.expression = Set(nested.clone());
+        let row = |child: &str, kind: ChildKind, order| alert_composite_children::ActiveModel {
+            composite_id: Set(legacy_id.clone()),
+            child_alert_id: Set(child.to_string()),
+            child_kind: Set(kind as i16),
+            display_order: Set(order),
+        };
+        create_with_children(
+            conn,
+            legacy,
+            vec![
+                row(&plain.id, ChildKind::Composite, 0),
+                row(a, ChildKind::Alert, 1),
+            ],
+        )
+        .await
+        .unwrap();
+        let clone = super::clone_composite(org, &legacy_id, None, None, "editor".into()).await;
+        assert_eq!(refused(clone), plain.id);
+        assert_eq!(
+            refused(update_composite(&legacy_id, request(nested)).await),
+            plain.id
+        );
+
+        let stored = super::get_composite(org, &legacy_id).await.unwrap();
+        assert_eq!(
+            stored.unwrap().children.len(),
+            2,
+            "a legacy row still reads"
+        );
+        set_composite_enabled(org, &legacy_id, false).await.unwrap();
+        super::delete_composite(org, &legacy_id).await.unwrap();
+        assert!(
+            super::get_composite(org, &legacy_id)
+                .await
+                .unwrap()
+                .is_none()
         );
     }
 
@@ -1160,38 +1166,6 @@ mod tests {
                 assert_eq!(job.status, TriggerStatus::Waiting);
                 assert_eq!(job.next_run_at, 42);
             }
-        }
-    }
-
-    /// R8: the refusal for every shape of graph around the evaluated node.
-    #[test]
-    fn evaluation_refuses_a_cycle_reachable_from_the_node_or_nesting_past_two() {
-        // Each word is `parent:child,child`, the composite children of one composite.
-        let cases = [
-            ("a:", "a", None),
-            ("a:b b:", "a", None),
-            ("a:b b:c c:", "a", Some(GraphFault::TooDeep)),
-            ("a:b b:c c:", "b", None),
-            ("a:a", "a", Some(GraphFault::Cycle)),
-            ("a:b b:a", "a", Some(GraphFault::Cycle)),
-            ("a:b b:c c:b", "a", Some(GraphFault::Cycle)),
-            ("a: x:y y:x", "a", None),
-            ("a:gone", "a", None),
-        ];
-        for (edges, node, expected) in cases {
-            let graph = edges
-                .split_whitespace()
-                .filter_map(|word| word.split_once(':'))
-                .map(|(parent, children)| {
-                    let children = children
-                        .split(',')
-                        .filter(|child| !child.is_empty())
-                        .map(str::to_string)
-                        .collect();
-                    (parent.to_string(), children)
-                })
-                .collect();
-            assert_eq!(graph_fault(&graph, node), expected, "{edges} from {node}");
         }
     }
 
