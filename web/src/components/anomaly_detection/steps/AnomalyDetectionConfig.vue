@@ -622,7 +622,7 @@ import { useStore } from "vuex";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
-import { dataNoun } from "@/utils/alerts/alertCopy";
+import { dataNoun, everyWords } from "@/utils/alerts/alertCopy";
 import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
 import QueryEditor from "@/components/QueryEditor.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1281,8 +1281,14 @@ export default defineComponent({
       const secs = anomalyIntervalSeconds(Number(value), String(unit));
       return secs === null ? raw("—") : secondsInWords(secs);
     };
+    // "Every hour", never "Every 1 hour": the same words the read-back uses.
+    const UNIT_MINUTES: Record<string, number> = { m: 1, h: 60, d: 1440 };
     const scheduleEvery = computed(() =>
-      intervalText(scheduleIntervalValue.value, scheduleIntervalUnit.value),
+      everyWords(
+        Number(scheduleIntervalValue.value) *
+          (UNIT_MINUTES[String(scheduleIntervalUnit.value)] ?? 1),
+        t,
+      ),
     );
     const scheduleWindow = computed(() =>
       intervalText(detectionWindowValue.value, detectionWindowUnit.value),
