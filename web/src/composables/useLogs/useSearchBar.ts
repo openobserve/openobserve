@@ -18,7 +18,6 @@ import { savedViewsQuery } from "@/services/saved_views.queries";
 import { viewTypeOf } from "@/services/saved_views";
 import { queryClient } from "@/composables/query/queryClient";
 import { queryFunctionsQuery } from "@/services/query_functions.queries";
-import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
@@ -52,6 +51,9 @@ import { noteGridQuery } from "@/composables/useLogs/useLogPermalink";
 import { getCachedSemanticGroups, loadSemanticGroups } from "@/utils/semanticGroupsCache";
 import config from "@/aws-exports";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
+
+// After a function catalog failure, how long SQL searches go before asking for it again.
+export const CATALOG_RETRY_INTERVAL = 60_000;
 
 let selectionToken = 0;
 
@@ -489,14 +491,17 @@ export const useSearchBar = (t: TranslateFn) => {
   };
 
   // hasAggregation reads aggregate names from the function catalog, so SQL runs wait for it once.
-  // A failure is not cached, so its error state stops every later run from waiting on it again.
+  // After a failure no run waits; a later run refetches it in the background instead.
   const pendingQueryFunctions = (): Promise<unknown> | null => {
     if (!searchObj.meta.sqlMode) return null;
     const catalog = queryFunctionsQuery(store.state.selectedOrganization.identifier);
     const state = queryClient.getQueryState(catalog.queryKey);
     if (state?.data) return null;
-    if (state?.status === "error" && Date.now() - state.errorUpdatedAt < NORMAL_STALE_TIME)
+    if (state?.status === "error") {
+      if (Date.now() - state.errorUpdatedAt > CATALOG_RETRY_INTERVAL)
+        void queryClient.prefetchQuery({ ...catalog, retry: false });
       return null;
+    }
     return queryClient.fetchQuery({ ...catalog, retry: false }).catch(() => undefined);
   };
 
