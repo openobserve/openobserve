@@ -416,6 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @scratch="startFromScratch"
                 @open-alert="openExistingAlert"
                 @browse-library="goToAlertLibrary"
+                @update:period="setLookBack"
               />
             </AlertFormSection>
 
@@ -499,6 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:aggregation="updateAggregation"
                   @update:promqlCondition="updatePromqlCondition"
                   @update:triggerCondition="updateTriggerCondition"
+                  @update:period="setLookBack"
                 />
                 <AnomalyDetectionConfig
                   v-show="isAnomalyMode"
@@ -2630,6 +2632,12 @@ export default defineComponent({
       goToSection("condition");
     };
 
+    // A window typed in a condition sentence is a Look back edit, so Check every follows as there.
+    const setLookBack = (minutes: number | "") =>
+      (
+        alertForm.step4Ref.value as { handlePeriodChange?: (value: unknown) => void } | null
+      )?.handlePeriodChange?.(minutes);
+
     const startFromScratch = () => {
       restoreIntent();
       goToSection("condition");
@@ -2668,6 +2676,7 @@ export default defineComponent({
       appliedIntent,
       pendingIntent,
       applyIntent,
+      setLookBack,
       onIntentPending,
       applySuggestion,
       startFromScratch,

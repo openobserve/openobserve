@@ -12245,7 +12245,8 @@
         "firesSomeGroupsCount": "Fires when at least {count} {groups} group has {condition} in the last {window}. | Fires when at least {count} {groups} groups have {condition} in the last {window}.",
         "firesSomeGroupsValue": "Fires when {measure} is {comparison} for at least {count} {groups} group in the last {window}. | Fires when {measure} is {comparison} for at least {count} {groups} groups in the last {window}.",
         "weeks": "{count} week | {count} weeks",
-        "months": "{count} month | {count} months"
+        "months": "{count} month | {count} months",
+        "firesCompare": "Fires when the count in the last {window} is more than {factor} times the same window {offsets} earlier."
       },
       "watch": {
         "title": "What should we watch?",
@@ -12276,7 +12277,8 @@
         "helpMetrics": "Choose what to measure and what value is a problem. The preview shows how it behaves right now.",
         "helpSql": "Write the query and how many rows is a problem. The preview shows how it behaves right now.",
         "helpPromql": "Write the query and what value is a problem. The preview shows how it behaves right now.",
-        "navFact": "{name} {value}"
+        "navFact": "{name} {value}",
+        "compareShort": "More than {factor}× the same window {offsets} earlier"
       },
       "notify": {
         "title": "Who should hear about it?",
@@ -15816,7 +15818,9 @@
           "d": "day | days",
           "w": "week | weeks",
           "M": "month | months"
-        }
+        },
+        "factorLine": "Fires at more than {factor} times that window's count",
+        "factor": "Times the past window"
       },
       "forecast": {
         "thresholdPlaceholder": "e.g. 90",
@@ -15855,6 +15859,9 @@
         "row": "{name} · {type} · {target}",
         "rowNoTarget": "{name} · {type}",
         "workflow": "Workflow"
+      },
+      "window": {
+        "inTheLast": "in the last {n} minute | in the last {n} minutes"
       }
     },
     "copy": {
@@ -15931,14 +15938,14 @@
       "fromIntent": "from {intent}",
       "countWhere": {
         "label": "Count matching {noun}",
-        "sentence": "Count of {noun} where {field} is {value}, per {group}",
-        "sentenceAll": "Count of {noun} where {field} is {value}"
+        "sentence": "Count of {noun} where {field} is {value} {window}, per {group}",
+        "sentenceAll": "Count of {noun} where {field} is {value} {window}"
       },
       "percentile": {
         "label": "Percentile of a field",
         "sentence": "p95 of {field} per {group}",
-        "sentencePer": "p95 of {measure} per {group}",
-        "sentenceAll": "p95 of {measure}"
+        "sentencePer": "p95 of {measure} per {group} {window}",
+        "sentenceAll": "p95 of {measure} {window}"
       },
       "anyEvent": {
         "label": "Any matching event (as it happens)",
@@ -15951,20 +15958,21 @@
       "compareLastWeek": {
         "label": "Compare with last week",
         "sentence": "{measure} more than {factor} times the same window last week",
-        "sentenceWhere": "Count of {noun} where {field} is {value}, more than {factor} times the same window last week"
+        "sentenceWhere": "Count of {noun} where {field} is {value} {window}, more than {factor} times the same window last week"
       },
       "metricAbove": {
         "label": "Above a value",
         "sentence": "{metric} per {label} above a value",
-        "sentencePer": "{metric} per {group}, above a value",
-        "sentenceAll": "{metric} above a value"
+        "sentencePer": "{metric} per {group} {window}, above a value",
+        "sentenceAll": "{metric} {window}, above a value"
       },
       "ratio": {
         "label": "Share of one metric over another (error rate)",
         "sentence": "{numerator} as a share of {denominator}, per {label}",
-        "sentenceWhere": "Share of {metric} where {label} matches {value}, per {group}",
-        "sentenceWhereAll": "Share of {metric} where {label} matches {value}",
-        "alsoCovers": "Also covers {metrics}"
+        "sentenceWhere": "Share of {metric} where {label} matches {value}, per {group}, {window}",
+        "sentenceWhereAll": "Share of {metric} where {label} matches {value}, {window}",
+        "alsoCovers": "Also covers {metrics}",
+        "memberReads": "{metric} (reads {labels})"
       },
       "unusualChange": {
         "label": "Unusual change",
