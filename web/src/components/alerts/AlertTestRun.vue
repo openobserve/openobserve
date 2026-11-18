@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -67,6 +67,24 @@ const cancelRun = () => {
 };
 
 const running = computed(() => testRun.state.value === "running");
+// A busy day can take minutes to replay, so past this the wait says how long it has been.
+const SLOW_RUN_SECONDS = 10;
+const elapsedSeconds = ref(0);
+let ticker: ReturnType<typeof setInterval> | undefined;
+watch(
+  running,
+  (now) => {
+    clearInterval(ticker);
+    elapsedSeconds.value = 0;
+    if (!now) return;
+    const startedAt = Date.now();
+    ticker = setInterval(() => {
+      elapsedSeconds.value = Math.floor((Date.now() - startedAt) / 1000);
+    }, 1000);
+  },
+  { immediate: true },
+);
+onBeforeUnmount(() => clearInterval(ticker));
 const sameAlert = computed(() => testRun.testedKey.value === testRun.currentKey.value);
 // A re-run of the same alert keeps its last answer, dimmed; another alert's answer is not shown.
 const report = computed(() => {
@@ -85,6 +103,7 @@ const stale = computed(
 const confirmOpen = ref(false);
 const sending = ref(false);
 const sendLines = ref<{ text: I18nText; tone: TestRunTone }[]>([]);
+const sendResultRefs = ref<HTMLElement[]>([]);
 const targets = computed(() => joinListMore(props.destinations, t));
 
 const send = async () => {
@@ -132,6 +151,9 @@ const send = async () => {
     })),
   ];
   sending.value = false;
+  // The answer can fill the panel, so the outcome of the send is brought into view under it.
+  await nextTick();
+  sendResultRefs.value.at(-1)?.scrollIntoView?.({ block: "nearest" });
 };
 </script>
 
@@ -158,6 +180,13 @@ const send = async () => {
             <OButton variant="link" data-test="alert-test-run-cancel" @click="cancelRun">
               {{ t("common.cancel") }}
             </OButton>
+          </p>
+          <p
+            v-if="running && !report && elapsedSeconds >= SLOW_RUN_SECONDS"
+            class="text-text-secondary m-0 text-xs"
+            data-test="alert-test-run-elapsed"
+          >
+            {{ t("alerts.testRun.elapsed", { seconds: formatNumber(elapsedSeconds) }) }}
           </p>
           <p
             v-else-if="testRun.state.value === 'failed'"
@@ -213,6 +242,17 @@ const send = async () => {
           }}
         </li>
       </ul>
+      <p
+        v-for="(line, i) in sendLines"
+        :key="i"
+        ref="sendResultRefs"
+        class="m-0"
+        :class="TONE_CLASS[line.tone]"
+        :role="line.tone === 'error' ? 'alert' : undefined"
+        data-test="alert-test-run-send-result"
+      >
+        {{ line.text }}
+      </p>
     </div>
     <div
       class="border-border-default flex shrink-0 items-center gap-3 border-t px-4 py-2"
@@ -231,15 +271,6 @@ const send = async () => {
         </OButton>
         <span v-else class="text-text-secondary text-xs" data-test="alert-test-run-no-destination">
           {{ t("alerts.testRun.noDestination") }}
-        </span>
-        <span
-          v-for="(line, i) in sendLines"
-          :key="i"
-          :class="TONE_CLASS[line.tone]"
-          :role="line.tone === 'error' ? 'alert' : undefined"
-          data-test="alert-test-run-send-result"
-        >
-          {{ line.text }}
         </span>
       </div>
       <OButton

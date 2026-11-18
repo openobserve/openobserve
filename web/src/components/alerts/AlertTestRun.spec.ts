@@ -65,7 +65,7 @@ describe("AlertTestRun", () => {
     await flushPromises();
 
     expect(evaluate).toHaveBeenCalledWith("default", { alert: BODY }, "f1", expect.anything());
-    expect(text(wrapper, "summary")).toContain("would have fired 2 times");
+    expect(text(wrapper, "summary")).toContain("notified 2 times");
     expect(text(wrapper, "groups")).toContain("checkout");
     expect(text(wrapper, "groups")).toContain("above the threshold in 2 checks");
 
@@ -109,6 +109,17 @@ describe("AlertTestRun", () => {
     expect(run.result.value).toEqual(grouped);
   });
 
+  it("says how long a slow test has run once it passes 10 seconds", async () => {
+    vi.useFakeTimers();
+    evaluate.mockReturnValue(new Promise(() => {}));
+    const { wrapper } = mountRun();
+    await vi.advanceTimersByTimeAsync(9_000);
+    expect(wrapper.find('[data-test="alert-test-run-elapsed"]').exists()).toBe(false);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(text(wrapper, "elapsed")).toContain("12");
+    vi.useRealTimers();
+  });
+
   it("closes when a first test is cancelled", async () => {
     evaluate.mockReturnValue(new Promise(() => {}));
     const { wrapper } = mountRun();
@@ -147,5 +158,11 @@ describe("AlertTestRun", () => {
       "Test message sent to slack",
       "Couldn't send the test message to pager and mail: Writes are disabled",
     ]);
+    // The answer above keeps its room: send results are not added to the fixed action bar.
+    expect(
+      wrapper
+        .find('[data-test="alert-test-run-actions"] [data-test="alert-test-run-send-result"]')
+        .exists(),
+    ).toBe(false);
   });
 });
