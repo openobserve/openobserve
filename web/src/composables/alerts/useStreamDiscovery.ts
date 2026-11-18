@@ -18,7 +18,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
-import type { FilterOperatorId } from "@/utils/query/filterBar";
+import type { FilterCondition, FilterGroup, FilterOperatorId } from "@/utils/query/filterBar";
 import { buildMetricFamilies, type MetricStream } from "@/utils/metrics/metricFamily";
 import {
   compactDuration,
@@ -393,22 +393,78 @@ export function valueNotSeenHint(
   t: TranslateFn,
 ): I18nText | undefined {
   if (!ctx || !operator || !(EXACT_OPS.has(operator) || TEXT_OPS.has(operator))) return undefined;
+  const found = unseenValues(ctx, field, typedValues, operator);
+  if (found === "empty") return t("alerts.discovery.fieldEmpty");
+  if (!found?.unseen.length) return undefined;
+  return t("alerts.guard.valueNotSeen", {
+    value: joinList(found.unseen),
+    seen: seenList(found.unseen[0], found.seen, t),
+  });
+}
+
+/** The typed values missing from the window with what did appear (`pending` while a value's lookup
+ * runs), "empty" for a field with no values, undefined until the field's counts are in. */
+function unseenValues(
+  ctx: ValueCountContext,
+  field: string,
+  typedValues: string[],
+  operator: FilterOperatorId,
+): { unseen: string[]; seen: ValueCount[]; pending: boolean } | "empty" | undefined {
   const base = cachedValueCounts(ctx, field);
   if (base?.state !== "ready") return undefined;
-  if (!base.values.length) return t("alerts.discovery.fieldEmpty");
+  if (!base.values.length) return "empty";
   const unseen: string[] = [];
   const nearby: ValueCount[] = [];
+  let pending = false;
   for (const typed of typedValues.filter(Boolean)) {
     const found = lookupSeen(ctx, field, base, typed, operator);
+    pending ||= found.seen === undefined;
     if (found.seen !== false) continue;
     unseen.push(typed);
     nearby.push(...found.nearby);
   }
-  if (!unseen.length) return undefined;
-  return t("alerts.guard.valueNotSeen", {
-    value: joinList(unseen),
-    seen: seenList(unseen[0], [...nearby, ...base.values], t),
-  });
+  return { unseen, seen: [...nearby, ...base.values], pending };
+}
+
+const andLeaves = (group: FilterGroup): FilterCondition[] | null => {
+  if (group.negate || group.items.slice(1).some((item) => item.connector !== "and")) return null;
+  const leaves: FilterCondition[] = [];
+  for (const item of group.items) {
+    const inner = item.kind === "group" ? andLeaves(item) : item.kind === "condition" ? [item] : [];
+    if (!inner) return null;
+    leaves.push(...inner);
+  }
+  return leaves;
+};
+
+/**
+ * Why a builder filter drew nothing over the window `ctx` names: the first exact condition whose values
+ * did not appear in it, said as the PromQL preview says it. Undefined when no one condition explains it.
+ */
+export function filterNotSeenText(
+  ctx: ValueCountContext,
+  tree: FilterGroup,
+  window: I18nText,
+  t: TranslateFn,
+): I18nText | undefined {
+  const day = (ctx.windowUs ?? DAY_US) === DAY_US;
+  for (const leaf of andLeaves(tree) ?? []) {
+    if (!EXACT_OPS.has(leaf.operator) || !leaf.values.length) continue;
+    probe(ctx, leaf.field, "");
+    const found = unseenValues(ctx, leaf.field, leaf.values, leaf.operator);
+    if (found === undefined || (found !== "empty" && found.pending)) return undefined;
+    if (found === "empty")
+      return t("alerts.guard.fieldEmptyIn", { field: raw(leaf.field), window });
+    if (!found.unseen.length) continue;
+    const params = {
+      value: joinList(found.unseen.map((v) => `${leaf.field}="${v}"`)),
+      seen: seenList(found.unseen[0], found.seen, t),
+    };
+    return day
+      ? t("alerts.guard.valueNotSeen", params)
+      : t("alerts.guard.valueNotSeenIn", { ...params, window });
+  }
+  return undefined;
 }
 
 /**

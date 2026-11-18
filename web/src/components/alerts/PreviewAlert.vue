@@ -69,12 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @loading-state-change="onPreviewLoading"
       />
       <OEmptyState
-        v-if="selectedTab === 'promql' && !awaitsQuery && !shownChartError && noSeriesText"
+        v-if="!awaitsQuery && !shownChartError && emptyChartText"
         class="bg-surface-base absolute! inset-0 h-full min-h-0! w-full"
         size="inline"
         icon="bar-chart"
         :title="t('panel.noData')"
-        :description="noSeriesText"
+        :description="emptyChartText"
         :backdrop="false"
         data-test="alert-preview-no-series"
       />
@@ -165,7 +165,9 @@ import {
   isSpanDurationMeasure,
   previewCountText,
 } from "@/utils/alerts/alertReadBack";
-import { durationText, formatNumber } from "@/utils/alerts/alertCopy";
+import { durationText, durationWords, formatNumber } from "@/utils/alerts/alertCopy";
+import { filterNotSeenText } from "@/composables/alerts/useStreamDiscovery";
+import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
 import { evaluateAlertBody, testRunKey, testValueText } from "@/utils/alerts/alertTestRun";
 import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import AlertTestRun from "./AlertTestRun.vue";
@@ -379,9 +381,15 @@ const onPreviewError = (error: { message?: string; code?: string | number } | nu
   previewError.value = error;
   if (error?.message || !previewLoading) settledPreviewError.value = error;
 };
+// Set once a builder run settles on the renderer's own "No Data", so the chart can say why.
+const filterDrewNothing = ref(false);
 const onPreviewLoading = (loading: boolean) => {
   previewLoading = loading;
   if (!loading) settledPreviewError.value = previewError.value;
+  filterDrewNothing.value =
+    !loading &&
+    props.selectedTab === "custom" &&
+    (panelRendererRef.value as { noData?: string } | null)?.noData === "No Data";
 };
 // Only a 4xx message is about the query; anything else says the data could not be loaded.
 const shownChartError = computed(() => {
@@ -1762,6 +1770,24 @@ const handleSeriesDataUpdate = (seriesData: any) => {
 
 // "No Data" alone can't tell a filter that matched nothing from a quiet metric, so the chart says which.
 const noSeriesText = ref<I18nText | null>(null);
+// The builder says it the same way, over the counts of the range the chart shows.
+const filterNotSeen = computed((): I18nText | null => {
+  if (props.selectedTab !== "custom" || !filterDrewNothing.value) return null;
+  const minutes = previewMinutes();
+  const tree = FILTER_PROFILES.alert.codec.parse(props.formData.query_condition?.conditions, {
+    fields: [],
+  });
+  const ctx = {
+    org: store.state.selectedOrganization.identifier,
+    streamType: props.formData.stream_type,
+    streamName: props.formData.stream_name,
+    windowUs: minutes >= 24 * 60 ? undefined : minutes * 60_000_000,
+  };
+  return filterNotSeenText(ctx, tree, durationWords(minutes, t), t) ?? null;
+});
+const emptyChartText = computed(() =>
+  props.selectedTab === "promql" ? noSeriesText.value : filterNotSeen.value,
+);
 let noSeriesGeneration = 0;
 const clearNoSeries = () => {
   noSeriesGeneration++;
@@ -2185,6 +2211,7 @@ watch(
     if (next[0] !== prev?.[0]) {
       evaluationStatus.value = null;
       clearNoSeries();
+      filterDrewNothing.value = false;
       cancelVerdictSearch();
       // The verdict is gone, so even a query typed back to the last run's must run again.
       lastRunKey = "";

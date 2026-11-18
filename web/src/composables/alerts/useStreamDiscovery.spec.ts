@@ -8,6 +8,7 @@ import {
   HOUR_US,
   VALUE_COUNT_SIZE,
   clearValueCounts,
+  filterNotSeenText,
   insertLabelIntoPromql,
   loadValueCounts,
   streamOptions,
@@ -263,6 +264,71 @@ describe("value counts", () => {
     const text = valueNotSeenHint(ctx, "reason", [typed], "eq", t);
     expect(text && String(text)).toBe(hint);
   });
+});
+
+describe("filterNotSeenText", () => {
+  beforeEach(() => {
+    stream.mockReset();
+    clearValueCounts();
+  });
+  const leaf = (field: string, values: string[], connector: "and" | "or" = "and") => ({
+    kind: "condition" as const,
+    id: field,
+    connector,
+    field,
+    operator: "eq" as const,
+    values,
+  });
+  const tree = (...items: ReturnType<typeof leaf>[]) => ({
+    kind: "group" as const,
+    id: "root",
+    connector: "and" as const,
+    items,
+  });
+  const halfHour = { ...ctx, windowUs: HOUR_US / 2 };
+
+  it.each([
+    [
+      "the range's value counts",
+      halfHour,
+      tree(leaf("severity", ["Warning"])),
+      'severity="Warning"',
+      "30 minutes",
+    ],
+    [
+      "the day's, worded as PromQL's",
+      ctx,
+      tree(leaf("severity", ["Warning"])),
+      'severity="Warning"',
+      "24 hours",
+    ],
+    ["nothing for a seen value", halfHour, tree(leaf("severity", ["WARN"])), undefined, undefined],
+    [
+      "nothing when an or joins the filters",
+      halfHour,
+      tree(leaf("k8s", ["a"]), leaf("severity", ["Warning"], "or")),
+      undefined,
+      undefined,
+    ],
+  ])(
+    "names a filter value missing from %s once the counts are in",
+    async (_, at, filter, value, window) => {
+      answerWith({
+        "": [
+          ["WARN", 24],
+          ["INFO", 1_009],
+        ],
+      });
+      const words = (window ?? "30 minutes") as never;
+      expect(filterNotSeenText(at, filter, words, t)).toBeUndefined();
+      await flush();
+      const text = filterNotSeenText(at, filter, words, t);
+      if (!value) return expect(text).toBeUndefined();
+      expect(String(text)).toContain(value);
+      expect(String(text)).toContain(window);
+      expect(String(text)).toContain("WARN (24)");
+    },
+  );
 });
 
 describe("insertLabelIntoPromql", () => {
