@@ -401,14 +401,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </p>
               </template>
-              <div
-                v-if="beingUpdated"
-                v-show="!isAnomalyMode && !isCompositeMode"
-                :ref="(el) => setSectionTarget('queryCondition', el)"
-                class="empty:hidden"
-                data-test="add-alert-query-condition-slot"
-                data-snap-stop
-              />
               <div data-test="add-alert-query-card" data-snap-stop>
                 <CompositeAlertForm
                   v-if="isCompositeMode"
@@ -496,7 +488,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</span>
                 </OSettingRow>
                 <div
-                  v-if="!beingUpdated"
                   v-show="!isAnomalyMode && !isCompositeMode"
                   :ref="(el) => setSectionTarget('queryCondition', el)"
                   class="empty:hidden"

@@ -1617,12 +1617,15 @@ describe("AddAlert (OForm owner)", () => {
       expect(row.find('[data-test="alert-settings-period-input"]').exists()).toBe(true);
     });
 
-    it("edit puts the limit before the query", async () => {
-      wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
+    it.each([
+      ["create", {}],
+      ["edit", { isUpdated: true, modelValue: savedAlert() }],
+    ])("%s puts the query before the limit", async (_mode, props) => {
+      wrapper = mountAlert(props);
       await flushPromises();
       const slot = wrapper.get('[data-test="add-alert-query-condition-slot"]').element;
       const card = wrapper.get('[data-test="add-alert-query-card"]').element;
-      expect(slot.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(card.compareDocumentPosition(slot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("section 3 puts what the message says before the incident rows", async () => {
