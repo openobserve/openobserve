@@ -67,6 +67,8 @@ export interface PreviewVerdict {
   wouldTrigger: boolean;
   reason: string;
   count?: number;
+  /** The server stopped counting at `count`, so there may be more. */
+  atLeast?: boolean;
   label?: string;
   grouped?: boolean;
 }
@@ -106,6 +108,12 @@ export const limitText = (op: string | undefined, value: unknown): string =>
   !op || op === ">=" ? String(value) : `${operatorSymbol(op)} ${value}`;
 
 const num = (value: unknown): number => Number(value ?? 0) || 0;
+
+/** A preview count as people read it: "1,000+" when the server stopped counting there. */
+export const previewCountText = (count: number, atLeast: boolean | undefined, t: TranslateFn) => {
+  const value = count.toLocaleString();
+  return atLeast ? t("alerts.incidents.panel.atLeast", { value }) : raw(value);
+};
 
 /** An event, row or series count limit: a whole number of 1 or more. */
 export const isCountLimit = (value: unknown): boolean =>
@@ -293,7 +301,7 @@ export function previewVerdictSentence(
     (alert.query_condition?.type === "custom" && !alert.query_condition?.aggregation);
   const label = countsEvents ? t("alerts.verdict.events", verdict.count) : raw(verdict.label ?? "");
   return t(verdict.wouldTrigger ? "alerts.verdict.fires" : "alerts.verdict.quiet", {
-    count: verdict.count,
+    count: previewCountText(verdict.count, verdict.atLeast, t),
     label,
     window: t("alerts.verdict.window", { n: num(tc.period) }),
     limit,

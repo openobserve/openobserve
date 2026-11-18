@@ -2695,6 +2695,49 @@ describe("PreviewAlert - SQL verdict under streaming aggregates", () => {
 
     expectVerdict(w, { matched: 2, gate: "2 >= 2", trigger: true, label: LABEL });
   });
+
+  // ── the server's row cap ──────────────────────────────────────────────────
+
+  it.each([
+    // [frames, operator, limit, verdict: true fires / false quiet / null none, count]
+    [[1000, 1000], ">=", 1, true, 2000],
+    [[1000], "<", 1000, false, 1000],
+    [[1000], "==", 999, false, 1000],
+    [[1000], ">=", 5000, null, 0],
+    [[1000], "<=", 1000, null, 0],
+  ])(
+    "a partition stopped at the server's row cap makes %j a lower bound (%s %s)",
+    async (totals, operator, threshold, fires, count) => {
+      store.state.zoConfig.query_default_limit = 1000;
+      try {
+        w = await mountSql({ threshold, operator });
+        await emitResultMetadata(w, [totals.map((total) => plain(total))]);
+        if (fires === null) {
+          expect(w.vm.evaluationStatus).toBeNull();
+        } else {
+          expect(w.vm.evaluationStatus).toMatchObject({
+            wouldTrigger: fires,
+            count,
+            atLeast: true,
+          });
+        }
+      } finally {
+        delete store.state.zoConfig.query_default_limit;
+      }
+    },
+  );
+
+  it("counts a partition under the row cap exactly", async () => {
+    store.state.zoConfig.query_default_limit = 1000;
+    try {
+      w = await mountSql({ threshold: 5 });
+      await emitResultMetadata(w, [[plain(999), plain(3)]]);
+      expect(w.vm.evaluationStatus).toMatchObject({ wouldTrigger: true, count: 1002 });
+      expect(w.vm.evaluationStatus.atLeast).toBeFalsy();
+    } finally {
+      delete store.state.zoConfig.query_default_limit;
+    }
+  });
 });
 
 describe("PreviewAlert - Forecast mode", () => {

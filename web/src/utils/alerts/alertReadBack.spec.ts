@@ -230,6 +230,20 @@ describe("previewVerdictSentence", () => {
     ).toBe("Quiet right now: 2 rows in the last 10 min (limit 3).");
   });
 
+  it.each([
+    [2000, true, `${t("alerts.incidents.panel.atLeast", { value: (2000).toLocaleString() })} `],
+    [2000, false, `${(2000).toLocaleString()} `],
+  ])("states %s rows (a lower bound: %s) as the server counted them", (count, atLeast, shown) => {
+    const sql = alert({ query_condition: { type: "sql", aggregation: null } });
+    expect(
+      previewVerdictSentence(
+        { wouldTrigger: true, reason: "", count, label: "rows", atLeast },
+        sql,
+        t,
+      ),
+    ).toContain(shown);
+  });
+
   it("lets the editor say the builder counts events", () => {
     const withAgg = alert({
       query_condition: { type: "custom", aggregation: { function: "avg" } },

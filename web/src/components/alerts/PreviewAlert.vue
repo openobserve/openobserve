@@ -82,7 +82,7 @@ import {
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import { keyToMs } from "@/utils/alerts/alertBacktest";
-import { isCountLimit } from "@/utils/alerts/alertReadBack";
+import { isCountLimit, previewCountText } from "@/utils/alerts/alertReadBack";
 import {
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
@@ -247,6 +247,7 @@ const evaluationStatus = ref<{
   wouldTrigger: boolean;
   reason: string;
   count?: number;
+  atLeast?: boolean;
   label?: string;
   grouped?: boolean;
 } | null>(null);
@@ -739,6 +740,12 @@ const handleChartDataUpdate = (resultMetaData: any) => {
   evaluateResultMetadata(resultMetaData, inVerdictWindow);
 };
 
+// The server stops each partition at its default row limit without flagging it, so a full one may hold more.
+const stoppedAtRowCap = (rows: number): boolean => {
+  const cap = Number(store.state.zoConfig?.query_default_limit) || 0;
+  return cap > 0 && rows === cap;
+};
+
 /** Counts a run's frames into the verdict; `inWindow` keeps the hits of the latest window. */
 const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boolean) => {
   // resultMetaData structure from usePanelDataLoader:
@@ -747,6 +754,7 @@ const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boo
   // Which includes: hits, total, took, etc.
 
   let resultCount = 0;
+  let atLeast = false;
 
   try {
     if (Array.isArray(resultMetaData) && resultMetaData.length > 0) {
@@ -900,6 +908,7 @@ const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boo
                 (sum: number, p: any) => sum + (Number(p?.total) || 0),
                 0,
               );
+              atLeast = framesWithTotal.some((p: any) => stoppedAtRowCap(Number(p?.total)));
             } else {
               // Last-wins, matching the server's own collector (collect.rs:165).
               // Skip range-capped frames: send_partial_search_resp emits a
@@ -917,9 +926,11 @@ const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boo
                 if (frame?.is_partial !== true) settled = frame;
               }
               resultCount = settled !== undefined ? Number(settled.total) || 0 : maxTotal;
+              atLeast = stoppedAtRowCap(resultCount);
             }
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
+            atLeast = stoppedAtRowCap(resultCount);
           }
         }
         // PromQL mode: count time series or data points
@@ -992,7 +1003,7 @@ const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boo
         //
         // A derived count of ZERO is still a verdict and is still written — the
         // guard is on the payload being usable, never on the count being nonzero.
-        evaluateAndSetStatus(resultCount);
+        evaluateAndSetStatus(resultCount, atLeast);
       }
     }
   } catch (error) {
@@ -1206,12 +1217,13 @@ const writeRealTimeStatus = (): boolean => {
  */
 const setEvaluationStatus = (verdict: {
   count: number;
+  atLeast?: boolean;
   wouldTrigger: boolean;
   comparison: string;
   level?: PreviewLevel | null;
 }) => {
   const args = {
-    count: verdict.count,
+    count: previewCountText(verdict.count, verdict.atLeast, t),
     label: resultLabelFor(verdict.count),
     comparison: verdict.comparison,
   };
@@ -1223,6 +1235,7 @@ const setEvaluationStatus = (verdict: {
   evaluationStatus.value = {
     wouldTrigger: verdict.wouldTrigger,
     count: verdict.count,
+    atLeast: verdict.atLeast,
     label: args.label,
     grouped:
       props.selectedTab === "custom" &&
@@ -1242,12 +1255,23 @@ const setEvaluationStatus = (verdict: {
 
 // Evaluate and set status based on a result count already gated on value
 // (rows, groups, data points). PromQL goes through evaluatePromqlSeries instead.
-const evaluateAndSetStatus = (resultCount: number) => {
+const evaluateAndSetStatus = (resultCount: number, atLeast = false) => {
   if (writeRealTimeStatus()) return;
 
+  // A lower bound decides only when every count from it up gets the same answer.
+  const threshold = Number(props.formData.trigger_condition?.threshold || 0);
+  const operator = props.formData.trigger_condition?.operator || ">=";
+  if (
+    atLeast &&
+    !(resultCount > threshold || (resultCount === threshold && [">=", "<"].includes(operator)))
+  ) {
+    evaluationStatus.value = null;
+    return;
+  }
   const gate = evaluateCountGate(resultCount);
   setEvaluationStatus({
     count: resultCount,
+    atLeast,
     wouldTrigger: gate.passes,
     comparison: gate.comparison,
   });
