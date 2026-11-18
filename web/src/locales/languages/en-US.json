@@ -15990,7 +15990,20 @@
       "sending": "Sending…",
       "sent": "Test message sent to {targets}",
       "sendFailed": "Couldn't send the test message to {targets}: {reason}",
-      "noDestination": "Pick a destination to send a test message"
+      "noDestination": "Pick a destination to send a test message",
+      "nowPending": "Right now: matching ({value} vs {threshold}), not yet for as long as Must last.",
+      "nowQuietBare": "Right now: quiet.",
+      "nowPendingBare": "Right now: matching, not yet for as long as Must last.",
+      "nowFiringBare": "Right now: firing.",
+      "pendingOnly": "It matched in {count} check, but not for as long as Must last. | It matched in {count} checks, but never for as long as Must last.",
+      "metricSeries": "{metric} has {count}",
+      "noSeriesMany": "The query matched no series. Series per metric: {list}.",
+      "groupChecks": "over the limit in {count} check | over the limit in {count} checks",
+      "serverStatus": "the server answered {status}",
+      "noAnswer": "no answer from the server",
+      "stale": "The alert changed after this test. Test it again for the new answer.",
+      "sendConfirm": "This posts a real message, marked [TEST], to {targets}.",
+      "region": "Test result"
     }
   },
   "alert_dependencies": {

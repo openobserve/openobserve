@@ -74,7 +74,7 @@ export type EvaluateLevel = "warning" | "critical";
 
 export type EvaluateNotFiredReason = "below_threshold" | "no_data" | "pending" | "error";
 
-export type EvaluateHeldBy = "notify_at_most_every" | "suppress_repeats";
+export type EvaluateHeldBy = "notify_at_most_every" | "suppress_repeats" | "notify_on_warning_off";
 
 export interface EvaluateGroup {
   /** The trigger record's `group_label` form: "host=b,region=eu". */

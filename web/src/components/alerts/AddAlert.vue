@@ -512,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-snap-stop
                 />
                 <AlertBacktest
-                  v-if="showsBacktest"
+                  v-if="showsBacktest || showsTestedDay"
                   :query="backtestQuery"
                   :stream-type="formData.stream_type"
                   :period="Number(formData.trigger_condition.period)"
@@ -1268,6 +1268,7 @@ import {
 } from "@/composables/alerts/useStreamDiscovery";
 import AlertCheckTimeline from "./AlertCheckTimeline.vue";
 import AlertBacktest from "./AlertBacktest.vue";
+import { provideAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import { getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval } from "@/utils/queryUtils";
 import OCommandSearch from "@/lib/forms/CommandSearch/OCommandSearch.vue";
@@ -1727,6 +1728,10 @@ export default defineComponent({
         !alertForm.isAggregationEnabled.value
       );
     });
+
+    // Test it's answer draws the 24-hour row for any query while the alert is unchanged.
+    const alertTestRun = provideAlertTestRun();
+    const showsTestedDay = computed(() => !!alertTestRun.fresh.value);
 
     const backtestQuery = computed(() =>
       generateSqlQuery(
@@ -2477,6 +2482,7 @@ export default defineComponent({
       showsCheckTimeline,
       showsBacktest,
       backtestQuery,
+      showsTestedDay,
       reviewLines,
       sentenceGap: SENTENCE_GAP,
       issueCount,
