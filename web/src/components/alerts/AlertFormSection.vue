@@ -17,29 +17,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, provide } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
 import { ALERT_SECTIONS, type AlertSectionId } from "./alertFormSections";
 
-const props = defineProps<{
-  id: AlertSectionId;
-  /** 1-based position among the editor's sections. */
-  index: number;
-  title: I18nText;
-  /** One sentence under the title. */
-  help: I18nText;
-  /** False while another section is in view: its step buttons fade out but stay in the Tab order. */
-  current?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    id: AlertSectionId;
+    /** 1-based position among the editor's sections. */
+    index: number;
+    title: I18nText;
+    /** One sentence under the title. */
+    help: I18nText;
+    /** False while another section is in view: its step buttons fade out but stay in the Tab order. */
+    current?: boolean;
+    /** False when the previous section cannot be opened from here, as section 1 of an edit. */
+    canGoBack?: boolean;
+  }>(),
+  { current: undefined, canGoBack: true },
+);
 
-const emit = defineEmits<{ go: [id: AlertSectionId] }>();
+const emit = defineEmits<{
+  /** The header arrows: scroll to the section and put the Tab start on its heading. */
+  go: [id: AlertSectionId];
+  /** The footer buttons: scroll to the section and focus its first control. */
+  step: [id: AlertSectionId];
+}>();
 
 const { t } = useI18nTyped();
 const total = ALERT_SECTIONS.length;
 const def = computed(() => ALERT_SECTIONS.find((section) => section.id === props.id));
-const icon = computed(() => def.value?.icon);
 const previous = computed(() => ALERT_SECTIONS[props.index - 2]);
 const next = computed(() => ALERT_SECTIONS[props.index]);
 const previousLabel = computed(() =>
@@ -52,80 +60,121 @@ const nextLabel = computed(() =>
     ? t("alerts.sections.next", { title: t(next.value.navKey) })
     : t("alerts.sections.nextStep"),
 );
+const footerBack = computed(() => (props.canGoBack ? previous.value : undefined));
 
+// The key also tells nested steps to drop their own card; the body restores the S4 rule and padding.
 provide(SETTING_ROW_BARE_KEY, true);
 </script>
 
+<!-- The header band is the sticky header (data-snap-sticky), so a stuck card shows one header, never two. -->
 <template>
   <section
     :data-snap-section="id"
     :data-test="`add-alert-section-${id}`"
-    class="max-lg:border-border-default flex flex-col max-lg:border-b max-lg:last:border-b-0 [&_[data-snap-stop]]:scroll-mt-24"
+    class="flex flex-col px-4 py-2 max-lg:px-3 [&_[data-snap-stop]]:scroll-mt-28"
   >
-    <div v-if="$slots.lead" class="px-4 pt-3" :data-test="`add-alert-section-${id}-lead`">
+    <div v-if="$slots.lead" class="px-1 pb-2" :data-test="`add-alert-section-${id}-lead`">
       <slot name="lead" />
     </div>
-    <header
-      class="bg-surface-base sticky top-0 z-30 flex items-start gap-3 px-4 pt-4 pb-3 max-lg:static max-lg:z-auto max-lg:pt-3"
+    <div
+      class="bg-surface-overlay border-border-default rounded-surface flex flex-col border"
+      :data-test="`add-alert-section-${id}-card`"
     >
-      <span
-        v-if="icon"
-        class="bg-surface-subtle text-accent rounded-surface flex size-8 shrink-0 items-center justify-center"
-        :data-test="`add-alert-section-${id}-icon`"
+      <header
+        data-snap-sticky
+        class="bg-surface-subtle border-border-default rounded-t-surface sticky top-0 z-30 flex items-start gap-3 border-b px-4 py-2 max-lg:static max-lg:z-auto"
       >
-        <OIcon :name="icon" size="sm" />
-      </span>
-      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span class="text-text-secondary text-xs" :data-test="`add-alert-section-${id}-eyebrow`">
-          {{
-            def?.optional
-              ? t("alerts.sections.eyebrowOptional", { n: index, total })
-              : t("alerts.sections.eyebrow", { n: index, total })
-          }}
-        </span>
-        <h2
-          class="text-text-heading m-0 text-xl font-semibold focus:outline-none"
-          tabindex="-1"
-          data-snap-heading
-          :data-test="`add-alert-section-${id}-title`"
+        <div class="flex min-w-0 flex-1 flex-col">
+          <span class="text-text-secondary text-xs" :data-test="`add-alert-section-${id}-eyebrow`">
+            {{
+              def?.optional
+                ? t("alerts.sections.eyebrowOptional", { n: index, total })
+                : t("alerts.sections.eyebrow", { n: index, total })
+            }}
+          </span>
+          <h2
+            class="text-text-heading m-0 text-sm font-semibold focus:outline-none"
+            tabindex="-1"
+            data-snap-heading
+            :data-test="`add-alert-section-${id}-title`"
+          >
+            {{ title }}
+          </h2>
+          <p
+            class="text-text-secondary text-compact m-0"
+            :data-test="`add-alert-section-${id}-help`"
+          >
+            {{ help }}
+          </p>
+        </div>
+        <div
+          class="flex shrink-0 gap-1"
+          :class="current === false && 'opacity-0 focus-within:opacity-100'"
+          :data-test="`add-alert-section-${id}-steps`"
         >
-          {{ title }}
-        </h2>
-        <p class="text-text-secondary m-0 text-sm" :data-test="`add-alert-section-${id}-help`">
-          {{ help }}
-        </p>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="keyboard-arrow-up"
+            :disabled="!previous"
+            :aria-label="previousLabel"
+            :data-test="`add-alert-section-${id}-prev`"
+            @click="previous && emit('go', previous.id)"
+          >
+            <OTooltip v-if="previous" side="bottom" :content="previousLabel" />
+          </OButton>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="keyboard-arrow-down"
+            :disabled="!next"
+            :aria-label="nextLabel"
+            :data-test="`add-alert-section-${id}-next`"
+            @click="next && emit('go', next.id)"
+          >
+            <OTooltip v-if="next" side="bottom" :content="nextLabel" />
+          </OButton>
+        </div>
+      </header>
+      <div
+        class="[&_[data-o-setting-row]]:border-border-default -mt-px flex flex-col px-4 pb-2 [&_[data-o-setting-row]]:border-t [&_[data-o-setting-row]]:py-3"
+        data-section-body
+      >
+        <slot />
       </div>
       <div
-        class="flex shrink-0 gap-1"
-        :class="current === false && 'opacity-0 focus-within:opacity-100'"
-        :data-test="`add-alert-section-${id}-steps`"
+        v-if="$slots.optional"
+        class="bg-surface-panel border-border-default hidden flex-col border-t px-4 py-1.5 has-[>:not(:empty):not([style*='display:_none'])]:flex"
+        :data-test="`add-alert-section-${id}-optional`"
+      >
+        <slot name="optional" />
+      </div>
+      <footer
+        class="border-border-default rounded-b-surface flex flex-wrap items-center gap-2 border-t px-4 py-1.5 max-md:flex-col max-md:items-stretch"
+        :data-test="`add-alert-section-${index}-footer`"
       >
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="keyboard-arrow-up"
-          :disabled="!previous"
-          :aria-label="previousLabel"
-          :data-test="`add-alert-section-${id}-prev`"
-          @click="previous && emit('go', previous.id)"
+          v-if="footerBack"
+          variant="ghost"
+          size="sm"
+          icon-left="arrow-upward"
+          :data-test="`add-alert-section-${index}-back`"
+          @click="emit('step', footerBack.id)"
         >
-          <OTooltip v-if="previous" side="bottom" :content="previousLabel" />
+          {{ previousLabel }}
         </OButton>
         <OButton
+          v-if="next"
+          class="ms-auto max-md:ms-0"
           variant="outline"
-          size="icon-sm"
-          icon-left="keyboard-arrow-down"
-          :disabled="!next"
-          :aria-label="nextLabel"
-          :data-test="`add-alert-section-${id}-next`"
-          @click="next && emit('go', next.id)"
+          size="sm"
+          icon-right="arrow-downward"
+          :data-test="`add-alert-section-${index}-next`"
+          @click="emit('step', next.id)"
         >
-          <OTooltip v-if="next" side="bottom" :content="nextLabel" />
+          {{ nextLabel }}
         </OButton>
-      </div>
-    </header>
-    <div class="flex flex-1 flex-col px-4 pb-4">
-      <slot />
+      </footer>
     </div>
   </section>
 </template>

@@ -69,7 +69,10 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
         </OButton>
       </div>
     </OSettingRow>
-    <div v-if="ownLinks.length" class="flex flex-wrap items-center gap-1 py-1">
+    <div
+      v-if="ownLinks.length || view.more.length"
+      class="flex flex-wrap items-center gap-x-1 gap-y-0.5 py-1"
+    >
       <OButton
         v-for="item in ownLinks"
         :key="item.id"
@@ -81,36 +84,39 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
       >
         {{ t(item.nameKey) }}
       </OButton>
-    </div>
-    <div v-if="view.more.length" class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-1">
-      <OButton
-        class="shrink-0"
-        variant="ghost-primary"
-        size="sm"
-        :icon-left="view.expanded ? 'expand-less' : 'expand-more'"
-        :aria-expanded="view.expanded"
-        :data-test="`add-alert-section-${section}-more`"
-        @click="emit('toggle')"
+      <div
+        v-if="view.more.length"
+        class="flex min-w-0 flex-1 basis-60 flex-wrap items-baseline gap-x-2 gap-y-0.5"
       >
-        {{
-          view.expanded
-            ? t("alerts.tiers.showFewer")
-            : t("alerts.form.moreOptions", { count: view.more.length })
-        }}
-      </OButton>
-      <span
-        v-if="!view.expanded"
-        class="text-text-secondary min-w-0 flex-1 text-xs whitespace-normal"
-        :data-test="`add-alert-section-${section}-more-names`"
-      >
-        <template v-for="(item, index) in view.more" :key="item.id"
-          ><template v-if="index">{{ SEP }}</template
-          >{{ t(item.nameKey)
-          }}<template v-if="item.defaultHintKey"
-            >{{ " " }}{{ t(item.defaultHintKey, HINT_DEFAULTS) }}</template
-          ></template
+        <OButton
+          class="shrink-0"
+          variant="ghost-primary"
+          size="sm"
+          :icon-left="view.expanded ? 'expand-less' : 'expand-more'"
+          :aria-expanded="view.expanded"
+          :data-test="`add-alert-section-${section}-more`"
+          @click="emit('toggle')"
         >
-      </span>
+          {{
+            view.expanded
+              ? t("alerts.tiers.showFewer")
+              : t("alerts.form.moreOptions", { count: view.more.length })
+          }}
+        </OButton>
+        <span
+          v-if="!view.expanded"
+          class="text-text-secondary min-w-0 flex-1 text-xs whitespace-normal"
+          :data-test="`add-alert-section-${section}-more-names`"
+        >
+          <template v-for="(item, index) in view.more" :key="item.id"
+            ><template v-if="index">{{ SEP }}</template
+            >{{ t(item.nameKey)
+            }}<template v-if="item.defaultHintKey"
+              >{{ " " }}{{ t(item.defaultHintKey, HINT_DEFAULTS) }}</template
+            ></template
+          >
+        </span>
+      </div>
     </div>
   </div>
 </template>

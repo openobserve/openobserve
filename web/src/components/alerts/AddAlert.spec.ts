@@ -1648,17 +1648,15 @@ describe("AddAlert (OForm owner)", () => {
       expect(help()).toBe("Pick the alerts to combine and how they must fire together.");
     });
 
-    it("keeps Save outlined while stepping and primary on the last step", async () => {
+    it("keeps Save the filled primary on every section", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const save = () => wrapper.findComponent('[data-test="add-alert-submit-btn"]');
-      wrapper.vm.activeSection = "watch";
-      await flushPromises();
-      expect(save().props("variant")).toBe("outline");
-
-      wrapper.vm.activeSection = "details";
-      await flushPromises();
-      expect(save().props("variant")).toBe("primary");
+      for (const section of ["watch", "details"]) {
+        wrapper.vm.activeSection = section;
+        await flushPromises();
+        expect(save().props("variant")).toBe("primary");
+      }
       expect(wrapper.find('[data-test="add-alert-footer"]').text()).not.toContain("Next");
     });
 
@@ -1718,6 +1716,23 @@ describe("AddAlert (OForm owner)", () => {
       expect(scrollToSection).toHaveBeenCalledWith("schedule");
       await wrapper.find(btn("notify", "prev")).trigger("click");
       expect(scrollToSection).toHaveBeenCalledWith("condition");
+    });
+
+    it("the footer Next scrolls to the next section and focuses its first control", async () => {
+      const rects = vi
+        .spyOn(Element.prototype, "getClientRects")
+        .mockReturnValue([new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList);
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      await wrapper.find('[data-test="add-alert-section-4-next"]').trigger("click");
+      await flushPromises();
+      expect(scrollToSection).toHaveBeenCalledWith("details");
+      expect(document.activeElement).toBe(
+        wrapper.find('[data-test="add-alert-details-name-input"] input').element,
+      );
+      rects.mockRestore();
     });
 
     it("names the alert types as ways of checking, keeping their ids", async () => {
@@ -2444,11 +2459,14 @@ describe("AddAlert (OForm owner)", () => {
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
       const input = seedFieldError("notify");
+      const revealElement = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.revealElement = revealElement;
 
       wrapper.vm.focusOnFirstError();
       await flushPromises();
 
       expect(document.activeElement).toBe(input);
+      expect(revealElement).toHaveBeenCalledWith(input);
     });
 
     it("focuses the earliest section's error when several sections have one", async () => {

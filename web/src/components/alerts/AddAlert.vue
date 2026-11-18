@@ -279,10 +279,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.sections.watch.title')"
               :help="t('alerts.sections.watch.help')"
               @go="goToSection"
+              @step="stepToSection"
             >
               <p
                 v-if="showsLibraryLink"
-                class="text-text-secondary m-0 pb-3 text-sm"
+                class="text-text-secondary m-0 pt-2.5 pb-2 text-sm"
                 data-test="add-alert-library-line"
               >
                 <i18n-t keypath="alerts.form.watch.library" tag="span" scope="global">
@@ -361,9 +362,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               id="condition"
               :current="activeSection === 'condition'"
               :index="2"
+              :can-go-back="!isEditing"
               :title="t('alerts.sections.condition.title')"
               :help="conditionHelp"
               @go="goToSection"
+              @step="stepToSection"
             >
               <template v-if="watchCollapsed" #lead>
                 <p
@@ -520,6 +523,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
+                <AlertSuggestionLine section="condition" anchor="end" />
+                <div
+                  :ref="(el) => setSectionTarget('narrowPreview', el)"
+                  class="empty:hidden"
+                  data-test="add-alert-narrow-preview"
+                />
+              </div>
+              <template #optional>
                 <!-- Every optional condition setting is scheduled-only, so a real-time step would show an empty heading. -->
                 <AlertOptionalHeading
                   v-if="!isAnomalyMode && !isCompositeMode && formData.is_real_time === 'false'"
@@ -545,19 +556,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:multiTimeRange="updateMultiTimeRange"
                   />
                 </div>
-                <AlertSuggestionLine section="condition" anchor="end" />
                 <AlertTierLinks
                   section="condition"
                   :view="tiers.view('condition')"
                   @add="onTierAdd"
                   @toggle="tiers.toggle('condition')"
                 />
-                <div
-                  :ref="(el) => setSectionTarget('narrowPreview', el)"
-                  class="empty:hidden"
-                  data-test="add-alert-narrow-preview"
-                />
-              </div>
+              </template>
             </AlertFormSection>
 
             <AlertFormSection
@@ -567,6 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.sections.notify.title')"
               :help="t('alerts.sections.notify.help')"
               @go="goToSection"
+              @step="stepToSection"
             >
               <div class="flex flex-col" data-snap-stop>
                 <div
@@ -602,13 +608,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-snap-stop
                 />
                 <AlertSuggestionLine section="notify" anchor="end" />
+              </div>
+              <template #optional>
                 <AlertTierLinks
                   section="notify"
                   :view="tiers.view('notify')"
                   @add="onTierAdd"
                   @toggle="tiers.toggle('notify')"
                 />
-              </div>
+              </template>
             </AlertFormSection>
 
             <AlertFormSection
@@ -618,6 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.sections.schedule.title')"
               :help="t('alerts.sections.schedule.help')"
               @go="goToSection"
+              @step="stepToSection"
             >
               <div class="flex flex-col" data-snap-stop>
                 <OSettingRow
@@ -682,6 +691,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('alerts.sections.details.help')
               "
               @go="goToSection"
+              @step="stepToSection"
             >
               <div class="flex flex-col" data-snap-stop>
                 <OSettingRow
@@ -757,14 +767,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-alert-details-folder-row"
                   data-snap-stop
                 >
-                  <InlineSelectFolderDropdown
-                    v-if="!isEditing"
-                    variant="inline"
-                    :model-value="activeFolderId as string"
-                    type="alerts"
-                    data-test="add-alert-details-folder-select"
-                    @update:model-value="updateActiveFolderId({ value: $event })"
-                  />
+                  <div v-if="!isEditing" class="flex min-h-8.5 items-center">
+                    <InlineSelectFolderDropdown
+                      variant="inline"
+                      :model-value="activeFolderId as string"
+                      type="alerts"
+                      data-test="add-alert-details-folder-select"
+                      @update:model-value="updateActiveFolderId({ value: $event })"
+                    />
+                  </div>
                   <OTruncatedText
                     v-else
                     class="text-text-body text-sm leading-8.5"
@@ -773,37 +784,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ activeFolderName }}
                   </OTruncatedText>
                 </OSettingRow>
-                <AlertOptionalHeading v-if="!isAnomalyMode" />
-                <div
-                  v-show="!isAnomalyMode"
-                  :ref="(el) => setSectionTarget('advancedDetails', el)"
-                  class="empty:hidden [&>*]:py-1!"
-                  data-snap-stop
-                />
-                <div v-show="!isAnomalyMode" data-snap-stop>
-                  <Advanced
-                    :section-targets="sectionTargets"
-                    :template="formData.template"
-                    :templates="templates"
-                    :contextAttributes="formData.context_attributes"
-                    :description="formData.description"
-                    :rowTemplate="formData.row_template"
-                    :rowTemplateType="formData.row_template_type"
-                    :destinations="destinations"
-                    :selectedDestinations="formData.destinations"
-                    :alertName="formData.name"
-                    :streamName="formData.stream_name"
-                    :streamType="formData.stream_type"
-                    :triggerCondition="formData.trigger_condition"
-                    :streamFields="filteredColumns"
-                    @update:template="updateTemplate"
-                    @refresh:templates="refreshTemplates"
-                    @update:contextAttributes="updateContextAttributes"
-                    @update:description="updateDescription"
-                    @update:rowTemplate="updateRowTemplate"
-                    @update:rowTemplateType="updateRowTemplateType"
-                  />
-                </div>
                 <!-- AlertSettings renders nothing inline in the sectioned editor: every slice lives in a section slot. -->
                 <AlertSettings
                   v-show="!isAnomalyMode"
@@ -835,15 +815,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-snap-stop
                 />
                 <AlertSuggestionLine section="details" anchor="end" />
-                <AlertTierLinks
-                  section="details"
-                  class="[&>*]:py-0!"
-                  :view="tiers.view('details')"
-                  @add="onTierAdd"
-                  @toggle="tiers.toggle('details')"
-                />
                 <section
-                  class="border-border-default bg-surface-base rounded-surface mt-2 flex flex-col overflow-hidden border"
+                  class="border-border-default bg-surface-base rounded-surface mt-1 flex flex-col overflow-hidden border"
                   aria-labelledby="add-alert-review-title"
                   data-test="add-alert-review"
                 >
@@ -883,6 +856,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </section>
               </div>
+              <template #optional>
+                <AlertOptionalHeading v-if="!isAnomalyMode" />
+                <div
+                  v-show="!isAnomalyMode"
+                  :ref="(el) => setSectionTarget('advancedDetails', el)"
+                  class="empty:hidden [&>*]:py-1!"
+                  data-snap-stop
+                />
+                <div v-show="!isAnomalyMode" data-snap-stop>
+                  <Advanced
+                    :section-targets="sectionTargets"
+                    :template="formData.template"
+                    :templates="templates"
+                    :contextAttributes="formData.context_attributes"
+                    :description="formData.description"
+                    :rowTemplate="formData.row_template"
+                    :rowTemplateType="formData.row_template_type"
+                    :destinations="destinations"
+                    :selectedDestinations="formData.destinations"
+                    :alertName="formData.name"
+                    :streamName="formData.stream_name"
+                    :streamType="formData.stream_type"
+                    :triggerCondition="formData.trigger_condition"
+                    :streamFields="filteredColumns"
+                    @update:template="updateTemplate"
+                    @refresh:templates="refreshTemplates"
+                    @update:contextAttributes="updateContextAttributes"
+                    @update:description="updateDescription"
+                    @update:rowTemplate="updateRowTemplate"
+                    @update:rowTemplateType="updateRowTemplateType"
+                  />
+                </div>
+                <AlertTierLinks
+                  section="details"
+                  class="[&>*]:py-0!"
+                  :view="tiers.view('details')"
+                  @add="onTierAdd"
+                  @toggle="tiers.toggle('details')"
+                />
+              </template>
             </AlertFormSection>
           </OSnapScroll>
         </div>
@@ -1033,7 +1046,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OButton
           data-test="add-alert-submit-btn"
-          :variant="guidesToNext ? 'outline' : 'primary'"
+          variant="primary"
           size="sm-action"
           :loading="isSubmitting || (isAnomalyMode && anomalySaving)"
           :disabled="compositeSaveDisabled"
@@ -1189,6 +1202,7 @@ import {
 } from "./alertSettingFind";
 import { useAlertSettingFind } from "@/composables/alerts/useAlertSettingFind";
 import AlertFormSection from "./AlertFormSection.vue";
+import { focusFirstControl } from "@/utils/focusNextControl";
 import AlertTierLinks from "./AlertTierLinks.vue";
 import AlertSuggestionLine from "./AlertSuggestionLine.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -1367,7 +1381,19 @@ export default defineComponent({
       if (!watchCollapsed.value) startJump();
       snapScrollRef.value?.scrollToSection(id);
     };
-    const alertForm = useAlertForm(props, formEmit, { showSection: goToSection });
+    // The footer's Back and Next hand the Tab start to the section's first control, past its header arrows.
+    const stepToSection = (id: AlertSectionId) => {
+      goToSection(id);
+      void nextTick(() => {
+        const section = document.querySelector<HTMLElement>(`[data-snap-section="${id}"]`);
+        if (section) focusFirstControl(section, "[data-snap-sticky]");
+      });
+    };
+    // A centred error leaves the previous card's band stuck over its tail; the snap scroller rests on a section stop.
+    const alertForm = useAlertForm(props, formEmit, {
+      showSection: goToSection,
+      revealControl: (el) => snapScrollRef.value?.revealElement(el),
+    });
     const alertEditorDraft = useAlertEditorDraft({
       form: alertForm,
       modelValue: () => props.modelValue,
@@ -1787,14 +1813,6 @@ export default defineComponent({
         how,
       });
     });
-
-    // Creating walks forward, so Next holds the one primary action until the last step.
-    const guidesToNext = computed(
-      () =>
-        !alertForm.beingUpdated.value &&
-        !alertForm.anomalyEditMode.value &&
-        activeSection.value !== ALERT_SECTIONS[ALERT_SECTIONS.length - 1].id,
-    );
 
     // Filled by template refs after mount; until then every step renders its slices inline.
     const sectionTargets = reactive<AlertSectionTargets>({});
@@ -2251,11 +2269,11 @@ export default defineComponent({
       goToSection,
       isEditing,
       watchCollapsed,
+      stepToSection,
       watchSummary,
       expandWatch,
       editNameInDetails,
       ALERT_SECTIONS,
-      guidesToNext,
       sectionTargets,
       setSectionTarget,
       sectionItems,
