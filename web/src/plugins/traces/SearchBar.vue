@@ -683,6 +683,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :suggestions="effectiveSuggestions"
           :field-value-resolver="resolveFieldValues"
           :recent-queries="recentQueries"
+          :full-text-search="false"
           :debounce-time="100"
           :filter-mode="!searchObj.meta.sqlMode"
           :hide-nl-toggle="!isAiEnabled"

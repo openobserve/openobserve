@@ -151,6 +151,7 @@ interface EditorConfig {
   valuesTimeRange: () => { startTime: number; endTime: number } | null;
   /** The user's recent queries, offered as clock rows that replace the editor text. */
   recents: () => string[];
+  fullTextSearch: () => boolean;
 }
 
 interface ChainState {
@@ -503,6 +504,11 @@ export default defineComponent({
     filterMode: {
       type: Boolean,
       default: false,
+    },
+    /** False when a selected stream has no full-text search field, so a typed word is not offered as match_all. */
+    fullTextSearch: {
+      type: Boolean,
+      default: true,
     },
     /** Replaces the default commented-SQL write of an AI result; null leaves the editor unchanged. */
     transformGeneratedQuery: {
@@ -875,6 +881,7 @@ export default defineComponent({
         showHint,
         valuesTimeRange: () => props.valuesTimeRange ?? null,
         recents: () => props.recentQueries,
+        fullTextSearch: () => props.fullTextSearch,
       });
     };
 
@@ -1891,7 +1898,9 @@ export default defineComponent({
         const textBeforeWord = textUntilPosition.slice(0, textUntilPosition.length - word.length);
         const filled =
           groupsMenus(config) && isPredicatePosition(textBeforeWord, config.filterMode())
-            ? buildFilledWordEntries(word, catalog.map(objectEntry))
+            ? buildFilledWordEntries(word, catalog.map(objectEntry), {
+                fullTextSearch: config.fullTextSearch(),
+              })
             : [];
         const entries = [...catalog, ...filled];
         const canChain = chainsHere(config, model, position);

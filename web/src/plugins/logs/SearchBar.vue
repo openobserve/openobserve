@@ -1381,6 +1381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :suggestions="effectiveSuggestions"
                 :field-value-resolver="resolveFieldValues"
                 :recent-queries="recentQueries"
+                :full-text-search="streamsSearchFullText"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
@@ -2379,6 +2380,14 @@ export default defineComponent({
     const filterBuilderFields = computed(() =>
       toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
     );
+    // match_all fails on any selected stream that has no full-text search field.
+    const streamsSearchFullText = computed(() => {
+      const selected: string[] = searchObj.data.stream.selectedStream ?? [];
+      const { targets } = buildFilterContext(searchObj, store.state.zoConfig, {
+        ignoreFailures: true,
+      });
+      return selected.length > 0 && selected.every((name) => targets[name]?.mode === "fts");
+    });
     const loadFilterBuilderValues = (field: string, search: string) =>
       resolveFieldValues(field, { prefix: search });
     const onFilterBuilderQuery = (sql: string) => {
@@ -5355,6 +5364,7 @@ export default defineComponent({
       pickRecentFilterRow,
       onFilterBuilderFocus,
       recentQueries,
+      streamsSearchFullText,
       recentExamples,
       onRecentEditorKeydown,
       noteEditorPointer,

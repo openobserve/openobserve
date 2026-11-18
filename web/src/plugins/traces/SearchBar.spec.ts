@@ -389,6 +389,7 @@ const sharedStubs = {
       "hideNlToggle",
       "nlpMode",
       "transformGeneratedQuery",
+      "fullTextSearch",
     ],
     emits: ["update:query", "run-query", "focus", "blur", "user-edit", "update:nlpMode"],
     setup(_: unknown, { emit }: { emit: (event: "focus") => void }) {
@@ -1994,6 +1995,13 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(editorProps().props("filterMode")).toBe(true);
+    });
+
+    it("never offers match_all for a typed word, since trace streams have no full-text fields", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(editorProps().props("fullTextSearch")).toBe(false);
     });
 
     it("hands the query to suggestions after 100 ms, as Logs does", async () => {

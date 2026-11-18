@@ -2361,6 +2361,31 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
     });
   });
 
+  describe("a typed word's match_all row follows the streams' full-text fields", () => {
+    const wordInserts = async (editorId: string, props: any) => {
+      const { editor, model, provide } = await mountWith(editorId, props);
+      const text = "SELECT * FROM logs WHERE alp";
+      placeCaret(editor, model, text);
+      model.getWordUntilPosition.mockReturnValue({
+        word: "alp",
+        startColumn: text.length - 2,
+        endColumn: text.length + 1,
+      });
+      const result = await provide(model, { lineNumber: 1, column: text.length + 1 }, {}, {});
+      return rowsOf(result).map((s: any) => s.insertText);
+    };
+
+    it("offers match_all('alp') when nothing says otherwise", { timeout: 30000 }, async () => {
+      expect(await wordInserts("fts-default", {})).toContain("match_all('alp')");
+    });
+
+    it("drops it when the streams have no full-text field", { timeout: 30000 }, async () => {
+      const inserts = await wordInserts("fts-none", { fullTextSearch: false });
+      expect(inserts).not.toContain("match_all('alp')");
+      expect(inserts).toContain("str_match(${1}, 'alp')");
+    });
+  });
+
   describe("the typed prefix reaches the resolver", () => {
     it("passes what is typed inside an open quote", { timeout: 30000 }, async () => {
       const resolver = vi.fn(async (_field: string, _options?: any) => ["openobserve"]);

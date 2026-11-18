@@ -101,6 +101,7 @@
         :filter-mode="filterMode"
         :values-time-range="valuesTimeRange ?? null"
         :recent-queries="recentQueries ?? []"
+        :full-text-search="fullTextSearch"
         :transform-generated-query="transformGeneratedQuery ?? undefined"
         @update:query="handleQueryUpdate"
         @user-edit="(isBlank: boolean, wasBlank: boolean) => emit('user-edit', isBlank, wasBlank)"
@@ -194,6 +195,7 @@ interface Props {
   filterMode?: boolean; // The query is a bare WHERE fragment (Logs without SQL mode)
   valuesTimeRange?: { startTime: number; endTime: number } | null; // Range field values are looked up in (microseconds)
   recentQueries?: string[]; // The user's recent queries, offered as clock rows while typing
+  fullTextSearch?: boolean; // False when a selected stream has no full-text search field (no match_all row)
   transformGeneratedQuery?: ((sql: string) => string | null) | null; // Page-specific write of an AI result (null result = keep the editor)
 
   // NL Mode (optional external control)
@@ -220,6 +222,7 @@ const props = withDefaults(defineProps<Props>(), {
   textPreview: false,
   showAutoComplete: true,
   releaseWheelToPage: true,
+  fullTextSearch: true,
   keywords: () => [],
   suggestions: () => [],
   debounceTime: 500,

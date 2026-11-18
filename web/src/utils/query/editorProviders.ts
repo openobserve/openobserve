@@ -949,7 +949,11 @@ const filledRow = (entry: LooseEntry, labelDetail: string): LooseEntry => ({
 });
 
 /** Search functions with a bare typed word as their value; the field-taking ones open the field menu at the field. */
-export const buildFilledWordEntries = (word: string, catalog: LooseEntry[]): LooseEntry[] => {
+export const buildFilledWordEntries = (
+  word: string,
+  catalog: LooseEntry[],
+  { fullTextSearch }: { fullTextSearch: boolean },
+): LooseEntry[] => {
   if (!word) return [];
   const literal = sqlQuoted(word);
   // A prefix filter word ties with the catalog's prefix matches, which then sort first; an exact one would be boosted above them.
@@ -957,7 +961,9 @@ export const buildFilledWordEntries = (word: string, catalog: LooseEntry[]): Loo
     filterText: `${word.toLowerCase()}\u0001`,
     sortText: `${SORT_LANE.clause}\uffff`,
   };
-  const term = catalogFunctions(catalog, TERM_SEARCH_FUNCTIONS).map((entry) => ({
+  // The server rejects match_all on a stream with no full-text search field.
+  const termFunctions = fullTextSearch ? catalogFunctions(catalog, TERM_SEARCH_FUNCTIONS) : [];
+  const term = termFunctions.map((entry) => ({
     ...filledRow(entry, `(${literal})`),
     ...shared,
     insertText: `${entryName(entry)}(${literal})`,

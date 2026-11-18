@@ -1772,9 +1772,10 @@ describe("isValueFunction — what may stand as a comparison operand", () => {
 
 describe("buildFilledWordEntries — search functions with the typed word", () => {
   const catalog = SQL_FUNCTIONS as any[];
+  const withFullText = { fullTextSearch: true };
 
   it("offers every value-taking search function the catalog has, filled with the word", () => {
-    const rows = buildFilledWordEntries("error", catalog);
+    const rows = buildFilledWordEntries("error", catalog, withFullText);
     expect(rows.map((r) => `${r.label}${r.labelDetail}`)).toEqual([
       "match_all('error')",
       "str_match(…, 'error')",
@@ -1791,7 +1792,7 @@ describe("buildFilledWordEntries — search functions with the typed word", () =
   });
 
   it("ranks after every name the word starts, without being filtered out by it", () => {
-    const rows = buildFilledWordEntries("Err", catalog);
+    const rows = buildFilledWordEntries("Err", catalog, withFullText);
     for (const row of rows) {
       expect(row.filterText).toBe("err\u0001");
       expect(row.sortText! > "\u0003").toBe(true);
@@ -1800,17 +1801,29 @@ describe("buildFilledWordEntries — search functions with the typed word", () =
   });
 
   it("escapes a quote for SQL and a dollar sign for the snippet", () => {
-    const rows = buildFilledWordEntries("it's$1", catalog);
+    const rows = buildFilledWordEntries("it's$1", catalog, withFullText);
     expect(rows[0].insertText).toBe("match_all('it''s$1')");
     expect(rows[1].insertText).toBe("str_match(${1}, 'it''s\\$1')");
   });
 
   it("skips a function the catalog does not have, and offers nothing for no word", () => {
     const onlyMatchAll = catalog.filter((e) => e.name === "match_all");
-    expect(buildFilledWordEntries("error", onlyMatchAll).map((r) => r.label)).toEqual([
-      "match_all",
+    expect(buildFilledWordEntries("error", onlyMatchAll, withFullText).map((r) => r.label)).toEqual(
+      ["match_all"],
+    );
+    expect(buildFilledWordEntries("", catalog, withFullText)).toEqual([]);
+  });
+
+  it("offers match_all only when the streams have a full-text search field", () => {
+    const labels = (fullTextSearch: boolean) =>
+      buildFilledWordEntries("alp", catalog, { fullTextSearch }).map((r) => r.label);
+    expect(labels(true)).toContain("match_all");
+    expect(labels(false)).toEqual([
+      "str_match",
+      "str_match_ignore_case",
+      "re_match",
+      "re_not_match",
     ]);
-    expect(buildFilledWordEntries("", catalog)).toEqual([]);
   });
 });
 
