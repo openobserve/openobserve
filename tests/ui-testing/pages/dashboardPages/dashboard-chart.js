@@ -27,6 +27,19 @@ export default class ChartTypeSelector {
     this.yAxisLayout = page.locator('[data-test="dashboard-y-layout"]');
     this.breakdownLayout = page.locator('[data-test="dashboard-b-layout"]');
 
+    // A field-list row and its add-to-axis buttons (+X / +Y / +B), CSS-hidden until the row is hovered
+    this.fieldListRow = (fieldName) => page.locator(`[data-test="o-field-list-row-${fieldName}"]`).first();
+    this.fieldAddButton = (fieldName, target) =>
+      this.fieldListRow(fieldName).locator(`[data-test="dashboard-add-${target}-data"]`);
+
+    // Name shown beside an axis drop zone ("Group", "Size", "Sub-group" on a sunburst):
+    // the nearest ancestor of the zone that holds a .layout-name label.
+    this.axisLayoutName = (layout) =>
+      layout
+        .locator('xpath=ancestor::div[.//div[contains(@class,"layout-name")]][1]')
+        .locator(".layout-name")
+        .first();
+
     // Chart picker item currently marked as selected, for a given chart type id
     this.selectedChartTypeItem = (chartType) =>
       page.locator(
@@ -536,6 +549,28 @@ export default class ChartTypeSelector {
     await removeButton.click();
   }
 
+  /**
+   * Remove a field if it is (or shortly becomes) present, e.g. the histogram(_timestamp) X field the
+   * editor seeds while it is still a bar chart, which a later chart-type switch carries over.
+   * @param {string} alias - e.g. "x_axis_1"
+   * @param {"x"|"y"|"b"} target
+   * @param {number} timeout - how long to wait for an asynchronously seeded field
+   * @returns {Promise<boolean>} whether a field was removed
+   */
+  async removeFieldIfPresent(alias, target, timeout = 5000) {
+    const baseTestIds = { x: "dashboard-x-item", y: "dashboard-y-item", b: "dashboard-b-item" };
+    if (!baseTestIds[target]) throw new Error(`Invalid target type: ${target}`);
+    const removeButton = this.page.locator(`[data-test="${baseTestIds[target]}-${alias}-remove"]`);
+    const present = await removeButton
+      .waitFor({ state: "visible", timeout })
+      .then(() => true)
+      .catch(() => false);
+    if (!present) return false;
+    await removeButton.click();
+    await expect(removeButton).toHaveCount(0);
+    return true;
+  }
+
   // Helper function to wait for table data to load completely
   async waitForTableDataLoad() {
     // Wait for table to be visible
@@ -1034,5 +1069,34 @@ export default class ChartTypeSelector {
   async expectYAxisRawField(field) {
     await expect(this.yAxisLayout).toContainText(field);
     await expect(this.yAxisLayout).not.toContainText("count(");
+  }
+
+  /** Assert the X, Y and Breakdown drop zones carry the given names (e.g. Group / Size / Sub-group). */
+  async expectAxisLayoutNames({ x, y, b }) {
+    if (x) await expect(this.axisLayoutName(this.xAxisLayout)).toContainText(x);
+    if (y) await expect(this.axisLayoutName(this.yAxisLayout)).toContainText(y);
+    if (b) await expect(this.axisLayoutName(this.breakdownLayout)).toContainText(b);
+  }
+
+  /**
+   * Assert whether a field's add-to-axis button (+X, +B, ...) is enabled.
+   * The buttons are CSS-hidden until the row is hovered, so hover first; the search is cleared afterwards.
+   * @param {string} fieldName
+   * @param {"x"|"y"|"b"} target
+   * @param {boolean} enabled
+   */
+  async expectAddFieldButtonEnabled(fieldName, target, enabled) {
+    if (!["x", "y", "b"].includes(target)) throw new Error(`Invalid target type: ${target}`);
+    await this.searchField(fieldName);
+    const row = this.fieldListRow(fieldName);
+    const button = this.fieldAddButton(fieldName, target);
+    await row.waitFor({ state: "visible", timeout: 10000 });
+    // Re-hover inside the poll: a field-list re-render after the search drops :hover.
+    await expect(async () => {
+      await row.hover({ timeout: 2000 });
+      if (enabled) await expect(button).toBeEnabled({ timeout: 1000 });
+      else await expect(button).toBeDisabled({ timeout: 1000 });
+    }).toPass({ timeout: 15000 });
+    await this.clearFieldSearch();
   }
 }

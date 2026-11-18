@@ -1054,6 +1054,113 @@ export default class DashboardactionPage {
     }
   }
 
+  /**
+   * Live state of the first rendered sunburst, read from its ECharts instance (the chart is canvas-painted).
+   *
+   * Returns null when no sunburst is drawn. `slices` lists every sector ECharts drew, with its ring depth
+   * (1 = innermost ring) and the page coordinates of its centre, so a test can click a real slice.
+   * `viewRoot` is the slice the chart is re-rooted to ("" for the whole tree).
+   *
+   * @param {string} scopeSelector
+   * @returns {Promise<null | {
+   *   depth: number, rootNames: string[], labelsShown: boolean, nodeClick: string|boolean|null,
+   *   viewRoot: string, slices: Array<{name: string, depth: number, value: number, x: number, y: number}>
+   * }>}
+   */
+  async getSunburstState(scopeSelector = this.chartRendererSelector) {
+    return this.page.evaluate((scopeSel) => {
+      const scopes = Array.from(document.querySelectorAll(scopeSel));
+      const visited = new Set();
+      let found = null;
+      const walk = (node, depth) => {
+        if (found || !node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
+        visited.add(node);
+        const comp = node.component;
+        if (comp) {
+          let chart = null;
+          try {
+            chart = "chart" in (comp.setupState || {}) ? comp.setupState.chart : null;
+          } catch {
+            chart = null;
+          }
+          const host = comp.setupState?.chartRef;
+          if (chart?.getOption && host instanceof Element && scopes.some((scope) => scope.contains(host))) {
+            try {
+              const series = chart.getOption()?.series?.[0];
+              if (series?.type === "sunburst") found = chart;
+            } catch {
+              // A disposed instance throws; keep looking.
+            }
+          }
+          walk(comp.subTree, depth + 1);
+        }
+        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
+        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
+      };
+      walk(document.querySelector("#app")?._vnode, 0);
+      if (!found) return null;
+
+      const series = found.getOption().series[0];
+      const treeDepth = (nodes) =>
+        Array.isArray(nodes) && nodes.length ? 1 + Math.max(...nodes.map((n) => treeDepth(n.children))) : 0;
+      const seriesModel = found.getModel().getSeriesByIndex(0);
+      const data = seriesModel.getData();
+      const rect = found.getDom().getBoundingClientRect();
+      const slices = [];
+      for (let i = 0; i < data.count(); i++) {
+        const el = data.getItemGraphicEl(i);
+        const treeNode = data.tree.getNodeByDataIndex(i);
+        // A sector ECharts removed after a re-root can still be returned here; it has left the scene graph.
+        if (!el?.shape || !el.parent || el.invisible || el.ignore || !treeNode || treeNode.depth < 1) continue;
+        const { cx, cy, r0, r, startAngle, endAngle } = el.shape;
+        const angle = (startAngle + endAngle) / 2;
+        const radius = (r0 + r) / 2;
+        slices.push({
+          name: String(treeNode.name ?? ""),
+          depth: treeNode.depth,
+          value: Number(treeNode.getValue?.() ?? 0),
+          x: rect.left + cx + radius * Math.cos(angle),
+          y: rect.top + cy + radius * Math.sin(angle),
+        });
+      }
+      return {
+        depth: treeDepth(series.data),
+        rootNames: (series.data ?? []).map((n) => String(n.name ?? "")),
+        labelsShown: series.label?.show !== false,
+        nodeClick: series.nodeClick ?? null,
+        viewRoot: String(seriesModel.getViewRoot?.()?.name ?? ""),
+        slices,
+      };
+    }, scopeSelector);
+  }
+
+  /** Poll until a sunburst is drawn, and return its state. */
+  async waitForSunburst(timeout = 20000) {
+    let state = null;
+    await expect
+      .poll(async () => {
+        state = await this.getSunburstState();
+        return state?.slices?.length ?? 0;
+      }, { timeout, message: "sunburst never drew any slice" })
+      .toBeGreaterThan(0);
+    return state;
+  }
+
+  /**
+   * Click the largest drawn slice on the given ring (1 = innermost) with a real mouse click
+   * at the slice centre, and return the slice that was clicked.
+   * @param {number} ringDepth
+   */
+  async clickLargestSunburstSlice(ringDepth = 1) {
+    const state = await this.waitForSunburst();
+    const ring = state.slices.filter((slice) => slice.depth === ringDepth);
+    if (!ring.length) throw new Error(`No sunburst slice drawn on ring ${ringDepth}`);
+    const slice = ring.reduce((a, b) => (b.value > a.value ? b : a));
+    await this.page.mouse.move(slice.x, slice.y);
+    await this.page.mouse.click(slice.x, slice.y);
+    return slice;
+  }
+
   async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {
     const charts = await this.getChartOptionSnapshots(scopeSelector);
     if (charts.length !== 1) return [`expected one rendered chart, found ${charts.length}`];
