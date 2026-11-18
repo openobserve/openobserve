@@ -165,6 +165,9 @@ const DETAIL_LINK_LABEL: &str = "Open anomaly";
 #[cfg(feature = "enterprise")]
 const SECOND_GROUP_KEY_ERROR: &str = "Anomaly detection reads one value per time bucket. Remove \
                                       '{expr}' from GROUP BY, or use a filter for one value.";
+/// `GROUP BY ALL` names no key to remove, so its error names the bucket to group by instead.
+#[cfg(feature = "enterprise")]
+const GROUP_BY_ALL_ERROR: &str = "Anomaly detection reads one value per time bucket. Replace GROUP BY ALL with GROUP BY {bucket}.";
 
 #[cfg(feature = "enterprise")]
 type QueryMetadataCache = HashMap<(String, String), (partitioned_search::QueryMetadata, Instant)>;
@@ -2888,10 +2891,10 @@ fn validate_custom_sql_grid(
         return Err(e);
     }
     #[cfg(feature = "enterprise")]
-    if let Some(expr) =
-        stream_fields.and_then(|fields| partitioned_search::custom_group_by_offender(sql, fields))
+    if let Some(error) =
+        stream_fields.and_then(|fields| partitioned_search::custom_group_by_error(sql, fields))
     {
-        anyhow::bail!(SECOND_GROUP_KEY_ERROR.replace("{expr}", &expr));
+        anyhow::bail!(error);
     }
     #[cfg(not(feature = "enterprise"))]
     let _ = stream_fields;
@@ -10185,6 +10188,16 @@ mod tests {
                     "{group_by}: {err}"
                 );
             }
+        }
+
+        #[test]
+        fn group_by_all_names_the_bucket_to_group_by() {
+            let err = guard("GROUP BY ALL", &["service"]).unwrap_err().to_string();
+            assert_eq!(
+                err,
+                "Anomaly detection reads one value per time bucket. Replace GROUP BY ALL with \
+                 GROUP BY time_bucket."
+            );
         }
 
         #[test]

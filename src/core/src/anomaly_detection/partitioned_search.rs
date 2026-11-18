@@ -147,6 +147,12 @@ struct CustomBucket<'a> {
     literal: &'a str,
 }
 
+/// A GROUP BY the save guard refuses: `GROUP BY ALL` names its bucket, any other its extra key.
+enum GroupByOffender {
+    All(String),
+    Key(String),
+}
+
 /// One supported invocation: its identity, window, proven grid and per-search row budget.
 struct SupportedRun<'a> {
     anomaly_id: &'a str,
@@ -538,18 +544,22 @@ pub(super) fn log_fallback(org_id: &str, anomaly_id: &str, reason: &str) {
     }
 }
 
-/// The save-time form of [`check_custom_group_by`]: the GROUP BY key that is not the bucket.
-/// SQL with no single SELECT or no histogram column is left to the other checks.
-pub(super) fn custom_group_by_offender(
-    sql: &str,
-    stream_fields: &HashSet<String>,
-) -> Option<String> {
+/// The save-time form of [`check_custom_group_by`]: the P1.11 error for a GROUP BY that is
+/// not the bucket alone. SQL with no single SELECT or no histogram is left to the other checks.
+pub(super) fn custom_group_by_error(sql: &str, stream_fields: &HashSet<String>) -> Option<String> {
     let statement = single_statement(sql).ok()?;
-    select_group_by_offender(statement_select(&statement)?, stream_fields)
+    let offender = select_group_by_offender(statement_select(&statement)?, stream_fields)?;
+    Some(match offender {
+        GroupByOffender::All(bucket) => super::GROUP_BY_ALL_ERROR.replace("{bucket}", &bucket),
+        GroupByOffender::Key(expr) => super::SECOND_GROUP_KEY_ERROR.replace("{expr}", &expr),
+    })
 }
 
 /// A bucket from a FROM subquery is checked there; above it a GROUP BY may hold only one key.
-fn select_group_by_offender(select: &Select, stream_fields: &HashSet<String>) -> Option<String> {
+fn select_group_by_offender(
+    select: &Select,
+    stream_fields: &HashSet<String>,
+) -> Option<GroupByOffender> {
     let Some(bucket) = save_time_bucket(select) else {
         if let Some(offender) = single_key_offender(&select.group_by) {
             return Some(offender);
@@ -558,16 +568,19 @@ fn select_group_by_offender(select: &Select, stream_fields: &HashSet<String>) ->
             .and_then(|inner| select_group_by_offender(inner, stream_fields));
     };
     let (exprs, modifiers) = match &select.group_by {
-        GroupByExpr::All(_) => return Some("ALL".to_string()),
+        GroupByExpr::All(_) if bucket.alias.is_empty() => {
+            return Some(GroupByOffender::All((bucket.position + 1).to_string()));
+        }
+        GroupByExpr::All(_) => return Some(GroupByOffender::All(bucket.alias.clone())),
         GroupByExpr::Expressions(exprs, modifiers) => (exprs, modifiers),
     };
     if let Some(modifier) = modifiers.first() {
-        return Some(modifier.to_string());
+        return Some(GroupByOffender::Key(modifier.to_string()));
     }
     exprs
         .iter()
         .find(|expr| !matches!(save_bucket_key(expr, &bucket, stream_fields), Ok(true)))
-        .map(ToString::to_string)
+        .map(|expr| GroupByOffender::Key(expr.to_string()))
 }
 
 /// The engine folds unquoted names to lower case, so `TIME_BUCKET` names `time_bucket`.
@@ -587,13 +600,15 @@ fn save_bucket_key(
 }
 
 /// With no bucket in this SELECT, its GROUP BY can be the bucket only when it has one key.
-fn single_key_offender(group_by: &GroupByExpr) -> Option<String> {
+fn single_key_offender(group_by: &GroupByExpr) -> Option<GroupByOffender> {
     match group_by {
-        GroupByExpr::All(_) => Some("ALL".to_string()),
+        GroupByExpr::All(_) => Some(GroupByOffender::All("<bucket alias>".to_string())),
         GroupByExpr::Expressions(_, modifiers) if !modifiers.is_empty() => {
-            Some(modifiers[0].to_string())
+            Some(GroupByOffender::Key(modifiers[0].to_string()))
         }
-        GroupByExpr::Expressions(exprs, _) => exprs.get(1).map(ToString::to_string),
+        GroupByExpr::Expressions(exprs, _) => exprs
+            .get(1)
+            .map(|expr| GroupByOffender::Key(expr.to_string())),
     }
 }
 
