@@ -98,16 +98,6 @@
 
       <div class="ms-auto flex shrink-0 items-center gap-2">
         <OButton
-          v-if="askAi"
-          variant="ai-gradient"
-          size="sm-action"
-          icon-left="bolt"
-          data-test="alerts-anomalysummarystrip-ask-ai"
-          @click="emit('ask-ai')"
-        >
-          {{ t("alerts.anomaly.stripAskAi") }}
-        </OButton>
-        <OButton
           v-if="response?.url"
           variant="primary"
           size="sm-action"
@@ -142,13 +132,11 @@ const props = defineProps<{
   failed: boolean;
   config: Record<string, any> | null;
   nowUs: number;
-  askAi?: boolean;
 }>();
 
 const emit = defineEmits<{
   retry: [];
   open: [url: string];
-  "ask-ai": [];
 }>();
 
 const { t } = useI18nTyped();

@@ -13789,8 +13789,6 @@
       "stripPeak": "Peak",
       "stripIncomplete": "Last point may be incomplete",
       "stripOpenData": "View data",
-      "stripAskAi": "Ask AI",
-      "stripAskAiChip": "Anomaly {name}",
       "pointAriaLabel": "Anomaly reading",
       "pointRange": "{start}-{end} UTC",
       "pointOlderModel": "From an earlier version of this detector",

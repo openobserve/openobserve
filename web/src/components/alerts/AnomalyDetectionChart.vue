@@ -38,10 +38,8 @@
       :failed="summaryFailed"
       :config="alert"
       :now-us="nowUs"
-      :ask-ai="askAiAvailable"
       @retry="refreshSummary"
       @open="openUrl"
-      @ask-ai="askAi"
     />
 
     <div class="flex items-center justify-between gap-2">
@@ -193,7 +191,6 @@ import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch 
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import config from "@/aws-exports";
 
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -206,7 +203,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
 import { anomalyExploreQuery } from "@/services/anomaly_detection.queries";
 import type { AnomalyExploreResponse } from "@/types/anomalyExplore";
-import { formatUtcHm, openAppUrl, pageModelVersion } from "@/utils/alerts/anomalyExploreView";
+import { openAppUrl, pageModelVersion } from "@/utils/alerts/anomalyExploreView";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { chartColor } from "@/utils/chartTheme";
 import { getDefaultDashboardPanelData } from "@/utils/alerts/aggregationPreviewQuery";
@@ -242,7 +239,6 @@ const props = defineProps<{ alert: any; anomalyId: string }>();
 const emit = defineEmits<{
   /** The page shows another model than the server: reload the config, and this chart follows. */
   reload: [];
-  "ask-ai": [payload: Record<string, unknown>];
 }>();
 
 const { t } = useI18nTyped();
@@ -607,36 +603,6 @@ function armSummaryTimer() {
   const ms = anomalyIntervalMs(props.alert?.schedule_interval);
   if (ms) summaryTimer = setInterval(() => void loadSummary(true), ms);
 }
-
-const askAiAvailable = computed(
-  () => config.isEnterprise === "true" && !!store.state.zoConfig?.ai_enabled && !!summary.value,
-);
-
-/** Questions are model input, not screen copy, so the prompt stays English. */
-const askAi = () => {
-  const res = summary.value;
-  if (!res) return;
-  const span = res.window
-    ? `${formatUtcHm(res.window.start_us)}-${formatUtcHm(res.window.end_us)} UTC`
-    : "the last hour";
-  emit("ask-ai", {
-    query:
-      `Anomaly detector "${res.name}" on stream "${res.stream}" measures ${res.measure}. ` +
-      `State: ${res.state}. Anomaly window: ${span}.`,
-    chipName: t("alerts.anomaly.stripAskAiChip", { name: res.name }),
-    newChat: true,
-    autoSend: false,
-    prompt: "What caused this anomaly, and what should I check first?",
-    context: {
-      currentPage: "alerts",
-      anomalyId: props.anomalyId,
-      selectedStreams: res.stream ? [res.stream] : [],
-      streamType: props.alert?.stream_type,
-      windowStartUs: res.window?.start_us ?? null,
-      windowEndUs: res.window?.end_us ?? null,
-    },
-  });
-};
 
 /** By timestamp, not dataIndex: gap rows shift the series indices. */
 function onChartClick(params: any) {

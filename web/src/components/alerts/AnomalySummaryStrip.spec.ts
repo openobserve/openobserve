@@ -251,9 +251,7 @@ describe("AnomalySummaryStrip", () => {
     expect(text(w, "open").exists()).toBe(false);
   });
 
-  it("shows Ask AI only when the parent allows it", () => {
+  it("has no Ask AI button (AC1.10)", () => {
     expect(text(mountStrip({ response: response() }), "ask-ai").exists()).toBe(false);
-    wrapper?.unmount();
-    expect(text(mountStrip({ response: response(), askAi: true }), "ask-ai").exists()).toBe(true);
   });
 });

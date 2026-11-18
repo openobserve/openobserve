@@ -366,7 +366,6 @@
                   :alert="alert"
                   :anomaly-id="alertId"
                   @reload="fetchAlert"
-                  @ask-ai="emit('sendToAiChat', $event)"
                 />
               </template>
             </OContent>
@@ -513,8 +512,6 @@ import type {
 } from "@/ts/interfaces/alert";
 
 const { t } = useI18nTyped();
-// A route root, so MainLayout's `@sendToAiChat` binding is on it directly.
-const emit = defineEmits<{ sendToAiChat: [payload: Record<string, unknown>] }>();
 
 const route = useRoute();
 const router = useRouter();

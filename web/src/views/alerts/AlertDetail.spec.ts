@@ -682,13 +682,6 @@ describe("AlertDetail — anomaly alerts", () => {
     expect(alertsService.get_by_alert_id).toHaveBeenCalledTimes(2);
   });
 
-  it("hands the chart's Ask AI payload to the layout's AI chat", async () => {
-    wrapper = await mountView({ alert: makeAnomalyAlert() });
-    const payload = { query: "q", chipName: "Anomaly x", newChat: true };
-    wrapper.findComponent({ name: "AnomalyDetectionChart" }).vm.$emit("ask-ai", payload);
-    expect(wrapper.emitted("sendToAiChat")?.[0]).toEqual([payload]);
-  });
-
   it("does not draw the generic evaluation chart, which has no SQL to build", async () => {
     wrapper = await mountView({ alert: makeAnomalyAlert() });
     expect(wrapper.findComponent({ name: "AlertGroupChart" }).exists()).toBe(false);
