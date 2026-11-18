@@ -16,13 +16,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # A label that changes nothing here skips every job, so it must neither replace nor queue behind a real run.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci"]'), github.event.label.name)) && '-mirror' || '' }}
   cancel-in-progress: true
 
 jobs:
   security_audit:
     # Nothing runs on a PR without the 'ready-for-ci' label, or on a draft; ci-gate alone reports the state.
-    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
+    # Other labels change nothing here, so they skip it; this is not a required check.
+    if: ${{ (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) && !(contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci"]'), github.event.label.name)) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
