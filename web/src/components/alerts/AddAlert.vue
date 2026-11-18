@@ -733,6 +733,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex max-w-120 min-w-0 flex-col gap-1.5"
                     @input="onNameInput"
                     @focusin="onNameFocus"
+                    @blur.capture="applySavedName"
                     @keydown.enter="onNameEnter"
                     @focusout="alertAutoName.onCommit(formData.name ?? '')"
                   >
@@ -747,14 +748,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-alert-details-name-input"
                     />
                     <span
-                      v-if="nameHasUnsupportedChars"
-                      class="text-status-error-text text-xs"
-                      role="alert"
-                      data-test="add-alert-details-name-error"
-                      >{{ t("alerts.nameNoSpecialChars") }}</span
+                      v-if="nameSavedAs"
+                      class="text-text-secondary text-xs"
+                      data-test="add-alert-details-name-saved-as"
+                      >{{ t("alerts.form.names.savedAs", { name: nameSavedAs }) }}</span
                     >
                     <span
-                      v-if="alertAutoName.isAuto.value && formData.name"
+                      v-else-if="alertAutoName.isAuto.value && formData.name"
                       class="text-text-secondary text-xs"
                       data-test="add-alert-details-name-auto"
                       >{{ t("alerts.sections.details.autoName") }}</span
@@ -1086,6 +1086,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("alerts.form.save.compositeNeeds") }}</OButton
           >
         </p>
+        <p
+          v-else-if="firesOnSave && !silentAutoObserveDraft"
+          :class="[
+            'm-0 flex min-w-0 items-start gap-1.5 text-xs',
+            firesOnSave === 'untouched' ? 'text-status-error-text' : 'text-status-warning-text',
+          ]"
+          data-test="add-alert-fires-on-save"
+        >
+          <OIcon
+            :name="firesOnSave === 'untouched' ? 'error' : 'warning'"
+            size="xs"
+            class="mt-0.5 shrink-0"
+          />
+          <span>{{ t("alerts.guard.firesOnSave") }}</span>
+        </p>
         <OButton
           data-test="add-alert-cancel-btn"
           variant="outline"
@@ -1221,11 +1236,14 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import { ALERT_NAME_UNSUPPORTED_CHARS } from "./AddAlert.schema";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { useAutoName } from "@/composables/useAutoName";
 import { buildAlertAutoName } from "@/utils/autoName";
+import { savedAlertName, unusedAlertName } from "@/utils/alerts/alertName";
+import { useQuery as useServerQuery } from "@tanstack/vue-query";
+import { alertsListQuery } from "@/services/alerts.queries";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -2087,6 +2105,12 @@ export default defineComponent({
       };
     });
 
+    // Red when the threshold that fires is one the form filled in, not one the user chose.
+    const firesOnSave = computed<"untouched" | "set" | null>(() => {
+      if (isEditingAlert.value || railVerdict.value?.tone !== "fires") return null;
+      return alertForm.valueThresholdUntouched.value ? "untouched" : "set";
+    });
+
     const tierContext = computed(() =>
       alertTierContext({
         isRealTime: String(alertForm.formData.value.is_real_time),
@@ -2321,8 +2345,26 @@ export default defineComponent({
     // change — until the first keystroke in the header, after which the name is
     // the user's. Editing an existing alert (or anomaly) is excluded outright:
     // a saved name is never regenerated behind the user's back.
+    const folderAlerts = useServerQuery(
+      computed(() => ({
+        ...alertsListQuery(
+          store.state.selectedOrganization.identifier,
+          String(alertForm.activeFolderId.value ?? "default"),
+        ),
+        enabled: !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value,
+      })),
+    );
+    const takenAlertNames = computed(
+      () =>
+        new Set<string>(
+          (folderAlerts.data.value ?? []).map((a: { name?: string }) => a.name ?? ""),
+        ),
+    );
     const alertNameSuggestion = computed(() =>
-      buildAlertAutoName(alertForm.formData.value, alertForm.t),
+      unusedAlertName(
+        buildAlertAutoName(alertForm.formData.value, alertForm.t),
+        takenAlertNames.value,
+      ),
     );
     const alertAutoName = useAutoName({
       suggestion: alertNameSuggestion,
@@ -2331,30 +2373,42 @@ export default defineComponent({
       enabled: () => !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value,
     });
     const nameFieldError = shownFieldError(alertForm.form, "name");
-    // The live hint covers typing; once the field shows its own error, that error says it instead.
-    const nameHasUnsupportedChars = computed(
-      () =>
-        !nameFieldError.value &&
-        ALERT_NAME_UNSUPPORTED_CHARS.test(String(alertForm.formData.value?.name ?? "")),
-    );
+    // While typing, the field keeps the user's text and this line names what it will save as.
+    const nameSavedAs = computed(() => {
+      const typed = String(alertForm.formData.value?.name ?? "");
+      const saved = savedAlertName(typed);
+      return !nameFieldError.value && saved && saved !== typed ? saved : "";
+    });
+    // Runs in the capture phase, ahead of the field's own blur check, so that check sees the saved name.
+    const applySavedName = () => {
+      if (nameSavedAs.value) alertForm.setF("name", nameSavedAs.value);
+    };
     // A generated name is a placeholder the user usually replaces, so focusing it selects it whole.
     const onNameFocus = (event: FocusEvent) => {
       if (alertAutoName.isAuto.value && event.target instanceof HTMLInputElement) {
         event.target.select();
       }
     };
-    // Enter in the name saves the alert, the same as Enter in the header name.
-    const onNameEnter = (event: KeyboardEvent) => {
+    // Enter in the name saves the alert; focus leaves for the first issue, so the toast says what stopped it.
+    const onNameEnter = async (event: KeyboardEvent) => {
       if (!(event.target instanceof HTMLInputElement)) return;
       event.preventDefault();
-      event.target.form?.requestSubmit();
+      applySavedName();
+      await alertForm.handleSave();
+      await nextTick();
+      if (alertForm.form.state.isValid) return;
+      toast({
+        variant: "error",
+        message: issueSections.value
+          ? alertForm.t(
+              "alerts.form.save.issuesIn",
+              { count: issueCount.value, sections: issueSections.value },
+              issueCount.value,
+            )
+          : alertForm.t("alerts.saveFailed"),
+      });
     };
-    // Names cannot hold spaces, so a typed space becomes the underscore the error would ask for.
-    const onNameInput = () => {
-      alertAutoName.markManual();
-      const name = String(alertForm.formData.value?.name ?? "");
-      if (/\s/.test(name)) alertForm.setF("name", name.replace(/\s/g, "_"));
-    };
+    const onNameInput = () => alertAutoName.markManual();
 
     // Its SQL is compiled from its Sigma rule, so the server refuses query edits from here.
     const siemDetectionId = computed(() => {
@@ -2455,6 +2509,7 @@ export default defineComponent({
       unsavedChanges: unsaved.changes,
       discardChanges,
       railVerdict,
+      firesOnSave,
       RAIL_VERDICT_ICONS,
       tiers,
       onTierAdd,
@@ -2467,7 +2522,8 @@ export default defineComponent({
       conditionHelp,
       settingFind,
       alertNameSuggestion,
-      nameHasUnsupportedChars,
+      nameSavedAs,
+      applySavedName,
       onNameInput,
       onNameFocus,
       onNameEnter,
