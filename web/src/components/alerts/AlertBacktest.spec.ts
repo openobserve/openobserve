@@ -22,6 +22,8 @@ import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectio
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
 import type { BacktestSignal } from "./alertSuggestions";
+import { ALERT_TEST_RUN_KEY, createAlertTestRun } from "@/composables/alerts/useAlertTestRun";
+import grouped from "@/test/fixtures/alerts/evaluate-grouped-fired.json";
 import AlertBacktest from "./AlertBacktest.vue";
 
 interface StreamHandlers {
@@ -60,7 +62,7 @@ const TRIGGER = { frequency: 5, frequency_type: "minutes", silence: 0 };
 const mountBacktest = (
   query = SQL("default"),
   signal: Ref<BacktestSignal | null> = ref(null),
-  extra: Record<string, unknown> = {},
+  { testRun, ...extra }: Record<string, unknown> = {},
 ): VueWrapper =>
   mount(AlertBacktest, {
     props: {
@@ -72,7 +74,13 @@ const mountBacktest = (
       triggerCondition: TRIGGER,
       ...extra,
     },
-    global: { plugins: [i18n], provide: { [ALERT_BACKTEST_SIGNAL_KEY]: signal } },
+    global: {
+      plugins: [i18n],
+      provide: {
+        [ALERT_BACKTEST_SIGNAL_KEY]: signal,
+        ...(testRun ? { [ALERT_TEST_RUN_KEY]: testRun } : {}),
+      },
+    },
   });
 
 const respond = (call: StreamCall, hits: Record<string, unknown>[]) => {
@@ -230,6 +238,23 @@ describe("AlertBacktest", () => {
     observer.setVisible(row, true);
     await vi.advanceTimersByTimeAsync(700);
     expect(calls).toHaveLength(1);
+    wrapper.unmount();
+  });
+  it("draws the day from Test it's answer for a query it can't replay, until the alert changes", async () => {
+    const testRun = createAlertTestRun();
+    testRun.result.value = grouped as any;
+    testRun.state.value = "ready";
+    testRun.testedKey.value = testRun.currentKey.value = "k";
+    const wrapper = mountBacktest('SELECT count(*) FROM "default"', ref(null), { testRun });
+    await vi.advanceTimersByTimeAsync(700);
+
+    expect(calls).toHaveLength(0);
+    expect(wrapper.find('[data-test="add-alert-backtest-result"]').text()).toContain("2 of 6");
+    expect(wrapper.findAll('[data-test="add-alert-backtest-hour-fired"]')).toHaveLength(1);
+
+    testRun.currentKey.value = "edited";
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-alert-backtest"]').exists()).toBe(false);
     wrapper.unmount();
   });
 });

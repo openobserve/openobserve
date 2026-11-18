@@ -32,6 +32,8 @@ import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import { formatNumber } from "@/utils/alerts/alertCopy";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
 import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
+import { ALERT_TEST_RUN_KEY } from "@/composables/alerts/useAlertTestRun";
+import { testRunDay } from "@/utils/alerts/alertTestRun";
 import {
   backtestBucketMinutes,
   backtestHintKey,
@@ -75,6 +77,10 @@ const { t } = useI18nTyped();
 const search = useAlertStreamQuery();
 
 const signal = inject(ALERT_BACKTEST_SIGNAL_KEY, null);
+// Once Test it has run the alert as it stands, the day is the server's answer, for any query.
+const testRun = inject(ALERT_TEST_RUN_KEY, null);
+const server = computed(() => testRun?.fresh.value ?? null);
+const serverDay = computed(() => (server.value ? testRunDay(server.value) : null));
 
 const isCron = computed(() => props.triggerCondition?.frequency_type === "cron");
 // Without a schedule the alert checks once per look-back.
@@ -186,6 +192,7 @@ onBeforeUnmount(() => {
 });
 
 const status = computed<"fixLimit" | "loading" | "slow" | "failed" | "ready">(() => {
+  if (server.value) return "ready";
   if (!props.realTime && !isCountLimit(props.threshold)) return "fixLimit";
   if (runKey.value !== ranKey.value) return "loading";
   if (timedOut.value) return "slow";
@@ -232,15 +239,17 @@ watchEffect(() => {
 // Without a WHERE, an empty day means the stream itself was quiet, not the filters.
 const filtered = computed(() => /\bWHERE\b/i.test(props.query));
 
-const day = computed(() =>
-  props.realTime ? realtimeDay(search.hits.value, { startMs, hours: HOURS }) : result.value,
-);
-const volume = computed(() =>
-  dailyVolume(
-    props.realTime ? { ...day.value, fired: 0, alerts: 0 } : result.value,
-    !!props.realTime,
-  ),
-);
+const day = computed(() => {
+  if (serverDay.value) return serverDay.value;
+  return props.realTime ? realtimeDay(search.hits.value, { startMs, hours: HOURS }) : result.value;
+});
+// The server and the replay give the same three counts; only the source differs.
+const counts = computed(() => serverDay.value ?? result.value);
+const volume = computed(() => {
+  if (props.realTime)
+    return dailyVolume({ events: day.value.events ?? 0, fired: 0, alerts: 0 }, true);
+  return dailyVolume({ ...counts.value, events: counts.value.events ?? 0 }, false);
+});
 const volumeText = computed(() =>
   volume.value
     ? t("alerts.guard.volume", { count: formatNumber(volume.value.count) }, volume.value.count)
@@ -251,20 +260,22 @@ const resultText = computed(() => {
   if (props.realTime) return volumeText.value ?? t(emptyDayHintKey(filtered.value));
   return isCron.value
     ? t("alerts.sections.backtest.cronResult", {
-        count: result.value.alerts,
-        total: result.value.total,
+        count: counts.value.alerts,
+        total: counts.value.total,
       })
     : t("alerts.sections.backtest.result", {
-        count: result.value.alerts,
-        total: result.value.total,
+        count: counts.value.alerts,
+        total: counts.value.total,
         frequency: frequency.value,
       });
 });
 
 const hint = computed(() => {
   if (props.realTime) return null;
-  const key = backtestHintKey(result.value.alerts, result.value.total, props.operator, {
-    events: result.value.events,
+  // A value or PromQL alert compares with its own operator, not the count gate's.
+  const operator = server.value?.checks[0]?.operator ?? props.operator;
+  const key = backtestHintKey(counts.value.alerts, counts.value.total, operator, {
+    events: counts.value.events,
     filtered: filtered.value,
   });
   return key ? t(key) : null;
@@ -273,7 +284,7 @@ const hint = computed(() => {
 
 <template>
   <OSettingRow
-    v-if="sql"
+    v-if="sql || server"
     ref="rowRef"
     :label="t('alerts.sections.backtest.label')"
     fill
