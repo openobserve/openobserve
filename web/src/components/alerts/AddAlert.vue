@@ -1239,6 +1239,7 @@ import { getUUID } from "@/utils/zincutils";
 import {
   AGGREGATION_ENABLED_FIELD,
   ALERT_CONDITION_PRESETS,
+  conditionPresetFor,
   ALERT_SECTIONS,
   type AlertSectionId,
   type AlertSectionSlot,
@@ -1606,14 +1607,9 @@ export default defineComponent({
       );
     });
     // A typed limit no card fits gets its own selected card, so the cards never read as unset.
-    const activeConditionPreset = computed(() => {
-      const tc = alertForm.formData.value.trigger_condition;
-      if (tc?.operator !== ">=") return undefined;
-      return (
-        ALERT_CONDITION_PRESETS.find((preset) => Number(tc.threshold) === preset.threshold)?.id ??
-        "custom"
-      );
-    });
+    const activeConditionPreset = computed(() =>
+      conditionPresetFor(alertForm.formData.value.trigger_condition),
+    );
     const conditionPresetOptions = computed<ChoiceCardOption[]>(() => [
       ...ALERT_CONDITION_PRESETS.map((preset) => ({
         value: preset.id,
