@@ -202,6 +202,20 @@ pub fn decide(
     }
 }
 
+/// A continuing absence stores only its first bucket, so an ongoing one runs to the last run.
+pub fn extend_ongoing_absence(decision: &mut ExploreDecision, last_detection_run: Option<i64>) {
+    let absence = decision
+        .summary
+        .as_ref()
+        .is_some_and(|s| s.kind == "absence");
+    if decision.state != ExploreState::Ongoing || !absence {
+        return;
+    }
+    if let (Some(window), Some(run)) = (decision.window.as_mut(), last_detection_run) {
+        window.end_us = window.end_us.max(run);
+    }
+}
+
 /// The model version the page and the endpoint compare; an untrained detector has none.
 pub fn served_model_version(is_trained: bool, current_model_version: i64) -> i64 {
     if is_trained { current_model_version } else { 0 }
@@ -668,6 +682,29 @@ mod tests {
         );
         let snap = summary_snapshot(&value.window.unwrap(), &value.summary.unwrap(), "m", true);
         assert_eq!(snap.start_us, 2 * B);
+    }
+
+    #[test]
+    fn test_an_ongoing_absence_window_runs_to_the_last_detection_run() {
+        let mut d = decide(&[normal(1), high(2, 900.0), absent(3)], B, 0, true, true);
+        extend_ongoing_absence(&mut d, Some(9 * B));
+        assert_eq!(d.window.unwrap().end_us, 9 * B);
+        let mut early = decide(&[normal(1), absent(3)], B, 0, true, true);
+        extend_ongoing_absence(&mut early, Some(3 * B));
+        assert_eq!(
+            early.window.unwrap().end_us,
+            4 * B,
+            "never shorter than the bucket"
+        );
+        let mut peer = decide(&[normal(1), absent(3)], B, 0, true, true);
+        extend_ongoing_absence(&mut peer, None);
+        assert_eq!(peer.window.unwrap().end_us, 4 * B);
+        let mut value = decide(&[normal(1), high(2, 900.0)], B, 0, true, true);
+        extend_ongoing_absence(&mut value, Some(9 * B));
+        assert_eq!(value.window.unwrap().end_us, 3 * B);
+        let mut back = decide(&[normal(1), absent(2), normal(3)], B, 0, true, true);
+        extend_ongoing_absence(&mut back, Some(9 * B));
+        assert_eq!(back.window.unwrap().end_us, 3 * B);
     }
 
     #[test]

@@ -348,8 +348,9 @@ async fn explore_response(
             .and_then(|trigger| trigger.start_time);
     // The trigger also fires while untrained, so only a moved cursor or a point counts as a run.
     let has_run = detector.last_processed_timestamp.is_some() || !buckets.is_empty();
-    let decision =
+    let mut decision =
         explore_state::decide(&buckets, bucket_us, range.0, has_run, detector.is_trained);
+    explore_state::extend_ongoing_absence(&mut decision, last_detection_run);
 
     let (start_us, end_us) = explore_state::link_window(
         requested,
