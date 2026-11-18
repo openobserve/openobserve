@@ -54,7 +54,7 @@ vi.mock("@/components/alerts/PreviewAlert.vue", async () => {
       setup(_props, { expose }) {
         expose({
           refreshData: mocks.refreshData,
-          evaluationStatus: ref({ wouldTrigger: true, reason: "4 rows match (4 >= 1)" }),
+          evaluationStatus: ref({ wouldTrigger: true, reason: "4 rows match (4 >= 1)", count: 4 }),
         });
         return () => h("div", { "data-test": "preview-alert" });
       },
@@ -242,9 +242,9 @@ describe("LibraryDrawer", () => {
   it("reports the verdict beside the chart", async () => {
     const wrapper = await mountDrawer();
     expect(wrapper.find('[data-test="alert-library-drawer-evaluation"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alert-library-drawer-preview"]').text()).toContain(
-      "4 rows match",
-    );
+    const verdict = wrapper.find('[data-test="alert-library-drawer-preview"]').text();
+    expect(verdict).toContain("Would alert now: 4");
+    expect(verdict).not.toContain("4 >= 1");
   });
 
   it("says there is nothing to evaluate rather than drawing an empty chart", async () => {
@@ -374,7 +374,7 @@ describe("LibraryDrawer", () => {
     const wrapper = await mountDrawer({ dataState: "fresh" });
 
     expect(wrapper.find('[data-test="alert-library-drawer-availability"]').text()).toContain(
-      "Data available",
+      "Receiving data",
     );
     expect(wrapper.find('[data-test="alert-library-drawer-needs-data"]').exists()).toBe(false);
   });

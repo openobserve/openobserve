@@ -179,19 +179,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <h3 class="text-text-secondary flex items-center gap-1.5 pb-2 text-xs font-semibold">
             <OIcon name="query-stats" size="xs" />
             <span>{{ t("alerts.preview") }}</span>
-            <template v-if="evaluation">
-              <OTag
-                :variant="evaluation.wouldTrigger ? 'error-soft' : 'success-soft'"
-                size="xs"
-                :label="
-                  evaluation.wouldTrigger
-                    ? t('alert_library.drawer.wouldTrigger')
-                    : t('alert_library.drawer.wouldNotTrigger')
-                "
-                data-test="alert-library-drawer-evaluation"
-              />
-              <span class="text-text-secondary normal-case">{{ raw(evaluation.reason) }}</span>
-            </template>
+            <span
+              v-if="verdictText"
+              class="text-text-secondary font-normal normal-case"
+              data-test="alert-library-drawer-evaluation"
+              >{{ verdictText }}</span
+            >
           </h3>
 
           <p v-if="!ready" class="text-text-secondary text-xs">
@@ -266,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { previewVerdictSentence } from "@/utils/alerts/alertReadBack";
 import { computed, nextTick, ref, watch } from "vue";
 
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
@@ -530,7 +524,7 @@ const availability = computed(() => {
   return {
     variant: "success-soft" as const,
     icon: "check-circle",
-    label: t("alert_library.drawer.dataAvailable"),
+    label: t("alerts.discovery.groupReceiving"),
     callout: null,
   };
 });
@@ -561,6 +555,16 @@ const isAggregationEnabled = computed(
 );
 
 const evaluation = computed(() => previewRef.value?.evaluationStatus ?? null);
+// The form's own verdict sentence, so the drawer never shows the preview's internal comparison.
+const verdictText = computed(() =>
+  evaluation.value
+    ? previewVerdictSentence(
+        evaluation.value,
+        { ...previewFormData.value, is_real_time: "false" },
+        t,
+      )
+    : null,
+);
 
 /**
  * PreviewAlert evaluates itself on mount for SQL, but deliberately skips PromQL
