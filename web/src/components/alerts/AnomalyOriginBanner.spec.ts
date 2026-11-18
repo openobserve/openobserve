@@ -119,6 +119,12 @@ describe("AnomalyOriginBanner", () => {
     await mountBanner({ stream: "k8s_logs", from_anomaly: "a1" });
     expect(find("title").exists()).toBe(true);
     expect(find("values").exists()).toBe(false);
+    wrapper?.unmount();
+    // A shortened absence link: the window stays, the measure was dropped.
+    const { anomaly_measure: _measure, ...lean } = VALUE_LINK;
+    await mountBanner({ ...lean, anomaly_kind: "absence", anomaly_actual: "" });
+    expect(find("title").exists()).toBe(true);
+    expect(find("values").exists()).toBe(false);
   });
 
   it("falls back to the unnamed title when the user cannot read the detector", async () => {

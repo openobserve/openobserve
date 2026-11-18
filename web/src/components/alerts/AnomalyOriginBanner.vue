@@ -96,7 +96,8 @@ const title = computed<I18nText>(() => {
 
 const valuesLine = computed<I18nText | null>(() => {
   const l = link.value;
-  if (!l || (l.kind !== "absence" && l.actual === null)) return null;
+  // An absence carries only the measure, so without it no value parameter is left.
+  if (!l || (l.kind === "absence" ? !l.measure : l.actual === null)) return null;
   const measure = l.measure ? raw(l.measure) : t("alerts.anomaly.originMeasureFallback");
   const span =
     l.startUs !== null && l.endUs !== null
