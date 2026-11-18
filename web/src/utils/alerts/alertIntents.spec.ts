@@ -105,7 +105,7 @@ describe("alertIntents", () => {
   });
 
   // Shaped like the live misses: an error rate picking a sender label, a count of OOM kills grouped by
-  // cluster, a latency grouped by node.
+  // cluster, a latency grouped by node; a slot nothing passes stays empty rather than take a weak pick.
   const shapesOf = (fields: Record<string, [number, number, Record<string, number>]>) => {
     const names = Object.keys(fields);
     const row: Record<string, unknown> = { t: 100 };
@@ -159,23 +159,42 @@ describe("alertIntents", () => {
       (n: string[], s: FieldShape[]) => rankGroup(n, s),
       "service",
     ],
+    [
+      "a count suggests no filter when no field has a majority beside a minority",
+      { svc: [100, 4, even("svc-", 4, 25)], node: [100, 3, { a: 34, b: 33, c: 33 }] },
+      (n: string[], s: FieldShape[]) => rankCategory(n, s),
+      undefined,
+    ],
+    [
+      "no group is suggested when every field holds most events in one value",
+      { cluster: [100, 3, { dev: 94, prod: 5, edge: 1 }] },
+      (n: string[], s: FieldShape[]) => rankGroup(n, s),
+      undefined,
+    ],
   ])("%s", (_, fields, rank, first) => {
     const { names, shapes } = shapesOf(
       fields as Record<string, [number, number, Record<string, number>]>,
     );
-    expect(rank(names, shapes)[0]).toBe(first);
+    const ranked = rank(names, shapes);
+    expect(ranked.fit[0]).toBe(first);
+    expect(ranked.all).toHaveLength(names.length);
   });
 
-  it("never filters a share on a label its group already fixes, which reads 0 or 100 % per group", () => {
+  it("filters a share on a lopsided label its group does not fix, and on none when no label is lopsided", () => {
     const series = [
-      { lib: "aspnet", svc: "cart", route: "/get", node: "a" },
-      { lib: "aspnet", svc: "cart", route: "/add", node: "b" },
-      { lib: "flagd", svc: "flagd", route: "/eval", node: "a" },
-      { lib: "flagd", svc: "flagd", route: "/eval", node: "c" },
+      { lib: "aspnet", svc: "cart", route: "/get", code: "200", node: "a" },
+      { lib: "aspnet", svc: "cart", route: "/get", code: "500", node: "b" },
+      { lib: "aspnet", svc: "cart", route: "/add", code: "200", node: "a" },
+      { lib: "flagd", svc: "flagd", route: "/eval", code: "200", node: "c" },
     ];
     const profile = labelProfile(series);
-    expect(rankMetricCategory(profile)[0]).toBe("lib");
-    expect(rankMetricCategory(profile, { group: "svc", series })[0]).toBe("route");
+    expect(rankMetricCategory(profile).fit[0]).toBe("lib");
+    expect(rankMetricCategory(profile, { group: "svc", series }).fit[0]).toBe("code");
+    const oneCode = labelProfile([
+      { code: "200", node: "a" },
+      { code: "200", node: "b" },
+    ]);
+    expect(rankMetricCategory(oneCode)).toEqual({ fit: [], all: ["code", "node"] });
   });
 
   it("ranks numbers by tail weight, heavy-tailed first", () => {
@@ -184,10 +203,14 @@ describe("alertIntents", () => {
       [],
       ["status", "took"],
     );
-    expect(rankMeasure(["status", "took"], shapes)).toEqual(["took", "status"]);
+    expect(rankMeasure(["status", "took"], shapes)).toEqual({
+      fit: ["took"],
+      all: ["took", "status"],
+    });
+    expect(rankMeasure(["status"], shapes).fit).toEqual([]);
   });
 
-  it("picks the rarest value under 5 % and adds the case variants of a picked value", () => {
+  it("picks the rarest value under 5 %, else a minority, and adds the case variants of a picked value", () => {
     const seen = [
       { value: "INFO", count: 9000 },
       { value: "ERROR", count: 300 },
@@ -197,11 +220,19 @@ describe("alertIntents", () => {
     expect(rareValue(seen)).toBe("error");
     expect(
       rareValue([
-        { value: "a", count: 5 },
-        { value: "b", count: 6 },
+        { value: "a", count: 2 },
+        { value: "b", count: 8 },
       ]),
     ).toBe("a");
-    expect(rareValue([])).toBeUndefined();
+    for (const none of [
+      [
+        { value: "a", count: 5 },
+        { value: "b", count: 6 },
+      ],
+      [{ value: "200", count: 9 }],
+      [],
+    ])
+      expect(rareValue(none)).toBeUndefined();
     expect(withCaseVariants(["ERROR"], seen)).toEqual(["ERROR", "error"]);
   });
 
@@ -328,7 +359,7 @@ describe("alertIntents", () => {
       { __name__: "m", host: "a", cpu: "1", job: "x" },
       { __name__: "m", host: "b", cpu: "2" },
     ]);
-    expect(rankMetricGroup(profile)).toEqual(["cpu", "host", "job"]);
+    expect(rankMetricGroup(profile).all).toEqual(["cpu", "host", "job"]);
   });
 
   it.each([

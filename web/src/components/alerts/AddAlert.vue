@@ -408,9 +408,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :anomaly-available="isAnomalyDetectionEnabled && !anomalyLicenseLocked"
                 :org-alert-count="orgAlertCount"
                 :show-library="showsLibraryLink"
-                :active="appliedIntent?.fill?.intent ?? null"
+                :active="appliedIntent?.fill?.intent ?? pendingIntent"
                 data-snap-stop
                 @apply="applyIntent"
+                @pending="onIntentPending"
                 @use-suggestion="applySuggestion"
                 @scratch="startFromScratch"
                 @open-alert="openExistingAlert"
@@ -987,21 +988,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.previewEmptyState") }}
                       </span>
                     </div>
-                    <PreviewAlert
-                      v-else
-                      ref="previewAlertRef"
-                      class="h-full w-full"
-                      :formData="formData"
-                      :query="previewQuery"
-                      :selectedTab="formData.query_condition.type || 'custom'"
-                      :isAggregationEnabled="isAggregationEnabled"
-                      :isUsingBackendSql="isUsingBackendSql"
-                      :isEditorOpen="isEditorOpen"
-                      :previewDateTime="previewDateTimeValue"
-                      :range-target="sectionTargets.previewRange ?? null"
-                      labelled-limit
-                      @schema-updated="handleSqlSchemaUpdated"
-                    />
+                    <template v-else>
+                      <!-- The preview stays mounted: a PromQL preview only runs from its watchers. -->
+                      <div
+                        v-if="pendingIntent"
+                        class="flex h-full flex-col items-center justify-center gap-2 px-3"
+                        data-test="add-alert-preview-intent-pending"
+                      >
+                        <OIcon name="edit" size="lg" class="opacity-20" />
+                        <span class="text-text-secondary text-center text-sm font-medium">
+                          {{ t("alerts.intent.previewWaits") }}
+                        </span>
+                      </div>
+                      <PreviewAlert
+                        v-show="!pendingIntent"
+                        ref="previewAlertRef"
+                        class="h-full w-full"
+                        :formData="formData"
+                        :query="previewQuery"
+                        :selectedTab="formData.query_condition.type || 'custom'"
+                        :isAggregationEnabled="isAggregationEnabled"
+                        :isUsingBackendSql="isUsingBackendSql"
+                        :isEditorOpen="isEditorOpen"
+                        :previewDateTime="previewDateTimeValue"
+                        :range-target="sectionTargets.previewRange ?? null"
+                        labelled-limit
+                        @schema-updated="handleSqlSchemaUpdated"
+                      />
+                    </template>
                   </template>
                 </div>
               </div>
@@ -1293,7 +1307,7 @@ import type { ChoiceCardOption } from "@/lib/forms/ChoiceCards/OChoiceCards.type
 import AlertSampleEvents from "./AlertSampleEvents.vue";
 import AlertStreamOption from "./AlertStreamOption.vue";
 import AlertIntentStart from "./AlertIntentStart.vue";
-import type { IntentFill } from "@/utils/alerts/alertIntents";
+import type { IntentFill, IntentId } from "@/utils/alerts/alertIntents";
 import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
 import { buildPrefillFromSuggestion } from "@/utils/alerts/prefill/fromLibrary";
 import { withPackTag } from "@/components/alertLibrary/libraryInstall";
@@ -2116,7 +2130,7 @@ export default defineComponent({
     } | null>(() => {
       const status = activeEvaluationStatus.value;
       const fd = alertForm.formData.value;
-      if (alertForm.isAnomalyMode.value || !fd.stream_name) return null;
+      if (alertForm.isAnomalyMode.value || !fd.stream_name || pendingIntent.value) return null;
       if (fd.is_real_time === "true") {
         // Every matching event fires, so with no filter every event in the stream does.
         const hasFilter = countCompleteConditions(fd.query_condition?.conditions) > 0;
@@ -2513,12 +2527,16 @@ export default defineComponent({
       return Math.max(org, folder ?? 0);
     });
     const appliedIntent = ref<{ fill: IntentFill | null; label: I18nText } | null>(null);
+    // A chosen intent whose sentence still has an empty filter or measure: nothing is written or previewed.
+    const pendingIntent = ref<IntentId | null>(null);
+    let pendingQuery = "";
     let intentBaseline: any = null;
     const intentPaths = new Set<string>();
     const LIBRARY_ATTRIBUTES = new Set(["library_id", "library_hash"]);
 
     // Undoes only what the last intent wrote, so edits elsewhere in the form stay.
     const restoreIntent = () => {
+      pendingIntent.value = null;
       if (!intentBaseline || !appliedIntent.value) return;
       if (appliedIntent.value.fill) {
         intentPaths.forEach((path) => alertForm.setF(path, cloneDeep(get(intentBaseline, path))));
@@ -2565,6 +2583,20 @@ export default defineComponent({
       }
       appliedIntent.value = { fill, label };
     };
+
+    const onIntentPending = async ({ intent }: { intent: IntentId }) => {
+      restoreIntent();
+      await nextTick();
+      pendingIntent.value = intent;
+      pendingQuery = JSON.stringify(alertForm.formData.value.query_condition);
+    };
+    // Building the query in section 2 instead answers the pending intent.
+    watch(
+      () => JSON.stringify(alertForm.formData.value.query_condition),
+      (query) => {
+        if (pendingIntent.value && query !== pendingQuery) pendingIntent.value = null;
+      },
+    );
 
     const applySuggestion = async (suggestion: LibrarySuggestion) => {
       holdBaseline();
@@ -2618,6 +2650,7 @@ export default defineComponent({
       () => `${alertForm.formData.value.stream_type}/${alertForm.formData.value.stream_name}`,
       () => {
         appliedIntent.value = null;
+        pendingIntent.value = null;
         intentBaseline = null;
         intentPaths.clear();
       },
@@ -2632,7 +2665,9 @@ export default defineComponent({
       showsIntentStart,
       orgAlertCount,
       appliedIntent,
+      pendingIntent,
       applyIntent,
+      onIntentPending,
       applySuggestion,
       startFromScratch,
       openExistingAlert,

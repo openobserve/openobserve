@@ -269,19 +269,37 @@ export function readFieldShapes(
   ];
 }
 
+/** A slot's candidates: `fit` pass the slot's rule and are the only ones it may default to; `all` lists
+ * them first, then the rest for the picker. */
+export interface Ranked {
+  fit: string[];
+  all: string[];
+}
+
+const ranked = (fit: string[], candidates: readonly string[]): Ranked => ({
+  fit,
+  all: [...fit, ...candidates.filter((name) => !fit.includes(name))],
+});
+
+/** Drops names from both lists, e.g. the field another slot already holds. */
+export const without = (r: Ranked, ...names: (string | undefined)[]): Ranked => ({
+  fit: r.fit.filter((n) => !names.includes(n)),
+  all: r.all.filter((n) => !names.includes(n)),
+});
+
 const byShape = (
   candidates: string[],
   shapes: readonly FieldShape[],
   qualifies: (s: FieldShape) => boolean,
   order: (a: FieldShape, b: FieldShape) => number,
-): string[] => {
+): Ranked => {
   const known = new Map(shapes.map((s) => [s.name, s]));
   const fit = candidates
     .map((name) => known.get(name))
     .filter((s): s is FieldShape => !!s && qualifies(s))
     .sort(order)
     .map((s) => s.name);
-  return [...fit, ...candidates.filter((name) => !fit.includes(name))];
+  return ranked(fit, candidates);
 };
 
 /** Repeating word values (not numbers, times, ids or one-per-event text) on enough events. */
@@ -327,27 +345,25 @@ export type CategoryWant = "split" | "variety";
 
 const isSplit = (s: FieldShape) => (s.topShare ?? 0) >= MAJORITY_SHARE && (s.topShare ?? 1) < 1;
 
-/** Filter fields. "split" (a count, a comparison) leads with a big majority beside a small minority, the
- * most lopsided first; "variety" (one kind of event) leads with the field naming the most kinds. */
+/** Filter fields. "split" (a count, a comparison) needs a big majority beside a small minority, the most
+ * lopsided first; "variety" (one kind of event) leads with the field naming the most kinds. */
 export const rankCategory = (
   candidates: string[],
   shapes: readonly FieldShape[],
   want: CategoryWant = "split",
-): string[] =>
-  byShape(
-    candidates,
-    shapes,
-    (s) => isCategory(s, FILTER_MIN_COVERAGE, 2),
-    want === "variety"
-      ? byEntropy
-      : (a, b) =>
-          Number(isSplit(b)) - Number(isSplit(a)) ||
-          (isSplit(a) ? (b.topShare ?? 0) - (a.topShare ?? 0) : byEntropy(a, b)),
-  );
+): Ranked =>
+  want === "variety"
+    ? byShape(candidates, shapes, (s) => isCategory(s, FILTER_MIN_COVERAGE, 2), byEntropy)
+    : byShape(
+        candidates,
+        shapes,
+        (s) => isCategory(s, FILTER_MIN_COVERAGE, 2) && isSplit(s),
+        (a, b) => (b.topShare ?? 0) - (a.topShare ?? 0),
+      );
 
 /** Group fields: several word values, none holding most events; those on (nearly) every event lead,
  * then the most even split. */
-export const rankGroup = (candidates: string[], shapes: readonly FieldShape[]): string[] =>
+export const rankGroup = (candidates: string[], shapes: readonly FieldShape[]): Ranked =>
   byShape(
     candidates,
     shapes,
@@ -362,7 +378,7 @@ const tailRatio = (s: FieldShape) =>
   s.p50 !== undefined && s.p99 !== undefined && s.p50 > 0 ? s.p99 / s.p50 : 0;
 
 /** Heavy-tailed numbers first (p99 at least 5 times p50), the heaviest leading. */
-export const rankMeasure = (candidates: string[], shapes: readonly FieldShape[]): string[] =>
+export const rankMeasure = (candidates: string[], shapes: readonly FieldShape[]): Ranked =>
   byShape(
     candidates,
     shapes,
@@ -370,13 +386,15 @@ export const rankMeasure = (candidates: string[], shapes: readonly FieldShape[])
     (a, b) => tailRatio(b) - tailRatio(a),
   );
 
-/** The rarest value under 5 % of the counted events, else the least frequent one. */
+/** The rarest value under 5 % of the counted events, else the least frequent one if it is a minority
+ * (the other side of a 60 % majority); one value everywhere has no minority to suggest. */
 export function rareValue(values: readonly ValueCount[]): string | undefined {
   const seen = values.filter((v) => v.value !== "" && v.count > 0);
   const total = seen.reduce((sum, v) => sum + v.count, 0);
-  if (!seen.length || !total) return undefined;
+  if (seen.length < 2 || !total) return undefined;
   const ascending = [...seen].sort((a, b) => a.count - b.count);
-  return (ascending.find((v) => v.count / total < RARE_SHARE) ?? ascending[0]).value;
+  const rare = ascending.find((v) => v.count / total < RARE_SHARE) ?? ascending[0];
+  return rare.count / total <= 1 - MAJORITY_SHARE ? rare.value : undefined;
 }
 
 /** The picked values plus every seen value that differs from one only in case. */
@@ -658,7 +676,7 @@ export function labelProfile(series: readonly SeriesLabels[]) {
 }
 
 /** Labels ranked for "per [label]": carried by nearly every series, more values first. */
-export function rankMetricGroup(profile: ReturnType<typeof labelProfile>): string[] {
+export function rankMetricGroup(profile: ReturnType<typeof labelProfile>): Ranked {
   const fit = profile
     .filter(
       (p) =>
@@ -668,15 +686,23 @@ export function rankMetricGroup(profile: ReturnType<typeof labelProfile>): strin
     )
     .sort((a, b) => b.coverage - a.coverage || b.values.length - a.values.length)
     .map((p) => p.label);
-  return [...fit, ...profile.map((p) => p.label).filter((l) => !fit.includes(l))];
+  return ranked(
+    fit,
+    profile.map((p) => p.label),
+  );
 }
 
-/** Labels ranked for "where [label] matches": few values, on nearly every series, never one the group
- * already fixes (each group's share would be 0 or 100 %). */
+const seriesTopShare = (p: ReturnType<typeof labelProfile>[number]) => {
+  const total = p.values.reduce((sum, v) => sum + v.count, 0);
+  return total ? (p.values[0]?.count ?? 0) / total : 0;
+};
+
+/** Labels ranked for "where [label] matches": few values, a majority of series beside a minority, on
+ * nearly every series, never one the group already fixes (each group's share would be 0 or 100 %). */
 export function rankMetricCategory(
   profile: ReturnType<typeof labelProfile>,
   opts: { group?: string; series?: readonly SeriesLabels[] } = {},
-): string[] {
+): Ranked {
   const { group, series = [] } = opts;
   const fit = profile
     .filter(
@@ -684,11 +710,15 @@ export function rankMetricCategory(
         p.coverage >= CATEGORY_MIN_COVERAGE &&
         p.values.length >= 2 &&
         p.values.length <= CATEGORY_MAX_DISTINCT &&
+        seriesTopShare(p) >= MAJORITY_SHARE &&
         (!group || fixedByGroup(series, p.label, group) < FIXED_BY_GROUP),
     )
-    .sort((a, b) => b.coverage - a.coverage || a.values.length - b.values.length)
+    .sort((a, b) => seriesTopShare(b) - seriesTopShare(a) || b.coverage - a.coverage)
     .map((p) => p.label);
-  return [...fit, ...profile.map((p) => p.label).filter((l) => !fit.includes(l))];
+  return ranked(
+    fit,
+    profile.map((p) => p.label),
+  );
 }
 
 const promLabelValue = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');

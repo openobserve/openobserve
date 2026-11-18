@@ -26,8 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="id"
         variant="outline"
         size="chip"
-        :active="active === id"
-        :aria-pressed="active === id"
+        :active="active === id || choosing === id"
+        :aria-pressed="active === id || choosing === id"
+        :loading="choosing === id"
         :data-test="`add-alert-intent-${id}`"
         @click="choose(id)"
         >{{ intentLabel(id) }}</OButton
@@ -43,7 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="default-soft"
         size="xs"
         class="me-1.5 align-middle"
-        :label="t('alerts.librarySuggest.suggestedStarter')"
+        :label="
+          needsChoice ? t('alerts.intent.needsChoice') : t('alerts.librarySuggest.suggestedStarter')
+        "
+        data-test="add-alert-intent-sentence-state"
       />
       <i18n-t :keypath="sentenceKey" tag="span" scope="global">
         <template #noun>{{ active === "anyEvent" ? nounOne : noun }}</template>
@@ -55,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               appearance="inline"
               size="xs"
               searchable
+              :placeholder="t('alerts.intent.slots.fieldPrompt')"
               :aria-label="t('alerts.intent.slots.field')"
               data-test="add-alert-intent-slot-field"
               @update:model-value="setSlot('field', $event)"
@@ -72,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               appearance="inline"
               size="xs"
               :loading="valuesLoading"
+              :disabled="!valueSource"
               :placeholder="t('alerts.intent.slots.valuePlaceholder')"
               :aria-label="t('alerts.intent.slots.value')"
               data-test="add-alert-intent-slot-value"
@@ -92,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               appearance="inline"
               size="xs"
               searchable
+              :placeholder="t('alerts.intent.slots.groupPrompt')"
               :aria-label="t('alerts.intent.slots.group')"
               data-test="add-alert-intent-slot-group"
               @update:model-value="setSlot('group', $event)"
@@ -106,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               appearance="inline"
               size="xs"
               searchable
+              :placeholder="t('alerts.intent.slots.fieldPrompt')"
               :aria-label="t('alerts.intent.slots.measure')"
               data-test="add-alert-intent-slot-measure"
               @update:model-value="setSlot('measure', $event)"
@@ -120,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               appearance="inline"
               size="xs"
               searchable
+              :placeholder="t('alerts.intent.slots.labelPrompt')"
               :aria-label="t('alerts.intent.slots.label')"
               data-test="add-alert-intent-slot-label"
               @update:model-value="setSlot('label', $event)"
@@ -145,12 +154,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #bucket>{{ bucketWords }}</template>
       </i18n-t>
       <OButton
-        v-if="offersGroup && !slots.group && groupCandidates.length"
+        v-if="offersGroup && slots.group === undefined && groupCandidates.all.length"
         variant="link"
         size="xs"
         class="ms-1.5"
         data-test="add-alert-intent-add-group"
-        @click="setSlot('group', groupCandidates[0])"
+        @click="addGroup"
         >{{ t("alerts.intent.addGroup") }}</OButton
       >
     </div>
@@ -296,11 +305,13 @@ import {
   shapeQuerySql,
   slotFields,
   withCaseVariants,
+  without,
   type IntentFill,
   type IntentId,
   type IntentSlots,
   type MetricFamilyMember,
   type MetricStreamInfo,
+  type Ranked,
 } from "@/utils/alerts/alertIntents";
 import { entryFromSuggestion } from "@/utils/alerts/prefill/fromLibrary";
 import { getUUID } from "@/utils/zincutils";
@@ -323,6 +334,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "apply", payload: { fill: IntentFill; label: I18nText }): void;
+  /** The chosen intent has a slot nothing on this stream passes for; the form waits for the user's pick. */
+  (e: "pending", payload: { intent: IntentId; label: I18nText }): void;
   (e: "use-suggestion", suggestion: LibrarySuggestion): void;
   (e: "scratch"): void;
   (e: "open-alert", alert: AlreadySetUp): void;
@@ -348,6 +361,8 @@ const questionText = computed(() => t("alerts.intent.question", { stream: raw(pr
 const bucketWords = computed(() => durationWords(ANOMALY_BUCKET_MINUTES, t));
 
 const slots = reactive<IntentSlots>({});
+// The chip pressed while its slots are still being ranked and seeded.
+const choosing = ref<IntentId | null>(null);
 
 // ── Logs and traces: slot candidates by type, ranked by one shape search ──────
 // Recent events pick the fields worth asking about, then one aggregate measures their shape.
@@ -381,24 +396,41 @@ const shapes = computed(() =>
   ),
 );
 // One kind of event wants the field naming the most kinds; a count or a share wants a rare minority.
-const categoriesFor = (id: IntentId | null) =>
-  isMetrics.value
-    ? rankMetricCategory(profile.value, {
-        group: slots.group,
-        series: series.value[props.streamName],
-      }).filter((l) => l !== slots.group)
-    : rankCategory(
-        stringFields.value,
-        shapes.value,
-        id === "anyEvent" ? "variety" : "split",
-      ).filter((f) => f !== slots.group);
+const categoriesFor = (id: IntentId | null): Ranked =>
+  without(
+    isMetrics.value
+      ? rankMetricCategory(profile.value, {
+          group: slots.group,
+          series: series.value[props.streamName],
+        })
+      : rankCategory(stringFields.value, shapes.value, id === "anyEvent" ? "variety" : "split"),
+    slots.group,
+  );
 const categoryCandidates = computed(() => categoriesFor(props.active));
-const groupCandidates = computed(() =>
+const groupCandidates = computed<Ranked>(() =>
   isMetrics.value
     ? rankMetricGroup(profile.value)
-    : rankGroup(stringFields.value, shapes.value).filter((f) => f !== slots.field),
+    : without(rankGroup(stringFields.value, shapes.value), slots.field),
 );
 const measureCandidates = computed(() => rankMeasure(numberFields.value, shapes.value));
+// Defaults come only from a ranking over the data, so a chip waits for its searches to answer.
+const rankingSettled = computed(() => {
+  if (isMetrics.value) return !props.streamName || !!series.value[props.streamName];
+  const sample = sampleSearch.state.value;
+  if (!props.columns.length || sample === "failed") return true;
+  if (sample !== "ready") return false;
+  if (!(askedStrings.value.length + askedNumbers.value.length)) return true;
+  return shapeSearch.state.value === "ready" || shapeSearch.state.value === "failed";
+});
+const whenRanked = () =>
+  new Promise<void>((resolve) => {
+    if (rankingSettled.value) return resolve();
+    const stop = watch(rankingSettled, (done) => {
+      if (!done) return;
+      stop();
+      resolve();
+    });
+  });
 
 const lastHour = () => {
   const end = Date.now() * 1000;
@@ -460,6 +492,7 @@ const loadSeries = async (metric: string) => {
     series.value = { ...series.value, [metric]: rows };
     return rows;
   } catch {
+    series.value = { ...series.value, [metric]: [] };
     return [];
   }
 };
@@ -489,6 +522,7 @@ const labelValues = computed(
 watch(
   () => `${props.streamType}/${props.streamName}`,
   async () => {
+    choosing.value = null;
     for (const key of Object.keys(slots) as (keyof IntentSlots)[]) delete slots[key];
     if (isMetrics.value && props.streamName) await loadSeries(props.streamName);
   },
@@ -498,13 +532,14 @@ watch(
 // ── Options for the slot pickers ─────────────────────────────────────────────
 const asOptions = (names: string[]): SelectOption[] =>
   names.map((name) => ({ label: raw(name), value: name }));
-const fieldOptions = computed(() => asOptions(categoryCandidates.value));
+const fieldOptions = computed(() => asOptions(categoryCandidates.value.all));
 const groupOptions = computed<SelectOption[]>(() => [
   { label: t("alerts.intent.noGroup"), value: NO_GROUP },
-  ...asOptions(groupCandidates.value),
+  ...asOptions(groupCandidates.value.all),
 ]);
-const measureOptions = computed(() => asOptions(measureCandidates.value));
-const labelOptions = computed(() => asOptions(categoryCandidates.value));
+const measureOptions = computed(() => asOptions(measureCandidates.value.all));
+const labelOptions = computed(() => asOptions(categoryCandidates.value.all));
+const valueSource = computed(() => (isMetrics.value ? slots.label : slots.field));
 // The top values come back capped, so a typed search also asks the server for values containing it.
 const valueSearch = ref("");
 watch(valueSearch, (text) => {
@@ -539,9 +574,7 @@ const valueOptions = computed<SelectOption[]>(() => {
 
 // The picked values read as words in the sentence, so the picker sizes to them like the other slots.
 const valuesText = computed<I18nText>(() =>
-  slots.values?.length
-    ? joinListOrMore(slots.values, t)
-    : t("alerts.intent.slots.valuePlaceholder"),
+  slots.values?.length ? joinListOrMore(slots.values, t) : t("alerts.intent.slots.valuePrompt"),
 );
 
 const offersGroup = computed(() => !!props.active && wantsGroup(props.active));
@@ -558,9 +591,10 @@ const SENTENCES: Record<IntentId, [I18nKey, I18nKey]> = {
   ratio: ["alerts.intent.ratio.sentenceWhere", "alerts.intent.ratio.sentenceWhereAll"],
   unusualChange: ["alerts.intent.unusualChange.sentence", "alerts.intent.unusualChange.sentence"],
 };
+// An empty group ("") is one the user asked for but has not picked yet.
 const sentenceKey = computed<I18nKey>(() => {
   const pair = SENTENCES[props.active ?? "countWhere"];
-  return slots.group ? pair[0] : pair[1];
+  return slots.group !== undefined ? pair[0] : pair[1];
 });
 const intentLabel = (id: IntentId) =>
   t(`alerts.intent.${id}.label` as I18nKey, { noun: noun.value });
@@ -580,22 +614,31 @@ const fillFor = (id: IntentId): IntentFill =>
       )
     : buildEventFill(id, slots, { stream: props.streamName, id: getUUID });
 
-const apply = (id: IntentId) => emit("apply", { fill: fillFor(id), label: intentLabel(id) });
-
 const wantsGroup = (id: IntentId) =>
   ["countWhere", "percentile", "metricAbove", "ratio"].includes(id);
 const wantsValue = (id: IntentId) =>
   ["countWhere", "anyEvent", "compareLastWeek", "ratio"].includes(id);
+/** A filter or measure the intent cannot run without is still empty. */
+const missingFor = (id: IntentId) =>
+  (wantsValue(id) && (!valueSource.value || !slots.values?.length)) ||
+  (id === "percentile" && !slots.measure);
+const needsChoice = computed(() => !!props.active && missingFor(props.active));
 
-/** Fills empty slots from what the ranking knows now; a slot the user set keeps its value. */
+const apply = (id: IntentId) => {
+  const label = intentLabel(id);
+  if (missingFor(id)) emit("pending", { intent: id, label });
+  else emit("apply", { fill: fillFor(id), label });
+};
+
+/** Fills empty slots with the first candidate that passes the slot's rule; none passing leaves it empty. */
 const seedSlots = (id: IntentId) => {
   if (!wantsGroup(id)) slots.group = undefined;
-  else if (slots.group === undefined) slots.group = groupCandidates.value[0];
-  if (id === "percentile") slots.measure ??= measureCandidates.value[0];
+  else if (slots.group === undefined) slots.group = groupCandidates.value.fit[0];
+  if (id === "percentile") slots.measure ??= measureCandidates.value.fit[0];
   if (id === "compareLastWeek") slots.factor ??= DEFAULT_FACTOR;
   if (!wantsValue(id)) return;
-  if (isMetrics.value) slots.label ??= categoriesFor(id)[0];
-  else slots.field ??= categoriesFor(id)[0];
+  if (isMetrics.value) slots.label ??= categoriesFor(id).fit[0];
+  else slots.field ??= categoriesFor(id).fit[0];
 };
 
 /** The value slot waits for the field's counts, then suggests its rarest value and that value's case variants. */
@@ -616,10 +659,14 @@ const seedValues = async (id: IntentId) => {
 
 const choose = async (id: IntentId) => {
   analytics.track("alert_intent_applied", { intent: id, stream_type: props.streamType });
+  choosing.value = id;
+  await whenRanked();
+  if (choosing.value !== id) return;
   seedSlots(id);
-  apply(id);
   await Promise.all([seedValues(id), ...(id === "ratio" ? siblings.value.map(loadSeries) : [])]);
-  if (props.active === id) apply(id);
+  if (choosing.value !== id) return;
+  choosing.value = null;
+  apply(id);
 };
 
 const reapply = () => props.active && apply(props.active);
@@ -630,11 +677,18 @@ const asText = (value: SelectModelValue): string =>
 const setSlot = async (slot: "field" | "group" | "measure" | "label", value: SelectModelValue) => {
   const next = asText(value);
   slots[slot] = next && next !== NO_GROUP ? next : undefined;
-  if (slot === "field" || slot === "label") slots.values = [];
-  reapply();
-  if (props.active) await seedValues(props.active);
+  if (slot === "field" || slot === "label") {
+    slots.values = [];
+    if (props.active) await seedValues(props.active);
+  }
   if (isMetrics.value) await Promise.all(siblings.value.map(loadSeries));
   reapply();
+};
+
+const addGroup = () => {
+  const first = groupCandidates.value.fit[0];
+  if (first) void setSlot("group", first);
+  else slots.group = "";
 };
 
 /** A newly picked value brings its case variants, so ERROR also counts error; the form follows on close. */
