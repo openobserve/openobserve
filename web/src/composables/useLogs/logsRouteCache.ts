@@ -13,26 +13,46 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-const IDENTITY_PARAMS = ["query", "sql_mode", "period", "from", "to", "logs_visualize_toggle"];
+import { b64DecodeUnicode } from "@/utils/zincutils";
+
+export interface CachedLogsSearch {
+  streams: string[];
+  org: string;
+  streamType?: string;
+  query?: string;
+  sqlMode?: boolean;
+  timeType?: string;
+  period?: string | null;
+  startTime?: number | string;
+  endTime?: number | string;
+  toggle?: string;
+}
 
 const sameStreams = (a: string[], b: string[]) =>
   a.length === b.length && [...a].sort().join(",") === [...b].sort().join(",");
 
+const decodeQuery = (value: unknown) => b64DecodeUnicode(String(value ?? "")) ?? "";
+
 /** True when the cached search is what the route asks for; params the route omits are not compared. */
 export const cachedSearchMatchesRoute = (
-  routeQuery: Record<string, unknown>,
-  cachedStreams: string[],
-  cachedOrg: string,
-  cachedUrlQuery: Record<string, unknown>,
+  route: Record<string, unknown>,
+  cache: CachedLogsSearch,
 ): boolean => {
-  if (routeQuery.org_identifier !== cachedOrg) return false;
-  const routeStreams = String(routeQuery.stream ?? "")
+  if (route.org_identifier !== cache.org) return false;
+  const routeStreams = String(route.stream ?? "")
     .split(",")
     .filter(Boolean);
-  if (!sameStreams(routeStreams, cachedStreams)) return false;
-  const streamType = (query: Record<string, unknown>) => String(query.stream_type || "logs");
-  if (streamType(routeQuery) !== streamType(cachedUrlQuery)) return false;
-  return IDENTITY_PARAMS.every(
-    (key) => !(key in routeQuery) || String(routeQuery[key]) === String(cachedUrlQuery[key] ?? ""),
-  );
+  if (!sameStreams(routeStreams, cache.streams)) return false;
+  if (String(route.stream_type || "logs") !== (cache.streamType || "logs")) return false;
+  if ("query" in route && decodeQuery(route.query) !== (cache.query ?? "").trim()) return false;
+  if ("sql_mode" in route && String(route.sql_mode) !== String(!!cache.sqlMode)) return false;
+  if ("period" in route && (cache.timeType !== "relative" || route.period !== cache.period)) {
+    return false;
+  }
+  if ("from" in route || "to" in route) {
+    const sameRange =
+      String(route.from) === String(cache.startTime) && String(route.to) === String(cache.endTime);
+    if (cache.timeType === "relative" || !sameRange) return false;
+  }
+  return !("logs_visualize_toggle" in route) || route.logs_visualize_toggle === cache.toggle;
 };

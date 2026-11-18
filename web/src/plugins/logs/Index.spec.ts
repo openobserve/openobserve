@@ -1942,7 +1942,7 @@ describe("Logs Index", async () => {
         (store.state as any).logs.isInitialized = false;
         await router.replace({
           path: router.currentRoute.value.path,
-          query: { logs_visualize_toggle: toggle },
+          query: { stream: "app_logs", logs_visualize_toggle: toggle },
         });
         loaderCalls.length = 0;
 
