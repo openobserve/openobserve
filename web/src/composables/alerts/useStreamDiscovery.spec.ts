@@ -10,6 +10,7 @@ import {
   clearValueCounts,
   filterNotSeenText,
   insertLabelIntoPromql,
+  isIngestArtifact,
   loadValueCounts,
   recentActivity,
   streamOptions,
@@ -368,6 +369,16 @@ describe("recentActivity", () => {
     expect(stream).toHaveBeenCalledTimes(1);
     const { query } = stream.mock.calls[0][0].queryReq;
     expect(query.end_time - query.start_time).toBe(HOUR_US);
+  });
+});
+
+describe("isIngestArtifact", () => {
+  it.each([
+    ["body_duration__serde_json__private__number", true],
+    ["body_duration", false],
+    ["service_name", false],
+  ])("%s → %s", (name, artifact) => {
+    expect(isIngestArtifact(name)).toBe(artifact);
   });
 });
 

@@ -103,6 +103,9 @@ export interface ValueCountContext {
   windowUs?: number;
 }
 
+/** A column the JSON flattener made from a number's internal wrapper, not a field anyone sent. */
+export const isIngestArtifact = (name: string): boolean => name.includes("__serde_json__private__");
+
 /** When a stream last received data and how much, from the stats its list row already carries. */
 export function streamFreshness(
   stats: DiscoveryStream["stats"] | undefined,

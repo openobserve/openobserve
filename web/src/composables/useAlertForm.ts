@@ -130,6 +130,7 @@ import { anomalyWhereClause, toDetectionFunctionSql } from "@/utils/alerts/anoma
 import { invalidateSiemDetections } from "@/composables/security/useSiemDetections";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { shownFieldMeta } from "@/composables/alerts/shownFieldError";
+import { isIngestArtifact } from "@/composables/alerts/useStreamDiscovery";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import type { AlertSectionId } from "@/components/alerts/alertFormSections";
 import {
@@ -1177,11 +1178,13 @@ export function useAlertForm(
     const streamsData: any = await getStream(stream_name, formData.value.stream_type, true);
 
     if (streamsData && Array.isArray(streamsData.schema)) {
-      streamCols = streamsData.schema.map((column: any) => ({
-        label: column.name,
-        value: column.name,
-        type: column.type,
-      }));
+      streamCols = streamsData.schema
+        .filter((column: any) => !isIngestArtifact(String(column?.name ?? "")))
+        .map((column: any) => ({
+          label: column.name,
+          value: column.name,
+          type: column.type,
+        }));
     }
 
     if (

@@ -619,6 +619,7 @@ import { useStore } from "vuex";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { isIngestArtifact } from "@/composables/alerts/useStreamDiscovery";
 import { dataNoun, durationText, everyDuration, everyWords } from "@/utils/alerts/alertCopy";
 import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
 import QueryEditor from "@/components/QueryEditor.vue";
@@ -1156,10 +1157,11 @@ export default defineComponent({
         const schema = await queryClient.fetchQuery(
           streamSchemaQuery(store.state.selectedOrganization.identifier, streamName, streamType),
         );
-        const fieldsArray =
+        const fieldsArray = (
           schema.uds_schema && schema.uds_schema.length > 0
             ? schema.uds_schema
-            : schema.schema || schema.fields || [];
+            : schema.schema || schema.fields || []
+        ).filter((f: any) => !isIngestArtifact(String(f?.name ?? "")));
         allStreamFields.value = fieldsArray.map((f: any) => f.name).sort();
         // The two failure branches below already cleared the keywords; without
         // this the success branch never set them, so the SQL editor offered
