@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
+import { removeConditions } from "@/utils/query/sqlFilterBuilder";
 
 /**
  * Extracts the field name from a filter expression.
@@ -58,14 +58,7 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Match both comparison operators (=, !=, <, >) and IS / IS NOT (for null checks)
   const fieldPattern = new RegExp(`^"?${esc}"?\\s*(?:[=!<>]|is\\s)`, "i");
-  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*(?:[=!<>]|is\\s)`, "i");
-
-  const remaining = splitOnAnd(queryStr.trim()).filter((cond) => {
-    const trimmed = cond.trim();
-    return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
-  });
-
-  return remaining.join(" AND ");
+  return removeConditions(queryStr.trim(), (condition) => fieldPattern.test(condition));
 };
 
 /**

@@ -26,11 +26,12 @@ export const sqlLiteral = (value: unknown): string => {
 // The SQL parser returns a quoted literal's value with its doubled quotes intact.
 export const unescapeSqlLiteral = (value: unknown): string => String(value).replace(/''/g, "'");
 
-// Splits on AND outside quoted literals and `--` comments; an unterminated quote falls back to a plain split.
-export const splitOnAnd = (query: string): string[] => {
-  const andPattern = /\s+AND\s+/iy;
+// Splits on `junction` outside quoted literals, brackets and `--` comments; an unterminated quote falls back to a plain split.
+const splitOnJunction = (query: string, junction: "AND" | "OR"): string[] => {
+  const pattern = new RegExp(`\\s+${junction}\\s+`, "iy");
   const parts: string[] = [];
   let inQuote = false;
+  let depth = 0;
   let start = 0;
   for (let i = 0; i < query.length; i++) {
     if (query[i] === "'") inQuote = !inQuote;
@@ -41,16 +42,59 @@ export const splitOnAnd = (query: string): string[] => {
       i = eol;
       continue;
     }
-    andPattern.lastIndex = i;
-    const match = andPattern.exec(query);
+    if (query[i] === "(") depth++;
+    else if (query[i] === ")") depth--;
+    if (depth !== 0) continue;
+    pattern.lastIndex = i;
+    const match = pattern.exec(query);
     if (!match) continue;
     parts.push(query.slice(start, i));
     i += match[0].length - 1;
     start = i + 1;
   }
-  if (inQuote) return query.split(/\s+AND\s+/i);
+  if (inQuote) return query.split(new RegExp(`\\s+${junction}\\s+`, "i"));
   parts.push(query.slice(start));
   return parts;
+};
+
+export const splitOnAnd = (query: string): string[] => splitOnJunction(query, "AND");
+
+// The text inside brackets that wrap all of `part`; null when they do not, as in `(a) OR (b)`.
+const innerOfGroup = (part: string): string | null => {
+  if (!part.startsWith("(") || !part.endsWith(")")) return null;
+  let inQuote = false;
+  let depth = 0;
+  for (let i = 0; i < part.length - 1; i++) {
+    if (part[i] === "'") inQuote = !inQuote;
+    if (inQuote) continue;
+    if (part[i] === "(") depth++;
+    else if (part[i] === ")" && --depth === 0) return null;
+  }
+  return part.slice(1, -1);
+};
+
+/** `clause` without the comparisons `isTarget` picks, inside brackets too; the rest keeps its AND, OR and brackets. */
+export const removeConditions = (
+  clause: string,
+  isTarget: (condition: string) => boolean,
+): string => {
+  let changed = false;
+  const operands = splitOnJunction(clause, "OR").flatMap((operand) => {
+    const kept = splitOnJunction(operand, "AND").flatMap((part) => {
+      const condition = part.trim();
+      if (isTarget(condition)) {
+        changed = true;
+        return [];
+      }
+      const inner = innerOfGroup(condition);
+      if (inner === null) return [condition];
+      const rest = removeConditions(inner, isTarget);
+      if (rest !== inner) changed = true;
+      return rest.trim() ? [`(${rest})`] : [];
+    });
+    return kept.length ? [kept.join(" AND ")] : [];
+  });
+  return changed ? operands.join(" OR ") : clause;
 };
 
 export const sqlEquals = (fieldName: string, value: unknown, negate = false): string =>

@@ -1,4 +1,4 @@
-import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
+import { removeConditions } from "@/utils/query/sqlFilterBuilder";
 
 /**
  * Shared filter utilities for the Traces feature.
@@ -74,21 +74,12 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
   // never matched and stayed in the query after the value was unchecked.
   const op = `(?:[=!<>]|is\\b)`;
   const fieldPattern = new RegExp(`^"?${esc}"?\\s*${op}`, "i");
-  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*${op}`, "i");
-
-  const removeFromClause = (clause: string): string => {
-    const remaining = splitOnAnd(clause.trim()).filter((cond) => {
-      const trimmed = cond.trim();
-      return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
-    });
-    return remaining.join(" AND ");
-  };
 
   // The whole string is the where clause. Do not split on "|": the legacy
   // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
   // inside a term such as match_all('text | error') would hide the conditions
   // before the pipe from removal and corrupt the term on rejoin.
-  return removeFromClause(queryStr);
+  return removeConditions(queryStr.trim(), (condition) => fieldPattern.test(condition));
 };
 
 /**
