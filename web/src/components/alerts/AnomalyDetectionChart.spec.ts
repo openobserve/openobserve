@@ -691,6 +691,19 @@ describe("AnomalyDetectionChart", () => {
       expect(openUrl.mock.calls[0][1]).toBe("https://o2.example/web/logs?bucket=1");
     });
 
+    it("asks the server again on a second open, so a retrain since gets its 409", async () => {
+      respond([{ ...HIT, model_version: 7 }]);
+      wrapper = await mountChart(TRAINED);
+      await click();
+      await popover().vm.$emit("open-bucket");
+      await settle();
+      explore.mockRejectedValue({ response: { status: 409 } });
+      await click();
+      await popover().vm.$emit("open-bucket");
+      await settle();
+      expect(wrapper.emitted("reload")).toHaveLength(1);
+    });
+
     it("marks a point of an older model, which has no data button", async () => {
       respond([{ ...HIT, model_version: 3 }]);
       wrapper = await mountChart(TRAINED);
