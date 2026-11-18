@@ -85,7 +85,9 @@ const valueLabel = computed<I18nText | undefined>(() => {
 
 const valueHint = computed<I18nText | undefined>(() => {
   const node = condition.value;
-  return node?.field && node.values.length ? bar?.valueHint(node.field, node.values) : undefined;
+  return node?.field && node.values.length
+    ? bar?.valueHint(node.field, node.values, node.operator)
+    : undefined;
 });
 
 const invalidMessage = computed(() =>

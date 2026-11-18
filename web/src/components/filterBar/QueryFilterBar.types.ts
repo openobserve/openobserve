@@ -74,7 +74,15 @@ export interface QueryFilterBarProps {
   /** Problems to mark on their chips, from FilterBuilder's validation. */
   issues?: FilterIssue[];
   /** A soft warning for a chip's value, e.g. one not seen in recent data. */
-  valueHint?: (field: string, values: string[]) => I18nText | undefined;
+  valueHint?: (
+    field: string,
+    values: string[],
+    operator?: FilterOperatorId,
+  ) => I18nText | undefined;
+  /** Replaces a field row's type word in the field list, e.g. to say the field had no values lately. */
+  fieldDetail?: (field: string) => I18nText | undefined;
+  /** What the value list says for a field when it has nothing to offer. */
+  valueEmptyText?: (field: string) => I18nText | undefined;
   /** A display name for a stored value: its value row reads as the label, and a vertical row shows it beside the chip. */
   valueLabel?: (field: string, value: string) => FilterValueLabel | undefined;
   fieldsLoading?: boolean;
@@ -172,7 +180,7 @@ export interface FilterBarCaretSlotProps {
 /** What a chip reads from the bar it sits in, without threading props through every nested group. */
 export interface FilterBarChipContext {
   fieldLabel: (field: string) => string | undefined;
-  valueHint: (field: string, values: string[]) => I18nText | undefined;
+  valueHint: (field: string, values: string[], operator?: FilterOperatorId) => I18nText | undefined;
   valueLabel?: (field: string, value: string) => FilterValueLabel | undefined;
   issueMessage: (nodeId: string) => I18nText | undefined;
   operatorName: (id: FilterOperatorId) => I18nText;

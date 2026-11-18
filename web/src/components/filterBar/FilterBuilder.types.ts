@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nText } from "@/types/i18n";
-import type { FilterField } from "@/utils/query/filterBar";
+import type { FilterField, FilterOperatorId } from "@/utils/query/filterBar";
 import type { FilterIssue, FilterLayout, FilterProfileName } from "./filterProfiles";
 import type { FilterAddLabels, FilterValueLabel } from "./QueryFilterBar.types";
 
@@ -29,9 +29,17 @@ export interface FilterBuilderProps {
   /** Values listed first for every field, e.g. dashboard `$variables`. */
   extraValueSuggestions?: (field: string) => string[];
   /** A soft warning for a chip's value, e.g. one not seen in recent data. */
-  valueHint?: (field: string, values: string[]) => I18nText | undefined;
+  valueHint?: (
+    field: string,
+    values: string[],
+    operator?: FilterOperatorId,
+  ) => I18nText | undefined;
   /** A display name for a stored value: its value row reads as the label, and a vertical row shows it beside the chip. */
   valueLabel?: (field: string, value: string) => FilterValueLabel | undefined;
+  /** Replaces a field row's type word in the field list, e.g. to say the field had no values lately. */
+  fieldDetail?: (field: string) => I18nText | undefined;
+  /** What the value list says for a field when it has nothing to offer. */
+  valueEmptyText?: (field: string) => I18nText | undefined;
   /** Overrides the profile's layout. */
   layout?: FilterLayout;
   fieldsLoading?: boolean;

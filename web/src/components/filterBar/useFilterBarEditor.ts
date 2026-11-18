@@ -80,6 +80,8 @@ export interface FilterBarEditorOptions {
   /** Values offered before the loaded ones for every field, e.g. dashboard `$variables`. */
   extraValues?: Ref<((field: string) => string[]) | undefined>;
   valueLabel?: Ref<((field: string, value: string) => FilterValueLabel | undefined) | undefined>;
+  /** Replaces a field row's type word, e.g. to say the field had no values lately. */
+  fieldDetail?: Ref<((field: string) => I18nText | undefined) | undefined>;
   /** Host rows listed above the fields while the bar is empty and nothing is typed. */
   extraSuggestions?: Ref<FilterBarExtraSection | undefined>;
   selectExtra?: (key: string, event: MouseEvent | KeyboardEvent) => void;
@@ -326,7 +328,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       rows.push({
         key: name,
         label: raw(fieldMap.value.get(name)!.label ?? name),
-        detail: t(`filterBar.types.${type}`),
+        detail: options.fieldDetail?.value?.(name) ?? t(`filterBar.types.${type}`),
         icon: TYPE_ICONS[type],
         selected: editPart.value === "field" && editedNode.value?.field === name,
       });

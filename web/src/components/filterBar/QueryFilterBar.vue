@@ -48,6 +48,8 @@ const props = withDefaults(defineProps<QueryFilterBarProps>(), {
   issues: undefined,
   valueHint: undefined,
   valueLabel: undefined,
+  fieldDetail: undefined,
+  valueEmptyText: undefined,
   fieldsLoading: false,
   placeholder: undefined,
   disabled: false,
@@ -88,6 +90,7 @@ const editor = useFilterBarEditor({
   loadValues: toRef(props, "loadValues"),
   extraValues: toRef(props, "extraValueSuggestions"),
   valueLabel: toRef(props, "valueLabel"),
+  fieldDetail: toRef(props, "fieldDetail"),
   extraSuggestions: toRef(props, "extraSuggestions"),
   selectExtra: (key, event) => emit("extra-select", key, event),
   t,
@@ -135,7 +138,7 @@ const showAddOrGroup = computed(
 );
 provide(FILTER_BAR_CHIP_CONTEXT, {
   fieldLabel: (field) => props.fields.find((f) => f.name === field)?.label,
-  valueHint: (field, values) => props.valueHint?.(field, values),
+  valueHint: (field, values, operator) => props.valueHint?.(field, values, operator),
   valueLabel: (field, value) => props.valueLabel?.(field, value),
   issueMessage: (nodeId) => props.issues?.find((issue) => issue.nodeId === nodeId)?.message,
   operatorName: (id) => operatorName(id, dialect.value, t, config.value.operatorNames),
@@ -202,7 +205,8 @@ const emptyText = computed(() => {
   }
   if (step.value === "value") {
     if (valueHint.value) return valueHint.value;
-    return valuesLoading.value ? undefined : t("filterBar.noValues");
+    if (valuesLoading.value) return undefined;
+    return props.valueEmptyText?.(draft.value?.field ?? "") ?? t("filterBar.noValues");
   }
   return t("filterBar.noOperators");
 });

@@ -34,6 +34,8 @@ const props = withDefaults(defineProps<FilterBuilderProps>(), {
   extraValueSuggestions: undefined,
   valueHint: undefined,
   valueLabel: undefined,
+  fieldDetail: undefined,
+  valueEmptyText: undefined,
   layout: undefined,
   fieldsLoading: false,
   placeholder: undefined,
@@ -127,6 +129,8 @@ defineExpose<FilterBuilderExpose>({ focus, validate });
       :extra-value-suggestions="extraValueSuggestions"
       :value-hint="valueHint"
       :value-label="valueLabel"
+      :field-detail="fieldDetail"
+      :value-empty-text="valueEmptyText"
       :issues="shownIssues"
       :fields-loading="fieldsLoading"
       :placeholder="placeholder"

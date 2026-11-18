@@ -642,6 +642,33 @@ describe("FilterBuilder", () => {
     });
   });
 
+  it("lets a host name an empty field in the list and its value step, and judge a value by its operator", async () => {
+    const empty = (field: string) => (field === "service" ? "Nothing in 24 h" : undefined);
+    const valueHint = vi.fn((_field: string, values: string[], operator?: string) =>
+      operator === "eq" ? `${values[0]} not seen` : undefined,
+    );
+    mountBuilder("alert", null, {
+      loadValues: vi.fn(async () => []),
+      fieldDetail: empty,
+      valueEmptyText: empty,
+      valueHint,
+    });
+    await find("input").trigger("click");
+    await flushPromises();
+    const row = (key: string) =>
+      document.body.querySelector(`[data-test="${DT}-suggest-item-${key}"]`)!.textContent ?? "";
+    expect(row("service")).toContain("Nothing in 24 h");
+    expect(row("level")).not.toContain("Nothing in 24 h");
+    await type("service");
+    await press("Enter");
+    await pickRow("eq");
+    await vi.waitFor(() => expect(document.body.textContent).toContain("Nothing in 24 h"));
+    await type("x");
+    await press("Enter");
+    expect(valueHint).toHaveBeenCalledWith("service", ["x"], "eq");
+    expect(find("chip-service").text()).toContain("x not seen");
+  });
+
   describe("horizontal layout", () => {
     it("starts a group from the field picker and draws it as a box with an ungroup button", async () => {
       const state = mountBuilder("logs", "level = 'error'");
