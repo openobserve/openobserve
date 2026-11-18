@@ -99,6 +99,7 @@ futures-util.workspace = true
 
 [dev-dependencies]
 base64.workspace = true
+flate2.workspace = true
 jsonschema = { version = "0.38", default-features = false }
 opentelemetry-proto.workspace = true
 openobserve-core = { workspace = true, features = ["test-utils"] }

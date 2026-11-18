@@ -88,6 +88,14 @@ const SUCCESS_CONTRACTS: &[ContractRow] = &[
         "application/x-protobuf",
         "none",
     ),
+    (
+        "all",
+        "POST",
+        "/api/{org_id}/ingest/profiles/pprof",
+        "200",
+        JSON,
+        "object",
+    ),
     ("ent", "POST", "/api/license/refresh", "200", JSON, "object"),
     (
         "all",
@@ -408,6 +416,18 @@ const REQUIRED_QUERY_PARAMS: &[(&str, &str, &str, &str)] = &[
         "query",
     ),
     ("ent", "GET", "/api/{org_id}/search/profile", "trace_id"),
+    (
+        "all",
+        "POST",
+        "/api/{org_id}/ingest/profiles/pprof",
+        "start_unix_nano",
+    ),
+    (
+        "all",
+        "POST",
+        "/api/{org_id}/ingest/profiles/pprof",
+        "duration_nano",
+    ),
     (
         "cloud",
         "GET",

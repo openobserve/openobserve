@@ -107,8 +107,10 @@ impl ProfilesService for ProfilesServer {
 fn export_error_to_status(err: ProfilesExportError) -> Status {
     match err {
         ProfilesExportError::InvalidArgument(msg) => Status::invalid_argument(msg),
-        ProfilesExportError::TrialPeriodExpired(msg) => Status::resource_exhausted(msg),
+        ProfilesExportError::TrialPeriodExpired(msg)
+        | ProfilesExportError::PayloadTooLarge(msg) => Status::resource_exhausted(msg),
         ProfilesExportError::Unavailable(msg) => Status::unavailable(msg),
+        ProfilesExportError::RequestTimeout(msg) => Status::deadline_exceeded(msg),
         ProfilesExportError::Internal(err) => Status::internal(err.to_string()),
     }
 }
@@ -149,5 +151,17 @@ mod tests {
         )));
         assert_eq!(internal.code(), tonic::Code::Internal);
         assert_eq!(internal.message(), "write failed");
+
+        let too_large = export_error_to_status(ProfilesExportError::PayloadTooLarge(
+            "too many samples".to_string(),
+        ));
+        assert_eq!(too_large.code(), tonic::Code::ResourceExhausted);
+        assert_eq!(too_large.message(), "too many samples");
+
+        let timeout = export_error_to_status(ProfilesExportError::RequestTimeout(
+            "body too slow".to_string(),
+        ));
+        assert_eq!(timeout.code(), tonic::Code::DeadlineExceeded);
+        assert_eq!(timeout.message(), "body too slow");
     }
 }

@@ -494,6 +494,7 @@ use crate::{
         openobserve_api_ingest::request::logs::ingest::otlp_logs_write,
         openobserve_api_ingest::request::metrics::ingest::otlp_metrics_write,
         openobserve_api_ingest::request::profiles::ingest::otlp_profiles_write,
+        openobserve_api_ingest::request::profiles::pprof::pprof_profiles_write,
         openobserve_api_management::request::alerts::delete_alert_bulk,
         openobserve_api_management::request::alerts::destinations::delete_destination_bulk,
         openobserve_api_management::request::alerts::destinations::list_prebuilt_destinations,

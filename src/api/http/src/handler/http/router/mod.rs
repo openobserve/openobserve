@@ -1424,6 +1424,7 @@ fn service_route_table() -> Router {
         .route("/{org_id}/v1/profiles", post(profiles::ingest::otlp_profiles_write))
         // OTLP Profiles is still development; otlp_http exporter defaults to this path.
         .route("/{org_id}/v1development/profiles", post(profiles::ingest::otlp_profiles_write))
+        .route("/{org_id}/ingest/profiles/pprof", post(profiles::pprof::pprof_profiles_write))
         .route("/{org_id}/v1/traces", post(traces::traces_write))
         .route("/{org_id}/traces", post(traces::traces_write))
         .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
@@ -4614,6 +4615,35 @@ mod tests {
         }
     }
 
+    // only the real tree proves the pprof route sits behind authentication
+    #[tokio::test]
+    async fn pprof_route_is_mounted_behind_authentication() {
+        let app = Router::new().nest("/api", service_routes());
+        let uri = "/api/default/ingest/profiles/pprof?start_unix_nano=1&duration_nano=1";
+        let post = Request::builder()
+            .method(Method::POST)
+            .uri(uri)
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            app.clone().oneshot(post).await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
+        );
+        let get = Request::builder()
+            .method(Method::GET)
+            .uri(uri)
+            .body(Body::empty())
+            .unwrap();
+        let status = app.oneshot(get).await.unwrap().status();
+        assert!(
+            matches!(
+                status,
+                StatusCode::UNAUTHORIZED | StatusCode::METHOD_NOT_ALLOWED
+            ),
+            "{status}"
+        );
+    }
+
     // the Loki handler does not inflate bodies itself, so this layer pair is the only cap
     #[tokio::test]
     async fn loki_body_that_decompresses_over_the_limit_is_413() {
@@ -4634,6 +4664,122 @@ mod tests {
 
         let status = app.oneshot(req).await.unwrap().status();
         assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    // the encoding layers of service_routes, in the same order
+    #[cfg(not(feature = "cloud"))]
+    fn pprof_app() -> Router {
+        Router::new()
+            .route(
+                "/{org_id}/ingest/profiles/pprof",
+                post(profiles::pprof::pprof_profiles_write),
+            )
+            .layer(RequestDecompressionLayer::new())
+            .layer(middleware::from_fn(
+                decompression::preprocess_encoding_middleware,
+            ))
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    fn pprof_request(
+        method: Method,
+        encoding: Option<&str>,
+        query: &str,
+        body: Vec<u8>,
+    ) -> Request<Body> {
+        let mut builder = Request::builder()
+            .method(method)
+            .uri(format!("/test_org_id/ingest/profiles/pprof{query}"))
+            .header("user_id", "a@a.com")
+            .header("x-o2-resource-attributes", "service.name=svc");
+        if let Some(encoding) = encoding {
+            builder = builder.header(header::CONTENT_ENCODING, encoding);
+        }
+        builder.body(Body::from(body)).unwrap()
+    }
+
+    async fn otlp_json_error(response: axum::response::Response) -> (StatusCode, Value) {
+        let status = response.status();
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&body).unwrap())
+    }
+
+    fn pprof_query() -> String {
+        let now = config::utils::time::now_micros() as u64 * 1000;
+        format!("?start_unix_nano={now}&duration_nano=60000000000")
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    fn gzip_bytes(data: &[u8]) -> Vec<u8> {
+        use std::io::Write;
+
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        encoder.write_all(data).unwrap();
+        encoder.finish().unwrap()
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn pprof_gzip_bodies_are_inflated_lazily_through_the_decompression_layer() {
+        let limit = config::get_config().limit.profiles_pprof_max_decoded_bytes;
+        let bomb = gzip_bytes(&vec![0_u8; limit + 1]);
+        assert!(bomb.len() < limit);
+        // an empty profile is a valid upload with nothing to store
+        for (body, status, want) in [
+            (gzip_bytes(&[]), StatusCode::OK, serde_json::json!({})),
+            (
+                b"not gzip".to_vec(),
+                StatusCode::BAD_REQUEST,
+                Value::from(3),
+            ),
+            (bomb, StatusCode::PAYLOAD_TOO_LARGE, Value::from(8)),
+        ] {
+            let request = pprof_request(Method::POST, Some("gzip"), &pprof_query(), body);
+            let (got, body) = otlp_json_error(pprof_app().oneshot(request).await.unwrap()).await;
+            assert_eq!(got, status);
+            let found = if status == StatusCode::OK {
+                &body
+            } else {
+                &body["code"]
+            };
+            assert_eq!(found, &want, "{status}");
+        }
+    }
+
+    // snappy would be collected and decoded up to the global payload limit before the handler's
+    // cap; only gzip and identity reach the handler
+    #[tokio::test]
+    async fn pprof_other_content_encodings_are_415_with_an_otlp_body_before_auth() {
+        let app = Router::new().nest("/api", service_routes());
+        let uri = format!("/api/default/ingest/profiles/pprof{}", pprof_query());
+        for encoding in ["snappy", "zstd", "GZIP", "gzip, gzip"] {
+            let request = Request::builder()
+                .method(Method::POST)
+                .uri(&uri)
+                .header(header::CONTENT_ENCODING, encoding)
+                .body(Body::from("encoded bytes"))
+                .unwrap();
+            let (status, body) = otlp_json_error(app.clone().oneshot(request).await.unwrap()).await;
+            assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE, "{encoding}");
+            assert_eq!(body["code"], 3, "{encoding}");
+        }
+        for encoding in ["gzip", "identity"] {
+            let request = Request::builder()
+                .method(Method::POST)
+                .uri(&uri)
+                .header(header::CONTENT_ENCODING, encoding)
+                .body(Body::empty())
+                .unwrap();
+            let status = app.clone().oneshot(request).await.unwrap().status();
+            assert_eq!(status, StatusCode::UNAUTHORIZED, "{encoding}");
+        }
     }
 
     // ── unauthenticated /config bootstrap ─────────────────────────────────

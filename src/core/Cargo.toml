@@ -92,6 +92,8 @@ arrow-schema.workspace = true
 flate2.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
+hex.workspace = true
+indexmap.workspace = true
 itoa = "1.0"
 hmac.workspace = true
 image.workspace = true
@@ -137,6 +139,7 @@ tonic.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true
 url.workspace = true
+urlencoding.workspace = true
 utoipa.workspace = true
 version-compare = { workspace = true, optional = true }
 config.workspace = true

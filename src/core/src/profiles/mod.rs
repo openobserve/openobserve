@@ -16,13 +16,14 @@
 mod attributes;
 mod dictionary_compat;
 mod otlp_json_compat;
+pub mod pprof_ingest;
 pub mod query;
 mod validation;
 
 use std::{
     collections::{HashMap, HashSet},
     io::BufReader,
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 use axum::{http, response::Response as HttpResponse};
@@ -55,6 +56,7 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 use schema::check_for_schema;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use self::attributes::resolve_any_value_string;
 use crate::{
@@ -76,15 +78,19 @@ pub enum ProfilesExportError {
     InvalidArgument(String),
     TrialPeriodExpired(String),
     Unavailable(String),
+    PayloadTooLarge(String),
+    RequestTimeout(String),
     Internal(anyhow::Error),
 }
 
 impl std::fmt::Display for ProfilesExportError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidArgument(msg) | Self::TrialPeriodExpired(msg) | Self::Unavailable(msg) => {
-                write!(f, "{msg}")
-            }
+            Self::InvalidArgument(msg)
+            | Self::TrialPeriodExpired(msg)
+            | Self::Unavailable(msg)
+            | Self::PayloadTooLarge(msg)
+            | Self::RequestTimeout(msg) => write!(f, "{msg}"),
             Self::Internal(err) => write!(f, "{err}"),
         }
     }
@@ -114,7 +120,10 @@ fn record_profiles_http_metrics(
     status: &str,
     took_secs: f64,
 ) {
-    let ep = profiles_http_endpoint(req_type);
+    record_profiles_endpoint_metrics(profiles_http_endpoint(req_type), org_id, status, took_secs);
+}
+
+fn record_profiles_endpoint_metrics(ep: &str, org_id: &str, status: &str, took_secs: f64) {
     let labels = [ep, status, org_id, StreamType::Profiles.as_str(), "", ""];
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&labels)
@@ -132,12 +141,30 @@ fn map_otlp_handler_error(
     req_type: OtlpRequestType,
     err: ProfilesExportError,
 ) -> HttpResponse {
+    map_otlp_handler_error_at(profiles_http_endpoint(req_type), org_id, req_type, err, 0.0)
+}
+
+fn map_otlp_handler_error_at(
+    endpoint: &str,
+    org_id: &str,
+    req_type: OtlpRequestType,
+    err: ProfilesExportError,
+    took_secs: f64,
+) -> HttpResponse {
     let kind = match req_type {
         OtlpRequestType::HttpJson => "json",
         OtlpRequestType::HttpProtobuf => "protobuf",
         OtlpRequestType::Grpc => "grpc",
     };
-    let level = if matches!(&err, ProfilesExportError::InvalidArgument(_)) {
+    // a full gate, an admission refusal or a slow client is not a server fault
+    let level = if matches!(
+        &err,
+        ProfilesExportError::InvalidArgument(_)
+            | ProfilesExportError::PayloadTooLarge(_)
+            | ProfilesExportError::RequestTimeout(_)
+            | ProfilesExportError::Unavailable(_)
+            | ProfilesExportError::TrialPeriodExpired(_)
+    ) {
         log::Level::Warn
     } else {
         log::Level::Error
@@ -154,6 +181,12 @@ fn map_otlp_handler_error(
         ProfilesExportError::Unavailable(msg) => {
             (http::StatusCode::SERVICE_UNAVAILABLE, 14, msg) // UNAVAILABLE
         }
+        ProfilesExportError::PayloadTooLarge(msg) => {
+            (http::StatusCode::PAYLOAD_TOO_LARGE, 8, msg) // RESOURCE_EXHAUSTED
+        }
+        ProfilesExportError::RequestTimeout(msg) => {
+            (http::StatusCode::REQUEST_TIMEOUT, 4, msg) // DEADLINE_EXCEEDED
+        }
         ProfilesExportError::Internal(inner) => {
             let error_msg = inner.to_string();
             if error_msg.contains("ZO_COLS_PER_RECORD_LIMIT") {
@@ -163,7 +196,7 @@ fn map_otlp_handler_error(
             }
         }
     };
-    record_profiles_http_metrics(org_id, req_type, status.as_str(), 0.0);
+    record_profiles_endpoint_metrics(endpoint, org_id, status.as_str(), took_secs);
     otlp_error_response(req_type, status, rpc_code, msg)
 }
 
@@ -202,6 +235,12 @@ const MAPPING_ID_ATTR_KEYS: &[&str] = &[
     "process.executable.build_id.go",
 ];
 const PROFILE_FRAME_TYPE_ATTR: &str = "profile.frame.type";
+const PPROF_ENDPOINT: &str = "/api/org/ingest/profiles/pprof";
+/// Bounds the pprof uploads held in memory and converted at once; a full gate answers 503.
+static PPROF_SLOTS: LazyLock<Arc<Semaphore>> = LazyLock::new(|| {
+    let slots = get_config().limit.profiles_pprof_max_concurrent;
+    Arc::new(Semaphore::new(slots.max(1)))
+});
 
 pub async fn otlp_proto(
     org_id: &str,
@@ -289,23 +328,26 @@ pub async fn otlp_json(
 
 pub async fn handle_otlp_request(
     org_id: &str,
-    mut request: ExportProfilesServiceRequest,
+    request: ExportProfilesServiceRequest,
     req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
     user: IngestUser,
 ) -> Result<ExportProfilesServiceResponse, ProfilesExportError> {
+    let endpoint = profiles_http_endpoint(req_type);
+    handle_otlp_request_at(endpoint, None, org_id, request, in_stream_name, user).await
+}
+
+/// `timer` is the caller's start, when its latency began before this; the metric is recorded once.
+async fn handle_otlp_request_at(
+    endpoint: &str,
+    timer: Option<std::time::Instant>,
+    org_id: &str,
+    mut request: ExportProfilesServiceRequest,
+    in_stream_name: Option<&str>,
+    user: IngestUser,
+) -> Result<ExportProfilesServiceResponse, ProfilesExportError> {
     let stream_name = format_stream_name(in_stream_name.unwrap_or("default").to_string());
-    // Pass the resolved stream name so deleting-stream ingestion is rejected.
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Profiles, Some(&stream_name)).await
-    {
-        if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
-            log::error!("[PROFILES:OTLP] ingestion error: {e}");
-        }
-        return Err(ingestion_gate_error(e));
-    }
-    // the write path creates a new stream's schema itself, before check_for_schema runs
-    schema::check_stream_key_len(org_id, StreamType::Profiles, &stream_name)
-        .map_err(|e| ProfilesExportError::InvalidArgument(e.to_string()))?;
+    admit_ingestion(org_id, &stream_name).await?;
 
     dictionary_compat::normalize(&mut request).map_err(ProfilesExportError::InvalidArgument)?;
     validation::validate(&request).map_err(ProfilesExportError::InvalidArgument)?;
@@ -407,10 +449,190 @@ pub async fn handle_otlp_request(
         .await;
     }
 
-    let time = start.elapsed().as_secs_f64();
-    record_profiles_http_metrics(org_id, req_type, "200", time);
+    let time = timer.unwrap_or(start).elapsed().as_secs_f64();
+    record_profiles_endpoint_metrics(endpoint, org_id, "200", time);
 
     Ok(export_service_response(partial_success))
+}
+
+/// Serves `POST /ingest/profiles/pprof`; always answers OTLP JSON, `{}` on a clean success.
+pub async fn handle_pprof_request(
+    org_id: &str,
+    headers: &http::HeaderMap,
+    raw_query: Option<&str>,
+    body: axum::body::Body,
+    user: IngestUser,
+) -> HttpResponse {
+    handle_pprof_request_with(org_id, headers, raw_query, body, user, &PPROF_SLOTS).await
+}
+
+async fn handle_pprof_request_with(
+    org_id: &str,
+    headers: &http::HeaderMap,
+    raw_query: Option<&str>,
+    body: axum::body::Body,
+    user: IngestUser,
+    slots: &Arc<Semaphore>,
+) -> HttpResponse {
+    let started = std::time::Instant::now();
+    match pprof_request(org_id, headers, raw_query, body, user, slots, started).await {
+        Ok(response) => otlp_export_response(&response, OtlpRequestType::HttpJson),
+        Err(e) => map_otlp_handler_error_at(
+            PPROF_ENDPOINT,
+            org_id,
+            OtlpRequestType::HttpJson,
+            e,
+            started.elapsed().as_secs_f64(),
+        ),
+    }
+}
+
+async fn pprof_request(
+    org_id: &str,
+    headers: &http::HeaderMap,
+    raw_query: Option<&str>,
+    body: axum::body::Body,
+    user: IngestUser,
+    slots: &Arc<Semaphore>,
+    started: std::time::Instant,
+) -> Result<ExportProfilesServiceResponse, ProfilesExportError> {
+    let stream_header = header_str(headers, &get_config().grpc.stream_header_key)?;
+    let stream_name = format_stream_name(stream_header.unwrap_or("default").to_string());
+    // admission comes before any body read, header parse or decode
+    admit_ingestion(org_id, &stream_name).await?;
+
+    let meta = pprof_ingest::PprofRequestMeta::parse(
+        raw_query,
+        header_str(headers, "x-o2-resource-attributes")?,
+        header_str(headers, "x-o2-source-root")?,
+        header_str(headers, "x-o2-pprof-runtime")?,
+    )?;
+    check_ingest_window(meta.start_unix_nano)?;
+    let limits = pprof_ingest::PprofLimits::from_config();
+    let slot = try_pprof_slot(slots)?;
+    // the body must arrive within this, or the route answers 408
+    let timeout =
+        std::time::Duration::from_secs(get_config().limit.profiles_pprof_body_timeout_secs);
+    let raw = read_limited_body(body, limits.max_decoded_bytes, timeout).await?;
+    let org = org_id.to_string();
+    // the slot is held to the end of this function, through the shared ingest that expands rows
+    let (converted, _slot) = run_gated(slot, move || {
+        pprof_ingest::convert(&org, &raw, &meta, &limits)
+    })
+    .await?;
+    match converted? {
+        // handle_otlp_request_at admits again; the first check spared the body read and decode.
+        Some(request) => {
+            handle_otlp_request_at(
+                PPROF_ENDPOINT,
+                Some(started),
+                org_id,
+                request,
+                Some(&stream_name),
+                user,
+            )
+            .await
+        }
+        None => {
+            record_profiles_endpoint_metrics(
+                PPROF_ENDPOINT,
+                org_id,
+                "200",
+                started.elapsed().as_secs_f64(),
+            );
+            Ok(ExportProfilesServiceResponse::default())
+        }
+    }
+}
+
+// The shared path would drop every row outside the window and still answer 200.
+fn check_ingest_window(start_unix_nano: u64) -> Result<(), ProfilesExportError> {
+    let limit = &get_config().limit;
+    let now = now_micros();
+    let start = (start_unix_nano / 1000) as i64;
+    if start < now - limit.ingest_allowed_upto_micro
+        || start > now + limit.ingest_allowed_in_future_micro
+    {
+        return Err(ProfilesExportError::InvalidArgument(format!(
+            "start_unix_nano is outside the ingest window ({} h back, {} h ahead)",
+            limit.ingest_allowed_upto, limit.ingest_allowed_in_future
+        )));
+    }
+    Ok(())
+}
+
+// The permit moves into the blocking task, so a dropped request cannot free it while the work
+// still runs; it comes back so the caller can keep holding it.
+async fn run_gated<T: Send + 'static>(
+    slot: OwnedSemaphorePermit,
+    work: impl FnOnce() -> T + Send + 'static,
+) -> Result<(T, OwnedSemaphorePermit), ProfilesExportError> {
+    tokio::task::spawn_blocking(move || (work(), slot))
+        .await
+        .map_err(|e| {
+            ProfilesExportError::Internal(anyhow::anyhow!("pprof conversion task failed: {e}"))
+        })
+}
+
+fn try_pprof_slot(slots: &Arc<Semaphore>) -> Result<OwnedSemaphorePermit, ProfilesExportError> {
+    slots.clone().try_acquire_owned().map_err(|_| {
+        ProfilesExportError::Unavailable(
+            "too many pprof uploads are being processed; retry later".to_string(),
+        )
+    })
+}
+
+async fn admit_ingestion(org_id: &str, stream_name: &str) -> Result<(), ProfilesExportError> {
+    // Pass the resolved stream name so deleting-stream ingestion is rejected.
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Profiles, Some(stream_name)).await {
+        if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            log::warn!("[PROFILES:OTLP] ingestion error: {e}");
+        }
+        return Err(ingestion_gate_error(e));
+    }
+    // the write path creates a new stream's schema itself, before check_for_schema runs
+    schema::check_stream_key_len(org_id, StreamType::Profiles, stream_name)
+        .map_err(|e| ProfilesExportError::InvalidArgument(e.to_string()))
+}
+
+fn header_str<'a>(
+    headers: &'a http::HeaderMap,
+    name: &str,
+) -> Result<Option<&'a str>, ProfilesExportError> {
+    headers
+        .get(name)
+        .map(|value| {
+            value.to_str().map_err(|_| {
+                ProfilesExportError::InvalidArgument(format!("header {name} is not valid ASCII"))
+            })
+        })
+        .transpose()
+}
+
+async fn read_limited_body(
+    body: axum::body::Body,
+    limit: usize,
+    timeout: std::time::Duration,
+) -> Result<Bytes, ProfilesExportError> {
+    use http_body_util::{BodyExt, LengthLimitError, Limited};
+
+    let collected = tokio::time::timeout(timeout, Limited::new(body, limit).collect())
+        .await
+        .map_err(|_| {
+            ProfilesExportError::RequestTimeout(format!(
+                "request body was not received within {} ms",
+                timeout.as_millis()
+            ))
+        })?;
+    match collected {
+        Ok(collected) => Ok(collected.to_bytes()),
+        Err(e) if e.downcast_ref::<LengthLimitError>().is_some() => Err(
+            ProfilesExportError::PayloadTooLarge(format!("request body exceeds {limit} bytes")),
+        ),
+        Err(e) => Err(ProfilesExportError::InvalidArgument(format!(
+            "invalid request body: {e}"
+        ))),
+    }
 }
 
 /// Flatten the batch, run one schema check for the stream, then partition rows.
@@ -2827,5 +3049,172 @@ mod tests {
                 .unwrap()
                 .contains("rejected")
         );
+    }
+
+    fn pprof_query() -> String {
+        let now = now_micros() as u64 * 1000;
+        format!("start_unix_nano={now}&duration_nano=60000000000")
+    }
+
+    fn pprof_headers(extra: &[(&str, &str)]) -> http::HeaderMap {
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            "x-o2-resource-attributes",
+            http::HeaderValue::from_static("service.name=svc"),
+        );
+        for (name, value) in extra {
+            headers.insert(
+                http::HeaderName::from_bytes(name.as_bytes()).unwrap(),
+                http::HeaderValue::from_str(value).unwrap(),
+            );
+        }
+        headers
+    }
+
+    fn unreadable_body() -> axum::body::Body {
+        axum::body::Body::from_stream(futures::stream::once(async {
+            Err::<Bytes, std::io::Error>(std::io::Error::other("body was read"))
+        }))
+    }
+
+    async fn pprof_call_for(
+        org_id: &str,
+        headers: &http::HeaderMap,
+        query: Option<&str>,
+        body: axum::body::Body,
+        slots: usize,
+    ) -> (http::StatusCode, json::Value) {
+        // each call has its own gate, so tests never depend on the global one
+        let response = handle_pprof_request_with(
+            org_id,
+            headers,
+            query,
+            body,
+            IngestUser::from_user_email("a@a.com"),
+            &Arc::new(Semaphore::new(slots)),
+        )
+        .await;
+        let status = response.status();
+        assert_eq!(
+            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            CONTENT_TYPE_JSON
+        );
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, json::from_slice(&bytes).unwrap())
+    }
+
+    // every refusal here must come before the body is read: reading it would fail the request
+    #[tokio::test]
+    async fn pprof_refuses_before_the_body_is_read() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        use infra::cache::deleting_streams;
+
+        let query = pprof_query();
+
+        let org = "pprof_blocked_org";
+        ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Deleting);
+        let (status, body) = pprof_call_for(
+            org,
+            &pprof_headers(&[]),
+            Some(query.as_str()),
+            unreadable_body(),
+            1,
+        )
+        .await;
+        ORG_STATUS_CACHE.remove(org);
+        assert_eq!(status, http::StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body["code"], 14);
+        assert!(!body["message"].as_str().unwrap().contains("body was read"));
+
+        let org = "pprof_deleting_org";
+        let key = deleting_streams::key(org, StreamType::Profiles, "doomed", None);
+        deleting_streams::insert(key.clone(), now_micros());
+        let stream_header = get_config().grpc.stream_header_key.clone();
+        let headers = pprof_headers(&[(stream_header.as_str(), "doomed")]);
+        let (status, body) =
+            pprof_call_for(org, &headers, Some(query.as_str()), unreadable_body(), 1).await;
+        deleting_streams::remove(&key);
+        assert_eq!(status, http::StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body["code"], 14);
+        let message = body["message"].as_str().unwrap();
+        assert!(message.contains("being deleted"), "{message}");
+
+        // cloud builds reject the unknown test org at the trial check
+        #[cfg(not(feature = "cloud"))]
+        {
+            let limit = &get_config().limit;
+            let now = now_micros();
+            let too_old = (now - limit.ingest_allowed_upto_micro - 60_000_000) as u64 * 1000;
+            let too_new = (now + limit.ingest_allowed_in_future_micro + 60_000_000) as u64 * 1000;
+            let at = |start: u64| format!("start_unix_nano={start}&duration_nano=60000000000");
+            // outside the ingest window is a 400; a full gate is a 503 the client can retry
+            let (bad, full) = (
+                http::StatusCode::BAD_REQUEST,
+                http::StatusCode::SERVICE_UNAVAILABLE,
+            );
+            for (query, slots, status, code, says) in [
+                (at(too_old), 1, bad, 3, "ingest window"),
+                (at(too_new), 1, bad, 3, "ingest window"),
+                (query.clone(), 0, full, 14, "retry later"),
+            ] {
+                let (got, body) = pprof_call_for(
+                    "test_org_id",
+                    &pprof_headers(&[]),
+                    Some(query.as_str()),
+                    unreadable_body(),
+                    slots,
+                )
+                .await;
+                assert_eq!(got, status, "{query}");
+                assert_eq!(body["code"], code);
+                let message = body["message"].as_str().unwrap();
+                assert!(message.contains(says), "{message}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn read_limited_body_times_out_on_a_slow_body_with_408() {
+        let pending = futures::stream::pending::<Result<Bytes, std::io::Error>>();
+        let stalled = axum::body::Body::from_stream(pending);
+        let result = read_limited_body(stalled, 8, std::time::Duration::from_millis(20)).await;
+        let err = match result {
+            Err(e @ ProfilesExportError::RequestTimeout(_)) => e,
+            other => panic!("expected RequestTimeout, got {other:?}"),
+        };
+        let response = map_otlp_handler_error("default", OtlpRequestType::HttpJson, err);
+        assert_eq!(response.status(), http::StatusCode::REQUEST_TIMEOUT);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: json::Value = json::from_slice(&bytes).unwrap();
+        assert_eq!(body["code"], 4);
+    }
+
+    // a dropped request must not free the slot while its blocking conversion still runs
+    #[tokio::test]
+    async fn the_pprof_slot_is_held_until_the_blocking_work_ends_even_if_the_request_is_dropped() {
+        let slots = Arc::new(Semaphore::new(1));
+        let slot = try_pprof_slot(&slots).unwrap();
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel::<()>();
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let request = tokio::spawn(run_gated(slot, move || {
+            started_tx.send(()).unwrap();
+            release_rx.recv().is_ok()
+        }));
+        started_rx.await.unwrap();
+        request.abort();
+        assert!(request.await.unwrap_err().is_cancelled());
+        assert_eq!(slots.available_permits(), 0);
+        release_tx.send(()).unwrap();
+        for _ in 0..500 {
+            if slots.available_permits() == 1 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert_eq!(slots.available_permits(), 1);
     }
 }

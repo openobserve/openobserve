@@ -136,6 +136,20 @@ pub static INGEST_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static PROFILES_PPROF_FOLDED_ROWS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "profiles_pprof_folded_rows",
+            "pprof rows folded into an [other] row, by reason: topn (over the per-type cap the request used, halved when it was over the request-wide budgets), unlinked (a linked row whose link lost its own [other] row) or budget (a row whose new stack the request's frame budget refused)."
+                .to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "profile_type", "reason"],
+    )
+    .expect("Metric created")
+});
 pub static INGEST_WAL_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -3210,6 +3224,9 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(INGEST_ERRORS.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(PROFILES_PPROF_FOLDED_ROWS.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(INGEST_WAL_USED_BYTES.clone()))
         .expect("Metric registered");
     registry
@@ -3889,6 +3906,7 @@ mod tests {
         let _ = INGEST_RECORDS.clone();
         let _ = INGEST_BYTES.clone();
         let _ = INGEST_ERRORS.clone();
+        let _ = PROFILES_PPROF_FOLDED_ROWS.clone();
         let _ = INGEST_WAL_USED_BYTES.clone();
         let _ = INGEST_PARQUET_FILES.clone();
         let _ = SYNTHETICS_PENDING_JOBS.clone();

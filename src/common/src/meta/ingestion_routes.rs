@@ -155,6 +155,12 @@ static INGESTION_ROUTES: &[IngestionRoute] = &[
         methods: &["POST"],
         kind: IngestionKind::Write,
     },
+    // `/{org}/ingest/profiles/pprof`
+    IngestionRoute {
+        segments: &[Param, Lit("ingest"), Lit("profiles"), Lit("pprof")],
+        methods: &["POST"],
+        kind: IngestionKind::Write,
+    },
     // `/{org}/prometheus/api/v1/write`
     IngestionRoute {
         segments: &[
@@ -349,6 +355,7 @@ mod tests {
             "{org_id}/traces",
             "{org_id}/otel/v1/traces",
             "{org_id}/ingest/metrics/_json",
+            "{org_id}/ingest/profiles/pprof",
             "{org_id}/prometheus/api/v1/write",
             "{org_id}/{stream_name}/_kinesis_firehose",
             "{org_id}/{stream_name}/_sub",
@@ -504,6 +511,42 @@ mod tests {
             ),
             Some(IngestionKind::Write)
         );
+    }
+
+    #[test]
+    fn pprof_ingest_is_a_post_write_and_its_neighbours_are_not() {
+        let route = Some("/api/{org_id}/ingest/profiles/pprof");
+        assert!(is_ingestion_write(
+            &Method::POST,
+            "default/ingest/profiles/pprof",
+            route
+        ));
+        assert!(is_ingestion_allowed(
+            &Method::POST,
+            "/default/ingest/profiles/pprof",
+            route
+        ));
+        for method in [
+            Method::GET,
+            Method::HEAD,
+            Method::PUT,
+            Method::DELETE,
+            Method::PATCH,
+        ] {
+            assert_eq!(
+                classify_route(&method, "{org_id}/ingest/profiles/pprof"),
+                None
+            );
+        }
+        for route in [
+            "{org_id}/ingest/profiles/meta",
+            "{org_id}/ingest/profiles/series",
+            "{org_id}/ingest/profiles",
+            "{org_id}/ingest/profiles/pprof/extra",
+            "{org_id}/profiles/pprof",
+        ] {
+            assert_eq!(classify_route(&Method::POST, route), None, "POST /{route}");
+        }
     }
 
     #[test]

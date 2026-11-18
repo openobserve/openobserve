@@ -20,10 +20,12 @@ use std::io::Read;
 use axum::{
     body::{Body, Bytes},
     extract::Request,
-    http::{HeaderMap, header},
+    http::{HeaderMap, StatusCode, header},
     middleware::Next,
     response::Response,
 };
+use common::meta::otlp::otlp_error_response;
+use config::meta::otlp::OtlpRequestType;
 use http_body::Frame;
 use http_body_util::{BodyExt, Full, Limited, StreamBody};
 
@@ -58,6 +60,9 @@ impl SnappyEncoding {
 
 /// Decodes `snappy` / `x-snappy-framed` bodies, except on routes whose handler decodes raw snappy.
 pub async fn preprocess_encoding_middleware(mut request: Request, next: Next) -> Response {
+    if let Some(refused) = refuse_pprof_encoding(&request) {
+        return refused;
+    }
     let Some(encoding) = SnappyEncoding::from_headers(request.headers()) else {
         return next.run(request).await;
     };
@@ -75,6 +80,31 @@ pub async fn preprocess_encoding_middleware(mut request: Request, next: Next) ->
     request.headers_mut().remove(header::CONTENT_LENGTH);
     next.run(request.map(|body| decoded_body(body, encoding, limit)))
         .await
+}
+
+// The pprof handler caps what it reads, and only the lazy gzip decoder streams through that cap;
+// snappy here would collect and decode up to the global payload limit first.
+fn refuse_pprof_encoding(request: &Request) -> Option<Response> {
+    if !request
+        .uri()
+        .path()
+        .trim_end_matches('/')
+        .ends_with("/ingest/profiles/pprof")
+    {
+        return None;
+    }
+    let mut values = request.headers().get_all(header::CONTENT_ENCODING).iter();
+    let first = values.next()?;
+    // the same bytes RequestDecompressionLayer matches
+    if values.next().is_none() && matches!(first.as_bytes(), b"gzip" | b"identity") {
+        return None;
+    }
+    Some(otlp_error_response(
+        OtlpRequestType::HttpJson,
+        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        3, // INVALID_ARGUMENT
+        "Content-Encoding on the pprof route must be gzip or identity",
+    ))
 }
 
 fn is_snappy_capable_route(path: &str) -> bool {

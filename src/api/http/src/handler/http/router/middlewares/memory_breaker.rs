@@ -60,6 +60,10 @@ async fn refuse_writes_when(
 fn refusal(request: &Request, e: infra::errors::Error) -> Response {
     let status = StatusCode::SERVICE_UNAVAILABLE;
     let path = request.uri().path();
+    // The pprof route answers in OTLP JSON whatever its body's content type.
+    if path.ends_with("/ingest/profiles/pprof") {
+        return otlp_rejection_response(OtlpRequestType::HttpJson, status, e.to_string());
+    }
     if !OTLP_ROUTE_SUFFIXES.iter().any(|s| path.ends_with(s)) {
         return (status, Json(MetaHttpResponse::error(status, e))).into_response();
     }
@@ -121,6 +125,7 @@ mod tests {
             .route("/{org_id}/v1/opamp", post(read_body))
             .route("/{org_id}/v1/logs", post(read_body))
             .route("/{org_id}/otel/v1/traces", post(read_body))
+            .route("/{org_id}/ingest/profiles/pprof", post(read_body))
             .route("/{org_id}/streams", get(read_body))
             .layer(middleware::from_fn(move |req, next| {
                 refuse_writes_when(req, next, check)
@@ -220,6 +225,19 @@ mod tests {
         }
 
         let resp = refuse_otlp("/api/default/v1/logs", "application/json; charset=utf-8").await;
+        assert_eq!(resp.headers()[CONTENT_TYPE], CONTENT_TYPE_JSON);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], 14);
+
+        let resp = refuse_otlp(
+            "/api/default/ingest/profiles/pprof",
+            "application/octet-stream",
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(resp.headers()[CONTENT_TYPE], CONTENT_TYPE_JSON);
         let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
             .await

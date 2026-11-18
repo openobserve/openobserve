@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "description": "Example requests and expected results for the OpenObserve POST /api/{org}/ingest/profiles/pprof route.",
+  "requests": [
+    {
+      "kind": "time",
+      "method": "POST",
+      "path": "/api/{org}/ingest/profiles/pprof",
+      "query": {
+        "start_unix_nano": "1762560000000000000",
+        "duration_nano": "60000000000"
+      },
+      "headers": {
+        "Content-Type": "application/octet-stream",
+        "Content-Encoding": "gzip",
+        "Authorization": "Basic <placeholder-ingest-token>",
+        "stream-name": "backend",
+        "x-o2-pprof-runtime": "nodejs",
+        "x-o2-source-root": "%2Fapp%2Fexample-server",
+        "x-o2-resource-attributes": "service.name=example-api,service.instance.id=00000000-0000-4000-8000-000000000001,deployment.environment=contract-test,service.namespace=backend,host.name=contract-host,process.pid=4242"
+      },
+      "body_file": "time-profile.pb.gz",
+      "expected": {
+        "http_status": 200,
+        "response_json": {},
+        "profile_types": [
+          "cpu",
+          "wall"
+        ],
+        "stack_frame_form": "./<path>:<name>:<line> (bare name when the filename is empty)"
+      }
+    },
+    {
+      "kind": "heap",
+      "method": "POST",
+      "path": "/api/{org}/ingest/profiles/pprof",
+      "query": {
+        "start_unix_nano": "1762560000000000000",
+        "duration_nano": "60000000000"
+      },
+      "headers": {
+        "Content-Type": "application/octet-stream",
+        "Content-Encoding": "gzip",
+        "Authorization": "Basic <placeholder-ingest-token>",
+        "stream-name": "backend",
+        "x-o2-pprof-runtime": "nodejs",
+        "x-o2-source-root": "%2Fapp%2Fexample-server",
+        "x-o2-resource-attributes": "service.name=example-api,service.instance.id=00000000-0000-4000-8000-000000000001,deployment.environment=contract-test,service.namespace=backend,host.name=contract-host,process.pid=4242"
+      },
+      "body_file": "heap-profile.pb.gz",
+      "expected": {
+        "http_status": 200,
+        "response_json": {},
+        "profile_types": [
+          "inuse_objects",
+          "inuse_space"
+        ],
+        "stack_frame_form": "./<path>:<name>:<line> (bare name when the filename is empty)"
+      }
+    }
+  ],
+  "notes": [
+    "start_unix_nano is a fixed synthetic value; replaying tests must override it with a current timestamp (ingest window 5 h past) and compare everything else exactly.",
+    "Body files are real @datadog/pprof 5.14.4 captures with paths rewritten to /app/example-server."
+  ]
+}

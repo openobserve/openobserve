@@ -9,6 +9,7 @@ POST /api/v2/{org_id}/incidents/events/{token} | ingest callback authenticated b
 POST /api/{org_id}/_bulk | ingest route, kept out of the API rate-limit groups
 POST /api/{org_id}/_hec | ingest route, kept out of the API rate-limit groups
 POST /api/{org_id}/ingest/metrics/_json | ingest route, kept out of the API rate-limit groups
+POST /api/{org_id}/ingest/profiles/pprof | ingest route, kept out of the API rate-limit groups
 POST /api/{org_id}/loki/api/v1/push | ingest route, kept out of the API rate-limit groups
 POST /api/{org_id}/prometheus/api/v1/write | ingest route, kept out of the API rate-limit groups
 POST /api/{org_id}/synthetics/jobs/ack | probe agent protocol, polled on the agent schedule

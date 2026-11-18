@@ -2769,6 +2769,72 @@ pub struct Limit {
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
     #[env_config(
+        name = "ZO_PROFILES_PPROF_MAX_DECODED_BYTES",
+        default = 16777216,
+        help = "Bytes a pprof ingest request body may reach after decompression; over it the route answers 413. 0 means 16 MiB"
+    )]
+    pub profiles_pprof_max_decoded_bytes: usize,
+    #[env_config(
+        name = "ZO_PROFILES_PPROF_MAX_CONCURRENT",
+        default = 4,
+        help = "Pprof uploads read and converted at once; more answer 503 so they can retry. 0 means 4"
+    )]
+    pub profiles_pprof_max_concurrent: usize,
+    #[env_config(
+        name = "ZO_PROFILES_PPROF_MAX_STACKS_PER_TYPE",
+        default = 2500,
+        help = "Distinct unlinked stacks kept per profile type of one pprof request; the rest fold into one [other] row. 0 means 2500"
+    )]
+    pub profiles_pprof_max_stacks_per_type: usize,
+    #[env_config(
+        name = "ZO_PROFILES_PPROF_MAX_LINKED_ROWS_PER_TYPE",
+        default = 10000,
+        help = "Trace-linked rows kept per profile type of one pprof request; the rest of each link fold into one [other] row with that link, for at most this many links, and further links into the type's unlinked [other] row. 0 means 10000"
+    )]
+    pub profiles_pprof_max_linked_rows_per_type: usize,
+    #[env_config(
+        name = "ZO_PROFILES_PPROF_MAX_ROWS",
+        default = 50000,
+        help = "Rows one pprof request may store across all its profile types, after the per-type folds; over it the linked and then the unlinked per-type caps are halved and the types folded again, and only when both reach 1 and it still does not fit does the route answer 413. 0 means 50000"
+    )]
+    pub profiles_pprof_max_rows: usize,
+    #[env_config(
+        name = "ZO_PROFILES_PPROF_MAX_STACK_BYTES",
+        default = 67108864,
+        help = "Stack text one pprof request may store: the rendered stack length summed over its rows; over it the per-type caps are halved and the types folded again, lowest value first (413 only when nothing fits at a cap of 1). 0 means 64 MiB"
+    )]
+    pub profiles_pprof_max_stack_bytes: usize,
+    #[env_config(
+        name = "ZO_PROFILES_PPROF_BODY_TIMEOUT_SECS",
+        default = 15,
+        help = "Seconds a pprof upload body may take to arrive; slower ones answer 408. 0 means 15"
+    )]
+    pub profiles_pprof_body_timeout_secs: u64,
+    #[env_config(
+        name = "ZO_PROFILES_PPROF_MAX_SAMPLES",
+        default = 200000,
+        help = "Samples one pprof upload may carry; more answer 413. 0 means 200000"
+    )]
+    pub profiles_pprof_max_samples: usize,
+    #[env_config(
+        name = "ZO_PROFILES_PPROF_MAX_FRAMES",
+        default = 100000,
+        help = "Distinct rendered frames one pprof upload may produce; more answer 413. 0 means 100000"
+    )]
+    pub profiles_pprof_max_frames: usize,
+    #[env_config(
+        name = "ZO_PROFILES_PPROF_MAX_FRAME_BYTES",
+        default = 8388608,
+        help = "Bytes of distinct rendered frame text one pprof upload may produce; more answer 413. 0 means 8 MiB"
+    )]
+    pub profiles_pprof_max_frame_bytes: usize,
+    #[env_config(
+        name = "ZO_PROFILES_PPROF_MAX_NESTED_ENTRIES",
+        default = 8000000,
+        help = "Sample location ids, sample values, sample labels and location lines one pprof upload may carry, counted on the wire before decoding; more answer 413. It bounds the decode allocations at about 16 bytes an entry (about 128 MiB at the default). 0 means 8000000"
+    )]
+    pub profiles_pprof_max_nested_entries: usize,
+    #[env_config(
         name = "ZO_FIREHOSE_DECOMPRESSED_LIMIT",
         default = 0,
         help = "Bytes the gzip records of one Kinesis Firehose request may inflate to; 0 means 640 MiB"
@@ -4299,6 +4365,39 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // A Firehose HTTP request is at most 64 MiB and CloudWatch gzip inflates about 10x
     if cfg.limit.firehose_decompressed_limit == 0 {
         cfg.limit.firehose_decompressed_limit = 640 * 1024 * 1024;
+    }
+    if cfg.limit.profiles_pprof_max_decoded_bytes == 0 {
+        cfg.limit.profiles_pprof_max_decoded_bytes = 16 * 1024 * 1024;
+    }
+    if cfg.limit.profiles_pprof_max_concurrent == 0 {
+        cfg.limit.profiles_pprof_max_concurrent = 4;
+    }
+    if cfg.limit.profiles_pprof_max_stacks_per_type == 0 {
+        cfg.limit.profiles_pprof_max_stacks_per_type = 2500;
+    }
+    if cfg.limit.profiles_pprof_max_linked_rows_per_type == 0 {
+        cfg.limit.profiles_pprof_max_linked_rows_per_type = 10_000;
+    }
+    if cfg.limit.profiles_pprof_max_rows == 0 {
+        cfg.limit.profiles_pprof_max_rows = 50_000;
+    }
+    if cfg.limit.profiles_pprof_max_stack_bytes == 0 {
+        cfg.limit.profiles_pprof_max_stack_bytes = 64 * 1024 * 1024;
+    }
+    if cfg.limit.profiles_pprof_body_timeout_secs == 0 {
+        cfg.limit.profiles_pprof_body_timeout_secs = 15;
+    }
+    if cfg.limit.profiles_pprof_max_samples == 0 {
+        cfg.limit.profiles_pprof_max_samples = 200_000;
+    }
+    if cfg.limit.profiles_pprof_max_frames == 0 {
+        cfg.limit.profiles_pprof_max_frames = 100_000;
+    }
+    if cfg.limit.profiles_pprof_max_frame_bytes == 0 {
+        cfg.limit.profiles_pprof_max_frame_bytes = 8 * 1024 * 1024;
+    }
+    if cfg.limit.profiles_pprof_max_nested_entries == 0 {
+        cfg.limit.profiles_pprof_max_nested_entries = 8_000_000;
     }
     if cfg.limit.grpc_runtime_worker_num == 0 {
         cfg.limit.grpc_runtime_worker_num = cpu_num;
@@ -7044,6 +7143,59 @@ mod tests {
         cfg.limit.firehose_decompressed_limit = 300;
         check_limit_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.firehose_decompressed_limit, 300);
+    }
+
+    #[test]
+    fn test_check_limit_config_profiles_pprof_limits() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.req_payload_limit = 200;
+        cfg.limit.profiles_pprof_max_decoded_bytes = 0;
+        cfg.limit.profiles_pprof_max_stacks_per_type = 0;
+        cfg.limit.profiles_pprof_max_linked_rows_per_type = 0;
+        cfg.limit.profiles_pprof_max_concurrent = 0;
+        cfg.limit.profiles_pprof_max_rows = 0;
+        cfg.limit.profiles_pprof_max_stack_bytes = 0;
+        cfg.limit.profiles_pprof_body_timeout_secs = 0;
+        cfg.limit.profiles_pprof_max_samples = 0;
+        cfg.limit.profiles_pprof_max_frames = 0;
+        cfg.limit.profiles_pprof_max_frame_bytes = 0;
+        cfg.limit.profiles_pprof_max_nested_entries = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.profiles_pprof_max_concurrent, 4);
+        assert_eq!(cfg.limit.profiles_pprof_max_rows, 50_000);
+        assert_eq!(cfg.limit.profiles_pprof_max_stack_bytes, 64 * 1024 * 1024);
+        assert_eq!(cfg.limit.profiles_pprof_max_decoded_bytes, 16 * 1024 * 1024);
+        assert_eq!(cfg.limit.profiles_pprof_max_stacks_per_type, 2500);
+        assert_eq!(cfg.limit.profiles_pprof_max_linked_rows_per_type, 10_000);
+        assert_eq!(cfg.limit.profiles_pprof_body_timeout_secs, 15);
+        assert_eq!(cfg.limit.profiles_pprof_max_samples, 200_000);
+        assert_eq!(cfg.limit.profiles_pprof_max_frames, 100_000);
+        assert_eq!(cfg.limit.profiles_pprof_max_frame_bytes, 8 * 1024 * 1024);
+        assert_eq!(cfg.limit.profiles_pprof_max_nested_entries, 8_000_000);
+
+        cfg.limit.profiles_pprof_max_decoded_bytes = 1024;
+        cfg.limit.profiles_pprof_max_stacks_per_type = 7;
+        cfg.limit.profiles_pprof_max_linked_rows_per_type = 9;
+        cfg.limit.profiles_pprof_max_concurrent = 2;
+        cfg.limit.profiles_pprof_max_rows = 11;
+        cfg.limit.profiles_pprof_max_stack_bytes = 13;
+        cfg.limit.profiles_pprof_body_timeout_secs = 3;
+        cfg.limit.profiles_pprof_max_samples = 5;
+        cfg.limit.profiles_pprof_max_frames = 6;
+        cfg.limit.profiles_pprof_max_frame_bytes = 8;
+        cfg.limit.profiles_pprof_max_nested_entries = 10;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.profiles_pprof_max_concurrent, 2);
+        assert_eq!(cfg.limit.profiles_pprof_max_rows, 11);
+        assert_eq!(cfg.limit.profiles_pprof_max_stack_bytes, 13);
+        assert_eq!(cfg.limit.profiles_pprof_max_decoded_bytes, 1024);
+        assert_eq!(cfg.limit.profiles_pprof_max_stacks_per_type, 7);
+        assert_eq!(cfg.limit.profiles_pprof_max_linked_rows_per_type, 9);
+        assert_eq!(cfg.limit.profiles_pprof_body_timeout_secs, 3);
+        assert_eq!(cfg.limit.profiles_pprof_max_samples, 5);
+        assert_eq!(cfg.limit.profiles_pprof_max_frames, 6);
+        assert_eq!(cfg.limit.profiles_pprof_max_frame_bytes, 8);
+        assert_eq!(cfg.limit.profiles_pprof_max_nested_entries, 10);
     }
 
     #[test]
