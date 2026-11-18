@@ -5,14 +5,14 @@
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection|🔴 error rate on web-logs firing>*"
+          "text": "*<https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136|🔴 error rate on web-logs firing>*"
         }
       },
       {
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)"
+          "text": "web-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC"
         }
       },
       {
@@ -36,7 +36,15 @@
           },
           {
             "type": "mrkdwn",
-            "text": "*Score*\n0.91 vs 0.80"
+            "text": "*Expected*\n60.00-136.00"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Change*\n+249.0%"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Started*\n2026-11-02 09:50 UTC"
           },
           {
             "type": "mrkdwn",
@@ -51,18 +59,18 @@
             "type": "button",
             "text": {
               "type": "plain_text",
-              "text": "View data around the window"
+              "text": "View logs"
             },
-            "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true"
+            "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136",
+            "style": "primary"
           },
           {
             "type": "button",
             "text": {
               "type": "plain_text",
-              "text": "Open detector"
+              "text": "Open anomaly"
             },
-            "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection",
-            "style": "primary"
+            "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
           }
         ]
       }
@@ -74,7 +82,7 @@
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection|🟢 error rate on web-logs resolved>*"
+          "text": "*<https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1|🟢 error rate on web-logs resolved>*"
         }
       },
       {
@@ -101,10 +109,6 @@
           },
           {
             "type": "mrkdwn",
-            "text": "*Score*\n0.00 vs 0.80"
-          },
-          {
-            "type": "mrkdwn",
             "text": "*Time*\n2026-11-02 10:40:00 UTC"
           }
         ]
@@ -116,18 +120,18 @@
             "type": "button",
             "text": {
               "type": "plain_text",
-              "text": "View data around the window"
+              "text": "View logs"
             },
-            "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true"
+            "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1",
+            "style": "primary"
           },
           {
             "type": "button",
             "text": {
               "type": "plain_text",
-              "text": "Open detector"
+              "text": "Open anomaly"
             },
-            "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection",
-            "style": "primary"
+            "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
           }
         ]
       }
@@ -136,24 +140,22 @@
   "webhook_firing": {
     "version": 1,
     "title": "🔴 error rate on web-logs firing",
-    "body_markdown": "3 anomalies in window 2026\\-11\\-02 09\\:50 UTC–2026\\-11\\-02 10\\:05 UTC \\| worst value\\: 342\\.00 \\(expected \\~98\\.00 for this hour\\) \\| score 0\\.91 vs threshold 0\\.80 \\(score 14\\.0\\% over its bar\\)",
+    "body_markdown": "web\\-logs rose 249\\.0\\% above expected \\| Actual 342\\.00\\, expected 60\\.00\\-136\\.00\\, since 09\\:50 UTC \\| 3 anomalies in window 2026\\-11\\-02 09\\:50 UTC–2026\\-11\\-02 10\\:05 UTC",
     "fields": {
       "Level": "Critical",
       "Event": "Firing",
       "Stream": "web-logs",
       "Value": "342.00",
-      "Score": "0.91 vs 0.80",
+      "Expected": "60.00-136.00",
+      "Change": "+249.0%",
+      "Started": "2026-11-02 09:50 UTC",
       "Time": "2026-11-02 10:05:00 UTC"
     },
     "rows": [],
     "links": [
       {
-        "label": "View data around the window",
-        "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true"
-      },
-      {
         "label": "",
-        "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
+        "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136"
       }
     ],
     "severity": "critical",
@@ -180,13 +182,13 @@
       "alert_warning_threshold": null,
       "alert_start_time": "N/A",
       "alert_end_time": "N/A",
-      "alert_url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection",
-      "alert_url_label": "Open detector",
-      "alert_detail_url": null,
-      "alert_detail_label": null,
+      "alert_url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136",
+      "alert_url_label": "View logs",
+      "alert_detail_url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection",
+      "alert_detail_label": "Open anomaly",
       "alert_trigger_time_str": "2026-11-02 10:05:00",
       "alert_time": "2026-11-02 10:05:00",
-      "alert_description": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)",
+      "alert_description": "web-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC",
       "kind": "anomaly",
       "notification_kind": "anomaly",
       "notification_event": "firing",
@@ -214,21 +216,27 @@
       "score": "0.91",
       "threshold": "0.80",
       "anomaly_score": "0.91 vs 0.80",
-      "anomaly_explore_url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true",
-      "anomaly_explore_label": "View data around the window",
+      "anomaly_explore_url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136",
+      "anomaly_explore_label": "View logs",
       "window_start": "2026-11-02 09:50 UTC",
       "window_end": "2026-11-02 10:05 UTC",
-      "anomaly_url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
+      "anomaly_url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection",
+      "anomaly_headline": "web-logs rose 249.0% above expected",
+      "expected_lower": "60.00",
+      "expected_upper": "136.00",
+      "value_change_percent": "+249.0",
+      "anomaly_started": "2026-11-02 09:50 UTC",
+      "anomaly_bucket": "5-min buckets"
     }
   },
   "email_firing": {
     "subject": "🔴 error rate on web-logs firing",
-    "html": "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#202124;\"><tr><td style=\"padding:16px;\"><h2 style=\"margin:0 0 8px 0;font-size:20px;line-height:1.3;color:#202124;\">🔴 error rate on web-logs firing</h2><div style=\"margin:16px 0;color:#202124;\"><p>3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)</p></div><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Level</td><td style=\"padding:4px 0;color:#202124;\">Critical</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Event</td><td style=\"padding:4px 0;color:#202124;\">Firing</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Stream</td><td style=\"padding:4px 0;color:#202124;\">web-logs</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Value</td><td style=\"padding:4px 0;color:#202124;\">342.00</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Score</td><td style=\"padding:4px 0;color:#202124;\">0.91 vs 0.80</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Time</td><td style=\"padding:4px 0;color:#202124;\">2026-11-02 10:05:00 UTC</td></tr></table><div style=\"margin:16px 0;\"><a href=\"https://o2.acme.com/web/logs?stream_type=logs&amp;stream=web-logs&amp;stream_value=web-logs&amp;from=1793612100000000&amp;to=1793613900000000&amp;sql_mode=true&amp;query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&amp;org_identifier=acme&amp;show_histogram=true\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;border:1px solid #DADCE0;border-radius:4px;color:#1A73E8;text-decoration:none;\">View data around the window</a><a href=\"https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&amp;tab=anomalyDetection\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;\">Open detector</a></div><div style=\"margin:24px 0 0 0;padding-top:12px;border-top:1px solid #DADCE0;color:#5F6368;font-size:12px;\">Sent by OpenObserve.</div></td></tr></table>",
-    "text": "🔴 error rate on web-logs firing\n\n3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)\n\nLevel: Critical\nEvent: Firing\nStream: web-logs\nValue: 342.00\nScore: 0.91 vs 0.80\nTime: 2026-11-02 10:05:00 UTC\n\nView data around the window: https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true\nOpen detector: https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection\n\nSent by OpenObserve."
+    "html": "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#202124;\"><tr><td style=\"padding:16px;\"><h2 style=\"margin:0 0 8px 0;font-size:20px;line-height:1.3;color:#202124;\">🔴 error rate on web-logs firing</h2><div style=\"margin:16px 0;color:#202124;\"><p>web-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC</p></div><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Level</td><td style=\"padding:4px 0;color:#202124;\">Critical</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Event</td><td style=\"padding:4px 0;color:#202124;\">Firing</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Stream</td><td style=\"padding:4px 0;color:#202124;\">web-logs</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Value</td><td style=\"padding:4px 0;color:#202124;\">342.00</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Expected</td><td style=\"padding:4px 0;color:#202124;\">60.00-136.00</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Change</td><td style=\"padding:4px 0;color:#202124;\">+249.0%</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Started</td><td style=\"padding:4px 0;color:#202124;\">2026-11-02 09:50 UTC</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Time</td><td style=\"padding:4px 0;color:#202124;\">2026-11-02 10:05:00 UTC</td></tr></table><div style=\"margin:16px 0;\"><a href=\"https://o2.acme.com/web/logs?stream_type=logs&amp;stream=web-logs&amp;stream_value=web-logs&amp;from=1793612100000000&amp;to=1793613900000000&amp;sql_mode=true&amp;query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&amp;org_identifier=acme&amp;show_histogram=true&amp;type=search_scheduler&amp;from_anomaly=a1b2c3&amp;anomaly_filter_applied=1&amp;anomaly_start=1793613000000000&amp;anomaly_end=1793613900000000&amp;anomaly_kind=value&amp;anomaly_measure=count%28*%29+per+5+min&amp;anomaly_actual=342&amp;anomaly_lower=60&amp;anomaly_upper=136\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;\">View logs</a><a href=\"https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&amp;tab=anomalyDetection\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;border:1px solid #DADCE0;border-radius:4px;color:#1A73E8;text-decoration:none;\">Open anomaly</a></div><div style=\"margin:24px 0 0 0;padding-top:12px;border-top:1px solid #DADCE0;color:#5F6368;font-size:12px;\">Sent by OpenObserve.</div></td></tr></table>",
+    "text": "🔴 error rate on web-logs firing\n\nweb-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC\n\nLevel: Critical\nEvent: Firing\nStream: web-logs\nValue: 342.00\nExpected: 60.00-136.00\nChange: +249.0%\nStarted: 2026-11-02 09:50 UTC\nTime: 2026-11-02 10:05:00 UTC\n\nView logs: https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136\nOpen anomaly: https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection\n\nSent by OpenObserve."
   },
   "sns_firing": {
     "subject": "🔴 error rate on web-logs firing",
-    "message": "🔴 error rate on web-logs firing\n\n3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)\n\nLevel: Critical\nEvent: Firing\nStream: web-logs\nValue: 342.00\nScore: 0.91 vs 0.80\nTime: 2026-11-02 10:05:00 UTC\n\nView data around the window: https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true\nOpen detector: https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
+    "message": "🔴 error rate on web-logs firing\n\nweb-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC\n\nLevel: Critical\nEvent: Firing\nStream: web-logs\nValue: 342.00\nExpected: 60.00-136.00\nChange: +249.0%\nStarted: 2026-11-02 09:50 UTC\nTime: 2026-11-02 10:05:00 UTC\n\nView logs: https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136\nOpen anomaly: https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
   },
   "teams_adaptive_firing": {
     "type": "message",
@@ -250,7 +258,7 @@
             },
             {
               "type": "TextBlock",
-              "text": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)",
+              "text": "web-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC",
               "wrap": true
             },
             {
@@ -273,8 +281,16 @@
                   "value": "342.00"
                 },
                 {
-                  "title": "Score",
-                  "value": "0.91 vs 0.80"
+                  "title": "Expected",
+                  "value": "60.00-136.00"
+                },
+                {
+                  "title": "Change",
+                  "value": "+249.0%"
+                },
+                {
+                  "title": "Started",
+                  "value": "2026-11-02 09:50 UTC"
                 },
                 {
                   "title": "Time",
@@ -286,14 +302,14 @@
           "actions": [
             {
               "type": "Action.OpenUrl",
-              "title": "View data around the window",
-              "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true"
+              "title": "View logs",
+              "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136",
+              "style": "positive"
             },
             {
               "type": "Action.OpenUrl",
-              "title": "Open detector",
-              "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection",
-              "style": "positive"
+              "title": "Open anomaly",
+              "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
             }
           ]
         }
@@ -308,7 +324,7 @@
       {
         "activityTitle": "🔴 error rate on web-logs firing",
         "markdown": false,
-        "text": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)",
+        "text": "web-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC",
         "facts": [
           {
             "name": "Level",
@@ -327,8 +343,16 @@
             "value": "342.00"
           },
           {
-            "name": "Score",
-            "value": "0.91 vs 0.80"
+            "name": "Expected",
+            "value": "60.00-136.00"
+          },
+          {
+            "name": "Change",
+            "value": "+249.0%"
+          },
+          {
+            "name": "Started",
+            "value": "2026-11-02 09:50 UTC"
           },
           {
             "name": "Time",
@@ -340,17 +364,17 @@
     "potentialAction": [
       {
         "@type": "OpenUri",
-        "name": "View data around the window",
+        "name": "View logs",
         "targets": [
           {
             "os": "default",
-            "uri": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true"
+            "uri": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136"
           }
         ]
       },
       {
         "@type": "OpenUri",
-        "name": "Open detector",
+        "name": "Open anomaly",
         "targets": [
           {
             "os": "default",
@@ -364,7 +388,7 @@
     "embeds": [
       {
         "title": "🔴 error rate on web-logs firing",
-        "description": "3 anomalies in window 2026\\-11\\-02 09\\:50 UTC–2026\\-11\\-02 10\\:05 UTC \\| worst value\\: 342\\.00 \\(expected \\~98\\.00 for this hour\\) \\| score 0\\.91 vs threshold 0\\.80 \\(score 14\\.0\\% over its bar\\)\n\n[View data around the window](https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true)",
+        "description": "web\\-logs rose 249\\.0\\% above expected \\| Actual 342\\.00\\, expected 60\\.00\\-136\\.00\\, since 09\\:50 UTC \\| 3 anomalies in window 2026\\-11\\-02 09\\:50 UTC–2026\\-11\\-02 10\\:05 UTC\n\n[Open anomaly](https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection)",
         "fields": [
           {
             "name": "Level",
@@ -387,8 +411,18 @@
             "inline": true
           },
           {
-            "name": "Score",
-            "value": "0\\.91 vs 0\\.80",
+            "name": "Expected",
+            "value": "60\\.00\\-136\\.00",
+            "inline": true
+          },
+          {
+            "name": "Change",
+            "value": "\\+249\\.0\\%",
+            "inline": true
+          },
+          {
+            "name": "Started",
+            "value": "2026\\-11\\-02 09\\:50 UTC",
             "inline": true
           },
           {
@@ -397,7 +431,7 @@
             "inline": true
           }
         ],
-        "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
+        "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136"
       }
     ]
   },
@@ -412,38 +446,42 @@
         "Event": "Firing",
         "Stream": "web-logs",
         "Value": "342.00",
-        "Score": "0.91 vs 0.80",
+        "Expected": "60.00-136.00",
+        "Change": "+249.0%",
+        "Started": "2026-11-02 09:50 UTC",
         "Time": "2026-11-02 10:05:00 UTC",
-        "body": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)"
+        "body": "web-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC"
       }
     },
     "links": [
       {
-        "href": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true",
-        "text": "View data around the window"
+        "href": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136",
+        "text": "View logs"
       },
       {
         "href": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection",
-        "text": "Open detector"
+        "text": "Open anomaly"
       }
     ],
     "dedup_key": "a1b2c3"
   },
   "opsgenie_firing": {
     "message": "🔴 error rate on web-logs firing",
-    "description": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)",
+    "description": "web-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC",
     "priority": "P1",
     "details": {
       "Level": "Critical",
       "Event": "Firing",
       "Stream": "web-logs",
       "Value": "342.00",
-      "Score": "0.91 vs 0.80",
+      "Expected": "60.00-136.00",
+      "Change": "+249.0%",
+      "Started": "2026-11-02 09:50 UTC",
       "Time": "2026-11-02 10:05:00 UTC"
     }
   },
   "servicenow_firing": {
     "short_description": "🔴 error rate on web-logs firing",
-    "description": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)\n\nLevel: Critical\nEvent: Firing\nStream: web-logs\nValue: 342.00\nScore: 0.91 vs 0.80\nTime: 2026-11-02 10:05:00 UTC"
+    "description": "web-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC\n\nLevel: Critical\nEvent: Firing\nStream: web-logs\nValue: 342.00\nExpected: 60.00-136.00\nChange: +249.0%\nStarted: 2026-11-02 09:50 UTC\nTime: 2026-11-02 10:05:00 UTC"
   }
 }

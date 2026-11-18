@@ -25,15 +25,21 @@ use super::{
     context::{NotificationContext, build_row_columns},
 };
 
-pub const ANOMALY_VARIABLES: [&str; 16] = [
+pub const ANOMALY_VARIABLES: [&str; 22] = [
     "anomaly_id",
     "anomaly_name",
     "anomaly_kind",
     "anomaly_count",
+    "anomaly_headline",
     "max_deviation_percent",
     "deviation_kind",
     "worst_actual_value",
     "worst_expected",
+    "expected_lower",
+    "expected_upper",
+    "value_change_percent",
+    "anomaly_started",
+    "anomaly_bucket",
     "score",
     "threshold",
     "anomaly_score",
@@ -330,6 +336,14 @@ fn base(kind: NotificationKind, resolved: bool, level: AlertLevel) -> Notificati
 fn anomaly_example(resolved: bool) -> NotificationContext {
     let link =
         "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection";
+    let explore = "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1";
+    let explore = if resolved {
+        explore.to_string()
+    } else {
+        format!(
+            "{explore}&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136"
+        )
+    };
     let level = if resolved {
         AlertLevel::Ok
     } else {
@@ -337,8 +351,10 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
     };
     let mut ctx = base(NotificationKind::Anomaly, resolved, level);
     ctx.alert_name = "error rate on web-logs".into();
-    ctx.alert_url = link.into();
-    ctx.alert_url_label = "Open detector".into();
+    ctx.alert_url = explore.clone();
+    ctx.alert_url_label = "View logs".into();
+    ctx.alert_detail_url = link.into();
+    ctx.alert_detail_label = "Open anomaly".into();
     ctx.event = event_of(resolved);
     ctx.episode_id = Some("a1b2c3".into());
     let (start, end) = if resolved {
@@ -352,18 +368,28 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
         "2026-11-02 10:05:00"
     }
     .into();
+    let headline = if resolved {
+        "web-logs recovered"
+    } else {
+        "web-logs rose 249.0% above expected"
+    };
     ctx.alert_description = if resolved {
         format!("a full detection run found no anomalies in window {start}\u{2013}{end}")
     } else {
         format!(
-            "3 anomalies in window {start}\u{2013}{end} | worst value: 342.00 (expected ~98.00 \
-             for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)"
+            "{headline} | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in \
+             window {start}\u{2013}{end}"
         )
     };
     let (count, worst, expected, score, deviation, kind) = if resolved {
         ("0", "", "", "0.00", "", "recovery")
     } else {
         ("3", "342.00", "98.00", "0.91", "14.0", "value")
+    };
+    let (lower, upper, change, started) = if resolved {
+        ("", "", "", "")
+    } else {
+        ("60.00", "136.00", "+249.0", start)
     };
     ctx.alert_agg_value = worst.into();
     let anomaly_score = format!("{score} vs 0.80");
@@ -372,6 +398,7 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
         ("anomaly_name", "error rate on web-logs"),
         ("anomaly_kind", kind),
         ("anomaly_count", count),
+        ("anomaly_headline", headline),
         ("max_deviation_percent", deviation),
         (
             "deviation_kind",
@@ -379,17 +406,19 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
         ),
         ("worst_actual_value", worst),
         ("worst_expected", expected),
+        ("expected_lower", lower),
+        ("expected_upper", upper),
+        ("value_change_percent", change),
+        ("anomaly_started", started),
+        ("anomaly_bucket", "5-min buckets"),
         ("score", score),
         ("threshold", "0.80"),
         ("anomaly_score", &anomaly_score),
-        (
-            "anomaly_explore_url",
-            "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true",
-        ),
-        ("anomaly_explore_label", "View data around the window"),
         ("window_start", start),
         ("window_end", end),
         ("anomaly_url", link),
+        ("anomaly_explore_url", &explore),
+        ("anomaly_explore_label", "View logs"),
     ]
     .map(|(k, v)| (k.to_string(), v.to_string()))
     .to_vec();
@@ -816,7 +845,7 @@ mod tests {
         let ctx = example_context(NotificationKind::Anomaly, true);
         let content = resolve_content(&compiled_default_content(), &ctx, "slack");
         let labels: Vec<&str> = content.fields.iter().map(|(l, _)| l.as_str()).collect();
-        assert_eq!(labels, ["Level", "Event", "Stream", "Score", "Time"]);
+        assert_eq!(labels, ["Level", "Event", "Stream", "Time"]);
     }
 
     #[test]

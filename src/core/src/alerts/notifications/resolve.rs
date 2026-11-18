@@ -225,9 +225,13 @@ pub fn resolve_content(
     }
 }
 
-/// Appends Primary, then Detail unless it is blank or repeats `alert_url`.
-/// An authored link to the Detail URL stands in for it, so the object link shows once.
+/// Appends Primary, then Detail unless it is blank or repeats `alert_url`. An authored link to
+/// `alert_url` drops and one to the Detail URL stands in for it, so each URL shows once.
 pub(crate) fn append_system_links(links: &mut Vec<Link>, ctx: &NotificationContext) {
+    let primary_url = ctx.alert_url.trim();
+    if !primary_url.is_empty() {
+        links.retain(|l| l.role != LinkRole::Authored || l.url.trim() != primary_url);
+    }
     links.push(Link {
         label: ctx.alert_url_label.clone(),
         url: ctx.alert_url.clone(),
@@ -1408,6 +1412,39 @@ mod tests {
         );
         assert!(!r.links[1].reserved);
         assert_eq!(r.links[2].role, LinkRole::Primary);
+    }
+
+    #[test]
+    fn an_authored_link_to_the_data_url_drops_and_the_others_stay() {
+        let ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        let data_url = format!(" {} ", ctx.alert_url);
+        let r = resolve_content(
+            &authored(&[
+                ("View data around the window", data_url.as_str()),
+                ("Runbook", "https://rb"),
+            ]),
+            &ctx,
+            "slack",
+        );
+        let links: Vec<(&str, LinkRole)> =
+            r.links.iter().map(|l| (l.label.as_str(), l.role)).collect();
+        assert_eq!(
+            links,
+            [
+                ("Runbook", LinkRole::Authored),
+                ("View logs", LinkRole::Primary),
+                ("Open alert", LinkRole::Detail),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_blank_data_url_drops_no_authored_link() {
+        let mut ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        ctx.alert_url.clear();
+        let mut links = vec![Link::authored("Mine", "")];
+        append_system_links(&mut links, &ctx);
+        assert_eq!(links[0], Link::authored("Mine", ""));
     }
 
     #[test]

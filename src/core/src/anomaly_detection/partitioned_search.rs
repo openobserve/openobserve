@@ -538,6 +538,28 @@ pub(super) fn log_fallback(org_id: &str, anomaly_id: &str, reason: &str) {
     }
 }
 
+/// The save-time form of [`check_custom_group_by`]: the GROUP BY key that is not the bucket.
+/// SQL with no single SELECT or no histogram column is left to the other checks.
+pub(super) fn custom_group_by_offender(
+    sql: &str,
+    stream_fields: &HashSet<String>,
+) -> Option<String> {
+    let statement = single_statement(sql).ok()?;
+    let select = statement_select(&statement)?;
+    let bucket = custom_bucket(select).ok()?;
+    let (exprs, modifiers) = match &select.group_by {
+        GroupByExpr::All(_) => return Some("ALL".to_string()),
+        GroupByExpr::Expressions(exprs, modifiers) => (exprs, modifiers),
+    };
+    if let Some(modifier) = modifiers.first() {
+        return Some(modifier.to_string());
+    }
+    exprs
+        .iter()
+        .find(|expr| !matches!(is_bucket_key(expr, &bucket, Some(stream_fields)), Ok(true)))
+        .map(ToString::to_string)
+}
+
 fn fallback_log_due(
     logged: &mut FallbackLog,
     key: (String, String),
@@ -879,8 +901,21 @@ fn check_custom_group_by(
     let ([expr], []) = (exprs.as_slice(), modifiers.as_slice()) else {
         return Err("GROUP BY is not exactly the histogram bucket".to_string());
     };
+    if is_bucket_key(expr, bucket, stream_fields)? {
+        Ok(())
+    } else {
+        Err("GROUP BY is not exactly the histogram bucket".to_string())
+    }
+}
+
+/// Whether one GROUP BY expression names the bucket; an alias that a stream field shadows errs.
+fn is_bucket_key(
+    expr: &Expr,
+    bucket: &CustomBucket<'_>,
+    stream_fields: Option<&HashSet<String>>,
+) -> Result<bool, String> {
     let ordinal = (bucket.position + 1).to_string();
-    let is_bucket = match expr {
+    Ok(match expr {
         Expr::Identifier(ident) if ident.value == bucket.alias => {
             alias_free_of_stream_fields(&bucket.alias, stream_fields)?;
             true
@@ -888,12 +923,7 @@ fn check_custom_group_by(
         Expr::Identifier(_) => false,
         Expr::Value(v) => matches!(&v.value, Value::Number(n, false) if *n == ordinal),
         other => other.to_string() == bucket.expr.to_string(),
-    };
-    if is_bucket {
-        Ok(())
-    } else {
-        Err("GROUP BY is not exactly the histogram bucket".to_string())
-    }
+    })
 }
 
 /// The engine binds a GROUP BY name to a stream field before a projection alias of that name.

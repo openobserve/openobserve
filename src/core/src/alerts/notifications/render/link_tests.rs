@@ -268,8 +268,8 @@ fn single_button_kinds_show_one_system_button_with_their_label() {
     let labels: Vec<String> = slack_buttons(&slack).into_iter().map(|b| b.0).collect();
     assert_eq!(
         labels,
-        vec!["View data around the window", "Open detector"],
-        "the explore link keeps its own label"
+        vec!["View logs", "Open anomaly"],
+        "the explore link is the data button and its authored copy drops"
     );
 }
 

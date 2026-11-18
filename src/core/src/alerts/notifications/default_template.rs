@@ -32,13 +32,15 @@ use db::alerts::templates::TemplateError;
 pub const DEFAULT_CONTENT_TEMPLATE_NAME: &str = infra::table::templates::DEFAULT_TEMPLATE_NAME;
 
 /// The field superset in the amendment's order; Slack shows at most ten, and no kind fills more.
-const FIELDS: [(&str, &str); 17] = [
+const FIELDS: [(&str, &str); 19] = [
     ("Level", "{alert_level_label}"),
     ("Event", "{notification_event_label}"),
     ("Stream", "{stream_name}"),
     ("Threshold", "{alert_operator} {alert_threshold}"),
     ("Value", "{alert_agg_value}"),
-    ("Score", "{anomaly_score}"),
+    ("Expected", "{expected_lower}-{expected_upper}"),
+    ("Change", "{value_change_percent}%"),
+    ("Started", "{anomaly_started}"),
     ("Check", "{check_name} ({check_type})"),
     ("Target", "{check_target}"),
     ("Status", "{check_status_label}"),
@@ -72,8 +74,8 @@ pub fn compiled_default_content() -> ContentSpec {
             columns: None,
             format: None,
         },
-        // resolve_content appends View in OpenObserve to alert_url; the explore link is anomaly's
-        // own.
+        // An anomaly's alert_url is this explore link, so resolve drops the copy; it stays for a
+        // context whose data button points elsewhere.
         links: vec![ContentLink {
             label: "{anomaly_explore_label}".into(),
             url: "{anomaly_explore_url}".into(),
@@ -218,7 +220,9 @@ mod tests {
             ),
             (
                 Anomaly,
-                &["Level", "Event", "Stream", "Value", "Score", "Time"],
+                &[
+                    "Level", "Event", "Stream", "Value", "Expected", "Change", "Started", "Time",
+                ],
             ),
             (
                 Synthetics,
@@ -261,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn only_an_anomaly_with_a_link_renders_the_explore_link() {
+    fn only_an_anomaly_with_a_separate_link_renders_the_explore_link() {
         let explore = |ctx: &crate::alerts::notifications::NotificationContext| {
             resolve_content(&compiled_default_content(), ctx, "slack")
                 .links
@@ -283,19 +287,25 @@ mod tests {
                 "{kind:?}"
             );
         }
+        // The explore link is the data button now, so its authored copy drops as a duplicate.
         let anomaly = example_context(NotificationKind::Anomaly, false);
-        let links = explore(&anomaly);
-        assert_eq!(links.len(), 1);
-        assert_eq!(links[0].0, "View data around the window");
-        assert!(links[0].1.contains("/web/logs?"));
+        assert!(explore(&anomaly).is_empty());
+        let links = resolve_content(&compiled_default_content(), &anomaly, "slack").links;
+        assert_eq!(links[0].label, "View logs");
+        assert!(links[0].url.contains("/web/logs?"));
 
-        let mut no_link = anomaly.clone();
-        for (k, v) in no_link.context_attributes.iter_mut() {
+        let mut own = anomaly.clone();
+        own.alert_url = "https://o2.acme.com/web/alerts/detail/a1b2c3".into();
+        let links = explore(&own);
+        assert_eq!(links.len(), 1, "a custom alert_url keeps the explore link");
+        assert_eq!(links[0].0, "View logs");
+
+        for (k, v) in own.context_attributes.iter_mut() {
             if k.starts_with("anomaly_explore_") {
                 v.clear();
             }
         }
-        assert!(explore(&no_link).is_empty());
+        assert!(explore(&own).is_empty());
     }
 
     #[test]
