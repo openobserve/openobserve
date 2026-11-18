@@ -9462,6 +9462,39 @@ mod tests {
             assert_eq!(get(&p, "to"), Some(c.window_end_us.to_string().as_str()));
         }
 
+        /// A catch-up run with in-range buckets before its gap: the absence starts at the gap.
+        #[test]
+        fn an_absence_starts_at_its_window_start_not_the_first_chart_point() {
+            use o2_enterprise::enterprise::anomaly_detection::types::ChartPoint;
+            let mut c = explore_ctx("logs", None, false);
+            c.kind = AnomalyAlertKind::Absence;
+            let run_start = c.window_start_us;
+            let gap = run_start + 15 * 60_000_000;
+            c.window_start_us = gap;
+            c.first_anomaly_us = Some(gap);
+            c.judged_end_us = c.window_end_us;
+            let point = |ts_us: i64, absent: bool| ChartPoint {
+                ts_us,
+                value: if absent { 0.0 } else { 100.0 },
+                lower: None,
+                upper: None,
+                is_anomaly: absent,
+                is_absence: absent,
+                is_partial_drop: false,
+            };
+            c.current_points = vec![point(run_start, false), point(gap, true)];
+            let msg = anomaly_alert_message(&c, LINK);
+            assert!(
+                msg.contains(&format!("since {}", super::super::fmt_alert_clock(gap))),
+                "{msg}"
+            );
+            let target = c.explore.clone().unwrap();
+            let snapshot = super::super::alert_link_snapshot(&c, &target).unwrap();
+            assert_eq!(snapshot.start_us, gap);
+            let (_, p) = pairs(&super::super::alert_explore_link(&c).url);
+            assert_eq!(get(&p, "anomaly_start"), Some(gap.to_string().as_str()));
+        }
+
         #[test]
         fn an_over_long_link_falls_back_to_the_unfiltered_stream() {
             // Traces sends the filter as plain text, so it needs more than the base64 SQL of logs.
