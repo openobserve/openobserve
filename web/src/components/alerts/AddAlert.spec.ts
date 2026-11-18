@@ -1371,6 +1371,8 @@ describe("AddAlert (OForm owner)", () => {
           conditions: [{ filterType: "condition", column: "host", operator: "=", value: "a" }],
         });
         await vi.advanceTimersByTimeAsync(2000);
+        await vi.waitFor(() => expect(alertsService.generate_sql).toHaveBeenCalled());
+        await flushPromises();
         vi.mocked(alertsService.generate_sql).mockClear();
 
         form.setFieldValue(field, value);
