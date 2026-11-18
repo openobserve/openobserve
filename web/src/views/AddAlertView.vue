@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full max-h-full overflow-hidden">
+    <AlertFormSkeleton v-if="isLoadingAlert" :bars="skeletonBars" @cancel="handleCancel" />
     <AddAlert
-      v-if="!isLoadingAlert && !loadFailed"
+      v-else-if="!loadFailed"
       :modelValue="editedAlert"
       :isUpdated="isUpdated"
       :destinations="destinations"
@@ -38,10 +39,13 @@ import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
+import { defineComponent, ref, watch, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import AddAlert from "@/components/alerts/AddAlert.vue";
+import AlertFormSkeleton from "@/components/alerts/AlertFormSkeleton.vue";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { MIN_SKELETON_MS } from "@/lib/styles/motion";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { clearAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
@@ -56,6 +60,7 @@ export default defineComponent({
   name: "AddAlertView",
   components: {
     AddAlert,
+    AlertFormSkeleton,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -78,6 +83,16 @@ export default defineComponent({
     const isLoadingAlert = ref(false);
     // Kept off screen while the view redirects, so an empty form never offers the new-alert draft.
     const loadFailed = ref(false);
+    // The outline paints at once; its bars wait out the loader delay, then hold so they never blink.
+    const skeletonBars = useDelayedFlag(isLoadingAlert);
+    let barsShownAt = 0;
+    watch(skeletonBars, (shown) => {
+      if (shown) barsShownAt = Date.now();
+    });
+    const holdSkeleton = async () => {
+      const left = barsShownAt ? MIN_SKELETON_MS - (Date.now() - barsShownAt) : 0;
+      if (left > 0) await new Promise((resolve) => setTimeout(resolve, left));
+    };
 
     /**
      * Fetch the alert being edited. The form takes its edit prefill from
@@ -124,6 +139,7 @@ export default defineComponent({
           },
         });
       } finally {
+        await holdSkeleton();
         isLoadingAlert.value = false;
       }
     };
@@ -234,6 +250,7 @@ export default defineComponent({
       isUpdated,
       editedAlert,
       isLoadingAlert,
+      skeletonBars,
       loadFailed,
       getDestinations,
       refreshDestinations,

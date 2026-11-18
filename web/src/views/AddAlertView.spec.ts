@@ -404,12 +404,17 @@ describe("AddAlertView.vue", () => {
       });
       await flushPromises();
 
-      // Rendering the form early would flash an empty create-form first.
+      // Rendering the form early would flash an empty create-form first; a static outline stands in, Save off.
       expect(wrapper.find(".add-alert-stub").exists()).toBe(false);
+      const skeleton = () => wrapper.find('[data-test="add-alert-skeleton"]');
+      expect(skeleton().exists()).toBe(true);
+      expect(skeleton().get('[data-test="add-alert-skeleton-save"]').attributes()).toHaveProperty(
+        "disabled",
+      );
 
       resolveAlert({ data: { name: "my-alert" } });
-      await flushPromises();
-      expect(wrapper.find(".add-alert-stub").exists()).toBe(true);
+      await vi.waitFor(() => expect(wrapper.find(".add-alert-stub").exists()).toBe(true));
+      expect(skeleton().exists()).toBe(false);
     });
 
     it("an alert read answered after an AutoObserve Apply or Undo is read again, so the form gets the new values (F2)", async () => {
