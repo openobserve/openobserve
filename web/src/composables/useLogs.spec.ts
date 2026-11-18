@@ -1411,6 +1411,22 @@ describe("Use Logs Composable", () => {
 
       expect(wrapper.vm.getFilterExpressionByFieldType("k", value, action)).toBe(expression);
     });
+
+    it.each([
+      ["Int64", "include", "code is null"],
+      ["Int64", "exclude", "code is not null"],
+      ["Boolean", "include", "code is null"],
+      ["Boolean", "exclude", "code is not null"],
+    ])("an empty value on a %s field can only be missing (%s)", (type, action, expression) => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.stream.selectedStream = ["a", "b"];
+      wrapper.vm.searchObj.data.streamResults.list = [
+        { name: "a", schema: [{ name: "code", type: "Utf8" }] },
+        { name: "b", schema: [{ name: "code", type }] },
+      ];
+
+      expect(wrapper.vm.getFilterExpressionByFieldType("code", "", action)).toBe(expression);
+    });
   });
 });
 
