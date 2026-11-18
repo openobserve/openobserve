@@ -199,7 +199,8 @@ export function dailyVolume(
 ): { count: number; noisy: boolean } | null {
   const count = realTime ? day.events : day.fired;
   if (count === 0 || (!realTime && count === day.alerts)) return null;
-  return { count: aboutCount(count), noisy: count > NOISY_SHARE * MAX_CHECKS };
+  // More than one a minute, the bar the read-back uses for a noisy real-time alert.
+  return { count: aboutCount(count), noisy: count > MAX_CHECKS };
 }
 
 function replayChecks(

@@ -242,7 +242,7 @@ describe("dailyVolume", () => {
       name: "scheduled: firing checks the throttle held",
       day: { events: 900, fired: 1_440, alerts: 48 },
       realTime: false,
-      expected: { count: 1_400, noisy: true },
+      expected: { count: 1_400, noisy: false },
     },
     {
       name: "scheduled: every firing check notified",
