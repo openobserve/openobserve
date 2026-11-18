@@ -40,6 +40,9 @@ export const VALUE_COUNT_SIZE = 20;
 const CACHE_TTL_MS = 5 * 60_000;
 const VALUE_COUNT_TIMEOUT_MS = 30_000;
 const RECENT_MAX = 3;
+// Stream stats trail ingestion by up to an hour, so a newer last event is only "in the last hour".
+const ACTIVE_US = HOUR_US;
+const ACTIVITY_PROBES = 8;
 const SEEN_MAX = 3;
 // A lookup by a value's first letters also finds its look-alikes (OOMKilled → OOMKilling).
 const PROBE_PREFIX = 4;
@@ -54,13 +57,20 @@ const TEXT_OPS = new Set<FilterOperatorId>(["contains", "contains_ci", "starts_w
 
 export interface DiscoveryStream extends MetricStream {
   is_internal?: boolean;
-  stats?: { doc_num?: number; doc_time_min?: number; doc_time_max?: number };
+  stats?: { doc_num?: number; doc_time_min?: number; doc_time_max?: number; created_at?: number };
 }
 
 export interface StreamFreshness {
   receiving: boolean;
   agoSeconds?: number;
   perHour?: number;
+  /** A last event inside the stats' own lag, or one a probe found: said as "in the last hour". */
+  activeNow?: boolean;
+}
+
+export interface ActivityContext {
+  org: string;
+  streamType: string;
 }
 
 export interface StreamOption extends SelectOption {
@@ -107,11 +117,17 @@ export function streamFreshness(
     receiving: true,
     agoSeconds: Math.max(0, (nowUs - last) / 1_000_000),
     perHour: perHour >= 1 ? perHour : undefined,
+    activeNow: nowUs - last <= ACTIVE_US,
   };
 }
 
 export function freshnessText(freshness: StreamFreshness, t: TranslateFn): I18nText {
   if (!freshness.receiving) return t("alerts.discovery.noData24h");
+  if (freshness.activeNow) {
+    return freshness.perHour === undefined
+      ? t("alerts.discovery.activeNoRate")
+      : t("alerts.discovery.active", { rate: compactNumber(Math.round(freshness.perHour)) });
+  }
   const ago = compactDuration(freshness.agoSeconds ?? 0, t);
   return freshness.perHour === undefined
     ? t("alerts.discovery.lastEventNoRate", { ago })
@@ -150,7 +166,13 @@ export function recentStreams(org: string, streamType: string): string[] {
  */
 export function streamOptions(
   streams: DiscoveryStream[],
-  options: { t: TranslateFn; nowUs: number; recent?: string[] },
+  options: {
+    t: TranslateFn;
+    nowUs: number;
+    recent?: string[];
+    /** Whether a stream the stats call quiet had an event in the last hour; undefined while unknown. */
+    activeNow?: (name: string) => boolean | undefined;
+  },
 ): StreamOption[] {
   const { t, nowUs } = options;
   const { familyOfStream } = buildMetricFamilies(
@@ -158,9 +180,16 @@ export function streamOptions(
   );
   const isSystem = (s: DiscoveryStream) => s.is_internal === true || s.name.startsWith("_");
   const named = streams.filter((stream) => stream?.name);
+  const live = probedLive(
+    named.filter((s) => !isSystem(s)),
+    nowUs,
+    options.activeNow,
+  );
   const rows = [...named.filter((s) => !isSystem(s)), ...named.filter(isSystem)].map(
     (stream): StreamOption => {
-      const freshness = streamFreshness(stream.stats, nowUs);
+      const freshness = live.has(stream.name)
+        ? { receiving: true, activeNow: true }
+        : streamFreshness(stream.stats, nowUs);
       const family = familyOfStream.get(stream.name);
       const meta = family
         ? { type: family.familyType, unit: family.unit, help: family.help }
@@ -195,6 +224,77 @@ export function streamOptions(
   ]) as StreamOption[];
 }
 
+// The newest user streams the stats do not place in the last hour, asked whether they are live after all.
+function probedLive(
+  streams: DiscoveryStream[],
+  nowUs: number,
+  activeNow: ((name: string) => boolean | undefined) | undefined,
+): Set<string> {
+  if (!activeNow) return new Set();
+  const seenAt = (s: DiscoveryStream) =>
+    Math.max(Number(s.stats?.doc_time_max ?? 0), Number(s.stats?.created_at ?? 0));
+  return new Set(
+    streams
+      .filter((s) => !streamFreshness(s.stats, nowUs).activeNow)
+      .sort((a, b) => seenAt(b) - seenAt(a))
+      .slice(0, ACTIVITY_PROBES)
+      .filter((s) => activeNow(s.name) === true)
+      .map((s) => s.name),
+  );
+}
+
+// ── Whether a stream had any event in the last hour, from one count per stream while cached ──
+
+const activity = reactive(
+  new Map<string, { state: ValueCountState; active: boolean; at: number }>(),
+);
+
+/** True or false once a last-hour count for the stream is in; undefined while it runs or is asked. */
+export function recentActivity(ctx: ActivityContext, name: string): boolean | undefined {
+  const key = [ctx.org, ctx.streamType, name].join("\u0000");
+  const known = activity.get(key);
+  if (known && (known.state === "loading" || Date.now() - known.at < CACHE_TTL_MS)) {
+    return known.state === "ready" ? known.active : undefined;
+  }
+  activity.set(key, { state: "loading", active: false, at: Date.now() });
+  // The reactive copy, so a template reading the answer re-renders when it lands.
+  const entry = activity.get(key)!;
+  queueMicrotask(() => {
+    const endTime = Date.now() * 1000;
+    streaming ??= useHttpStreaming();
+    streaming.fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          query: {
+            sql: b64EncodeUnicode(`SELECT count(*) AS n FROM "${name.replace(/"/g, '""')}"`),
+            start_time: endTime - HOUR_US,
+            end_time: endTime,
+            from: 0,
+            size: 1,
+          },
+          encoding: "base64",
+        },
+        type: "search",
+        traceId: generateTraceContext().traceId,
+        org_id: ctx.org,
+        pageType: ctx.streamType,
+        searchType: "ui",
+      },
+      {
+        data: (_payload: unknown, response: any) => {
+          if (response?.type !== "search_response_hits") return;
+          const hits: any[] = response.content?.results?.hits ?? [];
+          if (hits.some((hit) => Number(hit?.n ?? 0) > 0)) entry.active = true;
+        },
+        error: () => Object.assign(entry, { state: "failed", at: Date.now() }),
+        complete: () => Object.assign(entry, { state: "ready", at: Date.now() }),
+        reset: () => {},
+      },
+    );
+  });
+  return undefined;
+}
+
 // ── Value counts over the streaming values endpoint, cached per stream, field and window ──
 
 const entries = reactive(new Map<string, ValueCountEntry>());
@@ -218,6 +318,7 @@ const fresh = (entry: ValueCountEntry | undefined) =>
 export function clearValueCounts(): void {
   entries.clear();
   inFlight.clear();
+  activity.clear();
 }
 
 /** The cached answer for a field, if any; reactive, so a template re-renders when it lands. */

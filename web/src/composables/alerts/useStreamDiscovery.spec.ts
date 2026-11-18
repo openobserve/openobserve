@@ -11,6 +11,7 @@ import {
   filterNotSeenText,
   insertLabelIntoPromql,
   loadValueCounts,
+  recentActivity,
   streamOptions,
   useFilterDiscovery,
   valueNotSeenHint,
@@ -68,8 +69,8 @@ describe("streamOptions", () => {
       recent: [],
       expected: [
         ["Receiving data", undefined],
-        ["nginx", "Last event 12 s ago · 22K/h"],
-        ["_sys", "Last event 12 s ago · 22K/h"],
+        ["nginx", "Active in the last hour · 22K/h"],
+        ["_sys", "Active in the last hour · 22K/h"],
         ["No recent data", undefined],
         ["old", "No data in 24 h"],
         ["never", "No data in 24 h"],
@@ -77,13 +78,13 @@ describe("streamOptions", () => {
     },
     {
       name: "a remembered stream leads under Recent; one group needs no heading",
-      streams: [row("a", 60_000_000), row("b", 60_000_000)],
+      streams: [row("a", 5 * HOUR_US), row("b", 60_000_000)],
       recent: ["b"],
       expected: [
         ["Recent", undefined],
-        ["b", "Last event 1 min ago · 22K/h"],
+        ["b", "Active in the last hour · 22K/h"],
         ["Receiving data", undefined],
-        ["a", "Last event 1 min ago · 22K/h"],
+        ["a", "Last event 5 h ago · 22K/h"],
       ],
     },
     {
@@ -91,8 +92,8 @@ describe("streamOptions", () => {
       streams: [row("a", 60_000_000), row("b", 60_000_000)],
       recent: [],
       expected: [
-        ["a", "Last event 1 min ago · 22K/h"],
-        ["b", "Last event 1 min ago · 22K/h"],
+        ["a", "Active in the last hour · 22K/h"],
+        ["b", "Active in the last hour · 22K/h"],
       ],
     },
   ])("$name", ({ streams, recent, expected }) => {
@@ -103,6 +104,21 @@ describe("streamOptions", () => {
     expect(options.filter((o) => o.stale).map((o) => o.value)).toEqual(
       expected.filter(([, hint]) => hint === "No data in 24 h").map(([name]) => name),
     );
+  });
+
+  // Stats trail ingestion by up to an hour, so a stream they call quiet is asked directly, newest first.
+  it("asks whether the newest quiet user streams are live and lists the live ones as receiving", () => {
+    const quiet = Array.from({ length: 10 }, (_, i) => row(`s${i}`, 2 * DAY_US + i * HOUR_US));
+    const asked: string[] = [];
+    const options = streamOptions([...quiet, row("_sys_old", 2 * DAY_US)], {
+      t,
+      nowUs: NOW,
+      activeNow: (name) => (asked.push(name), name === "s3" ? true : undefined),
+    });
+    expect(asked).toEqual(["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7"]);
+    const live = options.find((o) => o.value === "s3")!;
+    expect([String(live.subLabel), live.stale]).toEqual(["Active in the last hour", false]);
+    expect(String(options[0].label)).toBe("Receiving data");
   });
 
   it("describes a metric by type, unit and help, and makes the help searchable", () => {
@@ -329,6 +345,30 @@ describe("filterNotSeenText", () => {
       expect(String(text)).toContain("WARN (24)");
     },
   );
+});
+
+describe("recentActivity", () => {
+  beforeEach(() => {
+    clearValueCounts();
+    stream.mockReset();
+  });
+
+  it.each([
+    { hits: [{ n: 3 }], active: true },
+    { hits: [{ n: 0 }], active: false },
+  ])("counts the last hour once and answers $active", async ({ hits, active }) => {
+    stream.mockImplementation((_req: unknown, handlers: Handlers) => {
+      handlers.data({}, { type: "search_response_hits", content: { results: { hits } } });
+      handlers.complete();
+    });
+    const where = { org: "default", streamType: "traces" };
+    expect(recentActivity(where, "default")).toBeUndefined();
+    await flush();
+    expect(recentActivity(where, "default")).toBe(active);
+    expect(stream).toHaveBeenCalledTimes(1);
+    const { query } = stream.mock.calls[0][0].queryReq;
+    expect(query.end_time - query.start_time).toBe(HOUR_US);
+  });
 });
 
 describe("insertLabelIntoPromql", () => {
