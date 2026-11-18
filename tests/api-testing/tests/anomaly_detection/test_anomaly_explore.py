@@ -1,13 +1,3 @@
-"""`GET /api/{org}/anomaly_detection/{id}/explore`: state, readings and the explore link.
-
-The Rust unit tests in `src/core/src/anomaly_detection/explore_state.rs` cover the
-state rules (ongoing, back in range, clipped, absence, partial drop, older models,
-peer freshness). These cover what only a live server can: the route, its RBAC entry,
-the error codes and the shape of a detector that never ran.
-
-Anomaly detection is enterprise-gated, so an OSS build 404s and the module skips.
-"""
-
 from __future__ import annotations
 
 import uuid
