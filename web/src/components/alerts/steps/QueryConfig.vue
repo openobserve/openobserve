@@ -1909,7 +1909,7 @@ import {
 import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
 import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
-import { dataNoun, formatNumber, joinListMore } from "@/utils/alerts/alertCopy";
+import { dataNoun, joinListMore } from "@/utils/alerts/alertCopy";
 import { alwaysOneRow, oneRowMeetsLimit } from "@/utils/alerts/alertSqlUtils";
 import { missingByLabel, promqlByLabels, promqlMetricNames } from "@/utils/alerts/promqlLabels";
 import { normalizeDeclaredUnit } from "@/utils/metrics/metricDefaults";
