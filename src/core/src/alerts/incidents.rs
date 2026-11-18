@@ -403,13 +403,13 @@ impl FindingPager for OncallPager {
         limit: u32,
     ) -> anyhow::Result<Vec<infra::table::oncall_responses::TeamPage>> {
         use config::meta::oncall::{SubjectRef, SubjectType};
-        use o2_enterprise::enterprise::autoobserve::plugins::stream::PAGE_COHORT_MAX_AGE_US;
+        use o2_enterprise::enterprise::autoobserve::plugins::stream::page_cohort_max_age_us;
 
         // A member's settle can route its incident up to a cohort's age after the incident opened.
         let incidents = infra::table::alert_incidents::created_with_alert_kind_since(
             org_id,
             AlertKind::AutoObserve.as_str(),
-            since - PAGE_COHORT_MAX_AGE_US,
+            since - page_cohort_max_age_us(),
         )
         .await?;
         // `route` opens firing 1 only, so each incident has one exact subject id to look up.
@@ -4334,7 +4334,7 @@ struct CohortLookup {
 async fn cohort_of(f: &FindingIncident, now: i64) -> Result<CohortLookup, anyhow::Error> {
     use o2_enterprise::enterprise::autoobserve::{
         page_routing::{catalogue, compatible, stream_dimensions},
-        plugins::stream::{PAGE_COHORT_GAP_US, PAGE_COHORT_MAX_AGE_US},
+        plugins::stream::{page_cohort_gap_us, page_cohort_max_age_us},
     };
 
     let kind = AlertKind::AutoObserve.as_str();
@@ -4356,15 +4356,16 @@ async fn cohort_of(f: &FindingIncident, now: i64) -> Result<CohortLookup, anyhow
     let latest = newest.iter().find(|i| same(i)).map(|i| i.id.clone());
     // Named before the open lookup, so a sibling created in between is joined, never skipped.
     let next_id = free_cohort_id(f, latest).await?;
+    let gap = page_cohort_gap_us();
     // Anchored on the first member's onset, which a join never moves, so a cohort cannot drift.
     let open = infra::table::alert_incidents::open_with_alert_kind_since(
         &f.org_id,
         kind,
-        now - PAGE_COHORT_MAX_AGE_US,
+        now - page_cohort_max_age_us(),
     )
     .await?
     .into_iter()
-    .find(|i| (f.triggered_at - i.first_alert_at).abs() <= PAGE_COHORT_GAP_US && same(i));
+    .find(|i| (f.triggered_at - i.first_alert_at).abs() <= gap && same(i));
     Ok(CohortLookup { open, next_id })
 }
 
@@ -7941,11 +7942,11 @@ mod tests {
 
         #[tokio::test]
         async fn a_stop_joins_by_its_onset_and_never_a_day_old_incident() {
-            use o2_enterprise::enterprise::autoobserve::plugins::stream::PAGE_COHORT_MAX_AGE_US;
+            use o2_enterprise::enterprise::autoobserve::plugins::stream::page_cohort_max_age_us;
 
             const MINUTE: i64 = 60_000_000;
             let _db = store().await;
-            let day_old = PAGE_COHORT_MAX_AGE_US + MINUTE;
+            let day_old = page_cohort_max_age_us() + MINUTE;
             for (case, onset, links_by, incident_by, joins) in [
                 ("same onset, links 15m44s old", ONSET, 944_000_000, 0, true),
                 (
@@ -7971,11 +7972,11 @@ mod tests {
 
         #[tokio::test]
         async fn a_member_that_stops_again_past_the_gap_or_the_day_opens_and_pages_its_own() {
-            use o2_enterprise::enterprise::autoobserve::plugins::stream::PAGE_COHORT_MAX_AGE_US;
+            use o2_enterprise::enterprise::autoobserve::plugins::stream::page_cohort_max_age_us;
 
             let _db = store().await;
             let minute = 60_000_000;
-            let day_old = PAGE_COHORT_MAX_AGE_US + minute;
+            let day_old = page_cohort_max_age_us() + minute;
             for (again_at, incident_by) in [(BACK + QUARTER_HOUR, 0), (NEXT_ONSET, day_old)] {
                 let (org, pager) = (new_org(), Pager::default());
                 let (a, b) = (stop(&org, 0), stop(&org, 1));

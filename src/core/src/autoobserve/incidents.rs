@@ -40,8 +40,8 @@ use o2_enterprise::enterprise::{
         INTERVAL_SECS,
         api::{Deps, Page},
         context::{
-            self, CohortStreams, IssueContext, IssueIncident, IssueRef, SpentPage, ViewerResolver,
-            for_issues, issue_by_id, issue_for,
+            self, COHORT_NAMES_SHOWN, CohortStreams, IssueContext, IssueIncident, IssueRef,
+            SpentPage, ViewerResolver, for_issues, issue_by_id, issue_for,
         },
         contract::ActionRequest,
         decisions::{Action, Change, DecisionView},
@@ -680,7 +680,7 @@ fn issue_incident(
         names: members
             .iter()
             .filter_map(|m| m.stream_name.clone())
-            .take(3)
+            .take(COHORT_NAMES_SHOWN)
             .collect(),
     });
     IssueIncident {
