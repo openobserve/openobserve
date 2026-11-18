@@ -56,6 +56,8 @@ const MAX_NOTIFIED_AT: usize = 100;
 const MAX_GROUPS_FIRED: usize = 20;
 const MAX_DIAGNOSTIC_METRICS: usize = 5;
 const CONCURRENT_CHECKS: usize = 8;
+// Bounds the cron walk: a week of every-second occurrences.
+const MAX_CRON_STEPS: usize = 7 * 86_400;
 const DAY_MICROS: i64 = 24 * 3_600 * 1_000_000;
 const MINUTE_MICROS: i64 = 60 * 1_000_000;
 // apply_outcome rejects an empty alert id; the dry run state never leaves memory.
@@ -996,20 +998,23 @@ fn cron_times(
     start: i64,
     end: i64,
 ) -> Result<Vec<i64>, DryRunError> {
-    let mut times = Vec::new();
+    // One past the cap is kept so the caller can tell the latest MAX_CHECKS were truncated.
+    let mut times = std::collections::VecDeque::with_capacity(MAX_CHECKS + 1);
     let mut cursor = start - 1;
-    // Every-second crons over a long range stop early; only the latest MAX_CHECKS are kept.
-    while times.len() <= MAX_CHECKS * 8 {
+    for _ in 0..MAX_CRON_STEPS {
         let next = condition
             .get_next_trigger_time(true, alert.tz_offset, false, Some(cursor))
             .map_err(|e| DryRunError::InvalidSchedule(e.to_string()))?;
         if next > end || next <= cursor {
             break;
         }
-        times.push(next);
+        if times.len() > MAX_CHECKS {
+            times.pop_front();
+        }
+        times.push_back(next);
         cursor = next;
     }
-    Ok(times)
+    Ok(times.into())
 }
 
 /// Every metric a PromQL query names, by bare selector or `__name__` equality.
@@ -1384,6 +1389,15 @@ mod tests {
                 (len, truncated, last)
             );
         }
+        let mut cron = alert.clone();
+        cron.trigger_condition.frequency_type = FrequencyType::Cron;
+        cron.trigger_condition.cron = "0 * * * * *".into();
+        let (times, t) =
+            check_times(&cron, &range(Some(T0 - 2 * DAY_MICROS), Some(T0), None), T0).unwrap();
+        assert_eq!(
+            (times.len(), t, times.last().copied()),
+            (MAX_CHECKS, true, Some(T0))
+        );
         let bad = check_times(&alert, &range(Some(T0), Some(T0 - 1), None), T0);
         assert!(matches!(bad, Err(DryRunError::InvalidSchedule(_))));
     }
