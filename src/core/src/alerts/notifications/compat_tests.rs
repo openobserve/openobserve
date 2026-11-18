@@ -145,6 +145,50 @@ fn a_scheduled_alert_through_the_default_template_matches_main() {
     );
 }
 
+/// The default's field list on main, as an org's copy of it still holds it.
+fn main_default_copy() -> ContentSpec {
+    let mut spec = compiled_default_content();
+    spec.fields = serde_json::from_value(serde_json::json!([
+        {"label": "Level", "value": "{alert_level_label}"},
+        {"label": "Event", "value": "{notification_event_label}"},
+        {"label": "Stream", "value": "{stream_name}"},
+        {"label": "Threshold", "value": "{alert_operator} {alert_threshold}"},
+        {"label": "Value", "value": "{alert_agg_value}"},
+        {"label": "Score", "value": "{anomaly_score}"},
+        {"label": "Check", "value": "{check_name} ({check_type})"},
+        {"label": "Target", "value": "{check_target}"},
+        {"label": "Status", "value": "{check_status_label}"},
+        {"label": "Locations", "value": "{check_locations_line}"},
+        {"label": "Environments", "value": "{check_environments}"},
+        {"label": "Error", "value": "{check_error}"},
+        {"label": "Window", "value": "{downtime_window}"},
+        {"label": "Muted", "value": "{downtime_targets}"},
+        {"label": "Team", "value": "{oncall_team}"},
+        {"label": "Reason", "value": "{oncall_reason}"},
+        {"label": "Time", "value": "{alert_trigger_time_utc}"},
+    ]))
+    .unwrap();
+    spec
+}
+
+#[test]
+fn a_scheduled_alert_through_a_copy_of_the_main_default_matches_main() {
+    let got = pretty(&rendered(&main_default_copy(), &scheduled_ctx()));
+    assert_eq!(
+        String::from_utf8(got.clone()).unwrap(),
+        String::from_utf8(fixture("main_default_copy_content.json", &got)).unwrap()
+    );
+}
+
+#[test]
+fn an_anomaly_through_a_copy_of_the_main_default_renders_the_current_default() {
+    let ctx = super::examples::example_context(NotificationKind::Anomaly, false);
+    assert_eq!(
+        rendered(&main_default_copy(), &ctx),
+        rendered(&compiled_default_content(), &ctx)
+    );
+}
+
 #[test]
 fn a_content_template_of_another_kind_matches_main_but_the_new_names() {
     let marker = |i: usize| format!("n{i}");

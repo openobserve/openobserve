@@ -67,12 +67,41 @@ const FIELDS: [(&str, &str); 20] = [
     ("Time", "{alert_trigger_time_utc}"),
 ];
 
-/// True for the default's own field list, also in its seeded copy; an authored list keeps all.
-pub fn is_default_field_list(fields: &[ContentField]) -> bool {
-    fields.len() == FIELDS.len()
-        && fields.iter().zip(FIELDS).all(|(field, (label, value))| {
-            field.label == label && field.value == value && field.show_when.is_none()
-        })
+/// The field list of the default before the anomaly fields, from main 83d4ccbfe8 (#16323).
+const MAIN_FIELDS: [(&str, &str); 17] = [
+    ("Level", "{alert_level_label}"),
+    ("Event", "{notification_event_label}"),
+    ("Stream", "{stream_name}"),
+    ("Threshold", "{alert_operator} {alert_threshold}"),
+    ("Value", "{alert_agg_value}"),
+    SCORE_FIELD,
+    ("Check", "{check_name} ({check_type})"),
+    ("Target", "{check_target}"),
+    ("Status", "{check_status_label}"),
+    ("Locations", "{check_locations_line}"),
+    ("Environments", "{check_environments}"),
+    ("Error", "{check_error}"),
+    ("Window", "{downtime_window}"),
+    ("Muted", "{downtime_targets}"),
+    ("Team", "{oncall_team}"),
+    ("Reason", "{oncall_reason}"),
+    ("Time", "{alert_trigger_time_utc}"),
+];
+
+/// The fields a send of `kind` renders, and whether they are the default's, whose selection
+/// applies; an anomaly through a copy of main's default gets the current default's fields.
+pub fn fields_for(
+    fields: &[ContentField],
+    kind: NotificationKind,
+) -> (std::borrow::Cow<'_, [ContentField]>, bool) {
+    use std::borrow::Cow;
+    if same_list(fields, &FIELDS) {
+        return (Cow::Borrowed(fields), true);
+    }
+    if kind == NotificationKind::Anomaly && same_list(fields, &MAIN_FIELDS) {
+        return (Cow::Owned(compiled_default_content().fields), true);
+    }
+    (Cow::Borrowed(fields), false)
 }
 
 /// Whether `field` of the default's field list applies to a send of `kind`.
@@ -180,6 +209,14 @@ async fn ensure_compiled_row(
     Ok(())
 }
 
+/// Names, order and values exactly; one changed field makes the list authored.
+fn same_list(fields: &[ContentField], list: &[(&str, &str)]) -> bool {
+    fields.len() == list.len()
+        && fields.iter().zip(list).all(|(field, (label, value))| {
+            field.label == *label && field.value == *value && field.show_when.is_none()
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationKind};
@@ -265,6 +302,37 @@ mod tests {
             labels(&edited).contains(&"Score".to_string()),
             "an edited copy of the default is an authored list"
         );
+    }
+
+    #[test]
+    fn an_anomaly_through_a_copy_of_the_main_default_gets_the_current_fields() {
+        let ctx = example_context(NotificationKind::Anomaly, false);
+        let labels = |spec: &ContentSpec| -> Vec<String> {
+            resolve_content(spec, &ctx, "slack")
+                .fields
+                .into_iter()
+                .map(|(label, _)| label)
+                .collect()
+        };
+        let field = |(label, value): &(&str, &str)| ContentField {
+            label: (*label).into(),
+            value: (*value).into(),
+            show_when: None,
+        };
+        let main_copy = ContentSpec {
+            fields: MAIN_FIELDS.iter().map(field).collect(),
+            ..compiled_default_content()
+        };
+        assert_eq!(labels(&main_copy), labels(&compiled_default_content()));
+        assert!(labels(&main_copy).contains(&"Expected".to_string()));
+        let mut edited = main_copy.clone();
+        edited.fields[0].value = "{alert_level}".into();
+        assert!(
+            labels(&edited).contains(&"Score".to_string()),
+            "one changed field makes the list authored"
+        );
+        let (_, default) = fields_for(&main_copy.fields, NotificationKind::Alert);
+        assert!(!default, "another kind renders the copy as written");
     }
 
     #[test]

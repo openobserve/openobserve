@@ -137,9 +137,9 @@ pub fn resolve_content(
     };
     unknown_variables.append(&mut unk);
 
-    let default_fields = super::default_template::is_default_field_list(&spec.fields);
+    let (spec_fields, default_fields) = super::default_template::fields_for(&spec.fields, ctx.kind);
     let mut fields = Vec::new();
-    for field in &spec.fields {
+    for field in spec_fields.iter() {
         if let Some(filter) = &field.show_when
             && !filter.matches(ctx.level)
         {
