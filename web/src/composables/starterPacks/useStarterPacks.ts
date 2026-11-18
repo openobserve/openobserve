@@ -653,7 +653,15 @@ export function useStarterPacks(org: string) {
         };
     await writeFirstRecord(record);
     onProgress?.(record);
+    return settleRecord(pack, record, entries, onProgress);
+  };
 
+  const settleRecord = async (
+    pack: StarterPack,
+    record: PackInstallRecord,
+    entries: Map<string, AlertLibraryEntry>,
+    onProgress?: PackInstallOptions["onProgress"],
+  ): Promise<PackInstallRecord> => {
     for (let index = 0; index < record.items.length; index += 1) {
       const item = record.items[index];
       if (item.status === "created" || item.status === "existing") continue;
@@ -680,7 +688,71 @@ export function useStarterPacks(org: string) {
     const key = `${org}\u0000${pack.id}`;
     const pending = inFlight.get(key);
     if (pending) return pending;
-    const run = runInstall(pack, options).finally(() => inFlight.delete(key));
+    const run = runInstall(pack, options).finally(() => {
+      if (inFlight.get(key) === run) inFlight.delete(key);
+    });
+    inFlight.set(key, run);
+    return run;
+  };
+
+  const runAppend = async (
+    sourcePack: StarterPack,
+    installId: string,
+    itemIds: string[],
+    { repairs = [], bindings = [], flavours = {}, onProgress }: PackInstallOptions,
+  ): Promise<PackInstallRecord> => {
+    const { entries } = await loadEntries(sourcePack);
+    const stored = await records.read(sourcePack.id, installId);
+    if (!stored) throw new Error(`No install record ${installId}`);
+    const pack = withFolder(sourcePack, stored.folderName);
+    const all = await planItems(pack);
+    const asked = all.filter((item) => item.kind !== "folder" && itemIds.includes(item.itemId));
+    // A first Add may have left a folder out; the new items need theirs.
+    const needed = all.filter(
+      ({ kind, itemId }) =>
+        kind === "folder" &&
+        asked.some((item) => item.kind === (itemId === "alerts" ? "alert" : "dashboard")),
+    );
+    const plan = new Map([...needed, ...asked].map((item) => [item.itemId, item]));
+    // A recorded item someone deleted since is made again rather than counted as installed.
+    const items = stored.items.map((item) => {
+      const fresh = plan.get(item.itemId);
+      if (!fresh) return item;
+      plan.delete(item.itemId);
+      return fresh.status === "pending" ? fresh : item;
+    });
+    const planned = [...plan.values()];
+    const merged = <T>(old: T[] = [], add: T[], keyOf: (row: T) => string) => [
+      ...new Map([...old, ...add].map((row) => [keyOf(row), row])).values(),
+    ];
+    const record: PackInstallRecord = {
+      ...stored,
+      status: "installing",
+      repairs: merged(stored.repairs, repairs, ({ from }) => from),
+      bindings: merged(stored.bindings, bindings, (row) => `${row.stream}/${row.from}`),
+      flavours: { ...stored.flavours, ...flavours },
+      items: [...items, ...planned],
+    };
+    await writeFirstRecord(record);
+    onProgress?.(record);
+    return settleRecord(pack, record, entries, onProgress);
+  };
+
+  /** Adds new items to an install's own record, so its Undo and Remove cover them. */
+  const appendToInstall = (
+    pack: StarterPack,
+    installId: string,
+    itemIds: string[],
+    options: PackInstallOptions = {},
+  ): Promise<PackInstallRecord> => {
+    const key = `${org}\u0000${pack.id}`;
+    // Waits for a running install or append of this pack instead of joining it.
+    const before = inFlight.get(key)?.catch(() => null) ?? Promise.resolve(null);
+    const run = before
+      .then(() => runAppend(pack, installId, itemIds, options))
+      .finally(() => {
+        if (inFlight.get(key) === run) inFlight.delete(key);
+      });
     inFlight.set(key, run);
     return run;
   };
@@ -747,6 +819,35 @@ export function useStarterPacks(org: string) {
     return record ? removeInstall(pack, record) : { removed: [], kept: [] };
   };
 
+  /** Removes only these items of one install, for an Undo of items appended to it. */
+  const undoItems = async (
+    sourcePack: StarterPack,
+    installId: string,
+    itemIds: string[],
+  ): Promise<PackRemovalResult> => {
+    const record = await records.read(sourcePack.id, installId);
+    if (!record) return { removed: [], kept: [] };
+    const pack = withFolder(sourcePack, record.folderName);
+    const removed: PackRecordItem[] = [];
+    const kept: PackKeptItem[] = [];
+    const items: PackRecordItem[] = [];
+    for (const item of record.items) {
+      if (!itemIds.includes(item.copyOf ?? item.itemId) || item.status === "existing") {
+        items.push(item);
+        continue;
+      }
+      const reason = await disposeItem(pack, item, record.items);
+      if (reason) {
+        kept.push({ kind: item.kind, itemId: item.itemId, reason });
+        items.push(item);
+      } else if (item.id) {
+        removed.push(item);
+      }
+    }
+    await records.write({ ...record, items });
+    return { removed, kept };
+  };
+
   /** Removes the unchanged items of every install of the pack and reports the rest. */
   const removePack = async (pack: StarterPack): Promise<PackRemovalResult> => {
     const result: PackRemovalResult = { removed: [], kept: [] };
@@ -806,6 +907,8 @@ export function useStarterPacks(org: string) {
 
   return {
     installPack,
+    appendToInstall,
+    undoItems,
     previewPack,
     undoPack,
     removePack,
