@@ -49,14 +49,20 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     // be an absolute http(s) one (`dispatchable_url`), which also rules out the
     // blocked placeholder, an empty `ZO_WEB_URL` and relative paths.
     let title_url = dispatchable_url(&ctx.alert_url).unwrap_or_default();
-    if !title_url.is_empty() && !title_url.contains(['|', '>', '<']) && !c.title.contains('|') {
+    let linked = format!(
+        "*<{}|{}>*",
+        title_url,
+        escape_mrkdwn(&clamp(&c.title, HEADER_MAX)),
+    );
+    // Slack refuses the whole message for a section over its limit; the data button keeps the URL.
+    if !title_url.is_empty()
+        && !title_url.contains(['|', '>', '<'])
+        && !c.title.contains('|')
+        && linked.chars().count() <= SECTION_TEXT_MAX
+    {
         blocks.push(json!({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": format!(
-                "*<{}|{}>*",
-                title_url,
-                escape_mrkdwn(&clamp(&c.title, HEADER_MAX)),
-            )}
+            "text": {"type": "mrkdwn", "text": linked}
         }));
     } else {
         // `plain_text` is not mrkdwn — Slack renders it literally, so the

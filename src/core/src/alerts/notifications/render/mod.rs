@@ -1117,6 +1117,38 @@ mod tests {
     /// emitted with an undispatchable URL, and when no link survives, no
     /// empty `actions` block may be emitted either (Slack rejects that too).
     #[test]
+    fn a_title_link_over_the_section_limit_renders_a_plain_header() {
+        let mut ctx = fixture_ctx();
+        let base = "https://o2.example/web/logs?q=";
+        ctx.alert_url = format!("{base}{}", "a".repeat(2_990 - base.len()));
+        assert_eq!(ctx.alert_url.len(), 2_990);
+        let mut c = hostile_content();
+        c.title = "CPU high on web-1".into();
+        c.links = vec![primary(ctx.alert_url.clone())];
+        let slack = slack::render_slack(&c, &ctx);
+        let blocks = slack["blocks"].as_array().unwrap();
+        assert_eq!(blocks[0]["type"], "header", "{:#}", blocks[0]);
+        assert_eq!(blocks[0]["text"]["text"], "CPU high on web-1");
+        let button = &slack_block(&slack, "actions")["elements"][0];
+        assert_eq!(
+            button["url"],
+            ctx.alert_url.as_str(),
+            "the button keeps the link"
+        );
+        for block in blocks.iter().filter(|b| b["type"] == "section") {
+            let text = block["text"]["text"].as_str().unwrap_or_default();
+            assert!(text.chars().count() <= 3_000, "{}", text.len());
+        }
+        ctx.alert_url = "https://o2.example/web/logs?q=short".into();
+        c.links = vec![primary(ctx.alert_url.clone())];
+        let short = slack::render_slack(&c, &ctx);
+        assert_eq!(
+            short["blocks"][0]["type"], "section",
+            "a short URL keeps the link"
+        );
+    }
+
+    #[test]
     fn relative_alert_url_does_not_produce_an_invalid_action_block() {
         let mut ctx = fixture_ctx();
         ctx.alert_url = "/web/logs?stream=app&org_identifier=default".into();
