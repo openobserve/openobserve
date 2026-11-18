@@ -260,12 +260,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <template v-else-if="isScheduled">
                 <AlertLinkNote
-                  v-if="silenceNote"
-                  :text="silenceNote.text"
-                  :action="silenceNote.action"
-                  :separated="silenceNote.separated"
-                  data-test="alert-settings-silence-link"
-                  @action="silenceNote.run"
+                  v-if="silenceHint"
+                  :text="silenceHint.text"
+                  :action="silenceHint.action"
+                  warning
+                  data-test="alert-settings-silence-hint"
+                  @action="silenceHint.run"
                 />
                 <p v-else class="m-0 min-h-4" aria-hidden="true" />
               </template>
@@ -532,7 +532,7 @@ import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
 import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
 import AlertLinkNote from "@/components/alerts/AlertLinkNote.vue";
 import { describeDestinations } from "@/utils/alerts/destinationDescription";
-import { durationWords, everyWords, joinList } from "@/utils/alerts/alertCopy";
+import { durationWords, everyWords } from "@/utils/alerts/alertCopy";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import {
@@ -798,20 +798,23 @@ export default defineComponent({
       });
     });
 
+    // The schema's floor: none when the org sets no minimum refresh interval.
     const minFrequency = () =>
-      Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
+      Math.ceil(Number(store.state?.zoConfig?.min_auto_refresh_interval) / 60) || 1;
     // Spread the FRESH form value, not `props.formData.trigger_condition`: the prop refreshes
     // only on the next render, and the parent writes back the whole trigger object.
     const lookBack = useLookBackLink({
       trigger: () => fv("trigger_condition") ?? props.formData?.trigger_condition ?? {},
       period: () => props.formData?.trigger_condition?.period,
+      frequency: () => fv("trigger_condition.frequency"),
+      formSeed: () => fv("query_condition"),
       minFrequency,
       emit: (trigger) => emit("update:trigger", trigger),
     });
     const { handlePeriodChange } = lookBack;
     const LINKED_LABEL: Record<LinkedField, I18nKey> = {
+      period: "alerts.form.names.lookBack",
       frequency: "alerts.queryConfig.checkEvery",
-      silence: "alerts.form.remind.label",
     };
     interface LinkNote {
       text: I18nText | null;
@@ -819,39 +822,47 @@ export default defineComponent({
       separated: boolean;
       run: () => void;
     }
-    // Null while the look back is empty: there is nothing to follow yet.
-    const linkNote = (field: LinkedField): LinkNote | null => {
-      const period = Number(fv("trigger_condition.period"));
-      if (!(period > 0)) return null;
-      if (!lookBack.isLinked(field))
-        return {
-          text: null,
-          action: t("alerts.form.link.relink"),
-          separated: false,
-          run: () => lookBack.relink(field),
-        };
-      return {
-        text: t("alerts.form.link.follows", { duration: durationWords(period, t) }),
-        action: t("alerts.form.link.unlink"),
-        separated: true,
-        run: () => lookBack.unlink(field),
-      };
-    };
+    // Null while the look back is empty or a cron runs the alert: there is nothing to link.
     const scheduleNote = computed<LinkNote | null>(() => {
       const move = lookBack.lastMove.value;
       if (move)
         return {
           text: t("alerts.form.link.alsoSet", {
-            fields: joinList(move.fields.map((field) => t(LINKED_LABEL[field]))),
-            duration: durationWords(move.period, t),
+            fields: t(LINKED_LABEL[move.field]),
+            duration: durationWords(move.value, t),
           }),
           action: t("alerts.form.link.undo"),
           separated: false,
           run: lookBack.undo,
         };
-      return isCron.value ? null : linkNote("frequency");
+      if (isCron.value || !(Number(fv("trigger_condition.period")) > 0)) return null;
+      return lookBack.isLinked()
+        ? {
+            text: t("alerts.form.link.linked"),
+            action: t("alerts.form.link.unlink"),
+            separated: true,
+            run: lookBack.unlink,
+          }
+        : {
+            text: t("alerts.form.link.separate"),
+            action: t("alerts.form.link.link"),
+            separated: true,
+            run: lookBack.relink,
+          };
     });
-    const silenceNote = computed(() => linkNote("silence"));
+    // A wait shorter than the checks never holds a notification back, so it says so instead of moving it.
+    const silenceHint = computed<LinkNote | null>(() => {
+      const checkMinutes = frequencyMinutes();
+      const silenceMinutes = Number(fv("trigger_condition.silence"));
+      if (!(silenceMinutes > 0) || !(checkMinutes > silenceMinutes)) return null;
+      const minutes = Math.ceil(checkMinutes);
+      return {
+        text: t("alerts.form.remind.noEffect", { every: everyWords(minutes, t) }),
+        action: t("alerts.form.remind.matchChecks", { duration: durationWords(minutes, t) }),
+        separated: false,
+        run: () => setFV("trigger_condition.silence", minutes),
+      };
+    });
 
     // ── Recovery ────────────────────────────────────────────────────────────
     // Platform destinations are resolved by the server itself (it closes the
@@ -1108,7 +1119,7 @@ export default defineComponent({
       repeatSuppressionAvailable,
       handlePeriodChange,
       scheduleNote,
-      silenceNote,
+      silenceHint,
       destinationDetails,
       // Field refs for the parent focus manager
       periodFieldRef,

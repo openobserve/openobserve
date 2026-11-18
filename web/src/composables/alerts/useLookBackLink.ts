@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, reactive, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { convertMinutesToCron } from "@/utils/zincutils";
 
-/** Settings that follow Look back until the user sets them, unlinks them or undoes a move. */
-export type LinkedField = "frequency" | "silence";
+/** The setting a link move rewrote: Look back after a Check every edit, or the other way round. */
+export type LinkedField = "period" | "frequency";
 
 type Trigger = Record<string, any>;
 
@@ -26,14 +26,18 @@ interface LookBackLinkOptions {
   trigger: () => Trigger;
   /** Reactive read of the period, to notice values written from outside (load, prefill). */
   period: () => unknown;
+  /** Reactive read of Check every in minutes, to follow the user's edits of it. */
+  frequency: () => unknown;
+  /** An object the form replaces only when it is re-seeded (load, prefill, JSON editor). */
+  formSeed: () => unknown;
   minFrequency: () => number;
   emit: (trigger: Trigger) => void;
 }
 
 interface Move {
-  fields: LinkedField[];
-  period: number;
-  previous: Partial<Record<LinkedField, unknown>>;
+  field: LinkedField;
+  value: number;
+  previous: unknown;
 }
 
 const getBrowserTimezone = (): string => {
@@ -46,111 +50,141 @@ const getBrowserTimezone = (): string => {
 
 const isBlank = (value: unknown) => value === undefined || value === null || value === "";
 
+/** Keeps Look back and Check every equal while linked, whichever one the user edits. */
 export function useLookBackLink(options: LookBackLinkOptions) {
-  // Baseline the linked fields are measured against; re-taken whenever the period changes from outside the handler.
+  // Baseline the link is measured against; re-taken whenever the period changes from outside the handlers.
   let baselinePeriod = Number(options.period());
   let lastHandledPeriod: unknown;
-  const followed = reactive<Record<LinkedField, number | null>>({ frequency: null, silence: null });
-  const unlinked = reactive<Record<LinkedField, boolean>>({ frequency: false, silence: false });
+  const followed = ref<number | null>(null);
+  const unlinked = ref(false);
   const move = ref<Move | null>(null);
+
+  const rebaseline = (period: unknown) => {
+    baselinePeriod = Number(period);
+    followed.value = null;
+    unlinked.value = false;
+    move.value = null;
+  };
 
   // Runs after the handler (pre-flush), so a user edit is recognised by lastHandledPeriod and kept as ours.
   watch(options.period, (period) => {
-    if (String(period) === String(lastHandledPeriod)) return;
-    baselinePeriod = Number(period);
-    followed.frequency = null;
-    followed.silence = null;
-    unlinked.frequency = false;
-    unlinked.silence = false;
-    move.value = null;
+    if (String(period) !== String(lastHandledPeriod)) rebaseline(period);
   });
 
   // A new alert's default frequency is raised to the refresh floor, so that raised value is still linked.
-  const followedValue = (field: LinkedField) =>
-    followed[field] ??
-    (field === "frequency" ? Math.max(baselinePeriod, options.minFrequency()) : baselinePeriod);
+  const followedValue = () => followed.value ?? Math.max(baselinePeriod, options.minFrequency());
 
-  // A baseline taken while the period was unset is not finite and leaves nothing to compare, so the field still follows.
-  const follows = (field: LinkedField, value: unknown) => {
-    if (unlinked[field]) return false;
-    const target = followedValue(field);
+  // A baseline taken while the period was unset is not finite and leaves nothing to compare, so it still follows.
+  const follows = (value: unknown) => {
+    if (unlinked.value) return false;
+    const target = followedValue();
     return !Number.isFinite(target) || isBlank(value) || Number(value) === target;
   };
 
   const isCron = (trigger: Trigger) => trigger?.frequency_type === "cron";
 
-  /** Whether a field still follows Look back; a cron schedule has no Check every to follow. */
-  const isLinked = (field: LinkedField) => {
+  /** Whether Check every follows Look back; a cron schedule has no Check every to follow. */
+  const isLinked = () => {
     const trigger = options.trigger() ?? {};
     void options.period();
-    if (field === "frequency" && isCron(trigger)) return false;
-    return follows(field, trigger[field]);
+    void followed.value;
+    void unlinked.value;
+    if (isCron(trigger)) return false;
+    return follows(trigger.frequency);
   };
 
-  const handlePeriodChange = (value: unknown) => {
-    const next: Trigger = { ...options.trigger(), period: value };
-    lastHandledPeriod = value;
-    const period = Number(value);
-    const moved: LinkedField[] = [];
-    const previous: Move["previous"] = {};
-    const follow = (field: LinkedField) => {
-      followed[field] = period;
-      if (Number(next[field]) === period) return;
-      moved.push(field);
-      previous[field] = next[field];
-      next[field] = period;
-    };
-    if (period > 0) {
-      // A cron schedule the user wrote is what runs the alert, so the period must not replace it.
-      if (!isCron(next)) {
-        if (period >= options.minFrequency() && follows("frequency", next.frequency))
-          follow("frequency");
-        next.cron = convertMinutesToCron(period);
-      }
-      if (!next.timezone) next.timezone = getBrowserTimezone();
-      if (follows("silence", next.silence)) follow("silence");
-    }
-    if (moved.length) move.value = { fields: moved, period, previous };
-    options.emit(next);
-  };
-
-  /** The last move, while every field it set still holds the value it was given. */
+  /** The last move, while both settings still hold the value it gave them. */
   const lastMove = computed<Move | null>(() => {
     const current = move.value;
     if (!current) return null;
     const trigger = options.trigger() ?? {};
     void options.period();
     const holds =
-      Number(trigger.period) === current.period &&
-      current.fields.every((field) => Number(trigger[field]) === current.period);
+      Number(trigger.period) === current.value && Number(trigger.frequency) === current.value;
     return holds ? current : null;
   });
+
+  // Typing "15" moves the other setting twice; Undo goes back to before the first keystroke.
+  const record = (field: LinkedField, value: number, previous: unknown) => {
+    const prior = lastMove.value;
+    move.value = { field, value, previous: prior?.field === field ? prior.previous : previous };
+  };
+
+  const handlePeriodChange = (value: unknown) => {
+    const next: Trigger = { ...options.trigger(), period: value };
+    lastHandledPeriod = value;
+    const period = Number(value);
+    if (period > 0) {
+      // A cron schedule the user wrote is what runs the alert, so the period must not replace it.
+      if (!isCron(next)) {
+        if (period >= options.minFrequency() && follows(next.frequency)) {
+          followed.value = period;
+          if (Number(next.frequency) !== period) record("frequency", period, next.frequency);
+          next.frequency = period;
+        }
+        next.cron = convertMinutesToCron(period);
+      }
+      if (!next.timezone) next.timezone = getBrowserTimezone();
+    }
+    options.emit(next);
+  };
+
+  const handleFrequencyChange = (value: unknown, previous: unknown) => {
+    const trigger = options.trigger() ?? {};
+    const frequency = Number(value);
+    if (isCron(trigger) || !(frequency > 0) || !follows(previous)) return;
+    followed.value = frequency;
+    if (Number(trigger.period) === frequency) return;
+    record("period", frequency, trigger.period);
+    lastHandledPeriod = frequency;
+    options.emit({ ...trigger, period: frequency });
+  };
+
+  // Only a write that leaves the period and the rest of the form alone is the user editing Check every.
+  watch(
+    () => [
+      options.frequency(),
+      options.period(),
+      options.formSeed(),
+      options.trigger()?.frequency_type,
+    ],
+    ([frequency, period, seed, type], [oldFrequency, oldPeriod, oldSeed, oldType]) => {
+      if (String(frequency) === String(oldFrequency)) return;
+      if (seed !== oldSeed) return rebaseline(period);
+      if (type !== oldType || String(period) !== String(oldPeriod)) return;
+      handleFrequencyChange(frequency, oldFrequency);
+    },
+  );
+
+  const emitWithPeriod = (next: Trigger) => {
+    lastHandledPeriod = next.period;
+    options.emit(next);
+  };
 
   const undo = () => {
     const current = lastMove.value;
     move.value = null;
     if (!current) return;
-    const next: Trigger = { ...options.trigger() };
-    for (const field of current.fields) {
-      next[field] = current.previous[field];
-      unlinked[field] = true;
-    }
-    options.emit(next);
+    unlinked.value = true;
+    emitWithPeriod({ ...options.trigger(), [current.field]: current.previous });
   };
 
-  const unlink = (field: LinkedField) => {
-    unlinked[field] = true;
-    if (move.value?.fields.includes(field)) move.value = null;
-  };
-
-  const relink = (field: LinkedField) => {
-    unlinked[field] = false;
+  const unlink = () => {
+    unlinked.value = true;
     move.value = null;
-    const period = Number(options.trigger()?.period);
+  };
+
+  /** Links again; Check every takes the look back, since the look back is what the condition reads. */
+  const relink = () => {
+    unlinked.value = false;
+    move.value = null;
+    const trigger = options.trigger() ?? {};
+    const period = Number(trigger.period);
     if (!(period > 0)) return;
-    followed[field] = period;
-    if (field === "frequency" && period < options.minFrequency()) return;
-    options.emit({ ...options.trigger(), [field]: period });
+    followed.value = period;
+    if (period < options.minFrequency() || Number(trigger.frequency) === period) return;
+    record("frequency", period, trigger.frequency);
+    emitWithPeriod({ ...trigger, frequency: period });
   };
 
   return { handlePeriodChange, isLinked, lastMove, undo, unlink, relink };

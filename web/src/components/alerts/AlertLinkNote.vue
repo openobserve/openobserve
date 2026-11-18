@@ -21,9 +21,12 @@ import { raw, type I18nText } from "@/types/i18n";
 const props = defineProps<{
   /** What links this field to another; omitted when the line only offers the action. */
   text?: I18nText | null;
-  action: I18nText;
+  /** Omitted when there is nothing to do from here. */
+  action?: I18nText | null;
   /** Joins text and action with a dot, for a phrase rather than a sentence. */
   separated?: boolean;
+  /** A setting that does nothing as set: amber, since nothing failed. */
+  warning?: boolean;
   dataTest: string;
 }>();
 
@@ -33,12 +36,18 @@ const dot = raw("·");
 
 <template>
   <p
-    class="text-text-secondary m-0 flex min-h-4 flex-wrap items-center gap-x-1 text-xs"
+    class="m-0 flex min-h-4 flex-wrap items-center gap-x-1 text-xs"
+    :class="props.warning ? 'text-status-warning-text' : 'text-text-secondary'"
     :data-test="props.dataTest"
   >
     <span v-if="props.text" :data-test="`${props.dataTest}-text`">{{ props.text }}</span>
     <span v-if="props.text && props.separated" aria-hidden="true">{{ dot }}</span>
-    <OButton variant="link" :data-test="`${props.dataTest}-action`" @click="emit('action')">
+    <OButton
+      v-if="props.action"
+      variant="link"
+      :data-test="`${props.dataTest}-action`"
+      @click="emit('action')"
+    >
       {{ props.action }}
     </OButton>
   </p>

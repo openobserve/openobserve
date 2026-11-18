@@ -38,7 +38,7 @@ import {
   useAlertSettingTiers,
 } from "@/composables/alerts/useAlertSettingTiers";
 import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
-import { durationWords, everyWords, joinList } from "@/utils/alerts/alertCopy";
+import { durationWords, everyWords } from "@/utils/alerts/alertCopy";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
   makeAlertSettingsShape,
@@ -291,34 +291,28 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(host.text()).toContain("Look back must be at least 1 minute.");
   });
 
-  it("period change CASCADES: emits update:trigger with synced silence/frequency/cron", () => {
-    // The pre-migration cross-step cascade (period drives frequency / cron /
-    // timezone / silence). The ancestor AddAlert listens to @update:trigger and
-    // writes the whole trigger_condition into the ONE form (setFieldValue), so
-    // the visible silence field auto-fills.
+  it("a look-back edit sets Check every and cron, and never Notify at most every", () => {
+    // AddAlert writes the emitted trigger_condition back into the ONE form (setFieldValue).
     const host = mountDescendant("false");
     const step = host.findComponent(AlertSettings);
 
     (step.vm as any).handlePeriodChange("15");
 
     const events = step.emitted("update:trigger") as any[];
-    expect(events).toBeTruthy();
     const trigger = events[events.length - 1][0];
-    expect(trigger.period).toBe("15");
-    expect(trigger.silence).toBe(15);
-    expect(trigger.frequency).toBe(15);
-    expect(typeof trigger.cron).toBe("string");
+    expect(trigger).toMatchObject({ period: "15", frequency: 15, silence: 10 });
     expect(trigger.cron.length).toBeGreaterThan(0);
     expect(trigger.timezone).toBeTruthy();
   });
 
-  describe("period cascade keeps user-set Check every / Quiet after alerting", () => {
+  describe("Look back and Check every move together while linked", () => {
     type TriggerValues = Record<string, unknown>;
     interface LiveForm {
       useStore: <T>(
         selector: (state: { values: { trigger_condition: TriggerValues } }) => T,
       ) => Ref<T>;
       setFieldValue: (name: string, value: unknown) => void;
+      reset: (values: Record<string, unknown>) => void;
       state: { values: { trigger_condition: TriggerValues } };
     }
 
@@ -369,10 +363,15 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     const liveForm = (host: VueWrapper) =>
       (host.findComponent({ name: "OForm" }).vm as unknown as { form: LiveForm }).form;
 
-    // Loads values after mount, the way an edit fetch, prefill or JSON editor re-seeds the form.
+    // Re-seeds the whole form, as an edit load, a prefill or the JSON editor does (resetForm).
     const loadTrigger = async (host: VueWrapper, trigger: TriggerValues) => {
-      liveForm(host).setFieldValue("trigger_condition", { ...trigger });
+      liveForm(host).reset({
+        trigger_condition: { ...trigger },
+        query_condition: {},
+        destinations: [],
+      });
       await flushPromises();
+      return liveForm(host).state.values.trigger_condition;
     };
 
     const typePeriod = async (host: VueWrapper, value: string) => {
@@ -383,15 +382,69 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       return liveForm(host).state.values.trigger_condition;
     };
 
+    // QueryConfig's Check every writes the stored minutes, then emits the whole trigger.
+    const typeCheckEvery = async (host: VueWrapper, minutes: number) => {
+      const form = liveForm(host);
+      form.setFieldValue("trigger_condition.frequency", minutes);
+      form.setFieldValue("trigger_condition", { ...form.state.values.trigger_condition });
+      await flushPromises();
+      return form.state.values.trigger_condition;
+    };
+
+    it.each([
+      {
+        name: "look back typed across keystrokes",
+        edit: async (host: VueWrapper) => (await typePeriod(host, "3"), typePeriod(host, "30")),
+        expected: { period: "30", frequency: 30 },
+      },
+      {
+        name: "Check every typed",
+        edit: (host: VueWrapper) => typeCheckEvery(host, 5),
+        expected: { period: 5, frequency: 5 },
+      },
+      {
+        name: "Check every, then look back",
+        edit: async (host: VueWrapper) => (await typeCheckEvery(host, 5), typePeriod(host, "20")),
+        expected: { period: "20", frequency: 20 },
+      },
+      {
+        name: "a form mounted without a period, first look back typed",
+        trigger: { frequency: 10, silence: 10, frequency_type: "minutes" },
+        edit: (host: VueWrapper) => typePeriod(host, "20"),
+        expected: { period: "20", frequency: 20 },
+      },
+      {
+        name: "a default raised to the refresh floor",
+        trigger: { ...defaults, frequency: 30 },
+        floor: 1800,
+        edit: (host: VueWrapper) => typePeriod(host, "60"),
+        expected: { period: "60", frequency: 60 },
+      },
+      {
+        name: "an org without a refresh floor",
+        floor: 0,
+        edit: (host: VueWrapper) => typePeriod(host, "5"),
+        expected: { period: "5", frequency: 5 },
+      },
+    ])("$name: the other one follows, Notify at most every stays", async (row) => {
+      const host = mountLive(row.trigger ?? defaults, row.floor ?? 60);
+
+      const trigger = await row.edit(host);
+
+      expect(trigger).toMatchObject({ ...row.expected, silence: 10 });
+    });
+
     const saved = { period: 15, frequency: 5, silence: 30, frequency_type: "minutes" };
 
-    it("editing a saved alert (5/15/30) loaded after mount: changing only the period keeps frequency and silence", async () => {
+    it.each([
+      { name: "a different look back", trigger: saved },
+      { name: "the same look back", trigger: { ...saved, period: 10 } },
+    ])("a saved alert loaded after mount with $name keeps its own Check every", async (row) => {
       const host = mountLive();
-      await loadTrigger(host, saved);
 
-      const trigger = await typePeriod(host, "20");
-
-      expect(trigger).toMatchObject({ period: "20", frequency: 5, silence: 30 });
+      expect(await loadTrigger(host, row.trigger)).toMatchObject(row.trigger);
+      expect(await typeCheckEvery(host, 7)).toMatchObject({ period: row.trigger.period });
+      expect(await typePeriod(host, "20")).toMatchObject({ period: "20", frequency: 7 });
     });
 
     it("keeps a hand-written cron schedule when only the period changes", async () => {
@@ -409,105 +462,61 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       expect(trigger.cron).toBe("0 9 * * *");
     });
 
-    it("new alert defaults (10/10/10): frequency and silence follow the period, across keystrokes", async () => {
-      const host = mountLive();
-
-      await typePeriod(host, "3");
-      const trigger = await typePeriod(host, "30");
-
-      expect(trigger).toMatchObject({ frequency: 30, silence: 30 });
-    });
-
-    it("a default frequency raised to the refresh floor still follows the period", async () => {
-      const host = mountLive({ ...defaults, frequency: 30 }, 1800);
-
-      const trigger = await typePeriod(host, "60");
-
-      expect(trigger).toMatchObject({ frequency: 60, silence: 60 });
-    });
-
-    it("Check every set first (5), then period 20: frequency stays 5, default silence follows", async () => {
-      const host = mountLive();
-      liveForm(host).setFieldValue("trigger_condition.frequency", 5);
-
-      const trigger = await typePeriod(host, "20");
-
-      expect(trigger).toMatchObject({ frequency: 5, silence: 20 });
-    });
-
-    it("Quiet after alerting changed by the user stops following later period edits", async () => {
-      const host = mountLive();
-
-      await typePeriod(host, "20");
-      liveForm(host).setFieldValue("trigger_condition.silence", 45);
-      const trigger = await typePeriod(host, "25");
-
-      expect(trigger).toMatchObject({ frequency: 25, silence: 45 });
-    });
-
-    it("a form mounted without a period still links frequency and silence to the first one typed", async () => {
-      const host = mountLive({ frequency: 10, silence: 10, frequency_type: "minutes" });
-
-      const trigger = await typePeriod(host, "20");
-
-      expect(trigger).toMatchObject({ frequency: 20, silence: 20 });
-    });
-
     const note = (host: VueWrapper, dataTest: string) => host.find(`[data-test="${dataTest}"]`);
     const click = async (host: VueWrapper, dataTest: string) => {
       await note(host, `${dataTest}-action`).trigger("click");
       await flushPromises();
       return liveForm(host).state.values.trigger_condition;
     };
-    const follows = (minutes: number) =>
-      t("alerts.form.link.follows", { duration: durationWords(minutes, i18n.global.t as any) });
-    const alsoSet = (fields: string[], minutes: number) =>
+    const LINE = "alert-settings-check-every-link";
+    const alsoSet = (field: string, minutes: number) =>
       t("alerts.form.link.alsoSet", {
-        fields: joinList(fields.map((key) => t(key))),
+        fields: t(field),
         duration: durationWords(minutes, i18n.global.t as any),
       });
 
-    it("a look-back edit that moves linked settings says so, and Undo puts them back", async () => {
+    it("the row's line names what moved; Undo puts it back and unlinks", async () => {
       const host = mountLive();
-      expect(note(host, "alert-settings-silence-link-text").text()).toBe(follows(10));
+      expect(note(host, `${LINE}-text`).text()).toBe(t("alerts.form.link.linked"));
 
-      await typePeriod(host, "5");
-      expect(note(host, "alert-settings-check-every-link-text").text()).toBe(
-        alsoSet(["alerts.queryConfig.checkEvery", "alerts.form.remind.label"], 5),
-      );
-      expect(note(host, "alert-settings-silence-link-text").text()).toBe(follows(5));
+      await typeCheckEvery(host, 5);
+      expect(note(host, `${LINE}-text`).text()).toBe(alsoSet("alerts.form.names.lookBack", 5));
 
-      const trigger = await click(host, "alert-settings-check-every-link");
-      expect(trigger).toMatchObject({ period: "5", frequency: 10, silence: 10 });
-      expect(note(host, "alert-settings-silence-link").text()).toBe(t("alerts.form.link.relink"));
+      expect(await click(host, LINE)).toMatchObject({ period: 10, frequency: 5 });
+      expect(note(host, `${LINE}-text`).text()).toBe(t("alerts.form.link.separate"));
+      expect(await typePeriod(host, "20")).toMatchObject({ period: "20", frequency: 5 });
     });
 
-    it("Unlink keeps Notify at most every through look-back edits; Follow Look back re-links it", async () => {
+    it("Unlink stops the cascade; Link them sets Check every to the look back, with Undo", async () => {
       const host = mountLive();
-      await click(host, "alert-settings-silence-link");
+      await click(host, LINE);
 
-      const trigger = await typePeriod(host, "20");
-      expect(trigger).toMatchObject({ frequency: 20, silence: 10 });
-      expect(note(host, "alert-settings-check-every-link-text").text()).toBe(
-        alsoSet(["alerts.queryConfig.checkEvery"], 20),
-      );
-
-      expect(await click(host, "alert-settings-silence-link")).toMatchObject({ silence: 20 });
+      expect(await typeCheckEvery(host, 5)).toMatchObject({ period: 10, frequency: 5 });
+      expect(await click(host, LINE)).toMatchObject({ period: 10, frequency: 10 });
+      expect(note(host, `${LINE}-text`).text()).toBe(alsoSet("alerts.queryConfig.checkEvery", 10));
+      expect(await typeCheckEvery(host, 15)).toMatchObject({ period: 15, frequency: 15 });
     });
 
     it("a form re-seeded without remount re-links fields that match its new period", async () => {
       const host = mountLive();
       await typePeriod(host, "20");
-      await loadTrigger(host, {
-        period: 15,
-        frequency: 15,
-        silence: 15,
-        frequency_type: "minutes",
-      });
+      await loadTrigger(host, { ...defaults, period: 15, frequency: 15 });
 
-      const trigger = await typePeriod(host, "40");
+      expect(await typePeriod(host, "40")).toMatchObject({ frequency: 40, silence: 10 });
+    });
 
-      expect(trigger).toMatchObject({ frequency: 40, silence: 40 });
+    it("Notify at most every shorter than the checks warns in amber; its action matches them", async () => {
+      const host = mountLive();
+      const hint = () => note(host, "alert-settings-silence-hint");
+      expect(hint().exists()).toBe(false);
+
+      await typePeriod(host, "60");
+      expect(note(host, "alert-settings-silence-hint-text").text()).toBe(
+        t("alerts.form.remind.noEffect", { every: everyWords(60, i18n.global.t as any) }),
+      );
+
+      expect(await click(host, "alert-settings-silence-hint")).toMatchObject({ silence: 60 });
+      expect(hint().exists()).toBe(false);
     });
   });
 
