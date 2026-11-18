@@ -88,17 +88,12 @@ fn weakens_under(
 pub async fn guard_org_retention_update(
     org_id: &str,
     user_id: &str,
-    stored: Option<DataRetentionDefaults>,
     update: &DataRetentionDefaults,
 ) -> Result<Option<DataRetentionDefaults>, Response> {
-    // `stored` is what a write found under its lock; without one the cached value is judged
-    let current = match stored {
-        Some(stored) => Some(stored),
-        None => db::organization::org_retention_defaults(org_id)
-            .await
-            .inspect_err(|e| log::error!("[SECURITY] org retention read failed: {e}"))
-            .ok(),
-    };
+    let current = db::organization::org_retention_defaults(org_id)
+        .await
+        .inspect_err(|e| log::error!("[SECURITY] org retention read failed: {e}"))
+        .ok();
     // unknown stored defaults are refused: a source may get shorter under them
     let destructive = match &current {
         Some(current) => shortens_a_security_source(org_id, current, update).await,

@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use axum::{
     Json,
@@ -45,9 +48,6 @@ use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
     organization::{OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse},
 };
-
-/// How often a write is judged again after the stored retention defaults moved under it.
-const RETENTION_GUARD_ATTEMPTS: usize = 3;
 
 // Only documents the multipart body: the handler concatenates every part it receives.
 #[derive(utoipa::ToSchema)]
@@ -112,51 +112,46 @@ pub async fn create(
         Err(msg) => return MetaHttpResponse::bad_request(msg),
     };
 
-    // the defaults the last write found under its lock, where they differ from the judged ones
-    let found = Arc::new(Mutex::new(None));
-    for _ in 0..RETENTION_GUARD_ATTEMPTS {
-        // a shorter org default deletes the data of every Security source that inherits it
-        #[cfg(feature = "enterprise")]
-        let stored = found.lock().unwrap().take();
-        #[cfg(feature = "enterprise")]
-        let judged = match &settings.data_retention {
-            Some(update) => match crate::request::security::streams::guard_org_retention_update(
-                &org_id,
-                &user_email.user_id,
-                stored,
-                update,
-            )
-            .await
-            {
-                Ok(judged) => judged,
-                Err(refusal) => return refusal,
-            },
-            None => None,
-        };
-        #[cfg(not(feature = "enterprise"))]
-        let judged = None;
-        let (moved, payload) = (found.clone(), settings.clone());
-        let written = db::organization::update_org_setting(&org_id, move |data| {
-            apply_judged_payload(data, payload, judged).unwrap_or_else(|stored| {
-                *moved.lock().unwrap() = Some(stored);
-                false
-            })
+    // a shorter org default deletes the data of every Security source that inherits it
+    #[cfg(feature = "enterprise")]
+    let judged = match &settings.data_retention {
+        Some(update) => match crate::request::security::streams::guard_org_retention_update(
+            &org_id,
+            &user_email.user_id,
+            update,
+        )
+        .await
+        {
+            Ok(judged) => judged,
+            Err(refusal) => return refusal,
+        },
+        None => None,
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let judged = None;
+    let moved = Arc::new(AtomicBool::new(false));
+    let flag = moved.clone();
+    let written = db::organization::update_org_setting(&org_id, move |data| {
+        apply_judged_payload(data, settings, judged).unwrap_or_else(|| {
+            flag.store(true, Ordering::Relaxed);
+            false
         })
-        .await;
-        if found.lock().unwrap().is_some() {
-            continue;
-        }
-        return match written {
-            Ok(true) => (
-                StatusCode::OK,
-                Json(serde_json::json!({"successful": "true"})),
-            )
-                .into_response(),
-            Ok(false) => MetaHttpResponse::bad_request("No valid field found"),
-            Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
-        };
+    })
+    .await;
+    if moved.load(Ordering::Relaxed) {
+        return MetaHttpResponse::conflict(
+            "The organization retention defaults changed, try again",
+        );
     }
-    MetaHttpResponse::conflict("The organization retention defaults changed, try again")
+    match written {
+        Ok(true) => (
+            StatusCode::OK,
+            Json(serde_json::json!({"successful": "true"})),
+        )
+            .into_response(),
+        Ok(false) => MetaHttpResponse::bad_request("No valid field found"),
+        Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
+    }
 }
 
 /// Retrieve organization specific settings
@@ -685,18 +680,18 @@ async fn check_budget_config(
 }
 
 // Runs under the settings lock on a fresh read, so it must not await or fail.
-/// `Err` with the stored retention defaults, and nothing applied, when they are no longer the
-/// ones the Security guard judged; the caller then judges them.
+/// `None`, with nothing applied, when the stored retention defaults are no longer the ones the
+/// Security guard judged.
 fn apply_judged_payload(
     data: &mut OrganizationSetting,
     settings: OrganizationSettingPayload,
     judged: Option<DataRetentionDefaults>,
-) -> Result<bool, DataRetentionDefaults> {
-    let stored = db::organization::org_setting_retention_defaults(data);
-    if judged.is_some_and(|judged| judged != stored) {
-        return Err(stored);
+) -> Option<bool> {
+    if judged.is_some_and(|judged| judged != db::organization::org_setting_retention_defaults(data))
+    {
+        return None;
     }
-    Ok(apply_settings_payload(data, settings))
+    Some(apply_settings_payload(data, settings))
 }
 
 fn apply_settings_payload(
@@ -818,17 +813,16 @@ mod tests {
         };
         assert_eq!(
             apply_judged_payload(&mut data, payload(), Some(moved)),
-            Err(stored),
-            "the caller judges the stored value next"
+            None
         );
         assert_eq!(data.data_retention, stored, "nothing is written");
         assert_eq!(
             apply_judged_payload(&mut data, payload(), Some(stored)),
-            Ok(true)
+            Some(true)
         );
         assert_eq!(data.data_retention.logs, 3);
         // a holder of the Security delete grant is bound to no stored value
-        assert_eq!(apply_judged_payload(&mut data, payload(), None), Ok(true));
+        assert_eq!(apply_judged_payload(&mut data, payload(), None), Some(true));
     }
 
     #[cfg(feature = "enterprise")]
