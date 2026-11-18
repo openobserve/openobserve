@@ -25,27 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
     >
       <OForm :form="form">
-        <p
-          v-if="storedIntervals"
-          class="text-text-secondary mb-1 text-xs"
-          data-test="anomaly-retrain-note"
-        >
-          {{ t("alerts.anomaly.retrainOnEditNote") }}
-        </p>
-        <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3">
-          <div class="min-w-0 flex-1 basis-60">
-            <div class="text-text-heading text-sm font-medium">
-              {{ t("alerts.sections.rows.whichEvents") }}
-            </div>
-            <div class="text-text-secondary mt-0.5 text-xs" data-test="anomaly-which-events-help">
-              {{ whichEventsHelp }}
-            </div>
-          </div>
-          <OFormToggleGroup
-            v-if="tierShows('anomalySql')"
-            name="query_mode"
-            data-test="anomaly-query-tabs"
-          >
+        <OSettingRow :label="t('alerts.sections.rows.whichEvents')" data-test="anomaly-events-row">
+          <OFormToggleGroup name="query_mode" data-test="anomaly-query-tabs">
             <OToggleGroupItem
               v-for="tab in queryTabOptions"
               :key="tab.value"
@@ -59,32 +40,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ tab.label }}
             </OToggleGroupItem>
           </OFormToggleGroup>
-          <OButton
-            v-else
-            variant="ghost-primary"
-            size="sm"
-            icon-left="add"
-            data-test="add-alert-add-anomalySql"
-            @click="writeSqlInstead"
-          >
-            {{ t("alerts.tiers.add.anomalySql") }}
-          </OButton>
-        </div>
+          <template v-if="storedIntervals" #note>
+            <span data-test="anomaly-retrain-note">{{
+              t("alerts.anomaly.retrainOnEditNote")
+            }}</span>
+          </template>
+        </OSettingRow>
 
-        <div v-if="queryMode === 'filters' && !filtersOpen" class="pb-2">
-          <AlertFilterSentence
-            :group="filterGroup"
-            :stream-name="config.stream_name || ''"
-            dialect="sql"
-            data-test="add-alert-filter-sentence"
-            @add="openFilters"
-            @change="openFilters"
-            @edit="openFilters"
-            @toggle-connector="openFilters"
-            @remove="onFiltersChange([])"
-          />
-        </div>
-        <div v-if="queryMode === 'filters' && filtersOpen" class="pb-2">
+        <AlertFilterSentence
+          v-if="queryMode === 'filters' && !filtersOpen"
+          :label="t('alerts.form.filter.label')"
+          :group="filterGroup"
+          :stream-name="config.stream_name || ''"
+          dialect="sql"
+          data-test="add-alert-filter-sentence"
+          @add="openFilters"
+          @change="openFilters"
+          @edit="openFilters"
+          @toggle-connector="openFilters"
+          @remove="onFiltersChange([])"
+        />
+        <OSettingRow
+          v-if="queryMode === 'filters' && filtersOpen"
+          :label="t('alerts.form.filter.label')"
+          wide
+          fill
+          data-test="anomaly-filters-row"
+        >
           <FilterBuilder
             ref="filterBuilderRef"
             profile="anomaly"
@@ -96,9 +78,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="anomaly-filter-builder"
             @update:model-value="onFiltersChange"
           />
-        </div>
+        </OSettingRow>
 
-        <div v-if="queryMode === 'custom_sql'" class="pb-2">
+        <OSettingRow
+          v-if="queryMode === 'custom_sql'"
+          :label="t('alerts.sections.rows.query')"
+          wide
+          fill
+          data-test="anomaly-query-row"
+        >
           <div
             class="custom-sql-editor-wrapper rounded-default h-35 overflow-hidden border"
             :class="hasSqlError ? 'border-input-border-error' : 'border-border-default'"
@@ -161,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </i18n-t>
           </div>
-          <div class="text-text-secondary mt-1 text-xs">
+          <template #note>
             <i18n-t keypath="alerts.anomaly.sqlColumnsHint" tag="span">
               <template #timeBucket
                 ><code>{{ raw("time_bucket") }}</code></template
@@ -170,8 +158,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ><code>{{ raw("value") }}</code></template
               >
             </i18n-t>
-          </div>
-        </div>
+          </template>
+        </OSettingRow>
 
         <Teleport
           :to="sectionTargets?.anomalyCondition"
@@ -183,72 +171,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             fill
             data-test="anomaly-measure-row"
           >
-            <!-- items-start: a part grows downward with its own error, so centring would shift its neighbours. -->
+            <!-- Each clause wraps whole, so a second line starts at the column: "[count] of [field]" / "per [5] [minutes]". -->
             <div class="text-text-body flex flex-wrap items-start gap-2 text-sm">
-              <template v-if="queryMode === 'filters'">
-                <OFormSelect
-                  name="detection_function"
-                  :options="detectionFunctions"
-                  :aria-label="t('alerts.detectionFunction')"
-                  data-test="anomaly-detection-function"
-                  class="alert-v3-select max-w-27.5 min-w-27.5"
-                  @update:model-value="onDetectionFunctionChange"
-                />
-                <template v-if="detectionFunction && detectionFunction !== 'count'">
-                  <span class="flex min-h-8.5 items-center">{{ t("alerts.form.anomaly.of") }}</span>
+              <div class="flex max-w-full min-w-0 items-start gap-2">
+                <template v-if="queryMode === 'filters'">
                   <OFormSelect
-                    name="detection_function_field"
-                    :options="filteredDetectionFields"
-                    :placeholder="
-                      detectionFunctionField ? raw('') : t('alerts.anomaly.fieldPlaceholder')
-                    "
-                    :loading="loadingFields"
-                    :aria-label="t('alerts.anomaly.detectionFunctionField')"
-                    data-test="anomaly-detection-function-field"
-                    class="alert-v3-select max-w-50 min-w-35"
-                  >
-                    <template #empty>
-                      <div class="text-muted-foreground px-3 py-2">
-                        {{
-                          config.stream_name
-                            ? t("alerts.anomaly.noFieldsFound")
-                            : t("alerts.anomaly.selectStreamFirst")
-                        }}
-                      </div>
-                    </template>
-                  </OFormSelect>
+                    name="detection_function"
+                    :options="detectionFunctions"
+                    :aria-label="t('alerts.detectionFunction')"
+                    data-test="anomaly-detection-function"
+                    class="w-32! shrink-0"
+                    @update:model-value="onDetectionFunctionChange"
+                  />
+                  <template v-if="detectionFunction && detectionFunction !== 'count'">
+                    <span class="flex min-h-8.5 items-center">{{
+                      t("alerts.form.anomaly.of")
+                    }}</span>
+                    <OFormSelect
+                      name="detection_function_field"
+                      :options="filteredDetectionFields"
+                      :placeholder="
+                        detectionFunctionField ? raw('') : t('alerts.anomaly.fieldPlaceholder')
+                      "
+                      :loading="loadingFields"
+                      :aria-label="t('alerts.anomaly.detectionFunctionField')"
+                      data-test="anomaly-detection-function-field"
+                      class="w-50! min-w-0"
+                    >
+                      <template #empty>
+                        <div class="text-muted-foreground px-3 py-2">
+                          {{
+                            config.stream_name
+                              ? t("alerts.anomaly.noFieldsFound")
+                              : t("alerts.anomaly.selectStreamFirst")
+                          }}
+                        </div>
+                      </template>
+                    </OFormSelect>
+                  </template>
                 </template>
-              </template>
-              <code
-                v-else
-                class="flex min-h-8.5 items-center"
-                data-test="anomaly-measure-sql-value"
-                >{{ raw("value") }}</code
-              >
-              <span class="flex min-h-8.5 items-center">{{ t("alerts.form.anomaly.per") }}</span>
-              <OFormInput
-                name="histogram_interval_value"
-                type="number"
-                min="1"
-                fit-content
-                class="alert-v3-input min-w-21.75"
-                :aria-label="t('alerts.anomaly.detectionResolution')"
-                data-test="anomaly-histogram-interval-value"
-              >
-                <!-- Message rendered below at row width — see histogramIntervalError. -->
-                <template #error />
-              </OFormInput>
-              <OFormSelect
-                name="histogram_interval_unit"
-                :options="intervalUnits"
-                label-key="label"
-                value-key="value"
-                class="alert-v3-select max-w-25 min-w-25"
-                :aria-label="
-                  t('common.unitFor', { label: t('alerts.anomaly.detectionResolution') })
-                "
-                data-test="anomaly-histogram-interval-unit"
-              />
+                <code
+                  v-else
+                  class="flex min-h-8.5 items-center"
+                  data-test="anomaly-measure-sql-value"
+                  >{{ raw("value") }}</code
+                >
+              </div>
+              <div class="flex items-start gap-2">
+                <span class="flex min-h-8.5 items-center">{{ t("alerts.form.anomaly.per") }}</span>
+                <OFormInput
+                  name="histogram_interval_value"
+                  type="number"
+                  min="1"
+                  fit-content
+                  class="max-w-32! min-w-16"
+                  :aria-label="t('alerts.anomaly.detectionResolution')"
+                  data-test="anomaly-histogram-interval-value"
+                >
+                  <!-- Message rendered below at row width — see histogramIntervalError. -->
+                  <template #error />
+                </OFormInput>
+                <OFormSelect
+                  name="histogram_interval_unit"
+                  :options="intervalUnits"
+                  label-key="label"
+                  value-key="value"
+                  class="w-32!"
+                  :aria-label="
+                    t('common.unitFor', { label: t('alerts.anomaly.detectionResolution') })
+                  "
+                  data-test="anomaly-histogram-interval-unit"
+                />
+              </div>
             </div>
             <div
               v-if="histogramIntervalError"
@@ -267,7 +261,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSettingRow
             :label="t('alerts.anomaly.checkEvery')"
-            :description="t('alerts.anomaly.checkEveryTooltip')"
             fill
             data-test="anomaly-check-every-row"
           >
@@ -277,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 min="1"
                 fit-content
-                class="alert-v3-input min-w-21.75"
+                class="max-w-32! min-w-16"
                 :aria-label="t('alerts.anomaly.checkEvery')"
                 data-test="anomaly-schedule-interval-value"
               >
@@ -289,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="intervalUnits"
                 label-key="label"
                 value-key="value"
-                class="alert-v3-select max-w-25 min-w-25"
+                class="w-32!"
                 :aria-label="t('common.unitFor', { label: t('alerts.anomaly.checkEvery') })"
                 data-test="anomaly-schedule-interval-unit"
               />
@@ -304,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OSettingRow>
           <OSettingRow
-            :label="t('alerts.anomaly.lookBackWindow')"
+            :label="t('alerts.form.schedule.lookingAtRow')"
             :info="t('alerts.anomaly.lookBackWindowTooltip')"
             fill
             data-test="anomaly-look-back-row"
@@ -315,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 min="1"
                 fit-content
-                class="alert-v3-input min-w-21.75"
+                class="max-w-32! min-w-16"
                 :aria-label="t('alerts.anomaly.lookBackWindow')"
                 data-test="anomaly-detection-window-value"
               >
@@ -327,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="intervalUnits"
                 label-key="label"
                 value-key="value"
-                class="alert-v3-select max-w-25 min-w-25"
+                class="w-32!"
                 :aria-label="t('common.unitFor', { label: t('alerts.anomaly.lookBackWindow') })"
                 data-test="anomaly-detection-window-unit"
               />
@@ -340,13 +333,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ detectionWindowError }}
             </div>
-            <div
-              v-if="lookBackWindowHint"
-              class="text-text-secondary pt-1 text-xs"
-              data-test="anomaly-detection-window-hint"
-            >
-              {{ lookBackWindowHint }}
-            </div>
+            <template v-if="lookBackWindowHint" #note>
+              <span data-test="anomaly-detection-window-hint">{{ lookBackWindowHint }}</span>
+            </template>
             <div
               v-if="legacyWindowWarning"
               class="text-status-warning-text pt-1 text-xs"
@@ -363,47 +352,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSettingRow
             :label="t('alerts.form.anomaly.learnFrom')"
-            :description="t('alerts.form.anomaly.trainingWindow')"
             fill
             data-test="anomaly-training-window-row"
           >
-            <div class="text-text-body flex flex-wrap items-start gap-2 text-sm">
-              <span class="flex min-h-8.5 items-center">{{
-                t("alerts.form.anomaly.theLast")
-              }}</span>
+            <div class="text-text-body flex items-center gap-2 text-sm">
+              <span>{{ t("alerts.form.anomaly.theLast") }}</span>
               <OFormInput
                 name="training_window_days"
                 type="number"
                 :min="1"
-                :suffix="t('alerts.anomaly.daysUnit')"
                 :aria-label="t('alerts.trainingWindow')"
                 data-test="anomaly-training-window"
                 fit-content
-                class="alert-v3-input min-w-30"
+                class="max-w-32! min-w-16"
               />
+              <span>{{ t("alerts.form.units.days") }}</span>
+            </div>
+            <div
+              class="text-text-secondary mt-1 text-xs"
+              data-test="anomaly-training-window-floor-hint"
+            >
+              {{ t("alerts.form.anomaly.trainingFloor", { days: minTrainingDays }) }}
+            </div>
+            <div v-if="!tierShows('anomalyRetrain')">
               <OButton
-                v-if="!tierShows('anomalyRetrain')"
                 variant="ghost-primary"
                 size="sm"
                 icon-left="add"
+                class="-ms-3.5 max-[85.5rem]:-ms-3"
                 data-test="add-alert-add-anomalyRetrain"
                 @click="tiers?.reveal('anomalyRetrain')"
               >
                 {{ t("alerts.tiers.add.anomalyRetrain") }}
               </OButton>
             </div>
-            <div
-              class="text-text-secondary pt-1 text-xs"
-              data-test="anomaly-training-window-floor-hint"
-            >
-              {{ t("alerts.anomaly.trainingWindowFloorHint", { days: minTrainingDays }) }}
-            </div>
           </OSettingRow>
           <OSettingRow
             v-if="tierShows('anomalyRetrain')"
             :label="t('alerts.anomaly.retrainEvery')"
-            :description="t('alerts.anomaly.retrainEveryTooltip')"
-            fill
+            :description="t('alerts.form.anomaly.retrainHelp')"
             data-test="anomaly-retrain-every-row"
           >
             <OFormSelect
@@ -413,35 +400,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               value-key="value"
               :aria-label="t('alerts.anomaly.retrainEvery')"
               data-test="anomaly-retrain-interval"
-              class="alert-v3-select max-w-50"
+              class="w-50!"
             />
           </OSettingRow>
-          <OSettingRow
+          <AlertSentenceRow
             v-if="formContext"
             :label="t('alerts.groups.schedule')"
-            fill
             data-test="anomaly-schedule-line"
+            changeable
+            @change="formContext.goToSection('schedule')"
           >
-            <i18n-t
-              keypath="alerts.form.anomaly.scheduleLine"
-              tag="p"
-              class="text-text-body m-0 text-sm"
-            >
-              <template #every>{{ scheduleEvery }}</template>
-              <template #window>{{ scheduleWindow }}</template>
-              <template #link>
-                <OButton
-                  variant="link"
-                  size="sm"
-                  class="h-auto! p-0!"
-                  data-test="anomaly-schedule-line-link"
-                  @click="formContext.goToSection('schedule')"
-                >
-                  {{ t("alerts.form.anomaly.scheduleLink") }}
-                </OButton>
-              </template>
-            </i18n-t>
-          </OSettingRow>
+            {{
+              t("alerts.form.anomaly.scheduleLine", {
+                every: scheduleEvery,
+                window: scheduleWindow,
+              })
+            }}
+          </AlertSentenceRow>
           <AlertSentenceRow
             v-if="!sensitivityOpened"
             :label="t('alerts.sensitivity')"
@@ -490,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :model-modifiers="{ number: true }"
                     :aria-label="t('alerts.anomaly.budgetLabel')"
                     fit-content
-                    class="alert-v3-input min-w-21.75"
+                    class="max-w-32! min-w-16"
                     data-test="anomaly-budget-count"
                   >
                     <template #error />
@@ -500,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="budgetPeriods"
                     label-key="label"
                     value-key="value"
-                    class="alert-v3-select min-w-25"
+                    class="w-32!"
                     :aria-label="t('alerts.anomaly.budgetPeriod')"
                     data-test="anomaly-budget-period"
                   />
@@ -558,7 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         sensitivityError ? 'anomaly-manual-level-error' : undefined
                       "
                       fit-content
-                      class="min-w-21.75"
+                      class="max-w-32! min-w-16"
                       data-test="anomaly-sensitivity-level"
                     >
                       <template #error />
@@ -605,7 +580,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- SQL preview — in custom_sql mode the user's own editor is already on this form -->
         <OSettingRow
           v-if="queryMode !== 'custom_sql' && tierShows('anomalySqlPreview')"
-          :label="t('alerts.sqlPreview')"
+          :label="t('alerts.tiers.names.generatedSql')"
+          wide
           fill
           data-test="anomaly-sql-preview-row"
         >
@@ -664,7 +640,6 @@ import {
   anomalyIntervalSeconds,
   anomalySensitivityModel,
   anomalyModelQuery,
-  formatAnomalySeconds,
   anomalyMissingValueColumn,
   hasTimestampAliasInSql,
   lookBackWindowFloorSeconds,
@@ -734,10 +709,10 @@ export default defineComponent({
     const detectionFunctions = ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
     // One s/m/h/d grammar shared with the server's parse_interval (§4.5) — "90s" and "1d" must render.
     const intervalUnits = computed(() => [
-      { label: t("common.seconds"), value: "s" },
-      { label: t("common.minutes"), value: "m" },
-      { label: t("common.hours"), value: "h" },
-      { label: t("common.days"), value: "d" },
+      { label: t("alerts.form.units.seconds"), value: "s" },
+      { label: t("alerts.form.units.minutes"), value: "m" },
+      { label: t("alerts.form.units.hours"), value: "h" },
+      { label: t("alerts.form.units.days"), value: "d" },
     ]);
     // Fixed enum labels, not dynamic counts — plain keys, no pluralization.
     const retrainIntervalOptions = computed(() => [
@@ -792,12 +767,6 @@ export default defineComponent({
     const queryMode = form.useStore((s: any) => s.values.query_mode);
     const customSql = form.useStore((s: any) => s.values.custom_sql);
     const filterRows = form.useStore((s: any): AnomalyFilterRow[] => s.values.filters ?? []);
-    const whichEventsHelp = computed(() => {
-      if (queryMode.value === "custom_sql") return t("alerts.sections.rows.whichEventsSql");
-      return filterRows.value.length > 0
-        ? t("alerts.sections.rows.whichEventsFiltered")
-        : t("alerts.sections.rows.whichEventsAll");
-    });
     const detectionFunction = form.useStore((s: any) => s.values.detection_function);
     const detectionFunctionField = form.useStore((s: any) => s.values.detection_function_field);
     const histogramIntervalValue = form.useStore((s: any) => s.values.histogram_interval_value);
@@ -941,6 +910,22 @@ export default defineComponent({
       return t("alerts.anomaly.manualSensitivityHelp");
     });
 
+    const WORD_UNITS = [
+      [86400, "alerts.form.duration.days"],
+      [3600, "alerts.form.duration.hours"],
+      [60, "alerts.form.duration.minutes"],
+      [1, "alerts.form.duration.seconds"],
+    ] as const;
+    const secondsInWords = (secs: number) => {
+      let rest = Math.max(0, Math.floor(secs));
+      const parts = WORD_UNITS.flatMap(([size, key]) => {
+        const n = Math.floor(rest / size);
+        rest -= n * size;
+        return n > 0 ? [t(key, { count: n }, n)] : [];
+      });
+      return raw(parts.length ? parts.join(" ") : t(WORD_UNITS[3][1], { count: 0 }, 0));
+    };
+
     // §4.6: the floor is computed locally from the form's own values — no server dependency.
     const currentWindowFloor = computed(() =>
       lookBackWindowFloorSeconds(
@@ -957,9 +942,9 @@ export default defineComponent({
       const floor = currentWindowFloor.value;
       if (floor === null) return raw("");
       return t("alerts.anomaly.lookBackWindowMinimum", {
-        min: formatAnomalySeconds(floor),
+        min: secondsInWords(floor),
         // Twice the floor plus the 10-minute absence allowance; absence detection is on by default.
-        recommended: formatAnomalySeconds(2 * floor + 600),
+        recommended: secondsInWords(2 * floor + 600),
       });
     });
 
@@ -992,7 +977,7 @@ export default defineComponent({
           ? stored.window.raw
           : anomalyIntervalSeconds(stored.window.value, stored.window.unit);
       if (floor === null || windowSecs === null || windowSecs >= floor) return raw("");
-      return t("alerts.anomaly.lookBackWindowLegacy", { min: formatAnomalySeconds(floor) });
+      return t("alerts.anomaly.lookBackWindowLegacy", { min: secondsInWords(floor) });
     });
 
     // The save payload, the SQL preview and the chart all read props.config, so the form writes back into it
@@ -1279,14 +1264,9 @@ export default defineComponent({
       filterBuilderRef.value?.focus();
     };
 
-    const writeSqlInstead = () => {
-      tiers?.reveal("anomalySql");
-      form.setFieldValue("query_mode", "custom_sql");
-    };
-
     const intervalText = (value: unknown, unit: unknown) => {
       const secs = anomalyIntervalSeconds(Number(value), String(unit));
-      return raw(secs === null ? "—" : formatAnomalySeconds(secs));
+      return secs === null ? raw("—") : secondsInWords(secs);
     };
     const scheduleEvery = computed(() =>
       intervalText(scheduleIntervalValue.value, scheduleIntervalUnit.value),
@@ -1309,7 +1289,6 @@ export default defineComponent({
     };
 
     return {
-      whichEventsHelp,
       raw,
       t,
       store,
@@ -1371,7 +1350,6 @@ export default defineComponent({
       filterBuilderRef,
       filterGroup,
       openFilters,
-      writeSqlInstead,
       scheduleEvery,
       scheduleWindow,
     };

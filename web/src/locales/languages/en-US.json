@@ -14007,9 +14007,9 @@
       "detectorInternals": "Detector internals",
       "deviationChart": "Deviation by kind",
       "deviationChartHint": "Score anomalies: % over the bar. Drops: % below expected. Separate series — not comparable numbers.",
-      "directionAbove": "Above only",
-      "directionBelow": "Below only",
-      "directionBoth": "Above or below",
+      "directionAbove": "Spikes only",
+      "directionBelow": "Drops only",
+      "directionBoth": "Spikes or drops",
       "disabled": "Disabled",
       "disabledNotificationsInfo": "Anomaly detection will still run and write results to the _anomalies stream. Enable notifications to receive alerts when anomalies are detected.",
       "enabled": "Enabled",
@@ -14025,7 +14025,7 @@
       "retrainOnEditNote": "Changing the query, the function or the detection resolution retrains this detector. Detection pauses until training ends.",
       "lookBackWindowFloor": "Look back over {min} at least: the check interval plus one detection resolution. A shorter window cannot hold a complete bucket when the first run fires, so that run would skip buckets.",
       "lookBackWindowLegacy": "This saved window is below the {min} minimum (the check interval plus one detection resolution). It will save unchanged, but a first run can skip buckets until the window is raised.",
-      "lookBackWindowMinimum": "At least {min}; {recommended} or more recommended for these settings.",
+      "lookBackWindowMinimum": "At least {min}; {recommended} or more works best",
       "lookBackWindowTooltip": "How far back the first detection run queries. Later runs resume where the previous run stopped, so a late run never skips a bucket; only a pause longer than both this window and 24 hours skips the older buckets. Minimum: the check interval plus one detection resolution, or the first run cannot hold a complete bucket. Recommended: twice the minimum, plus 10 minutes for absence detection.",
       "metricChart": "Metric and anomalies",
       "metricChartHint": "Grey band is the expected range; red marks values outside it",
@@ -15338,13 +15338,13 @@
         "generatedSql": "Generated SQL",
         "vrl": "Transform results with VRL",
         "ruleExpression": "Treat the query as a rule expression",
-        "anomalyDirection": "Only alert on spikes, or only on drops",
-        "anomalyWindow": "How many unusual buckets fire it",
-        "anomalySqlPreview": "Show generated SQL",
-        "compositeWarningCounts": "Count a warning as firing",
-        "compositeStalePolicy": "If an alert stops reporting",
+        "anomalyDirection": "Direction",
+        "anomalyWindow": "Alert window",
+        "anomalySqlPreview": "Generated SQL",
+        "compositeWarningCounts": "Count warnings as firing",
+        "compositeStalePolicy": "If an alert goes stale",
         "suppressRepeats": "Suppress repeats",
-        "anomalyRecordOnly": "Record only, don't notify",
+        "anomalyRecordOnly": "Record only",
         "anomalyTags": "Tags",
         "anomalyPriority": "Priority"
       },
@@ -15598,7 +15598,10 @@
         "builderOne": "One, when at least",
         "builderOneTail": "groups cross the limit",
         "row": "row",
-        "series": "series"
+        "series": "series",
+        "one": "One alert",
+        "when": "when",
+        "whenAtLeast": "when at least"
       },
       "editor": {
         "promql": "PromQL",
@@ -15628,6 +15631,12 @@
         "min": "minutes",
         "h": "hours",
         "seconds": "seconds"
+      },
+      "duration": {
+        "seconds": "{count} second | {count} seconds",
+        "minutes": "{count} minute | {count} minutes",
+        "hours": "{count} hour | {count} hours",
+        "days": "{count} day | {count} days"
       },
       "keepFiring": {
         "help": "After the condition clears",
@@ -15686,7 +15695,7 @@
       "anomaly": {
         "sensitivityAuto": "Auto",
         "learned": "· learned from your data",
-        "scheduleLine": "Checks every {every}, looking at the last {window}. Set in {link}.",
+        "scheduleLine": "Every {every}, looking at the last {window}",
         "scheduleLink": "How often to check",
         "windowSentence": "Fire when {fire}% of the last {buckets} buckets are unusual, and recover below {recover}%",
         "measure": "Measure",
@@ -15694,7 +15703,13 @@
         "per": "per",
         "learnFrom": "Learn from",
         "trainingWindow": "Training window",
-        "theLast": "the last"
+        "theLast": "the last",
+        "trainingFloor": "Needs {days}+ days of data",
+        "retrainHelp": "Never keeps the first model",
+        "directionHelp": "Which side of normal alerts",
+        "windowFire": "fire at {fire}% of {buckets} bucket | fire at {fire}% of {buckets} buckets",
+        "windowRecover": "recover below {recover}%",
+        "templateNote": "Prebuilt templates must be copied first"
       },
       "holdFor": {
         "label": "Must last",
@@ -15708,7 +15723,14 @@
         "sentence": "{direction} {threshold} within {horizon} based on the last {window}"
       },
       "composite": {
-        "previewEmpty": "Add two or more alerts to see when they would have fired together."
+        "previewEmpty": "Add two or more alerts to see when they would have fired together.",
+        "alerts": "Alerts",
+        "alertsHelp": "Pick 2 to 10",
+        "empty": "Each alert gets a letter for the rule below",
+        "insert": "Insert",
+        "staleLastState": "Uses its last known state",
+        "staleFalse": "Counts it as not firing",
+        "staleTrue": "Counts it as firing"
       }
     }
   },

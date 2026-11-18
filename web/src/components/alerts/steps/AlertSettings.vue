@@ -110,18 +110,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-wrap items-center gap-2">
                 <span>{{ t("alerts.form.holdFor.sentence") }}</span>
                 <div class="flex items-center gap-2">
-                  <OFormInput
-                    :aria-label="t('alerts.plain.forAtLeast')"
-                    name="_ui.pendingPeriod"
-                    type="number"
-                    min="0"
-                    fit-content
-                    class="max-w-32! min-w-16"
-                    data-test="alert-settings-pending-period-input"
-                    @update:model-value="onPendingPeriodChange"
-                  >
-                    <template #error />
-                  </OFormInput>
+                  <component :is="formField" v-if="formField" name="_ui.pendingPeriod">
+                    <template #default="{ field }">
+                      <OInput
+                        :aria-label="t('alerts.plain.forAtLeast')"
+                        type="number"
+                        min="0"
+                        fit-content
+                        class="max-w-32! min-w-16"
+                        :model-value="holdAmount(field.state.value)"
+                        :placeholder="t('common.off')"
+                        :error="fieldInvalid(field)"
+                        data-test="alert-settings-pending-period-input"
+                        @update:model-value="(v: unknown) => onHoldAmount(v, field)"
+                        @blur="field.handleBlur"
+                      />
+                    </template>
+                  </component>
                   <OSelect
                     :aria-label="t('common.unitFor', { label: t('alerts.plain.forAtLeast') })"
                     class="w-32!"
@@ -175,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :target-required="destinationRequired"
             show-status
             tooltip=""
-            :placeholder="t('alerts.summary.noDestination')"
+            :placeholder="sectionTargets ? t('common.none') : t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
             @refresh="$emit('refresh:destinations')"
@@ -395,6 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           min="0"
                           :debounce="300"
                           :model-value="keepFiring.amount"
+                          :placeholder="t('common.off')"
                           :error="fieldInvalid(field)"
                           data-test="alert-settings-keep-firing-for-input"
                           @update:model-value="(v: unknown) => keepFiring.onAmount(v, field)"
@@ -661,12 +667,24 @@ export default defineComponent({
       const parsed = value === "" || value === null || value === undefined ? null : Number(value);
       setStoredPendingPeriod(parsed);
     };
+    // 0 means Must last is off: the field reads empty with an "Off" placeholder until typed into.
+    const holdDraft = ref<unknown>(null);
+    const holdAmount = (value: unknown) => {
+      if (holdDraft.value !== null) return holdDraft.value;
+      return Number(value) === 0 || value === null || value === undefined ? "" : value;
+    };
+    const onHoldAmount = (value: unknown, field: { handleChange: (v: unknown) => void }) => {
+      holdDraft.value = value;
+      field.handleChange(value);
+      onPendingPeriodChange(value);
+    };
 
     const onPendingPeriodUnitChange = (modelValue: SelectModelValue) => {
       const unit = typeof modelValue === "string" ? modelValue : "";
       const prevUnit = pendingPeriodUnit.value;
       pendingPeriodUnit.value = unit as "minutes" | "hours";
       if (unit === prevUnit) return;
+      holdDraft.value = null;
 
       const currentDisplay = Number(fv("_ui.pendingPeriod")) || 0;
       if (unit === "hours" && prevUnit === "minutes") {
@@ -898,13 +916,17 @@ export default defineComponent({
       v !== "" && v !== null && v !== undefined && Number.isFinite(Number(v));
 
     // The unit only changes how the stored value reads; the field keeps its own unit.
+    // `offUnit`: 0 means the setting is off, so it reads as an empty "Off" field in that unit.
     const useDurationField = (
       name: string,
       base: "seconds" | "min",
       units: readonly DurationUnit[],
+      offUnit?: DurationUnit,
     ) => {
       const stored = computed(() => fv(name));
-      const unitFor = (v: unknown) => pickUnit(isNumber(v) ? Number(v) : 0, base, units).unit;
+      const isOff = (v: unknown) => offUnit !== undefined && !(Number(v) > 0) && !(Number(v) < 0);
+      const unitFor = (v: unknown) =>
+        isOff(v) ? offUnit! : pickUnit(isNumber(v) ? Number(v) : 0, base, units).unit;
       const unit = ref<DurationUnit>(unitFor(stored.value));
       const draft = ref<unknown>(null);
       let written: unknown = stored.value;
@@ -917,6 +939,7 @@ export default defineComponent({
       });
       const amount = computed(() => {
         if (draft.value !== null) return draft.value;
+        if (isOff(stored.value)) return "";
         return isNumber(stored.value)
           ? fromBase(Number(stored.value), unit.value, base)
           : stored.value;
@@ -936,7 +959,12 @@ export default defineComponent({
       return reactive({ unit, amount, onAmount, onUnit, options });
     };
     const silence = useDurationField("trigger_condition.silence", "min", ["min", "h"]);
-    const keepFiring = useDurationField("keep_firing_for", "seconds", ["seconds", "min", "h"]);
+    const keepFiring = useDurationField(
+      "keep_firing_for",
+      "seconds",
+      ["seconds", "min", "h"],
+      "min",
+    );
     const keepFiringError = fieldError("keep_firing_for");
 
     // ── Sentence rows ───────────────────────────────────────────────────────
@@ -962,6 +990,7 @@ export default defineComponent({
     };
 
     const setPendingPeriodMinutes = (minutes: number) => {
+      holdDraft.value = null;
       pendingPeriodUnit.value = "minutes";
       setFV("_ui.pendingPeriod", minutes);
       setFV("pending_period_sec", minutes);
@@ -1044,6 +1073,8 @@ export default defineComponent({
       pendingPeriodUnit,
       pendingPeriodUnitOptions,
       onPendingPeriodChange,
+      holdAmount,
+      onHoldAmount,
       onPendingPeriodUnitChange,
     };
   },

@@ -1003,6 +1003,18 @@ describe("AlertSettings — notify and timing in their sections", () => {
     expect(values().keep_firing_for).toBe(120);
   });
 
+  it.each([
+    ["alert-settings-pending-period-input", "pending_period_sec"],
+    ["alert-settings-keep-firing-for-input", "keep_firing_for"],
+  ])("with Show all on, an unset %s reads Off and writes nothing", (dataTest, field) => {
+    const unset = { pending_period_sec: 0, keep_firing_for: 0, _ui: { pendingPeriod: 0 } };
+    const { host, values } = mountSectioned("false", unset, { showAll: true });
+    const input = amountInput(host, dataTest);
+    expect([input.props("modelValue"), input.props("placeholder")]).toEqual(["", t("common.off")]);
+    expect(values()[field]).toBe(0);
+    host.unmount();
+  });
+
   it("an incident reads as a sentence with its title row", async () => {
     config.isEnterprise = "true";
     const { host, values, inSlot } = mountSectioned(

@@ -1023,15 +1023,15 @@ describe("AnomalyDetectionConfig", () => {
       wrapper = mountConfig({ training_window_days: days });
       await flushPromises();
       expect(floorHint(wrapper).text()).toBe(
-        i18n.global.t("alerts.anomaly.trainingWindowFloorHint", { days: 21 }),
+        i18n.global.t("alerts.form.anomaly.trainingFloor", { days: 21 }),
       );
     });
 
-    it("shows days as the input's own unit and keeps the grouping out of the form", async () => {
+    it("names days beside the number and keeps the grouping out of the form", async () => {
       wrapper = mountConfig();
       await flushPromises();
-      const field = wrapper.find('[data-test="anomaly-training-window"]');
-      expect(field.text()).toContain(i18n.global.t("alerts.anomaly.daysUnit"));
+      const row = wrapper.find('[data-test="anomaly-training-window-row"]');
+      expect(row.text()).toContain(i18n.global.t("alerts.form.units.days"));
       expect(wrapper.text()).not.toContain(
         i18n.global.t("alerts.anomaly.bandGroupingWeekendHourIfData"),
       );
@@ -1113,7 +1113,7 @@ describe("AnomalyDetectionConfig", () => {
       wrapper = mountConfig();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("SQL Preview");
+      expect(wrapper.text()).toContain(i18n.global.t("alerts.tiers.names.generatedSql"));
       expect(wrapper.text()).not.toContain("Anomaly Score Range");
     });
 
@@ -1431,9 +1431,9 @@ describe("AnomalyDetectionConfig", () => {
 
       const hint = wrapper.find('[data-test="anomaly-detection-window-hint"]');
       expect(hint.exists()).toBe(true);
-      expect(hint.text()).toContain("1h 5m");
+      expect(hint.text()).toContain("1 hour 5 minutes");
       // Twice the floor plus the 10-minute absence allowance.
-      expect(hint.text()).toContain("2h 20m");
+      expect(hint.text()).toContain("2 hours 20 minutes");
     });
   });
 
@@ -1556,7 +1556,7 @@ describe("AnomalyDetectionConfig", () => {
 
       const warning = wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]');
       expect(warning.exists()).toBe(true);
-      expect(warning.text()).toContain("1h 5m");
+      expect(warning.text()).toContain("1 hour 5 minutes");
     });
 
     it("clears the legacy warning once the triple is edited", async () => {
@@ -1635,20 +1635,18 @@ describe("AnomalyDetectionConfig — section 2 in the sectioned editor (E1)", ()
     });
     await flushPromises();
     const line = w.find('[data-test="anomaly-schedule-line"]');
-    expect(line.text()).toContain("1h");
-    expect(line.text()).toContain("3h");
-    await w.find('[data-test="anomaly-schedule-line-link"]').trigger("click");
+    expect(line.text()).toContain("1 hour");
+    expect(line.text()).toContain("3 hours");
+    await w.find('[data-test="anomaly-schedule-line-change"]').trigger("click");
     expect(goToSection).toHaveBeenCalledWith("schedule");
   });
 
-  it("Write SQL instead switches to custom SQL and shows the query tabs", async () => {
+  it("offers the Builder / SQL toggle from the start, and SQL switches to custom SQL", async () => {
     const { w, config } = mountSectioned();
     await flushPromises();
-    expect(w.find('[data-test="anomaly-query-tabs"]').exists()).toBe(false);
-    await w.find('[data-test="add-alert-add-anomalySql"]').trigger("click");
+    await w.find('[data-test="anomaly-query-tab-custom_sql"]').trigger("click");
     await flushPromises();
     expect(config.query_mode).toBe("custom_sql");
-    expect(w.find('[data-test="anomaly-query-tabs"]').exists()).toBe(true);
   });
 
   it.each<[string, string]>([["add-alert-add-anomalyRetrain", "anomaly-retrain-every-row"]])(

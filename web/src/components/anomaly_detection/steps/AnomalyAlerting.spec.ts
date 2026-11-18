@@ -90,9 +90,10 @@ describe("AnomalyAlerting - rendering", () => {
     expect(w.find('[data-test="anomaly-destination"]').exists()).toBe(false);
   });
 
-  it("shows info note when alert_enabled=false", async () => {
+  it("explains record-only in the row's info when alert_enabled=false", async () => {
     const w = await mountComp({ config: makeConfig({ alert_enabled: false }) });
-    expect(w.text()).toContain("_anomalies");
+    const info = w.find('[data-test="anomaly-record-only-row-info"]');
+    expect(info.attributes("aria-label")).toContain("_anomalies");
   });
 
   it("notes that no destination is notified when alerting is on with none", async () => {
@@ -236,9 +237,11 @@ describe("AnomalyAlerting - setting rows", () => {
     expect(w.find(".step-content").classes()).toContain("border");
   });
 
-  it("puts the three window share inputs in one sentence, each named for screen readers", async () => {
-    const w = await mountComp();
-    const inputs = w.find('[data-test="anomaly-window-sentence"]').findAll("input");
+  it("puts the fire and recover inputs on two clause lines, each named for screen readers", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_window_buckets: 1 }) });
+    expect(w.find('[data-test="anomaly-window-sentence"]').text()).toContain("bucket");
+    expect(w.find('[data-test="anomaly-window-sentence"]').text()).not.toContain("buckets");
+    const inputs = w.find('[data-test="anomaly-window-share-row"]').findAll("input");
     expect(inputs.map((i) => i.attributes("aria-label"))).toEqual([
       i18n.global.t("alerts.anomaly.windowFirePct"),
       i18n.global.t("alerts.anomaly.windowBuckets"),

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="anomaly-destination-row"
         fill
       >
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-2 max-md:flex-wrap">
           <OSelect
             v-model="configModel.alert_destination_ids"
             :options="destinations"
@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey="name"
             multiple
             searchable
-            :placeholder="t('alerts.summary.noDestination')"
-            class="h-auto! min-h-auto! max-w-75 min-w-45 flex-1 max-md:max-w-none max-md:min-w-0 max-md:basis-[calc(100%-2rem)]"
+            :placeholder="bare ? t('common.none') : t('alerts.summary.noDestination')"
+            class="h-auto! min-h-auto! max-w-75 min-w-0 flex-1 max-md:max-w-none max-md:basis-full"
             :aria-label="t('alerts.destination')"
             data-test="anomaly-destination"
           >
@@ -72,6 +72,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OSelect>
           <OButton
+            variant="outline"
+            size="sm"
+            icon-left="add"
+            class="shrink-0"
+            data-test="anomaly-add-destination"
+            @click="openAddDestination"
+          >
+            {{ t("alerts.alertSettings.addNewDestination") }}
+          </OButton>
+        </div>
+        <template #note>
+          <span
+            :data-test="
+              config.alert_destination_ids.length === 0
+                ? 'anomaly-destination-note'
+                : 'anomaly-destination-status'
+            "
+            >{{ destinationStatus }}</span
+          >
+        </template>
+        <template #actions>
+          <OButton
             variant="ghost"
             size="icon-circle-sm"
             :title="t('alerts.alertSettings.refreshDestinations')"
@@ -80,49 +102,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="refresh" size="sm" />
           </OButton>
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="add"
-            data-test="anomaly-add-destination"
-            @click="openAddDestination"
-          >
-            {{ t("alerts.alertSettings.addNewDestination") }}
-          </OButton>
-        </div>
-        <p
-          class="text-input-help-text pt-1 text-xs"
-          :data-test="
-            config.alert_destination_ids.length === 0
-              ? 'anomaly-destination-note'
-              : 'anomaly-destination-status'
-          "
-        >
-          {{ destinationStatus }}
-        </p>
+        </template>
       </OSettingRow>
 
       <OSettingRow
         v-if="config.alert_enabled && tierShows('anomalyTemplate')"
-        :label="t('alerts.templateOverride.label')"
+        :label="t('alerts.plain.messageTemplate')"
         data-test="anomaly-template-row"
         fill
       >
-        <div class="max-w-105">
+        <div class="w-75 max-w-full">
           <TemplateOverridePicker
+            ref="templatePickerRef"
             kind="anomaly"
             :model-value="config.template ?? null"
             :destinations="selectedDestinations"
             :server-error="config.template_error ?? null"
+            :help-text="t('alerts.form.anomaly.templateNote')"
+            help-outside
             @update:model-value="onTemplateChange"
           />
         </div>
+        <template #actions>
+          <OButton
+            variant="ghost-primary"
+            size="icon-circle-sm"
+            :title="t('alerts.alertSettings.helpLearnMore')"
+            :aria-label="t('alerts.alertSettings.helpLearnMore')"
+            data-test="template-override-help-btn"
+            @click="templatePickerRef?.openHelp()"
+          >
+            <OIcon name="help" size="sm" />
+          </OButton>
+        </template>
       </OSettingRow>
 
       <AlertSentenceRow
         v-if="!config.alert_enabled"
         :label="t('alerts.anomaly.notifications')"
-        :description="t('alerts.anomaly.disabledNotificationsInfo')"
+        :info="t('alerts.anomaly.disabledNotificationsInfo')"
         data-test="anomaly-record-only-row"
         removable
         @remove="stopRecordOnly"
@@ -135,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="anomaly-notifications-row"
         fill
       >
-        <div class="flex min-h-9 items-center">
+        <div class="flex min-h-8.5 items-center">
           <OSwitch
             :model-value="!config.alert_enabled"
             off-tone="neutral"
@@ -154,9 +172,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSettingRow
           v-if="tierShows('anomalyDirection')"
           :label="t('alerts.tiers.names.anomalyDirection')"
-          :description="t('alerts.anomaly.alertDirectionTooltip')"
+          :description="t('alerts.form.anomaly.directionHelp')"
+          :info="t('alerts.anomaly.alertDirectionTooltip')"
           data-test="anomaly-alert-direction-row"
-          fill
         >
           <OSelect
             v-model="directionModel"
@@ -164,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             labelKey="label"
             valueKey="value"
             :searchable="false"
-            width="sm"
+            class="w-50!"
             :aria-label="t('alerts.anomaly.alertDirection')"
             data-test="anomaly-alert-direction"
           />
@@ -177,11 +195,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="anomaly-window-share-row"
           fill
         >
-          <div class="flex flex-col gap-1">
+          <div class="flex flex-col gap-2">
             <i18n-t
-              keypath="alerts.form.anomaly.windowSentence"
+              keypath="alerts.form.anomaly.windowFire"
+              :plural="windowBucketCount"
               tag="div"
-              class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm"
+              class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-2 text-sm"
               data-test="anomaly-window-sentence"
             >
               <template #fire>
@@ -190,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   :model-modifiers="{ number: true }"
                   fit-content
-                  class="min-w-20"
+                  class="max-w-32! min-w-16"
                   :aria-label="t('alerts.anomaly.windowFirePct')"
                   :placeholder="raw('100')"
                   :error="!!windowShareErrors.fire"
@@ -203,20 +222,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   :model-modifiers="{ number: true }"
                   fit-content
-                  class="min-w-20"
+                  class="max-w-32! min-w-16"
                   :aria-label="t('alerts.anomaly.windowBuckets')"
                   :placeholder="raw('1')"
                   :error="!!windowShareErrors.buckets"
                   data-test="anomaly-window-buckets"
                 />
               </template>
+            </i18n-t>
+            <i18n-t
+              keypath="alerts.form.anomaly.windowRecover"
+              tag="div"
+              class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-2 text-sm"
+            >
               <template #recover>
                 <OInput
                   v-model="configModel.alert_window_recover_pct"
                   type="number"
                   :model-modifiers="{ number: true }"
                   fit-content
-                  class="min-w-32"
+                  class="max-w-32! min-w-16"
                   :aria-label="t('alerts.anomaly.windowRecoverPct')"
                   :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
                   :error="!!windowShareErrors.recover"
@@ -252,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey="value"
             :searchable="false"
             clearable
-            width="xs"
+            width="sm"
             :placeholder="t('alerts.priorityUnset')"
             :aria-label="t('alerts.priority')"
             data-test="anomaly-priority-select"
@@ -266,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="anomaly-tags-row"
           fill
         >
-          <div class="max-w-105">
+          <div>
             <OTagInput
               v-model="tagsModel"
               :aria-label="t('alerts.tags')"
@@ -281,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, type PropType } from "vue";
+import { computed, defineComponent, inject, ref, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -382,6 +407,9 @@ export default defineComponent({
     });
 
     const windowShareErrors = computed(() => anomalyWindowShareErrors(props.config));
+    // Blank buckets mean 1, so the sentence reads "1 bucket" until a larger count is typed.
+    const windowBucketCount = computed(() => Number(props.config.alert_window_buckets) || 1);
+    const templatePickerRef = ref<{ openHelp: () => void } | null>(null);
     const windowShareMessages = computed(() =>
       [
         windowShareErrors.value.buckets,
@@ -395,7 +423,7 @@ export default defineComponent({
     // One name reads better than "1 destination"; more than one is a count.
     const destinationStatus = computed(() => {
       const ids = props.config.alert_destination_ids;
-      if (ids.length === 0) return t("alerts.anomaly.noDestinationNote");
+      if (ids.length === 0) return t("alerts.alertSettings.noDestinationNote");
       const targets =
         ids.length === 1
           ? ids[0]
@@ -456,6 +484,8 @@ export default defineComponent({
     };
 
     return {
+      windowBucketCount,
+      templatePickerRef,
       t,
       raw,
       store,
