@@ -386,6 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-else-if="hasNoMetricStreams"
+                    data-test="correlation-no-metric-streams"
                     class="flex h-[calc(100vh-7.5rem)] flex-col items-center justify-center py-20"
                   >
                     <div class="mb-2 text-base font-medium opacity-90">
@@ -840,6 +841,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else-if="hasNoMetricStreams"
+                  data-test="correlation-no-metric-streams"
                   class="flex h-full flex-col items-center justify-center py-20"
                 >
                   <div class="mb-2 text-base font-medium opacity-90">
