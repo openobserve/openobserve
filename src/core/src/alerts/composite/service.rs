@@ -790,7 +790,7 @@ mod tests {
     use config::meta::destinations::{Destination, DestinationType, Endpoint, Module, Template};
 
     use super::{
-        CompositeCreate, composite_entity, create_composite, replica_job, set_composite_enabled,
+        CompositeCreate, composite_entity, create_composite, set_composite_enabled,
         sync_replica_job, update_composite, validate_jira_destinations,
     };
     use crate::alerts::notifications::jira;
@@ -1140,33 +1140,6 @@ mod tests {
                 .await
                 .is_ok()
         );
-    }
-
-    /// R6: the job a region holds, for every state of its local definition.
-    #[test]
-    fn a_replica_holds_a_waiting_job_only_for_an_enabled_local_definition() {
-        use config::meta::triggers::{TriggerModule, TriggerStatus};
-
-        let definition = |enabled| composite_entity::Model {
-            id: "c1".to_string(),
-            org: "acme".to_string(),
-            enabled,
-            ..Default::default()
-        };
-        for (local, holds_job) in [
-            (Some(definition(true)), true),
-            (Some(definition(false)), false),
-            (None, false),
-        ] {
-            let job = replica_job(local.as_ref(), 42);
-            assert_eq!(job.is_some(), holds_job, "{local:?}");
-            if let Some(job) = job {
-                assert_eq!((job.org.as_str(), job.module_key.as_str()), ("acme", "c1"));
-                assert_eq!(job.module, TriggerModule::CompositeAlert);
-                assert_eq!(job.status, TriggerStatus::Waiting);
-                assert_eq!(job.next_run_at, 42);
-            }
-        }
     }
 
     /// R6 against the scheduler table, and the retry `sync_replica_job` promises is safe.
