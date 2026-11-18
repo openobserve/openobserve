@@ -518,6 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :operator="formData.trigger_condition.operator"
                   :threshold="Number(formData.trigger_condition.threshold)"
                   :trigger-condition="formData.trigger_condition"
+                  :real-time="formData.is_real_time === 'true'"
                 />
                 <div
                   v-show="isCompositeMode"
@@ -1718,12 +1719,11 @@ export default defineComponent({
       alertForm.setF("trigger_condition.threshold", preset.threshold);
     };
 
-    // The 24-hour check replays an event count, so it needs a scheduled builder alert counting events.
+    // The 24-hour check replays an event count, so it needs a builder alert counting events.
     const showsBacktest = computed(() => {
       const fd = alertForm.formData.value;
       return (
         !!fd.stream_name &&
-        fd.is_real_time === "false" &&
         (fd.query_condition?.type || "custom") === "custom" &&
         !alertForm.isAggregationEnabled.value
       );
