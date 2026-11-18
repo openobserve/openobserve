@@ -668,13 +668,15 @@ export default defineComponent({
       setStoredPendingPeriod(parsed);
     };
     // 0 means Must last is off: the field reads empty with an "Off" placeholder until typed into.
-    const holdDraft = ref<unknown>(null);
-    const holdAmount = (value: unknown) => {
+    const holdDraft = ref<string | number | null>(null);
+    const holdAmount = (value: unknown): string | number => {
       if (holdDraft.value !== null) return holdDraft.value;
-      return Number(value) === 0 || value === null || value === undefined ? "" : value;
+      return Number(value) === 0 || value === null || value === undefined
+        ? ""
+        : (value as string | number);
     };
     const onHoldAmount = (value: unknown, field: { handleChange: (v: unknown) => void }) => {
-      holdDraft.value = value;
+      holdDraft.value = value as string | number;
       field.handleChange(value);
       onPendingPeriodChange(value);
     };

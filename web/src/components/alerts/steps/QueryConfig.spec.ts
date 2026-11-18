@@ -2647,6 +2647,23 @@ describe("QueryConfig.vue", () => {
       expect([v.trigger_condition.operator, v.trigger_condition.threshold]).toEqual([">", 5]);
     });
 
+    it("with VRL on, the plain row limit is the only limit drawn", async () => {
+      remount(
+        { ...sectioned, tab: "sql", sqlQuery: "SELECT * FROM t" },
+        {
+          query_condition: {
+            ...hostDefaults().query_condition,
+            type: "sql",
+            sql: "SELECT * FROM t",
+          },
+        },
+      );
+      wrapper.vm.showVrl = true;
+      await flushPromises();
+      expect(host.findAll('[data-test="alert-trigger-operator-select"]')).toHaveLength(1);
+      expect(host.find('[data-test="add-alert-group-question"]').exists()).toBe(false);
+    });
+
     it("+ Use a cron schedule turns the row into Run on cron with a timezone, and Remove returns to the minutes it had", async () => {
       remount({ ...sectioned });
       await host.find('[data-test="add-alert-add-cron"]').trigger("click");
