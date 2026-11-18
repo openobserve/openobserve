@@ -143,7 +143,6 @@ interface Props {
   searchQuery?: string;
   /** Selected stream name */
   selectedStream?: string;
-  /** Type of the selected stream (logs, traces or metrics) */
   selectedStreamType?: string;
   /** Selected date time */
   selectedDateTime?: {

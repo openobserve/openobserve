@@ -254,7 +254,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else-if="selectedDimensions.length === 0"
                   size="hero"
                   illustration="wave-bars"
-                  :hide-action="true"
                   :title="t('latencyInsights.noDimensionsSelected')"
                   :description="t('latencyInsights.noDimensionsSelectedDesc')"
                   data-test="traces-analysis-dashboard-no-dimensions"
@@ -434,7 +433,11 @@ const getInitialDimensions = () => {
   }));
 
   // For LOGS: Use sample-based analysis if we have log data
-  if (streamType === "logs" && props.logSamples && props.logSamples.length >= 10) {
+  if (
+    (streamType === "logs" || props.embedded) &&
+    props.logSamples &&
+    props.logSamples.length >= 10
+  ) {
     return selectDimensionsFromData(props.logSamples, schemaFields, 6);
   }
 

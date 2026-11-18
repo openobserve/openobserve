@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Bottom reservation for rotated category labels beneath a bottom legend.
 import { describe, expect, it, vi } from "vitest";
 import { buildSQLContext } from "@/utils/dashboard/sql/shared/contextBuilder";
 

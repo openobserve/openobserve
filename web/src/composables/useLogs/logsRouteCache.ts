@@ -31,7 +31,7 @@ export interface CachedLogsSearch {
 const sameStreams = (a: string[], b: string[]) =>
   a.length === b.length && [...a].sort().join(",") === [...b].sort().join(",");
 
-const decodeQuery = (value: unknown) => b64DecodeUnicode(String(value ?? "")) ?? "";
+const decodeQuery = (value: unknown) => (b64DecodeUnicode(String(value ?? "")) ?? "").trim();
 
 /** True when the cached search is what the route asks for; params the route omits are not compared. */
 export const cachedSearchMatchesRoute = (
