@@ -2027,14 +2027,39 @@ describe("SearchBar", () => {
     it("looks up values over the selected range, cut to its latest day", async () => {
       const HOUR = 3_600_000_000;
       const end = 29_000_000 * 60_000_000;
+      searchObjInstance.data.datetime.type = "absolute";
       searchObjInstance.data.datetime.startTime = end - 7 * 24 * HOUR;
       searchObjInstance.data.datetime.endTime = end;
       wrapper = mountSearchBar();
       await flushPromises();
 
       const window = { startTime: end - 24 * HOUR, endTime: end, capped: true };
-      expect(suggestState.setValuesTimeRange).toHaveBeenLastCalledWith(window);
+      const readRange = suggestState.setValuesTimeRange.mock.calls.at(-1)![0];
+      expect(readRange()).toEqual(window);
       expect(editorProps().props("valuesTimeRange")).toEqual(window);
+    });
+
+    it("looks up a relative range from the time of the lookup", async () => {
+      const MINUTE = 60_000_000;
+      const end = 29_000_000 * MINUTE;
+      searchObjInstance.data.datetime.type = "relative";
+      searchObjInstance.data.datetime.startTime = end - 15 * MINUTE;
+      searchObjInstance.data.datetime.endTime = end;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime((end + 60 * MINUTE) / 1000);
+        const readRange = suggestState.setValuesTimeRange.mock.calls.at(-1)![0];
+        expect(readRange()).toEqual({
+          startTime: end + 45 * MINUTE,
+          endTime: end + 60 * MINUTE,
+          capped: false,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("hands the query to suggestions after 100 ms, as Logs does", async () => {

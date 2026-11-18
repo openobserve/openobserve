@@ -351,17 +351,30 @@ export interface FieldValuesWindow extends FieldValuesTimeRange {
   capped?: boolean;
 }
 
-/** A page's time range as the window its value lookups search; null when it has no usable range. */
-export const valuesWindowFor = (startTime: unknown, endTime: unknown): FieldValuesWindow | null => {
-  const start = Number(startTime);
-  const end = Number(endTime);
+/** A page's date-time state: microseconds, possibly as strings, and whether it is relative to now. */
+export interface PageTimeRange {
+  type?: string;
+  startTime?: unknown;
+  endTime?: unknown;
+}
+
+/** The window a page's value lookups search at `nowMicros`; null when the page has no usable range. */
+export const valuesWindowFor = (
+  range: PageTimeRange,
+  nowMicros: number,
+): FieldValuesWindow | null => {
+  const start = Number(range.startTime);
+  const end = Number(range.endTime);
   if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) return null;
-  const capped = end - start > MAX_RANGE_MICROS;
-  // Whole minutes, so a relative range re-run within one minute asks the cached question again.
-  const windowEnd = Math.ceil(end / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
+  const span = end - start;
+  // A relative range's stored times are from its last run; the same period now is what it means.
+  const [from, to] = range.type === "relative" ? [nowMicros - span, nowMicros] : [start, end];
+  const capped = span > MAX_RANGE_MICROS;
+  // Whole minutes, so lookups within one minute ask the cached question again.
+  const windowEnd = Math.ceil(to / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
   const windowStart = capped
     ? windowEnd - MAX_RANGE_MICROS
-    : Math.floor(start / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
+    : Math.floor(from / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
   return { startTime: windowStart, endTime: windowEnd, capped };
 };
 
