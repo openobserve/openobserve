@@ -2465,7 +2465,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.splitterModel).toBe(90 + 40);
     });
 
-    it("should drop only the scope row when the builder changes in the same tick as leaving the Spans view", async () => {
+    it("should keep the reserved row slot when the builder changes in the same tick as leaving the Spans view", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
       const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
@@ -2475,10 +2475,10 @@ describe("Index.vue (Main Traces Page)", () => {
       bar.vm.$emit("filterBuilderGrowth", 18);
       mockSearchObj.meta.searchMode = "traces";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 18);
+      expect(wrapper.vm.splitterModel).toBe(90 + 40 + 18);
       bar.vm.$emit("filterBuilderGrowth", null);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(90 + 40);
       mockSearchObj.meta.searchMode = "spans";
       await flushPromises();
       expect(wrapper.vm.splitterModel).toBe(90 + 40);
@@ -5907,7 +5907,7 @@ describe("Index.vue (Main Traces Page)", () => {
       });
     });
 
-    it("grows the query bar to fit up to six lines of SQL, and never for a filter", async () => {
+    it("keeps one pane height for Spans with SQL off, Spans with SQL on, and the Traces view", async () => {
       await mountSql();
       // Only meta is reactive in this mock, so each text is set with SQL off and shown by turning SQL on.
       const showSql = async (text: string, sqlMode = true) => {
@@ -5917,50 +5917,34 @@ describe("Index.vue (Main Traces Page)", () => {
         mockSearchObj.meta.sqlMode = sqlMode;
         await flushPromises();
       };
-      // The Spans view's Scope row adds its 40px under the editor.
       await showSql("a = 1\nAND b = 2\nAND c = 3", false);
       expect(wrapper.vm.splitterModel).toBe(130);
-
-      // SQL hides the Scope row, so its 40px holds the third and fourth lines.
       await showSql(`SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`);
       expect(wrapper.vm.splitterModel).toBe(130);
-
-      await showSql(Array.from({ length: 5 }, (_, i) => `-- ${i}`).join("\n"));
-      expect(wrapper.vm.splitterModel).toBe(144);
-
-      await showSql(Array.from({ length: 9 }, (_, i) => `-- ${i}`).join("\n"));
-      expect(wrapper.vm.splitterModel).toBe(162);
-
-      await showSql("SELECT 1");
+      await showSql(Array.from({ length: 13 }, (_, i) => `-- ${i}`).join("\n"));
       expect(wrapper.vm.splitterModel).toBe(130);
-    });
-
-    it("shrinks the query bar back after multi-line SQL, unless the reader dragged it", async () => {
-      await mountSql();
-      const showSql = async (text: string, sqlMode = true) => {
-        mockSearchObj.meta.sqlMode = false;
-        await flushPromises();
-        mockSearchObj.data.editorValue = text;
-        mockSearchObj.meta.sqlMode = sqlMode;
-        await flushPromises();
-      };
-      await showSql(Array.from({ length: 9 }, (_, i) => `-- ${i}`).join("\n"));
-      expect(wrapper.vm.splitterModel).toBe(162);
-      await showSql("a = 1", false);
-      expect(wrapper.vm.splitterModel).toBe(130);
-      await showSql(Array.from({ length: 9 }, (_, i) => `-- ${i}`).join("\n"));
-      // Leaving the Spans view turns SQL off first, then drops the Scope row: one shrink, not two.
       mockSearchObj.meta.sqlMode = false;
       mockSearchObj.meta.searchMode = "traces";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(130);
       mockSearchObj.meta.searchMode = "spans";
       await flushPromises();
       expect(wrapper.vm.splitterModel).toBe(130);
+    });
 
-      await showSql(Array.from({ length: 9 }, (_, i) => `-- ${i}`).join("\n"));
+    it("keeps a dragged pane height across SQL and view toggles", async () => {
+      await mountSql();
       wrapper.vm.splitterModel = 250;
-      await showSql("SELECT 1");
+      mockSearchObj.data.editorValue = Array.from({ length: 13 }, (_, i) => `-- ${i}`).join("\n");
+      mockSearchObj.meta.sqlMode = true;
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(250);
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.searchMode = "traces";
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(250);
+      mockSearchObj.meta.searchMode = "spans";
+      await flushPromises();
       expect(wrapper.vm.splitterModel).toBe(250);
     });
 
@@ -6473,12 +6457,18 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain(`WHERE ${ROOT}`);
       });
 
-      it("makes room for the Scope row in the Spans view only", async () => {
+      it("reserves the Scope row slot only while the query editor is shown", async () => {
         await mountSql();
         expect(wrapper.vm.splitterModel).toBe(130);
         mockSearchObj.meta.searchMode = "traces";
         await flushPromises();
+        expect(wrapper.vm.splitterModel).toBe(130);
+        mockSearchObj.meta.showQuery = false;
+        await flushPromises();
         expect(wrapper.vm.splitterModel).toBe(90);
+        mockSearchObj.meta.showQuery = true;
+        await flushPromises();
+        expect(wrapper.vm.splitterModel).toBe(130);
         mockSearchObj.meta.searchMode = "spans";
         await flushPromises();
         expect(wrapper.vm.splitterModel).toBe(130);

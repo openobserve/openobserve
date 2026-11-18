@@ -579,9 +579,13 @@ const activeHealthView = computed(() =>
       : null,
 );
 const SCOPE_ROW_PX = 40;
-// The pane keeps the Scope row's height in SQL mode too, so toggling SQL gives it to the editor and back.
+// Every view with the editor reserves the Scope row's height, so toggling SQL or the view never moves the results.
 const scopeRowSlotPx = () =>
-  searchObj.meta.searchMode === "spans" && searchObj.meta.showQuery ? SCOPE_ROW_PX : 0;
+  searchObj.meta.showQuery &&
+  searchObj.meta.searchMode !== "service-graph" &&
+  searchObj.meta.searchMode !== "services-catalog"
+    ? SCOPE_ROW_PX
+    : 0;
 const splitterModel = ref(90 + scopeRowSlotPx());
 const fieldValues = ref({});
 
@@ -614,42 +618,15 @@ watch([filterBuilderGrowth, isMobile], ([growth, mobile]) => {
   }
   autoSplitterHeight = target;
 });
-// The height multi-line SQL grew the bar to; null once the bar is back at its own height or was dragged.
-let sqlBarGrownTo: number | null = null;
-// Sync: the builder and SQL-line watchers read the new Scope row, so the heights they compare must already include it.
+// Sync: the builder watcher reads the new slot, so the heights it compares must already include it.
 watch(
   scopeRowSlotPx,
   (px, was) => {
     splitterModel.value += px - was;
-    if (sqlBarGrownTo !== null) sqlBarGrownTo += px - was;
     if (autoSplitterHeight) autoSplitterHeight += px - was;
     onSplitterUpdate();
   },
   { flush: "sync" },
-);
-const SQL_BAR_MAX_LINES = 6;
-const EDITOR_LINE_PX = 18;
-watch(
-  () => (searchObj.meta.sqlMode ? String(searchObj.data.editorValue ?? "").split("\n").length : 0),
-  (lines) => {
-    const base = 90 + scopeRowSlotPx();
-    // The hidden Scope row's height is editor space, so SQL grows the pane only past it.
-    const need = 90 + (Math.min(Math.max(lines, 2), SQL_BAR_MAX_LINES) - 2) * EDITOR_LINE_PX;
-    const fit = Math.max(base, need);
-    if (splitterModel.value < fit) {
-      splitterModel.value = fit;
-      sqlBarGrownTo = fit;
-      onSplitterUpdate();
-      return;
-    }
-    // Shrinks back only what SQL grew, so a bar the reader dragged keeps its height.
-    if (sqlBarGrownTo === null || splitterModel.value !== sqlBarGrownTo || fit >= sqlBarGrownTo) {
-      return;
-    }
-    splitterModel.value = fit;
-    sqlBarGrownTo = fit > base ? fit : null;
-    onSplitterUpdate();
-  },
 );
 // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
 let preTabletSplitter: number | null = null;
