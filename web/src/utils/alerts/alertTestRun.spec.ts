@@ -46,8 +46,8 @@ describe("testRunReport", () => {
       grouped,
       {
         summary:
-          "Over the last 24 hours this would have fired 2 times (09:20 and 09:50), for checkout and cart.",
-        held: "1 more firing was held by Notify at most every.",
+          "Over the last 24 hours this would have fired in 3 of 6 checks, for 2 groups, and notified 2 times (09:20 and 09:50).",
+        held: "Notify at most every held back the other 1 firing.",
       },
     ],
     [
@@ -64,6 +64,7 @@ describe("testRunReport", () => {
       {
         summary: "Over the last 24 hours this would not have fired.",
         pendingOnly: "It matched in 1 check, but not for as long as Must last.",
+        closest: "Closest: 1,000 at 09:40.",
         errors: "1 check failed: Search timed out",
         truncated: "Tested the latest 3 checks only.",
       },
@@ -131,8 +132,32 @@ describe("testRunReport", () => {
       },
     };
     expect(String(lines(many).summary.text)).toBe(
-      "Over the last 24 hours this would have fired 5 times (05:00, 06:00, 07:00, and 2 more).",
+      "Over the last 24 hours this would have fired in 3 of 6 checks and notified 5 times (05:00, 06:00, 07:00, and 2 more).",
     );
+  });
+
+  it.each([
+    ["has series, so the filters matched nothing then", 3, "secondary"],
+    ["has none, so the query reads nothing", 0, "warning"],
+  ])("tells a metric that %s apart by tone", (_case, series, tone) => {
+    const r = { ...noSeries, diagnostics: { metrics: [{ name: "a_total", series }] } };
+    expect(lines(r).noSeries.tone).toBe(tone);
+  });
+
+  it("names the series that came closest when none lasted long enough", () => {
+    const check = errorsTruncated.checks[0];
+    const r = {
+      ...errorsTruncated,
+      checks: [
+        { ...check, groups: [{ key: "node=a", labels: { node: "a" }, value: 0.93 }] },
+        {
+          ...check,
+          time: check.time + 60_000_000,
+          groups: [{ key: "node=b", labels: { node: "b" }, value: 0.97 }],
+        },
+      ],
+    };
+    expect(String(lines(r).closest.text)).toBe("Closest: b reached 0.97 at 09:41.");
   });
 });
 

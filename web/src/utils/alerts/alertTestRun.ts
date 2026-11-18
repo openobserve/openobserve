@@ -139,22 +139,53 @@ function summaryLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRun
     s.notifications,
     t,
   );
-  const count = formatNumber(s.notifications);
+  // Checks that fired and notifications are counted apart, so the held line below adds up to the first.
+  const params = {
+    count: formatNumber(s.notifications),
+    fired: formatNumber(s.fired),
+    checks: formatNumber(s.checks),
+    times,
+  };
+  const groupTotal = Math.max(s.groups_fired_total, s.groups_fired.length);
   if (!s.groups_fired.length)
     return {
       id: "summary",
-      text: t("alerts.testRun.firedTimes", { count, times }, s.notifications),
+      text: t("alerts.testRun.firedInChecks", params, s.notifications),
       tone: "body",
     };
-  const groups = listWithMore(
-    s.groups_fired.slice(0, SHOWN_TIMES).map((g) => groupLabel(g.labels, g.key)),
-    Math.max(s.groups_fired_total, s.groups_fired.length),
-    t,
-  );
+  const groups = t("alerts.testRun.groupCount", { count: formatNumber(groupTotal) }, groupTotal);
   return {
     id: "summary",
-    text: t("alerts.testRun.firedTimesGroups", { count, times, groups }, s.notifications),
+    text: t("alerts.testRun.firedInChecksGroups", { ...params, groups }, s.notifications),
     tone: "body",
+  };
+}
+
+/** The value that came nearest the threshold in a check that matched but did not last long enough. */
+function closestLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine | null {
+  const side = thresholdSide(r.checks[0]?.operator);
+  if (side !== "above" && side !== "below") return null;
+  let best: { value: number; series: string | null; time: number } | null = null;
+  for (const check of r.checks) {
+    if (check.state !== "pending") continue;
+    const group = check.groups?.[0];
+    const value = group?.value ?? check.value;
+    if (value === null || value === undefined) continue;
+    if (best && (side === "above" ? value <= best.value : value >= best.value)) continue;
+    const labels = Object.values(group?.labels ?? {});
+    best = { value, series: labels.length ? labels.join(" · ") : null, time: check.time };
+  }
+  if (!best) return null;
+  const params = {
+    value: testValueText(best.value, null, o.t),
+    time: checkTimeText(best.time, o.timeZone, o.nowMs),
+  };
+  return {
+    id: "closest",
+    text: best.series
+      ? o.t("alerts.testRun.closest", { ...params, series: raw(best.series) })
+      : o.t("alerts.testRun.closestValue", params),
+    tone: "secondary",
   };
 }
 
@@ -164,6 +195,7 @@ function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn): TestRunLine | n
   if (!metrics.length || !latest || latest.matched > 0) return null;
   if (metrics.length === 1) {
     const [{ name, series }] = metrics;
+    // A metric with series that matched nothing is an answer; a metric with none is a broken query.
     return {
       id: "noSeries",
       text: t(
@@ -171,7 +203,7 @@ function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn): TestRunLine | n
         { metric: raw(name), count: formatNumber(series) },
         series,
       ),
-      tone: "warning",
+      tone: series > 0 ? "secondary" : "warning",
     };
   }
   const list = metrics.map((m) =>
@@ -180,7 +212,7 @@ function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn): TestRunLine | n
   return {
     id: "noSeries",
     text: t("alerts.testRun.noSeriesMany", { list: joinList(list) }),
-    tone: "warning",
+    tone: metrics.every((m) => m.series > 0) ? "secondary" : "warning",
   };
 }
 
@@ -189,12 +221,15 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
   const { t } = o;
   const s = r.summary;
   const lines: TestRunLine[] = [summaryLine(r, o)];
-  if (s.notifications === 0 && s.pending > 0)
+  if (s.notifications === 0 && s.pending > 0) {
     lines.push({
       id: "pendingOnly",
       text: t("alerts.testRun.pendingOnly", { count: formatNumber(s.pending) }, s.pending),
       tone: "secondary",
     });
+    const closest = closestLine(r, o);
+    if (closest) lines.push(closest);
+  }
   const answered = r.checks.filter((c) => !c.error);
   if (r.query_type !== "promql" && answered.length && answered.every((c) => c.reason === "no_data"))
     lines.push({ id: "matchedNothing", text: t("alerts.guard.matchedNothing"), tone: "secondary" });
@@ -202,7 +237,11 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
   if (held)
     lines.push({
       id: "held",
-      text: t("alerts.testRun.held", { count: formatNumber(held) }, held),
+      text: t(
+        held === s.fired - s.notifications ? "alerts.testRun.heldOther" : "alerts.testRun.held",
+        { count: formatNumber(held) },
+        held,
+      ),
       tone: "secondary",
     });
   const noSeries = noSeriesLine(r, t);
