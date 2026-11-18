@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.downtimes.actions.edit") }}
       </OButton>
       <OButton
+        v-if="isFinished(downtime)"
         variant="outline"
         size="sm"
         icon-left="notifications-paused"
@@ -166,8 +167,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t("alerts.downtimes.detail.bannerOff")
               }}
             </ODescriptionItem>
-            <ODescriptionItem :label="t('alerts.downtimes.columns.schedule')">
+            <ODescriptionItem
+              :label="
+                stoppedAt
+                  ? t('alerts.downtimes.detail.plannedSchedule')
+                  : t('alerts.downtimes.columns.schedule')
+              "
+            >
               {{ scheduleSentence(downtime.schedule, t) }}
+            </ODescriptionItem>
+            <ODescriptionItem
+              v-if="stoppedAt"
+              :label="stoppedAt.label"
+              data-test="downtime-detail-stopped-at"
+            >
+              {{ stoppedAt.time }}
             </ODescriptionItem>
             <ODescriptionItem :label="t('alerts.downtimes.form.reason')">
               <template v-if="downtime.reason">{{ downtime.reason }}</template>
@@ -337,10 +351,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="endsNow"
       v-model="cancelOpen"
       :title="t('alerts.downtimes.confirmEndNow.title')"
-      :message="t('alerts.downtimes.confirmEndNow.message')"
-      :ok-label="t('alerts.downtimes.confirmEndNow.ok')"
+      :message="
+        repeats
+          ? t('alerts.downtimes.confirmEndNow.recurringMessage')
+          : t('alerts.downtimes.confirmEndNow.message')
+      "
+      :ok-label="
+        repeats
+          ? t('alerts.downtimes.confirmEndNow.recurringOk')
+          : t('alerts.downtimes.confirmEndNow.ok')
+      "
       :cancel-label="t('alerts.downtimes.confirmEndNow.keep')"
-      ok-color="destructive"
+      ok-variant="destructive"
+      focus-cancel
       @update:ok="confirmCancel"
       @update:cancel="cancelOpen = false"
     />
@@ -348,8 +371,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-model="cancelOpen"
       :title="t('alerts.downtimes.confirmCancel.title')"
-      :message="t('alerts.downtimes.confirmCancel.message')"
+      :message="
+        repeats
+          ? t('alerts.downtimes.confirmCancel.recurringMessage')
+          : t('alerts.downtimes.confirmCancel.message')
+      "
       :ok-label="t('alerts.downtimes.confirmCancel.confirm', { count: 1 }, 1)"
+      ok-variant="destructive"
+      focus-cancel
       :cancel-label="t('alerts.downtimes.confirmCancel.keep', { count: 1 }, 1)"
       @update:ok="confirmCancel"
       @update:cancel="cancelOpen = false"
@@ -394,6 +423,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   currentOrNextWindow,
   formatWindow,
+  formatWindowTime,
   recentWindows,
   scheduleSentence,
 } from "@/utils/downtimes/schedule";
@@ -428,7 +458,8 @@ import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
 import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryRefetch";
 import { useNowMicros } from "@/composables/downtimes/useNowMicros";
 import { isExtendable } from "@/utils/downtimes/extend";
-import { isEditable } from "@/utils/downtimes/listOrder";
+import { isEditable, isFinished } from "@/utils/downtimes/listOrder";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { suppressedPage } from "@/utils/downtimes/suppressed";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 
@@ -506,9 +537,32 @@ const muteMutation = useMutation(() => quickMuteMutation(orgId.value));
 const title = computed<I18nText>(() =>
   downtime.value ? raw(downtime.value.name) : t("alerts.downtimes.detailTitle"),
 );
-const subtitle = computed<I18nText | undefined>(() =>
-  downtime.value ? scheduleSentence(downtime.value.schedule, t) : undefined,
-);
+// After an End now or a cancel, the planned schedule is not what happened, so the real stop is shown too.
+const stoppedAt = computed<{ label: I18nText; time: string; line: I18nText } | null>(() => {
+  const d = downtime.value;
+  if (!d?.cancelled_at || (d.status !== "ended_early" && d.status !== "cancelled")) return null;
+  const time = formatWindowTime(d.cancelled_at, viewerZone.value);
+  const zoned = t("alerts.downtimes.detail.stoppedTime", { time, zone: viewerZone.value });
+  return d.status === "ended_early"
+    ? {
+        label: t("alerts.downtimes.detail.endedEarlyAt"),
+        time: zoned,
+        line: t("alerts.downtimes.detail.endedEarlyAtTime", { time: zoned }),
+      }
+    : {
+        label: t("alerts.downtimes.detail.cancelledAt"),
+        time: zoned,
+        line: t("alerts.downtimes.detail.cancelledAtTime", { time: zoned }),
+      };
+});
+
+const subtitle = computed<I18nText | undefined>(() => {
+  if (!downtime.value) return undefined;
+  const planned = scheduleSentence(downtime.value.schedule, t);
+  return stoppedAt.value ? raw(`${planned} · ${stoppedAt.value.line}`) : planned;
+});
+
+const repeats = computed(() => !!downtime.value && downtime.value.schedule.repeat !== "none");
 
 const folderNameIn = (list: { folderId: string; name: string }[] | undefined, fid: string) =>
   list?.find((f) => f.folderId === fid)?.name;
@@ -544,7 +598,9 @@ const missingModules = computed(() =>
 );
 
 const pastWindows = computed(() =>
-  downtime.value ? recentWindows(downtime.value.schedule, nowMicros.value, 3) : [],
+  downtime.value
+    ? recentWindows(downtime.value.schedule, nowMicros.value, 3, downtime.value.cancelled_at)
+    : [],
 );
 
 const nextWindow = computed(() =>
@@ -758,11 +814,11 @@ const confirmCancel = async () => {
   }
 };
 
-// A one-time child window with the same scope, for the hour from now.
+// A one-time window with the same scope, for the hour from now; an active or scheduled row has Extend and Edit.
 const muteForHour = async () => {
   const d = downtime.value;
   if (!d) return;
-  const startsAt = Date.now() * 1000;
+  const startsAt = Math.round(serverNowMs()) * 1000;
   try {
     await muteMutation.mutateAsync({
       folder_id: d.folder_id,
@@ -770,6 +826,9 @@ const muteForHour = async () => {
       reason: d.reason,
       condition: d.condition,
       targets: d.targets,
+      // The groups keep the copy narrow; "until it clears" is not copied, as it can end at once.
+      alert_groups: d.alert_groups?.length ? d.alert_groups : null,
+      end_on_clear: null,
       schedule: {
         repeat: "none",
         starts_at: startsAt,

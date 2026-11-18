@@ -14,6 +14,8 @@ import {
   defaultDowntimeValues,
   downtimeToFormValues,
   exclusiveAllFolders,
+  groupLimitLost,
+  movePastWindow,
   nextFullHourMs,
   scheduleForRepeat,
   unnarrowedModules,
@@ -91,6 +93,8 @@ describe("buildDowntimeRequest", () => {
         starts_at: Date.parse("2026-09-13T22:00:00Z") * 1000,
       },
       show_banner: true,
+      alert_groups: null,
+      end_on_clear: null,
     });
   });
 
@@ -258,6 +262,108 @@ describe("buildDowntimeRequest", () => {
     const body = buildDowntimeRequest(defaultDowntimeValues(NOW, "UTC"));
     expect(body).not.toHaveProperty("name");
     expect(body).not.toHaveProperty("reason");
+  });
+});
+
+describe("group scope of a loaded mute", () => {
+  const scoped: Downtime = {
+    ...flow1,
+    condition: undefined,
+    targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1", "a2"] }],
+    schedule: {
+      repeat: "none",
+      starts_at: Date.parse("2026-09-17T12:00:00Z") * 1000,
+      ends_at: Date.parse("2026-09-17T14:00:00Z") * 1000,
+      timezone: "UTC",
+      duration_secs: 7200,
+      weekdays: [],
+    },
+    alert_groups: [{ alert_id: "a1", group_key: "k1", group_labels: { region: "pune" } }],
+    end_on_clear: { alert_id: "a1", group_key: "k1" },
+    version: 3,
+  };
+
+  it("keeps the groups and the until-it-clears end through an edit", () => {
+    const body = buildDowntimeRequest(downtimeToFormValues(scoped, "edit"));
+    expect(body.alert_groups).toEqual(scoped.alert_groups);
+    expect(body.end_on_clear).toEqual(scoped.end_on_clear);
+    expect(body.version).toBe(3);
+  });
+
+  it("keeps the groups but drops the until-it-clears end in a duplicate", () => {
+    const body = buildDowntimeRequest(downtimeToFormValues(scoped, "duplicate"));
+    expect(body.alert_groups).toEqual(scoped.alert_groups);
+    expect(body.end_on_clear).toBeNull();
+  });
+
+  it("drops the groups of a removed alert and sends null when none is left", () => {
+    const values = downtimeToFormValues({
+      ...scoped,
+      alert_groups: [...scoped.alert_groups!, { alert_id: "a2", group_key: "k9" }],
+    });
+    values.targets.alerts.ids = ["a2"];
+    const body = buildDowntimeRequest(values);
+    expect(body.alert_groups).toEqual([{ alert_id: "a2", group_key: "k9" }]);
+    expect(body.end_on_clear).toBeNull();
+    expect(groupLimitLost(values)).toBe(false);
+    values.targets.alerts.ids = ["a3"];
+    expect(buildDowntimeRequest(values).alert_groups).toBeNull();
+  });
+
+  it("refuses to drop the last group limit while an alerts target stays", () => {
+    const values = downtimeToFormValues(scoped);
+    values.targets.alerts.ids = ["a2"];
+    expect(groupLimitLost(values)).toBe(true);
+    values.alert_groups = null;
+    values.end_on_clear = null;
+    expect(groupLimitLost(values)).toBe(false);
+    const body = buildDowntimeRequest(values);
+    expect(body.alert_groups).toBeNull();
+    expect(body.end_on_clear).toBeNull();
+  });
+
+  it("sends an explicit null end once the schedule repeats", () => {
+    const values = downtimeToFormValues(scoped);
+    values.schedule = scheduleForRepeat(values.schedule, "daily", NOW);
+    expect(buildDowntimeRequest(values).end_on_clear).toBeNull();
+    expect(buildDowntimeRequest(values).alert_groups).toEqual(scoped.alert_groups);
+  });
+
+  it("sends explicit nulls for a new downtime", () => {
+    const body = buildDowntimeRequest(defaultDowntimeValues(NOW, "UTC"));
+    expect(body.alert_groups).toBeNull();
+    expect(body.end_on_clear).toBeNull();
+  });
+});
+
+describe("duplicate of a past window", () => {
+  const once = (start: string, end: string): Downtime => ({
+    ...flow1,
+    schedule: {
+      repeat: "none",
+      starts_at: Date.parse(start) * 1000,
+      ends_at: Date.parse(end) * 1000,
+      timezone: "UTC",
+      duration_secs: (Date.parse(end) - Date.parse(start)) / 1000,
+      weekdays: [],
+    },
+  });
+
+  it("moves an ended one-time window to the next full hour with the same duration", () => {
+    const values = movePastWindow(
+      downtimeToFormValues(once("2026-09-10T20:00:00Z", "2026-09-10T22:30:00Z"), "duplicate"),
+      NOW,
+    );
+    const s = buildDowntimeRequest(values).schedule;
+    expect(s.starts_at).toBe(Date.parse("2026-09-17T13:00:00Z") * 1000);
+    expect(s.ends_at).toBe(Date.parse("2026-09-17T15:30:00Z") * 1000);
+  });
+
+  it("keeps a window that is still ahead and leaves a recurring row alone", () => {
+    const ahead = downtimeToFormValues(once("2026-09-18T20:00:00Z", "2026-09-18T22:00:00Z"));
+    expect(movePastWindow(ahead, NOW)).toBe(ahead);
+    const weekly = downtimeToFormValues(flow1);
+    expect(movePastWindow(weekly, NOW)).toBe(weekly);
   });
 });
 

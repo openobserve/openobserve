@@ -25,6 +25,7 @@ import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { formatWindowTime } from "@/utils/downtimes/schedule";
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -56,6 +57,12 @@ vi.mock("@/services/common", async (importOriginal) => {
       ),
     },
   };
+});
+
+const serverNow = vi.hoisted(() => ({ ms: null as number | null }));
+vi.mock("@/composables/useAnnouncementBanners", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useAnnouncementBanners")>();
+  return { ...actual, serverNowMs: () => serverNow.ms ?? actual.serverNowMs() };
 });
 
 const NOW_MICROS = 1_770_000_000_000_000;
@@ -295,5 +302,113 @@ describe("DowntimeDetail", () => {
     );
     expect(wrapper.find('[data-test="downtime-detail-not-found"]').exists()).toBe(false);
     wrapper.unmount();
+  });
+  describe("Mute for an hour", () => {
+    const finished: DowntimeDetailData = {
+      ...detail,
+      status: "ended",
+      current_window: null,
+      targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1"] }],
+      alert_groups: [{ alert_id: "a1", group_key: "k1", group_labels: { region: "pune" } }],
+      end_on_clear: { alert_id: "a1", group_key: "k1" },
+    };
+
+    afterEach(() => {
+      serverNow.ms = null;
+    });
+
+    it("is absent on an active and on a scheduled row", async () => {
+      vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
+      const active = await mountDetail();
+      expect(active.wrapper.find('[data-test="downtime-detail-mute-hour"]').exists()).toBe(false);
+      active.wrapper.unmount();
+      queryClient.clear();
+      vi.mocked(downtimes.get).mockResolvedValue({
+        data: { ...detail, status: "scheduled", current_window: null },
+      } as never);
+      const scheduled = await mountDetail();
+      expect(scheduled.wrapper.find('[data-test="downtime-detail-mute-hour"]').exists()).toBe(
+        false,
+      );
+      scheduled.wrapper.unmount();
+    });
+
+    it("keeps the groups, drops the end and starts at the server time on a finished row", async () => {
+      serverNow.ms = NOW_MICROS / 1000 + 180_000;
+      vi.mocked(downtimes.get).mockResolvedValue({ data: finished } as never);
+      vi.mocked(downtimes.create).mockReset();
+      vi.mocked(downtimes.create).mockResolvedValue({ data: { id: "dt-2" } } as never);
+      const { wrapper } = await mountDetail();
+      await wrapper.get('[data-test="downtime-detail-mute-hour"]').trigger("click");
+      await flushPromises();
+      expect(downtimes.create).toHaveBeenCalledTimes(1);
+      const [, body] = vi.mocked(downtimes.create).mock.calls[0];
+      expect(body.alert_groups).toEqual(finished.alert_groups);
+      expect(body.end_on_clear).toBeNull();
+      expect(body.schedule.starts_at).toBe(NOW_MICROS + 180_000_000);
+      expect(body.schedule.ends_at).toBe(NOW_MICROS + 180_000_000 + HOUR_MICROS);
+      wrapper.unmount();
+    });
+  });
+
+  describe("recurring rows and an early end", () => {
+    const confirm = () => document.body.querySelector<HTMLElement>('[data-test="confirm-dialog"]');
+    const weekly = {
+      repeat: "weekly" as const,
+      starts_at: NOW_MICROS - 10 * 24 * HOUR_MICROS,
+      ends_at: null,
+      timezone: "UTC",
+      start_time_local: "02:00",
+      duration_secs: 3600,
+      weekdays: [1],
+    };
+
+    it("says End now of a series stops every future window", async () => {
+      vi.mocked(downtimes.get).mockResolvedValue({
+        data: { ...detail, schedule: weekly },
+      } as never);
+      const { wrapper } = await mountDetail();
+      await wrapper.get('[data-test="downtime-detail-end-now"]').trigger("click");
+      await flushPromises();
+      expect(confirm()?.textContent).toContain("This downtime repeats.");
+      expect(confirm()?.textContent).toContain("End now and stop future windows");
+      wrapper.unmount();
+    });
+
+    it("says Cancel of a scheduled series stops every future window", async () => {
+      vi.mocked(downtimes.get).mockResolvedValue({
+        data: { ...detail, schedule: weekly, status: "scheduled", current_window: null },
+      } as never);
+      const { wrapper } = await mountDetail();
+      await wrapper.get('[data-test="downtime-detail-cancel"]').trigger("click");
+      await flushPromises();
+      expect(confirm()?.textContent).toContain(
+        "This downtime repeats. Cancelling it stops every future window.",
+      );
+      wrapper.unmount();
+    });
+
+    it("keeps the one-time End now text", async () => {
+      vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
+      const { wrapper } = await mountDetail();
+      await wrapper.get('[data-test="downtime-detail-end-now"]').trigger("click");
+      await flushPromises();
+      expect(confirm()?.textContent).toContain("Notifications resume at once.");
+      expect(confirm()?.textContent).not.toContain("This downtime repeats.");
+      wrapper.unmount();
+    });
+
+    it("shows the real end after an early end, and labels the planned schedule", async () => {
+      const endedAt = NOW_MICROS - HOUR_MICROS / 2;
+      vi.mocked(downtimes.get).mockResolvedValue({
+        data: { ...detail, status: "ended_early", current_window: null, cancelled_at: endedAt },
+      } as never);
+      const { wrapper } = await mountDetail();
+      const stopped = wrapper.get('[data-test="downtime-detail-stopped-at"]');
+      expect(stopped.text()).toContain("Ended early at");
+      expect(stopped.text()).toContain(formatWindowTime(endedAt, "UTC"));
+      expect(wrapper.text()).toContain("Planned schedule");
+      wrapper.unmount();
+    });
   });
 });

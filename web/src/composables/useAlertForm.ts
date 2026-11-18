@@ -121,6 +121,7 @@ import {
   anomalyWindowShareErrors,
   type AnomalyIntervalUnit,
   type AnomalyStoredIntervals,
+  type AnomalyStoredSqlFunction,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 // ─── Default Values ─────────────────────────────────────────────────────────
@@ -241,6 +242,30 @@ export const anomalyWindowSecondsToParts = (
   if (secs % 3600 === 0) return { value: secs / 3600, unit: "h" };
   if (secs % 60 === 0) return { value: secs / 60, unit: "m" };
   return { value: secs, unit: "s" };
+};
+
+// custom_sql has no function control, so the form value there is a Filters-tab leftover:
+// a stored custom_sql row round-trips its own function VERBATIM, any other sends `count`.
+export const anomalyDetectionFunctionPayload = (
+  c: { query_mode?: string; detection_function?: string; detection_function_field?: string },
+  storedSql: AnomalyStoredSqlFunction | null,
+): { detection_function: string; detection_function_field: string | undefined } => {
+  if (c.query_mode !== "custom_sql") {
+    return {
+      detection_function: c.detection_function || "count(*)",
+      detection_function_field:
+        c.query_mode === "filters" && c.detection_function !== "count"
+          ? c.detection_function_field || undefined
+          : undefined,
+    };
+  }
+  if (storedSql) {
+    return {
+      detection_function: storedSql.detection_function,
+      detection_function_field: storedSql.detection_function_field || undefined,
+    };
+  }
+  return { detection_function: "count", detection_function_field: undefined };
 };
 
 /** The three governing payload fields; an untouched stored field round-trips its raw wire value VERBATIM (N11). */
@@ -568,6 +593,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const anomalyConfig = ref(defaultAnomalyConfig());
   // Captured ONCE from the edit-fetch response — never from anomalyConfig, which the form live-mutates (D4).
   const anomalyStoredIntervals = ref<AnomalyStoredIntervals | null>(null);
+  // Same rule as the intervals: the function of a stored custom_sql row, captured from the fetch.
+  const anomalyStoredSqlFunction = ref<AnomalyStoredSqlFunction | null>(null);
   const anomalyStep2Ref = ref<any>(null);
   const showAnomalySummary = ref(true);
   const anomalyEditMode = ref(false);
@@ -2094,11 +2121,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           query_mode: c.query_mode,
           filters: c.query_mode === "filters" ? (c.filters ?? []) : null,
           custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : null,
-          detection_function: c.detection_function || "count(*)",
-          detection_function_field:
-            c.query_mode === "filters" && c.detection_function !== "count"
-              ? c.detection_function_field || undefined
-              : undefined,
+          ...anomalyDetectionFunctionPayload(c, anomalyStoredSqlFunction.value),
           ...anomalyIntervalPayload(c, anomalyStoredIntervals.value),
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
@@ -3088,6 +3111,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           : rawDestIds
             ? [rawDestIds]
             : [];
+        anomalyStoredSqlFunction.value =
+          data.query_mode === "custom_sql" &&
+          typeof data.detection_function === "string" &&
+          data.detection_function
+            ? {
+                detection_function: data.detection_function,
+                detection_function_field: data.detection_function_field,
+              }
+            : null;
         const rawFn: string = data.detection_function || "count";
         const fnMatch = rawFn.match(/^(\w+)\(([^)]*)\)$/);
         const parsedFn = fnMatch ? fnMatch[1] : rawFn;
@@ -3232,6 +3264,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // Anomaly state
     anomalyConfig,
     anomalyStoredIntervals,
+    anomalyStoredSqlFunction,
     anomalyStep2Ref,
     showAnomalySummary,
     anomalyEditMode,

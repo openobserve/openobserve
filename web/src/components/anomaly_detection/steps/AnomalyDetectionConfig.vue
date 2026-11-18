@@ -169,6 +169,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </i18n-t>
             </div>
+            <div
+              v-if="showSqlErrors && missingValueColumn"
+              class="text-input-error-text pt-1 text-xs"
+              data-test="anomaly-custom-sql-value-column-error"
+            >
+              <i18n-t keypath="alerts.anomaly.valueColumnMissing" tag="span">
+                <template #column>
+                  <code>{{ raw(missingValueColumn) }}</code>
+                </template>
+              </i18n-t>
+            </div>
             <div class="mt-1 text-xs" :class="'text-text-secondary'">
               <i18n-t keypath="alerts.anomaly.sqlColumnsHint" tag="span">
                 <template #timeBucket
@@ -740,12 +751,14 @@ import {
   anomalySensitivityModel,
   anomalyModelQuery,
   formatAnomalySeconds,
+  anomalyMissingValueColumn,
   hasTimestampAliasInSql,
   lookBackWindowFloorSeconds,
   makeAnomalyFilterRow,
   type AnomalyDetectionConfigForm,
   type AnomalyFilterRow,
   type AnomalyStoredIntervals,
+  type AnomalyStoredSqlFunction,
 } from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
@@ -776,6 +789,11 @@ export default defineComponent({
     // From the edit fetch (useAlertForm.anomalyStoredIntervals), never derived from `config` (D4).
     storedIntervals: {
       type: Object as PropType<AnomalyStoredIntervals | null>,
+      default: null,
+    },
+    // Same source and rule as storedIntervals: the function of a stored custom_sql row.
+    storedSqlFunction: {
+      type: Object as PropType<AnomalyStoredSqlFunction | null>,
       default: null,
     },
   },
@@ -859,6 +877,7 @@ export default defineComponent({
       t,
       getTimestampColumn,
       () => props.storedIntervals,
+      () => props.storedSqlFunction,
     );
 
     const form = useOForm<AnomalyDetectionConfigForm>({
@@ -1125,11 +1144,23 @@ export default defineComponent({
         hasTimestampAliasInSql(customSql.value || "", getTimestampColumn()),
     );
 
+    // Mirrors the schema's third custom_sql rule, which runs only when the first two pass.
+    const missingValueColumn = computed(() =>
+      customSql.value?.trim() && !hasTimestampAlias.value
+        ? anomalyMissingValueColumn(
+            { query_mode: queryMode.value, custom_sql: customSql.value },
+            props.storedSqlFunction,
+          )
+        : null,
+    );
+
     // Bare Monaco has no field binding, so it never gets the red border the
     // OForm* wrappers paint from field state. This drives that border, post-
     // submit only, over the same conditions the two error divs render on.
     const hasSqlError = computed(
-      () => showSqlErrors.value && (!customSql.value?.trim() || hasTimestampAlias.value),
+      () =>
+        showSqlErrors.value &&
+        (!customSql.value?.trim() || hasTimestampAlias.value || !!missingValueColumn.value),
     );
 
     // Bridge the bare Monaco editor's value into the form so the schema
@@ -1341,6 +1372,7 @@ export default defineComponent({
       removeFilter,
       validate,
       hasTimestampAlias,
+      missingValueColumn,
       hasSqlError,
       queryMode,
       customSql,

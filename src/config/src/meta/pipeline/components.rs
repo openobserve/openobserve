@@ -83,6 +83,8 @@ pub struct DerivedStream {
     /// The negative secs means the Western Hemisphere
     #[serde(default)]
     pub tz_offset: i32,
+    /// Minutes to wait after the scheduled time before a run, so that late data can arrive.
+    /// The window still ends at the scheduled time. A save accepts 0 to 525,600 (365 days).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delay: Option<i32>,
     /// The datetime from when the pipeline should check for ingested data

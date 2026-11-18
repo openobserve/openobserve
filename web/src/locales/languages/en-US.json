@@ -5628,8 +5628,8 @@
     "periodInfoLine1": "Period for which the query should run.",
     "periodInfoLine2": "e.g. 10 minutes means that whenever the query will run it will use the last 10 minutes of data. If the query runs at 4:00 PM then it will use the data from 3:50 PM to 4:00 PM.",
     "periodShouldMatchFrequency": "Note: The period should be the same as frequency.",
-    "delayInfoLine1": "Delay for which the pipeline is scheduled to run.",
-    "delayInfoLine2": "e.g. 10 minutes delay means that the pipeline will run 10 minutes after its scheduled time.",
+    "delayInfoLine1": "Time to wait after the scheduled time, so that late data can arrive.",
+    "delayInfoLine2": "e.g. with a 10 minute delay, an hourly pipeline runs at 10:10 and reads the data from 9:00 to 10:00.",
     "closeDrawer": "Close drawer",
     "conditionValueGuidelines": "Condition value Guidelines:",
     "customColumnGuideline": "To add a custom column, type column name and press",
@@ -12509,6 +12509,7 @@
       "summaryTrainingDays": "{days} days",
       "summaryWindowShare": "✓ Window share: {rule}",
       "timestampAliasBanned": "{column} cannot be used as a column alias. Use {timeBucket} instead.",
+      "valueColumnMissing": "This alert reads its value from the column {column}. Keep that column name in the SQL query.",
       "tooltipAnomalyAbove": "Anomaly: above the expected range",
       "tooltipAnomalyBelow": "Anomaly: below the expected range",
       "trainingSpan": "Training span",
@@ -13017,6 +13018,10 @@
         "onceFor": "Once, {duration}"
       },
       "validation": {
+        "groupLimitLost": "Removing this alert also removes the group limit. Use Mute all groups to confirm.",
+        "endInPast": "The end time is in the past. Pick an end time after now.",
+        "pastSloOnly": "This window is in the past. It only corrects SLO data.",
+        "neverProducesWindow": "This schedule never produces a window.",
         "conditionRequired": "Add a condition, or remove the condition block.",
         "pairKey": "Choose a dimension for every row.",
         "pairOperator": "Use = or != in a downtime condition.",
@@ -13090,7 +13095,9 @@
       "confirmEndNow": {
         "title": "End this downtime now?",
         "message": "Notifications resume at once. The downtime stays in the list as ended early.",
+        "recurringMessage": "This downtime repeats. Ending it now also stops every future window and its extensions. Other downtimes that cover the same items keep muting. To mute future windows again, duplicate it.",
         "ok": "End now",
+        "recurringOk": "End now and stop future windows",
         "keep": "Keep running"
       },
       "extend": {
@@ -13123,6 +13130,8 @@
       "confirmCancel": {
         "title": "Cancel downtime",
         "message": "Notifications resume at once. The downtime stays in the list for history.",
+        "recurringMessage": "This downtime repeats. Cancelling it stops every future window.",
+        "bulkRecurringNote": "At least one selected downtime repeats. Cancelling it stops every future window.",
         "bulkMessage": "Cancel {count} downtime? Notifications resume at once. | Cancel {count} downtimes? Notifications resume at once.",
         "confirm": "Cancel downtime | Cancel downtimes",
         "keep": "Keep downtime | Keep downtimes"
@@ -13160,6 +13169,11 @@
         "cardCaption": "Folders first, then the optional blocks narrow further. The dimension condition above applies to this module too.",
         "noConditionForChecks": "The dimension condition above does not apply to checks.",
         "appliesTo": "Applies to",
+        "groupScope": "Mutes only {count} group of {alert}: {labels}. | Mutes only {count} groups of {alert}: {labels}.",
+        "groupScopeNoLabels": "Mutes only {count} group of {alert}. | Mutes only {count} groups of {alert}.",
+        "groupScopeEndsOnGroupClear": "Ends when this group stops firing.",
+        "groupScopeEndsOnAlertClear": "Ends when this alert stops firing.",
+        "groupScopeClear": "Mute all groups until the scheduled end",
         "tabTargets": "Targets",
         "tabSchedule": "Schedule",
         "tabAdvanced": "Advanced",
@@ -13322,6 +13336,12 @@
         "bannerOn": "Shown to the org while active",
         "bannerOff": "No banner",
         "occurrences": "Occurrences",
+        "plannedSchedule": "Planned schedule",
+        "endedEarlyAt": "Ended early at",
+        "cancelledAt": "Cancelled at",
+        "endedEarlyAtTime": "Ended early at {time}",
+        "cancelledAtTime": "Cancelled at {time}",
+        "stoppedTime": "{time} ({zone})",
         "nextWindow": "Next window: {window}. Your time: {local}.",
         "sectionCount": "{name} · {count}",
         "matchedByHeader": "Matched by",

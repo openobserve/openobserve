@@ -451,6 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :config="anomalyConfig"
                   :preview-sql="anomalyPreviewSql"
                   :stored-intervals="anomalyStoredIntervals"
+                  :stored-sql-function="anomalyStoredSqlFunction"
                 />
               </div>
 
