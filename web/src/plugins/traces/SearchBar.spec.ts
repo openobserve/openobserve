@@ -2272,6 +2272,27 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("removeFilterByField", () => {
+    it.each([
+      ["an OR branch", "service_name='a' OR span_status='ERROR'", "service_name='a'"],
+      [
+        "an OR branch in brackets",
+        "(service_name='a' OR span_status='ERROR')",
+        "(service_name='a')",
+      ],
+      ["an AND condition", "a = '1' and span_status = 'ERROR' and b = '2'", "a = '1' and b = '2'"],
+      ["a filter without the field", "service_name='a'", "service_name='a'"],
+    ])("leaves a valid filter after removing %s", async (_name, filter, expected) => {
+      searchObjInstance.data.editorValue = filter;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      wrapper.vm.removeFilterByField("span_status");
+
+      expect(searchObjInstance.data.editorValue).toBe(expected);
+    });
+  });
+
   describe("applyFilters function", () => {
     beforeEach(async () => {
       // Setup auto-search enabled + live mode
