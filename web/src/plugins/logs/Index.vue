@@ -698,6 +698,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import { cachedSearchMatchesRoute } from "@/composables/useLogs/logsRouteCache";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
 import { inheritedRetentionDays } from "@/utils/dataRetention";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
@@ -1540,11 +1541,12 @@ export default defineComponent({
         store.state.logs.logs.data != undefined &&
         Object.hasOwn(store.state.logs.logs.data, "stream") &&
         Object.hasOwn(store.state.logs.logs, "organizationIdentifier") &&
-        (!store.state.logs.logs.data.stream.selectedStream.includes(
-          router.currentRoute.value.query.stream,
-        ) ||
-          router.currentRoute.value.query.org_identifier !==
-            store.state.logs.logs.organizationIdentifier)
+        !cachedSearchMatchesRoute(
+          router.currentRoute.value.query,
+          store.state.logs.logs.data.stream.selectedStream,
+          store.state.logs.logs.organizationIdentifier,
+          generateURLQuery(false),
+        )
       ) {
         store.dispatch("logs/setIsInitialized", false);
       }
