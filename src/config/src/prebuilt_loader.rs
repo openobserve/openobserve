@@ -135,9 +135,11 @@ pub fn is_prebuilt_template_name(name: &str) -> bool {
 
 /// Get a specific prebuilt template by type (e.g., "slack", "teams", "email")
 pub fn get_prebuilt_template(prebuilt_type: &str) -> Option<Template> {
-    let config = load_prebuilt_config();
+    find_template(&load_prebuilt_config(), prebuilt_type)
+}
 
-    for dest_config in config.destinations {
+fn find_template(config: &PrebuiltDestinationsConfig, prebuilt_type: &str) -> Option<Template> {
+    for dest_config in &config.destinations {
         // Match by ID or destination_type in endpoint
         let matches = dest_config.id == prebuilt_type
             || dest_config
@@ -266,12 +268,13 @@ pub fn upgrade_legacy_body(name: &str, body: &mut String) -> bool {
     true
 }
 
-/// True when `body` is exactly the shipped body of the system template `name`, so the system,
-/// not a user, wrote every placeholder in it.
+/// True when `body` is exactly the body this binary ships for the system template `name`, so the
+/// system, not a user or an operator's override file, wrote every placeholder in it.
 pub fn is_shipped_prebuilt_body(name: &str, body: &str) -> bool {
-    name.strip_prefix(PREBUILT_TEMPLATE_PREFIX)
-        .and_then(get_prebuilt_template)
-        .is_some_and(|shipped| shipped.body == body)
+    let Some(prebuilt_type) = name.strip_prefix(PREBUILT_TEMPLATE_PREFIX) else {
+        return false;
+    };
+    find_template(&load_builtin_config(), prebuilt_type).is_some_and(|t| t.body == body)
 }
 
 /// Built-in config: the embedded copy of the shipped JSON.
@@ -742,6 +745,13 @@ mod tests {
             r#"{"text": "x"}"#
         ));
         assert!(!is_shipped_prebuilt_body("my_slack", &body));
+        // An operator's override file is not the body this binary ships.
+        assert!(!is_shipped_prebuilt_body(
+            "prebuilt_webhook",
+            r#"{"payload":{alert_description}}"#
+        ));
+        let teams = get_prebuilt_template("teams").unwrap().body;
+        assert!(is_shipped_prebuilt_body("prebuilt_teams", &teams));
     }
 
     #[test]

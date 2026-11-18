@@ -514,10 +514,8 @@ pub fn wire_from_custom(msg: &str, ctx: &NotificationContext) -> RenderedWire {
             wire.title = t.to_string();
             // A body that opens with its own bold title line, as the prebuilt Slack body does,
             // would show the title twice.
-            if body
-                .first()
-                .is_some_and(|b| b.trim().trim_matches('*') == t)
-            {
+            let bold = format!("*{t}*");
+            if body.first().is_some_and(|b| b.trim() == bold) {
                 body.remove(0);
             }
         }
@@ -1302,6 +1300,16 @@ mod tests {
         assert!(
             !wire.body.contains("[firing] checkout-errors"),
             "the bold title line is not repeated in the body: {wire:?}"
+        );
+        let starred = NotificationContext {
+            alert_name: "cpu_high*".into(),
+            ..ctx.clone()
+        };
+        let wire = render_wire(&built_in, &starred).unwrap();
+        assert_eq!(wire.title, "[firing] cpu_high*");
+        assert!(
+            !wire.body.contains("[firing] cpu_high*"),
+            "a name ending in * is not shown twice: {wire:?}"
         );
     }
 
