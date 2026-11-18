@@ -6,9 +6,8 @@ from typing import Any
 
 from support.client import OpenObserveClient
 from support.factories import unique_name
-from support.wait import wait_until
+from support.pipeline_routing import ingest_until_routed
 from tests.pipelines.test_pipeline_regression import (  # noqa: F401
-    _count_records,
     _delete_pipeline_by_name,
     _find_pipeline,
     _realtime_payload,
@@ -36,11 +35,8 @@ def test_fixed_destination_name_is_formatted_and_receives_the_records(
         assert pipeline, f"{name} is not listed after create"
         assert _stream_node_names(pipeline) == [seeded_stream, formatted], pipeline["nodes"]
 
-        resp = client.post(f"{seeded_stream}/_json", json=[{"m": f"r{i}"} for i in range(3)])
-        assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text}"
-        wait_until(
-            lambda: _count_records(client, formatted) == 3, timeout=45, msg=f"{formatted} did not get the 3 records"
-        )
+        routed = ingest_until_routed(client, seeded_stream, formatted, [{"m": f"r{i}"} for i in range(3)])
+        assert sorted(row["m"] for row in routed) == ["r0", "r1", "r2"], routed
         streams = {s["name"] for s in client.get("streams", params={"type": "logs"}).json().get("list", [])}
         assert raw not in streams, f"a stream named as typed was created: {raw!r}"
     finally:

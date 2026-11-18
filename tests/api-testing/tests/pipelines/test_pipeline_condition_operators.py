@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import time
 import uuid
 from typing import Any
 
@@ -11,7 +10,7 @@ import pytest
 
 from support.client import OpenObserveClient
 from support.factories import unique_name
-from support.wait import wait_until
+from support.pipeline_routing import ingest_until_routed
 from tests.pipelines.test_pipeline_regression import _delete_pipeline_by_name, _find_pipeline
 
 logger = logging.getLogger(__name__)
@@ -62,24 +61,6 @@ def _condition_payload(name: str, source: str, destination: str, condition: dict
     }
 
 
-def _messages(client: OpenObserveClient, stream: str) -> list[str]:
-    now = int(time.time())
-    resp = client.post(
-        "_search?type=logs&use_cache=false",
-        json={
-            "query": {
-                "sql": f'SELECT msg FROM "{stream}"',
-                "start_time": (now - 600) * 1_000_000,
-                "end_time": (now + 60) * 1_000_000,
-                "size": 100,
-            }
-        },
-    )
-    if resp.status_code != 200:
-        return []
-    return sorted(hit["msg"] for hit in resp.json().get("hits", []))
-
-
 @pytest.mark.parametrize(
     ("condition", "kept"),
     [
@@ -118,10 +99,7 @@ def test_condition_node_routes_only_matching_records(
         assert resp.status_code == 200, f"create failed: {resp.status_code} {resp.text}"
         assert _find_pipeline(client, name), f"{name} is not listed after create"
 
-        resp = client.post(f"{source}/_json", json=RECORDS)
-        assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text}"
-        # one ingest request is routed as one batch, so the first non-empty read is the whole result
-        got = wait_until(lambda: _messages(client, destination) or None, timeout=45, msg=f"{destination} got nothing")
+        got = sorted(row["msg"] for row in ingest_until_routed(client, source, destination, RECORDS))
         assert got == kept, f"{condition}: routed {got}, expected {kept}"
     finally:
         _delete_pipeline_by_name(client, name)
