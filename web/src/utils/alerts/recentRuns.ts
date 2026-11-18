@@ -51,6 +51,17 @@ export const newestRuns = (data: unknown, limit = RECENT_RUNS_LIMIT): RecentRun[
     .sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0))
     .slice(0, limit);
 
+const KSUID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const KSUID_EPOCH_SECONDS = 1_400_000_000;
+
+/** When a KSUID was minted, in seconds; a new alert has no `updated_at`, but its id carries this. */
+export function ksuidSeconds(id: string): number | undefined {
+  if (!/^[0-9A-Za-z]{27}$/.test(id)) return undefined;
+  let value = 0n;
+  for (const ch of id) value = value * 62n + BigInt(KSUID_ALPHABET.indexOf(ch));
+  return Number(value >> 128n) + KSUID_EPOCH_SECONDS;
+}
+
 /** An alert saved less than one interval ago has not missed anything yet; `savedAtSec` is the alert's `updated_at`. */
 export function noChecksNotice(input: {
   everyMinutes?: number;

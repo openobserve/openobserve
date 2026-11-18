@@ -28,6 +28,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { everyWords } from "@/utils/alerts/alertCopy";
 import {
+  ksuidSeconds,
   newestRuns,
   noChecksNotice,
   recentRunsParams,
@@ -42,7 +43,7 @@ const props = withDefaults(
     limit?: number;
     /** Minutes between checks of an enabled alert that should have checked in the last day. */
     expectedEveryMinutes?: number;
-    /** The alert's `updated_at` in seconds, so a just-saved alert is not warned about. */
+    /** The alert's `updated_at` in seconds; without one, the id's creation time is used. */
     savedAt?: number;
   }>(),
   {
@@ -87,7 +88,7 @@ const clockText = (ms: number) =>
 const emptyNotice = computed(() => {
   const notice = noChecksNotice({
     everyMinutes: props.expectedEveryMinutes,
-    savedAtSec: props.savedAt,
+    savedAtSec: props.savedAt ?? ksuidSeconds(props.alertId),
     nowMs,
   });
   if (notice.kind === "none") return { warn: false, text: t("alerts.editMode.recentRuns.empty") };

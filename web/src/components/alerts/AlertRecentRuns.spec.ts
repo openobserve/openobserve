@@ -93,6 +93,21 @@ describe("AlertRecentRuns", () => {
     },
   );
 
+  it("dates a never-updated alert from its id, which encodes when it was created", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.UTC(2026, 10, 18, 21, 3));
+    getHistory.mockResolvedValue({ hits: [] });
+    // A KSUID minted at 2026-11-18 21:02:35 UTC.
+    const wrapper = mount(AlertRecentRuns, {
+      props: { alertId: "3MIQltialXtmoEn6SQTlMrohOvE", expectedEveryMinutes: 60 },
+    });
+    await flushPromises();
+    vi.useRealTimers();
+    expect(wrapper.find('[data-test="add-alert-recent-runs-empty"]').text()).toBe(
+      "No checks yet. The first is due by 22:04.",
+    );
+  });
+
   it("says so when the history cannot be read", async () => {
     getHistory.mockRejectedValue(new Error("boom"));
     const wrapper = mount(AlertRecentRuns, { props: { alertId: "a1" } });
