@@ -181,6 +181,26 @@ export const isGraphHasCycle = (graph: any) => {
   return null;
 };
 
+/** The cycle `isGraphHasCycle` found, named for the user without the variables that only lead into it. */
+export const describeVariableCycle = (graph: any, path: string[]): string => {
+  // The search stops at the last variable in the path, whose dependency back into the path closes the loop.
+  const last = path[path.length - 1];
+  const start = graph?.[last]?.parentVariables?.find((name: string) => path.includes(name));
+  const loop = path.slice(Math.max(path.indexOf(start), 0));
+  if (loop.length === 1) {
+    return gt("dashboard.addSettingVariable.variableDependsOnItself", { name: loop[0] });
+  }
+  if (loop.length === 2) {
+    return gt("dashboard.addSettingVariable.variablesDependOnEachOther", {
+      first: loop[0],
+      second: loop[1],
+    });
+  }
+  return gt("dashboard.addSettingVariable.variablesHasCycle", {
+    path: [...loop, loop[0]].join(" → "),
+  });
+};
+
 // ========== SCOPED DEPENDENCY GRAPH FUNCTIONS ==========
 
 export interface ScopedDependencyGraph {

@@ -9353,6 +9353,8 @@
       "failedToGetStreamFields": "فشلت في الحصول على حقول التدفقات",
       "variableUpdateFailed": "فشل تحديث المتغير",
       "variableCreationFailed": "فشل إنشاء المتغيرات",
+      "variableDependsOnItself": "{name} can't depend on itself.",
+      "variablesDependOnEachOther": "{first} and {second} depend on each other.",
       "variablesHasCycle": "المتغيرات لها دورة: {path}",
       "variableNameExists": "متغير يحمل نفس الاسم موجود بالفعل.",
       "selectAtLeastOneOption": "اختر خيارا افتراضيا واحدا على الأقل",

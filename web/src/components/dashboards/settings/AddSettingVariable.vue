@@ -579,6 +579,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useStreams from "@/composables/useStreams";
 import {
   buildVariablesDependencyGraph,
+  describeVariableCycle,
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
@@ -1451,9 +1452,7 @@ export default defineComponent({
         const hasCycle = isGraphHasCycle(variablesDependencyGraph);
         if (hasCycle) {
           // filter has cycle, so show error and return
-          filterCycleError.value = t("dashboard.addSettingVariable.variablesHasCycle", {
-            path: `${hasCycle.join("->")} -> ${hasCycle[0]}`,
-          });
+          filterCycleError.value = describeVariableCycle(variablesDependencyGraph, hasCycle);
           return true;
         }
 

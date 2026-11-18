@@ -9353,6 +9353,8 @@
       "failedToGetStreamFields": "Nie udało się pobrać pól strumienia",
       "variableUpdateFailed": "Aktualizacja zmiennej nie powiodła się",
       "variableCreationFailed": "Tworzenie zmiennej nie powiodło się",
+      "variableDependsOnItself": "{name} can't depend on itself.",
+      "variablesDependOnEachOther": "{first} and {second} depend on each other.",
       "variablesHasCycle": "Zmienne mają cykl: {path}",
       "variableNameExists": "Zmienna o tej samej nazwie już istnieje.",
       "selectAtLeastOneOption": "Wybierz co najmniej jedną opcję domyślną",

@@ -9353,6 +9353,8 @@
       "failedToGetStreamFields": "Не удалось получить поля потока",
       "variableUpdateFailed": "Не удалось обновить переменную",
       "variableCreationFailed": "Не удалось создать переменную",
+      "variableDependsOnItself": "{name} can't depend on itself.",
+      "variablesDependOnEachOther": "{first} and {second} depend on each other.",
       "variablesHasCycle": "Переменные содержат цикл: {path}",
       "variableNameExists": "Переменная с таким именем уже существует.",
       "selectAtLeastOneOption": "Выберите хотя бы один вариант по умолчанию",

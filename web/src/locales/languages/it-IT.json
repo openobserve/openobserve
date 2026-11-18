@@ -9353,6 +9353,8 @@
       "failedToGetStreamFields": "Impossibile ottenere i campi dello stream",
       "variableUpdateFailed": "Aggiornamento variabile fallito",
       "variableCreationFailed": "Creazione variabile fallita",
+      "variableDependsOnItself": "{name} can't depend on itself.",
+      "variablesDependOnEachOther": "{first} and {second} depend on each other.",
       "variablesHasCycle": "Le variabili hanno un ciclo: {path}",
       "variableNameExists": "Una variabile con lo stesso nome esiste già.",
       "selectAtLeastOneOption": "Seleziona almeno un'opzione predefinita",

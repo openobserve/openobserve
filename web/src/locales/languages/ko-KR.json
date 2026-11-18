@@ -9353,6 +9353,8 @@
       "failedToGetStreamFields": "스트림 필드를 가져오지 못했습니다.",
       "variableUpdateFailed": "변수 업데이트 실패",
       "variableCreationFailed": "변수 생성 실패",
+      "variableDependsOnItself": "{name} can't depend on itself.",
+      "variablesDependOnEachOther": "{first} and {second} depend on each other.",
       "variablesHasCycle": "변수에 순환이 있습니다: {path}",
       "variableNameExists": "동일한 이름의 변수가 이미 존재합니다.",
       "selectAtLeastOneOption": "기본 옵션을 하나 이상 선택하세요.",

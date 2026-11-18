@@ -9353,6 +9353,8 @@
       "failedToGetStreamFields": "Không thể lấy các trường stream",
       "variableUpdateFailed": "Cập nhật biến thất bại",
       "variableCreationFailed": "Tạo biến thất bại",
+      "variableDependsOnItself": "{name} can't depend on itself.",
+      "variablesDependOnEachOther": "{first} and {second} depend on each other.",
       "variablesHasCycle": "Biến có chu trình: {path}",
       "variableNameExists": "Biến cùng tên đã tồn tại.",
       "selectAtLeastOneOption": "Chọn ít nhất một tùy chọn mặc định",

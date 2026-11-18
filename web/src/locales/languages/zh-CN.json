@@ -9353,6 +9353,8 @@
       "failedToGetStreamFields": "获取流字段失败",
       "variableUpdateFailed": "变量更新失败",
       "variableCreationFailed": "变量创建失败",
+      "variableDependsOnItself": "{name} can't depend on itself.",
+      "variablesDependOnEachOther": "{first} and {second} depend on each other.",
       "variablesHasCycle": "变量存在循环依赖：{path}",
       "variableNameExists": "同名变量已存在。",
       "selectAtLeastOneOption": "至少选择一个默认选项",

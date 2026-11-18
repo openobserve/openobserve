@@ -20,6 +20,7 @@ import {
   detectCyclesInScopedGraph,
   extractVariableNames,
   isGraphHasCycle,
+  describeVariableCycle,
 } from "./variablesDependencyUtils";
 
 describe("Variables Dependency Utils", () => {
@@ -265,6 +266,32 @@ describe("Variables Dependency Utils", () => {
       expect(graph.cluster.childVariables).toContain("pod");
       // Only query_values variables keep their childVariables
       expect(graph.namespace.childVariables).toContain("pod");
+    });
+  });
+
+  describe("describeVariableCycle", () => {
+    const describe_ = (parents: Record<string, string[]>) => {
+      const graph = Object.fromEntries(
+        Object.entries(parents).map(([name, list]) => [
+          name,
+          { parentVariables: list, childVariables: [] },
+        ]),
+      );
+      return describeVariableCycle(graph, isGraphHasCycle(graph));
+    };
+
+    it("names a variable that refers to itself", () => {
+      expect(describe_({ svc: ["svc"] })).toBe("svc can't depend on itself.");
+    });
+
+    it("names two variables that refer to each other", () => {
+      expect(describe_({ a: ["b"], b: ["a"] })).toBe("a and b depend on each other.");
+    });
+
+    it("lists only the variables in a longer loop, not those leading into it", () => {
+      expect(describe_({ x: ["a"], a: ["b"], b: ["c"], c: ["a"] })).toBe(
+        "These variables depend on each other in a loop: a → b → c → a",
+      );
     });
   });
 

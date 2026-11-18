@@ -9513,7 +9513,9 @@
       "failedToGetStreamFields": "Failed to get stream fields",
       "variableUpdateFailed": "Variable update failed",
       "variableCreationFailed": "Variable creation failed",
-      "variablesHasCycle": "Variables has cycle: {path}",
+      "variableDependsOnItself": "{name} can't depend on itself.",
+      "variablesDependOnEachOther": "{first} and {second} depend on each other.",
+      "variablesHasCycle": "These variables depend on each other in a loop: {path}",
       "variableNameExists": "Variable with same name already exists.",
       "selectAtLeastOneOption": "Select at least one default option",
       "variableSuffix": "{name} (variable)"

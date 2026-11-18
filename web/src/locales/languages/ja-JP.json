@@ -9353,6 +9353,8 @@
       "failedToGetStreamFields": "ストリームフィールドの取得に失敗しました",
       "variableUpdateFailed": "変数の更新に失敗しました",
       "variableCreationFailed": "変数の作成に失敗しました",
+      "variableDependsOnItself": "{name} can't depend on itself.",
+      "variablesDependOnEachOther": "{first} and {second} depend on each other.",
       "variablesHasCycle": "変数に循環参照があります: {path}",
       "variableNameExists": "同じ名前の変数が既に存在します。",
       "selectAtLeastOneOption": "少なくとも1つのデフォルトオプションを選択してください",

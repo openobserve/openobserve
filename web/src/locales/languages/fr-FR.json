@@ -9353,6 +9353,8 @@
       "failedToGetStreamFields": "Échec de la récupération des champs du flux",
       "variableUpdateFailed": "Échec de la mise à jour de la variable",
       "variableCreationFailed": "Échec de la création de la variable",
+      "variableDependsOnItself": "{name} can't depend on itself.",
+      "variablesDependOnEachOther": "{first} and {second} depend on each other.",
       "variablesHasCycle": "La variable a un cycle : {path}",
       "variableNameExists": "Une variable avec le même nom existe déjà.",
       "selectAtLeastOneOption": "Sélectionnez au moins une option par défaut",
