@@ -335,6 +335,7 @@ async fn accept(
         &auth.body,
     );
     rejections::record_use(&call.trigger_id, &auth.credential_id, call.now_us);
+    // Skips idempotency: a signed dry run's webhook-id can be resent without its unsigned flag.
     if payload::is_dry_run(call.query.as_deref()) {
         return Ok(dry_run(call, &auth, input).await);
     }
