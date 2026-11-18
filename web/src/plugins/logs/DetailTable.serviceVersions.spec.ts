@@ -172,8 +172,11 @@ describe("Source Details correlation header", () => {
     );
   });
 
-  it("opens the service panel from Versions & deploys", async () => {
-    const w = await render();
+  it("opens the service panel from Versions & deploys on the log's trace stream", async () => {
+    const w = await render("correlated-logs", {
+      ...correlationProps,
+      traceStreams: [{ stream_name: "otel_traces", stream_type: "traces" }],
+    });
     $("svcver-correlation-open-service")!.click();
     await flushPromises();
     expect(w.emitted("closeTable")).toHaveLength(1);
@@ -181,6 +184,7 @@ describe("Source Details correlation header", () => {
       name: "traces",
       query: expect.objectContaining({
         tab: "services-catalog",
+        stream: "otel_traces",
         panel: "versions",
         panelSvc: "ingester",
         panelWhere: "k8s:c1/c1",

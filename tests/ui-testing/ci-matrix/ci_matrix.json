@@ -59,7 +59,8 @@
       "alerts-clone-dialog.spec.js",
       "alerts-save-query-mode.spec.js",
       "alerts-evaluation-chart.spec.js",
-      "list-quick-filter-cards.spec.js"
+      "list-quick-filter-cards.spec.js",
+      "alerts-list-opens-on-firing.spec.js"
     ],
     "disabled": []
   },
@@ -230,7 +231,8 @@
       "dashboard-variables-custom-parents.spec.js",
       "dashboard-mustache-variables.spec.js",
       "dashboard-variable-select-all.spec.js",
-      "dashboard-variables-auto-run.spec.js"
+      "dashboard-variables-auto-run.spec.js",
+      "dashboard-variables-date-format.spec.js"
     ],
     "disabled": []
   },

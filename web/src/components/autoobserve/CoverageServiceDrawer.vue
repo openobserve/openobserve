@@ -613,12 +613,18 @@ const openTraces = (tab?: string) => {
     return;
   }
   const service = props.row.identity?.serviceName;
+  // A service can list several trace streams; the one correlation charts from is the current one.
+  const stream =
+    serviceCharts.traceStream.value ??
+    props.row.identity?.streams.find((s) => s.type === "traces")?.name;
+  const catalog = tab === "services-catalog";
   void router.push({
     name: "traces",
     query: {
       org_identifier: org,
       ...(tab ? { tab } : {}),
-      ...(tab === "services-catalog" && service ? { service } : {}),
+      ...(catalog && stream ? { stream } : {}),
+      ...(catalog && service ? { service } : {}),
     },
   });
 };

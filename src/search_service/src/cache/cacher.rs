@@ -23,7 +23,7 @@ use config::{
         histogram_origin::histogram_bucket_offset, search::Response, sql::OrderBy,
         stream::StreamType,
     },
-    utils::{file::scan_files, json},
+    utils::json,
 };
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
@@ -120,7 +120,6 @@ pub async fn check_cache(
     trace_id: &str,
     org_id: &str,
     req: &mut config::meta::search::Request,
-    origin_sql: &mut str,
     file_path: &str,
     is_aggregate: bool,
     sql: &Sql,
@@ -132,27 +131,9 @@ pub async fn check_cache(
 
     let order_by = &sql.order_by;
 
-    if req.query.track_total_hits || result_ts_col.is_empty() {
-        return MultiCachedQueryResponse {
-            order_by: order_by.clone(),
-            ..Default::default()
-        };
-    }
-
     let mut histogram_interval = -1;
     if is_aggregate && let Some(interval) = sql.histogram_interval {
-        // The query must run the SQL prepare_cache_response normalized and hashed.
-        req.query.sql = origin_sql.to_owned();
         histogram_interval = interval * 1000 * 1000; // in microseconds
-    }
-
-    if sql.histogram_offset != Some(0) {
-        return MultiCachedQueryResponse {
-            ts_column: result_ts_col.to_string(),
-            is_descending,
-            order_by: order_by.clone(),
-            ..Default::default()
-        };
     }
 
     let mut multi_resp = MultiCachedQueryResponse {
@@ -795,11 +776,8 @@ pub async fn delete_cache(
     clean_start_ts: Option<i64>,
     clean_end_ts: Option<i64>,
 ) -> std::io::Result<bool> {
-    let root_dir = disk::get_dir().await;
     // Part 1: delete the results cache
-    let pattern = format!("{root_dir}/results/{path}");
-    let prefix = format!("{root_dir}/");
-    let files = scan_files(&pattern, "json", None).unwrap_or_default();
+    let files = disk::scan_keys(&format!("results/{path}"), "json").await;
     let mut remove_files: Vec<String> = vec![];
 
     let criteria = match (clean_start_ts, clean_end_ts, delete_ts) {
@@ -811,11 +789,10 @@ pub async fn delete_cache(
         _ => DeletionCriteria::DeleteAll,
     };
 
-    for file in files {
-        if !should_delete_cache_file(&file, &criteria) {
+    for file_key in files {
+        if !should_delete_cache_file(&file_key, &criteria) {
             continue;
         }
-        let file_key = file.strip_prefix(&prefix).unwrap().to_string();
         match disk::remove(&file_key).await {
             Ok(_) => remove_files.push(file_key),
             Err(e) => {
@@ -826,14 +803,13 @@ pub async fn delete_cache(
     }
 
     // Part 2: delete the aggregation cache
-    let aggs_pattern = format!("{root_dir}/{STREAMING_AGGS_CACHE_DIR}/{path}");
-    let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
+    let aggs_files = disk::scan_keys(&format!("{STREAMING_AGGS_CACHE_DIR}/{path}"), "arrow").await;
 
-    for file in aggs_files {
-        if !should_delete_cache_file(&file, &criteria) {
+    for file_key in aggs_files {
+        if !should_delete_cache_file(&file_key, &criteria) {
             continue;
         }
-        if let Err(e) = disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+        if let Err(e) = disk::remove(&file_key).await {
             log::error!("Error deleting cache: {:?}", e);
             return Err(std::io::Error::other("Error deleting cache"));
         }
@@ -1391,7 +1367,6 @@ mod tests {
             local_mode: None,
             agent_options: None,
         };
-        let mut origin_sql = req.query.sql.clone();
         let file_path = "test_org/logs/test_stream".to_string();
         let is_aggregate = false;
         let mut should_exec_query = true;
@@ -1408,7 +1383,6 @@ mod tests {
             trace_id,
             org_id,
             &mut req,
-            &mut origin_sql,
             &file_path,
             is_aggregate,
             &sql,
