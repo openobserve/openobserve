@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else-if="description || $slots.description"
         class="text-text-secondary text-xs"
-        :class="grid ? '-mt-1.5' : 'mt-0.5'"
+        :class="grid ? 'mt-0.5 md:-mt-1.5' : 'mt-0.5'"
       >
         <slot name="description">{{ description }}</slot>
       </div>
