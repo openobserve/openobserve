@@ -87,7 +87,7 @@ test.describe('Profiles query controls', () => {
     await expect.poll(() => calls.meta.filter((call) => call.url.includes('service_name=payments')).length).toBeGreaterThan(0);
     await expect
       .poll(() => pm.profilesPage.selectOptionLabels(pm.profilesPage.typeSelect), { timeout: 15000 })
-      .toEqual(['alloc_space (bytes)', 'CPU time', 'inuse_space (bytes)']);
+      .toEqual(['Allocated memory (bytes)', 'CPU time', 'Memory in use (bytes)']);
   });
 
   test('With Auto Run off a change marks Run as pending without querying', { tag: ['@all', '@profiles', '@P1'] }, async () => {
