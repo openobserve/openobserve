@@ -857,21 +857,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-compact flex min-w-0 items-center gap-6 py-1 ps-3.5"
                     :class="{ 'border-border-subtle border-t': index > 0 }"
                   >
-                    <i18n-t
-                      :keypath="line.keypath"
-                      :plural="line.plural"
-                      tag="span"
-                      scope="global"
+                    <span
                       class="text-text-body min-w-0 flex-1 break-words"
                       :data-test="`add-alert-review-${line.id}-text`"
                     >
-                      <template v-for="(part, name) in line.parts" :key="name" #[name]>
-                        <strong v-if="part.strong" class="text-text-heading font-semibold">{{
-                          part.text
-                        }}</strong>
-                        <template v-else>{{ part.text }}</template>
-                      </template>
-                    </i18n-t>
+                      <template
+                        v-for="(sentence, position) in [line, ...(line.more ?? [])]"
+                        :key="sentence.keypath"
+                        >{{ position > 0 ? sentenceGap : ""
+                        }}<i18n-t
+                          :keypath="sentence.keypath"
+                          :plural="sentence.plural"
+                          tag="span"
+                          scope="global"
+                        >
+                          <template v-for="(part, name) in sentence.parts" :key="name" #[name]>
+                            <strong v-if="part.strong" class="text-text-heading font-semibold">{{
+                              part.text
+                            }}</strong>
+                            <template v-else>{{ part.text }}</template>
+                          </template>
+                        </i18n-t></template
+                      >
+                    </span>
                     <span class="flex w-18 shrink-0 justify-end">
                       <OButton
                         variant="ghost-primary"
@@ -1256,7 +1264,7 @@ import {
 } from "./alertSuggestions";
 import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
-import { previewVerdictSentence } from "@/utils/alerts/alertReadBack";
+import { previewVerdictSentence, realtimeDailyVolume } from "@/utils/alerts/alertReadBack";
 import { dataNoun, forecastWindowWords } from "@/utils/alerts/alertCopy";
 import { countCompleteConditions } from "@/utils/alerts/alertCondition";
 import config from "@/aws-exports";
@@ -1270,7 +1278,10 @@ import {
   type AlertSectionSlot,
   type AlertSectionTargets,
 } from "./alertFormSections";
-import { useAlertFormSections } from "@/composables/alerts/useAlertFormSections";
+import {
+  useAlertFormSections,
+  type AlertDestinationObjects,
+} from "@/composables/alerts/useAlertFormSections";
 import { shownFieldError } from "@/composables/alerts/shownFieldError";
 import useBreakpoint from "@/composables/useBreakpoint";
 import type { OSnapScrollExpose } from "@/lib/core/SnapScroll/OSnapScroll.types";
@@ -1294,6 +1305,9 @@ const RAIL_VERDICT_ICONS = {
 } as const;
 // A jump has landed once no scroll event has fired for this long (the snap scroller's own settle time).
 const JUMP_SETTLE_MS = 150;
+// Past one matching event a minute on average, a real-time alert is likely too broad.
+const NOISY_REALTIME_PER_DAY = 1440;
+const SENTENCE_GAP = raw(" ");
 
 // The focused control stays put when it survives the fold; otherwise the section in view does.
 function foldAnchor(active: string): HTMLElement | null {
@@ -1961,6 +1975,7 @@ export default defineComponent({
       })),
       fieldMeta: alertForm.visibleFieldMeta,
       formData: alertForm.formData,
+      destinationObjects: computed(() => props.destinations as AlertDestinationObjects),
       anomalyConfig: alertForm.anomalyConfig,
       isAnomalyMode: alertForm.isAnomalyMode,
       isAggregationEnabled: alertForm.isAggregationEnabled,
@@ -2029,7 +2044,11 @@ export default defineComponent({
               hasFilter,
             },
           ),
-          tone: status?.count !== undefined && !hasFilter ? "warn" : "note",
+          tone:
+            status?.count !== undefined &&
+            (!hasFilter || (realtimeDailyVolume(status) ?? 0) > NOISY_REALTIME_PER_DAY)
+              ? "warn"
+              : "note",
         };
       }
       // The save check is stricter than the preview run, so its error also leaves nothing to judge.
@@ -2360,6 +2379,7 @@ export default defineComponent({
       showsBacktest,
       backtestQuery,
       reviewLines,
+      sentenceGap: SENTENCE_GAP,
       issueCount,
       saveLabel,
       compositeNeedsChildren,
