@@ -17,13 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, provide, ref, toRef, watch, type ComponentPublicInstance } from "vue";
 import OChipInput from "@/lib/forms/ChipInput/OChipInput.vue";
+import type { ChipInputActivation } from "@/lib/forms/ChipInput/OChipInput.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OFilterToken from "@/lib/core/Badge/OFilterToken.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { FilterTokenPart } from "@/lib/core/Badge/OFilterToken.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { countConditions, findNode, findParent, type FilterGroup } from "@/utils/query/filterBar";
+import {
+  countConditions,
+  findNode,
+  findParent,
+  type FilterGroup,
+  type FilterOperatorId,
+} from "@/utils/query/filterBar";
 import FilterBarNodes from "./FilterBarNodes.vue";
 import FilterBarRows from "./FilterBarRows.vue";
 import { dialectConfig, FILTER_PROFILES, type FilterEditorConfig } from "./filterProfiles";
@@ -40,6 +47,8 @@ const props = withDefaults(defineProps<QueryFilterBarProps>(), {
   dialect: "sql",
   freeText: false,
   allowCustomFields: false,
+  searchFunctions: false,
+  openOnType: false,
   profile: undefined,
   layout: undefined,
   loadValues: undefined,
@@ -67,7 +76,7 @@ const rowsRef = ref<HTMLElement | null>(null);
 const config = computed<FilterEditorConfig>(() => {
   const base = props.profile
     ? FILTER_PROFILES[props.profile]
-    : dialectConfig(props.dialect, props.freeText, props.allowCustomFields);
+    : dialectConfig(props.dialect, props.freeText, props.allowCustomFields, props.searchFunctions);
   return props.layout ? { ...base, layout: props.layout } : base;
 });
 const vertical = computed(() => config.value.layout === "vertical");
@@ -209,6 +218,12 @@ const resting = computed(
 );
 
 const multiStep = computed(() => step.value === "value" && editor.multiValue.value);
+const highlightedKey = ref<string | null>(null);
+const operatorHint = computed(() => {
+  if (step.value !== "operator" || !highlightedKey.value) return null;
+  const key = config.value.operatorHints?.[highlightedKey.value as FilterOperatorId];
+  return key ? t(key) : null;
+});
 const selectedCount = computed(() => draft.value?.values.length ?? 0);
 
 // The picker's search box goes away with the edit; a keyboard user lands back on the part they changed.
@@ -230,16 +245,16 @@ function focus() {
 function activate() {
   if (props.disabled) return;
   focus();
-  onActivate();
+  onActivate("pointer");
 }
 
 defineExpose<QueryFilterBarExpose>({ focus, activate });
 
-function onActivate() {
+function onActivate(how: ChipInputActivation) {
   if (props.disabled) return;
   if (editingId.value) editor.reset();
   armedId.value = null;
-  open.value = true;
+  open.value = !props.openOnType || how !== "pointer";
   emit("focus");
 }
 
@@ -367,9 +382,19 @@ function onPress(event: PointerEvent) {
   editor.moveCaretTo(groupId, before);
 }
 
+// A search function picked from the list waits for its field with the operator (and maybe value) set.
+const draftField = computed(() => {
+  if (newDraft.value?.field) return raw(newDraft.value.field);
+  return newDraft.value?.operator === "match_all"
+    ? t("filterBar.textField")
+    : t("filterBar.chooseField");
+});
+
+// Like a finished free-text chip, a match_all draft names no operator.
 const draftOperator = computed(() => {
   const op = newDraft.value?.operator;
-  return op ? operatorName(op, dialect.value, t, config.value.operatorNames) : undefined;
+  if (!op || op === "match_all") return undefined;
+  return operatorName(op, dialect.value, t, config.value.operatorNames);
 });
 </script>
 
@@ -398,7 +423,7 @@ const draftOperator = computed(() => {
     @update:model-value="editor.onTextChange"
     @select="editor.select"
     @enter="editor.onEnter"
-    @apply="editor.applyValues"
+    @apply="editor.commitPending"
     @separator="editor.onSeparator"
     @backspace-empty="editor.onBackspace"
     @delete-empty="editor.onDelete"
@@ -409,6 +434,7 @@ const draftOperator = computed(() => {
     @close="close"
     @leave="close"
     @activate="onActivate"
+    @highlight="highlightedKey = $event"
   >
     <template #default="{ caret }">
       <div v-if="vertical" ref="rowsRef" class="flex w-full min-w-min flex-col gap-1.5">
@@ -463,9 +489,9 @@ const draftOperator = computed(() => {
               </div>
               <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                 <OFilterToken
-                  v-if="newDraft?.field"
+                  v-if="newDraft?.field || newDraft?.operator"
                   ref="draftRef"
-                  :field="raw(newDraft.field)"
+                  :field="draftField"
                   :operator="draftOperator"
                   :value="newDraft.values.length ? raw(newDraft.values.join(', ')) : undefined"
                   :active-part="step"
@@ -520,9 +546,9 @@ const draftOperator = computed(() => {
             @click.stop="editor.togglePendingConnector"
           />
           <OFilterToken
-            v-if="newDraft?.field"
+            v-if="newDraft?.field || newDraft?.operator"
             ref="draftRef"
-            :field="raw(newDraft.field)"
+            :field="draftField"
             :operator="draftOperator"
             :value="newDraft.values.length ? raw(newDraft.values.join(', ')) : undefined"
             :active-part="step"
@@ -600,8 +626,9 @@ const draftOperator = computed(() => {
         @click.stop="clearAll"
       />
     </template>
-    <template v-if="multiStep" #footer>
-      <div class="flex items-center gap-2">
+    <template v-if="multiStep || operatorHint" #footer>
+      <div v-if="!multiStep" :data-test="`${dataTest}-operator-hint`">{{ operatorHint }}</div>
+      <div v-else class="flex items-center gap-2">
         <span class="min-w-0 flex-1" :data-test="`${dataTest}-selected-count`">{{
           valuesAtLimit
             ? t(

@@ -39,8 +39,6 @@ export interface SqlFilterBuilderExpose {
 export interface SqlFilterBuilderEmits {
   (_e: "update:query", _value: string): void;
   (_e: "submit"): void;
-  /** The user chose to keep editing an unparsable query as text. */
-  (_e: "exit"): void;
   /** The field list is about to be shown. */
   (_e: "focus"): void;
   (_e: "extra-select", _key: string, _event: MouseEvent | KeyboardEvent): void;

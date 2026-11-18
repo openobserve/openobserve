@@ -117,6 +117,16 @@ describe("OChipInput", () => {
     expect(input.emitted("delete-empty")).toHaveLength(1);
   });
 
+  it("applies with Ctrl or Cmd + Enter while the list is shut, so only a plain Enter submits", async () => {
+    const input = mountInput();
+    await key("Enter", { ctrlKey: true });
+    await key("Enter", { metaKey: true });
+    expect(input.emitted("apply")).toHaveLength(2);
+    expect(input.emitted("enter")).toBeUndefined();
+    await key("Enter");
+    expect(input.emitted("enter")).toHaveLength(1);
+  });
+
   it("applies with Ctrl or Cmd + Enter instead of picking the highlighted row", async () => {
     const input = mountInput({ open: true, multiple: true });
     await key("Enter", { ctrlKey: true });

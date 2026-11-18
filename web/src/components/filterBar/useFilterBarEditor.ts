@@ -90,7 +90,16 @@ const SHORTHAND_KEY = "\u0000shorthand";
 const CUSTOM_KEY = "\u0000custom";
 const CUSTOM_FIELD_KEY = "\u0000custom-field";
 const GROUP_KEY = "\u0000group";
+const FUNCTION_KEY_PREFIX = "\u0000fn:";
+const FUNCTION_START_PREFIX = "\u0000fn-start:";
 const EXTRA_KEY_PREFIX = "extra-";
+// The search functions a typed word offers, and the chip operator each becomes.
+const SEARCH_FUNCTIONS: [string, FilterOperatorId][] = [
+  ["str_match", "contains"],
+  ["str_match_ignore_case", "contains_ci"],
+  ["re_match", "regex"],
+  ["re_not_match", "not_regex"],
+];
 const PROMQL_LABEL_NAME = /^[A-Za-z_]\w*$/;
 // Engine pages take dotted payload paths (a workflow's `meta.severity`), so SQL names allow what the shorthand parser does.
 const SQL_FIELD_NAME = /^[A-Za-z_@][\w.@-]*$/;
@@ -237,6 +246,36 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     return node?.kind === "condition" ? node : undefined;
   });
 
+  const quoted = (value: string) => `'${value.replace(/'/g, "''")}'`;
+
+  // A word that starts a function's name is that function, offered empty; any other word fills each one.
+  function searchFunctionRows(needle: string): ChipInputSuggestion[] {
+    const section = t("filterBar.functions");
+    const offered: [string, FilterOperatorId][] = [
+      ...(config.value.freeText ? [["match_all", "match_all"] as [string, FilterOperatorId]] : []),
+      ...SEARCH_FUNCTIONS.filter(([, id]) => fields.value.some((field) => allows(field.name, id))),
+    ];
+    const word = needle.toLowerCase();
+    const named = offered.filter(([fn]) => fn.startsWith(word));
+    const icon = (id: FilterOperatorId): IconName => (id === "match_all" ? "search" : "function");
+    if (named.length) {
+      return named.map(([fn, id]) => ({
+        key: `${FUNCTION_START_PREFIX}${id}`,
+        label: raw(id === "match_all" ? `${fn}(…)` : `${fn}(…, …)`),
+        detail: t(OPERATORS[id].labelKey),
+        icon: icon(id),
+        section,
+      }));
+    }
+    return offered.map(([fn, id]) => ({
+      key: id === "match_all" ? FREE_TEXT_KEY : `${FUNCTION_KEY_PREFIX}${id}`,
+      label: raw(id === "match_all" ? `${fn}(${quoted(needle)})` : `${fn}(…, ${quoted(needle)})`),
+      detail: t(OPERATORS[id].labelKey),
+      icon: icon(id),
+      section,
+    }));
+  }
+
   const fieldSuggestions = computed<ChipInputSuggestion[]>(() => {
     const needle = text.value.trim();
     const rows: ChipInputSuggestion[] = [];
@@ -245,7 +284,9 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const unique = config.value.limits.uniqueFields;
     // Every way to name a field honours one-condition-per-field, not just the picked list.
     const taken = (name: string) => unique && name !== editedField && usedFields.value.has(name);
-    const shorthand = parseShorthand(needle);
+    // A picked search function waits for its field, so only fields that take its operator are listed.
+    const pending = !editingId.value ? (draft.value?.operator ?? null) : null;
+    const shorthand = pending ? null : parseShorthand(needle);
     if (shorthand && fieldMap.value.has(shorthand.field) && !taken(shorthand.field)) {
       rows.push({
         key: SHORTHAND_KEY,
@@ -259,7 +300,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const names = rankByMatch(
       fields.value
         .map((field) => field.name)
-        .filter((name) => !taken(name))
+        .filter((name) => !taken(name) && (!pending || allows(name, pending)))
         // A label typed in full stays reachable, for matchers like job!="a", job!="b".
         .filter((name) => name === editedField || name === needle || !usedInGroup.value.has(name)),
       needle,
@@ -293,7 +334,9 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
         icon: "add",
       });
     }
-    if (needle && config.value.freeText && dialect.value === "sql" && !shorthand) {
+    if (needle && config.value.searchFunctions && !editingId.value && !shorthand) {
+      if (!pending) rows.push(...searchFunctionRows(needle));
+    } else if (needle && config.value.freeText && dialect.value === "sql" && !shorthand) {
       const row: ChipInputSuggestion = {
         key: FREE_TEXT_KEY,
         label: t("filterBar.searchText", { text: needle }),
@@ -512,7 +555,12 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const current = draft.value!;
     if (current.operator && allows(field, current.operator)) {
       draft.value = { ...current, field };
-      return commitDraft();
+      if (current.values.length || arityOf(current.operator) === "none") return commitDraft();
+      // A function picked by name still needs its value.
+      editPart.value = null;
+      text.value = "";
+      step.value = "value";
+      return;
     }
     editPart.value = null;
     startDraft(field);
@@ -560,6 +608,19 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   function selectField(key: string) {
     if (key === GROUP_KEY) return startGroup();
     if (key === SHORTHAND_KEY) return addShorthand();
+    const named = key.startsWith(FUNCTION_START_PREFIX);
+    if (named || key.startsWith(FUNCTION_KEY_PREFIX)) {
+      dropValues();
+      const prefix = named ? FUNCTION_START_PREFIX : FUNCTION_KEY_PREFIX;
+      const operator = key.slice(prefix.length) as FilterOperatorId;
+      draft.value = { field: "", operator, values: named ? [] : [text.value.trim()] };
+      text.value = "";
+      // match_all takes no field, so its text comes next.
+      if (operator === "match_all") step.value = "value";
+      // Picking the field then goes through changeField, which keeps the operator and value.
+      else editPart.value = "field";
+      return;
+    }
     if (key === FREE_TEXT_KEY) {
       draft.value = { field: "", operator: "match_all", values: [text.value.trim()] };
       return commitDraft();
@@ -594,6 +655,20 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   function applyValues() {
     if (multiValue.value && draft.value?.values.length) commitDraft();
+  }
+
+  /** Ctrl/Cmd+Enter: what is typed or ticked becomes a condition, so the run that follows includes it. */
+  function commitPending() {
+    const typed = text.value.trim();
+    if (step.value === "value" && draft.value) {
+      if (typed && !draft.value.values.includes(typed)) addValue(typed);
+      if (multiValue.value && draft.value?.values.length) commitDraft();
+    } else if (step.value === "field" && typed && !draft.value) {
+      const offered = fieldSuggestions.value.map((row) => row.key);
+      if (offered.includes(SHORTHAND_KEY)) addShorthand();
+      else if (offered.includes(FREE_TEXT_KEY)) selectField(FREE_TEXT_KEY);
+    }
+    open.value = false;
   }
 
   function onSeparator() {
@@ -785,6 +860,10 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function backspaceDraft(): boolean {
+    if (step.value === "value" && draft.value?.operator === "match_all") {
+      reset();
+      return true;
+    }
     if (step.value === "value") {
       if (multiValue.value && draft.value?.values.length) {
         draft.value = { ...draft.value, values: draft.value.values.slice(0, -1) };
@@ -799,6 +878,12 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       const wasEditing = editingId.value;
       reset();
       if (!wasEditing) text.value = field;
+      return true;
+    }
+    if (draft.value && !editingId.value) {
+      const typed = draft.value.values[0] ?? "";
+      reset();
+      text.value = typed;
       return true;
     }
     return false;
@@ -941,6 +1026,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     onEnter,
     onSeparator,
     applyValues,
+    commitPending,
     onTextChange,
     onBackspace,
     onDelete,

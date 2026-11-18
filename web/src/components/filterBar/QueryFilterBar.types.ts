@@ -56,6 +56,10 @@ export interface QueryFilterBarProps {
   freeText?: boolean;
   /** Let the user name a field that is not in `fields` (labels not loaded yet). */
   allowCustomFields?: boolean;
+  /** A typed word also offers the search functions filled with it (SQL only). */
+  searchFunctions?: boolean;
+  /** A click or focus only places the caret; the list opens once the user types or presses ArrowDown. */
+  openOnType?: boolean;
   /** Edit by a named profile's rules; `dialect`, `freeText` and `allowCustomFields` are then ignored. */
   profile?: FilterProfileName;
   /** Overrides the profile's layout. */

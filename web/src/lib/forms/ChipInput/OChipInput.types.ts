@@ -17,6 +17,9 @@ import type { Component } from "vue";
 import type { I18nText } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
+/** What opened the popover: a click or focus on the field, ArrowDown, or typing. */
+export type ChipInputActivation = "pointer" | "key" | "type";
+
 export interface ChipInputSuggestion {
   /** Stable identity; emitted by `select`. */
   key: string;
@@ -80,8 +83,8 @@ export interface ChipInputEmits {
   (_e: "escape"): void;
   /** A pointer or focus move outside the field and its popover. */
   (_e: "close"): void;
-  /** The caret was clicked or typed into while the popover was shut. */
-  (_e: "activate"): void;
+  /** The caret was clicked, typed into or arrowed down while the popover was shut, and which. */
+  (_e: "activate", _how: ChipInputActivation): void;
   /** A comma typed into a `multiple` input, which the parent treats as a separator. */
   (_e: "separator", _char: string): void;
   /** Left or Right on an empty caret: move it one place among the chips. */
@@ -96,6 +99,8 @@ export interface ChipInputEmits {
   (_e: "dismiss"): void;
   /** Focus left the field and its popover. */
   (_e: "leave"): void;
+  /** The highlighted row changed; null while none is. */
+  (_e: "highlight", _key: string | null): void;
 }
 
 export interface ChipInputSlots {

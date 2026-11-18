@@ -54,12 +54,18 @@ describe("SqlFilterBuilder", () => {
     expect(wrapper!.find('[data-test="b-bar-field"]').classes()).not.toContain("border");
   });
 
-  it("activates like a click on the bar: focuses the caret and opens the field list", async () => {
+  it("activates like a click on the bar: focuses the caret and leaves the list shut until typing", async () => {
     mountBuilder("level = 'error'");
     (wrapper!.vm as unknown as { activate: () => void }).activate();
     await flushPromises();
-    expect(document.activeElement).toBe(wrapper!.find('[data-test="b-bar-input"]').element);
+    const caret = wrapper!.find<HTMLInputElement>('[data-test="b-bar-input"]').element;
+    expect(document.activeElement).toBe(caret);
     expect(wrapper!.emitted("focus")).toHaveLength(1);
+    expect(document.body.querySelector('[data-test^="b-bar-suggest-item-"]')).toBeNull();
+    caret.value = "sta";
+    caret.dispatchEvent(new Event("input"));
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="b-bar-suggest-item-status"]')).not.toBeNull();
   });
 
   it("caps the bar at three lines unless the host lifts the cap", () => {
@@ -91,9 +97,9 @@ describe("SqlFilterBuilder", () => {
     await wrapper!.setProps({ query: "level = 'error'" });
     expect(chips().map((chip) => chip.text())).toEqual(["level"]);
     await wrapper!.setProps({ query: "upper(level) = 'x'" });
-    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="b-bar-chip-locked"]').exists()).toBe(true);
     await wrapper!.setProps({ query: "level = 'error'" });
-    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="b-bar-chip-locked"]').exists()).toBe(false);
   });
 
   it("re-reads an earlier emitted query the page restores without echoing it first", async () => {
@@ -104,20 +110,13 @@ describe("SqlFilterBuilder", () => {
     expect(chips().map((chip) => chip.text())).toEqual(["level"]);
   });
 
-  it("offers to keep a query it cannot draw as text, or clear it and build", async () => {
-    mountBuilder("upper(level) = 'ERROR'");
-    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(true);
-    await wrapper!.find('[data-test="b-keep-query"]').trigger("click");
-    expect(wrapper!.emitted("exit")).toHaveLength(1);
-    await wrapper!.find('[data-test="b-clear-and-build"]').trigger("click");
-    await flushPromises();
-    expect(wrapper!.emitted("update:query")).toEqual([[""]]);
-    expect(wrapper!.find('[data-test="b-bar-input"]').exists()).toBe(true);
-  });
-
-  it("shows the query it cannot draw, so the running filter stays visible", () => {
-    mountBuilder("NOT (level = 'error')");
-    expect(wrapper!.find('[data-test="b-unparsable-query"]').text()).toBe("NOT (level = 'error')");
+  it("locks only the part it cannot draw, showing its SQL, and keeps it when a chip changes", async () => {
+    mountBuilder("upper(level) = 'ERROR' AND status = 1");
+    expect(wrapper!.find('[data-test="b-bar-chip-locked"]').text()).toContain(
+      "upper(level) = 'ERROR'",
+    );
+    await wrapper!.find('[data-test="b-bar-chip-status-remove"]').trigger("click");
+    expect(wrapper!.emitted("update:query")).toEqual([["(upper(level) = 'ERROR')"]]);
   });
 
   it("draws an OR query with its connector", () => {

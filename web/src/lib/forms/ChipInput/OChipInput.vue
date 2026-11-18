@@ -116,6 +116,12 @@ watch(
   },
 );
 
+watch(
+  () => (showList.value ? (props.suggestions[highlighted.value]?.key ?? null) : null),
+  (key) => emit("highlight", key),
+  { immediate: true },
+);
+
 watch(highlighted, async (index) => {
   if (index < 0) return;
   await nextTick();
@@ -476,10 +482,12 @@ function onCaretKeydown(event: KeyboardEvent) {
   if (showList.value) return onKeydown(event);
   if (event.key === "ArrowDown") {
     event.preventDefault();
-    emit("activate");
+    emit("activate", "key");
   } else if (event.key === "Enter") {
     event.preventDefault();
-    emit("enter");
+    // Ctrl/Cmd+Enter is the page's run shortcut, so the field only commits what is typed and never runs twice.
+    if (event.metaKey || event.ctrlKey) emit("apply");
+    else emit("enter");
   } else if (event.key === "Backspace" && !caretRef.value?.value) {
     event.preventDefault();
     emit("backspace-empty");
@@ -490,7 +498,7 @@ function onInput(event: Event) {
   const opening = !showList.value;
   if (opening) openedByTyping = true;
   emit("update:modelValue", (event.target as HTMLInputElement).value);
-  if (opening) emit("activate");
+  if (opening) emit("activate", "type");
 }
 
 function onCaretInput(event: Event) {
@@ -500,7 +508,7 @@ function onCaretInput(event: Event) {
 }
 
 function onCaretClick() {
-  if (!props.disabled && (!showList.value || !caretSearches.value)) emit("activate");
+  if (!props.disabled && (!showList.value || !caretSearches.value)) emit("activate", "pointer");
 }
 
 // A pointerdown inside the field (a chip, the add target) is not an outside interaction.
