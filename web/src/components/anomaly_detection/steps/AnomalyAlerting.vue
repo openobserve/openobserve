@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="anomaly-destination-row"
         fill
       >
-        <div class="flex items-center gap-2 max-md:flex-wrap">
+        <div class="flex items-center">
           <OSelect
             v-model="configModel.alert_destination_ids"
             :options="destinations"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey="name"
             multiple
             searchable
-            :placeholder="bare ? t('common.none') : t('alerts.summary.noDestination')"
+            :placeholder="t('alerts.summary.noDestination')"
             class="h-auto! min-h-auto! max-w-75 min-w-0 flex-1 max-md:max-w-none max-md:basis-full"
             :aria-label="t('alerts.destination')"
             data-test="anomaly-destination"
@@ -71,26 +71,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("alerts.anomaly.noDestinationsFound") }}</span>
             </template>
           </OSelect>
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="add"
-            class="shrink-0"
-            data-test="anomaly-add-destination"
-            @click="openAddDestination"
-          >
-            {{ t("alerts.alertSettings.addNewDestination") }}
-          </OButton>
         </div>
         <template #note>
-          <span
-            :data-test="
-              config.alert_destination_ids.length === 0
-                ? 'anomaly-destination-note'
-                : 'anomaly-destination-status'
-            "
-            >{{ destinationStatus }}</span
-          >
+          <span class="flex flex-wrap items-start gap-x-3 gap-y-0.5">
+            <span
+              class="basis-full"
+              :data-test="
+                config.alert_destination_ids.length === 0
+                  ? 'anomaly-destination-note'
+                  : 'anomaly-destination-status'
+              "
+              >{{ destinationStatus }}</span
+            >
+            <OButton
+              variant="link"
+              class="shrink-0"
+              data-test="anomaly-add-destination"
+              @click="openAddDestination"
+            >
+              {{ t("alerts.alertSettings.addNewDestination") }}
+            </OButton>
+          </span>
         </template>
         <template #actions>
           <OButton

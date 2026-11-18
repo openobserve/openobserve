@@ -330,13 +330,12 @@ describe("AlertTargetsSelect", () => {
       expect(wrapper.emitted("refresh")).toHaveLength(1);
     });
 
-    it("oneLine leaves refresh to the caller and keeps New destination on the picker's line", () => {
+    it("oneLine leaves refresh and New destination to the caller, so the picker has the line", () => {
       const wrapper = createWrapper({ oneLine: true });
       expect(wrapper.find('[data-test="alert-settings-refresh-destinations-btn"]').exists()).toBe(
         false,
       );
-      expect(wrapper.classes()).not.toContain("flex-wrap");
-      expect(wrapper.find('[data-test="create-destination-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="create-destination-btn"]').exists()).toBe(false);
     });
 
     it("emits create-destination", async () => {

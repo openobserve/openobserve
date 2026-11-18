@@ -15349,8 +15349,8 @@
         "anomalyPriority": "Priority"
       },
       "defaults": {
-        "anomalyDirection": "(default: both)",
-        "anomalyWindow": "(default: {fire}% of the last {buckets}; recovers below the same share)",
+        "anomalyDirection": "(default: spikes or drops)",
+        "anomalyWindow": "(default: every unusual bucket)",
         "compositeWarningCounts": "(default: yes)",
         "compositeStalePolicy": "(default: keep its last state)"
       },

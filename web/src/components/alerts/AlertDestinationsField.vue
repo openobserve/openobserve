@@ -63,7 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @create-destination="routeToCreateDestination"
         @create-workflow="routeToCreateWorkflow"
       />
-      <div v-if="error || showStatus || workflowLink" class="flex items-start gap-3 pt-1">
+      <div
+        v-if="error || showStatus || workflowLink || settingRow"
+        class="flex items-start gap-x-3 pt-1"
+        :class="settingRow && 'flex-wrap gap-y-0.5'"
+      >
         <!-- role="alert": focusOnFirstError finds stranded errors by this marker.
              The data-test predates the extraction and is asserted by
              AlertSettings.spec, so it keeps its historical name everywhere. -->
@@ -80,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p
           v-else-if="showStatus"
           class="text-input-help-text m-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs"
+          :class="settingRow && 'basis-full'"
           :data-test="
             notifiesNobody
               ? 'alert-settings-destinations-note'
@@ -98,7 +103,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
         </p>
-        <span v-if="workflowLink" class="ms-auto shrink-0 text-xs">
+        <span v-if="settingRow" class="shrink-0 text-xs">
+          <OButton
+            data-test="alert-settings-create-destination-link"
+            variant="link"
+            @click="routeToCreateDestination"
+          >
+            {{ t("alerts.alertSettings.addNewDestination") }}
+          </OButton>
+        </span>
+        <span v-if="workflowLink" class="shrink-0 text-xs" :class="!settingRow && 'ms-auto'">
           <OTooltip v-if="workflowsLicenseLocked" :content="workflowsLicenseReason" />
           <OButton
             data-test="create-workflow-btn"

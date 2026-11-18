@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :target-required="destinationRequired"
             show-status
             tooltip=""
-            :placeholder="sectionTargets ? t('common.none') : t('alerts.summary.noDestination')"
+            :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
             @refresh="$emit('refresh:destinations')"

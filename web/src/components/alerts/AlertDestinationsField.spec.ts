@@ -122,7 +122,7 @@ describe("AlertDestinationsField workflows", () => {
     expect(wrapper.emitted("refresh")).toHaveLength(1);
   });
 
-  it("as a setting row, puts refresh in the actions column and keeps the picker on one line", async () => {
+  it("as a setting row, puts refresh in the actions column and New destination on the status line", async () => {
     wrapper = mountField({ settingRow: true });
     await flushPromises();
     expect(wrapper.findComponent(TargetsStub).props("oneLine")).toBe(true);
@@ -133,6 +133,10 @@ describe("AlertDestinationsField workflows", () => {
     await flushPromises();
     expect(listWorkflowsMock).toHaveBeenCalledTimes(2);
     expect(wrapper.emitted("refresh")).toHaveLength(1);
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await wrapper.find('[data-test="alert-settings-create-destination-link"]').trigger("click");
+    expect(open).toHaveBeenCalledTimes(1);
+    open.mockRestore();
   });
 });
 
