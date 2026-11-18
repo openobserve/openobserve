@@ -1330,6 +1330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :fields="filterBuilderFields"
                   :load-values="loadFilterBuilderValues"
                   :fields-loading="searchObj.loadingStream"
+                  :free-text="streamsSearchFullText"
                   :extra-suggestions="recentFilterSection"
                   :max-rows="isFocused ? 0 : 3"
                   data-test="logs-search-bar-filter-builder"

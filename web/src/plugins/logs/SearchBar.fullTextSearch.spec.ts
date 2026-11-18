@@ -20,6 +20,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
+import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 
 const router = createRouter({
   history: createMemoryHistory(),
@@ -79,5 +80,40 @@ describe("SearchBar — the editor knows whether match_all can run", () => {
   it("says no when any selected stream lacks one, since match_all fails there", async () => {
     const streams = [stream("app", ["log"]), stream("metrics", ["code"])];
     expect(await editorFullTextSearch(["app", "metrics"], streams)).toBe(false);
+  });
+});
+
+describe("SearchBar — the filter builder offers free text only where match_all runs", () => {
+  let wrapper: VueWrapper<any> | undefined;
+
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.vm.searchObj.data.stream.selectedStream = [];
+      wrapper.vm.searchObj.data.streamResults = {};
+    }
+    wrapper?.unmount();
+    wrapper = undefined;
+    localStorage.removeItem("o2.logs.queryInput");
+  });
+
+  const builderFreeText = async (fields: string[]) => {
+    localStorage.setItem("o2.logs.queryInput", "builder");
+    await router.replace({ name: "logs" });
+    wrapper = mount(SearchBar, {
+      global: { provide: { store }, plugins: [i18n, router], stubs: { UnifiedQueryEditor: true } },
+    });
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    wrapper.vm.searchObj.data.streamResults = { list: [stream("app", fields)] };
+    wrapper.vm.searchObj.data.stream.selectedStream = ["app"];
+    await nextTick();
+    return wrapper.findComponent(SqlFilterBuilder).props("freeText");
+  };
+
+  it("keeps the search-text row for a stream with a full-text search field", async () => {
+    expect(await builderFreeText(["log", "code"])).toBe(true);
+  });
+
+  it("drops it for a stream without one", async () => {
+    expect(await builderFreeText(["code", "level"])).toBe(false);
   });
 });

@@ -335,6 +335,7 @@ import queryHistory from "@/services/query_history";
 import { queryClient } from "@/composables/query/queryClient";
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
+import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import analytics from "@/services/product_analytics";
 import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
@@ -1871,6 +1872,20 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("filter builder free text", () => {
+    afterEach(() => localStorage.removeItem("o2.traces.queryInput"));
+
+    it("never offers a search-text row, since trace streams have no full-text fields", async () => {
+      localStorage.setItem("o2.traces.queryInput", "builder");
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.findComponent(SqlFilterBuilder).props("freeText")).toBe(false);
+    });
+  });
+
   describe("filter builder growth", () => {
     let rectSpy: ReturnType<typeof vi.spyOn> | undefined;
 

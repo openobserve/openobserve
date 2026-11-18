@@ -648,6 +648,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :fields="filterBuilderFields"
             :load-values="loadFilterBuilderValues"
             :fields-loading="searchObj.loadingStream"
+            :free-text="false"
             :extra-suggestions="recentFilterSection"
             data-test="traces-search-bar-filter-builder"
             @update:query="(sql: string) => onFilterBuilderQuery(sql) && searchData()"
