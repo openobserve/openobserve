@@ -40,9 +40,8 @@ import {
   mapHistogram,
   mapHistogramSplit,
   deriveKpiFromHistogram,
-  applyConfirmPairs,
-  buildConfirmPairRowsSql,
-  buildConfirmRunIdsSql,
+  applySlotUptime,
+  buildSlotUptimeSql,
   mapRun,
   evidenceOriginTs,
   evidenceSeverity,
@@ -1884,88 +1883,80 @@ describe("confirm jobs in uptime", () => {
     expect(bucket.uptimePct).toBe(100);
   });
 
-  describe("pairs of a confirm job and the run it re-tested", () => {
+  describe("one result per slot (run, location, device, engine)", () => {
     const start = Date.UTC(2026, 0, 1) * 1000; // micros
     const key = new Date(start / 1000).toISOString().slice(0, 19);
-    const nextKey = new Date(start / 1000 + 60_000).toISOString().slice(0, 19);
-    const row = (
-      tsOffsetSec: number,
-      device: string,
-      status: string,
-      trigger = "schedule",
-      environment = "",
-    ) => ({
-      ts: start + tsOffsetSec * 1_000_000,
-      status,
-      trigger_type: trigger,
-      run_id: "r1",
-      location: "us",
-      device,
-      engine: "chromium",
-      environment,
-    });
+    const nextUs = start + 60_000_000;
+    const nextKey = new Date(nextUs / 1000).toISOString().slice(0, 19);
+    const fields = new Set([
+      "trigger_type",
+      "run_id",
+      "execution_id",
+      "location",
+      "device",
+      "engine",
+    ]);
 
     it("should show 50% when desktop passes, mobile fails, and the confirm job repeats both", () => {
-      // The reviewer's case: 4 rows, 2 up, 2 confirm rows. The row estimate gives 100%.
+      // 4 rows, 2 up, 2 confirm rows: the row estimate gives 100%.
       const histogram = [
         { ts: key, total_runs: 4, passed_runs: 2, failed_runs: 2, confirm_runs: 2 },
       ];
       expect(deriveKpiFromHistogram(histogram, null, null).uptimePct).toBe(100);
-
-      const pairs = [
-        row(0, "desktop", "passed"),
-        row(0, "mobile", "failed"),
-        row(30, "desktop", "passed", "confirm"),
-        row(30, "mobile", "failed", "confirm"),
-      ];
-      const fixed = applyConfirmPairs(histogram, pairs, false);
+      // The server counts 2 slots: desktop up, mobile down.
+      const fixed = applySlotUptime(
+        histogram,
+        [{ bucket_us: start, slot_up: 1, slot_measured: 2 }],
+        false,
+      );
       expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(50);
       expect(mapHistogram(fixed, start, start + 60_000_000)[0].uptimePct).toBe(50);
       // The run counts the tiles show do not change.
       expect(deriveKpiFromHistogram(fixed, null, null).totalRuns).toBe(4);
     });
 
-    it("should take the confirm answer when mobile passes on the re-test", () => {
+    it("should take uptime from the slot query alone when the histogram read fewer rows", () => {
+      // The histogram missed desktop's confirm row, which was saved before the slot query ran.
       const histogram = [
-        { ts: key, total_runs: 4, passed_runs: 3, failed_runs: 1, confirm_runs: 2 },
+        { ts: key, total_runs: 3, passed_runs: 1, failed_runs: 2, confirm_runs: 1 },
       ];
-      const pairs = [
-        row(0, "desktop", "passed"),
-        row(0, "mobile", "failed"),
-        row(30, "desktop", "passed", "confirm"),
-        row(30, "mobile", "passed", "confirm"),
-      ];
-      const fixed = applyConfirmPairs(histogram, pairs, false);
-      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(100);
+      const fixed = applySlotUptime(
+        histogram,
+        [{ bucket_us: start, slot_up: 1, slot_measured: 2 }],
+        false,
+      );
+      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(50);
     });
 
-    it("should keep the original answer when the confirm job could not test the site", () => {
+    it("should stay correct for any number of confirmed runs", () => {
+      // 201 runs where desktop always passes and mobile always fails.
       const histogram = [
-        { ts: key, total_runs: 2, passed_runs: 0, failed_runs: 1, error_runs: 1, confirm_runs: 0 },
+        { ts: key, total_runs: 804, passed_runs: 402, failed_runs: 402, confirm_runs: 402 },
       ];
-      const pairs = [row(0, "mobile", "failed"), row(30, "mobile", "error", "confirm")];
-      const fixed = applyConfirmPairs(histogram, pairs, false);
-      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(0);
-      expect(fixed[0].measured_delta).toBe(0);
+      const fixed = applySlotUptime(
+        histogram,
+        [{ bucket_us: start, slot_up: 201, slot_measured: 402 }],
+        false,
+      );
+      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(50);
     });
 
-    it("should count a pair that spans two buckets once, in the bucket of the original", () => {
+    it("should add a bucket the histogram does not have, and leave buckets without slots empty", () => {
       const histogram = [
         { ts: key, total_runs: 2, passed_runs: 1, failed_runs: 1, confirm_runs: 0 },
-        { ts: nextKey, total_runs: 2, passed_runs: 1, failed_runs: 1, confirm_runs: 2 },
       ];
-      const pairs = [
-        row(50, "desktop", "passed"),
-        row(50, "mobile", "failed"),
-        row(70, "desktop", "passed", "confirm"),
-        row(70, "mobile", "failed", "confirm"),
-      ];
-      const fixed = applyConfirmPairs(histogram, pairs, false);
+      const fixed = applySlotUptime(
+        histogram,
+        [
+          { bucket_us: start, slot_up: 0, slot_measured: 0 },
+          { bucket_us: nextUs, slot_up: 1, slot_measured: 1 },
+        ],
+        false,
+      );
       const buckets = mapHistogram(fixed, start, start + 120_000_000);
-      expect(buckets[0].uptimePct).toBe(50);
-      // The second bucket held only the confirm rows, which now count in the first.
-      expect(buckets[1].uptimePct).toBeNull();
-      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(50);
+      expect(buckets.find((b) => b.tsMs === start / 1000)?.uptimePct).toBeNull();
+      expect(buckets.find((b) => b.tsMs === nextUs / 1000)?.uptimePct).toBe(100);
+      expect(fixed.find((r) => r.ts === nextKey)?.total_runs).toBe(0);
     });
 
     it("should correct each environment on its own when the chart splits by environment", () => {
@@ -1980,13 +1971,14 @@ describe("confirm jobs in uptime", () => {
         },
         { ts: key, environment: "stage", total_runs: 1, passed_runs: 1, confirm_runs: 0 },
       ];
-      const pairs = [
-        row(0, "desktop", "passed", "schedule", "prod"),
-        row(0, "mobile", "failed", "schedule", "prod"),
-        row(30, "desktop", "passed", "confirm", "prod"),
-        row(30, "mobile", "failed", "confirm", "prod"),
-      ];
-      const fixed = applyConfirmPairs(histogram, pairs, true);
+      const fixed = applySlotUptime(
+        histogram,
+        [
+          { bucket_us: start, environment: "prod", slot_up: 1, slot_measured: 2 },
+          { bucket_us: start, environment: "stage", slot_up: 1, slot_measured: 1 },
+        ],
+        true,
+      );
       const { blended, byEnv } = mapHistogramSplit(fixed, start, start + 60_000_000);
       expect(byEnv.get("prod")![0].uptimePct).toBe(50);
       expect(byEnv.get("stage")![0].uptimePct).toBe(100);
@@ -1994,11 +1986,21 @@ describe("confirm jobs in uptime", () => {
       expect(blended[0].uptimePct).toBeCloseTo(66.667, 2);
     });
 
-    it("should name the runs in the pair query and select absent fields as literals", () => {
-      expect(buildConfirmRunIdsSql("m")).toContain("trigger_type = 'confirm'");
-      const sql = buildConfirmPairRowsSql("m", ["r1", "o'k"], new Set(["run_id", "trigger_type"]));
-      expect(sql).toContain("run_id IN ('r1', 'o''k')");
-      expect(sql).toContain("'' as device");
+    it("should build the slot query only when the stream has the slot key fields", () => {
+      expect(buildSlotUptimeSql("m", "1 minute", new Set(["trigger_type"]))).toBeNull();
+      const sql = buildSlotUptimeSql("m", "1 minute", fields, "prod", true)!;
+      expect(sql).toContain("% 60000000 as bucket_us, environment");
+      expect(sql).toContain(
+        "GROUP BY CASE WHEN run_id IS NULL OR run_id = '' THEN execution_id ELSE run_id END, location, device, engine, environment",
+      );
+      expect(sql).toContain("environment = 'prod'");
+      // Absent fields stay out of the slot key, because the search API rejects them.
+      const noDevice = buildSlotUptimeSql(
+        "m",
+        "1 minute",
+        new Set(["trigger_type", "run_id", "execution_id"]),
+      )!;
+      expect(noDevice).not.toContain("device");
     });
   });
 

@@ -37,11 +37,8 @@ import {
   mapHistogram,
   mapHistogramSplit,
   deriveKpiFromHistogram,
-  applyConfirmPairs,
-  buildConfirmPairRowsSql,
-  buildConfirmRunIdsSql,
-  CONFIRM_PAIR_ROW_LIMIT,
-  CONFIRM_PAIR_RUN_LIMIT,
+  applySlotUptime,
+  buildSlotUptimeSql,
   mapProtocolRunDetail,
   mapRun,
   mapRunDetail,
@@ -404,40 +401,29 @@ export function useSyntheticResults(t: TranslateFn) {
    * Counts a confirm job and the result it re-tested as one result per device, for uptime.
    *
    * Runs only when the histogram holds confirm rows, so most checks send no extra query and the
-   * cached histogram query does not change. If a query fails, or the window holds more confirm
-   * runs or rows than one page load reads, the histogram rows come back unchanged and uptime
-   * uses the row estimate in `uptimePercent`.
+   * cached histogram query does not change. The slot query counts on the server over the whole
+   * window. If it fails, or the stream lacks a field it needs, the histogram rows come back
+   * unchanged and uptime uses the row estimate in `uptimePercent`.
    */
   async function withConfirmPairs(
     rows: Record<string, unknown>[],
     monitorId: string,
+    interval: string,
     schemaFields: Set<string>,
     environment: string | undefined,
     split: boolean,
     startTime: number,
     endTime: number,
   ): Promise<Record<string, unknown>[]> {
-    const hasConfirm = rows.some((r) => Number(r.confirm_runs) > 0);
-    if (!hasConfirm || !schemaFields.has("run_id") || !schemaFields.has("trigger_type")) {
-      return rows;
-    }
+    if (!rows.some((r) => Number(r.confirm_runs) > 0)) return rows;
+    const sql = buildSlotUptimeSql(monitorId, interval, schemaFields, environment, split);
+    if (!sql) return rows;
     try {
-      const idRows = (await executeQuery(
-        buildConfirmRunIdsSql(monitorId, environment),
-        startTime,
-        endTime,
-        "logs",
-      )) as Record<string, unknown>[];
-      const runIds = idRows.map((r) => String(r.run_id ?? "")).filter((r) => r !== "");
-      if (runIds.length === 0 || runIds.length > CONFIRM_PAIR_RUN_LIMIT) return rows;
-      const pairRows = (await executeQuery(
-        buildConfirmPairRowsSql(monitorId, runIds, schemaFields, environment),
-        startTime,
-        endTime,
-        "logs",
-      )) as Record<string, unknown>[];
-      if (pairRows.length > CONFIRM_PAIR_ROW_LIMIT) return rows;
-      return applyConfirmPairs(rows, pairRows, split);
+      const slotRows = (await executeQuery(sql, startTime, endTime, "logs")) as Record<
+        string,
+        unknown
+      >[];
+      return applySlotUptime(rows, slotRows, split);
     } catch {
       return rows;
     }
@@ -519,6 +505,7 @@ export function useSyntheticResults(t: TranslateFn) {
         withConfirmPairs(
           rows as Record<string, unknown>[],
           monitorId,
+          interval,
           schemaFields,
           environment,
           split,
